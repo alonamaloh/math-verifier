@@ -1,0 +1,1058 @@
+-- Algebra/rank_two_escalators.math
+--
+-- The two rank-2 escalators (fifteen-theorem stage S3.E3). Escalating
+-- x² — truant 2 — confines the cross entry by β² < 1·2, so β ∈ {−1, 0, 1}:
+-- β = 0 gives x² + 2y² on the nose, and β = ±1 gives a form the
+-- unimodular shear [[1, β], [0, 1]] pulls back from x² + y². Every
+-- escalation of x² is therefore isometric to x² + y² or to x² + 2y².
+--
+-- The 2×2 block calculus runs on the two placed units
+-- E = J_L·J_Rᵀ (a lone 1 in the upper-right corner) and J_R·J_Rᵀ (a lone
+-- 1 in the lower-right corner): the escalation decomposes as
+-- B = (I + β·Eᵀ) + (β·E + J_R·J_Rᵀ), which is exactly the shape the
+-- shear conjugation (I + β·E)ᵀ · I · (I + β·E) multiplies out to.
+
+module Algebra.rank_two_escalators
+
+import axioms
+import Logic.basics
+import Logic.functions
+import Logic.exists
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+import Natural.add_order
+import Natural.subtraction
+import Natural.multiply_bounds
+import Natural.classical_decidable
+import Natural.least_number
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.embedding
+import Integer.order
+import Integer.order_multiply
+import Integer.sign
+import Integer.units
+import Integer.integral_domain
+import Set.finite
+import Set.finite_pigeonhole
+import Lists.list
+import Lists.map
+import Lists.append
+import Lists.distinct
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.ring_from_integer
+import Algebra.integer_domain
+import Algebra.finite_permutation
+import Algebra.permutation_enumeration
+import Algebra.permutation_sign
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.matrix_transpose
+import Algebra.matrix_vector
+import Algebra.matrix_submatrix
+import Algebra.determinant
+import Algebra.determinant_identity
+import Algebra.determinant_transpose
+import Algebra.determinant_multiplicative
+import Algebra.alternating_collapse
+import Algebra.determinant_row_permutation
+import Algebra.adjugate
+import Algebra.matrix_inverse
+import Algebra.determinant_bordered
+import Algebra.quadratic_form
+import Algebra.schur_complement
+import Algebra.matrix_direct_sum
+import Algebra.integer_quadratic_form
+import Algebra.square_form
+import Algebra.truant
+import Algebra.escalation
+
+-- ----------------------------------------------------------------------
+-- The two indices of a rank-2 form, named.
+
+definition NaturalsBelow.firstOfTwo : NaturalsBelow(2) :=
+  NaturalsBelow.sumLeft(1, 1, NaturalsBelow.top(0))
+
+definition NaturalsBelow.secondOfTwo : NaturalsBelow(2) :=
+  NaturalsBelow.shift(1, NaturalsBelow.top(0))
+
+theorem NaturalsBelow.below_one_unique (y : NaturalsBelow(1)) : y = NaturalsBelow.top(0) := {
+  NaturalsBelow.value(y) < 1;
+  NaturalsBelow.value(y) ≤ 0 by Natural.le_of_lt_one_plus;
+  NaturalsBelow.value(y) = 0;
+  done by NaturalsBelow.equal_of_value
+}
+
+theorem NaturalsBelow.two_split (a : NaturalsBelow(2))
+        : a = NaturalsBelow.firstOfTwo ∨ a = NaturalsBelow.secondOfTwo := {
+  (∃ (i : NaturalsBelow(1)). a = NaturalsBelow.sumLeft(1, 1, i))
+      ∨ (∃ (j : NaturalsBelow(1)). a = NaturalsBelow.shift(1, j))
+      by NaturalsBelow.sumLeft_or_shift;
+  done by cases {
+    case ∃ (i : NaturalsBelow(1)). a = NaturalsBelow.sumLeft(1, 1, i) as aLeft: {
+        choose i such that a = NaturalsBelow.sumLeft(1, 1, i) from aLeft;
+        i = NaturalsBelow.top(0) by NaturalsBelow.below_one_unique;
+        a = NaturalsBelow.firstOfTwo by substituting (i = NaturalsBelow.top(0));
+        done
+      }
+    case ∃ (j : NaturalsBelow(1)). a = NaturalsBelow.shift(1, j) as aRight: {
+        choose j such that a = NaturalsBelow.shift(1, j) from aRight;
+        j = NaturalsBelow.top(0) by NaturalsBelow.below_one_unique;
+        a = NaturalsBelow.secondOfTwo by substituting (j = NaturalsBelow.top(0));
+        done
+      }
+  }
+}
+
+theorem NaturalsBelow.firstOfTwo_not_secondOfTwo
+        : ¬(NaturalsBelow.firstOfTwo = NaturalsBelow.secondOfTwo) :=
+  by NaturalsBelow.sumLeft_not_shift
+
+-- The bridges to the bordered vocabulary: the first index is the block
+-- inclusion, the second is the top.
+theorem NaturalsBelow.firstOfTwo_is_inclusion
+        : NaturalsBelow.firstOfTwo = NaturalsBelow.inclusion(1, NaturalsBelow.top(0)) := {
+  NaturalsBelow.value(NaturalsBelow.firstOfTwo)
+      = NaturalsBelow.value(NaturalsBelow.inclusion(1, NaturalsBelow.top(0)));
+  done by NaturalsBelow.equal_of_value
+}
+
+theorem NaturalsBelow.secondOfTwo_is_top : NaturalsBelow.secondOfTwo = NaturalsBelow.top(1) := {
+  NaturalsBelow.value(NaturalsBelow.secondOfTwo) = NaturalsBelow.value(NaturalsBelow.top(1));
+  done by NaturalsBelow.equal_of_value
+}
+
+-- ----------------------------------------------------------------------
+-- The placed units: a lone 1 in the upper-right corner (E = J_L·J_Rᵀ)
+-- and a lone 1 in the lower-right corner (J_R·J_Rᵀ).
+
+definition Matrix.upperRightUnit : Matrix(Integer.commutative_ring_bundle, 2, 2) :=
+  Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+  * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+
+definition Matrix.lowerRightUnit : Matrix(Integer.commutative_ring_bundle, 2, 2) :=
+  Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+  * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+
+theorem Matrix.upperRightUnit_entry_unit
+        : Matrix.upperRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo) = (1 : ℤ) := {
+  Function.IsInjective((NaturalsBelow.shift(1) : NaturalsBelow(1) → NaturalsBelow(2)))
+      by NaturalsBelow.shift_is_injective;
+  NaturalsBelow.firstOfTwo = NaturalsBelow.sumLeft(1, 1, NaturalsBelow.top(0));
+  Matrix.upperRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo)
+     = (Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+        * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ)(
+           NaturalsBelow.firstOfTwo, NaturalsBelow.shift(1, NaturalsBelow.top(0)))
+     = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)(
+           NaturalsBelow.firstOfTwo, NaturalsBelow.top(0))
+           by Matrix.multiply_inclusionMatrix_transpose_entry_selected
+     = CommutativeRing.one(Integer.commutative_ring_bundle)
+           by Matrix.inclusionMatrix_entry_at
+     = (1 : ℤ);
+  done
+}
+
+theorem Matrix.upperRightUnit_column_vanishes (a : NaturalsBelow(2))
+        : Matrix.upperRightUnit(a, NaturalsBelow.firstOfTwo) = (0 : ℤ) := {
+  ∀ (t : NaturalsBelow(1)). ¬(NaturalsBelow.firstOfTwo = NaturalsBelow.shift(1, t))
+      by (t : NaturalsBelow(1)) ↦ { done by NaturalsBelow.sumLeft_not_shift };
+  Matrix.upperRightUnit(a, NaturalsBelow.firstOfTwo)
+     = (Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+        * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ)(
+           a, NaturalsBelow.firstOfTwo)
+     = CommutativeRing.zero(Integer.commutative_ring_bundle)
+           by Matrix.multiply_inclusionMatrix_transpose_entry_off
+     = (0 : ℤ);
+  done
+}
+
+theorem Matrix.upperRightUnit_corner_vanishes
+        : Matrix.upperRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo) = (0 : ℤ) := {
+  Function.IsInjective((NaturalsBelow.shift(1) : NaturalsBelow(1) → NaturalsBelow(2)))
+      by NaturalsBelow.shift_is_injective;
+  ¬(NaturalsBelow.firstOfTwo = NaturalsBelow.secondOfTwo) by NaturalsBelow.firstOfTwo_not_secondOfTwo;
+  ¬(NaturalsBelow.secondOfTwo = NaturalsBelow.sumLeft(1, 1, NaturalsBelow.top(0)));
+  Matrix.upperRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo)
+     = (Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+        * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ)(
+           NaturalsBelow.secondOfTwo, NaturalsBelow.shift(1, NaturalsBelow.top(0)))
+     = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)(
+           NaturalsBelow.secondOfTwo, NaturalsBelow.top(0))
+           by Matrix.multiply_inclusionMatrix_transpose_entry_selected
+     = CommutativeRing.zero(Integer.commutative_ring_bundle)
+           by Matrix.inclusionMatrix_entry_off
+     = (0 : ℤ);
+  done
+}
+
+theorem Matrix.lowerRightUnit_entry_unit
+        : Matrix.lowerRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo) = (1 : ℤ) := {
+  Function.IsInjective((NaturalsBelow.shift(1) : NaturalsBelow(1) → NaturalsBelow(2)))
+      by NaturalsBelow.shift_is_injective;
+  NaturalsBelow.secondOfTwo = NaturalsBelow.shift(1, NaturalsBelow.top(0));
+  Matrix.lowerRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo)
+     = (Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+        * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ)(
+           NaturalsBelow.secondOfTwo, NaturalsBelow.shift(1, NaturalsBelow.top(0)))
+     = Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)(
+           NaturalsBelow.secondOfTwo, NaturalsBelow.top(0))
+           by Matrix.multiply_inclusionMatrix_transpose_entry_selected
+     = CommutativeRing.one(Integer.commutative_ring_bundle)
+           by Matrix.inclusionMatrix_entry_at
+     = (1 : ℤ);
+  done
+}
+
+theorem Matrix.lowerRightUnit_column_vanishes (a : NaturalsBelow(2))
+        : Matrix.lowerRightUnit(a, NaturalsBelow.firstOfTwo) = (0 : ℤ) := {
+  ∀ (t : NaturalsBelow(1)). ¬(NaturalsBelow.firstOfTwo = NaturalsBelow.shift(1, t))
+      by (t : NaturalsBelow(1)) ↦ { done by NaturalsBelow.sumLeft_not_shift };
+  Matrix.lowerRightUnit(a, NaturalsBelow.firstOfTwo)
+     = (Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+        * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ)(
+           a, NaturalsBelow.firstOfTwo)
+     = CommutativeRing.zero(Integer.commutative_ring_bundle)
+           by Matrix.multiply_inclusionMatrix_transpose_entry_off
+     = (0 : ℤ);
+  done
+}
+
+theorem Matrix.lowerRightUnit_top_vanishes
+        : Matrix.lowerRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo) = (0 : ℤ) := {
+  Function.IsInjective((NaturalsBelow.shift(1) : NaturalsBelow(1) → NaturalsBelow(2)))
+      by NaturalsBelow.shift_is_injective;
+  ¬(NaturalsBelow.firstOfTwo = NaturalsBelow.secondOfTwo) by NaturalsBelow.firstOfTwo_not_secondOfTwo;
+  ¬(NaturalsBelow.firstOfTwo = NaturalsBelow.shift(1, NaturalsBelow.top(0)));
+  Matrix.lowerRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo)
+     = (Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+        * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ)(
+           NaturalsBelow.firstOfTwo, NaturalsBelow.shift(1, NaturalsBelow.top(0)))
+     = Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)(
+           NaturalsBelow.firstOfTwo, NaturalsBelow.top(0))
+           by Matrix.multiply_inclusionMatrix_transpose_entry_selected
+     = CommutativeRing.zero(Integer.commutative_ring_bundle)
+           by Matrix.inclusionMatrix_entry_off
+     = (0 : ℤ);
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The algebra of the placed units: E² = 0, Eᵀ·E = the lower-right unit.
+
+theorem Matrix.upperRightUnit_multiply_self
+        : Matrix.upperRightUnit * Matrix.upperRightUnit
+          = Matrix.zero(Integer.commutative_ring_bundle, 2, 2) := {
+  ∀ (j : NaturalsBelow(1)). ∀ (t : NaturalsBelow(1)).
+      ¬(NaturalsBelow.shift(1, j) = NaturalsBelow.sumLeft(1, 1, t))
+      by (j : NaturalsBelow(1)) (t : NaturalsBelow(1)) ↦ {
+          ¬(NaturalsBelow.sumLeft(1, 1, t) = NaturalsBelow.shift(1, j))
+              by NaturalsBelow.sumLeft_not_shift;
+          done
+        };
+  Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+      * Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+     = Matrix.zero(Integer.commutative_ring_bundle, 1, 1)
+      by Matrix.inclusionMatrix_transpose_multiply_disjoint as crossCollapses;
+  Matrix.upperRightUnit * Matrix.upperRightUnit
+     = (Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+        * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ)
+       * (Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+          * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ)
+     = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+       * (Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+          * (Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+             * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ))
+           by Matrix.multiply_associative
+     = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+       * ((Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+           * Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1))
+          * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ)
+           by Matrix.multiply_associative
+     = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+       * (Matrix.zero(Integer.commutative_ring_bundle, 1, 1)
+          * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ)
+           by substituting crossCollapses
+     = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+       * Matrix.zero(Integer.commutative_ring_bundle, 1, 2)
+           by substituting Matrix.zero_multiply
+     = Matrix.zero(Integer.commutative_ring_bundle, 2, 2)
+           by Matrix.multiply_zero;
+  done
+}
+
+theorem Matrix.upperRightUnit_transpose_multiply
+        : Matrix.upperRightUnitᵀ * Matrix.upperRightUnit = Matrix.lowerRightUnit := {
+  Function.IsInjective(NaturalsBelow.sumLeft(1, 1)) by NaturalsBelow.sumLeft_is_injective;
+  Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+      * Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+     = Matrix.identity(Integer.commutative_ring_bundle, 1)
+      by Matrix.inclusionMatrix_transpose_multiply_self as selfCollapses;
+  Matrix.upperRightUnitᵀ
+     = (Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+        * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ)ᵀ
+     = (Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ)ᵀ
+       * Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+           by Matrix.transpose_multiply
+     = Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+       * Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+           by substituting Matrix.transpose_transpose
+  as transposeReads;
+  Matrix.upperRightUnitᵀ * Matrix.upperRightUnit
+     = (Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+        * Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ)
+       * (Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+          * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ)
+           by substituting transposeReads
+     = Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+       * (Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+          * (Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+             * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ))
+           by Matrix.multiply_associative
+     = Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+       * ((Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+           * Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1))
+          * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ)
+           by Matrix.multiply_associative
+     = Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+       * (Matrix.identity(Integer.commutative_ring_bundle, 1)
+          * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ)
+           by substituting selfCollapses
+     = Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+       * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+           by substituting Matrix.one_multiply
+     = Matrix.lowerRightUnit;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The shear [[1, s], [0, 1]] = I + s·E: two shears with opposite offsets
+-- cancel, so every shear is invertible.
+
+theorem Matrix.shear_product_identity (s t : ℤ) (sumZero : s + t = (0 : ℤ))
+        : (Matrix.identity(Integer.commutative_ring_bundle, 2) + s • Matrix.upperRightUnit)
+          * (Matrix.identity(Integer.commutative_ring_bundle, 2) + t • Matrix.upperRightUnit)
+          = Matrix.identity(Integer.commutative_ring_bundle, 2) := {
+  (Matrix.identity(Integer.commutative_ring_bundle, 2) + s • Matrix.upperRightUnit)
+      * (Matrix.identity(Integer.commutative_ring_bundle, 2) + t • Matrix.upperRightUnit)
+     = (Matrix.identity(Integer.commutative_ring_bundle, 2) + s • Matrix.upperRightUnit)
+           * Matrix.identity(Integer.commutative_ring_bundle, 2)
+       + (Matrix.identity(Integer.commutative_ring_bundle, 2) + s • Matrix.upperRightUnit)
+           * (t • Matrix.upperRightUnit)
+           by Matrix.distributivity_left
+     = (Matrix.identity(Integer.commutative_ring_bundle, 2) + s • Matrix.upperRightUnit)
+       + (Matrix.identity(Integer.commutative_ring_bundle, 2) + s • Matrix.upperRightUnit)
+           * (t • Matrix.upperRightUnit)
+           by substituting Matrix.multiply_one
+     = (Matrix.identity(Integer.commutative_ring_bundle, 2) + s • Matrix.upperRightUnit)
+       + t • ((Matrix.identity(Integer.commutative_ring_bundle, 2) + s • Matrix.upperRightUnit)
+              * Matrix.upperRightUnit)
+           by substituting Matrix.scale_multiply_right
+     = (Matrix.identity(Integer.commutative_ring_bundle, 2) + s • Matrix.upperRightUnit)
+       + t • (Matrix.identity(Integer.commutative_ring_bundle, 2) * Matrix.upperRightUnit
+              + (s • Matrix.upperRightUnit) * Matrix.upperRightUnit)
+           by substituting Matrix.distributivity_right
+     = (Matrix.identity(Integer.commutative_ring_bundle, 2) + s • Matrix.upperRightUnit)
+       + t • (Matrix.upperRightUnit + (s • Matrix.upperRightUnit) * Matrix.upperRightUnit)
+           by substituting Matrix.one_multiply
+     = (Matrix.identity(Integer.commutative_ring_bundle, 2) + s • Matrix.upperRightUnit)
+       + t • (Matrix.upperRightUnit + s • (Matrix.upperRightUnit * Matrix.upperRightUnit))
+           by substituting Matrix.scale_multiply_left
+     = (Matrix.identity(Integer.commutative_ring_bundle, 2) + s • Matrix.upperRightUnit)
+       + t • (Matrix.upperRightUnit + s • Matrix.zero(Integer.commutative_ring_bundle, 2, 2))
+           by substituting Matrix.upperRightUnit_multiply_self
+     = (Matrix.identity(Integer.commutative_ring_bundle, 2) + s • Matrix.upperRightUnit)
+       + t • (Matrix.upperRightUnit + Matrix.zero(Integer.commutative_ring_bundle, 2, 2))
+           by substituting Matrix.scale_zero_matrix
+     = (Matrix.identity(Integer.commutative_ring_bundle, 2) + s • Matrix.upperRightUnit)
+       + t • Matrix.upperRightUnit
+           by substituting Matrix.add_zero
+     = Matrix.identity(Integer.commutative_ring_bundle, 2)
+       + (s • Matrix.upperRightUnit + t • Matrix.upperRightUnit)
+           by Matrix.add_associative
+     = Matrix.identity(Integer.commutative_ring_bundle, 2) + (s + t) • Matrix.upperRightUnit
+           by substituting Matrix.scale_add_scalar
+     = Matrix.identity(Integer.commutative_ring_bundle, 2) + (0 : ℤ) • Matrix.upperRightUnit
+           by substituting sumZero
+     = Matrix.identity(Integer.commutative_ring_bundle, 2)
+       + Matrix.zero(Integer.commutative_ring_bundle, 2, 2)
+           by substituting Matrix.scale_zero_scalar
+     = Matrix.identity(Integer.commutative_ring_bundle, 2)
+           by Matrix.add_zero;
+  done
+}
+
+theorem Matrix.shear_invertible (s : ℤ)
+        : Matrix.IsInvertible(
+              Matrix.identity(Integer.commutative_ring_bundle, 2) + s • Matrix.upperRightUnit) := {
+  s + -s = (0 : ℤ);
+  -s + s = (0 : ℤ);
+  (Matrix.identity(Integer.commutative_ring_bundle, 2) + s • Matrix.upperRightUnit)
+      * (Matrix.identity(Integer.commutative_ring_bundle, 2) + (-s) • Matrix.upperRightUnit)
+     = Matrix.identity(Integer.commutative_ring_bundle, 2)
+      by Matrix.shear_product_identity;
+  (Matrix.identity(Integer.commutative_ring_bundle, 2) + (-s) • Matrix.upperRightUnit)
+      * (Matrix.identity(Integer.commutative_ring_bundle, 2) + s • Matrix.upperRightUnit)
+     = Matrix.identity(Integer.commutative_ring_bundle, 2)
+      by Matrix.shear_product_identity;
+  witness Matrix.identity(Integer.commutative_ring_bundle, 2) + (-s) • Matrix.upperRightUnit
+      with done
+}
+
+-- ----------------------------------------------------------------------
+-- The two canonical rank-2 forms: x² + y² and x² + 2y².
+
+definition Matrix.sumOfTwoSquaresForm : Matrix(Integer.commutative_ring_bundle, 2, 2) :=
+  Matrix.directSum(Matrix.squareForm, Matrix.squareForm)
+
+definition Matrix.squarePlusDoubleSquareForm : Matrix(Integer.commutative_ring_bundle, 2, 2) :=
+  Matrix.directSum(Matrix.squareForm, (2 : ℤ) • Matrix.squareForm)
+
+theorem Matrix.sumOfTwoSquaresForm_is_identity
+        : Matrix.sumOfTwoSquaresForm = Matrix.identity(Integer.commutative_ring_bundle, 2) := {
+  Matrix.sumOfTwoSquaresForm
+     = Matrix.directSum(Matrix.identity(Integer.commutative_ring_bundle, 1),
+           Matrix.identity(Integer.commutative_ring_bundle, 1))
+     = Matrix.identity(Integer.commutative_ring_bundle, 2)
+           by Matrix.directSum_identity;
+  done
+}
+
+theorem Matrix.identity_two_splits
+        : Matrix.identity(Integer.commutative_ring_bundle, 2)
+          = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+                * Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+            + Matrix.lowerRightUnit := {
+  Matrix.identity(Integer.commutative_ring_bundle, 2)
+     = Matrix.directSum(Matrix.identity(Integer.commutative_ring_bundle, 1),
+           Matrix.identity(Integer.commutative_ring_bundle, 1))
+           by Matrix.directSum_identity
+     = (Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+        * Matrix.identity(Integer.commutative_ring_bundle, 1))
+       * Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+       + (Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+          * Matrix.identity(Integer.commutative_ring_bundle, 1))
+         * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+     = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+       * Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+       + (Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+          * Matrix.identity(Integer.commutative_ring_bundle, 1))
+         * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+           by substituting Matrix.multiply_one
+     = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+       * Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+       + Matrix.lowerRightUnit
+           by substituting Matrix.multiply_one;
+  done
+}
+
+theorem Matrix.squarePlusDoubleSquareForm_splits
+        : Matrix.squarePlusDoubleSquareForm
+          = Matrix.identity(Integer.commutative_ring_bundle, 2) + Matrix.lowerRightUnit := {
+  (2 : ℤ) = (1 : ℤ) + (1 : ℤ) as twoSplits;
+  Matrix.identity(Integer.commutative_ring_bundle, 2)
+     = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+           * Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+       + Matrix.lowerRightUnit
+      by Matrix.identity_two_splits as identitySplits;
+  Matrix.squarePlusDoubleSquareForm
+     = (Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+        * Matrix.identity(Integer.commutative_ring_bundle, 1))
+       * Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+       + (Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+          * ((2 : ℤ) • Matrix.identity(Integer.commutative_ring_bundle, 1)))
+         * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+     = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+       * Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+       + (Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+          * ((2 : ℤ) • Matrix.identity(Integer.commutative_ring_bundle, 1)))
+         * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+           by substituting Matrix.multiply_one
+     = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+       * Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+       + ((2 : ℤ) • (Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+                     * Matrix.identity(Integer.commutative_ring_bundle, 1)))
+         * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+           by substituting Matrix.scale_multiply_right
+     = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+       * Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+       + ((2 : ℤ) • Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1))
+         * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+           by substituting Matrix.multiply_one
+     = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+       * Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+       + (2 : ℤ) • Matrix.lowerRightUnit
+           by substituting Matrix.scale_multiply_left
+     = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+       * Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+       + ((1 : ℤ) + (1 : ℤ)) • Matrix.lowerRightUnit
+           by substituting twoSplits
+     = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+       * Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+       + ((1 : ℤ) • Matrix.lowerRightUnit + (1 : ℤ) • Matrix.lowerRightUnit)
+           by substituting Matrix.scale_add_scalar
+     = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+       * Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+       + (Matrix.lowerRightUnit + Matrix.lowerRightUnit)
+           by substituting Matrix.one_scale
+     = (Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)
+        * Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1)ᵀ
+        + Matrix.lowerRightUnit)
+       + Matrix.lowerRightUnit
+           by Matrix.add_associative
+     = Matrix.identity(Integer.commutative_ring_bundle, 2) + Matrix.lowerRightUnit
+           by identitySplits;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- An integer square below 2 has root −1, 0, or 1.
+
+theorem Integer.square_below_two (b : ℤ) (bound : b * b < (2 : ℤ))
+        : b = -(1 : ℤ) ∨ b = (0 : ℤ) ∨ b = (1 : ℤ) := {
+  Integer.IsNonneg(b) ∨ ∃ (m : ℕ). b = -(m : ℤ) by Integer.sign_split;
+  done by cases {
+    case Integer.IsNonneg(b) as nonneg: {
+        choose m such that b = (m : ℤ) from nonneg;
+        ((m * m : ℕ) : ℤ)
+           = (m : ℤ) * (m : ℤ)     by Natural.to_integer.multiply_preserves
+           = b * b                 by substituting (b = (m : ℤ))
+           < (2 : ℤ)               by bound
+           = ((2 : ℕ) : ℤ);
+        m * m < 2 by Natural.to_integer.LessThan_reflects;
+        m = 0 ∨ m = 1 by Natural.square_below_two;
+        done by cases {
+          case m = 0 as mZero: {
+              b  = (m : ℤ)
+                 = ((0 : ℕ) : ℤ)   by substituting mZero
+                 = (0 : ℤ);
+              done
+            }
+          case m = 1 as mOne: {
+              b  = (m : ℤ)
+                 = ((1 : ℕ) : ℤ)   by substituting mOne
+                 = (1 : ℤ);
+              done
+            }
+        }
+      }
+    case ∃ (m : ℕ). b = -(m : ℤ) as negated: {
+        choose m such that b = -(m : ℤ) from negated;
+        ((m * m : ℕ) : ℤ)
+           = (m : ℤ) * (m : ℤ)           by Natural.to_integer.multiply_preserves
+           = (-(m : ℤ)) * (-(m : ℤ))
+           = b * b                       by substituting (b = -(m : ℤ))
+           < (2 : ℤ)                     by bound
+           = ((2 : ℕ) : ℤ);
+        m * m < 2 by Natural.to_integer.LessThan_reflects;
+        m = 0 ∨ m = 1 by Natural.square_below_two;
+        done by cases {
+          case m = 0 as mZero: {
+              b  = -(m : ℤ)
+                 = -((0 : ℕ) : ℤ)   by substituting mZero
+                 = (0 : ℤ);
+              done
+            }
+          case m = 1 as mOne: {
+              b  = -(m : ℤ)
+                 = -((1 : ℕ) : ℤ)   by substituting mOne
+                 = -(1 : ℤ);
+              done
+            }
+        }
+      }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- Every escalation of x² decomposes over the placed units as
+-- B = (I + β·Eᵀ) + (β·E + J_R·J_Rᵀ), with β the border entry — the four
+-- entries agree one by one.
+
+theorem Matrix.squareForm_escalation_decomposition
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 1, 1 + 1))
+        (escalation : Matrix.IsEscalation(Matrix.squareForm, B))
+        : B = (Matrix.identity(Integer.commutative_ring_bundle, 2)
+               + Matrix.borderColumn(B)(NaturalsBelow.top(0)) • Matrix.upperRightUnitᵀ)
+              + (Matrix.borderColumn(B)(NaturalsBelow.top(0)) • Matrix.upperRightUnit
+                 + Matrix.lowerRightUnit) := {
+  Matrix.IsSymmetric(B) by Matrix.IsEscalation.symmetric as symmetric;
+  Matrix.leadingBlock(B) = Matrix.squareForm by Matrix.IsEscalation.block as blockReads;
+  Matrix.corner(B) = (Matrix.truant(Matrix.squareForm) : ℤ)
+      by Matrix.IsEscalation.corner_is_truant as cornerIsTruant;
+  let border : ℤ := Matrix.borderColumn(B)(NaturalsBelow.top(0));
+
+  -- The four entries of B, read off the escalation structure.
+  B(NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo)
+     = B(NaturalsBelow.inclusion(1, NaturalsBelow.top(0)), NaturalsBelow.inclusion(1, NaturalsBelow.top(0)))
+           by substituting NaturalsBelow.firstOfTwo_is_inclusion
+     = Matrix.leadingBlock(B)(NaturalsBelow.top(0), NaturalsBelow.top(0))
+     = Matrix.squareForm(NaturalsBelow.top(0), NaturalsBelow.top(0))
+           by substituting blockReads
+     = (1 : ℤ)
+           by Matrix.identity_entry_diagonal
+  as entryFirstFirst;
+  B(NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo)
+     = B(NaturalsBelow.inclusion(1, NaturalsBelow.top(0)), NaturalsBelow.secondOfTwo)
+           by substituting NaturalsBelow.firstOfTwo_is_inclusion
+     = B(NaturalsBelow.inclusion(1, NaturalsBelow.top(0)), NaturalsBelow.top(1))
+           by substituting NaturalsBelow.secondOfTwo_is_top
+     = border
+  as entryFirstSecond;
+  B(NaturalsBelow.secondOfTwo, NaturalsBelow.firstOfTwo)
+     = Bᵀ(NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo)
+           by Matrix.transpose_entry
+     = B(NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo)
+           by substituting symmetric
+     = border
+           by entryFirstSecond
+  as entrySecondFirst;
+  B(NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo)
+     = B(NaturalsBelow.top(1), NaturalsBelow.top(1))
+           by substituting NaturalsBelow.secondOfTwo_is_top
+     = Matrix.corner(B)
+     = (Matrix.truant(Matrix.squareForm) : ℤ)
+           by cornerIsTruant
+     = ((2 : ℕ) : ℤ)
+           by substituting Matrix.squareForm_truant
+     = (2 : ℤ)
+  as entrySecondSecond;
+
+  -- The four entries of each right-hand-side piece.
+  ¬(NaturalsBelow.firstOfTwo = NaturalsBelow.secondOfTwo) by NaturalsBelow.firstOfTwo_not_secondOfTwo;
+  ¬(NaturalsBelow.secondOfTwo = NaturalsBelow.firstOfTwo);
+  Matrix.identity(Integer.commutative_ring_bundle, 2)(NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo)
+     = (1 : ℤ) by Matrix.identity_entry_diagonal as identityFirstFirst;
+  Matrix.identity(Integer.commutative_ring_bundle, 2)(NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo)
+     = (0 : ℤ) by Matrix.identity_entry_off as identityFirstSecond;
+  Matrix.identity(Integer.commutative_ring_bundle, 2)(NaturalsBelow.secondOfTwo, NaturalsBelow.firstOfTwo)
+     = (0 : ℤ) by Matrix.identity_entry_off as identitySecondFirst;
+  Matrix.identity(Integer.commutative_ring_bundle, 2)(NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo)
+     = (1 : ℤ) by Matrix.identity_entry_diagonal as identitySecondSecond;
+
+  Matrix.upperRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo) = (0 : ℤ)
+      by Matrix.upperRightUnit_column_vanishes as upperFirstFirst;
+  Matrix.upperRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo) = (1 : ℤ)
+      by Matrix.upperRightUnit_entry_unit as upperFirstSecond;
+  Matrix.upperRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.firstOfTwo) = (0 : ℤ)
+      by Matrix.upperRightUnit_column_vanishes as upperSecondFirst;
+  Matrix.upperRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo) = (0 : ℤ)
+      by Matrix.upperRightUnit_corner_vanishes as upperSecondSecond;
+
+  Matrix.upperRightUnitᵀ(NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo)
+     = Matrix.upperRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo)
+           by Matrix.transpose_entry
+     = (0 : ℤ) by upperFirstFirst
+  as transposedFirstFirst;
+  Matrix.upperRightUnitᵀ(NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo)
+     = Matrix.upperRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.firstOfTwo)
+           by Matrix.transpose_entry
+     = (0 : ℤ) by upperSecondFirst
+  as transposedFirstSecond;
+  Matrix.upperRightUnitᵀ(NaturalsBelow.secondOfTwo, NaturalsBelow.firstOfTwo)
+     = Matrix.upperRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo)
+           by Matrix.transpose_entry
+     = (1 : ℤ) by upperFirstSecond
+  as transposedSecondFirst;
+  Matrix.upperRightUnitᵀ(NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo)
+     = Matrix.upperRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo)
+           by Matrix.transpose_entry
+     = (0 : ℤ) by upperSecondSecond
+  as transposedSecondSecond;
+
+  Matrix.lowerRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo) = (0 : ℤ)
+      by Matrix.lowerRightUnit_column_vanishes as lowerFirstFirst;
+  Matrix.lowerRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo) = (0 : ℤ)
+      by Matrix.lowerRightUnit_top_vanishes as lowerFirstSecond;
+  Matrix.lowerRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.firstOfTwo) = (0 : ℤ)
+      by Matrix.lowerRightUnit_column_vanishes as lowerSecondFirst;
+  Matrix.lowerRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo) = (1 : ℤ)
+      by Matrix.lowerRightUnit_entry_unit as lowerSecondSecond;
+
+  ∀ (a : NaturalsBelow(2)). ∀ (b : NaturalsBelow(2)).
+      B(a, b) = ((Matrix.identity(Integer.commutative_ring_bundle, 2)
+                  + border • Matrix.upperRightUnitᵀ)
+                 + (border • Matrix.upperRightUnit + Matrix.lowerRightUnit))(a, b)
+      by (a : NaturalsBelow(2)) (b : NaturalsBelow(2)) ↦ {
+          a = NaturalsBelow.firstOfTwo ∨ a = NaturalsBelow.secondOfTwo by NaturalsBelow.two_split;
+          b = NaturalsBelow.firstOfTwo ∨ b = NaturalsBelow.secondOfTwo by NaturalsBelow.two_split;
+          done by cases {
+            case a = NaturalsBelow.firstOfTwo as aFirst: done by cases {
+                case b = NaturalsBelow.firstOfTwo as bFirst: {
+                    ((Matrix.identity(Integer.commutative_ring_bundle, 2)
+                      + border • Matrix.upperRightUnitᵀ)
+                     + (border • Matrix.upperRightUnit + Matrix.lowerRightUnit))(
+                        NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo)
+                       = (Matrix.identity(Integer.commutative_ring_bundle, 2)(
+                              NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo)
+                          + border * Matrix.upperRightUnitᵀ(NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo))
+                         + (border * Matrix.upperRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo)
+                            + Matrix.lowerRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo))
+                       = ((1 : ℤ) + border * Matrix.upperRightUnitᵀ(NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo))
+                         + (border * Matrix.upperRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo)
+                            + Matrix.lowerRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo))
+                             by substituting identityFirstFirst
+                       = ((1 : ℤ) + border * (0 : ℤ))
+                         + (border * Matrix.upperRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo)
+                            + Matrix.lowerRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo))
+                             by substituting transposedFirstFirst
+                       = ((1 : ℤ) + border * (0 : ℤ))
+                         + (border * (0 : ℤ)
+                            + Matrix.lowerRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo))
+                             by substituting upperFirstFirst
+                       = ((1 : ℤ) + border * (0 : ℤ)) + (border * (0 : ℤ) + (0 : ℤ))
+                             by substituting lowerFirstFirst
+                       = (1 : ℤ)
+                             by ring
+                    as rightEntry;
+                    B(a, b)
+                       = B(NaturalsBelow.firstOfTwo, b)                     by substituting aFirst
+                       = B(NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo)  by substituting bFirst
+                       = (1 : ℤ)                                            by entryFirstFirst
+                       = ((Matrix.identity(Integer.commutative_ring_bundle, 2)
+                           + border • Matrix.upperRightUnitᵀ)
+                          + (border • Matrix.upperRightUnit + Matrix.lowerRightUnit))(
+                             NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo)
+                                                                             by rightEntry
+                       = ((Matrix.identity(Integer.commutative_ring_bundle, 2)
+                           + border • Matrix.upperRightUnitᵀ)
+                          + (border • Matrix.upperRightUnit + Matrix.lowerRightUnit))(
+                             NaturalsBelow.firstOfTwo, b)                    by substituting bFirst
+                       = ((Matrix.identity(Integer.commutative_ring_bundle, 2)
+                           + border • Matrix.upperRightUnitᵀ)
+                          + (border • Matrix.upperRightUnit + Matrix.lowerRightUnit))(a, b)
+                                                                             by substituting aFirst;
+                    done
+                  }
+                case b = NaturalsBelow.secondOfTwo as bSecond: {
+                    ((Matrix.identity(Integer.commutative_ring_bundle, 2)
+                      + border • Matrix.upperRightUnitᵀ)
+                     + (border • Matrix.upperRightUnit + Matrix.lowerRightUnit))(
+                        NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo)
+                       = (Matrix.identity(Integer.commutative_ring_bundle, 2)(
+                              NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo)
+                          + border * Matrix.upperRightUnitᵀ(NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo))
+                         + (border * Matrix.upperRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo)
+                            + Matrix.lowerRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo))
+                       = ((0 : ℤ) + border * Matrix.upperRightUnitᵀ(NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo))
+                         + (border * Matrix.upperRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo)
+                            + Matrix.lowerRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo))
+                             by substituting identityFirstSecond
+                       = ((0 : ℤ) + border * (0 : ℤ))
+                         + (border * Matrix.upperRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo)
+                            + Matrix.lowerRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo))
+                             by substituting transposedFirstSecond
+                       = ((0 : ℤ) + border * (0 : ℤ))
+                         + (border * (1 : ℤ)
+                            + Matrix.lowerRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo))
+                             by substituting upperFirstSecond
+                       = ((0 : ℤ) + border * (0 : ℤ)) + (border * (1 : ℤ) + (0 : ℤ))
+                             by substituting lowerFirstSecond
+                       = border
+                             by ring
+                    as rightEntry;
+                    B(a, b)
+                       = B(NaturalsBelow.firstOfTwo, b)                          by substituting aFirst
+                       = B(NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo)  by substituting bSecond
+                       = border                                                  by entryFirstSecond
+                       = ((Matrix.identity(Integer.commutative_ring_bundle, 2)
+                           + border • Matrix.upperRightUnitᵀ)
+                          + (border • Matrix.upperRightUnit + Matrix.lowerRightUnit))(
+                             NaturalsBelow.firstOfTwo, NaturalsBelow.secondOfTwo)
+                                                                                  by rightEntry
+                       = ((Matrix.identity(Integer.commutative_ring_bundle, 2)
+                           + border • Matrix.upperRightUnitᵀ)
+                          + (border • Matrix.upperRightUnit + Matrix.lowerRightUnit))(
+                             NaturalsBelow.firstOfTwo, b)                         by substituting bSecond
+                       = ((Matrix.identity(Integer.commutative_ring_bundle, 2)
+                           + border • Matrix.upperRightUnitᵀ)
+                          + (border • Matrix.upperRightUnit + Matrix.lowerRightUnit))(a, b)
+                                                                                  by substituting aFirst;
+                    done
+                  }
+              }
+            case a = NaturalsBelow.secondOfTwo as aSecond: done by cases {
+                case b = NaturalsBelow.firstOfTwo as bFirst: {
+                    ((Matrix.identity(Integer.commutative_ring_bundle, 2)
+                      + border • Matrix.upperRightUnitᵀ)
+                     + (border • Matrix.upperRightUnit + Matrix.lowerRightUnit))(
+                        NaturalsBelow.secondOfTwo, NaturalsBelow.firstOfTwo)
+                       = (Matrix.identity(Integer.commutative_ring_bundle, 2)(
+                              NaturalsBelow.secondOfTwo, NaturalsBelow.firstOfTwo)
+                          + border * Matrix.upperRightUnitᵀ(NaturalsBelow.secondOfTwo, NaturalsBelow.firstOfTwo))
+                         + (border * Matrix.upperRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.firstOfTwo)
+                            + Matrix.lowerRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.firstOfTwo))
+                       = ((0 : ℤ) + border * Matrix.upperRightUnitᵀ(NaturalsBelow.secondOfTwo, NaturalsBelow.firstOfTwo))
+                         + (border * Matrix.upperRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.firstOfTwo)
+                            + Matrix.lowerRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.firstOfTwo))
+                             by substituting identitySecondFirst
+                       = ((0 : ℤ) + border * (1 : ℤ))
+                         + (border * Matrix.upperRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.firstOfTwo)
+                            + Matrix.lowerRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.firstOfTwo))
+                             by substituting transposedSecondFirst
+                       = ((0 : ℤ) + border * (1 : ℤ))
+                         + (border * (0 : ℤ)
+                            + Matrix.lowerRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.firstOfTwo))
+                             by substituting upperSecondFirst
+                       = ((0 : ℤ) + border * (1 : ℤ)) + (border * (0 : ℤ) + (0 : ℤ))
+                             by substituting lowerSecondFirst
+                       = border
+                             by ring
+                    as rightEntry;
+                    B(a, b)
+                       = B(NaturalsBelow.secondOfTwo, b)                         by substituting aSecond
+                       = B(NaturalsBelow.secondOfTwo, NaturalsBelow.firstOfTwo)  by substituting bFirst
+                       = border                                                  by entrySecondFirst
+                       = ((Matrix.identity(Integer.commutative_ring_bundle, 2)
+                           + border • Matrix.upperRightUnitᵀ)
+                          + (border • Matrix.upperRightUnit + Matrix.lowerRightUnit))(
+                             NaturalsBelow.secondOfTwo, NaturalsBelow.firstOfTwo)
+                                                                                  by rightEntry
+                       = ((Matrix.identity(Integer.commutative_ring_bundle, 2)
+                           + border • Matrix.upperRightUnitᵀ)
+                          + (border • Matrix.upperRightUnit + Matrix.lowerRightUnit))(
+                             NaturalsBelow.secondOfTwo, b)                        by substituting bFirst
+                       = ((Matrix.identity(Integer.commutative_ring_bundle, 2)
+                           + border • Matrix.upperRightUnitᵀ)
+                          + (border • Matrix.upperRightUnit + Matrix.lowerRightUnit))(a, b)
+                                                                                  by substituting aSecond;
+                    done
+                  }
+                case b = NaturalsBelow.secondOfTwo as bSecond: {
+                    ((Matrix.identity(Integer.commutative_ring_bundle, 2)
+                      + border • Matrix.upperRightUnitᵀ)
+                     + (border • Matrix.upperRightUnit + Matrix.lowerRightUnit))(
+                        NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo)
+                       = (Matrix.identity(Integer.commutative_ring_bundle, 2)(
+                              NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo)
+                          + border * Matrix.upperRightUnitᵀ(NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo))
+                         + (border * Matrix.upperRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo)
+                            + Matrix.lowerRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo))
+                       = ((1 : ℤ) + border * Matrix.upperRightUnitᵀ(NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo))
+                         + (border * Matrix.upperRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo)
+                            + Matrix.lowerRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo))
+                             by substituting identitySecondSecond
+                       = ((1 : ℤ) + border * (0 : ℤ))
+                         + (border * Matrix.upperRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo)
+                            + Matrix.lowerRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo))
+                             by substituting transposedSecondSecond
+                       = ((1 : ℤ) + border * (0 : ℤ))
+                         + (border * (0 : ℤ)
+                            + Matrix.lowerRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo))
+                             by substituting upperSecondSecond
+                       = ((1 : ℤ) + border * (0 : ℤ)) + (border * (0 : ℤ) + (1 : ℤ))
+                             by substituting lowerSecondSecond
+                       = (1 : ℤ) + (1 : ℤ)
+                             by ring
+                       = (2 : ℤ)
+                    as rightEntry;
+                    B(a, b)
+                       = B(NaturalsBelow.secondOfTwo, b)                          by substituting aSecond
+                       = B(NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo)  by substituting bSecond
+                       = (2 : ℤ)                                                  by entrySecondSecond
+                       = ((Matrix.identity(Integer.commutative_ring_bundle, 2)
+                           + border • Matrix.upperRightUnitᵀ)
+                          + (border • Matrix.upperRightUnit + Matrix.lowerRightUnit))(
+                             NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo)
+                                                                                   by rightEntry
+                       = ((Matrix.identity(Integer.commutative_ring_bundle, 2)
+                           + border • Matrix.upperRightUnitᵀ)
+                          + (border • Matrix.upperRightUnit + Matrix.lowerRightUnit))(
+                             NaturalsBelow.secondOfTwo, b)                         by substituting bSecond
+                       = ((Matrix.identity(Integer.commutative_ring_bundle, 2)
+                           + border • Matrix.upperRightUnitᵀ)
+                          + (border • Matrix.upperRightUnit + Matrix.lowerRightUnit))(a, b)
+                                                                                   by substituting aSecond;
+                    done
+                  }
+              }
+          }
+        };
+  done by Matrix.equal_of_entries
+}
+
+-- ----------------------------------------------------------------------
+-- A unit border entry makes the escalation a shear pullback of x² + y²:
+-- (I + β·E)ᵀ · I · (I + β·E) multiplies out to exactly the decomposition.
+
+theorem Matrix.squareForm_escalation_isometric_of_unit_border
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 1, 1 + 1))
+        (escalation : Matrix.IsEscalation(Matrix.squareForm, B))
+        (borderSquareOne : Matrix.borderColumn(B)(NaturalsBelow.top(0))
+                           * Matrix.borderColumn(B)(NaturalsBelow.top(0)) = (1 : ℤ))
+        : Matrix.IsIsometric(B, Matrix.sumOfTwoSquaresForm) := {
+  let border : ℤ := Matrix.borderColumn(B)(NaturalsBelow.top(0));
+  let shear : Matrix(Integer.commutative_ring_bundle, 2, 2) :=
+      Matrix.identity(Integer.commutative_ring_bundle, 2) + border • Matrix.upperRightUnit;
+  B = (Matrix.identity(Integer.commutative_ring_bundle, 2) + border • Matrix.upperRightUnitᵀ)
+      + (border • Matrix.upperRightUnit + Matrix.lowerRightUnit)
+      by Matrix.squareForm_escalation_decomposition as decomposition;
+  Matrix.IsInvertible(shear) by Matrix.shear_invertible;
+  Matrix.upperRightUnitᵀ * Matrix.upperRightUnit = Matrix.lowerRightUnit
+      by Matrix.upperRightUnit_transpose_multiply as transposeUnitCollapses;
+  shearᵀ
+     = Matrix.identity(Integer.commutative_ring_bundle, 2)ᵀ + (border • Matrix.upperRightUnit)ᵀ
+           by Matrix.transpose_add
+     = Matrix.identity(Integer.commutative_ring_bundle, 2) + (border • Matrix.upperRightUnit)ᵀ
+           by substituting Matrix.transpose_identity
+     = Matrix.identity(Integer.commutative_ring_bundle, 2) + border • Matrix.upperRightUnitᵀ
+           by substituting Matrix.transpose_scale
+  as shearTransposeReads;
+
+  (shearᵀ * Matrix.sumOfTwoSquaresForm) * shear
+     = (shearᵀ * Matrix.identity(Integer.commutative_ring_bundle, 2)) * shear
+           by substituting Matrix.sumOfTwoSquaresForm_is_identity
+     = shearᵀ * shear
+           by substituting Matrix.multiply_one
+     = (Matrix.identity(Integer.commutative_ring_bundle, 2) + border • Matrix.upperRightUnitᵀ) * shear
+           by substituting shearTransposeReads
+     = (Matrix.identity(Integer.commutative_ring_bundle, 2) + border • Matrix.upperRightUnitᵀ)
+           * Matrix.identity(Integer.commutative_ring_bundle, 2)
+       + (Matrix.identity(Integer.commutative_ring_bundle, 2) + border • Matrix.upperRightUnitᵀ)
+           * (border • Matrix.upperRightUnit)
+           by Matrix.distributivity_left
+     = (Matrix.identity(Integer.commutative_ring_bundle, 2) + border • Matrix.upperRightUnitᵀ)
+       + (Matrix.identity(Integer.commutative_ring_bundle, 2) + border • Matrix.upperRightUnitᵀ)
+           * (border • Matrix.upperRightUnit)
+           by substituting Matrix.multiply_one
+     = (Matrix.identity(Integer.commutative_ring_bundle, 2) + border • Matrix.upperRightUnitᵀ)
+       + border • ((Matrix.identity(Integer.commutative_ring_bundle, 2)
+                    + border • Matrix.upperRightUnitᵀ) * Matrix.upperRightUnit)
+           by substituting Matrix.scale_multiply_right
+     = (Matrix.identity(Integer.commutative_ring_bundle, 2) + border • Matrix.upperRightUnitᵀ)
+       + border • (Matrix.identity(Integer.commutative_ring_bundle, 2) * Matrix.upperRightUnit
+                   + (border • Matrix.upperRightUnitᵀ) * Matrix.upperRightUnit)
+           by substituting Matrix.distributivity_right
+     = (Matrix.identity(Integer.commutative_ring_bundle, 2) + border • Matrix.upperRightUnitᵀ)
+       + border • (Matrix.upperRightUnit
+                   + (border • Matrix.upperRightUnitᵀ) * Matrix.upperRightUnit)
+           by substituting Matrix.one_multiply
+     = (Matrix.identity(Integer.commutative_ring_bundle, 2) + border • Matrix.upperRightUnitᵀ)
+       + border • (Matrix.upperRightUnit
+                   + border • (Matrix.upperRightUnitᵀ * Matrix.upperRightUnit))
+           by substituting Matrix.scale_multiply_left
+     = (Matrix.identity(Integer.commutative_ring_bundle, 2) + border • Matrix.upperRightUnitᵀ)
+       + border • (Matrix.upperRightUnit + border • Matrix.lowerRightUnit)
+           by substituting transposeUnitCollapses
+     = (Matrix.identity(Integer.commutative_ring_bundle, 2) + border • Matrix.upperRightUnitᵀ)
+       + (border • Matrix.upperRightUnit + border • (border • Matrix.lowerRightUnit))
+           by substituting Matrix.scale_add
+     = (Matrix.identity(Integer.commutative_ring_bundle, 2) + border • Matrix.upperRightUnitᵀ)
+       + (border • Matrix.upperRightUnit + (border * border) • Matrix.lowerRightUnit)
+           by substituting Matrix.scale_scale
+     = (Matrix.identity(Integer.commutative_ring_bundle, 2) + border • Matrix.upperRightUnitᵀ)
+       + (border • Matrix.upperRightUnit + (1 : ℤ) • Matrix.lowerRightUnit)
+           by substituting borderSquareOne
+     = (Matrix.identity(Integer.commutative_ring_bundle, 2) + border • Matrix.upperRightUnitᵀ)
+       + (border • Matrix.upperRightUnit + Matrix.lowerRightUnit)
+           by substituting Matrix.one_scale
+     = B
+           by decomposition
+  as pullbackReads;
+
+  Matrix.IsIsometric(Matrix.sumOfTwoSquaresForm, B) by {
+      witness shear with {
+          Matrix.IsInvertible(shear) by Matrix.shear_invertible;
+          B = (shearᵀ * Matrix.sumOfTwoSquaresForm) * shear by pullbackReads;
+          done
+        }
+    };
+  done by Matrix.IsIsometric.symmetric
+}
+
+-- ----------------------------------------------------------------------
+-- S3.E3 ★: the two rank-2 escalators. Every escalation of x² is
+-- isometric to x² + y² or to x² + 2y².
+
+theorem Matrix.rank_two_escalators
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 1, 1 + 1))
+        (escalation : Matrix.IsEscalation(Matrix.squareForm, B))
+        : Matrix.IsIsometric(B, Matrix.sumOfTwoSquaresForm)
+          ∨ Matrix.IsIsometric(B, Matrix.squarePlusDoubleSquareForm) := {
+  let border : ℤ := Matrix.borderColumn(B)(NaturalsBelow.top(0));
+
+  -- The Cauchy–Schwarz box: border² < 1·2.
+  border * border
+      < Matrix.squareForm(NaturalsBelow.top(0), NaturalsBelow.top(0))
+        * (Matrix.truant(Matrix.squareForm) : ℤ)
+      by Matrix.escalation_border_bound;
+  Matrix.squareForm(NaturalsBelow.top(0), NaturalsBelow.top(0)) = (1 : ℤ)
+      by Matrix.identity_entry_diagonal as diagonalIsOne;
+  (Matrix.truant(Matrix.squareForm) : ℤ)
+     = ((2 : ℕ) : ℤ)    by substituting Matrix.squareForm_truant
+     = (2 : ℤ)
+  as truantCastIsTwo;
+  border * border < (1 : ℤ) * (Matrix.truant(Matrix.squareForm) : ℤ) by substituting diagonalIsOne;
+  border * border < (1 : ℤ) * (2 : ℤ) by substituting truantCastIsTwo;
+  (1 : ℤ) * (2 : ℤ) = (2 : ℤ);
+  border * border < (2 : ℤ) by substitution;
+  border = -(1 : ℤ) ∨ border = (0 : ℤ) ∨ border = (1 : ℤ) by Integer.square_below_two;
+
+  done by cases {
+    case border = -(1 : ℤ) as borderNegativeOne: {
+        border * border
+           = (-(1 : ℤ)) * (-(1 : ℤ))   by substituting borderNegativeOne
+           = (1 : ℤ);
+        Matrix.IsIsometric(B, Matrix.sumOfTwoSquaresForm)
+            by Matrix.squareForm_escalation_isometric_of_unit_border;
+        done
+      }
+    case border = (0 : ℤ) ∨ border = (1 : ℤ): done by cases {
+        case border = (0 : ℤ) as borderZero: {
+            B = (Matrix.identity(Integer.commutative_ring_bundle, 2)
+                 + border • Matrix.upperRightUnitᵀ)
+                + (border • Matrix.upperRightUnit + Matrix.lowerRightUnit)
+                by Matrix.squareForm_escalation_decomposition;
+            (0 : ℤ) • Matrix.upperRightUnitᵀ = Matrix.zero(Integer.commutative_ring_bundle, 2, 2)
+                by Matrix.scale_zero_scalar as transposedScaleVanishes;
+            (0 : ℤ) • Matrix.upperRightUnit = Matrix.zero(Integer.commutative_ring_bundle, 2, 2)
+                by Matrix.scale_zero_scalar as scaleVanishes;
+            B  = (Matrix.identity(Integer.commutative_ring_bundle, 2)
+                  + border • Matrix.upperRightUnitᵀ)
+                 + (border • Matrix.upperRightUnit + Matrix.lowerRightUnit)
+               = (Matrix.identity(Integer.commutative_ring_bundle, 2)
+                  + (0 : ℤ) • Matrix.upperRightUnitᵀ)
+                 + ((0 : ℤ) • Matrix.upperRightUnit + Matrix.lowerRightUnit)
+                     by substituting borderZero
+               = (Matrix.identity(Integer.commutative_ring_bundle, 2)
+                  + Matrix.zero(Integer.commutative_ring_bundle, 2, 2))
+                 + ((0 : ℤ) • Matrix.upperRightUnit + Matrix.lowerRightUnit)
+                     by substituting transposedScaleVanishes
+               = (Matrix.identity(Integer.commutative_ring_bundle, 2)
+                  + Matrix.zero(Integer.commutative_ring_bundle, 2, 2))
+                 + (Matrix.zero(Integer.commutative_ring_bundle, 2, 2) + Matrix.lowerRightUnit)
+                     by substituting scaleVanishes
+               = Matrix.identity(Integer.commutative_ring_bundle, 2)
+                 + (Matrix.zero(Integer.commutative_ring_bundle, 2, 2) + Matrix.lowerRightUnit)
+                     by substituting Matrix.add_zero
+               = Matrix.identity(Integer.commutative_ring_bundle, 2) + Matrix.lowerRightUnit
+                     by substituting Matrix.zero_add
+               = Matrix.squarePlusDoubleSquareForm
+                     by Matrix.squarePlusDoubleSquareForm_splits
+            as diagonalReads;
+            Matrix.IsIsometric(Matrix.squarePlusDoubleSquareForm, Matrix.squarePlusDoubleSquareForm)
+                by Matrix.IsIsometric.reflexive;
+            Matrix.IsIsometric(B, Matrix.squarePlusDoubleSquareForm) by substituting diagonalReads;
+            done
+          }
+        case border = (1 : ℤ) as borderOne: {
+            border * border
+               = (1 : ℤ) * (1 : ℤ)   by substituting borderOne
+               = (1 : ℤ);
+            Matrix.IsIsometric(B, Matrix.sumOfTwoSquaresForm)
+                by Matrix.squareForm_escalation_isometric_of_unit_border;
+            done
+          }
+      }
+  }
+}
