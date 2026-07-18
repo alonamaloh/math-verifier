@@ -1,0 +1,221 @@
+-- Algebra/escalation.math
+--
+-- The escalation step (fifteen-theorem stage S3.E1). An escalation of a
+-- form A is a symmetric positive-definite extension of A by one basis
+-- vector whose norm is the truant of A — the bordered Gram matrix
+-- [[A, b], [bᵀ, truant(A)]]. An escalation represents the truant (at the
+-- new basis vector), and the Cauchy–Schwarz entry bound confines its
+-- border column to the explicit box b_i² < A(i,i)·truant(A) — so each
+-- escalation step searches a finite, explicitly bounded set of forms.
+
+module Algebra.escalation
+
+import axioms
+import Logic.basics
+import Logic.functions
+import Logic.exists
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+import Natural.subtraction
+import Natural.classical_decidable
+import Natural.least_number
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.embedding
+import Integer.order
+import Integer.order_multiply
+import Integer.units
+import Integer.integral_domain
+import Set.finite
+import Set.finite_pigeonhole
+import Lists.list
+import Lists.map
+import Lists.append
+import Lists.distinct
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.ring_from_integer
+import Algebra.integer_domain
+import Algebra.finite_permutation
+import Algebra.permutation_enumeration
+import Algebra.permutation_sign
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.matrix_transpose
+import Algebra.matrix_vector
+import Algebra.matrix_submatrix
+import Algebra.determinant
+import Algebra.determinant_identity
+import Algebra.determinant_transpose
+import Algebra.determinant_multiplicative
+import Algebra.alternating_collapse
+import Algebra.determinant_row_permutation
+import Algebra.adjugate
+import Algebra.matrix_inverse
+import Algebra.determinant_bordered
+import Algebra.quadratic_form
+import Algebra.schur_complement
+import Algebra.integer_quadratic_form
+import Algebra.square_form
+import Algebra.truant
+
+-- ----------------------------------------------------------------------
+-- An escalation of A: a symmetric positive-definite bordered extension
+-- whose corner — the norm of the new basis vector — is the truant of A.
+-- (A universal form has no escalations: its junk truant 0 cannot be a
+-- positive-definite diagonal entry.)
+
+definition Matrix.IsEscalation {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n)) : Proposition :=
+  Matrix.IsSymmetric(B)
+  ∧ Matrix.IsPositiveDefinite(B)
+  ∧ Matrix.leadingBlock(B) = A
+  ∧ Matrix.corner(B) = (Matrix.truant(A) : ℤ)
+
+-- The four faces of the property, as citable lemmas.
+theorem Matrix.IsEscalation.symmetric {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n))
+        (escalation : Matrix.IsEscalation(A, B)) : Matrix.IsSymmetric(B) := {
+  Matrix.IsSymmetric(B)
+  ∧ Matrix.IsPositiveDefinite(B)
+  ∧ Matrix.leadingBlock(B) = A
+  ∧ Matrix.corner(B) = (Matrix.truant(A) : ℤ) by escalation;
+  done
+}
+
+theorem Matrix.IsEscalation.positive_definite {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n))
+        (escalation : Matrix.IsEscalation(A, B)) : Matrix.IsPositiveDefinite(B) := {
+  Matrix.IsSymmetric(B)
+  ∧ Matrix.IsPositiveDefinite(B)
+  ∧ Matrix.leadingBlock(B) = A
+  ∧ Matrix.corner(B) = (Matrix.truant(A) : ℤ) by escalation;
+  done
+}
+
+theorem Matrix.IsEscalation.block {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n))
+        (escalation : Matrix.IsEscalation(A, B)) : Matrix.leadingBlock(B) = A := {
+  Matrix.IsSymmetric(B)
+  ∧ Matrix.IsPositiveDefinite(B)
+  ∧ Matrix.leadingBlock(B) = A
+  ∧ Matrix.corner(B) = (Matrix.truant(A) : ℤ) by escalation;
+  done
+}
+
+theorem Matrix.IsEscalation.corner_is_truant {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n))
+        (escalation : Matrix.IsEscalation(A, B)) : Matrix.corner(B) = (Matrix.truant(A) : ℤ) := {
+  Matrix.IsSymmetric(B)
+  ∧ Matrix.IsPositiveDefinite(B)
+  ∧ Matrix.leadingBlock(B) = A
+  ∧ Matrix.corner(B) = (Matrix.truant(A) : ℤ) by escalation;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The escalated form inherits its block: the leading block of an
+-- escalation is symmetric and positive-definite — the escalator tree
+-- stays inside positive-definite forms.
+
+theorem Matrix.escalation_block_symmetric {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n))
+        (escalation : Matrix.IsEscalation(A, B)) : Matrix.IsSymmetric(A) := {
+  Matrix.IsSymmetric(B) by Matrix.IsEscalation.symmetric;
+  Matrix.leadingBlock(B) = A by Matrix.IsEscalation.block as blockReads;
+  Matrix.IsSymmetric(
+      Matrix.submatrix(B, NaturalsBelow.inclusion(n), NaturalsBelow.inclusion(n)))
+      by Matrix.submatrix_symmetric;
+  Matrix.IsSymmetric(Matrix.leadingBlock(B));
+  done by substituting blockReads
+}
+
+theorem Matrix.escalation_block_positive_definite {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n))
+        (escalation : Matrix.IsEscalation(A, B)) : Matrix.IsPositiveDefinite(A) := {
+  Matrix.IsPositiveDefinite(B) by Matrix.IsEscalation.positive_definite;
+  Matrix.leadingBlock(B) = A by Matrix.IsEscalation.block as blockReads;
+  n ≤ 1 + n as blockBound;
+  Matrix.leadingBlock(B) = Matrix.leadingSubmatrix(B, blockBound)
+      by Matrix.leadingBlock_leadingSubmatrix as blockIsLeading;
+  Matrix.IsPositiveDefinite(Matrix.leadingSubmatrix(B, blockBound))
+      by Matrix.positive_definite_leadingSubmatrix;
+  Matrix.IsPositiveDefinite(Matrix.leadingBlock(B)) by substituting blockIsLeading;
+  done by substituting blockReads
+}
+
+-- ----------------------------------------------------------------------
+-- An escalation represents the truant: the new basis vector's norm is
+-- the corner.
+
+theorem Matrix.escalation_represents_truant {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n))
+        (escalation : Matrix.IsEscalation(A, B))
+        : Matrix.Represents(B, (Matrix.truant(A) : ℤ)) := {
+  Matrix.corner(B) = (Matrix.truant(A) : ℤ) by Matrix.IsEscalation.corner_is_truant
+      as cornerIsTruant;
+  Matrix.quadraticForm(B,
+      Matrix.standardBasisRow(Integer.commutative_ring_bundle, 1 + n, NaturalsBelow.top(n)))
+     = B(NaturalsBelow.top(n), NaturalsBelow.top(n))    by Matrix.quadraticForm_standardBasis
+     = (Matrix.truant(A) : ℤ)                           by cornerIsTruant;
+  witness Matrix.standardBasisRow(Integer.commutative_ring_bundle, 1 + n, NaturalsBelow.top(n))
+      with done
+}
+
+-- ----------------------------------------------------------------------
+-- The escalation bound (★): the border column lives in the explicit box
+-- b_i² < A(i,i)·truant(A). With the fixed block A and the fixed corner,
+-- this bounds every entry of an escalation — the finite cover that makes
+-- the escalation step a finite search.
+
+theorem Matrix.escalation_border_bound {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n))
+        (escalation : Matrix.IsEscalation(A, B)) (i : NaturalsBelow(n))
+        : Matrix.borderColumn(B)(i) * Matrix.borderColumn(B)(i)
+          < A(i, i) * (Matrix.truant(A) : ℤ) := {
+  Matrix.IsSymmetric(B) by Matrix.IsEscalation.symmetric;
+  Matrix.IsPositiveDefinite(B) by Matrix.IsEscalation.positive_definite;
+  Matrix.leadingBlock(B) = A by Matrix.IsEscalation.block as blockReads;
+  Matrix.corner(B) = (Matrix.truant(A) : ℤ) by Matrix.IsEscalation.corner_is_truant
+      as cornerIsTruant;
+
+  ¬(NaturalsBelow.inclusion(n, i) = NaturalsBelow.top(n)) by NaturalsBelow.top_not_inclusion;
+  B(NaturalsBelow.inclusion(n, i), NaturalsBelow.top(n))
+      * B(NaturalsBelow.inclusion(n, i), NaturalsBelow.top(n))
+      < B(NaturalsBelow.inclusion(n, i), NaturalsBelow.inclusion(n, i))
+        * B(NaturalsBelow.top(n), NaturalsBelow.top(n))
+      by Matrix.cauchy_schwarz_entry_bound;
+
+  B(NaturalsBelow.inclusion(n, i), NaturalsBelow.inclusion(n, i))
+     = Matrix.leadingBlock(B)(i, i)
+     = A(i, i)                          by substituting blockReads
+  as diagonalReads;
+  B(NaturalsBelow.top(n), NaturalsBelow.top(n))
+     = Matrix.corner(B)
+     = (Matrix.truant(A) : ℤ)           by cornerIsTruant
+  as cornerReads;
+
+  Matrix.borderColumn(B)(i) * Matrix.borderColumn(B)(i)
+      < A(i, i) * B(NaturalsBelow.top(n), NaturalsBelow.top(n))
+      by substituting diagonalReads;
+  done by substituting cornerReads
+}
