@@ -7294,17 +7294,43 @@ std::optional<ExpressionPointer> Elaborator::synthesizeCofactorProofOpened(
             cancellation.poly = g;
             cancellation.reciprocalHash = pair.reciprocalHash;
             cancellation.leadingCoeff = 0;
+            // Lead = the graded-lex maximal monomial (total degree first,
+            // then the sorted-hash vector lexicographically). For an
+            // atomic base this is the unique reciprocal monomial; for a
+            // base containing a SUM (`1+x`, the partial-fraction shape)
+            // `g` has several reciprocal monomials, and dividing by the
+            // maximal one feeds back strictly smaller remainders — the
+            // standard multivariate division step, so the loop below
+            // still terminates (the guard backstops pathological
+            // orders). The lead always carries the reciprocal atom:
+            // every non-constant monomial of `b·r − 1` does, and the
+            // constant has degree 0.
             bool found = false;
             for (const auto& entry : g) {
-                if (std::find(entry.first.begin(), entry.first.end(),
-                              pair.reciprocalHash) != entry.first.end()) {
-                    if (found) return std::nullopt;  // >1 reciprocal monomial
+                if (entry.second == 0) continue;
+                bool bigger = !found;
+                if (found) {
+                    if (entry.first.size()
+                        != cancellation.leadingSig.size()) {
+                        bigger = entry.first.size()
+                            > cancellation.leadingSig.size();
+                    } else {
+                        bigger = entry.first > cancellation.leadingSig;
+                    }
+                }
+                if (bigger) {
                     cancellation.leadingSig = entry.first;
                     cancellation.leadingCoeff = entry.second;
                     found = true;
                 }
             }
             if (!found || cancellation.leadingCoeff == 0) return std::nullopt;
+            if (std::find(cancellation.leadingSig.begin(),
+                          cancellation.leadingSig.end(),
+                          pair.reciprocalHash)
+                == cancellation.leadingSig.end()) {
+                return std::nullopt;
+            }
             cancellations.push_back(std::move(cancellation));
         }
         // Multiset subtraction on sorted signatures: `super ⊇ subset`?
