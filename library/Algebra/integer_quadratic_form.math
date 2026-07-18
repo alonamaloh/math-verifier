@@ -56,6 +56,7 @@ import Algebra.adjugate
 import Algebra.matrix_inverse
 import Algebra.unimodular
 import Algebra.quadratic_form
+import Algebra.matrix_direct_sum
 
 -- A form represents an integer when the integer is a value of the form.
 definition Matrix.Represents {n : ℕ}
@@ -347,4 +348,158 @@ theorem Matrix.isometric_determinant {n : ℕ}
      = (Matrix.determinant(U) * Matrix.determinant(U)) * Matrix.determinant(A)   by Matrix.determinant_pullback
      = Integer.one * Matrix.determinant(A)                                       by substituting determinantSquareOne
      = Matrix.determinant(A)
+}
+
+-- ----------------------------------------------------------------------
+-- Direct sums and representability: each summand is a sublattice of the
+-- sum (the block pullback), so anything a summand represents, the sum
+-- represents — and a universal summand makes the whole sum universal.
+-- This is how the escalation method carries universality upward.
+
+theorem Matrix.directSum_represents_left {n p : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (B : Matrix(Integer.commutative_ring_bundle, p, p)) (target : ℤ)
+        (represented : Matrix.Represents(A, target))
+        : Matrix.Represents(Matrix.directSum(A, B), target) := {
+  (Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, n, p)ᵀ * Matrix.directSum(A, B))
+      * Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, n, p) = A
+      by Matrix.directSum_pullback_left as pullbackReads;
+  Matrix.Represents(
+      (Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, n, p)ᵀ * Matrix.directSum(A, B))
+          * Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, n, p),
+      target)
+      by substituting pullbackReads;
+  done by Matrix.represents_of_sublattice
+}
+
+theorem Matrix.directSum_represents_right {n p : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (B : Matrix(Integer.commutative_ring_bundle, p, p)) (target : ℤ)
+        (represented : Matrix.Represents(B, target))
+        : Matrix.Represents(Matrix.directSum(A, B), target) := {
+  (Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, n, p)ᵀ * Matrix.directSum(A, B))
+      * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, n, p) = B
+      by Matrix.directSum_pullback_right as pullbackReads;
+  Matrix.Represents(
+      (Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, n, p)ᵀ * Matrix.directSum(A, B))
+          * Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, n, p),
+      target)
+      by substituting pullbackReads;
+  done by Matrix.represents_of_sublattice
+}
+
+theorem Matrix.directSum_universal_left {n p : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (B : Matrix(Integer.commutative_ring_bundle, p, p))
+        (universal : Matrix.IsUniversal(A))
+        : Matrix.IsUniversal(Matrix.directSum(A, B)) := {
+  take m : ℕ;
+  suppose m ≥ 1;
+  Matrix.Represents(A, (m : ℤ)) by universal;
+  done by Matrix.directSum_represents_left
+}
+
+-- The direct sum of positive-definite forms is positive-definite: a
+-- nonzero vector has a nonzero restriction on at least one block, and
+-- the form splits as the sum of the block values.
+theorem Matrix.directSum_positive_definite {n p : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (B : Matrix(Integer.commutative_ring_bundle, p, p))
+        (positiveDefiniteA : Matrix.IsPositiveDefinite(A))
+        (positiveDefiniteB : Matrix.IsPositiveDefinite(B))
+        : Matrix.IsPositiveDefinite(Matrix.directSum(A, B)) := {
+  take z : RingVector(Integer.commutative_ring_bundle, n + p);
+  suppose ¬(z = RingVector.zero(Integer.commutative_ring_bundle, n + p)) as zNonzero;
+  let u : RingVector(Integer.commutative_ring_bundle, n) := RingVector.restrictLeft(z);
+  let v : RingVector(Integer.commutative_ring_bundle, p) := RingVector.restrictRight(z);
+  z = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, n, p) · u
+      + Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, n, p) · v
+      by RingVector.directSum_decomposition as decomposition;
+  Matrix.quadraticForm(Matrix.directSum(A, B), z)
+     = Matrix.quadraticForm(Matrix.directSum(A, B),
+           Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, n, p) · u
+           + Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, n, p) · v)
+           by substituting decomposition
+     = Matrix.quadraticForm(A, u) + Matrix.quadraticForm(B, v)
+           by Matrix.directSum_quadraticForm
+  as valueSplits;
+
+  Matrix.quadraticForm(A, u) ≥ (0 : ℤ) by {
+      done by cases {
+        case u = RingVector.zero(Integer.commutative_ring_bundle, n) as restrictionZero: {
+            Matrix.quadraticForm(A, RingVector.zero(Integer.commutative_ring_bundle, n)) = Integer.zero
+                by Matrix.quadraticForm_zero;
+            done
+          }
+        otherwise: {
+            Matrix.quadraticForm(A, u) > (0 : ℤ) by positiveDefiniteA;
+            done by Integer.LessThan.weaken
+          }
+      }
+    };
+  Matrix.quadraticForm(B, v) ≥ (0 : ℤ) by {
+      done by cases {
+        case v = RingVector.zero(Integer.commutative_ring_bundle, p) as restrictionZero: {
+            Matrix.quadraticForm(B, RingVector.zero(Integer.commutative_ring_bundle, p)) = Integer.zero
+                by Matrix.quadraticForm_zero;
+            done
+          }
+        otherwise: {
+            Matrix.quadraticForm(B, v) > (0 : ℤ) by positiveDefiniteB;
+            done by Integer.LessThan.weaken
+          }
+      }
+    };
+
+  done by cases {
+    case u = RingVector.zero(Integer.commutative_ring_bundle, n) as leftZero: {
+        -- The right restriction must carry the nonzero-ness.
+        ¬(v = RingVector.zero(Integer.commutative_ring_bundle, p)) by {
+            suppose v = RingVector.zero(Integer.commutative_ring_bundle, p) as rightZero;
+            RingVector.zero(Integer.commutative_ring_bundle, n + p)
+                + RingVector.zero(Integer.commutative_ring_bundle, n + p)
+               = RingVector.zero(Integer.commutative_ring_bundle, n + p) by {
+                  ∀ (k : NaturalsBelow(n + p)).
+                      (RingVector.zero(Integer.commutative_ring_bundle, n + p)
+                       + RingVector.zero(Integer.commutative_ring_bundle, n + p))(k)
+                      = RingVector.zero(Integer.commutative_ring_bundle, n + p)(k)
+                      by (k : NaturalsBelow(n + p)) ↦ ring;
+                  done by RingVector.equal_of_pointwise
+                } as zeroFolds;
+            z  = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, n, p) · u
+                 + Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, n, p) · v
+                     by decomposition
+               = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, n, p)
+                     · RingVector.zero(Integer.commutative_ring_bundle, n)
+                 + Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, n, p) · v
+                     by substituting leftZero
+               = RingVector.zero(Integer.commutative_ring_bundle, n + p)
+                 + Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, n, p) · v
+                     by substituting Matrix.applyVector_zero
+               = RingVector.zero(Integer.commutative_ring_bundle, n + p)
+                 + Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, n, p)
+                       · RingVector.zero(Integer.commutative_ring_bundle, p)
+                     by substituting rightZero
+               = RingVector.zero(Integer.commutative_ring_bundle, n + p)
+                 + RingVector.zero(Integer.commutative_ring_bundle, n + p)
+                     by substituting Matrix.applyVector_zero
+               = RingVector.zero(Integer.commutative_ring_bundle, n + p)
+                     by zeroFolds;
+            done
+          };
+        Matrix.quadraticForm(B, v) > (0 : ℤ) by positiveDefiniteB;
+        Matrix.quadraticForm(A, u) + Matrix.quadraticForm(B, v) > (0 : ℤ)
+            by Integer.add_nonneg_positive;
+        done by substituting valueSplits
+      }
+    otherwise as leftNonzero: {
+        Matrix.quadraticForm(A, u) > (0 : ℤ) by positiveDefiniteA;
+        Matrix.quadraticForm(B, v) + Matrix.quadraticForm(A, u) > (0 : ℤ)
+            by Integer.add_nonneg_positive;
+        Matrix.quadraticForm(A, u) + Matrix.quadraticForm(B, v)
+           = Matrix.quadraticForm(B, v) + Matrix.quadraticForm(A, u);
+        Matrix.quadraticForm(A, u) + Matrix.quadraticForm(B, v) > (0 : ℤ);
+        done by substituting valueSplits
+      }
+  }
 }

@@ -390,3 +390,34 @@ theorem Matrix.transpose_adjoint {r : CommutativeRing} {rows columns : ℕ}
                     })
      = RingVector.innerProduct(u, A · v)
 }
+
+-- The zero matrix kills every vector.
+theorem Matrix.zero_applyVector {r : CommutativeRing} {rows columns : ℕ} (x : RingVector(r, columns))
+        : Matrix.zero(r, rows, columns) · x = RingVector.zero(r, rows) := {
+  ∀ (i : NaturalsBelow(rows)). (Matrix.zero(r, rows, columns) · x)(i) = RingVector.zero(r, rows)(i)
+      by (i : NaturalsBelow(rows)) ↦ {
+          ∀ (k : NaturalsBelow(columns)).
+              Matrix.zero(r, rows, columns)(i, k) * x(k) = CommutativeRing.zero(r)
+              by (k : NaturalsBelow(columns)) ↦ done;
+          (Matrix.zero(r, rows, columns) · x)(i)
+             = CommutativeRing.sumOver((k : NaturalsBelow(columns)) ↦ CommutativeRing.zero(r),
+                   NaturalsBelow.enumerate(columns))
+                   by CommutativeRing.sumOver_congruence
+             = RingVector.zero(r, rows)(i)
+                   by CommutativeRing.sumOver_zero_function
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+-- Pairing with the zero vector gives zero.
+theorem RingVector.innerProduct_zero_right {r : CommutativeRing} {n : ℕ} (u : RingVector(r, n))
+        : RingVector.innerProduct(u, RingVector.zero(r, n)) = CommutativeRing.zero(r) := {
+  ∀ (k : NaturalsBelow(n)). u(k) * RingVector.zero(r, n)(k) = CommutativeRing.zero(r)
+      by (k : NaturalsBelow(n)) ↦ done;
+  RingVector.innerProduct(u, RingVector.zero(r, n))
+     = CommutativeRing.sumOver((k : NaturalsBelow(n)) ↦ CommutativeRing.zero(r), NaturalsBelow.enumerate(n))
+           by CommutativeRing.sumOver_congruence
+     = CommutativeRing.zero(r)
+           by CommutativeRing.sumOver_zero_function;
+  done
+}

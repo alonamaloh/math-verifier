@@ -274,3 +274,147 @@ theorem Matrix.inclusionMatrix_applyVector_nonzero {r : CommutativeRing} {n k : 
   x = RingVector.zero(r, k) by RingVector.equal_of_pointwise;
   done
 }
+
+-- ----------------------------------------------------------------------
+-- The inclusion-matrix calculus: multiplying by an inclusion matrix on
+-- the left places rows (selected rows read the factor, others vanish),
+-- and by its transpose on the right places columns. These four entry
+-- laws assemble block matrices — the direct sum reads its blocks off
+-- them directly.
+
+theorem Matrix.inclusionMatrix_multiply_entry_selected {r : CommutativeRing} {n k columns : ℕ}
+        (select : NaturalsBelow(k) → NaturalsBelow(n)) (injective : Function.IsInjective(select))
+        (Y : Matrix(r, k, columns)) (p : NaturalsBelow(k)) (q : NaturalsBelow(columns))
+        : (Matrix.inclusionMatrix(r, select) * Y)(select(p), q) = Y(p, q) := {
+  List.Distinct(NaturalsBelow(k), NaturalsBelow.enumerate(k)) by NaturalsBelow.enumerate_distinct;
+  p ∈ NaturalsBelow.enumerate(k) by NaturalsBelow.enumerate_complete;
+  ∀ (t : NaturalsBelow(k)). t ∈ NaturalsBelow.enumerate(k) → ¬(t = p)
+      → Matrix.inclusionMatrix(r, select)(select(p), t) * Y(t, q) = CommutativeRing.zero(r)
+      by (t : NaturalsBelow(k)) (tMember : t ∈ NaturalsBelow.enumerate(k)) (tNotP : ¬(t = p)) ↦ {
+          ¬(select(p) = select(t)) by (imagesEqual : select(p) = select(t)) ↦ {
+              p = t by injective;
+              t = p;
+              done
+            };
+          Matrix.inclusionMatrix(r, select)(select(p), t) = CommutativeRing.zero(r)
+              by Matrix.inclusionMatrix_entry_off;
+          Matrix.inclusionMatrix(r, select)(select(p), t) * Y(t, q)
+             = CommutativeRing.zero(r) * Y(t, q)   by substitution
+             = CommutativeRing.zero(r)
+        };
+  Matrix.inclusionMatrix(r, select)(select(p), p) = CommutativeRing.one(r)
+      by Matrix.inclusionMatrix_entry_at as entryAtSelect;
+  (Matrix.inclusionMatrix(r, select) * Y)(select(p), q)
+     = CommutativeRing.sumOver(
+           (t : NaturalsBelow(k)) ↦ Matrix.inclusionMatrix(r, select)(select(p), t) * Y(t, q),
+           NaturalsBelow.enumerate(k))
+     = Matrix.inclusionMatrix(r, select)(select(p), p) * Y(p, q)   by CommutativeRing.sumOver_single
+     = CommutativeRing.one(r) * Y(p, q)                            by substituting entryAtSelect
+     = Y(p, q)
+}
+
+theorem Matrix.inclusionMatrix_multiply_entry_off {r : CommutativeRing} {n k columns : ℕ}
+        (select : NaturalsBelow(k) → NaturalsBelow(n)) (Y : Matrix(r, k, columns))
+        (l : NaturalsBelow(n)) (q : NaturalsBelow(columns))
+        (offImage : ∀ (t : NaturalsBelow(k)). ¬(l = select(t)))
+        : (Matrix.inclusionMatrix(r, select) * Y)(l, q) = CommutativeRing.zero(r) := {
+  ∀ (t : NaturalsBelow(k)).
+      Matrix.inclusionMatrix(r, select)(l, t) * Y(t, q) = CommutativeRing.zero(r)
+      by (t : NaturalsBelow(k)) ↦ {
+          ¬(l = select(t)) by offImage;
+          Matrix.inclusionMatrix(r, select)(l, t) = CommutativeRing.zero(r)
+              by Matrix.inclusionMatrix_entry_off;
+          Matrix.inclusionMatrix(r, select)(l, t) * Y(t, q)
+             = CommutativeRing.zero(r) * Y(t, q)   by substitution
+             = CommutativeRing.zero(r)
+        };
+  (Matrix.inclusionMatrix(r, select) * Y)(l, q)
+     = CommutativeRing.sumOver(
+           (t : NaturalsBelow(k)) ↦ Matrix.inclusionMatrix(r, select)(l, t) * Y(t, q),
+           NaturalsBelow.enumerate(k))
+     = CommutativeRing.sumOver((t : NaturalsBelow(k)) ↦ CommutativeRing.zero(r), NaturalsBelow.enumerate(k))
+           by CommutativeRing.sumOver_congruence
+     = CommutativeRing.zero(r)
+           by CommutativeRing.sumOver_zero_function;
+  done
+}
+
+theorem Matrix.multiply_inclusionMatrix_transpose_entry_selected {r : CommutativeRing} {rows n k : ℕ}
+        (select : NaturalsBelow(k) → NaturalsBelow(n)) (injective : Function.IsInjective(select))
+        (X : Matrix(r, rows, k)) (i : NaturalsBelow(rows)) (q : NaturalsBelow(k))
+        : (X * Matrix.inclusionMatrix(r, select)ᵀ)(i, select(q)) = X(i, q) := {
+  List.Distinct(NaturalsBelow(k), NaturalsBelow.enumerate(k)) by NaturalsBelow.enumerate_distinct;
+  q ∈ NaturalsBelow.enumerate(k) by NaturalsBelow.enumerate_complete;
+  ∀ (t : NaturalsBelow(k)). t ∈ NaturalsBelow.enumerate(k) → ¬(t = q)
+      → X(i, t) * Matrix.inclusionMatrix(r, select)ᵀ(t, select(q)) = CommutativeRing.zero(r)
+      by (t : NaturalsBelow(k)) (tMember : t ∈ NaturalsBelow.enumerate(k)) (tNotQ : ¬(t = q)) ↦ {
+          ¬(select(q) = select(t)) by (imagesEqual : select(q) = select(t)) ↦ {
+              q = t by injective;
+              t = q;
+              done
+            };
+          Matrix.inclusionMatrix(r, select)ᵀ(t, select(q)) = CommutativeRing.zero(r)
+              by Matrix.inclusionMatrix_entry_off;
+          X(i, t) * Matrix.inclusionMatrix(r, select)ᵀ(t, select(q))
+             = X(i, t) * CommutativeRing.zero(r)   by substitution
+             = CommutativeRing.zero(r)
+        };
+  Matrix.inclusionMatrix(r, select)ᵀ(q, select(q)) = CommutativeRing.one(r)
+      by Matrix.inclusionMatrix_entry_at as entryAtSelect;
+  (X * Matrix.inclusionMatrix(r, select)ᵀ)(i, select(q))
+     = CommutativeRing.sumOver(
+           (t : NaturalsBelow(k)) ↦ X(i, t) * Matrix.inclusionMatrix(r, select)ᵀ(t, select(q)),
+           NaturalsBelow.enumerate(k))
+     = X(i, q) * Matrix.inclusionMatrix(r, select)ᵀ(q, select(q))   by CommutativeRing.sumOver_single
+     = X(i, q) * CommutativeRing.one(r)                             by substituting entryAtSelect
+     = X(i, q)
+}
+
+theorem Matrix.multiply_inclusionMatrix_transpose_entry_off {r : CommutativeRing} {rows n k : ℕ}
+        (select : NaturalsBelow(k) → NaturalsBelow(n)) (X : Matrix(r, rows, k))
+        (i : NaturalsBelow(rows)) (l : NaturalsBelow(n))
+        (offImage : ∀ (t : NaturalsBelow(k)). ¬(l = select(t)))
+        : (X * Matrix.inclusionMatrix(r, select)ᵀ)(i, l) = CommutativeRing.zero(r) := {
+  ∀ (t : NaturalsBelow(k)).
+      X(i, t) * Matrix.inclusionMatrix(r, select)ᵀ(t, l) = CommutativeRing.zero(r)
+      by (t : NaturalsBelow(k)) ↦ {
+          ¬(l = select(t)) by offImage;
+          Matrix.inclusionMatrix(r, select)ᵀ(t, l) = CommutativeRing.zero(r)
+              by Matrix.inclusionMatrix_entry_off;
+          X(i, t) * Matrix.inclusionMatrix(r, select)ᵀ(t, l)
+             = X(i, t) * CommutativeRing.zero(r)   by substitution
+             = CommutativeRing.zero(r)
+        };
+  (X * Matrix.inclusionMatrix(r, select)ᵀ)(i, l)
+     = CommutativeRing.sumOver(
+           (t : NaturalsBelow(k)) ↦ X(i, t) * Matrix.inclusionMatrix(r, select)ᵀ(t, l),
+           NaturalsBelow.enumerate(k))
+     = CommutativeRing.sumOver((t : NaturalsBelow(k)) ↦ CommutativeRing.zero(r), NaturalsBelow.enumerate(k))
+           by CommutativeRing.sumOver_congruence
+     = CommutativeRing.zero(r)
+           by CommutativeRing.sumOver_zero_function;
+  done
+}
+
+-- Off the selection's image the placed vector vanishes: no column of the
+-- inclusion matrix puts weight there.
+theorem Matrix.inclusionMatrix_applyVector_off {r : CommutativeRing} {n k : ℕ}
+        (select : NaturalsBelow(k) → NaturalsBelow(n)) (x : RingVector(r, k)) (l : NaturalsBelow(n))
+        (offImage : ∀ (t : NaturalsBelow(k)). ¬(l = select(t)))
+        : (Matrix.inclusionMatrix(r, select) · x)(l) = CommutativeRing.zero(r) := {
+  ∀ (t : NaturalsBelow(k)). Matrix.inclusionMatrix(r, select)(l, t) * x(t) = CommutativeRing.zero(r)
+      by (t : NaturalsBelow(k)) ↦ {
+          ¬(l = select(t)) by offImage;
+          Matrix.inclusionMatrix(r, select)(l, t) = CommutativeRing.zero(r)
+              by Matrix.inclusionMatrix_entry_off;
+          Matrix.inclusionMatrix(r, select)(l, t) * x(t)
+             = CommutativeRing.zero(r) * x(t)   by substitution
+             = CommutativeRing.zero(r)
+        };
+  (Matrix.inclusionMatrix(r, select) · x)(l)
+     = CommutativeRing.sumOver((t : NaturalsBelow(k)) ↦ CommutativeRing.zero(r), NaturalsBelow.enumerate(k))
+           by CommutativeRing.sumOver_congruence
+     = CommutativeRing.zero(r)
+           by CommutativeRing.sumOver_zero_function;
+  done
+}

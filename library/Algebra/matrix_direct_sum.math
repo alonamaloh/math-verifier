@@ -1,0 +1,622 @@
+-- Algebra/matrix_direct_sum.math
+--
+-- The direct sum of square matrices: A ⊕ B is the block-diagonal matrix
+-- [[A, 0], [0, B]] on n + p indices, assembled algebraically from the
+-- inclusion matrices of the two index embeddings —
+-- A ⊕ B = J_L·A·J_Lᵀ + J_R·B·J_Rᵀ — so the block structure is read off
+-- the inclusion-matrix calculus rather than an index case-split. The
+-- pullbacks J_Lᵀ·(A ⊕ B)·J_L = A and J_Rᵀ·(A ⊕ B)·J_R = B exhibit each
+-- summand as a sublattice restriction — the lever that transfers
+-- represented numbers (and universality) from a summand to the sum.
+
+module Algebra.matrix_direct_sum
+
+import Logic.basics
+import Logic.functions
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+import Natural.add_order
+import Natural.subtraction
+import Natural.classical_decidable
+import Set.finite
+import Lists.list
+import Lists.map
+import Lists.distinct
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.permutation_enumeration
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.matrix_transpose
+import Algebra.matrix_vector
+import Algebra.matrix_submatrix
+import Algebra.finite_permutation
+import Algebra.permutation_sign
+import Algebra.determinant
+import Algebra.determinant_identity
+import Algebra.determinant_transpose
+import Algebra.determinant_multiplicative
+import Algebra.alternating_collapse
+import Algebra.determinant_row_permutation
+import Algebra.adjugate
+import Algebra.matrix_inverse
+import Algebra.quadratic_form
+
+-- ----------------------------------------------------------------------
+-- The two embeddings of the summand index ranges: values below n keep
+-- their value, values below p land shifted by n.
+
+theorem NaturalsBelow.sumLeft_bound {n p : ℕ} (element : NaturalsBelow(n))
+        : NaturalsBelow.value(element) < n + p :=
+  NaturalsBelow.value(element)
+     < n
+     ≤ n + p
+
+definition NaturalsBelow.sumLeft (n p : ℕ) (element : NaturalsBelow(n)) : NaturalsBelow(n + p) :=
+  NaturalsBelow.make(NaturalsBelow.value(element), NaturalsBelow.sumLeft_bound)
+
+theorem NaturalsBelow.shift_bound {p : ℕ} (n : ℕ) (element : NaturalsBelow(p))
+        : n + NaturalsBelow.value(element) < n + p := {
+  NaturalsBelow.value(element) < p;
+  done by Natural.add_left_strict_monotone
+}
+
+definition NaturalsBelow.shift {p : ℕ} (n : ℕ) (element : NaturalsBelow(p)) : NaturalsBelow(n + p) :=
+  NaturalsBelow.make(n + NaturalsBelow.value(element), NaturalsBelow.shift_bound)
+
+theorem NaturalsBelow.sumLeft_is_injective (n p : ℕ)
+        : Function.IsInjective(NaturalsBelow.sumLeft(n, p)) := {
+  take a : NaturalsBelow(n);
+  take b : NaturalsBelow(n);
+  suppose NaturalsBelow.sumLeft(n, p, a) = NaturalsBelow.sumLeft(n, p, b) as imagesEqual;
+  NaturalsBelow.value(a)
+     = NaturalsBelow.value(NaturalsBelow.sumLeft(n, p, a))
+     = NaturalsBelow.value(NaturalsBelow.sumLeft(n, p, b))   by substituting imagesEqual
+     = NaturalsBelow.value(b);
+  done by NaturalsBelow.equal_of_value
+}
+
+theorem NaturalsBelow.shift_is_injective {p : ℕ} (n : ℕ)
+        : Function.IsInjective((NaturalsBelow.shift(n) : NaturalsBelow(p) → NaturalsBelow(n + p))) := {
+  take a : NaturalsBelow(p);
+  take b : NaturalsBelow(p);
+  suppose NaturalsBelow.shift(n, a) = NaturalsBelow.shift(n, b) as imagesEqual;
+  n + NaturalsBelow.value(a)
+     = NaturalsBelow.value(NaturalsBelow.shift(n, a))
+     = NaturalsBelow.value(NaturalsBelow.shift(n, b))   by substituting imagesEqual
+     = n + NaturalsBelow.value(b);
+  NaturalsBelow.value(a) = NaturalsBelow.value(b);
+  done by NaturalsBelow.equal_of_value
+}
+
+-- The two ranges are disjoint: a left value stays below n, a right value
+-- reaches at least n.
+theorem NaturalsBelow.sumLeft_not_shift {n p : ℕ} (i : NaturalsBelow(n)) (j : NaturalsBelow(p))
+        : ¬(NaturalsBelow.sumLeft(n, p, i) = NaturalsBelow.shift(n, j)) := {
+  suppose NaturalsBelow.sumLeft(n, p, i) = NaturalsBelow.shift(n, j) as collision;
+  NaturalsBelow.value(i)
+     = NaturalsBelow.value(NaturalsBelow.sumLeft(n, p, i))
+     = NaturalsBelow.value(NaturalsBelow.shift(n, j))        by substituting collision
+     = n + NaturalsBelow.value(j)
+  as valueJumps;
+  NaturalsBelow.value(i)
+     < n
+     ≤ n + NaturalsBelow.value(j)
+     = NaturalsBelow.value(i)      by valueJumps;
+  done by Natural.lt_irreflexive
+}
+
+-- Every summed index is a left value or a right value.
+theorem NaturalsBelow.sumLeft_or_shift {n p : ℕ} (k : NaturalsBelow(n + p))
+        : (∃ (i : NaturalsBelow(n)). k = NaturalsBelow.sumLeft(n, p, i))
+          ∨ (∃ (j : NaturalsBelow(p)). k = NaturalsBelow.shift(n, j)) := {
+  NaturalsBelow.value(k) < n ∨ n ≤ NaturalsBelow.value(k) by Natural.lt_or_le;
+  done by cases {
+    case NaturalsBelow.value(k) < n as belowBoundary: {
+        k = NaturalsBelow.sumLeft(n, p, NaturalsBelow.make(NaturalsBelow.value(k), belowBoundary))
+            by NaturalsBelow.equal_of_value;
+        ∃ (i : NaturalsBelow(n)). k = NaturalsBelow.sumLeft(n, p, i)
+            by { witness NaturalsBelow.make(NaturalsBelow.value(k), belowBoundary) with done };
+        done
+      }
+    case n ≤ NaturalsBelow.value(k) as atLeastBoundary: {
+        choose gap such that NaturalsBelow.value(k) = n + gap from Natural.subtraction_witness;
+        NaturalsBelow.value(k) < n + p;
+        n + gap < n + p by substituting (NaturalsBelow.value(k) = n + gap);
+        gap < p by {
+            choose excess such that (n + gap) + (1 + excess) = n + p from Natural.lt_elim;
+            n + (gap + (1 + excess))
+               = (n + gap) + (1 + excess)
+               = n + p;
+            gap + (1 + excess) = p;
+            done by Natural.lt_intro
+          } as gapBelow;
+        k = NaturalsBelow.shift(n, NaturalsBelow.make(gap, gapBelow)) by NaturalsBelow.equal_of_value;
+        ∃ (j : NaturalsBelow(p)). k = NaturalsBelow.shift(n, j)
+            by { witness NaturalsBelow.make(gap, gapBelow) with done };
+        done
+      }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- The direct sum, assembled from the block inclusion matrices.
+
+definition Matrix.leftBlockInclusion (r : CommutativeRing) (n p : ℕ) : Matrix(r, n + p, n) :=
+  Matrix.inclusionMatrix(r, NaturalsBelow.sumLeft(n, p))
+
+definition Matrix.rightBlockInclusion (r : CommutativeRing) (n p : ℕ) : Matrix(r, n + p, p) :=
+  Matrix.inclusionMatrix(r, NaturalsBelow.shift(n))
+
+definition Matrix.directSum {r : CommutativeRing} {n p : ℕ}
+        (A : Matrix(r, n, n)) (B : Matrix(r, p, p)) : Matrix(r, n + p, n + p) :=
+  Matrix.leftBlockInclusion(r, n, p) * A * Matrix.leftBlockInclusion(r, n, p)ᵀ
+  + Matrix.rightBlockInclusion(r, n, p) * B * Matrix.rightBlockInclusion(r, n, p)ᵀ
+
+-- The four blocks, read through the inclusion-matrix calculus.
+theorem Matrix.directSum_entry_left_left {r : CommutativeRing} {n p : ℕ}
+        (A : Matrix(r, n, n)) (B : Matrix(r, p, p)) (i iPrime : NaturalsBelow(n))
+        : Matrix.directSum(A, B)(NaturalsBelow.sumLeft(n, p, i), NaturalsBelow.sumLeft(n, p, iPrime))
+          = A(i, iPrime) := {
+  Function.IsInjective(NaturalsBelow.sumLeft(n, p));
+  ∀ (t : NaturalsBelow(p)). ¬(NaturalsBelow.sumLeft(n, p, iPrime) = NaturalsBelow.shift(n, t))
+      by (t : NaturalsBelow(p)) ↦ { done by NaturalsBelow.sumLeft_not_shift };
+  (Matrix.leftBlockInclusion(r, n, p) * A * Matrix.leftBlockInclusion(r, n, p)ᵀ)(
+        NaturalsBelow.sumLeft(n, p, i), NaturalsBelow.sumLeft(n, p, iPrime))
+     = (Matrix.leftBlockInclusion(r, n, p) * A)(NaturalsBelow.sumLeft(n, p, i), iPrime)
+           by Matrix.multiply_inclusionMatrix_transpose_entry_selected
+     = A(i, iPrime)
+           by Matrix.inclusionMatrix_multiply_entry_selected
+  as leftBlockReads;
+  (Matrix.rightBlockInclusion(r, n, p) * B * Matrix.rightBlockInclusion(r, n, p)ᵀ)(
+        NaturalsBelow.sumLeft(n, p, i), NaturalsBelow.sumLeft(n, p, iPrime))
+     = CommutativeRing.zero(r)
+      by Matrix.multiply_inclusionMatrix_transpose_entry_off as rightBlockVanishes;
+  Matrix.directSum(A, B)(NaturalsBelow.sumLeft(n, p, i), NaturalsBelow.sumLeft(n, p, iPrime))
+     = (Matrix.leftBlockInclusion(r, n, p) * A * Matrix.leftBlockInclusion(r, n, p)ᵀ)(
+           NaturalsBelow.sumLeft(n, p, i), NaturalsBelow.sumLeft(n, p, iPrime))
+       + (Matrix.rightBlockInclusion(r, n, p) * B * Matrix.rightBlockInclusion(r, n, p)ᵀ)(
+             NaturalsBelow.sumLeft(n, p, i), NaturalsBelow.sumLeft(n, p, iPrime))
+     = A(i, iPrime)
+       + (Matrix.rightBlockInclusion(r, n, p) * B * Matrix.rightBlockInclusion(r, n, p)ᵀ)(
+             NaturalsBelow.sumLeft(n, p, i), NaturalsBelow.sumLeft(n, p, iPrime))
+           by substituting leftBlockReads
+     = A(i, iPrime) + CommutativeRing.zero(r)
+           by substituting rightBlockVanishes
+     = A(i, iPrime)
+           by ring;
+  done
+}
+
+theorem Matrix.directSum_entry_right_right {r : CommutativeRing} {n p : ℕ}
+        (A : Matrix(r, n, n)) (B : Matrix(r, p, p)) (j jPrime : NaturalsBelow(p))
+        : Matrix.directSum(A, B)(NaturalsBelow.shift(n, j), NaturalsBelow.shift(n, jPrime))
+          = B(j, jPrime) := {
+  Function.IsInjective((NaturalsBelow.shift(n) : NaturalsBelow(p) → NaturalsBelow(n + p)));
+  ∀ (t : NaturalsBelow(n)). ¬(NaturalsBelow.shift(n, jPrime) = NaturalsBelow.sumLeft(n, p, t))
+      by (t : NaturalsBelow(n)) ↦ {
+          ¬(NaturalsBelow.sumLeft(n, p, t) = NaturalsBelow.shift(n, jPrime))
+              by NaturalsBelow.sumLeft_not_shift;
+          done
+        };
+  (Matrix.leftBlockInclusion(r, n, p) * A * Matrix.leftBlockInclusion(r, n, p)ᵀ)(
+        NaturalsBelow.shift(n, j), NaturalsBelow.shift(n, jPrime))
+     = CommutativeRing.zero(r)
+      by Matrix.multiply_inclusionMatrix_transpose_entry_off as leftBlockVanishes;
+  (Matrix.rightBlockInclusion(r, n, p) * B * Matrix.rightBlockInclusion(r, n, p)ᵀ)(
+        NaturalsBelow.shift(n, j), NaturalsBelow.shift(n, jPrime))
+     = (Matrix.rightBlockInclusion(r, n, p) * B)(NaturalsBelow.shift(n, j), jPrime)
+           by Matrix.multiply_inclusionMatrix_transpose_entry_selected
+     = B(j, jPrime)
+           by Matrix.inclusionMatrix_multiply_entry_selected
+  as rightBlockReads;
+  Matrix.directSum(A, B)(NaturalsBelow.shift(n, j), NaturalsBelow.shift(n, jPrime))
+     = (Matrix.leftBlockInclusion(r, n, p) * A * Matrix.leftBlockInclusion(r, n, p)ᵀ)(
+           NaturalsBelow.shift(n, j), NaturalsBelow.shift(n, jPrime))
+       + (Matrix.rightBlockInclusion(r, n, p) * B * Matrix.rightBlockInclusion(r, n, p)ᵀ)(
+             NaturalsBelow.shift(n, j), NaturalsBelow.shift(n, jPrime))
+     = CommutativeRing.zero(r)
+       + (Matrix.rightBlockInclusion(r, n, p) * B * Matrix.rightBlockInclusion(r, n, p)ᵀ)(
+             NaturalsBelow.shift(n, j), NaturalsBelow.shift(n, jPrime))
+           by substituting leftBlockVanishes
+     = CommutativeRing.zero(r) + B(j, jPrime)
+           by substituting rightBlockReads
+     = B(j, jPrime)
+           by ring;
+  done
+}
+
+theorem Matrix.directSum_entry_left_right {r : CommutativeRing} {n p : ℕ}
+        (A : Matrix(r, n, n)) (B : Matrix(r, p, p)) (i : NaturalsBelow(n)) (j : NaturalsBelow(p))
+        : Matrix.directSum(A, B)(NaturalsBelow.sumLeft(n, p, i), NaturalsBelow.shift(n, j))
+          = CommutativeRing.zero(r) := {
+  Function.IsInjective((NaturalsBelow.shift(n) : NaturalsBelow(p) → NaturalsBelow(n + p)));
+  ∀ (t : NaturalsBelow(n)). ¬(NaturalsBelow.shift(n, j) = NaturalsBelow.sumLeft(n, p, t))
+      by (t : NaturalsBelow(n)) ↦ {
+          ¬(NaturalsBelow.sumLeft(n, p, t) = NaturalsBelow.shift(n, j))
+              by NaturalsBelow.sumLeft_not_shift;
+          done
+        };
+  ∀ (t : NaturalsBelow(p)). ¬(NaturalsBelow.sumLeft(n, p, i) = NaturalsBelow.shift(n, t))
+      by (t : NaturalsBelow(p)) ↦ { done by NaturalsBelow.sumLeft_not_shift };
+  (Matrix.leftBlockInclusion(r, n, p) * A * Matrix.leftBlockInclusion(r, n, p)ᵀ)(
+        NaturalsBelow.sumLeft(n, p, i), NaturalsBelow.shift(n, j))
+     = CommutativeRing.zero(r)
+      by Matrix.multiply_inclusionMatrix_transpose_entry_off as leftBlockVanishes;
+  (Matrix.rightBlockInclusion(r, n, p) * B * Matrix.rightBlockInclusion(r, n, p)ᵀ)(
+        NaturalsBelow.sumLeft(n, p, i), NaturalsBelow.shift(n, j))
+     = (Matrix.rightBlockInclusion(r, n, p) * B)(NaturalsBelow.sumLeft(n, p, i), j)
+           by Matrix.multiply_inclusionMatrix_transpose_entry_selected
+     = CommutativeRing.zero(r)
+           by Matrix.inclusionMatrix_multiply_entry_off
+  as rightBlockVanishes;
+  Matrix.directSum(A, B)(NaturalsBelow.sumLeft(n, p, i), NaturalsBelow.shift(n, j))
+     = (Matrix.leftBlockInclusion(r, n, p) * A * Matrix.leftBlockInclusion(r, n, p)ᵀ)(
+           NaturalsBelow.sumLeft(n, p, i), NaturalsBelow.shift(n, j))
+       + (Matrix.rightBlockInclusion(r, n, p) * B * Matrix.rightBlockInclusion(r, n, p)ᵀ)(
+             NaturalsBelow.sumLeft(n, p, i), NaturalsBelow.shift(n, j))
+     = CommutativeRing.zero(r)
+       + (Matrix.rightBlockInclusion(r, n, p) * B * Matrix.rightBlockInclusion(r, n, p)ᵀ)(
+             NaturalsBelow.sumLeft(n, p, i), NaturalsBelow.shift(n, j))
+           by substituting leftBlockVanishes
+     = CommutativeRing.zero(r) + CommutativeRing.zero(r)
+           by substituting rightBlockVanishes
+     = CommutativeRing.zero(r)
+           by ring;
+  done
+}
+
+theorem Matrix.directSum_entry_right_left {r : CommutativeRing} {n p : ℕ}
+        (A : Matrix(r, n, n)) (B : Matrix(r, p, p)) (j : NaturalsBelow(p)) (i : NaturalsBelow(n))
+        : Matrix.directSum(A, B)(NaturalsBelow.shift(n, j), NaturalsBelow.sumLeft(n, p, i))
+          = CommutativeRing.zero(r) := {
+  Function.IsInjective(NaturalsBelow.sumLeft(n, p));
+  ∀ (t : NaturalsBelow(p)). ¬(NaturalsBelow.sumLeft(n, p, i) = NaturalsBelow.shift(n, t))
+      by (t : NaturalsBelow(p)) ↦ { done by NaturalsBelow.sumLeft_not_shift };
+  ∀ (t : NaturalsBelow(n)). ¬(NaturalsBelow.shift(n, j) = NaturalsBelow.sumLeft(n, p, t))
+      by (t : NaturalsBelow(n)) ↦ {
+          ¬(NaturalsBelow.sumLeft(n, p, t) = NaturalsBelow.shift(n, j))
+              by NaturalsBelow.sumLeft_not_shift;
+          done
+        };
+  (Matrix.leftBlockInclusion(r, n, p) * A * Matrix.leftBlockInclusion(r, n, p)ᵀ)(
+        NaturalsBelow.shift(n, j), NaturalsBelow.sumLeft(n, p, i))
+     = (Matrix.leftBlockInclusion(r, n, p) * A)(NaturalsBelow.shift(n, j), i)
+           by Matrix.multiply_inclusionMatrix_transpose_entry_selected
+     = CommutativeRing.zero(r)
+           by Matrix.inclusionMatrix_multiply_entry_off
+  as leftBlockVanishes;
+  (Matrix.rightBlockInclusion(r, n, p) * B * Matrix.rightBlockInclusion(r, n, p)ᵀ)(
+        NaturalsBelow.shift(n, j), NaturalsBelow.sumLeft(n, p, i))
+     = CommutativeRing.zero(r)
+      by Matrix.multiply_inclusionMatrix_transpose_entry_off as rightBlockVanishes;
+  Matrix.directSum(A, B)(NaturalsBelow.shift(n, j), NaturalsBelow.sumLeft(n, p, i))
+     = (Matrix.leftBlockInclusion(r, n, p) * A * Matrix.leftBlockInclusion(r, n, p)ᵀ)(
+           NaturalsBelow.shift(n, j), NaturalsBelow.sumLeft(n, p, i))
+       + (Matrix.rightBlockInclusion(r, n, p) * B * Matrix.rightBlockInclusion(r, n, p)ᵀ)(
+             NaturalsBelow.shift(n, j), NaturalsBelow.sumLeft(n, p, i))
+     = CommutativeRing.zero(r)
+       + (Matrix.rightBlockInclusion(r, n, p) * B * Matrix.rightBlockInclusion(r, n, p)ᵀ)(
+             NaturalsBelow.shift(n, j), NaturalsBelow.sumLeft(n, p, i))
+           by substituting leftBlockVanishes
+     = CommutativeRing.zero(r) + CommutativeRing.zero(r)
+           by substituting rightBlockVanishes
+     = CommutativeRing.zero(r)
+           by ring;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The direct sum of symmetric matrices is symmetric.
+
+theorem Matrix.directSum_symmetric {r : CommutativeRing} {n p : ℕ}
+        (A : Matrix(r, n, n)) (B : Matrix(r, p, p))
+        (symmetricA : Matrix.IsSymmetric(A)) (symmetricB : Matrix.IsSymmetric(B))
+        : Matrix.IsSymmetric(Matrix.directSum(A, B)) :=
+  Matrix.directSum(A, B)ᵀ
+     = (Matrix.leftBlockInclusion(r, n, p) * A * Matrix.leftBlockInclusion(r, n, p)ᵀ)ᵀ
+       + (Matrix.rightBlockInclusion(r, n, p) * B * Matrix.rightBlockInclusion(r, n, p)ᵀ)ᵀ
+           by Matrix.transpose_add
+     = (Matrix.leftBlockInclusion(r, n, p)ᵀ)ᵀ * (Matrix.leftBlockInclusion(r, n, p) * A)ᵀ
+       + (Matrix.rightBlockInclusion(r, n, p) * B * Matrix.rightBlockInclusion(r, n, p)ᵀ)ᵀ
+           by substituting Matrix.transpose_multiply
+     = Matrix.leftBlockInclusion(r, n, p) * (Matrix.leftBlockInclusion(r, n, p) * A)ᵀ
+       + (Matrix.rightBlockInclusion(r, n, p) * B * Matrix.rightBlockInclusion(r, n, p)ᵀ)ᵀ
+     = Matrix.leftBlockInclusion(r, n, p) * (Aᵀ * Matrix.leftBlockInclusion(r, n, p)ᵀ)
+       + (Matrix.rightBlockInclusion(r, n, p) * B * Matrix.rightBlockInclusion(r, n, p)ᵀ)ᵀ
+           by substituting Matrix.transpose_multiply
+     = Matrix.leftBlockInclusion(r, n, p) * (A * Matrix.leftBlockInclusion(r, n, p)ᵀ)
+       + (Matrix.rightBlockInclusion(r, n, p) * B * Matrix.rightBlockInclusion(r, n, p)ᵀ)ᵀ
+           by substituting symmetricA
+     = Matrix.leftBlockInclusion(r, n, p) * A * Matrix.leftBlockInclusion(r, n, p)ᵀ
+       + (Matrix.rightBlockInclusion(r, n, p) * B * Matrix.rightBlockInclusion(r, n, p)ᵀ)ᵀ
+           by Matrix.multiply_associative
+     = Matrix.leftBlockInclusion(r, n, p) * A * Matrix.leftBlockInclusion(r, n, p)ᵀ
+       + (Matrix.rightBlockInclusion(r, n, p)ᵀ)ᵀ * (Matrix.rightBlockInclusion(r, n, p) * B)ᵀ
+           by substituting Matrix.transpose_multiply
+     = Matrix.leftBlockInclusion(r, n, p) * A * Matrix.leftBlockInclusion(r, n, p)ᵀ
+       + Matrix.rightBlockInclusion(r, n, p) * (Matrix.rightBlockInclusion(r, n, p) * B)ᵀ
+     = Matrix.leftBlockInclusion(r, n, p) * A * Matrix.leftBlockInclusion(r, n, p)ᵀ
+       + Matrix.rightBlockInclusion(r, n, p) * (Bᵀ * Matrix.rightBlockInclusion(r, n, p)ᵀ)
+           by substituting Matrix.transpose_multiply
+     = Matrix.leftBlockInclusion(r, n, p) * A * Matrix.leftBlockInclusion(r, n, p)ᵀ
+       + Matrix.rightBlockInclusion(r, n, p) * (B * Matrix.rightBlockInclusion(r, n, p)ᵀ)
+           by substituting symmetricB
+     = Matrix.leftBlockInclusion(r, n, p) * A * Matrix.leftBlockInclusion(r, n, p)ᵀ
+       + Matrix.rightBlockInclusion(r, n, p) * B * Matrix.rightBlockInclusion(r, n, p)ᵀ
+           by Matrix.multiply_associative
+     = Matrix.directSum(A, B)
+
+-- ----------------------------------------------------------------------
+-- Pulling the direct sum back along a block inclusion recovers the
+-- summand: each block is a sublattice restriction of the sum.
+
+theorem Matrix.directSum_pullback_left {r : CommutativeRing} {n p : ℕ}
+        (A : Matrix(r, n, n)) (B : Matrix(r, p, p))
+        : (Matrix.leftBlockInclusion(r, n, p)ᵀ * Matrix.directSum(A, B)) * Matrix.leftBlockInclusion(r, n, p)
+          = A := {
+  ∀ (i : NaturalsBelow(n)). ∀ (iPrime : NaturalsBelow(n)).
+      Matrix.submatrix(Matrix.directSum(A, B), NaturalsBelow.sumLeft(n, p), NaturalsBelow.sumLeft(n, p))(i, iPrime)
+      = A(i, iPrime)
+      by (i : NaturalsBelow(n)) (iPrime : NaturalsBelow(n)) ↦ {
+          done by Matrix.directSum_entry_left_left
+        };
+  Matrix.submatrix(Matrix.directSum(A, B), NaturalsBelow.sumLeft(n, p), NaturalsBelow.sumLeft(n, p)) = A
+      by Matrix.equal_of_entries as leftBlockReads;
+  (Matrix.leftBlockInclusion(r, n, p)ᵀ * Matrix.directSum(A, B)) * Matrix.leftBlockInclusion(r, n, p)
+     = Matrix.submatrix(Matrix.directSum(A, B), NaturalsBelow.sumLeft(n, p), NaturalsBelow.sumLeft(n, p))
+           by Matrix.submatrix_pullback
+     = A
+           by leftBlockReads;
+  done
+}
+
+theorem Matrix.directSum_pullback_right {r : CommutativeRing} {n p : ℕ}
+        (A : Matrix(r, n, n)) (B : Matrix(r, p, p))
+        : (Matrix.rightBlockInclusion(r, n, p)ᵀ * Matrix.directSum(A, B)) * Matrix.rightBlockInclusion(r, n, p)
+          = B := {
+  ∀ (j : NaturalsBelow(p)). ∀ (jPrime : NaturalsBelow(p)).
+      Matrix.submatrix(Matrix.directSum(A, B),
+          (NaturalsBelow.shift(n) : NaturalsBelow(p) → NaturalsBelow(n + p)),
+          (NaturalsBelow.shift(n) : NaturalsBelow(p) → NaturalsBelow(n + p)))(j, jPrime)
+      = B(j, jPrime)
+      by (j : NaturalsBelow(p)) (jPrime : NaturalsBelow(p)) ↦ {
+          done by Matrix.directSum_entry_right_right
+        };
+  Matrix.submatrix(Matrix.directSum(A, B),
+          (NaturalsBelow.shift(n) : NaturalsBelow(p) → NaturalsBelow(n + p)),
+          (NaturalsBelow.shift(n) : NaturalsBelow(p) → NaturalsBelow(n + p))) = B
+      by Matrix.equal_of_entries as rightBlockReads;
+  (Matrix.rightBlockInclusion(r, n, p)ᵀ * Matrix.directSum(A, B)) * Matrix.rightBlockInclusion(r, n, p)
+     = Matrix.submatrix(Matrix.directSum(A, B),
+          (NaturalsBelow.shift(n) : NaturalsBelow(p) → NaturalsBelow(n + p)),
+          (NaturalsBelow.shift(n) : NaturalsBelow(p) → NaturalsBelow(n + p)))
+           by Matrix.submatrix_pullback
+     = B
+           by rightBlockReads;
+  done
+}
+
+-- The off-diagonal pullbacks vanish: the blocks do not interact.
+theorem Matrix.directSum_pullback_left_right {r : CommutativeRing} {n p : ℕ}
+        (A : Matrix(r, n, n)) (B : Matrix(r, p, p))
+        : (Matrix.leftBlockInclusion(r, n, p)ᵀ * Matrix.directSum(A, B)) * Matrix.rightBlockInclusion(r, n, p)
+          = Matrix.zero(r, n, p) := {
+  ∀ (i : NaturalsBelow(n)). ∀ (j : NaturalsBelow(p)).
+      Matrix.submatrix(Matrix.directSum(A, B), NaturalsBelow.sumLeft(n, p),
+          (NaturalsBelow.shift(n) : NaturalsBelow(p) → NaturalsBelow(n + p)))(i, j)
+      = Matrix.zero(r, n, p)(i, j)
+      by (i : NaturalsBelow(n)) (j : NaturalsBelow(p)) ↦ {
+          done by Matrix.directSum_entry_left_right
+        };
+  Matrix.submatrix(Matrix.directSum(A, B), NaturalsBelow.sumLeft(n, p),
+      (NaturalsBelow.shift(n) : NaturalsBelow(p) → NaturalsBelow(n + p)))
+     = Matrix.zero(r, n, p)
+      by Matrix.equal_of_entries as offDiagonalReads;
+  (Matrix.leftBlockInclusion(r, n, p)ᵀ * Matrix.directSum(A, B)) * Matrix.rightBlockInclusion(r, n, p)
+     = Matrix.submatrix(Matrix.directSum(A, B), NaturalsBelow.sumLeft(n, p),
+           (NaturalsBelow.shift(n) : NaturalsBelow(p) → NaturalsBelow(n + p)))
+           by Matrix.submatrix_pullback
+     = Matrix.zero(r, n, p)
+           by offDiagonalReads;
+  done
+}
+
+theorem Matrix.directSum_pullback_right_left {r : CommutativeRing} {n p : ℕ}
+        (A : Matrix(r, n, n)) (B : Matrix(r, p, p))
+        : (Matrix.rightBlockInclusion(r, n, p)ᵀ * Matrix.directSum(A, B)) * Matrix.leftBlockInclusion(r, n, p)
+          = Matrix.zero(r, p, n) := {
+  ∀ (j : NaturalsBelow(p)). ∀ (i : NaturalsBelow(n)).
+      Matrix.submatrix(Matrix.directSum(A, B),
+          (NaturalsBelow.shift(n) : NaturalsBelow(p) → NaturalsBelow(n + p)), NaturalsBelow.sumLeft(n, p))(j, i)
+      = Matrix.zero(r, p, n)(j, i)
+      by (j : NaturalsBelow(p)) (i : NaturalsBelow(n)) ↦ {
+          done by Matrix.directSum_entry_right_left
+        };
+  Matrix.submatrix(Matrix.directSum(A, B),
+      (NaturalsBelow.shift(n) : NaturalsBelow(p) → NaturalsBelow(n + p)), NaturalsBelow.sumLeft(n, p))
+     = Matrix.zero(r, p, n)
+      by Matrix.equal_of_entries as offDiagonalReads;
+  (Matrix.rightBlockInclusion(r, n, p)ᵀ * Matrix.directSum(A, B)) * Matrix.leftBlockInclusion(r, n, p)
+     = Matrix.submatrix(Matrix.directSum(A, B),
+           (NaturalsBelow.shift(n) : NaturalsBelow(p) → NaturalsBelow(n + p)), NaturalsBelow.sumLeft(n, p))
+           by Matrix.submatrix_pullback
+     = Matrix.zero(r, p, n)
+           by offDiagonalReads;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The quadratic form of a direct sum is the sum of the forms: on a
+-- decomposed vector the diagonal terms pull back to the summands and the
+-- cross terms die on the vanishing off-diagonal pullbacks.
+
+theorem Matrix.directSum_quadraticForm {r : CommutativeRing} {n p : ℕ}
+        (A : Matrix(r, n, n)) (B : Matrix(r, p, p)) (u : RingVector(r, n)) (v : RingVector(r, p))
+        : Matrix.quadraticForm(Matrix.directSum(A, B),
+              Matrix.leftBlockInclusion(r, n, p) · u + Matrix.rightBlockInclusion(r, n, p) · v)
+          = Matrix.quadraticForm(A, u) + Matrix.quadraticForm(B, v) := {
+  let D : Matrix(r, n + p, n + p) := Matrix.directSum(A, B);
+  let leftPlaced : RingVector(r, n + p) := Matrix.leftBlockInclusion(r, n, p) · u;
+  let rightPlaced : RingVector(r, n + p) := Matrix.rightBlockInclusion(r, n, p) · v;
+
+  Matrix.quadraticForm(A, u)
+     = Matrix.quadraticForm(
+           (Matrix.leftBlockInclusion(r, n, p)ᵀ * D) * Matrix.leftBlockInclusion(r, n, p), u)
+           by substituting Matrix.directSum_pullback_left
+     = Matrix.quadraticForm(D, leftPlaced)
+           by Matrix.quadraticForm_pullback
+  as leftFormAgrees;
+  Matrix.quadraticForm(B, v)
+     = Matrix.quadraticForm(
+           (Matrix.rightBlockInclusion(r, n, p)ᵀ * D) * Matrix.rightBlockInclusion(r, n, p), v)
+           by substituting Matrix.directSum_pullback_right
+     = Matrix.quadraticForm(D, rightPlaced)
+           by Matrix.quadraticForm_pullback
+  as rightFormAgrees;
+
+  (Matrix.leftBlockInclusion(r, n, p)ᵀ * D) * Matrix.rightBlockInclusion(r, n, p) = Matrix.zero(r, n, p)
+      by Matrix.directSum_pullback_left_right as leftOffDiagonalVanishes;
+  (Matrix.rightBlockInclusion(r, n, p)ᵀ * D) * Matrix.leftBlockInclusion(r, n, p) = Matrix.zero(r, p, n)
+      by Matrix.directSum_pullback_right_left as rightOffDiagonalVanishes;
+
+  RingVector.innerProduct(leftPlaced, D · rightPlaced)
+     = RingVector.innerProduct((Matrix.leftBlockInclusion(r, n, p)ᵀ)ᵀ · u, D · rightPlaced)
+     = RingVector.innerProduct(u, Matrix.leftBlockInclusion(r, n, p)ᵀ · (D · rightPlaced))
+           by Matrix.transpose_adjoint
+     = RingVector.innerProduct(u, (Matrix.leftBlockInclusion(r, n, p)ᵀ * D) · rightPlaced)
+           by substituting Matrix.applyVector_multiply
+     = RingVector.innerProduct(u,
+           ((Matrix.leftBlockInclusion(r, n, p)ᵀ * D) * Matrix.rightBlockInclusion(r, n, p)) · v)
+           by substituting Matrix.applyVector_multiply
+     = RingVector.innerProduct(u, Matrix.zero(r, n, p) · v)
+           by substituting leftOffDiagonalVanishes
+     = RingVector.innerProduct(u, RingVector.zero(r, n))
+           by substituting Matrix.zero_applyVector
+     = CommutativeRing.zero(r)
+           by RingVector.innerProduct_zero_right
+  as firstCrossVanishes;
+  RingVector.innerProduct(rightPlaced, D · leftPlaced)
+     = RingVector.innerProduct((Matrix.rightBlockInclusion(r, n, p)ᵀ)ᵀ · v, D · leftPlaced)
+     = RingVector.innerProduct(v, Matrix.rightBlockInclusion(r, n, p)ᵀ · (D · leftPlaced))
+           by Matrix.transpose_adjoint
+     = RingVector.innerProduct(v, (Matrix.rightBlockInclusion(r, n, p)ᵀ * D) · leftPlaced)
+           by substituting Matrix.applyVector_multiply
+     = RingVector.innerProduct(v,
+           ((Matrix.rightBlockInclusion(r, n, p)ᵀ * D) * Matrix.leftBlockInclusion(r, n, p)) · u)
+           by substituting Matrix.applyVector_multiply
+     = RingVector.innerProduct(v, Matrix.zero(r, p, n) · u)
+           by substituting rightOffDiagonalVanishes
+     = RingVector.innerProduct(v, RingVector.zero(r, p))
+           by substituting Matrix.zero_applyVector
+     = CommutativeRing.zero(r)
+           by RingVector.innerProduct_zero_right
+  as secondCrossVanishes;
+
+  Matrix.quadraticForm(D, leftPlaced + rightPlaced)
+     = Matrix.quadraticForm(D, leftPlaced) + RingVector.innerProduct(leftPlaced, D · rightPlaced)
+       + RingVector.innerProduct(rightPlaced, D · leftPlaced) + Matrix.quadraticForm(D, rightPlaced)
+           by Matrix.quadraticForm_add
+     = Matrix.quadraticForm(A, u) + RingVector.innerProduct(leftPlaced, D · rightPlaced)
+       + RingVector.innerProduct(rightPlaced, D · leftPlaced) + Matrix.quadraticForm(D, rightPlaced)
+           by substituting leftFormAgrees
+     = Matrix.quadraticForm(A, u) + CommutativeRing.zero(r)
+       + RingVector.innerProduct(rightPlaced, D · leftPlaced) + Matrix.quadraticForm(D, rightPlaced)
+           by substituting firstCrossVanishes
+     = Matrix.quadraticForm(A, u) + CommutativeRing.zero(r) + CommutativeRing.zero(r)
+       + Matrix.quadraticForm(D, rightPlaced)
+           by substituting secondCrossVanishes
+     = Matrix.quadraticForm(A, u) + CommutativeRing.zero(r) + CommutativeRing.zero(r)
+       + Matrix.quadraticForm(B, v)
+           by substituting rightFormAgrees
+     = Matrix.quadraticForm(A, u) + Matrix.quadraticForm(B, v)
+           by ring;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- Every summed vector decomposes into its two placed restrictions.
+
+definition RingVector.restrictLeft {r : CommutativeRing} {n p : ℕ}
+        (z : RingVector(r, n + p)) : RingVector(r, n) :=
+  (i : NaturalsBelow(n)) ↦ z(NaturalsBelow.sumLeft(n, p, i))
+
+definition RingVector.restrictRight {r : CommutativeRing} {n p : ℕ}
+        (z : RingVector(r, n + p)) : RingVector(r, p) :=
+  (j : NaturalsBelow(p)) ↦ z(NaturalsBelow.shift(n, j))
+
+theorem RingVector.directSum_decomposition {r : CommutativeRing} {n p : ℕ} (z : RingVector(r, n + p))
+        : z = Matrix.leftBlockInclusion(r, n, p) · RingVector.restrictLeft(z)
+              + Matrix.rightBlockInclusion(r, n, p) · RingVector.restrictRight(z) := {
+  let leftPlaced : RingVector(r, n + p) :=
+      Matrix.leftBlockInclusion(r, n, p) · RingVector.restrictLeft(z);
+  let rightPlaced : RingVector(r, n + p) :=
+      Matrix.rightBlockInclusion(r, n, p) · RingVector.restrictRight(z);
+  Function.IsInjective(NaturalsBelow.sumLeft(n, p));
+  Function.IsInjective((NaturalsBelow.shift(n) : NaturalsBelow(p) → NaturalsBelow(n + p)));
+  ∀ (k : NaturalsBelow(n + p)). z(k) = (leftPlaced + rightPlaced)(k)
+      by (k : NaturalsBelow(n + p)) ↦ {
+          (∃ (i : NaturalsBelow(n)). k = NaturalsBelow.sumLeft(n, p, i))
+              ∨ (∃ (j : NaturalsBelow(p)). k = NaturalsBelow.shift(n, j))
+              by NaturalsBelow.sumLeft_or_shift;
+          done by cases {
+            case ∃ (i : NaturalsBelow(n)). k = NaturalsBelow.sumLeft(n, p, i): {
+                choose i such that k = NaturalsBelow.sumLeft(n, p, i) as kIsLeft;
+                ∀ (t : NaturalsBelow(p)). ¬(NaturalsBelow.sumLeft(n, p, i) = NaturalsBelow.shift(n, t))
+                    by (t : NaturalsBelow(p)) ↦ { done by NaturalsBelow.sumLeft_not_shift };
+                leftPlaced(NaturalsBelow.sumLeft(n, p, i)) = RingVector.restrictLeft(z)(i)
+                    by Matrix.inclusionMatrix_applyVector_entry as leftReads;
+                rightPlaced(NaturalsBelow.sumLeft(n, p, i)) = CommutativeRing.zero(r)
+                    by Matrix.inclusionMatrix_applyVector_off as rightVanishes;
+                (leftPlaced + rightPlaced)(k)
+                   = (leftPlaced + rightPlaced)(NaturalsBelow.sumLeft(n, p, i))
+                         by substituting kIsLeft
+                   = leftPlaced(NaturalsBelow.sumLeft(n, p, i)) + rightPlaced(NaturalsBelow.sumLeft(n, p, i))
+                   = RingVector.restrictLeft(z)(i) + rightPlaced(NaturalsBelow.sumLeft(n, p, i))
+                         by substituting leftReads
+                   = RingVector.restrictLeft(z)(i) + CommutativeRing.zero(r)
+                         by substituting rightVanishes
+                   = RingVector.restrictLeft(z)(i)
+                         by ring
+                   = z(NaturalsBelow.sumLeft(n, p, i))
+                   = z(k)
+                         by substituting kIsLeft;
+                done
+              }
+            case ∃ (j : NaturalsBelow(p)). k = NaturalsBelow.shift(n, j): {
+                choose j such that k = NaturalsBelow.shift(n, j) as kIsRight;
+                ∀ (t : NaturalsBelow(n)). ¬(NaturalsBelow.shift(n, j) = NaturalsBelow.sumLeft(n, p, t))
+                    by (t : NaturalsBelow(n)) ↦ {
+                        ¬(NaturalsBelow.sumLeft(n, p, t) = NaturalsBelow.shift(n, j))
+                            by NaturalsBelow.sumLeft_not_shift;
+                        done
+                      };
+                leftPlaced(NaturalsBelow.shift(n, j)) = CommutativeRing.zero(r)
+                    by Matrix.inclusionMatrix_applyVector_off as leftVanishes;
+                rightPlaced(NaturalsBelow.shift(n, j)) = RingVector.restrictRight(z)(j)
+                    by Matrix.inclusionMatrix_applyVector_entry as rightReads;
+                (leftPlaced + rightPlaced)(k)
+                   = (leftPlaced + rightPlaced)(NaturalsBelow.shift(n, j))
+                         by substituting kIsRight
+                   = leftPlaced(NaturalsBelow.shift(n, j)) + rightPlaced(NaturalsBelow.shift(n, j))
+                   = CommutativeRing.zero(r) + rightPlaced(NaturalsBelow.shift(n, j))
+                         by substituting leftVanishes
+                   = CommutativeRing.zero(r) + RingVector.restrictRight(z)(j)
+                         by substituting rightReads
+                   = RingVector.restrictRight(z)(j)
+                         by ring
+                   = z(NaturalsBelow.shift(n, j))
+                   = z(k)
+                         by substituting kIsRight;
+                done
+              }
+          }
+        };
+  done by RingVector.equal_of_pointwise
+}
