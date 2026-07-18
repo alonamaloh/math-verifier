@@ -72,7 +72,9 @@ theorem Polynomial.bezout_one_of_irreducible (r : Ring)
         : ∃ (a b : Polynomial(Ring.carrier(r), Ring.zero(r))).
             ((a * f) + (b * g))
             = Polynomial.one(r) := {
-  let ⟨fNotUnit, factorClause⟩ := fIrreducible;
+  ((a b : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        → f = (a * b)
+        → Polynomial.IsUnit(r, a) ∨ Polynomial.IsUnit(r, b)) as factorClause;
   choose bound such that Polynomial.DegreeLessThan(r, g, bound) as gBound
       from Polynomial.exists_degree_bound(r, g);
   choose m, coefficientF, coefficientG such that
@@ -88,14 +90,13 @@ theorem Polynomial.bezout_one_of_irreducible (r : Ring)
   done by cases {
     case Polynomial.IsUnit(r, m) as mIsUnit: {
         choose mInverse such that Polynomial.one(r) = (m * mInverse) from mIsUnit;
-        ⟨(coefficientF * mInverse),
-         (coefficientG * mInverse),
-         { (((coefficientF * mInverse) * f) + ((coefficientG * mInverse) * g))
-              = (((coefficientF * mInverse) * f) + ((coefficientG * g) * mInverse))
-              = (((coefficientF * f) * mInverse) + ((coefficientG * g) * mInverse))
-              = (((coefficientF * f) + (coefficientG * g)) * mInverse)
-              = (m * mInverse)
-              = Polynomial.one(r) }⟩
+        witness (coefficientF * mInverse) with witness (coefficientG * mInverse) with
+          (((coefficientF * mInverse) * f) + ((coefficientG * mInverse) * g))
+             = (((coefficientF * mInverse) * f) + ((coefficientG * g) * mInverse))
+             = (((coefficientF * f) * mInverse) + ((coefficientG * g) * mInverse))
+             = (((coefficientF * f) + (coefficientG * g)) * mInverse)
+             = (m * mInverse)
+             = Polynomial.one(r)
       }
     case Polynomial.IsUnit(r, quotientFM) as quotientIsUnit: {
         choose quotientInverse such that
@@ -108,11 +109,11 @@ theorem Polynomial.bezout_one_of_irreducible (r : Ring)
                   = (f * quotientInverse);
         choose cofactorG such that g = (m * cofactorG) from mDividesG;
         Ring.divides(Polynomial.ring(r), f, g)
-            by ⟨(quotientInverse * cofactorG),
-                { g
-                   = (m * cofactorG)
-                   = ((f * quotientInverse) * cofactorG)
-                   = (f * (quotientInverse * cofactorG)) }⟩;
+            by { witness (quotientInverse * cofactorG) with
+                   g
+                      = (m * cofactorG)
+                      = ((f * quotientInverse) * cofactorG)
+                      = (f * (quotientInverse * cofactorG)) };
         done
       }
   }

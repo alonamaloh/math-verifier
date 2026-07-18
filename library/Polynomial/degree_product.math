@@ -157,16 +157,18 @@ theorem Polynomial.HasDegree_product (r : Ring)
         (aDegree : Polynomial.HasDegree(r, a, m))
         (bDegree : Polynomial.HasDegree(r, b, n))
         : Polynomial.HasDegree(r, (a * b), m + n) := {
-  let ⟨aBound, aLeadingNonzero⟩ := aDegree;
-  let ⟨bBound, bLeadingNonzero⟩ := bDegree;
+  Polynomial.DegreeLessThan(r, a, 1 + m);
+  ¬(a[m] = Ring.zero(r));
+  Polynomial.DegreeLessThan(r, b, 1 + n);
+  ¬(b[n] = Ring.zero(r));
   Polynomial.DegreeLessThan(r, (a * b), 1 + (m + n)) by Polynomial.product_DegreeLessThan;
   ¬((a * b)[m + n] = Ring.zero(r))
       by (topZero : (a * b)[m + n] = Ring.zero(r)) ↦ {
           -- coeff(a,m)·coeff(b,n) is the top coefficient of a·b, which is 0;
           -- a is nonzero there, so (no zero divisors) b is zero at n.
           (a[m] * b[n]) = (a * b)[m + n] = Ring.zero(r);
-          b[n] = Ring.zero(r) by Ring.field_no_zero_divisors as leadingZero;
-          bLeadingNonzero(leadingZero)
+          b[n] = Ring.zero(r) by Ring.field_no_zero_divisors;
+          done
       };
   done
 }
@@ -177,8 +179,10 @@ theorem Polynomial.HasDegree_unique (r : Ring)
         (dDegree : Polynomial.HasDegree(r, p, d))
         (eDegree : Polynomial.HasDegree(r, p, e))
         : d = e := {
-  let ⟨dBound, dNonzero⟩ := dDegree;
-  let ⟨eBound, eNonzero⟩ := eDegree;
+  Polynomial.DegreeLessThan(r, p, 1 + d);
+  ¬(p[d] = Ring.zero(r));
+  Polynomial.DegreeLessThan(r, p, 1 + e);
+  ¬(p[e] = Ring.zero(r));
   d ≤ e ∨ e ≤ d;
   done by cases {
     case d ≤ e: {

@@ -118,14 +118,16 @@ theorem Polynomial.gcd_bezout (r : Ring)
         done by cases {
           case y = Polynomial.zero(r): {
               -- gcd = x: x = 1·x + 0·0, x | x, x | 0.
-              ⟨x, Polynomial.one(r), Polynomial.zero(r),
-               { x
-                  = (Polynomial.one(r) * x)
-                  = ((Polynomial.one(r) * x) + Polynomial.zero(r))
-                  = ((Polynomial.one(r) * x) + (Polynomial.zero(r) * Polynomial.zero(r)))
-                        by Ring.zero_multiply_left(Polynomial.ring(r), Polynomial.zero(r)) },
-               Ring.divides_reflexive(Polynomial.ring(r), x),
-               Ring.divides_zero(Polynomial.ring(r), x)⟩
+              witness x with witness Polynomial.one(r) with witness Polynomial.zero(r) with {
+                  x
+                     = (Polynomial.one(r) * x)
+                     = ((Polynomial.one(r) * x) + Polynomial.zero(r))
+                     = ((Polynomial.one(r) * x) + (Polynomial.zero(r) * Polynomial.zero(r)))
+                           by Ring.zero_multiply_left(Polynomial.ring(r), Polynomial.zero(r));
+                  Ring.divides_reflexive(Polynomial.ring(r), x);
+                  Ring.divides_zero(Polynomial.ring(r), x);
+                  done
+                }
             }
           otherwise as yNotZero: {
               choose degreeY such that
@@ -175,21 +177,20 @@ theorem Polynomial.gcd_bezout (r : Ring)
                   by Ring.divides_add(Polynomial.ring(r), m,
                          (quotient * y), remainder,
                          mDividesQuotientY, mDividesRemainder);
-              Ring.divides(Polynomial.ring(r), m, x) as mDividesX;
+              Ring.divides(Polynomial.ring(r), m, x);
 
-              ⟨m, bRest,
-               (aRest + (- (bRest * quotient))),
-               { m
-                  = ((aRest * y) + (bRest * remainder))
-                  = ((aRest * y) + (bRest * (x + (- (quotient * y)))))
-                  = ((aRest * y) + ((bRest * x) + (bRest * (- (quotient * y)))))
-                  = ((aRest * y) + ((bRest * x) + (- (bRest * (quotient * y)))))
-                  = ((bRest * x) + ((aRest * y) + (- (bRest * (quotient * y)))))
-                  = ((bRest * x) + ((aRest * y) + (- ((bRest * quotient) * y))))
-                  = ((bRest * x) + ((aRest * y) + ((- (bRest * quotient)) * y)))
-                  = ((bRest * x) + ((aRest + (- (bRest * quotient))) * y)) },
-               mDividesX,
-               mDividesY⟩
+              witness m with witness bRest with witness (aRest + (- (bRest * quotient))) with {
+                  m
+                     = ((aRest * y) + (bRest * remainder))
+                     = ((aRest * y) + (bRest * (x + (- (quotient * y)))))
+                     = ((aRest * y) + ((bRest * x) + (bRest * (- (quotient * y)))))
+                     = ((aRest * y) + ((bRest * x) + (- (bRest * (quotient * y)))))
+                     = ((bRest * x) + ((aRest * y) + (- (bRest * (quotient * y)))))
+                     = ((bRest * x) + ((aRest * y) + (- ((bRest * quotient) * y))))
+                     = ((bRest * x) + ((aRest * y) + ((- (bRest * quotient)) * y)))
+                     = ((bRest * x) + ((aRest + (- (bRest * quotient))) * y));
+                  done
+                }
             }
         },
     bound)

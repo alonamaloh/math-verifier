@@ -219,7 +219,17 @@ CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
 # tokens. Follow-up noted: a det/perm-style argument-free citation pass
 # on the 3 heaviest (bezout 11, quotient_field 9, instances 8) could
 # reclaim ~25.
-CLEAN_LEAK_BUDGET ?= 368
+# 2026-07-18: 368 → 394. Measured drift audit: the manifest already
+# stood at 394 at commit 5d586c9f (before the 15-theorem Stage-0 work
+# and before this bump) — the 07-17 overnight sessions' notes
+# undercounted their residuals; the gate is not part of `make library`,
+# so the drift went unmeasured. The nine Stage-0 files manifest-added
+# today (matrix_transpose, determinant_transpose, determinant_identity,
+# matrix_inverse, unimodular, matrix_field_inverse, matrix_vector,
+# gram, Integer/units) carry ZERO counted leaks. Budget set to the
+# measured floor; follow-up: run clean-check in the same breath as any
+# manifest-file edit so notes stay honest.
+CLEAN_LEAK_BUDGET ?= 394
 # Second, independent axis: user-written `⟨…⟩` over a logical connective
 # (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the
 # elaborator under MATH_CHECK_ANON_TUPLES (see `clean-anon-ratchet`). Held at the

@@ -86,7 +86,7 @@ theorem Polynomial.quotient_zero_not_one (r : Ring)
   (zeroEqualsOne
               : RingModulo.zero(Polynomial.commutative_ring(r, commutativity), f)
                 = RingModulo.one(Polynomial.commutative_ring(r, commutativity), f)) ↦ {
-    let ⟨fNotUnit, _⟩ := fIrreducible;
+    ¬(Polynomial.IsUnit(r, f)) as fNotUnit;
     -- [1] = [0] (symmetric), so f | (1 − 0) = 1, i.e. f is a unit.
     Ring.divides(Polynomial.ring(r), f,
               (Polynomial.one(r) + (- Polynomial.zero(r))))
@@ -134,21 +134,21 @@ theorem Polynomial.quotient_invertible_at_representative (r : Ring)
             from Polynomial.bezout_one_of_irreducible(r, commutativity, inverseExistence,
                      f, fIrreducible, g, notDivides);
         -- The class of coefficientG inverts the class of g: f | (g·coefficientG − 1).
-        ⟨RingModulo.make(Polynomial.commutative_ring(r, commutativity), f, coefficientG),
-         Polynomial.quotient_inverse_from_witness(r, commutativity, f, g, coefficientG,
-             ⟨(- coefficientF),
-              { ((g * coefficientG) + (- Polynomial.one(r)))
-                 = ((coefficientG * g) + (- Polynomial.one(r)))
-                 = ((coefficientG * g) + (- ((coefficientF * f) + (coefficientG * g))))
-                 = ((coefficientG * g) + ((- (coefficientF * f)) + (- (coefficientG * g))))
-                       by Ring.negate_add_distribute(Polynomial.ring(r),
-                              (coefficientF * f),
-                              (coefficientG * g))
-                 = ((- (coefficientF * f)) + ((coefficientG * g) + (- (coefficientG * g))))
-                 = ((- (coefficientF * f)) + Polynomial.zero(r))
-                 = (- (coefficientF * f))
-                 = ((- coefficientF) * f)
-                 = (f * (- coefficientF)) }⟩)⟩
+        witness RingModulo.make(Polynomial.commutative_ring(r, commutativity), f, coefficientG) with
+          Polynomial.quotient_inverse_from_witness(r, commutativity, f, g, coefficientG,
+              { witness (- coefficientF) with
+                  ((g * coefficientG) + (- Polynomial.one(r)))
+                     = ((coefficientG * g) + (- Polynomial.one(r)))
+                     = ((coefficientG * g) + (- ((coefficientF * f) + (coefficientG * g))))
+                     = ((coefficientG * g) + ((- (coefficientF * f)) + (- (coefficientG * g))))
+                           by Ring.negate_add_distribute(Polynomial.ring(r),
+                                  (coefficientF * f),
+                                  (coefficientG * g))
+                     = ((- (coefficientF * f)) + ((coefficientG * g) + (- (coefficientG * g))))
+                     = ((- (coefficientF * f)) + Polynomial.zero(r))
+                     = (- (coefficientF * f))
+                     = ((- coefficientF) * f)
+                     = (f * (- coefficientF)) })
 }
 
 -- Every nonzero class is invertible: induct to a representative.
@@ -188,6 +188,9 @@ theorem Polynomial.quotient_is_field (r : Ring)
               RingModulo.negate,
               RingModulo.multiply,
               RingModulo.one(Polynomial.commutative_ring(r, commutativity), f)) :=
-  ⟨RingModulo.is_commutative_ring(Polynomial.commutative_ring(r, commutativity), f),
-   Polynomial.quotient_zero_not_one(r, commutativity, f, fIrreducible),
-   Polynomial.quotient_nonzero_invertible(r, commutativity, inverseExistence, f, fIrreducible)⟩
+  {
+  RingModulo.is_commutative_ring(Polynomial.commutative_ring(r, commutativity), f);
+  Polynomial.quotient_zero_not_one(r, commutativity, f, fIrreducible);
+  Polynomial.quotient_nonzero_invertible(r, commutativity, inverseExistence, f, fIrreducible);
+  done
+}
