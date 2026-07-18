@@ -1,0 +1,103 @@
+-- Algebra/determinant_identity.math
+--
+-- det I = 1. In the Leibniz sum every non-identity permutation moves some
+-- index, whose off-diagonal identity entry vanishes and kills that term;
+-- the sum delta-collapses to the identity term, a product of ones.
+
+module Algebra.determinant_identity
+
+import Logic.basics
+import Logic.functions
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.classical_decidable
+import Integer.basics
+import Set.finite
+import Lists.list
+import Lists.map
+import Lists.distinct
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.ring_from_integer
+import Algebra.finite_permutation
+import Algebra.permutation_enumeration
+import Algebra.permutation_sign
+import Algebra.matrix
+import Algebra.determinant
+
+-- A permutation that is not the identity moves some index.
+theorem Permutation.moved_index_of_not_identity {n : ℕ} (sigma : Permutation(n))
+        (notIdentity : ¬(sigma = Permutation.identity(n)))
+        : ∃ (i : NaturalsBelow(n)). ¬(sigma(i) = i) := {
+  ¬(∀ (i : NaturalsBelow(n)). sigma(i) = i)
+      by (fixesAll : ∀ (i : NaturalsBelow(n)). sigma(i) = i) ↦ {
+          sigma = Permutation.identity(n) by Permutation.equal_of_apply_equal;
+          done
+        };
+  done by Logic.not_forall_implies_exists_not(predicate := (i : NaturalsBelow(n)) ↦ sigma(i) = i)
+}
+
+-- det I = 1.
+theorem Matrix.determinant_identity (r : CommutativeRing) (n : ℕ)
+        : Matrix.determinant(Matrix.identity(r, n)) = CommutativeRing.one(r) := {
+  let identityTerm : Permutation(n) → CommutativeRing.carrier(r) :=
+      (sigma : Permutation(n)) ↦
+          CommutativeRing.from_integer(r, Permutation.sign(sigma))
+              * CommutativeRing.productOver(
+                    (i : NaturalsBelow(n)) ↦ Matrix.identity(r, n)(i, sigma(i)),
+                    NaturalsBelow.enumerate(n));
+  -- A non-identity permutation's term vanishes: it moves some index i,
+  -- and the off-diagonal entry I(i, σ(i)) = 0 kills the product.
+  ∀ (sigma : Permutation(n)). sigma ∈ Permutation.allPermutations(n)
+      → ¬(sigma = Permutation.identity(n)) → identityTerm(sigma) = CommutativeRing.zero(r)
+      by (sigma : Permutation(n))
+         (inList : sigma ∈ Permutation.allPermutations(n))
+         (notIdentity : ¬(sigma = Permutation.identity(n))) ↦ {
+          choose i : NaturalsBelow(n) such that ¬(sigma(i) = i) from Permutation.moved_index_of_not_identity;
+          ¬(i = sigma(i)) by (equal : i = sigma(i)) ↦ { sigma(i) = i; done };
+          Matrix.identity(r, n)(i, sigma(i)) = CommutativeRing.zero(r) by Matrix.identity_entry_off;
+          i ∈ NaturalsBelow.enumerate(n) by NaturalsBelow.enumerate_complete;
+          CommutativeRing.productOver(
+                (j : NaturalsBelow(n)) ↦ Matrix.identity(r, n)(j, sigma(j)),
+                NaturalsBelow.enumerate(n))
+              = CommutativeRing.zero(r)
+              by CommutativeRing.productOver_zero_on_member as productVanishes;
+          identityTerm(sigma)
+             = CommutativeRing.from_integer(r, Permutation.sign(sigma)) * CommutativeRing.zero(r)
+                   by substituting productVanishes
+             = CommutativeRing.zero(r)
+        };
+  -- The sum delta-collapses to the identity permutation's term: a product
+  -- of diagonal entries, all ones.
+  Permutation.identity(n) ∈ Permutation.allPermutations(n) by Permutation.allPermutations_complete;
+  List.Distinct(Permutation(n), Permutation.allPermutations(n)) by Permutation.allPermutations_distinct;
+  ∀ (i : NaturalsBelow(n)). Matrix.identity(r, n)(i, i) = CommutativeRing.one(r)
+      by (i : NaturalsBelow(n)) ↦ { done by Matrix.identity_entry_diagonal };
+  CommutativeRing.from_integer(r, 1) = CommutativeRing.one(r) by Ring.from_integer_one as fromIntegerOne;
+  Matrix.determinant(Matrix.identity(r, n))
+     = identityTerm(Permutation.identity(n))
+           by CommutativeRing.sumOver_single
+     = CommutativeRing.from_integer(r, Permutation.sign(Permutation.identity(n)))
+           * CommutativeRing.productOver(
+                 (i : NaturalsBelow(n)) ↦ Matrix.identity(r, n)(i, i), NaturalsBelow.enumerate(n))
+     = CommutativeRing.from_integer(r, 1)
+           * CommutativeRing.productOver(
+                 (i : NaturalsBelow(n)) ↦ Matrix.identity(r, n)(i, i), NaturalsBelow.enumerate(n))
+           by substituting Permutation.sign_identity
+     = CommutativeRing.one(r)
+           * CommutativeRing.productOver(
+                 (i : NaturalsBelow(n)) ↦ Matrix.identity(r, n)(i, i), NaturalsBelow.enumerate(n))
+           by substituting fromIntegerOne
+     = CommutativeRing.one(r)
+           * CommutativeRing.productOver(
+                 (i : NaturalsBelow(n)) ↦ CommutativeRing.one(r), NaturalsBelow.enumerate(n))
+           by CommutativeRing.productOver_congruence
+     = CommutativeRing.one(r) * CommutativeRing.one(r)
+           by substituting CommutativeRing.productOver_one_function
+     = CommutativeRing.one(r);
+  done
+}

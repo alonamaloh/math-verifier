@@ -241,6 +241,20 @@ theorem CommutativeRing.sumOver_zero_function {r : CommutativeRing} {index : Typ
            = CommutativeRing.zero(r)
   }
 
+-- The multiplicative companion: the product of ones is one.
+theorem CommutativeRing.productOver_one_function {r : CommutativeRing} {index : Type(0)}
+        (items : List(index))
+        : CommutativeRing.productOver((x : index) ↦ CommutativeRing.one(r), items) = CommutativeRing.one(r) :=
+  by induction on items with IH {
+    case List.empty:
+        CommutativeRing.productOver((x : index) ↦ CommutativeRing.one(r), List.empty(index)) = CommutativeRing.one(r)
+    case List.prepend(head, tail):
+        CommutativeRing.productOver((x : index) ↦ CommutativeRing.one(r), List.prepend(index, head, tail))
+           = CommutativeRing.one(r) * CommutativeRing.productOver((x : index) ↦ CommutativeRing.one(r), tail)
+           = CommutativeRing.one(r) * CommutativeRing.one(r)                            by substituting IH
+           = CommutativeRing.one(r)
+  }
+
 -- Fubini for finite list sums: the order of a double sum is immaterial.
 theorem CommutativeRing.sumOver_interchange {r : CommutativeRing} {left right : Type(0)}
         (term : left → right → CommutativeRing.carrier(r))
@@ -512,6 +526,16 @@ theorem CommutativeRing.productOver_remove {r : CommutativeRing} {index : Type(0
           }
         }
   }
+
+-- One vanishing factor kills the whole product.
+theorem CommutativeRing.productOver_zero_on_member {r : CommutativeRing} {index : Type(0)}
+        (term : index → CommutativeRing.carrier(r)) (x : index) (items : List(index))
+        (member : x ∈ items) (vanishes : term(x) = CommutativeRing.zero(r))
+        : CommutativeRing.productOver(term, items) = CommutativeRing.zero(r) :=
+  CommutativeRing.productOver(term, items)
+     = term(x) * CommutativeRing.productOver(term, items ∖ x)                by CommutativeRing.productOver_remove
+     = CommutativeRing.zero(r) * CommutativeRing.productOver(term, items ∖ x)  by substituting vanishes
+     = CommutativeRing.zero(r)
 
 -- A sum whose term vanishes on every member of the list vanishes.
 theorem CommutativeRing.sumOver_zero_on_members {r : CommutativeRing} {index : Type(0)}
