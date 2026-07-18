@@ -1451,6 +1451,17 @@ ExpressionPointer Elaborator::tryContextEqualityBridge(
                 call = makeApplication(call, transportRhs);
                 call = makeApplication(call, eqForTransport);
                 call = makeApplication(call, proofRewritten);
+                // The motive can be ill-typed even though the rewritten
+                // goal is provable: abstracting an occurrence that a
+                // sibling PROOF argument's type mentions (a divide
+                // denominator) leaves that argument typed against the
+                // concrete term, not the hole. Typecheck the transport
+                // and move on to the next equation rather than letting
+                // the kernel reject it downstream as a hard error.
+                try {
+                    inferTypeInLocalContext(localBinders, call);
+                } catch (const TypeError&) { continue; }
+                  catch (const ElaborateError&) { continue; }
                 lastWinningDetail_ = eq.source;
                 return call;
             }

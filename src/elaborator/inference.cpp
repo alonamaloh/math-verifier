@@ -2197,8 +2197,70 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                     } catch (const TypeError&) {
                         eq = false;
                     }
+                    ExpressionPointer proofForSlot = fact.proofTerm;
+                    // An equality premise is direction-blind: a context
+                    // fact `b = c` discharges a `c = b` slot through
+                    // `Equality.symmetry`. Compare against the flipped
+                    // candidate when the direct comparison fails.
+                    if (!eq) {
+                        ExpressionPointer flipped;
+                        ExpressionPointer symmetryProof;
+                        auto* outer = std::get_if<Application>(
+                            &candidateType->node);
+                        auto* middle = outer
+                            ? std::get_if<Application>(
+                                  &outer->function->node)
+                            : nullptr;
+                        auto* inner = middle
+                            ? std::get_if<Application>(
+                                  &middle->function->node)
+                            : nullptr;
+                        auto* head = inner
+                            ? std::get_if<Constant>(&inner->function->node)
+                            : nullptr;
+                        if (head && head->name == "Equality") {
+                            flipped = makeApplication(
+                                makeApplication(
+                                    makeApplication(
+                                        makeConstant(
+                                            "Equality",
+                                            head->universeArguments),
+                                        inner->argument),
+                                    outer->argument),
+                                middle->argument);
+                            symmetryProof = makeConstant(
+                                "Equality.symmetry",
+                                head->universeArguments);
+                            for (ExpressionPointer part :
+                                     {inner->argument, middle->argument,
+                                      outer->argument,
+                                      openOverLocalBinders(
+                                          fact.proofTerm, localBinders,
+                                          N)}) {
+                                symmetryProof = makeApplication(
+                                    symmetryProof, part);
+                            }
+                        }
+                        if (flipped) {
+                            try {
+                                eq = isDefinitionallyEqual(
+                                    environment_, openedContext,
+                                    flipped, slotNormalised);
+                            } catch (const TypeError&) {
+                                eq = false;
+                            }
+                            if (eq) {
+                                try {
+                                    proofForSlot = closeOverLocalBinders(
+                                        symmetryProof, localBinders, N);
+                                } catch (const TypeError&) {
+                                    eq = false;
+                                }
+                            }
+                        }
+                    }
                     if (eq) {
-                        elaboratedArgs[i] = fact.proofTerm;
+                        elaboratedArgs[i] = proofForSlot;
                         // Diagnostic (BY_DISCHARGE_STATS): record the binder
                         // the proof bottoms out at, peeling any ∧ projections.
                         ExpressionPointer leaf = fact.proofTerm;
