@@ -1,0 +1,401 @@
+-- Algebra/schur_complement.math
+--
+-- The bordered decomposition of a symmetric (1+m)×(1+m) matrix
+-- B = [[A', b], [bᵀ, c]] — leading block A', border column b, corner c —
+-- and the fraction-free Schur-complement identities over a commutative
+-- ring, with s := det(A')·c − ⟨adj(A')·b, b⟩:
+--
+--   (i)  (det A')²·Q_B(x) = Q_{A'}(det(A')·y + t·adj(A')·b) + t²·det(A')·s
+--        (y the restriction of x, t its top coordinate) — completing the
+--        square without dividing, via the adjugate identity;
+--   (ii) det(A')·det(B) = det(A')·s — eliminate the border column of B by
+--        the unimodular-style column operation G = [[I, −adj(A')·b], [0, det A']].
+--
+-- Together they run both directions of Sylvester's criterion by induction
+-- on the bordered decomposition, entirely over ℤ.
+
+module Algebra.schur_complement
+
+import Logic.basics
+import Logic.functions
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.classical_decidable
+import Set.finite
+import Set.finite_pigeonhole
+import Lists.list
+import Lists.map
+import Lists.append
+import Lists.distinct
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.finite_permutation
+import Algebra.permutation_enumeration
+import Algebra.permutation_sign
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.matrix_transpose
+import Algebra.matrix_vector
+import Algebra.matrix_submatrix
+import Algebra.determinant
+import Algebra.determinant_identity
+import Algebra.determinant_transpose
+import Algebra.determinant_multiplicative
+import Algebra.alternating_collapse
+import Algebra.determinant_row_permutation
+import Algebra.adjugate
+import Algebra.determinant_bordered
+import Algebra.quadratic_form
+
+-- ----------------------------------------------------------------------
+-- The bordered vocabulary: leading block, border column, corner; and
+-- vectors restricted and extended across the boundary.
+
+definition Matrix.leadingBlock {r : CommutativeRing} {m : ℕ}
+        (B : Matrix(r, 1 + m, 1 + m)) : Matrix(r, m, m) :=
+  Matrix.submatrix(B, NaturalsBelow.inclusion(m), NaturalsBelow.inclusion(m))
+
+definition Matrix.borderColumn {r : CommutativeRing} {m : ℕ}
+        (B : Matrix(r, 1 + m, 1 + m)) : RingVector(r, m) :=
+  (i : NaturalsBelow(m)) ↦ B(NaturalsBelow.inclusion(m, i), NaturalsBelow.top(m))
+
+definition Matrix.corner {r : CommutativeRing} {m : ℕ}
+        (B : Matrix(r, 1 + m, 1 + m)) : CommutativeRing.carrier(r) :=
+  B(NaturalsBelow.top(m), NaturalsBelow.top(m))
+
+definition RingVector.restrict {r : CommutativeRing} {m : ℕ}
+        (x : RingVector(r, 1 + m)) : RingVector(r, m) :=
+  (i : NaturalsBelow(m)) ↦ x(NaturalsBelow.inclusion(m, i))
+
+-- Extending places the coordinates below the boundary and zero at the top:
+-- it is the action of the inclusion matrix, so the pullback machinery
+-- (`Matrix.quadraticForm_submatrix`, `Matrix.applyVector_multiply`) reads
+-- extensions directly.
+definition RingVector.extend {r : CommutativeRing} {m : ℕ}
+        (y : RingVector(r, m)) : RingVector(r, 1 + m) :=
+  Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m)) · y
+
+theorem RingVector.extend_inclusion {r : CommutativeRing} {m : ℕ}
+        (y : RingVector(r, m)) (i : NaturalsBelow(m))
+        : RingVector.extend(y)(NaturalsBelow.inclusion(m, i)) = y(i) := {
+  Function.IsInjective(NaturalsBelow.inclusion(m)) by NaturalsBelow.inclusion_is_injective;
+  done by Matrix.inclusionMatrix_applyVector_entry
+}
+
+theorem RingVector.extend_top {r : CommutativeRing} {m : ℕ} (y : RingVector(r, m))
+        : RingVector.extend(y)(NaturalsBelow.top(m)) = CommutativeRing.zero(r) := {
+  ∀ (j : NaturalsBelow(m)).
+      Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m))(NaturalsBelow.top(m), j) * y(j)
+      = CommutativeRing.zero(r)
+      by (j : NaturalsBelow(m)) ↦ {
+          ¬(NaturalsBelow.top(m) = NaturalsBelow.inclusion(m, j)) by NaturalsBelow.top_not_inclusion;
+          Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m))(NaturalsBelow.top(m), j)
+             = CommutativeRing.zero(r)
+              by Matrix.inclusionMatrix_entry_off;
+          Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m))(NaturalsBelow.top(m), j) * y(j)
+             = CommutativeRing.zero(r) * y(j)   by substitution
+             = CommutativeRing.zero(r)
+        };
+  RingVector.extend(y)(NaturalsBelow.top(m))
+     = CommutativeRing.sumOver((j : NaturalsBelow(m)) ↦ CommutativeRing.zero(r), NaturalsBelow.enumerate(m))
+           by CommutativeRing.sumOver_congruence
+     = CommutativeRing.zero(r)
+           by CommutativeRing.sumOver_zero_function;
+  done
+}
+
+-- Every vector splits across the boundary: restriction below, top
+-- coordinate on the top basis vector.
+theorem RingVector.bordered_decomposition {r : CommutativeRing} {m : ℕ} (x : RingVector(r, 1 + m))
+        : x = RingVector.extend(RingVector.restrict(x))
+              + x(NaturalsBelow.top(m)) • Matrix.standardBasisRow(r, 1 + m, NaturalsBelow.top(m)) := {
+  let topEntry : CommutativeRing.carrier(r) := x(NaturalsBelow.top(m));
+  let topBasis : RingVector(r, 1 + m) := Matrix.standardBasisRow(r, 1 + m, NaturalsBelow.top(m));
+  ∀ (k : NaturalsBelow(1 + m)). x(k) = (RingVector.extend(RingVector.restrict(x)) + topEntry • topBasis)(k)
+      by (k : NaturalsBelow(1 + m)) ↦ {
+          (∃ (y : NaturalsBelow(m)). k = NaturalsBelow.inclusion(m, y)) ∨ k = NaturalsBelow.top(m)
+              by NaturalsBelow.inclusion_or_top;
+          done by cases {
+            case ∃ (y : NaturalsBelow(m)). k = NaturalsBelow.inclusion(m, y): {
+                choose y such that k = NaturalsBelow.inclusion(m, y) as kIncluded;
+                ¬(NaturalsBelow.top(m) = NaturalsBelow.inclusion(m, y)) by NaturalsBelow.top_not_inclusion;
+                topBasis(NaturalsBelow.inclusion(m, y)) = CommutativeRing.zero(r)
+                    by Matrix.standardBasisRow_off as basisVanishes;
+                RingVector.extend(RingVector.restrict(x))(NaturalsBelow.inclusion(m, y)) = RingVector.restrict(x)(y)
+                    by RingVector.extend_inclusion as extendReads;
+                (RingVector.extend(RingVector.restrict(x)) + topEntry • topBasis)(k)
+                   = (RingVector.extend(RingVector.restrict(x)) + topEntry • topBasis)(NaturalsBelow.inclusion(m, y))
+                         by substituting kIncluded
+                   = RingVector.extend(RingVector.restrict(x))(NaturalsBelow.inclusion(m, y))
+                     + topEntry * topBasis(NaturalsBelow.inclusion(m, y))
+                   = RingVector.restrict(x)(y) + topEntry * topBasis(NaturalsBelow.inclusion(m, y))
+                         by substituting extendReads
+                   = RingVector.restrict(x)(y) + topEntry * CommutativeRing.zero(r)
+                         by substituting basisVanishes
+                   = RingVector.restrict(x)(y)
+                   = x(NaturalsBelow.inclusion(m, y))
+                   = x(k)                                    by substituting kIncluded;
+                done
+              }
+            case k = NaturalsBelow.top(m) as kTop: {
+                RingVector.extend(RingVector.restrict(x))(NaturalsBelow.top(m)) = CommutativeRing.zero(r)
+                    by RingVector.extend_top as extendVanishes;
+                topBasis(NaturalsBelow.top(m)) = CommutativeRing.one(r)
+                    by Matrix.standardBasisRow_at as basisReads;
+                (RingVector.extend(RingVector.restrict(x)) + topEntry • topBasis)(k)
+                   = (RingVector.extend(RingVector.restrict(x)) + topEntry • topBasis)(NaturalsBelow.top(m))
+                         by substituting kTop
+                   = RingVector.extend(RingVector.restrict(x))(NaturalsBelow.top(m))
+                     + topEntry * topBasis(NaturalsBelow.top(m))
+                   = CommutativeRing.zero(r) + topEntry * topBasis(NaturalsBelow.top(m))
+                         by substituting extendVanishes
+                   = CommutativeRing.zero(r) + topEntry * CommutativeRing.one(r)
+                         by substituting basisReads
+                   = topEntry
+                   = x(k)                                    by substituting kTop;
+                done
+              }
+          }
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+-- An extension pairs as the restriction: the top term of the inner
+-- product vanishes with the extension's top coordinate.
+theorem RingVector.innerProduct_extend_left {r : CommutativeRing} {m : ℕ}
+        (y : RingVector(r, m)) (v : RingVector(r, 1 + m))
+        : RingVector.innerProduct(RingVector.extend(y), v)
+          = RingVector.innerProduct(y, RingVector.restrict(v)) := {
+  RingVector.extend(y)(NaturalsBelow.top(m)) = CommutativeRing.zero(r)
+      by RingVector.extend_top as extendVanishes;
+  let pairedTerm : NaturalsBelow(1 + m) → CommutativeRing.carrier(r) :=
+      (k : NaturalsBelow(1 + m)) ↦ RingVector.extend(y)(k) * v(k);
+  NaturalsBelow.enumerate(1 + m)
+     = List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
+           List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))
+      by NaturalsBelow.enumerate_one_plus as enumerationSplits;
+  RingVector.innerProduct(RingVector.extend(y), v)
+     = CommutativeRing.sumOver(pairedTerm, NaturalsBelow.enumerate(1 + m))
+     = CommutativeRing.sumOver(pairedTerm,
+           List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
+               List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m))))
+           by substituting enumerationSplits
+     = RingVector.extend(y)(NaturalsBelow.top(m)) * v(NaturalsBelow.top(m))
+       + CommutativeRing.sumOver(pairedTerm, List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))
+     = CommutativeRing.zero(r) * v(NaturalsBelow.top(m))
+       + CommutativeRing.sumOver(pairedTerm, List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))
+           by substituting extendVanishes
+     = CommutativeRing.sumOver(
+           (i : NaturalsBelow(m)) ↦ pairedTerm(NaturalsBelow.inclusion(m, i)), NaturalsBelow.enumerate(m))
+           by substituting CommutativeRing.sumOver_map
+     = CommutativeRing.sumOver((i : NaturalsBelow(m)) ↦ y(i) * RingVector.restrict(v)(i),
+           NaturalsBelow.enumerate(m))
+           by ((i : NaturalsBelow(m)) ↦ {
+               RingVector.extend(y)(NaturalsBelow.inclusion(m, i)) = y(i) by RingVector.extend_inclusion;
+               done by substitution
+             })
+     = RingVector.innerProduct(y, RingVector.restrict(v));
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The bordered splitting of a symmetric quadratic form:
+-- Q_B(x) = Q_{A'}(y) + t·⟨y, b⟩ + t·⟨b, y⟩ + t²·c.
+
+theorem Matrix.quadraticForm_bordered {r : CommutativeRing} {m : ℕ}
+        (B : Matrix(r, 1 + m, 1 + m)) (symmetric : Matrix.IsSymmetric(B)) (x : RingVector(r, 1 + m))
+        : Matrix.quadraticForm(B, x)
+          = Matrix.quadraticForm(Matrix.leadingBlock(B), RingVector.restrict(x))
+            + x(NaturalsBelow.top(m))
+              * RingVector.innerProduct(RingVector.restrict(x), Matrix.borderColumn(B))
+            + x(NaturalsBelow.top(m))
+              * RingVector.innerProduct(Matrix.borderColumn(B), RingVector.restrict(x))
+            + (x(NaturalsBelow.top(m)) * x(NaturalsBelow.top(m))) * Matrix.corner(B) := {
+  let y : RingVector(r, m) := RingVector.restrict(x);
+  let t : CommutativeRing.carrier(r) := x(NaturalsBelow.top(m));
+  let topBasis : RingVector(r, 1 + m) := Matrix.standardBasisRow(r, 1 + m, NaturalsBelow.top(m));
+  let b : RingVector(r, m) := Matrix.borderColumn(B);
+
+  x = RingVector.extend(y) + t • topBasis by RingVector.bordered_decomposition as decomposition;
+
+  -- The diagonal block term is the leading form.
+  Matrix.quadraticForm(Matrix.leadingBlock(B), y) = Matrix.quadraticForm(B, RingVector.extend(y))
+      by Matrix.quadraticForm_submatrix as blockTerm;
+
+  -- The border column is what the action on the top basis vector reads.
+  ∀ (i : NaturalsBelow(m)). RingVector.restrict(B · topBasis)(i) = b(i)
+      by (i : NaturalsBelow(m)) ↦ {
+          RingVector.restrict(B · topBasis)(i)
+             = (B · topBasis)(NaturalsBelow.inclusion(m, i))
+             = B(NaturalsBelow.inclusion(m, i), NaturalsBelow.top(m))   by Matrix.applyVector_standardBasisRow
+             = b(i);
+          done
+        };
+  RingVector.restrict(B · topBasis) = b by RingVector.equal_of_pointwise as borderReads;
+
+  RingVector.innerProduct(RingVector.extend(y), B · (t • topBasis))
+     = RingVector.innerProduct(RingVector.extend(y), t • (B · topBasis))   by substituting Matrix.applyVector_scale
+     = t * RingVector.innerProduct(RingVector.extend(y), B · topBasis)     by RingVector.innerProduct_scale_right
+     = t * RingVector.innerProduct(y, RingVector.restrict(B · topBasis))   by substituting RingVector.innerProduct_extend_left
+     = t * RingVector.innerProduct(y, b)                                   by substituting borderReads
+  as firstCrossTerm;
+
+  RingVector.innerProduct(t • topBasis, B · RingVector.extend(y))
+     = t * RingVector.innerProduct(topBasis, B · RingVector.extend(y))     by RingVector.innerProduct_scale_left
+     = t * RingVector.innerProduct(Bᵀ · topBasis, RingVector.extend(y))    by substituting Matrix.transpose_adjoint
+     = t * RingVector.innerProduct(B · topBasis, RingVector.extend(y))     by substituting symmetric
+     = t * RingVector.innerProduct(RingVector.extend(y), B · topBasis)     by RingVector.innerProduct_symmetric
+     = t * RingVector.innerProduct(y, RingVector.restrict(B · topBasis))   by substituting RingVector.innerProduct_extend_left
+     = t * RingVector.innerProduct(y, b)                                   by substituting borderReads
+     = t * RingVector.innerProduct(b, y)                                   by RingVector.innerProduct_symmetric
+  as secondCrossTerm;
+
+  Matrix.quadraticForm(B, topBasis) = Matrix.corner(B)
+      by Matrix.quadraticForm_standardBasis as cornerReads;
+  Matrix.quadraticForm(B, t • topBasis)
+     = (t * t) * Matrix.quadraticForm(B, topBasis)   by Matrix.quadraticForm_scale
+     = (t * t) * Matrix.corner(B)                    by substituting cornerReads
+  as cornerTerm;
+
+  Matrix.quadraticForm(B, x)
+     = Matrix.quadraticForm(B, RingVector.extend(y) + t • topBasis)
+           by substituting decomposition
+     = Matrix.quadraticForm(B, RingVector.extend(y))
+       + RingVector.innerProduct(RingVector.extend(y), B · (t • topBasis))
+       + RingVector.innerProduct(t • topBasis, B · RingVector.extend(y))
+       + Matrix.quadraticForm(B, t • topBasis)
+           by Matrix.quadraticForm_add
+     = Matrix.quadraticForm(Matrix.leadingBlock(B), y)
+       + RingVector.innerProduct(RingVector.extend(y), B · (t • topBasis))
+       + RingVector.innerProduct(t • topBasis, B · RingVector.extend(y))
+       + Matrix.quadraticForm(B, t • topBasis)
+           by substituting blockTerm
+     = Matrix.quadraticForm(Matrix.leadingBlock(B), y)
+       + t * RingVector.innerProduct(y, b)
+       + RingVector.innerProduct(t • topBasis, B · RingVector.extend(y))
+       + Matrix.quadraticForm(B, t • topBasis)
+           by substituting firstCrossTerm
+     = Matrix.quadraticForm(Matrix.leadingBlock(B), y)
+       + t * RingVector.innerProduct(y, b)
+       + t * RingVector.innerProduct(b, y)
+       + Matrix.quadraticForm(B, t • topBasis)
+           by substituting secondCrossTerm
+     = Matrix.quadraticForm(Matrix.leadingBlock(B), y)
+       + t * RingVector.innerProduct(y, b)
+       + t * RingVector.innerProduct(b, y)
+       + (t * t) * Matrix.corner(B)
+           by substituting cornerTerm;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The Schur complement, fraction-free: s = det(A')·c − ⟨adj(A')·b, b⟩.
+-- Over a field it is det(A') times the usual c − ⟨A'⁻¹·b, b⟩.
+
+definition Matrix.schurComplement {r : CommutativeRing} {m : ℕ}
+        (B : Matrix(r, 1 + m, 1 + m)) : CommutativeRing.carrier(r) :=
+  Matrix.determinant(Matrix.leadingBlock(B)) * Matrix.corner(B)
+  - RingVector.innerProduct(
+        Matrix.adjugate(Matrix.leadingBlock(B)) · Matrix.borderColumn(B), Matrix.borderColumn(B))
+
+-- Identity (i): completing the square without dividing. Scaling Q_B by
+-- (det A')² concentrates the cross terms into the shifted argument
+-- det(A')·y + t·adj(A')·b, and the residue is t²·det(A')·s.
+theorem Matrix.quadraticForm_schurComplement {r : CommutativeRing} {m : ℕ}
+        (B : Matrix(r, 1 + m, 1 + m)) (symmetric : Matrix.IsSymmetric(B)) (x : RingVector(r, 1 + m))
+        : (Matrix.determinant(Matrix.leadingBlock(B)) * Matrix.determinant(Matrix.leadingBlock(B)))
+          * Matrix.quadraticForm(B, x)
+          = Matrix.quadraticForm(Matrix.leadingBlock(B),
+                Matrix.determinant(Matrix.leadingBlock(B)) • RingVector.restrict(x)
+                + x(NaturalsBelow.top(m)) • (Matrix.adjugate(Matrix.leadingBlock(B)) · Matrix.borderColumn(B)))
+            + (x(NaturalsBelow.top(m)) * x(NaturalsBelow.top(m)))
+              * (Matrix.determinant(Matrix.leadingBlock(B)) * Matrix.schurComplement(B)) := {
+  let block : Matrix(r, m, m) := Matrix.leadingBlock(B);
+  let d : CommutativeRing.carrier(r) := Matrix.determinant(block);
+  let y : RingVector(r, m) := RingVector.restrict(x);
+  let t : CommutativeRing.carrier(r) := x(NaturalsBelow.top(m));
+  let b : RingVector(r, m) := Matrix.borderColumn(B);
+  let w : RingVector(r, m) := Matrix.adjugate(block) · b;
+  let firstCross : CommutativeRing.carrier(r) := RingVector.innerProduct(d • y, block · (t • w));
+  let secondCross : CommutativeRing.carrier(r) := RingVector.innerProduct(t • w, block · (d • y));
+
+  Matrix.IsSymmetric(block) by Matrix.submatrix_symmetric as blockSymmetric;
+  block · w = d • b by Matrix.applyVector_adjugate as adjugateAction;
+
+  firstCross
+     = RingVector.innerProduct(d • y, t • (block · w))       by substituting Matrix.applyVector_scale
+     = RingVector.innerProduct(d • y, t • (d • b))           by substituting adjugateAction
+     = d * RingVector.innerProduct(y, t • (d • b))           by RingVector.innerProduct_scale_left
+     = d * (t * RingVector.innerProduct(y, d • b))           by substituting RingVector.innerProduct_scale_right
+     = d * (t * (d * RingVector.innerProduct(y, b)))         by substituting RingVector.innerProduct_scale_right
+  as firstCrossValue;
+
+  secondCross
+     = t * RingVector.innerProduct(w, block · (d • y))       by RingVector.innerProduct_scale_left
+     = t * RingVector.innerProduct(blockᵀ · w, d • y)        by substituting Matrix.transpose_adjoint
+     = t * RingVector.innerProduct(block · w, d • y)         by substituting blockSymmetric
+     = t * RingVector.innerProduct(d • b, d • y)             by substituting adjugateAction
+     = t * (d * RingVector.innerProduct(b, d • y))           by substituting RingVector.innerProduct_scale_left
+     = t * (d * (d * RingVector.innerProduct(b, y)))         by substituting RingVector.innerProduct_scale_right
+     = t * (d * (d * RingVector.innerProduct(y, b)))         by substituting RingVector.innerProduct_symmetric
+  as secondCrossValue;
+
+  Matrix.quadraticForm(block, w)
+     = RingVector.innerProduct(w, block · w)
+     = RingVector.innerProduct(w, d • b)                     by substituting adjugateAction
+     = d * RingVector.innerProduct(w, b)                     by RingVector.innerProduct_scale_right
+  as squareTerm;
+  Matrix.quadraticForm(block, t • w)
+     = (t * t) * Matrix.quadraticForm(block, w)              by Matrix.quadraticForm_scale
+     = (t * t) * (d * RingVector.innerProduct(w, b))         by substituting squareTerm
+  as scaledSquareTerm;
+  Matrix.quadraticForm(block, d • y) = (d * d) * Matrix.quadraticForm(block, y)
+      by Matrix.quadraticForm_scale as diagonalTerm;
+
+  -- The completed square, term by term.
+  Matrix.quadraticForm(block, d • y + t • w)
+     = Matrix.quadraticForm(block, d • y) + firstCross + secondCross + Matrix.quadraticForm(block, t • w)
+           by Matrix.quadraticForm_add
+     = (d * d) * Matrix.quadraticForm(block, y) + firstCross + secondCross
+       + Matrix.quadraticForm(block, t • w)
+           by substituting diagonalTerm
+     = (d * d) * Matrix.quadraticForm(block, y) + d * (t * (d * RingVector.innerProduct(y, b)))
+       + secondCross + Matrix.quadraticForm(block, t • w)
+           by substituting firstCrossValue
+     = (d * d) * Matrix.quadraticForm(block, y) + d * (t * (d * RingVector.innerProduct(y, b)))
+       + t * (d * (d * RingVector.innerProduct(y, b))) + Matrix.quadraticForm(block, t • w)
+           by substituting secondCrossValue
+     = (d * d) * Matrix.quadraticForm(block, y) + d * (t * (d * RingVector.innerProduct(y, b)))
+       + t * (d * (d * RingVector.innerProduct(y, b))) + (t * t) * (d * RingVector.innerProduct(w, b))
+           by substituting scaledSquareTerm
+  as completedSquareValue;
+
+  Matrix.quadraticForm(B, x)
+     = Matrix.quadraticForm(block, y) + t * RingVector.innerProduct(y, b)
+       + t * RingVector.innerProduct(b, y) + (t * t) * Matrix.corner(B)
+      by Matrix.quadraticForm_bordered as splitting;
+  RingVector.innerProduct(b, y) = RingVector.innerProduct(y, b)
+      by RingVector.innerProduct_symmetric as crossFlips;
+
+  (d * d) * Matrix.quadraticForm(B, x)
+     = (d * d) * (Matrix.quadraticForm(block, y) + t * RingVector.innerProduct(y, b)
+                  + t * RingVector.innerProduct(b, y) + (t * t) * Matrix.corner(B))
+           by substituting splitting
+     = (d * d) * (Matrix.quadraticForm(block, y) + t * RingVector.innerProduct(y, b)
+                  + t * RingVector.innerProduct(y, b) + (t * t) * Matrix.corner(B))
+           by substituting crossFlips
+     = ((d * d) * Matrix.quadraticForm(block, y) + d * (t * (d * RingVector.innerProduct(y, b)))
+        + t * (d * (d * RingVector.innerProduct(y, b))) + (t * t) * (d * RingVector.innerProduct(w, b)))
+       + (t * t) * (d * (d * Matrix.corner(B) - RingVector.innerProduct(w, b)))
+           by ring
+     = Matrix.quadraticForm(block, d • y + t • w)
+       + (t * t) * (d * (d * Matrix.corner(B) - RingVector.innerProduct(w, b)))
+           by substituting completedSquareValue
+     = Matrix.quadraticForm(block, d • y + t • w) + (t * t) * (d * Matrix.schurComplement(B));
+  done
+}
