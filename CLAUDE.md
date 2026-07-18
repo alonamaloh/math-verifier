@@ -67,9 +67,10 @@ write in a textbook, with the kernel doing the typechecking. Optimize for
   proofs. Start here.
 - **reference.md** — a catalogue of every surface construct.
 - **style.md** — the ONE style guide, principles + worked depth: **what
-  an ideal proof looks like and the raw-CIC tells to avoid** (no
+  an ideal proof looks like and the raw-CIC tells to avoid** (avoid
   `congruenceOf`/`transport_proposition`/raw `Subtype.make`/positional
-  lemma calls — read this BEFORE writing proofs); equation-shaped
+  lemma calls by default — the few documented fallbacks live in the
+  conventions files; read this BEFORE writing proofs); equation-shaped
   `by cases`/`by induction`; statement-level sugar (a bare stated
   proposition/`goal`/`choose`/`take`/`suppose`/`let`/`note`/`change`/
   `unfold`); when-to-hint judgment; and the **redundancy-check polishing

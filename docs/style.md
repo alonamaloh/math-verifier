@@ -116,10 +116,7 @@ Mathematicians don't write proofs as separated equation cases at the
 outer-syntax level — they write a body that opens with "by cases" or
 "by induction on n" and then handles each shape. The proof-level split
 is **equation-shaped**: each arm states what the scrutinee *equals*,
-with `for some` binding the constructor arguments. (The old proof-level
-`cases n { | zero => … | successor(k) => … }` form is **retired** —
-`ErrorTest/cases_keyword_retired.math` locks the rejection; `|`-arms
-survive only in `definition`s and in `cases by <lemma> { … }`.)
+with `for some` binding the constructor arguments.
 
 ```math
 -- Non-recursive case split:
@@ -139,11 +136,8 @@ theorem Natural.foo (n : ℕ) : P(n) :=
 
 Each arm's equation refines the goal (and the hypotheses that mention
 the scrutinee); exhaustiveness discharges through the type's coverage
-theorem. At the **`Natural/` floor only**, the constructor-named arms
-(`case zero:` / `case successor(k):`) are still the right spelling for
-proofs that lean on structural reduction — outside `Natural/`,
-`successor` is not part of the consumer vocabulary at all (see
-`conventions/numerals-and-naming.md`).
+theorem. Constructor spellings stay behind the `Natural/` boundary
+(see `conventions/numerals-and-naming.md`).
 
 Pattern-match **definitions** (`definition f | 0 => … | 1 + k => …`)
 remain the tool for direct recursion that doesn't fit `by induction`'s
@@ -156,22 +150,8 @@ really demands it.
 
 ### Branch on a *condition*, not a constructor
 
-There is no proof-level `cases <value> { | … }` at all any more; a
-branch in a proof is either an equation-shaped split (above), a
-condition split, or data-dispatch pushed into a helper definition.
-The old computed-scrutinee form was rejected even before the
-retirement —
-
-```math
--- RETIRED — no proof-level `cases <expr> { | … }`, computed or not:
-(i : Natural) ↦ cases Natural.compare_strict(i, m) {
-    | Natural.StrictComparison.below(_)   => a
-    | Natural.StrictComparison.atLeast(_) => b
-  }
-```
-
-Reach for a **condition** or an **argument-matching helper** instead —
-they read as the branch they are:
+A branch in a proof is an equation-shaped split (above), a condition
+split, or data-dispatch pushed into a helper definition:
 
 - **value-level, a decidable condition** (in a `definition`):
   `if i < m then a else b` — the classical conditional (see
@@ -183,20 +163,17 @@ they read as the branch they are:
   `by cases { case i < m as h: … otherwise as h2: … }` — the decidable
   split (`import axioms` for `otherwise`).
 - **dispatching on a computed *data* value** (not a `Prop` condition —
-  e.g. a `StrictComparison`, or `monus(a,b)`'s zero/successor shape):
+  e.g. a `StrictComparison`, or `monus(a,b)`'s zero-or-not shape):
   push the destructure into a **helper that pattern-matches its
   argument** (the pattern-match-*definition* form `definition f | Ctor(x)
-  => …`, whose scrutinee IS a bound parameter). The library does exactly
-  this — `Natural.compare_strict_shift` (matches the `StrictComparison`
-  passed to it) and `Natural.Raw.select_on_zero` (matches the overshoot
-  argument, forming both branches eagerly). Even foundational primitives
-  that must dispatch on a computed sub-result need no `cases <expr>`, so
-  there are **no exemptions**.
+  => …`, whose scrutinee IS a bound parameter). The library does exactly this —
+  `Natural.compare_strict_shift` matches the `StrictComparison` passed
+  to it.
 
 **Even a branch that needs the decision PROOF** (building a dependent
 value like a `NaturalsBelow` witness, `NaturalsBelow.sum_out_of`) does
 NOT need `cases`: `if` binds the proof anonymously but leaves it in
-scope, so restate the condition as a claim in the branch block to
+scope, so restate the condition as a stated fact in the branch block to
 recover a named handle —
 
 ```math
@@ -206,45 +183,13 @@ else { m ≤ i by …;      … }                          -- from ¬(i < 1 + m)
 ```
 
 (The restatement line is mild friction; an `if P as h then …` sugar that
-binds the proof directly is a candidate, not yet built.) The
-scrutinee-destructure capability still exists in the elaborator — it is
-what `if`/decide, `choose`, and destructuring-`let ⟨a,b⟩` desugar onto —
-but it is not reachable from proof syntax.
-`library/ErrorTest/cases_keyword_retired.math` locks the rejection.
-
-### Multi-pattern bindings (when the pattern-match form is used)
-
-Constructor patterns at non-scrutinee positions of a pattern-match
-definition properly refine the types of later-bound args
-(including dependent equality hypotheses). Write all destructures in
-one row:
-
-```math
-theorem IntegerEquivalent.symmetric
-        : (x y : IntegerRepresentative)
-          → IntegerEquivalent(x, y)
-          → IntegerEquivalent(y, x)
-  | IntegerRepresentative.make(a, b),
-    IntegerRepresentative.make(c, d),
-    aPlusDEqualsBPlusC ↦
-      …
-```
-
-The elaborator emits a nested recursor chain whose motives abstract
-the destructured position AND every later position binder, so a
-hypothesis like `aPlusDEqualsBPlusC` arrives in its refined
-Natural-level form. Inner constructor patterns are supported on
-single-constructor non-indexed non-recursive (parameterised OK)
-inductives — covers `IntegerRepresentative.make`,
-`RationalRepresentative.make`, `PAdicCauchySequence.make`. Multi-
-constructor inner positions would need per-row coverage analysis
-that isn't yet wired up.
+binds the proof directly is a candidate, not yet built.)
 
 ## Case-split with retained equation: state it in the arm
 
 To case-split on an expression and keep the equation between the
 expression and the matched form on the page, use the equation-shaped
-by-cases split (the old `cases E with <eq>` convoy form is retired):
+by-cases split:
 
 ```math
 done by cases {
@@ -256,14 +201,11 @@ done by cases {
 
 Each arm's equation is an ordinary stated hypothesis — citable,
 statement-addressable, and transported by the prover — and
-exhaustiveness discharges through the type's coverage lemma
-(auto-generated `<T>.cases_covered`; `Natural.zero_or_successor` /
-`zero_or_one_plus` at the floor).
+exhaustiveness discharges through the type's coverage lemma.
 
 ## Classical case-splits: `by cases { case P: … otherwise: … }`
 
-The canonical form for "P or not P" reasoning in proofs (the old
-`decide P { yes/no }` construct is retired). `otherwise` is always
+The canonical form for "P or not P" reasoning in proofs. `otherwise` is always
 last; its hypothesis is ¬(the stated cases), and exhaustiveness is
 excluded middle by construction — it cannot fail to cover.
 
@@ -309,8 +251,6 @@ case-analyze the classical decision.
 > `Logic.the`). A module using `if` must reach that file; an `unknown
 > identifier 'Logic.classical_decidable'` means you need
 > `import Natural.classical_decidable`.
-
-Error diagnostic: if the assembled `Decidable_recursor` application doesn't typecheck, the elaborator pre-checks it and dumps each of the 5 arg slots (proposition / motive / yes case / no case / scrutinee) with its inferred type, so the error points at which slot is the culprit. Generic kernel "Application: argument type does not match Pi domain" errors anywhere in the file now also print `expected type:` and `actual type:` lines.
 
 ## Introducing a disjunction — state the side, skip `Or.introduce*`
 
@@ -364,16 +304,11 @@ Concretely:
   feature, not a cost — `halvedEpsilonPositive`, not `hep`.
 - **Consider the ellipsis for reader-facing sums.** A statement a text
   writes term-by-term should be spelled that way:
-  `(p * q)[k] = p[0] * q[k ∸ 0] + ... + p[k] * q[k ∸ k]`
-  (`Polynomial.nth_multiply_expanded`) or
-  `(1 - r) * (r^0 + r^1 + ... + r^(n - 1)) = 1 - r^n`. The ellipsis
-  elaborates through the `fold_operation` registry (registered for
-  `+`/`*` at Natural, Integer, Ring.carrier, VectorSpace.carrier), and
-  is one δ-step from `Ring.Sum` — citations bridge. INSIDE calc chains
-  keep the binder form (`Ring.Sum(r, (i) ↦ …, k)`): the `Sum.*` lemma
-  library speaks it. Caveat: write prefix terms UNSIMPLIFIED
-  (`q[k ∸ 0]`, not `q[k]`) — term-function inference is syntactic
-  (gap filed in the inbox).
+  `(1 - r) * (r^0 + r^1 + ... + r^(n - 1)) = 1 - r^n`
+  (`Real.geometric_series`). Inside relation chains keep the binder form
+  (`Ring.Sum(r, (i) ↦ …, k)`) — the `Sum.*` lemma library speaks it —
+  and write the ellipsis's edge terms unsimplified (`q[k ∸ 0]`, not
+  `q[k]`): term-function inference is syntactic.
 
 - **Math-like phrasing.** Compose the proof out of named
   mathematical steps. A reader should see "triangle inequality on
@@ -444,11 +379,13 @@ NOT the other way around. The single biggest readability failure is
 mathematics. If you find yourself writing any of the following, stop and
 reach for the math-like form instead:
 
-- **`congruenceOf(…)` / `Equality.congruence(…)` — a raw-CIC stink.**
-  "Apply `f` to both sides of `a = b`" is a one-step relation-chain
-  whose justification is the inner equality: the elaborator's
-  *diff-inferred congruence* wraps `f` automatically (see
-  conventions/relation-chains.md).
+- **`congruenceOf(…)` / `Equality.congruence(…)` — a raw-CIC stink,
+  avoid by default.** "Apply `f` to both sides of `a = b`" is a
+  one-step relation-chain whose justification is the inner equality:
+  the elaborator's *diff-inferred congruence* wraps `f` automatically.
+  The one documented fallback is a multi-occurrence motive (the same
+  changed subterm at several positions at once) — see
+  conventions/relation-chains.md.
   ```
   -- NOT: congruenceOf((x) ↦ Sum.left(A, B, x), valueEquality)
   Sum.left(A, B, recovered)
@@ -524,7 +461,7 @@ reach for the math-like form instead:
 - **Direct proof-lemma calls** — applying a `theorem` to positional
   arguments — are discouraged *entirely*, at every arity. Not just
   `LessOrEqual.transitive(a, b, c, p, q)` but also the one-argument
-  `successor_less_or_equal_successor(proof)`: both invoke the lemma as a
+  `LessThan.weaken(proof)`: both invoke the lemma as a
   function instead of reading as mathematics. **State the fact and
   discharge it by name, argument-free**: `T by <Lemma>` (which binds
   `T` into context), or chain it via a relation chain,
@@ -539,25 +476,21 @@ reach for the math-like form instead:
   - **Recursion reads as induction.** A pattern-matched proof whose body
     recurses by a positional self-call (`Foo.bar(predecessor, …)`) hides the
     induction in a comment AND counts as a direct call. Write it
-    `by induction on a with IH { case zero: … case
-    successor(predecessor): … }` instead: the hypothesis is the named local
+    `by induction on a with IH { case a = 0: … case a = 1 + p
+    for some p: … }` instead: the hypothesis is the named local
     `IH`, cited argument-free like any fact (`done by IH`),
     so the recursion both reads as induction and is no longer a lemma call.
     Hypotheses whose types mention the inducted variable are generalised
     automatically (the IH then quantifies over them); write
     `generalizing b, c` only for induction loading — an IH the proof must
-    apply at *different* values of extra binders. Example —
-    `Natural.add_cancel_left` (`library/Natural/arithmetic.math` — a
-    Natural-floor proof, hence the constructor arms and the `unfold`
-    that lets them reduce; outside the floor the arms are
-    equation-shaped, `case a = 0:` / `case a = 1 + k for some k:`):
+    apply at *different* values of extra binders. The shape
+    (cancellation on the left, `a + b = a + c → b = c`):
     ```
-    unfold Natural.add, ℕ in
     by induction on a with IH {
-      case zero:
+      case a = 0:
           equalityHypothesis
-      case successor(predecessor): {
-          predecessor + b = predecessor + c;
+      case a = 1 + p for some p: {
+          p + b = p + c;
           done by IH
         }
     }
@@ -590,11 +523,10 @@ reach for the math-like form instead:
     ```
   - Argument-free `by <Lemma>` works for a `≤`/`∣` chain step and any goal
     that pins the lemma's conclusion. It does **not** work for an `=` chain
-    step (diff-inference needs the lemma *applied*: `by add_successor(m,
-    x)`), nor when a lemma premise is a *derived term* rather than a
-    context hypothesis (the prover can't conjure it) — there, keep that one
-    argument explicit, or pick a premise-free lemma (`successor_positive`
-    over `successor_less_or_equal_successor`).
+    step (diff-inference needs the lemma *applied*), nor when a lemma
+    premise is a *derived term* rather than a context hypothesis (the
+    prover can't conjure it) — there, keep that one argument explicit,
+    or pick a premise-free lemma.
 
 - **Universe annotations (`Sum.{0,0,0}(…)`, `Product.{0,0}(…)`) are
   noise.** `Sum`/`Product` are universe-polymorphic and can't infer their
@@ -614,15 +546,15 @@ reach for the math-like form instead:
   position, so spell those.
 
 The litmus test: a reader should follow the proof as *mathematics* —
-"apply `g` to both sides", "by antisymmetry", "`successor(v) ≤ m ≤ v`,
-absurd" — without parsing CIC bureaucracy. Length spent on named
+"apply `g` to both sides", "by antisymmetry", "`1 + v ≤ m ≤ v`,
+contradiction" — without parsing CIC bureaucracy. Length spent on named
 mathematical steps is a feature; ceremony is the enemy.
 
 ### Statement-level proof sugar
 
-Inside a `{ … }` proof block, the following statement forms compose
-naturally and read as math prose. All end with `;` and the block
-returns its final non-`;`-terminated expression.
+`reference.md` catalogues the statement grammar (stated facts, `take`,
+`suppose`, `let`, `witness`/`choose`, `note`). What follows is the
+judgment: which form reads as mathematics where.
 
 - `<type> by <proof> as <name>;` — assert and discharge, named for later
   citation. To close the current goal (type from the surrounding expected
@@ -653,29 +585,15 @@ returns its final non-`;`-terminated expression.
   decomposition), so this is the form for `⟨a, b, c⟩`-style structure
   proofs (`IsField`, `IsEquivalenceRelation`, …), not a tuple.
 - **Eliminating an existential — prefer `choose`.**
-  `choose <name> [such that <prop>] [as <condName>] from <source>;` is the
-  readable way to take a witness out of an `∃ x. P(x)`. It shows — and the
-  kernel verifies — *what the witness satisfies* in place, and it avoids the
-  `⟨…⟩` tuple pattern, which leaks that `∃`/`∧` are encoded as tuples
-  (something a mathematician never thinks about). The clauses:
-  - **`from <source>`** — where the existential comes from. A **hypothesis**
-    name destructures that specific one (so you say *which* when several `∃`
-    are in scope — what plain `choose` can't). A **lemma** name is cited
-    argument-free (premises discharged from context), then
-    destructured. `from` also takes any applied term of existential type
-    (`gSurjective(z)`, `Permutation.extract(a, b, sub)`, an explicit recursive
-    self-call). With **no `from`**, `choose` takes the most-recent in-scope `∃`.
-  - **`such that <prop>`** — optional but PREFERRED: a formally-verified,
-    locally-readable assertion of the witness's property, so the reader needn't
-    hunt in the lemma's statement or unfold a definition (`∣`, `Equinumerous`).
-    Give the full existential body — a conjunction is fine (`such that A ∧ B`).
-    For a *lemma* source it is also the disambiguator when several context
-    facts could discharge the premise.
-  - **`as <condName>`** — names the chosen condition for later citation; omit
-    it and the condition joins the context anonymously, to be consumed by
-    type-match in a by-less / `by` / `substituting` step (the usual case).
-  Example: `choose firstQuotient such that b = a * firstQuotient from aDividesB;`
-  or, citing a lemma, `choose gap such that a + (1 + gap) = b from Natural.lt_elim;`.
+  `choose <name> [such that <prop>] [as <condName>] from <source>;` shows —
+  and the kernel verifies — *what the witness satisfies* in place, and
+  avoids the `⟨…⟩` tuple pattern. `from` takes a hypothesis (naming *which*
+  `∃` when several are in scope), a lemma cited argument-free, or any
+  applied term of existential type; omitted, the most recent in-scope `∃`
+  is used. `such that` is preferred (the full existential body — a
+  conjunction is fine), and doubles as the disambiguator for a lemma
+  source. Omit `as` unless the condition is later cited by name.
+  Example: `choose gap such that a + (1 + gap) = b from Natural.lt_elim;`.
 - A context **conjunction's legs are facts on their own**: a hypothesis
   `A ∧ B` lets you prove/cite `A` or `B` directly — no manual `And.left`/
   `And.right`. So after `choose x such that A ∧ B from h;`, both `A` and `B` are
@@ -730,12 +648,6 @@ returns its final non-`;`-terminated expression.
   contradiction. `absurd(<proof-or-proposition>)` still exists as the
   explicit closer, but reads as plumbing; prefer stating the false fact
   and letting `done` refute it.
-- `let <name> ∈ <type> [with <predicate>];` — introduce a typed
-  variable that can later be refined.
-- `let <name> [: <type>] := <value>;` — ζ-tracked abbreviation
-  (kernel sees through it; see `conventions/numerals-and-naming.md`).
-- `suppose <proposition> as <name>;` — introduce a hypothesis as a
-  step (useful for breaking implication arrows into named pieces).
 - **Introduce a goal's `∀`/`→` binders with `take`/`suppose`, not a
   restated-type lambda.** For a goal `∀ (a b : T). P(a) → P(b) → C`, open the
   proof with `by { take a; take b; suppose P(a) as ha; suppose P(b) as hb;
@@ -764,21 +676,12 @@ returns its final non-`;`-terminated expression.
   Prove `Q` under the hypothesis `h : P` inside the block, which adds
   `P → Q` to the context (anonymously, for the auto-prover to pick up by
   type) for the rest of the proof. Reads as "suppose `P`; to prove `Q`: …".
-- `take <name> : <type>;` — introduce a Pi-binder of the given type
-  from the expected type. Reads as the math-prose "take an arbitrary
-  <name> of type <type>" / "let <name> ∈ <type> be given". Use
-  `take` over `(name : type) ↦` whenever the binder is
-  the textbook "fix a variable" move; reserve `` for genuine
-  lambdas that aren't intros. Semantically identical to a single-
-  binder `suppose … as …` (both wrap the rest of the block in a
-  lambda) but reads as the universal/Pi side rather than the
-  hypothesis-naming side.
 - `note goal : <type>;` — assert the current expected type is
   definitionally equal to `<type>` and continue. Reads as
   "we need to show that …" / "the goal is …". A no-op at the term
   level — pure scaffolding that documents the goal at a point where
   the reader benefits from seeing it (right after `take`s, after a
-  `cases` split, before a long calc). The elaborator runs
+  `cases` split, before a long chain). The elaborator runs
   `isDefinitionallyEqual` and reports a mismatch with both forms in
   the error.
 - `note <proposition> [by <proof>];` — a *verified comment*: like a
@@ -791,13 +694,6 @@ returns its final non-`;`-terminated expression.
   for the reader, it is never flagged unused or redundant. Use it to keep
   an intermediate fact visible even when the surrounding proof would close
   without it.
-- `since <proof>` — **removed from the language** (2026-07-02): it no
-  longer parses at all. Never write it in new proofs. Its old job — "a
-  kept explanation the prover doesn't need" — is served by
-  `note P [by <proof>];` (the verified comment) or, for the rare step
-  where the named result *is* the insight, by
-  keeping the `by <Lemma>` and accepting the redundancy warning (the
-  author's keep-decision is the exemption now).
 - `change <type>;` — the *active* counterpart of `note goal`: assert
   `<type>` is definitionally equal to the current goal AND replace the
   goal by `<type>` for the rest of the block (the body is elaborated at
@@ -835,9 +731,7 @@ So, in order of preference for a step the auto-prover can close:
    itself is the insight (the induction hypothesis, a closed form, a
    big-name theorem). The redundant-`by` check will flag it; keeping
    it anyway is the author's judgment call, and that judgment — not a
-   keyword — is what marks the hint as reader-load-bearing. (`since`,
-   the old keyword for this, was removed (2026-07-02) and no longer
-   parses.)
+   keyword — is what marks the hint as reader-load-bearing.
 
 When the prover **cannot** close the step without help, the citation
 isn't an explanation — it's load-bearing. Prefer, in order:
@@ -866,7 +760,7 @@ natural_is_nonneg(n))` — the prover can't reach `IsNonneg(n)` on its own.
 
 Outermost-arm shorthands for case-splits:
 
-- `by induction on n with IH { case zero: … case successor(k): … }` —
+- `by induction on n with IH { case n = 0: … case n = 1 + k for some k: … }` —
   preferred over a pattern-match definition.
 - Hypotheses about `n` refine automatically per arm (and the IH
   quantifies over them); `by induction on n with IH generalizing b { … }`
@@ -951,8 +845,8 @@ it next to the operation, not a workaround at the call site.
 ### Pattern-match at constructor reps for Quotient-lifted proofs
 
 The bad shape (~80 lines): `Quotient.induct_two` whose at-rep body
-threads bridge lemmas (`sequenceFunction_add`, etc.) through a calc
-chain to reach a pointwise Rational fact.
+threads bridge lemmas (`sequenceFunction_add`, etc.) through a
+relation chain to reach a pointwise Rational fact.
 
 The good shape (~20 lines): a separate `*_at_make` theorem that
 pattern-matches the reps to expose the underlying sequences, plus a
@@ -1000,16 +894,7 @@ stuck and query its line:
 
 It prints the hypotheses and goal at the proof statement at (or nearest
 before) that line — pointing anywhere inside a multi-line statement
-reports the enclosing statement:
-
-```
-goal at line 147:
-  divisor : Natural
-  dividend : Natural
-  remainderBelowDivisor : successor recursedRemainder ≤ divisor
-  bumpedDecomposition : dividend = (successor recursedQuotient) * divisor + recursedRemainder
-  ⊢ Natural.has_quotient_remainder divisor dividend
-```
+reports the enclosing statement (hypotheses, then `⊢ <goal>`).
 
 The report is printed even when elaboration fails *after* the queried
 line, so a half-written proof still answers "what was I proving here".
@@ -1041,7 +926,7 @@ rewriter.
 **How to resolve each finding — by readability, not by chasing zero:**
 
 - **Redundant `by` on a *chain step* citing a library lemma / tactic**
-  (`by ring`, `by add_successor`, `by multiply_commutative`) → make it
+  (`by ring`, `by multiply_commutative`) → make it
   **by-less**. The chain already shows the intermediate form; the
   citation was noise.
 - **Redundant `by` on a *stated fact* that names the operative lemma**
@@ -1049,8 +934,7 @@ rewriter.
   (`by <Lemma>`) and then decide: if the named result is genuinely the
   insight (IH, a closed form, a big-name theorem), **keep it** and
   accept the persistent warning; otherwise **bare the fact** — the
-  stated proposition is its own explanation. (The old `since <Lemma>`
-  resolution is retired; there is no exempt keyword anymore.)
+  stated proposition is its own explanation.
 
 **The cascade — expect it, and settle it.** Removing a `by` (or going
 argument-free) makes the auto-prover pick the needed fact out of context by
@@ -1077,9 +961,7 @@ prover could skip it.
 author insists the reader does — a kept, flagged hint). `note P [by …];`
 = a verified comment that is **not added to the context** — so never use
 `note` for a fact a later step must consume by type-match (it won't be
-there); state it bare (anonymously) for that. (`since` — the old
-exempt-explanation keyword — was removed (2026-07-02) and no longer
-parses.)
+there); state it bare (anonymously) for that.
 
 ## Check the result
 

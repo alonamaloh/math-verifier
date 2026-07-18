@@ -43,7 +43,7 @@ real limitation:
   hypotheses at the same let-free spelling), so
   `mean * mean - x*y = halfDiff * halfDiff by field` with
   `let mean := (x+y)/2` closes as written; so do bare sign/positivity
-  claims over a `let` (`let tolerance := ε / 2 / fRoof;
+  stated facts over a `let` (`let tolerance := ε / 2 / fRoof;
   tolerance > 0;` — pinned by `Test/zeta_let_test.math`). The one
   remaining blind spot is `linear_combination`: its cited hypothesis
   equations feed the coefficient bookkeeping at their stated

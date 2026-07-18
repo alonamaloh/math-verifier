@@ -42,7 +42,7 @@ not cover), run the checks directly:
     --check-redundant-by --check-redundant-by-non-eq --check-redundant-calc-steps
 ```
 
-(Also heed `expensive by-less proof step` and `unused claim/let`
+(Also heed `expensive by-less proof step` and `unused fact/let`
 warnings from the plain build — they count as findings here. Note the
 marker pass can surface "arguments inferable — `by <lemma>` alone
 suffices" findings: take those — dropping spelled-out lambda arguments
@@ -61,16 +61,16 @@ see the `by` vs `note` mnemonic below).)
 
 | Finding | Resolution |
 |---|---|
-| Redundant `by ring` / `by <plumbing lemma>` on a calc step | **By-less it.** The calc already shows the intermediate forms; mechanism citations are noise. |
+| Redundant `by ring` / `by <plumbing lemma>` on a chain step | **By-less it.** The chain already shows the intermediate forms; mechanism citations are noise. |
 | Redundant `by` on a step citing the **induction hypothesis** | **Keep `by IH`** (accept the warning) — the marker for where induction lands. |
 | Redundant `by <Lemma>` where the *named result is the insight* (a closed form, `absolute_value_multiplicative`, a `partition` equation, …) | **Keep `by <Lemma>`** (argument-free; accept the warning) — the explanation is reader-load-bearing. |
-| Redundant `by` on a claim citing a self-evident fact (`0 < 1`) | **Bare claim.** The statement is its own explanation. |
+| Redundant `by` on a stated fact citing a self-evident proposition (`0 < 1`) | **Bare the fact.** The statement is its own explanation. |
 | Redundant `by` whose removal makes the prover **search expensively** (watch for the expensive-step warning re-appearing) | **Keep the hint** — performance-load-bearing. |
-| `unused name` on a claim/calc-`as` | **Anonymize** (`claim T by V;` / drop the `as`) — unless the name is referenced later by name, or appears in a `cases … refining` list (known false positive: refining usage doesn't count — leave the name). |
+| `unused name` on an `as`-named fact or chain | **Anonymize** (`T by V;` / drop the `as`) — unless the name is referenced later by name, or appears in a `cases … refining` list (known false positive: refining usage doesn't count — leave the name). |
 | Redundant `by <binder>` where the binder is an `obtain`/`suppose`/lambda hypothesis used nowhere else | **Leave it** — by-less'ing just moves the warning to an unused binder. |
-| A whole claim the prover derives without its stated proof | Try **deleting the scaffolding entirely** (the checker sometimes reveals a 5-line derivation is unnecessary); keep the claim itself only if it documents a milestone. |
+| A whole stated fact the prover derives without its stated proof | Try **deleting the scaffolding entirely** (the checker sometimes reveals a 5-line derivation is unnecessary); keep the fact itself only if it documents a milestone. |
 | An intermediate fact that is **only there to orient the reader** — the prover doesn't need it and no later step consumes it by type-match | Turn it into `note P [by …];` — a verified comment kept out of the context. (Do NOT use `note` for a fact a later step consumes by type-match: `note` isn't in context, so the match fails — state that one bare.) |
-| `redundant by` on the claim that is the theorem's **final proof expression** | **Not a hint** — the claim+`by` IS the proof term; a bare Proposition there fails with "proof has type … Proposition". Leave it (or restructure the whole ending, only if that genuinely reads better). |
+| `redundant by` on the stated fact that is the theorem's **final proof expression** | **Not a hint** — the fact+`by` IS the proof term; a bare Proposition there fails with "proof has type … Proposition". Leave it (or restructure the whole ending, only if that genuinely reads better). |
 
 **Verify every removal.** The checker's speculative re-proof can
 disagree with real elaboration (documented false positives in
@@ -97,7 +97,7 @@ consumed fact.
 **Comment hygiene — no checker catches this.** Restructuring a proof
 strands its comments. Re-read every comment in a site you edited and
 confirm it names the lemma/tactic actually used — we have shipped a
-`by ring` header on steps that became explicit calc, and an `inverse_right`
+`by ring` header on steps that became an explicit chain, and an `inverse_right`
 note on an `inverse_left` proof. Fix it to name the real lemma or describe
 the step generically ("gather into one factor of `c`"). While there: lead
 each comment block with the math and pull kernel/elaborator mechanics

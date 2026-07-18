@@ -110,7 +110,7 @@ hypothesis remains available by its statement.
 For a negation goal, suppose the statement and derive something impossible:
 
 ```math
-theorem Tutorial.successor_nonzero (n : ℕ) : ¬(n + 1 = 0) := {
+theorem Tutorial.add_one_nonzero (n : ℕ) : ¬(n + 1 = 0) := {
   suppose n + 1 = 0;
   0 = n + 1
     = 1 + n;
