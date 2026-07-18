@@ -1,0 +1,179 @@
+-- Algebra/square_form.math
+--
+-- The rank-one form x² — the root of the fifteen theorem's escalation
+-- ladder (S1.B1). Its values are exactly the perfect squares: it
+-- represents 1 = 1² but not 2 (the squares jump from 1 to 4), so the
+-- least positive integer it misses — its truant, once Stage 3 defines
+-- the word — is 2.
+
+module Algebra.square_form
+
+import Logic.basics
+import Logic.functions
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.multiply_bounds
+import Natural.classical_decidable
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.embedding
+import Integer.order
+import Integer.sign
+import Set.finite
+import Set.finite_pigeonhole
+import Lists.list
+import Lists.map
+import Lists.distinct
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.ring_from_integer
+import Algebra.integer_domain
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.matrix_transpose
+import Algebra.matrix_vector
+import Algebra.matrix_submatrix
+import Algebra.adjugate
+import Algebra.quadratic_form
+import Algebra.integer_quadratic_form
+
+-- The form x², as a 1×1 matrix.
+definition Matrix.squareForm : Matrix(Integer.commutative_ring_bundle, 1, 1) :=
+  Matrix.identity(Integer.commutative_ring_bundle, 1)
+
+-- The single coordinate of a one-dimensional vector.
+definition RingVector.coordinate {r : CommutativeRing} (x : RingVector(r, 1)) : CommutativeRing.carrier(r) :=
+  x(NaturalsBelow.top(0))
+
+-- Every one-dimensional vector is its coordinate times the basis vector.
+theorem RingVector.coordinate_decomposition {r : CommutativeRing} (x : RingVector(r, 1))
+        : x = RingVector.coordinate(x) • Matrix.standardBasisRow(r, 1, NaturalsBelow.top(0)) := {
+  ∀ (i : NaturalsBelow(1)).
+      x(i) = (RingVector.coordinate(x) • Matrix.standardBasisRow(r, 1, NaturalsBelow.top(0)))(i)
+      by (i : NaturalsBelow(1)) ↦ {
+          NaturalsBelow.value(i) < 1;
+          NaturalsBelow.value(i) ≤ 0 by Natural.le_of_lt_one_plus;
+          NaturalsBelow.value(i) = 0;
+          i = NaturalsBelow.top(0) as iIsTheOnlyIndex;
+          (RingVector.coordinate(x) • Matrix.standardBasisRow(r, 1, NaturalsBelow.top(0)))(i)
+             = (RingVector.coordinate(x) • Matrix.standardBasisRow(r, 1, NaturalsBelow.top(0)))(NaturalsBelow.top(0))
+                   by substituting iIsTheOnlyIndex
+             = RingVector.coordinate(x) * Matrix.standardBasisRow(r, 1, NaturalsBelow.top(0))(NaturalsBelow.top(0))
+             = RingVector.coordinate(x) * CommutativeRing.one(r)
+                   by substituting Matrix.standardBasisRow_at
+             = RingVector.coordinate(x)
+             = x(i)
+                   by substituting iIsTheOnlyIndex;
+          done
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+-- The value of x² at a vector is the square of its coordinate.
+theorem Matrix.squareForm_value (x : RingVector(Integer.commutative_ring_bundle, 1))
+        : Matrix.quadraticForm(Matrix.squareForm, x) = RingVector.coordinate(x) * RingVector.coordinate(x) := {
+  x = RingVector.coordinate(x) • Matrix.standardBasisRow(Integer.commutative_ring_bundle, 1, NaturalsBelow.top(0))
+      by RingVector.coordinate_decomposition as decomposition;
+  Matrix.quadraticForm(Matrix.squareForm, x)
+     = Matrix.quadraticForm(Matrix.squareForm,
+           RingVector.coordinate(x)
+               • Matrix.standardBasisRow(Integer.commutative_ring_bundle, 1, NaturalsBelow.top(0)))
+           by substituting decomposition
+     = (RingVector.coordinate(x) * RingVector.coordinate(x))
+       * Matrix.quadraticForm(Matrix.squareForm,
+             Matrix.standardBasisRow(Integer.commutative_ring_bundle, 1, NaturalsBelow.top(0)))
+           by Matrix.quadraticForm_scale
+     = (RingVector.coordinate(x) * RingVector.coordinate(x))
+       * Matrix.squareForm(NaturalsBelow.top(0), NaturalsBelow.top(0))
+           by substituting Matrix.quadraticForm_standardBasis
+     = (RingVector.coordinate(x) * RingVector.coordinate(x))
+       * Matrix.identity(Integer.commutative_ring_bundle, 1)(NaturalsBelow.top(0), NaturalsBelow.top(0))
+     = (RingVector.coordinate(x) * RingVector.coordinate(x))
+       * CommutativeRing.one(Integer.commutative_ring_bundle)
+           by substituting Matrix.identity_entry_diagonal
+     = RingVector.coordinate(x) * RingVector.coordinate(x);
+  done
+}
+
+-- Every square is a value of x².
+theorem Matrix.squareForm_represents_square (k : ℤ)
+        : Matrix.Represents(Matrix.squareForm, k * k) := {
+  let candidate : RingVector(Integer.commutative_ring_bundle, 1) :=
+      k • Matrix.standardBasisRow(Integer.commutative_ring_bundle, 1, NaturalsBelow.top(0));
+  RingVector.coordinate(candidate)
+     = k * Matrix.standardBasisRow(Integer.commutative_ring_bundle, 1, NaturalsBelow.top(0))(NaturalsBelow.top(0))
+     = k * CommutativeRing.one(Integer.commutative_ring_bundle)
+           by substituting Matrix.standardBasisRow_at
+     = k
+  as coordinateIsK;
+  Matrix.quadraticForm(Matrix.squareForm, candidate)
+     = RingVector.coordinate(candidate) * RingVector.coordinate(candidate)
+           by Matrix.squareForm_value
+     = k * k
+           by substituting coordinateIsK;
+  witness candidate with done
+}
+
+-- And nothing else is: a value of x² is a square.
+theorem Matrix.squareForm_represents_only_squares (target : ℤ)
+        (represented : Matrix.Represents(Matrix.squareForm, target))
+        : ∃ (k : ℤ). target = k * k := {
+  choose x such that Matrix.quadraticForm(Matrix.squareForm, x) = target from represented;
+  target
+     = Matrix.quadraticForm(Matrix.squareForm, x)
+     = RingVector.coordinate(x) * RingVector.coordinate(x)   by Matrix.squareForm_value;
+  witness RingVector.coordinate(x) with done
+}
+
+theorem Matrix.squareForm_represents_one : Matrix.Represents(Matrix.squareForm, (1 : ℤ)) := {
+  Matrix.Represents(Matrix.squareForm, (1 : ℤ) * (1 : ℤ)) by Matrix.squareForm_represents_square;
+  (1 : ℤ) * (1 : ℤ) = (1 : ℤ);
+  done
+}
+
+-- 2 is not a square over ℤ: a square is the image of a square of naturals,
+-- and 2 is not a square of naturals.
+theorem Integer.two_is_not_a_square (k : ℤ) : ¬(k * k = (2 : ℤ)) := {
+  suppose k * k = (2 : ℤ) as squareIsTwo;
+  Integer.IsNonneg(k) ∨ ∃ (m : ℕ). k = -(m : ℤ) by Integer.sign_split;
+  done by cases {
+    case Integer.IsNonneg(k) as nonneg: {
+        choose m such that k = (m : ℤ) as kIsImage from nonneg;
+        (2 : ℤ)
+           = k * k                     by squareIsTwo
+           = (m : ℤ) * (m : ℤ)         by substituting kIsImage
+           = ((m * m : ℕ) : ℤ)         by Natural.to_integer.multiply_preserves;
+        m * m = 2 by Natural.to_integer.injective;
+        done by Natural.two_is_not_a_square
+    }
+    case ∃ (m : ℕ). k = -(m : ℤ) as negated: {
+        choose m such that k = -(m : ℤ) as kIsNegatedImage from negated;
+        (2 : ℤ)
+           = k * k                       by squareIsTwo
+           = (-(m : ℤ)) * (-(m : ℤ))     by substituting kIsNegatedImage
+           = (m : ℤ) * (m : ℤ)
+           = ((m * m : ℕ) : ℤ)           by Natural.to_integer.multiply_preserves;
+        m * m = 2 by Natural.to_integer.injective;
+        done by Natural.two_is_not_a_square
+    }
+  }
+}
+
+-- The truant of x² is 2: it represents 1 but not 2.
+theorem Matrix.squareForm_not_represents_two
+        : ¬(Matrix.Represents(Matrix.squareForm, (2 : ℤ))) := {
+  suppose Matrix.Represents(Matrix.squareForm, (2 : ℤ)) as represented;
+  ∃ (k : ℤ). (2 : ℤ) = k * k by Matrix.squareForm_represents_only_squares;
+  choose k such that (2 : ℤ) = k * k;
+  k * k = (2 : ℤ);
+  done by Integer.two_is_not_a_square
+}
