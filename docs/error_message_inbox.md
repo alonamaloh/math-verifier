@@ -1758,3 +1758,47 @@ match-and-unify then pins a and b from it). Fix direction: after
 argument inference, attempt auto-proof of remaining CLOSED
 Proposition-typed premises (the ground tier makes this cheap; bound the
 attempt to avoid burying real inference failures).
+
+**FRICTION (`ring` treats a cast numeral as an opaque atom, 2026-07-19,
+rank_two_escalators).** A calc step
+`(1:ℤ) + border*(0:ℤ) + (border*(0:ℤ) + (1:ℤ)) = (2:ℤ)` closed `by ring`
+fails: `(0:ℤ)`/`(1:ℤ)` elaborate to `Integer.zero`/`Integer.one` (ring
+constants), but `(2:ℤ)` elaborates to `Natural.to_integer 2` — an
+APPLICATION, which ring fingerprints as an opaque atom, so LHS = 2 (a
+coefficient) never equals RHS = α. The error's fingerprint hint was
+excellent (it names the opaque-atom cause). Workaround: end the ring
+step at `(1:ℤ) + (1:ℤ)` and close `= (2:ℤ)` with a bare step (the ground
+tier decides the cast). Fix direction: ring's atom canonicalization
+should recognize `to_integer <NaturalLiteral>` (and the other
+tower casts of literals) as mpz coefficients — the elaborator gap
+"numeral canon beyond {0,1}" (numeral_let_ring_elaborator_gaps) keeps
+biting through every `(2:ℤ)` in a ring goal.
+
+**FRICTION (disjunction-injection pays full defeq per wrong disjunct,
+2026-07-19, rank_two_escalators / Integer.square_below_two).** Closing a
+goal `b = -(1:ℤ) ∨ b = (0:ℤ) ∨ b = (1:ℤ)` from an in-scope proof of one
+disjunct — whether by bare-chain arm value or by `done` — runs the
+disjunctionIntro strategy at 65k–97k kernel steps: matching the proof's
+type against each WRONG disjunct attempts a deep defeq comparison of
+ground-distinct opaque-Integer terms (`to_integer 0` vs
+`negate(to_integer 1)`) before the right disjunct matches. Three such
+sites cost ~250k steps every rebuild; there is no `by` that avoids the
+search (the injection coercion is the only route). Fix direction: a
+ground-disequality fast path in the disjunct matcher — if both sides are
+ground and the ground tier decides them UNEQUAL, skip the defeq attempt.
+
+**FRICTION (flex `select(q)` pattern will not δ-unfold a constant
+argument, 2026-07-19, rank_two_escalators).** Citing
+`multiply_inclusionMatrix_transpose_entry_selected` (conclusion indexed
+by `select(q)`, `select` a metavariable) against an index spelled
+`NaturalsBelow.secondOfTwo` (a constant whose δ-body IS `shift(1, top 0)`)
+fails argument inference — flex-vs-constant positions do not δ-align,
+while constant-vs-constant head mismatches (leftBlockInclusion vs
+inclusionMatrix) DO. Also the OUTER wrapper (`upperRightUnit(f, s)` vs
+the lemma's `(X * Jᵀ)(i, select q)`) does not δ-unfold in the citation
+path, though the same shape works in the chain-diff path (Q3). Workaround
+(used throughout rank_two_escalators): a preceding by-less defeq step
+that respells the endpoint at the unfolded product + explicit
+`shift(1, top(0))` index. Fix direction: extend Q3's one-step head
+δ-alignment to (a) citation targets' outer wrapper heads and (b) term-side
+constants matched against flex-headed application patterns.
