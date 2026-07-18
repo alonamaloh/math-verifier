@@ -1,0 +1,44 @@
+-- Matcher/normalization batch 3, item 4: the disjunct matcher's
+-- ground-disequality fast path. Closing a disjunction from a context
+-- fact pinning the subject to a ground value used to pay 65k–97k
+-- kernel steps of deep defeq per WRONG ground disjunct (matching
+-- `b = -(1:ℤ)` under `b = (0:ℤ)` grinds the Integer quotient
+-- machinery); such disjuncts are now skipped by a value-only ground
+-- evaluation (deliberately lemma-free — this module does NOT import
+-- Integer.ground_arithmetic, matching rank_two_escalators, the live
+-- acceptance site whose three expensive-step warnings disappeared).
+-- These probes lock the guard's CORRECTNESS: a disjunct whose ground
+-- value AGREES with the context pin must never be skipped, in either
+-- position and for the negative spelling.
+module Test.disjunction_ground_fastpath_test
+
+import axioms
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.embedding
+
+theorem Probe.picks_middle_disjunct (b : ℤ) (pinned : b = (0 : ℤ))
+        : b = -(1 : ℤ) ∨ b = (0 : ℤ) ∨ b = (1 : ℤ) := {
+  done
+}
+
+theorem Probe.picks_last_disjunct (b : ℤ) (pinned : b = (1 : ℤ))
+        : b = -(1 : ℤ) ∨ b = (0 : ℤ) ∨ b = (1 : ℤ) := {
+  done
+}
+
+theorem Probe.keeps_negative_disjunct (b : ℤ) (pinned : b = -(1 : ℤ))
+        : b = -(1 : ℤ) ∨ b = (0 : ℤ) := {
+  done
+}
+
+theorem Probe.keeps_right_negative_disjunct (b : ℤ) (pinned : b = -(1 : ℤ))
+        : b = (0 : ℤ) ∨ b = -(1 : ℤ) := {
+  done
+}

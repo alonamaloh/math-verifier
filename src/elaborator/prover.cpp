@@ -601,6 +601,146 @@ ExpressionPointer Elaborator::tryConstructorDisjointness(
         return nullptr;
     }
 
+// Ground-disequality fast path (matcher batch 3, item 4). Closing a
+// disjunction from an in-scope proof of one disjunct used to pay
+// 65k–97k kernel steps PER WRONG DISJUNCT: proving `b = -(1 : ℤ)`
+// under a context fact `b = (0 : ℤ)` attempts deep defeq of
+// ground-distinct Integer spellings, grinding through the quotient
+// machinery before failing. When the disjunct's ground content already
+// contradicts the ground tier — both sides ground with different
+// values, or one side ground and every base context equality pins the
+// other side to a DIFFERENT ground value — the attempt cannot succeed
+// in a consistent context, so skip it. Purely a search-pruning
+// heuristic: skipping never produces a proof, and the kernel checks
+// whatever the surviving disjunct attempt builds.
+bool Elaborator::disjunctGroundRefuted(
+        ExpressionPointer disjunctClosed,
+        const std::vector<LocalBinder>& localBinders) {
+        auto equalitySides = [](ExpressionPointer type,
+                                ExpressionPointer& leftOut,
+                                ExpressionPointer& rightOut) -> bool {
+            auto* outer = std::get_if<Application>(&type->node);
+            if (!outer) return false;
+            auto* mid = std::get_if<Application>(&outer->function->node);
+            if (!mid) return false;
+            auto* inner = std::get_if<Application>(&mid->function->node);
+            if (!inner) return false;
+            auto* head = std::get_if<Constant>(&inner->function->node);
+            if (!head || head->name != "Equality") return false;
+            leftOut = mid->argument;
+            rightOut = outer->argument;
+            return true;
+        };
+        ExpressionPointer left, right;
+        if (!equalitySides(disjunctClosed, left, right)) return false;
+        constexpr int kGroundProbeDepth = 8;
+        // Signed value as (positive, negative) with value = p − n; a
+        // bare ground Natural reads as (n, 0). Equality of a = (p1, n1)
+        // and b = (p2, n2) is p1 + n2 == p2 + n1 (no signed type needed).
+        // VALUE-ONLY evaluation (no certificate): the refutation skips a
+        // search branch rather than building a proof, so it must work
+        // even where the `Integer.ground_arithmetic` evaluation lemmas
+        // are not imported (rank_two_escalators is such a file).
+        using SignedValue = std::pair<NaturalValue, NaturalValue>;
+        std::function<std::optional<SignedValue>(ExpressionPointer, int)>
+            signedValueAt = [&](ExpressionPointer side, int depth)
+                -> std::optional<SignedValue> {
+            if (depth <= 0) return std::nullopt;
+            std::vector<ExpressionPointer> args;
+            ExpressionPointer head = side;
+            while (auto* app = std::get_if<Application>(&head->node)) {
+                args.push_back(app->argument);
+                head = app->function;
+            }
+            std::reverse(args.begin(), args.end());
+            auto* headConstant = std::get_if<Constant>(&head->node);
+            if (headConstant) {
+                const std::string& name = headConstant->name;
+                if (name == "Natural.to_integer" && args.size() == 1) {
+                    if (auto value = tryGroundNaturalValue(args[0])) {
+                        return SignedValue{*value, 0};
+                    }
+                    return std::nullopt;
+                }
+                if (name == "Integer.zero" && args.empty()) {
+                    return SignedValue{0, 0};
+                }
+                if (name == "Integer.one" && args.empty()) {
+                    return SignedValue{1, 0};
+                }
+                if (name == "Integer.from_difference" && args.size() == 2) {
+                    auto positive = tryGroundNaturalValue(args[0]);
+                    auto negative = tryGroundNaturalValue(args[1]);
+                    if (!positive || !negative) return std::nullopt;
+                    return SignedValue{*positive, *negative};
+                }
+                if ((name == "Integer.negate" || name == "Natural.negate")
+                    && args.size() == 1) {
+                    auto inner = signedValueAt(args[0], depth - 1);
+                    if (!inner) return std::nullopt;
+                    return SignedValue{inner->second, inner->first};
+                }
+                if ((name == "Integer.add" || name == "Integer.subtract"
+                     || name == "Integer.multiply")
+                    && args.size() == 2) {
+                    auto x = signedValueAt(args[0], depth - 1);
+                    auto y = signedValueAt(args[1], depth - 1);
+                    if (!x || !y) return std::nullopt;
+                    if (name == "Integer.add") {
+                        return SignedValue{x->first + y->first,
+                                           x->second + y->second};
+                    }
+                    if (name == "Integer.subtract") {
+                        return SignedValue{x->first + y->second,
+                                           x->second + y->first};
+                    }
+                    return SignedValue{
+                        x->first * y->first + x->second * y->second,
+                        x->first * y->second + x->second * y->first};
+                }
+            }
+            // Bare ground Natural (a ℕ-carrier equality's sides).
+            if (auto natural = tryGroundNaturalValue(side)) {
+                return SignedValue{*natural, 0};
+            }
+            return std::nullopt;
+        };
+        auto signedValue = [&](ExpressionPointer side)
+                -> std::optional<SignedValue> {
+            return signedValueAt(side, kGroundProbeDepth);
+        };
+        auto sameValue =
+            [](const std::pair<NaturalValue, NaturalValue>& a,
+               const std::pair<NaturalValue, NaturalValue>& b) {
+            return a.first + b.second == b.first + a.second;
+        };
+        auto leftValue = signedValue(left);
+        auto rightValue = signedValue(right);
+        if (leftValue && rightValue) {
+            return !sameValue(*leftValue, *rightValue);
+        }
+        if (!leftValue && !rightValue) return false;
+        ExpressionPointer variableSide = leftValue ? right : left;
+        const auto groundValue = leftValue ? *leftValue : *rightValue;
+        bool sawDifferingPin = false;
+        for (const auto& fact : collectLocalBinderFacts(localBinders)) {
+            ExpressionPointer factLeft, factRight;
+            if (!equalitySides(fact.type, factLeft, factRight)) continue;
+            ExpressionPointer pinned = nullptr;
+            if (structurallyEqual(factLeft, variableSide)) {
+                pinned = factRight;
+            } else if (structurallyEqual(factRight, variableSide)) {
+                pinned = factLeft;
+            }
+            if (!pinned) continue;
+            auto pinnedValue = signedValue(pinned);
+            if (!pinnedValue) continue;
+            if (sameValue(*pinnedValue, groundValue)) return false;
+            sawDifferingPin = true;
+        }
+        return sawDifferingPin;
+    }
+
 ExpressionPointer Elaborator::tryDisjunctionIntro(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
@@ -619,8 +759,10 @@ ExpressionPointer Elaborator::tryDisjunctionIntro(
             innerApp->argument, localBinders, N);
         ExpressionPointer bClosed = closeOverLocalBinders(
             outerApp->argument, localBinders, N);
-        // Try Or.introduceLeft (prove A).
-        if (environment_.lookup("Or.introduceLeft")) {
+        // Try Or.introduceLeft (prove A) — unless the ground tier
+        // already refutes the disjunct against the context.
+        if (environment_.lookup("Or.introduceLeft")
+            && !disjunctGroundRefuted(aClosed, localBinders)) {
             ExpressionPointer proofA;
             try {
                 proofA = autoProveClaim(
@@ -637,7 +779,8 @@ ExpressionPointer Elaborator::tryDisjunctionIntro(
             }
         }
         // Fall through to Or.introduceRight (prove B).
-        if (environment_.lookup("Or.introduceRight")) {
+        if (environment_.lookup("Or.introduceRight")
+            && !disjunctGroundRefuted(bClosed, localBinders)) {
             ExpressionPointer proofB;
             try {
                 proofB = autoProveClaim(

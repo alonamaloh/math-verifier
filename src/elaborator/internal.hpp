@@ -1692,6 +1692,18 @@ private:
         const std::vector<LocalBinder>& localBinders,
         int line);
 
+    // Ground-disequality fast path for tryDisjunctionIntro: true when
+    // a disjunct's equality is refuted by the ground tier — both sides
+    // ground with different values, or one side ground while every
+    // ground-pinning base context equality gives the other side a
+    // DIFFERENT value. A refuted disjunct's autoProveClaim attempt is
+    // skipped (it used to burn 65k–97k kernel steps of deep defeq per
+    // wrong ground disjunct). Search pruning only — never builds a
+    // proof.
+    bool disjunctGroundRefuted(
+        ExpressionPointer disjunctClosed,
+        const std::vector<LocalBinder>& localBinders);
+
     // Disjunctive syllogism: an in-scope `A ∨ B` whose one side is the
     // goal and whose other side is refuted by an in-scope negation
     // concludes the goal by-less — the one Or-elimination performed
