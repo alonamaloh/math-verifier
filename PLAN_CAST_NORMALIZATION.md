@@ -270,9 +270,14 @@ Remaining in this phase:
 - the budget-exhaustion-before-cheap-route failures, seen twice
   (AM-GM :144 power congruence; the by-less cross fact at 181k
   kernel-steps) — the cost-gated-ring backlog item, elaborator-side;
-- the ℂ coordinate-evaluation rewrite family (exponential_imaginary
-  23, trig files ~46: `realPart(i)`-style hints) — needs its own
-  mechanism look (rewrite-index reach, not division);
+- ~~ℂ coordinate-evaluation rewrite family~~ **MECHANISM FIXED
+  (1608ba8f):** ground (zero-binder) facts now register in the
+  rewrite index, so `realPart(i) = 0`-style rewrites close by-less at
+  diff positions. Guard: entries are never keyed by a numeral pattern
+  (hot-bucket flooding regressed series.math's budget); the interior
+  diff-ring try is size-capped at 48 nodes. Remaining: the file
+  SWEEP of now-redundant hints (exponential_imaginary + trig files,
+  ~70 sites);
 - reassess the number-theory `divides` family separately.
 
 The pipeline is now unified: **join inserts → elaboration normalizes to
