@@ -13,8 +13,16 @@
 
 namespace {
 
+// mpz_class's arithmetic overloads take `unsigned long`, which is 32
+// bits on LLP64 platforms — a bare `mpz % kFingerprintModulus` would
+// silently truncate the modulus there. Build the full 64-bit value in
+// two 32-bit halves (no string formatting: this runs inside the Z/p
+// fast-fail, which every `ring` call hits).
 mpz_class mpzFromUint64(uint64_t value) {
-    return mpz_class(std::to_string(value));
+    mpz_class result = static_cast<unsigned long>(value >> 32);
+    result <<= 32;
+    result += static_cast<unsigned long>(value & 0xffffffffu);
+    return result;
 }
 
 } // namespace

@@ -2,7 +2,7 @@
 
 When (and when not) to mark a definition `opaque`, the characterising-lemma discipline, and the failure modes to expect.
 
-*(Part of the project conventions; see `CLAUDE.md` for the index.)*
+*(Part of the project conventions; see `LANGUAGE.md` for the index.)*
 
 ## `opaque definition` — hide a function's body from kernel reduction
 

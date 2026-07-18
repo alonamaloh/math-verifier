@@ -2,7 +2,7 @@
 
 Short forms for every Quotient operation, the `construction` intro form, and pattern-binders (`by_representatives`, `cases`, `take`, `suppose`) on quotients.
 
-*(Part of the project conventions; see `CLAUDE.md` for the index.)*
+*(Part of the project conventions; see `LANGUAGE.md` for the index.)*
 
 *For the complete machinery (kernel primitives, the auto-prover
 sound-coercion / exact-bridge, the cases the sugar can't yet express, and a

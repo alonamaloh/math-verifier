@@ -2,7 +2,7 @@
 
 Name-bound `convention`s, implicit arguments `{x:T}`, canonical `instance` inference, and operator overloading (incl. the `·`/postfix `⁻¹` group operators).
 
-*(Part of the project conventions; see `CLAUDE.md` for the index.)*
+*(Part of the project conventions; see `LANGUAGE.md` for the index.)*
 
 ## Name-bound conventions
 

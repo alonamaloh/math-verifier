@@ -2,7 +2,7 @@
 
 No abbreviations; the 140-column rule; arithmetic Natural notation; binding a repeated cast with `let`.
 
-*(Part of the project conventions; see `CLAUDE.md` for the index.)*
+*(Part of the project conventions; see `LANGUAGE.md` for the index.)*
 
 ## Naming
 

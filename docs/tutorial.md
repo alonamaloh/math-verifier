@@ -107,13 +107,15 @@ suppose P(x) as propertyOfX;
 Use the name only if the proof refers to it explicitly. An anonymous
 hypothesis remains available by its statement.
 
-For contradiction:
+For a negation goal, suppose the statement and derive something impossible:
 
 ```math
-suppose n + 1 = 0;
-0 = n + 1
-  = 1 + n;
-done
+theorem Tutorial.successor_nonzero (n : ℕ) : ¬(n + 1 = 0) := {
+  suppose n + 1 = 0;
+  0 = n + 1
+    = 1 + n;
+  done
+}
 ```
 
 The final `done` sees the contradiction with the public Natural fact that
@@ -196,16 +198,22 @@ Proofs over exposed inductive types also use equation-shaped induction
 arms:
 
 ```math
-theorem Tutorial.list_reflexive
-        (A : Type(0)) (xs : List(A)) : xs = xs :=
+theorem Tutorial.append_empty (A : Type(0)) (xs : List(A))
+        : List.append(xs, List.empty(A)) = xs :=
   by induction on xs with IH {
     case xs = List.empty: done
-    case xs = List.prepend(head, tail) for some head, tail: done
+    case xs = List.prepend(head, tail) for some head, tail: {
+      List.append(List.prepend(A, head, tail), List.empty(A))
+         = List.prepend(A, head, List.append(tail, List.empty(A)))
+         = List.prepend(A, head, tail) by substituting IH;
+      done
+    }
   }
 ```
 
 The witness list after `for some` documents and binds the constructor
-arguments. A recursive arm may name its own induction hypothesis:
+arguments; `IH` is the induction hypothesis for `tail`, applied here by
+rewriting under the prepend. A recursive arm may name its own induction hypothesis:
 
 ```math
 case xs = List.prepend(head, tail) for some head, tail, with tailIH: ...

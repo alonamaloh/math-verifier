@@ -2,7 +2,7 @@
 
 The `ring`/`field` tactics, foundational-vs-derived ring lemmas, and `linear_combination` (ring with equational hypotheses).
 
-*(Part of the project conventions; see `CLAUDE.md` for the index.)*
+*(Part of the project conventions; see `LANGUAGE.md` for the index.)*
 
 ## `ring` — try it first
 

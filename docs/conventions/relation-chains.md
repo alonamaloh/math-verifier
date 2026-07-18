@@ -2,7 +2,7 @@
 
 Relation chains with mixed relations, `let` abbreviations (ζ), preferring a chain over nested transitivity, `<chain> as NAME`, equation transport, diff-inferred congruence, and rewriting under a binder.
 
-*(Part of the project conventions; see `CLAUDE.md` for the index.)*
+*(Part of the project conventions; see `LANGUAGE.md` for the index.)*
 
 ## Relation chains with mixed relations
 

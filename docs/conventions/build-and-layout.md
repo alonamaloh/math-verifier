@@ -3,7 +3,7 @@
 How to build the library, how the C++ sources are organised, and how
 `library/` is organised.
 
-*(Part of the project conventions; see `CLAUDE.md` for the index.)*
+*(Part of the project conventions; see `LANGUAGE.md` for the index.)*
 
 ## Build
 

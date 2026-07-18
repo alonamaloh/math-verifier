@@ -29,7 +29,8 @@ interface.
 - The first, second, and third isomorphism developments in their named modules
 - `PrincipalIdealDomain.bezout` and
   `PrincipalIdealDomain.irreducible_is_prime`
-- `EuclideanDomain.to_principal_ideal_domain`
+- `EuclideanDomain.ideal_is_principal` (every ideal of a Euclidean domain
+  is principal)
 - `IntegralDomain.prime_factorization_unique`
 - `CommutativeRing.binomial_theorem`
 

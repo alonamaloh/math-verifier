@@ -348,7 +348,7 @@ Quotient-facing public destructuring is documented in
 ```math
 ring
 field(nonzeroFact, ...)
-linear_combination expression
+linear_combination(expression)
 group
 monoid
 module

@@ -4,6 +4,11 @@ The standard is simple: a proof should read like mathematics, with the
 kernel checking it. The files in `scripts/clean_manifest.txt` are the best
 current examples.
 
+This page is the principles. The worked depth — the ideal-proof
+walkthrough, the raw-CIC tells, the statement-sugar idioms, when to
+hint, and the redundancy-check polishing workflow — lives in
+[`conventions/proof-style.md`](conventions/proof-style.md).
+
 ## Start from the public interface
 
 Read `library/<Area>/README.md` before using an area. Prefer its named
