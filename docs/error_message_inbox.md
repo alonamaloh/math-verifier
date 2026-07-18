@@ -1722,7 +1722,14 @@ underlying gap — ∀-quantified context facts should instantiate during
 premise discharge (PLAN_SIGN_DISCHARGE.md S2).
 
 **ERROR QUALITY (under-binder congruence fall-through is invisible,
-2026-07-18, schur_complement / QUIRK Q9).** A chain `=` step between two
+2026-07-18, schur_complement / QUIRK Q9). FIXED 2026-07-19 together with
+the Q9 matcher fix: a lambda proof on a calc `=` step now throws the
+recognizer's own reason ("the `by ((x) ↦ …)` proof is the under-binder
+pointwise-congruence form, but it did not apply: <reason>") instead of
+elaborating the lambda bare; a lambda hint on an equality claim appends
+the reason as a note to the inner error. Locks:
+ErrorTest/under_binder_fall_through, ErrorTest/under_binder_claim_note.
+Original entry follows.** A chain `=` step between two
 `CommutativeRing.sumOver` calls justified by the pointwise-lambda form
 (`by ((j : …) ↦ { … })`) failed with
   "bare `claim` / `done` needs an expected type from context (none

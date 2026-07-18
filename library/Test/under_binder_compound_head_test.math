@@ -1,0 +1,75 @@
+-- Locks for QUIRK Q9: the under-binder pointwise-lambda form
+-- (`by ((x) ↦ …)`) on aggregation chain steps.
+--
+--   (a) compound-head changed slot: the differing slot's head is itself
+--       a compound application — a matrix-product entry
+--       `(B * inclusionMatrix(…))(p, j)`. The congruence lemma's
+--       pointwise premise instantiates its `term`/`termPrime` binders
+--       with the two LITERAL lambdas, so the obligation used to reach
+--       the user's proof spelled with β-redex endpoints
+--       `((j) ↦ …)(x)` — a cited entry lemma can't match through the
+--       redex, the path silently fell through, and the lambda died on
+--       "bare `claim`/`done` needs an expected type". The obligation is
+--       now β-contracted before the pointwise proof elaborates.
+--   (b) wrapper-head endpoint: one chain endpoint spells the sumOver
+--       through a wrapper (`RingVector.extend`-style); head δβ-steps
+--       align the two heads before the diff walk (Q3 family).
+
+module Test.under_binder_compound_head_test
+
+import Logic.basics
+import Logic.functions
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.classical_decidable
+import Set.finite
+import Lists.list
+import Lists.map
+import Lists.distinct
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.permutation_enumeration
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.matrix_transpose
+import Algebra.matrix_vector
+import Algebra.matrix_submatrix
+
+theorem Probe.q9_compound_head {r : CommutativeRing} {m : ℕ}
+        (B : Matrix(r, 1 + m, 1 + m)) (i : NaturalsBelow(m))
+        : CommutativeRing.sumOver(
+              (j : NaturalsBelow(m)) ↦
+                  (B * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m)))(NaturalsBelow.inclusion(m, i), j),
+              NaturalsBelow.enumerate(m))
+          = CommutativeRing.sumOver(
+              (j : NaturalsBelow(m)) ↦ B(NaturalsBelow.inclusion(m, i), NaturalsBelow.inclusion(m, j)),
+              NaturalsBelow.enumerate(m)) := {
+  CommutativeRing.sumOver(
+      (j : NaturalsBelow(m)) ↦
+          (B * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m)))(NaturalsBelow.inclusion(m, i), j),
+      NaturalsBelow.enumerate(m))
+     = CommutativeRing.sumOver(
+          (j : NaturalsBelow(m)) ↦ B(NaturalsBelow.inclusion(m, i), NaturalsBelow.inclusion(m, j)),
+          NaturalsBelow.enumerate(m))
+      by ((j : NaturalsBelow(m)) ↦ { done by Matrix.multiply_inclusionMatrix_entry });
+  done
+}
+
+definition Probe.rowTotal {r : CommutativeRing} {m : ℕ}
+        (B : Matrix(r, 1 + m, 1 + m)) (i : NaturalsBelow(1 + m)) : CommutativeRing.carrier(r) :=
+  CommutativeRing.sumOver((j : NaturalsBelow(1 + m)) ↦ B(i, j), NaturalsBelow.enumerate(1 + m))
+
+theorem Probe.q9_wrapper_endpoint {r : CommutativeRing} {m : ℕ}
+        (B C : Matrix(r, 1 + m, 1 + m)) (i : NaturalsBelow(1 + m))
+        (rowsAgree : ∀ (j : NaturalsBelow(1 + m)). B(i, j) = C(i, j))
+        : Probe.rowTotal(B, i)
+          = CommutativeRing.sumOver((j : NaturalsBelow(1 + m)) ↦ C(i, j), NaturalsBelow.enumerate(1 + m)) := {
+  Probe.rowTotal(B, i)
+     = CommutativeRing.sumOver((j : NaturalsBelow(1 + m)) ↦ C(i, j), NaturalsBelow.enumerate(1 + m))
+         by ((j : NaturalsBelow(1 + m)) ↦ { done by rowsAgree });
+  done
+}

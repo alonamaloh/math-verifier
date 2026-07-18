@@ -55,13 +55,18 @@ bool Elaborator::isPointwiseEqualityType(ExpressionPointer type) {
 ExpressionPointer Elaborator::tryUnderBinderStep(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer previous, ExpressionPointer next,
-        const SurfaceExpression& proofSurface, int line, int column) {
+        const SurfaceExpression& proofSurface, int line, int column,
+        std::string* reasonOut) {
         (void)line; (void)column;
+        auto fail = [&](const std::string& reason) -> ExpressionPointer {
+            if (reasonOut) *reasonOut = reason;
+            return nullptr;
+        };
         // Only fire when the `by` proof is syntactically a lambda — the
         // under-binder form IS `function (i) => <pointwise proof>`. An
         // ordinary lemma proof is left to the normal path.
         if (!std::get_if<SurfaceLambda>(&proofSurface.node)) {
-            return nullptr;
+            return fail("the proof is not a lambda");
         }
         // Peel `Head(arg0, …, argN)` → (head name, args outermost-first).
         auto peelApplication = [&](ExpressionPointer expression,
@@ -80,20 +85,69 @@ ExpressionPointer Elaborator::tryUnderBinderStep(
         std::vector<ExpressionPointer> argsLeft, argsRight;
         std::string headLeft = peelApplication(previous, argsLeft);
         std::string headRight = peelApplication(next, argsRight);
-        if (headLeft.empty() || headLeft != headRight) return nullptr;
+        // Wrapper-head alignment (the Q3/Q9 family): one endpoint may
+        // spell the registered aggregation through a wrapper —
+        // `RingVector.extend(y)(top)` for the `sumOver` the other side
+        // spells literally. Head δβ-steps (budget 8) walk the wrapper
+        // side down until the heads meet; every step is a defeq move, so
+        // the assembled congruence proof still types at the original
+        // endpoints.
+        if (!headLeft.empty() && !headRight.empty()
+            && headLeft != headRight) {
+            auto alignToward =
+                [&](ExpressionPointer side,
+                    const std::string& targetHead) -> ExpressionPointer {
+                ExpressionPointer cursor = side;
+                for (int step = 0; step < 8; ++step) {
+                    cursor = headDeltaBetaStepOnce(cursor);
+                    if (!cursor) return nullptr;
+                    std::vector<ExpressionPointer> peeled;
+                    if (peelApplication(cursor, peeled) == targetHead) {
+                        return cursor;
+                    }
+                }
+                return nullptr;
+            };
+            if (ExpressionPointer aligned =
+                    alignToward(previous, headRight)) {
+                argsLeft.clear();
+                headLeft = peelApplication(aligned, argsLeft);
+            } else if (ExpressionPointer aligned =
+                           alignToward(next, headLeft)) {
+                argsRight.clear();
+                headRight = peelApplication(aligned, argsRight);
+            }
+        }
+        if (headLeft.empty() || headLeft != headRight) {
+            return fail(
+                "the two endpoints are not applications of one shared "
+                "constant head (left head `"
+                + (headLeft.empty() ? std::string("<none>") : headLeft)
+                + "`, right head `"
+                + (headRight.empty() ? std::string("<none>") : headRight)
+                + "`)");
+        }
         if (argsLeft.size() != argsRight.size() || argsLeft.empty()) {
-            return nullptr;
+            return fail("the two `" + headLeft
+                        + "` applications have different arities");
         }
         // Exactly one differing argument position, and both sides there are
         // lambdas (the binder body).
         int diffPosition = -1;
         for (size_t i = 0; i < argsLeft.size(); ++i) {
             if (!structurallyEqual(argsLeft[i], argsRight[i])) {
-                if (diffPosition >= 0) return nullptr;  // more than one diff
+                if (diffPosition >= 0) {
+                    return fail(
+                        "the two `" + headLeft + "` applications differ "
+                        "in MORE than one argument slot — the pointwise "
+                        "form rewrites exactly one");
+                }
                 diffPosition = static_cast<int>(i);
             }
         }
-        if (diffPosition < 0) return nullptr;  // identical (reflexivity)
+        if (diffPosition < 0) {
+            return fail("the two endpoints are structurally identical");
+        }
         // The differing argument is the binder body (`f` vs `g`) — it need
         // not be a literal lambda (an abstract function variable is fine);
         // the lemma lookup + pointwise elaboration + final type-check below
@@ -106,8 +160,12 @@ ExpressionPointer Elaborator::tryUnderBinderStep(
         auto registryEntry =
             environment_.congruenceUnderBinderRegistry.find(headLeft);
         if (registryEntry == environment_.congruenceUnderBinderRegistry.end()) {
-            return nullptr;
+            return fail("no congruence lemma is registered for the head `"
+                        + headLeft
+                        + "` (`congruence_under_binder " + headLeft
+                        + " := <lemma>;`)");
         }
+        std::string lastLemmaError;
         for (const std::string& lemmaName : registryEntry->second) {
             if (!environment_.lookup(lemmaName)) continue;
             try {
@@ -130,8 +188,20 @@ ExpressionPointer Elaborator::tryUnderBinderStep(
                     if (!pi) break;  // fully applied
                     if (!lambdaUsed
                         && isPointwiseEqualityType(pi->domain)) {
+                        // The congruence lemma's pointwise premise
+                        // `∀ x. term(x) = termPrime(x)` was instantiated
+                        // with the two LITERAL lambdas, so its instance
+                        // spells the endpoints as β-redexes
+                        // `((j) ↦ …)(x)`. Present the user's proof with
+                        // the β-contracted obligation — a cited lemma
+                        // inside the body (`done by <entry-lemma>`)
+                        // matches the reduced spelling, not the redex
+                        // (Q9: compound-head slots died here; β and the
+                        // final application check are defeq, so the
+                        // lemma still accepts the normalized proof).
                         ExpressionPointer expected = closeOverLocalBinders(
-                            pi->domain, localBinders, localBinders.size());
+                            betaNormalizeForDisplay(pi->domain),
+                            localBinders, localBinders.size());
                         ExpressionPointer proof = elaborateExpression(
                             proofSurface, localBinders, expected);
                         partial = makeApplication(std::move(partial), proof);
@@ -143,22 +213,39 @@ ExpressionPointer Elaborator::tryUnderBinderStep(
                         break;  // cannot fill
                     }
                 }
-                if (!lambdaUsed) continue;
+                if (!lambdaUsed) {
+                    lastLemmaError = "congruence lemma `" + lemmaName
+                        + "` has no pointwise-equality premise to receive "
+                        "the lambda";
+                    continue;
+                }
                 // Validate: a fully-applied, well-typed proof.
                 ExpressionPointer resultType =
                     inferTypeInLocalContext(localBinders, partial);
                 if (std::get_if<Pi>(&weakHeadNormalForm(
                         environment_, resultType)->node)) {
-                    continue;  // still under-applied
+                    lastLemmaError = "congruence lemma `" + lemmaName
+                        + "` remained under-applied after filling its "
+                        "binders from the endpoints";
+                    continue;
                 }
                 return partial;
-            } catch (const ElaborateError&) {
+            } catch (const ElaborateError& error) {
+                lastLemmaError = "the pointwise proof failed against "
+                    "congruence lemma `" + lemmaName + "`: "
+                    + error.what();
                 continue;
-            } catch (const TypeError&) {
+            } catch (const TypeError& error) {
+                lastLemmaError = "the assembled congruence application "
+                    "failed to type-check for lemma `" + lemmaName
+                    + "`: " + error.what();
                 continue;
             }
         }
-        return nullptr;
+        return fail(lastLemmaError.empty()
+                        ? "no registered congruence lemma for `" + headLeft
+                              + "` was found in scope"
+                        : lastLemmaError);
     }
 
 ExpressionPointer Elaborator::tryCombineCitedWithContext(

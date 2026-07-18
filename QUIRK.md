@@ -51,7 +51,7 @@ four per-index leaves).
 explicit combining calc `A = v by lhsEq = B by rhsEq` (the named-hyp flip that
 F3 also wants).
 
-## Q9 — under-binder congruence (`by ((x) ↦ …)`) falls through when the changed slot's head is a compound application
+## Q9 — CLOSED 2026-07-19: under-binder congruence (`by ((x) ↦ …)`) fell through when the changed slot's head is a compound application
 
 **Symptom.** A chain `=` step between two `CommutativeRing.sumOver` calls whose
 lambdas differ pointwise, justified by the under-binder pointwise-lambda form,
@@ -97,9 +97,30 @@ family (Q3/Q5/Q7).
 **Attempts.** Bisected 2026-07-18 with five probes (variable slots, product
 slots, compound-head slots, classical route); only compound-head slots fail.
 
-**Workaround.** State the pointwise fact as a named/anonymous ∀ and close the
-chain step with argument-free `by CommutativeRing.sumOver_congruence` (the
-classical form; used at four sites in `Algebra/schur_complement.math`).
+**Workaround (retired).** State the pointwise fact as a named/anonymous ∀ and
+close the chain step with argument-free `by CommutativeRing.sumOver_congruence`
+(the classical form; was used at five sites in `Algebra/schur_complement.math`).
+
+**Fix (2026-07-19).** The root cause was NOT the diff walk (the top-level
+single-slot diff detection was fine): `tryUnderBinderStep` instantiates the
+congruence lemma's pointwise premise `∀ x. term(x) = termPrime(x)` with the
+two LITERAL lambdas, so the user's proof elaborated against β-REDEX endpoints
+`((j) ↦ …)(x)`. A variable-headed slot survives (the auto-prover closes
+through the redex); a compound-head slot's cited entry lemma
+(`done by Matrix.multiply_inclusionMatrix_entry`) can't match the redex
+spelling, the ElaborateError was swallowed, and the path fell through to the
+misreport. Two changes in `tryUnderBinderStep`: (1) the pointwise expected
+type is β-contracted (`betaNormalizeForDisplay` — pure β, no δ) before the
+proof elaborates; (2) mismatched endpoint HEADS get up-to-8 head δβ-steps to
+align (`RingVector.extend(y)(top)` vs a literal `sumOver` — Q3 family), so
+wrapper-headed endpoints accept the lambda form too. Error quality: a lambda
+proof on a calc `=` step now surfaces the recognizer's own reason when it
+declines (a lambda has no other reading there), and a lambda hint on an
+equality CLAIM appends the reason as a note to the inner error. Locks:
+`Test/under_binder_compound_head_test.math`,
+`ErrorTest/under_binder_fall_through`, `ErrorTest/under_binder_claim_note`.
+All five `schur_complement.math` classical-form sites converted to the
+honest lambda form.
 
 ## How to use this file
 

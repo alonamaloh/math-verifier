@@ -2688,11 +2688,18 @@ private:
     //
     // Returns nullptr unless the endpoints are a single-lambda-diff
     // application of a registered `F` and the proof elaborates pointwise —
-    // so it never shadows an ordinary step proof.
+    // so it never shadows an ordinary step proof. When `reasonOut` is
+    // non-null, a nullptr return records WHY the path did not fire
+    // (head mismatch / no single diff / no registered congruence lemma /
+    // the pointwise proof's own error) — a calc `=` step with a lambda
+    // proof has no other reading, so its error surfaces this instead of
+    // elaborating the lambda bare (the Q9 "bare claim/done needs an
+    // expected type" misreport).
     ExpressionPointer tryUnderBinderStep(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer previous, ExpressionPointer next,
-        const SurfaceExpression& proofSurface, int line, int column);
+        const SurfaceExpression& proofSurface, int line, int column,
+        std::string* reasonOut = nullptr);
 
     // WS5 bounded combining. The single-position descent in
     // `tryDiffApplyUserProof` finds a proof only when the cited fact
@@ -3880,6 +3887,12 @@ private:
     // is compared). Only fires under a non-empty structure prefix.
     bool matchesRingConstReduct(ExpressionPointer candidateHeadOrWhole,
                                 const std::string& name);
+
+    // One head δβ-step: β-contract a literal redex spine, or unfold a
+    // transparent-definition head and absorb the spine arguments its
+    // leading lambdas take. Returns nullptr when the head is
+    // δβ-head-normal (variable / opaque / recursor / bare lambda).
+    ExpressionPointer headDeltaBetaStepOnce(ExpressionPointer expression);
 
     // Q5 companion, atom side: canonicalize an atom's spelling by
     // bounded head δβ-reduction (budget 8) so defeq reducts —

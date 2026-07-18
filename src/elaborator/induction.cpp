@@ -1306,6 +1306,7 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
         // unless the endpoints have a registered extensionality bridge
         // and the hint elaborates pointwise, so it never shadows an
         // ordinary lambda proof of the equality itself.
+        std::string underBinderReason;
         if (std::get_if<SurfaceLambda>(&claim.byHint->node)) {
             EqualityComponents goalComponents;
             bool goalIsEquality = true;
@@ -1319,7 +1320,7 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
                 ExpressionPointer underBinder = tryUnderBinderStep(
                     localBinders, goalComponents.leftEndpoint,
                     goalComponents.rightEndpoint, *claim.byHint,
-                    line, /*column=*/0);
+                    line, /*column=*/0, &underBinderReason);
                 if (underBinder) return underBinder;
             }
         }
@@ -1365,7 +1366,7 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
                 hintTypeOpened, localBinders, localBinders.size());
             result = autoFillHintForClaim(
                 hintTerm, hintType, goalClosed, localBinders, line);
-        } catch (const ElaborateError&) {
+        } catch (const ElaborateError& error) {
             // A proof-TERM hint (a lambda or a block, or ring/field) whose
             // own elaboration failed has no recovery: recoverClaimHint
             // would just re-elaborate the identical term and fail again,
@@ -1373,6 +1374,18 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
             // claim inside the body) behind the generic citation message.
             // Re-throw the inner error instead — it is the real one.
             if (!hintTerm && hintShapeIsProofTerm(*claim.byHint)) {
+                // A lambda hint on an equality goal had one more reading —
+                // the under-binder pointwise-congruence form. If that was
+                // attempted and declined, say WHY alongside the inner
+                // error (the inner error alone is the Q9 misreport:
+                // "bare `claim`/`done` needs an expected type").
+                if (!underBinderReason.empty()) {
+                    throwElaborate(std::string(error.what())
+                        + "\n  note: the hint is a lambda on an `=` goal, "
+                        "so the under-binder pointwise-congruence form was "
+                        "attempted first; it did not apply: "
+                        + underBinderReason);
+                }
                 throw;
             }
             // Otherwise: the hint didn't fill against the goal directly.

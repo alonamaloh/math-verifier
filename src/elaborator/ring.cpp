@@ -2684,49 +2684,56 @@ bool Elaborator::matchesRingConstReduct(
         }
     }
 
+ExpressionPointer Elaborator::headDeltaBetaStepOnce(
+        ExpressionPointer expression) {
+        ExpressionPointer head;
+        std::vector<ExpressionPointer> args;
+        peelSpine(expression, head, args);
+        ExpressionPointer body;
+        if (std::get_if<Lambda>(&head->node)) {
+            if (args.empty()) return nullptr;  // bare lambda: head-normal
+            body = head;
+        } else if (auto* constant = std::get_if<Constant>(&head->node)) {
+            const Declaration* declaration =
+                environment_.lookup(constant->name);
+            if (!declaration) return nullptr;
+            auto* definition = std::get_if<Definition>(declaration);
+            if (!definition) return nullptr;
+            if (definition->opacity == Opacity::Opaque) return nullptr;
+            if (definition->universeParameters.size()
+                    != constant->universeArguments.size()) {
+                return nullptr;
+            }
+            body = definition->body;
+            if (!body) return nullptr;
+            if (!definition->universeParameters.empty()) {
+                body = substituteUniverseLevels(
+                    body, definition->universeParameters,
+                    constant->universeArguments);
+            }
+        } else {
+            return nullptr;  // variable / recursor head: head-normal
+        }
+        size_t applied = 0;
+        while (applied < args.size()) {
+            auto* lambda = std::get_if<Lambda>(&body->node);
+            if (!lambda) break;
+            body = substitute(lambda->body, 0, args[applied]);
+            ++applied;
+        }
+        for (; applied < args.size(); ++applied) {
+            body = makeApplication(body, args[applied]);
+        }
+        return body;
+    }
+
 ExpressionPointer Elaborator::ringCanonicalizeAtomSpelling(
         ExpressionPointer expression) {
         ExpressionPointer cursor = expression;
         for (int step = 0; step < 8; ++step) {
-            ExpressionPointer head;
-            std::vector<ExpressionPointer> args;
-            peelSpine(cursor, head, args);
-            ExpressionPointer body;
-            if (std::get_if<Lambda>(&head->node)) {
-                if (args.empty()) return cursor;  // bare lambda: head-normal
-                body = head;
-            } else if (auto* constant = std::get_if<Constant>(&head->node)) {
-                const Declaration* declaration =
-                    environment_.lookup(constant->name);
-                if (!declaration) return cursor;
-                auto* definition = std::get_if<Definition>(declaration);
-                if (!definition) return cursor;
-                if (definition->opacity == Opacity::Opaque) return cursor;
-                if (definition->universeParameters.size()
-                        != constant->universeArguments.size()) {
-                    return cursor;
-                }
-                body = definition->body;
-                if (!body) return cursor;
-                if (!definition->universeParameters.empty()) {
-                    body = substituteUniverseLevels(
-                        body, definition->universeParameters,
-                        constant->universeArguments);
-                }
-            } else {
-                return cursor;  // variable / recursor head: head-normal
-            }
-            size_t applied = 0;
-            while (applied < args.size()) {
-                auto* lambda = std::get_if<Lambda>(&body->node);
-                if (!lambda) break;
-                body = substitute(lambda->body, 0, args[applied]);
-                ++applied;
-            }
-            for (; applied < args.size(); ++applied) {
-                body = makeApplication(body, args[applied]);
-            }
-            cursor = body;
+            ExpressionPointer next = headDeltaBetaStepOnce(cursor);
+            if (!next) return cursor;  // head-normal within budget
+            cursor = next;
         }
         // Budget exhausted mid-walk: keep the original spelling so a
         // deep transparent definition doesn't half-unfold into its key.

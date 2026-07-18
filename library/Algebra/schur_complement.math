@@ -112,20 +112,16 @@ theorem RingVector.extend_inclusion {r : CommutativeRing} {m : ℕ}
 
 theorem RingVector.extend_top {r : CommutativeRing} {m : ℕ} (y : RingVector(r, m))
         : RingVector.extend(y)(NaturalsBelow.top(m)) = CommutativeRing.zero(r) := {
-  ∀ (j : NaturalsBelow(m)).
-      Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m))(NaturalsBelow.top(m), j) * y(j)
-      = CommutativeRing.zero(r)
-      by (j : NaturalsBelow(m)) ↦ {
-          ¬(NaturalsBelow.top(m) = NaturalsBelow.inclusion(m, j)) by NaturalsBelow.top_not_inclusion;
-          Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m))(NaturalsBelow.top(m), j)
-             = CommutativeRing.zero(r);
-          Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m))(NaturalsBelow.top(m), j) * y(j)
-             = CommutativeRing.zero(r) * y(j)   by substitution
-             = CommutativeRing.zero(r)
-        };
   RingVector.extend(y)(NaturalsBelow.top(m))
      = CommutativeRing.sumOver((j : NaturalsBelow(m)) ↦ CommutativeRing.zero(r), NaturalsBelow.enumerate(m))
-           by CommutativeRing.sumOver_congruence
+           by ((j : NaturalsBelow(m)) ↦ {
+               ¬(NaturalsBelow.top(m) = NaturalsBelow.inclusion(m, j)) by NaturalsBelow.top_not_inclusion;
+               Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m))(NaturalsBelow.top(m), j)
+                  = CommutativeRing.zero(r);
+               Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m))(NaturalsBelow.top(m), j) * y(j)
+                  = CommutativeRing.zero(r) * y(j)   by substitution
+                  = CommutativeRing.zero(r)
+             })
      = CommutativeRing.zero(r);
   done
 }
@@ -427,14 +423,6 @@ theorem Matrix.applyVector_extend_inclusion {r : CommutativeRing} {m : ℕ}
         : (B · RingVector.extend(z))(NaturalsBelow.inclusion(m, i)) = (Matrix.leadingBlock(B) · z)(i) := {
   (B * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m))) · z = B · RingVector.extend(z)
       as actionFactors;
-  ∀ (j : NaturalsBelow(m)).
-      (B * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m)))(NaturalsBelow.inclusion(m, i), j) * z(j)
-      = B(NaturalsBelow.inclusion(m, i), NaturalsBelow.inclusion(m, j)) * z(j)
-      by (j : NaturalsBelow(m)) ↦ {
-          (B * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m)))(NaturalsBelow.inclusion(m, i), j)
-             = B(NaturalsBelow.inclusion(m, i), NaturalsBelow.inclusion(m, j));
-          done by substitution
-        };
   (B · RingVector.extend(z))(NaturalsBelow.inclusion(m, i))
      = ((B * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m))) · z)(NaturalsBelow.inclusion(m, i))
            by substituting actionFactors
@@ -446,7 +434,7 @@ theorem Matrix.applyVector_extend_inclusion {r : CommutativeRing} {m : ℕ}
      = CommutativeRing.sumOver(
            (j : NaturalsBelow(m)) ↦ B(NaturalsBelow.inclusion(m, i), NaturalsBelow.inclusion(m, j)) * z(j),
            NaturalsBelow.enumerate(m))
-           by CommutativeRing.sumOver_congruence
+           by ((j : NaturalsBelow(m)) ↦ { done by Matrix.multiply_inclusionMatrix_entry })
      = (Matrix.leadingBlock(B) · z)(i);
   done
 }
@@ -457,18 +445,6 @@ theorem Matrix.applyVector_extend_top {r : CommutativeRing} {m : ℕ}
           = RingVector.innerProduct(Matrix.borderColumn(B), z) := {
   (B * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m))) · z = B · RingVector.extend(z)
       as actionFactors;
-  ∀ (j : NaturalsBelow(m)).
-      (B * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m)))(NaturalsBelow.top(m), j) * z(j)
-      = Matrix.borderColumn(B)(j) * z(j)
-      by (j : NaturalsBelow(m)) ↦ {
-          (B * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m)))(NaturalsBelow.top(m), j)
-             = B(NaturalsBelow.top(m), NaturalsBelow.inclusion(m, j))
-             = Bᵀ(NaturalsBelow.inclusion(m, j), NaturalsBelow.top(m))
-             = B(NaturalsBelow.inclusion(m, j), NaturalsBelow.top(m))
-                   by substituting symmetric
-             = Matrix.borderColumn(B)(j);
-          done by substitution
-        };
   (B · RingVector.extend(z))(NaturalsBelow.top(m))
      = ((B * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m))) · z)(NaturalsBelow.top(m))
            by substituting actionFactors
@@ -478,7 +454,15 @@ theorem Matrix.applyVector_extend_top {r : CommutativeRing} {m : ℕ}
            NaturalsBelow.enumerate(m))
      = CommutativeRing.sumOver(
            (j : NaturalsBelow(m)) ↦ Matrix.borderColumn(B)(j) * z(j), NaturalsBelow.enumerate(m))
-           by CommutativeRing.sumOver_congruence
+           by ((j : NaturalsBelow(m)) ↦ {
+               (B * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m)))(NaturalsBelow.top(m), j)
+                  = B(NaturalsBelow.top(m), NaturalsBelow.inclusion(m, j))
+                  = Bᵀ(NaturalsBelow.inclusion(m, j), NaturalsBelow.top(m))
+                  = B(NaturalsBelow.inclusion(m, j), NaturalsBelow.top(m))
+                        by substituting symmetric
+                  = Matrix.borderColumn(B)(j);
+               done by substitution
+             })
      = RingVector.innerProduct(Matrix.borderColumn(B), z);
   done
 }
@@ -680,18 +664,16 @@ theorem Matrix.determinant_schurComplement {r : CommutativeRing} {m : ℕ}
   ∀ (p : NaturalsBelow(1 + m)). ∀ (l : NaturalsBelow(1 + m)). ¬(l = NaturalsBelow.top(m))
       → (B * G)(p, l) = B(p, l)
       by (p : NaturalsBelow(1 + m)) (l : NaturalsBelow(1 + m)) (notTop : ¬(l = NaturalsBelow.top(m))) ↦ {
-          ∀ (k : NaturalsBelow(1 + m)). B(p, k) * G(k, l) = B(p, k) * Matrix.identity(r, 1 + m)(k, l)
-              by (k : NaturalsBelow(1 + m)) ↦ {
-                  G(k, l) = Matrix.identity(r, 1 + m)(k, l);
-                  done by substitution
-                };
           (B * G)(p, l)
              = CommutativeRing.sumOver(
                    (k : NaturalsBelow(1 + m)) ↦ B(p, k) * G(k, l), NaturalsBelow.enumerate(1 + m))
              = CommutativeRing.sumOver(
                    (k : NaturalsBelow(1 + m)) ↦ B(p, k) * Matrix.identity(r, 1 + m)(k, l),
                    NaturalsBelow.enumerate(1 + m))
-                   by CommutativeRing.sumOver_congruence
+                   by ((k : NaturalsBelow(1 + m)) ↦ {
+                       G(k, l) = Matrix.identity(r, 1 + m)(k, l);
+                       done by substitution
+                     })
              = (B * Matrix.identity(r, 1 + m))(p, l)
              = B(p, l)
                    by substituting Matrix.multiply_one;
@@ -700,12 +682,6 @@ theorem Matrix.determinant_schurComplement {r : CommutativeRing} {m : ℕ}
   ∀ (p : NaturalsBelow(1 + m)).
       (B * G)(p, NaturalsBelow.top(m)) = (B · Matrix.borderEliminationColumn(B))(p)
       by (p : NaturalsBelow(1 + m)) ↦ {
-          ∀ (k : NaturalsBelow(1 + m)).
-              B(p, k) * G(k, NaturalsBelow.top(m)) = B(p, k) * Matrix.borderEliminationColumn(B)(k)
-              by (k : NaturalsBelow(1 + m)) ↦ {
-                  G(k, NaturalsBelow.top(m)) = Matrix.borderEliminationColumn(B)(k);
-                  done by substitution
-                };
           (B * G)(p, NaturalsBelow.top(m))
              = CommutativeRing.sumOver(
                    (k : NaturalsBelow(1 + m)) ↦ B(p, k) * G(k, NaturalsBelow.top(m)),
@@ -713,7 +689,10 @@ theorem Matrix.determinant_schurComplement {r : CommutativeRing} {m : ℕ}
              = CommutativeRing.sumOver(
                    (k : NaturalsBelow(1 + m)) ↦ B(p, k) * Matrix.borderEliminationColumn(B)(k),
                    NaturalsBelow.enumerate(1 + m))
-                   by CommutativeRing.sumOver_congruence
+                   by ((k : NaturalsBelow(1 + m)) ↦ {
+                       G(k, NaturalsBelow.top(m)) = Matrix.borderEliminationColumn(B)(k);
+                       done by substitution
+                     })
              = (B · Matrix.borderEliminationColumn(B))(p);
           done
         } as topColumnAction;

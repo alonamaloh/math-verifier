@@ -401,9 +401,28 @@ ExpressionPointer Elaborator::elaborateCalc(
                 // endpoints are `Sum`s and the proof elaborates pointwise,
                 // so it never shadows an ordinary step proof.
                 if (isEqualityStep) {
+                    std::string underBinderReason;
                     stepProofKernel = tryUnderBinderStep(
                         localBinders, previousKernel, nextKernel,
-                        *step.stepProof, step.line, step.column);
+                        *step.stepProof, step.line, step.column,
+                        &underBinderReason);
+                    // A lambda `by` proof on an `=` step has no other
+                    // reading — elaborating it bare against the equality
+                    // type only produces an incomprehensible inner error
+                    // ("bare `claim`/`done` needs an expected type").
+                    // Surface the under-binder recognizer's own reason.
+                    if (!stepProofKernel
+                        && std::get_if<SurfaceLambda>(
+                               &step.stepProof->node)) {
+                        throwElaborate(
+                            "step at line " + std::to_string(step.line)
+                            + ": the `by ((x) ↦ …)` proof is the "
+                            "under-binder pointwise-congruence form, but "
+                            "it did not apply: " + underBinderReason
+                            + "\n  (fallback: state the pointwise fact "
+                            "as a `∀` and close the step with the "
+                            "argument-free congruence lemma)");
+                    }
                 }
                 if (!stepProofKernel) {
                     stepProofKernel = elaborateExpression(
