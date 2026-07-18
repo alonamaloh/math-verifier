@@ -235,7 +235,23 @@ multiply-through dances outside triangular_series (the ℂ exponential
 reciprocalOne is already compact).
 
 Remaining in this phase:
-- **`field` sum-base denominator limitation (next, DESIGN READY):**
+- ~~`field` sum-base denominator limitation~~ **FIXED (ff47a2f6):**
+  the cofactor synthesis's lead extraction now takes the graded-lex
+  maximal monomial of `b·r − 1` instead of bailing on multi-monomial
+  relations, so sum bases divide out (standard multivariate division;
+  the reduction loop was already general). Partial fractions are a
+  one-word `field` proof; triangular_term_telescopes collapsed to the
+  5-step natural spelling (−49).
+- ~~budget-exhaustion-before-cheap-route~~ **FIXED (23183893):** the
+  diff walk now tries cost-gated ring on each interior carrier-typed
+  pair before descending (the walk used to descend past ring-provable
+  pairs; fingerprint fast-fail keeps misses cheap). AM-GM's inline
+  power-congruence fact-hint deleted. The contextEqualityBridge
+  79-second pathology is thereby unreached for this class; its
+  residual cost on genuinely unclosable goals stays bounded by the
+  effort budget as designed.
+- (superseded design note, kept for the record) **`field` sum-base
+  denominator limitation:**
   `2/(x·(1+x)) = 2/x − 2/(1+x)` is declared FALSE. Diagnosis: the
   clearing routes (cofactor synthesis and monomial contraction,
   ring.cpp ~7403/7822) cancel `bᵢ·rᵢ = 1` only when the base appears
