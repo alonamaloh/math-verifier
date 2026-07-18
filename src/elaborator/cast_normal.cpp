@@ -80,6 +80,27 @@ bool Elaborator::isCoercionFunctionName(const std::string& name) const {
     return false;
 }
 
+// Does the term contain an EXPLICIT coercion over a ring-op compound —
+// `ι(a · b)`, `ι(a + b)`, … ? The join never produces this shape (Option B
+// normalizes its own insertions to the leaves), so its presence means a
+// user-written ascription cast of a homogeneous compound (`((4·t² : ℕ) : ℤ)`,
+// the number-theory idiom). Used as the gate for the early ring seat in
+// `autoProveCalcStepRaw`: cheap syntactic walk, no typing.
+bool Elaborator::termContainsCoercionOverRingOp(ExpressionPointer term) {
+    if (!term) return false;
+    if (auto* app = std::get_if<Application>(&term->node)) {
+        if (auto* head = std::get_if<Constant>(&app->function->node)) {
+            if (isCoercionFunctionName(head->name)
+                && asBinaryOp(app->argument)) {
+                return true;
+            }
+        }
+        return termContainsCoercionOverRingOp(app->function)
+            || termContainsCoercionOverRingOp(app->argument);
+    }
+    return false;
+}
+
 // The norm_cast registry: every nullary library theorem `L = R` with a
 // coercion image on one side (`ι(<T>.zero) = <carrier>.zero`, the shape of
 // `from_real_zero`/`from_real_one`). Derived on demand from the declaration

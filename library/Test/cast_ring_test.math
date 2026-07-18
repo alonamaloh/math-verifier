@@ -5,7 +5,11 @@ import Logic.exists
 import Logic.quotient
 import Equality.basics
 import Natural.basics
+import Natural.arithmetic
 import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.ring
 import Integer.embedding
 import Rational.basics
 import Rational.embedding
@@ -43,3 +47,33 @@ theorem mixed_tower (x : Real) (q : Rational) (n : Natural)
 theorem subtract_compound_cast (x : Real) (a b : Integer)
         : (a - b) + x = x + (a - b) :=
   ring
+
+-- An EXPLICIT ascription cast of a homogeneous compound — the
+-- number-theory idiom (prove at ℕ, cast wholesale to ℤ) — never passes
+-- through the join, so Option B leaves it un-normalized; `ring`'s
+-- reinstated pre-pass must push it. Without the pre-pass this was
+-- declared FALSE (the compound cast counted as one opaque atom).
+theorem explicit_compound_cast_multiply (t : Natural)
+        : (4 : Integer) * ((t : Integer) * (t : Integer)) = ((4 * (t * t) : Natural) : Integer) :=
+  ring
+
+-- Both sides carry explicit compound casts of different ℕ-polynomials
+-- (the `4·t² = (t+t)²` bridge from Integer/balanced_division).
+theorem explicit_compound_cast_both_sides (t : Natural)
+        : ((4 * (t * t) : Natural) : Integer) = (((t + t) * (t + t) : Natural) : Integer) :=
+  ring
+
+-- The compound cast as an interior factor of a bigger product
+-- (the `dSquareCast` shape from GaussianInteger/euclidean).
+theorem explicit_compound_cast_interior (d : Natural) (norm : Integer)
+        : ((d : Integer) * (d : Integer)) * (4 * norm) = ((d * d : Natural) : Integer) * (4 * norm) :=
+  ring
+
+-- The early ring seat in the by-less calc-step prover: the same shapes
+-- close as bare `=` steps (previously the battery burned the effort
+-- budget searching around the opaque compound cast).
+theorem explicit_compound_cast_byless_step (t : Natural)
+        : (4 : Integer) * ((t : Integer) * (t : Integer)) = (((t + t) * (t + t) : Natural) : Integer) :=
+  (4 : Integer) * ((t : Integer) * (t : Integer))
+     = ((4 * (t * t) : Natural) : Integer)
+     = (((t + t) * (t + t) : Natural) : Integer)

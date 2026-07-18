@@ -1880,6 +1880,33 @@ ExpressionPointer Elaborator::autoProveCalcStepRaw(
         // type, which now also sees let-values via ContextEntry.value).
         previousKernel = zetaUnfoldLetBinders(previousKernel, localBinders);
         nextKernel = zetaUnfoldLetBinders(nextKernel, localBinders);
+        // Early ring seat for explicit compound casts. An endpoint carrying
+        // `ι(a · b)` — a user-written ascription cast of a homogeneous
+        // compound, the number-theory idiom, which the join never produces
+        // and so Option B never normalized — is out of every structural
+        // strategy's reach until the cast moves, and the general tactics
+        // burn the effort budget searching around it. `ring`'s cast
+        // pre-pass owns exactly this shape, and a miss is a cheap
+        // fingerprint fast-fail with near-zero kernel steps, so when the
+        // shape is present (rare outside the number-theory files) try it
+        // FIRST. The gate keeps every other goal's tactic order untouched.
+        if (termContainsCoercionOverRingOp(previousKernel)
+            || termContainsCoercionOverRingOp(nextKernel)) {
+            ExpressionPointer castRingGoal = makeApplication(
+                makeApplication(
+                    makeApplication(
+                        makeConstant("Equality", {carrierLevel}),
+                        carrierType),
+                    previousKernel),
+                nextKernel);
+            try {
+                ExpressionPointer castRingProof = elaborateRing(
+                    localBinders, castRingGoal, line, column);
+                if (castRingProof) return castRingProof;
+            } catch (const ElaborateError&) {
+            } catch (const TypeError&) {
+            }
+        }
         // Strategy 1: reflexivity for definitionally-equal endpoints.
         Context openedContext = buildContextFromLocalBinders(localBinders);
         ExpressionPointer previousOpened = openOverLocalBinders(

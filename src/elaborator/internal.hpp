@@ -864,6 +864,7 @@ private:
     // Is `name` a primitive coercion function (a hop in some registered
     // coercion chain)?
     bool isCoercionFunctionName(const std::string& name) const;
+    bool termContainsCoercionOverRingOp(ExpressionPointer term);
 
     // A norm_cast-style ground normalization equality — a nullary library
     // theorem `L = R` whose one side is a coercion image (`ι(<T>.zero)`)

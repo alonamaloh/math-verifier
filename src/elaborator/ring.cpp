@@ -749,9 +749,62 @@ ExpressionPointer Elaborator::elaborateRing(
         }
         EqualityComponents goal =
             extractEqualityComponents(expectedType, "ring", line);
-        // Cast normalization now happens at elaboration time (Option B, see
-        // PLAN_CAST_NORMALIZATION.md): mixed-type expressions arrive with
-        // coercions already at the leaves, so `ring` needs no cast pre-pass.
+        // Cast normalization mostly happens at elaboration time (Option B,
+        // see PLAN_CAST_NORMALIZATION.md): JOIN-inserted coercions arrive
+        // with casts already at the leaves. But an EXPLICIT ascription cast
+        // of a homogeneous compound — `((4 * t² : ℕ) : ℤ)`, the
+        // number-theory idiom of proving a fact at ℕ and casting it
+        // wholesale — never passes through the join, so it reaches `ring`
+        // un-normalized and would count as one opaque atom (making a true
+        // identity FALSE by fingerprint). Drive such casts to the leaves
+        // here, prove the leaf-cast goal recursively (idempotent: the
+        // pushed endpoints contain no further coercion-over-op), and
+        // bridge with the endpoint-rewrite proofs. A no-op — and near-zero
+        // cost — whenever the goal has no coercion over an operation.
+        {
+            CastNormalForm leftNorm =
+                castPushToLeaves(goal.leftEndpoint, localBinders);
+            CastNormalForm rightNorm =
+                castPushToLeaves(goal.rightEndpoint, localBinders);
+            if (leftNorm.proof || rightNorm.proof) {
+                ExpressionPointer pushedGoal = makeApplication(
+                    makeApplication(
+                        makeApplication(
+                            makeConstant("Equality",
+                                          {goal.carrierUniverseLevel}),
+                            goal.carrierType),
+                        leftNorm.term),
+                    rightNorm.term);
+                ExpressionPointer proof = elaborateRing(
+                    localBinders, pushedGoal, line, column);
+                ExpressionPointer leftCursor = leftNorm.term;
+                if (leftNorm.proof) {
+                    proof = buildEqualityTransitivity(
+                        goal.carrierUniverseLevel, goal.carrierType,
+                        goal.leftEndpoint, leftNorm.term, rightNorm.term,
+                        leftNorm.proof, proof);
+                    leftCursor = goal.leftEndpoint;
+                }
+                if (rightNorm.proof) {
+                    ExpressionPointer rightSymmetry = makeApplication(
+                        makeApplication(
+                            makeApplication(
+                                makeApplication(
+                                    makeConstant(
+                                        "Equality.symmetry",
+                                        {goal.carrierUniverseLevel}),
+                                    goal.carrierType),
+                                goal.rightEndpoint),
+                            rightNorm.term),
+                        rightNorm.proof);
+                    proof = buildEqualityTransitivity(
+                        goal.carrierUniverseLevel, goal.carrierType,
+                        leftCursor, rightNorm.term, goal.rightEndpoint,
+                        proof, rightSymmetry);
+                }
+                return proof;
+            }
+        }
         std::string carrierName = headConstantName(goal.carrierType);
         // Abstract plain-`Ring.carrier(s)` carrier (fingerprint plan Phase
         // 2). The registered-carrier normaliser below needs multiplicative
