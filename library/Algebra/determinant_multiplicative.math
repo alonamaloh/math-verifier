@@ -39,7 +39,7 @@ import Algebra.function_enumeration_distinct
 -- A non-injective self-map has an explicit colliding pair.
 theorem Function.non_injective_collision (n : ℕ)
         (phi : NaturalsBelow(n) → NaturalsBelow(n))
-        (notInjective : ¬(Function.IsInjective(NaturalsBelow(n), NaturalsBelow(n), phi)))
+        (notInjective : ¬(Function.IsInjective(phi)))
         : ∃ (a : NaturalsBelow(n)). ∃ (b : NaturalsBelow(n)). phi(a) = phi(b) ∧ ¬(a = b) := {
   ∃ (a : NaturalsBelow(n)). ¬(∀ (b : NaturalsBelow(n)). phi(a) = phi(b) → a = b)
       by Logic.not_forall_implies_exists_not(
@@ -60,17 +60,17 @@ theorem Function.non_injective_collision (n : ℕ)
 -- hence a member of the enumerated permutation-image list.
 theorem Function.injective_in_permutation_image (n : ℕ)
         (phi : NaturalsBelow(n) → NaturalsBelow(n))
-        (inj : Function.IsInjective(NaturalsBelow(n), NaturalsBelow(n), phi))
-        : phi ∈ List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
+        (inj : Function.IsInjective(phi))
+        : phi ∈ List.map(
               (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ rho(i)),
               Permutation.allPermutations(n)) := {
   Permutation.of_injective(n, phi, inj) ∈ Permutation.allPermutations(n) by Permutation.allPermutations_complete;
   ((i : NaturalsBelow(n)) ↦ Permutation.of_injective(n, phi, inj)(i))
-      ∈ List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
+      ∈ List.map(
           (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ rho(i)),
           Permutation.allPermutations(n))
       by List.map_member;
-  phi ∈ List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
+  phi ∈ List.map(
           (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ rho(i)),
           Permutation.allPermutations(n));
   done
@@ -238,7 +238,7 @@ theorem Matrix.phi_inner_sum {r : CommutativeRing} {n : ℕ}
 -- inner B-determinant sum vanishes (6c) and the whole summand is zero.
 theorem Matrix.det_multiply_summand_vanishes {r : CommutativeRing} {n : ℕ}
         (A B : Matrix(r, n, n)) (phi : NaturalsBelow(n) → NaturalsBelow(n))
-        (notInImage : ¬(phi ∈ List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
+        (notInImage : ¬(phi ∈ List.map(
             (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ rho(i)),
             Permutation.allPermutations(n))))
         : CommutativeRing.productOver((i : NaturalsBelow(n)) ↦ A(i, phi(i)), NaturalsBelow.enumerate(n))
@@ -250,8 +250,8 @@ theorem Matrix.det_multiply_summand_vanishes {r : CommutativeRing} {n : ℕ}
                                   NaturalsBelow.enumerate(n)),
                     Permutation.allPermutations(n))
           = CommutativeRing.zero(r) := {
-  ¬(Function.IsInjective(NaturalsBelow(n), NaturalsBelow(n), phi))
-      by (inj : Function.IsInjective(NaturalsBelow(n), NaturalsBelow(n), phi)) ↦
+  ¬(Function.IsInjective(phi))
+      by (inj : Function.IsInjective(phi)) ↦
           notInImage(Function.injective_in_permutation_image(inj := inj)) as notInjective;
   choose a such that ∃ (b : NaturalsBelow(n)). phi(a) = phi(b) ∧ ¬(a = b)
       from Function.non_injective_collision(notInjective := notInjective);
@@ -289,7 +289,7 @@ theorem Matrix.determinant_multiply {r : CommutativeRing} {n : ℕ} (A B : Matri
   -- members are (trivially) all functions.
   List.Distinct(Permutation(n), Permutation.allPermutations(n)) by Permutation.allPermutations_distinct;
   List.Distinct(NaturalsBelow(n) → NaturalsBelow(n),
-          List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
+          List.map(
               (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ rho(i)),
               Permutation.allPermutations(n)))
       by List.map_distinct(
@@ -302,12 +302,12 @@ theorem Matrix.determinant_multiply {r : CommutativeRing} {n : ℕ} (A B : Matri
                done by Permutation.equal_of_apply_equal
              });
   (∀ (phi : NaturalsBelow(n) → NaturalsBelow(n)).
-      phi ∈ List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
+      phi ∈ List.map(
           (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ rho(i)),
           Permutation.allPermutations(n))
       → phi ∈ Function.allFunctions(n))
       by (phi : NaturalsBelow(n) → NaturalsBelow(n))
-         (phiInPart : phi ∈ List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
+         (phiInPart : phi ∈ List.map(
              (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ rho(i)),
              Permutation.allPermutations(n))) ↦
            Function.allFunctions_complete;
@@ -350,7 +350,7 @@ theorem Matrix.determinant_multiply {r : CommutativeRing} {n : ℕ} (A B : Matri
   List.Distinct(NaturalsBelow(n) → NaturalsBelow(n), Function.allFunctions(n)) by Function.allFunctions_distinct;
   ∀ (phi : NaturalsBelow(n) → NaturalsBelow(n)).
       phi ∈ Function.allFunctions(n)
-      → ¬(phi ∈ List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
+      → ¬(phi ∈ List.map(
               (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ rho(i)),
               Permutation.allPermutations(n)))
       → CommutativeRing.productOver((i : NaturalsBelow(n)) ↦ A(i, phi(i)), NaturalsBelow.enumerate(n))
@@ -422,7 +422,7 @@ theorem Matrix.determinant_multiply {r : CommutativeRing} {n : ℕ} (A B : Matri
                                        (i : NaturalsBelow(n)) ↦ B(phi(i), sigma(i)),
                                        NaturalsBelow.enumerate(n)),
                          Permutation.allPermutations(n)),
-           List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
+           List.map(
                (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ rho(i)),
                Permutation.allPermutations(n)))
            by CommutativeRing.sumOver_restrict_support

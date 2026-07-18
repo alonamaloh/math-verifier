@@ -39,14 +39,14 @@ theorem List.range_down_one_plus (n : ℕ)
 definition List.range_up : ℕ → List(ℕ)
   | 0 => List.empty(ℕ)
   | 1 + predecessor =>
-      List.append(ℕ, List.range_up(predecessor),
+      List.append(List.range_up(predecessor),
           List.prepend(ℕ, predecessor, List.empty(ℕ)))
 
 -- The recursion in `1 + n` form (`Natural.add` is opaque, so `1 + n` is
 -- not definitionally the constructor; bridge via `one_add`).
 theorem List.range_up_add_one (n : ℕ)
         : List.range_up(1 + n)
-          = List.append(ℕ, List.range_up(n),
+          = List.append(List.range_up(n),
                 List.prepend(ℕ, n, List.empty(ℕ))) :=
   done by substituting Natural.one_add
 
@@ -185,7 +185,7 @@ theorem List.range_up_complete (n : ℕ)
         done by cases {
           case j < predecessor as strictlyBelow: {
               j ∈ List.range_up(predecessor) by IH(j, strictlyBelow);
-              j ∈ List.append(ℕ, List.range_up(predecessor), List.prepend(ℕ, predecessor, List.empty(ℕ)))
+              j ∈ List.append(List.range_up(predecessor), List.prepend(ℕ, predecessor, List.empty(ℕ)))
                   by List.member_append_left;
               done by substituting List.range_up_add_one
             }
@@ -194,7 +194,7 @@ theorem List.range_up_complete (n : ℕ)
                   by List.member.here;
               j ∈ List.prepend(ℕ, predecessor, List.empty(ℕ))
                   by substituting atTop;
-              j ∈ List.append(ℕ, List.range_up(predecessor), List.prepend(ℕ, predecessor, List.empty(ℕ)))
+              j ∈ List.append(List.range_up(predecessor), List.prepend(ℕ, predecessor, List.empty(ℕ)))
                   by List.member_append_right;
               done by substituting List.range_up_add_one
             }
@@ -214,7 +214,7 @@ theorem List.range_up_member_lt (n : ℕ)
     case step(predecessor): {
         take j : ℕ;
         suppose j ∈ List.range_up(1 + predecessor) as mem;
-        j ∈ List.append(ℕ, List.range_up(predecessor), List.prepend(ℕ, predecessor, List.empty(ℕ)))
+        j ∈ List.append(List.range_up(predecessor), List.prepend(ℕ, predecessor, List.empty(ℕ)))
             by substituting List.range_up_add_one;
         j ∈ List.range_up(predecessor)
               ∨ j ∈ List.prepend(ℕ, predecessor, List.empty(ℕ))
@@ -264,14 +264,14 @@ theorem List.range_down_offset_one_plus (base count : ℕ)
 -- [base+count .. 1] = [base+count .. base+1] ++ [base .. 1].
 theorem List.range_down_split (base count : ℕ)
         : List.range_down(base + count)
-          = List.append(ℕ, List.range_down_offset(base, count),
+          = List.append(List.range_down_offset(base, count),
                 List.range_down(base)) :=
   by induction on count with IH {
     case base:
         -- The offset slice is empty and base + 0 = base.
         List.range_down(base + 0)
            = List.range_down(base)   by (base + 0 = base)
-           = List.append(ℕ, List.range_down_offset(base, 0),
+           = List.append(List.range_down_offset(base, 0),
                  List.range_down(base))
     case step(predecessorCount):
         -- Peel the top element base + (1 + count′) off both sides.
@@ -283,17 +283,17 @@ theorem List.range_down_split (base count : ℕ)
                  List.range_down(base + predecessorCount))
                  by List.range_down_one_plus
            = List.prepend(ℕ, 1 + (base + predecessorCount),
-                 List.append(ℕ,
+                 List.append(
                      List.range_down_offset(base, predecessorCount),
                      List.range_down(base)))
                  by substituting IH
            = List.prepend(ℕ, base + (1 + predecessorCount),
-                 List.append(ℕ,
+                 List.append(
                      List.range_down_offset(base, predecessorCount),
                      List.range_down(base)))
                  by (1 + (base + predecessorCount)
                      = base + (1 + predecessorCount))
-           = List.append(ℕ,
+           = List.append(
                  List.range_down_offset(base, 1 + predecessorCount),
                  List.range_down(base))
                  by List.range_down_offset_one_plus

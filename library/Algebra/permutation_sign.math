@@ -99,26 +99,23 @@ definition Permutation.indexPairBelow {n : ℕ}
   NaturalsBelow.value(Product.first(p)) < NaturalsBelow.value(Product.second(p))
 
 definition Permutation.orderedPairs (n : ℕ) : List(Pair(NaturalsBelow(n), NaturalsBelow(n))) :=
-  List.filter(Pair(NaturalsBelow(n), NaturalsBelow(n)), Permutation.indexPairBelow,
-      List.cartesianProduct(NaturalsBelow(n), NaturalsBelow(n),
-          NaturalsBelow.enumerate(n), NaturalsBelow.enumerate(n)))
+  List.filter(Permutation.indexPairBelow,
+      List.cartesianProduct(NaturalsBelow.enumerate(n), NaturalsBelow.enumerate(n)))
 
 definition Permutation.pairOrient {n : ℕ} (sigma : Permutation(n))
         (p : Pair(NaturalsBelow(n), NaturalsBelow(n))) : ℤ :=
   Permutation.orient(sigma(Product.first(p)), sigma(Product.second(p)))
 
 definition Permutation.sign {n : ℕ} (sigma : Permutation(n)) : ℤ :=
-  List.product(ℤ, Integer.multiply, Integer.one,
-      List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), ℤ,
-          Permutation.pairOrient(sigma), Permutation.orderedPairs(n)))
+  List.product(Integer.multiply, Integer.one,
+      List.map(Permutation.pairOrient(sigma), Permutation.orderedPairs(n)))
 
 -- Every value-ordered pair is enumerated, and every enumerated pair is
 -- value-ordered and distinct.
 theorem Permutation.orderedPairs_member (n : ℕ) (i j : NaturalsBelow(n))
         (precedes : NaturalsBelow.value(i) < NaturalsBelow.value(j))
         : Product.make(i, j) ∈ Permutation.orderedPairs(n) := {
-  Product.make(i, j) ∈ List.cartesianProduct(NaturalsBelow(n), NaturalsBelow(n),
-          NaturalsBelow.enumerate(n), NaturalsBelow.enumerate(n))
+  Product.make(i, j) ∈ List.cartesianProduct(NaturalsBelow.enumerate(n), NaturalsBelow.enumerate(n))
       by List.cartesianProduct_member(aMember := NaturalsBelow.enumerate_complete, bMember := NaturalsBelow.enumerate_complete);
   done by List.filter_member_complete
 }
@@ -132,8 +129,7 @@ theorem Permutation.orderedPairs_property (n : ℕ)
 theorem Permutation.orderedPairs_distinct (n : ℕ)
         : List.Distinct(Pair(NaturalsBelow(n), NaturalsBelow(n)), Permutation.orderedPairs(n)) := {
   List.Distinct(Pair(NaturalsBelow(n), NaturalsBelow(n)),
-          List.cartesianProduct(NaturalsBelow(n), NaturalsBelow(n),
-              NaturalsBelow.enumerate(n), NaturalsBelow.enumerate(n)))
+          List.cartesianProduct(NaturalsBelow.enumerate(n), NaturalsBelow.enumerate(n)))
       by List.cartesianProduct_distinct(A := NaturalsBelow(n), B := NaturalsBelow(n),
              second := NaturalsBelow.enumerate(n), secondDistinct := NaturalsBelow.enumerate_distinct,
              first := NaturalsBelow.enumerate(n), NaturalsBelow.enumerate_distinct);
@@ -144,7 +140,7 @@ theorem Permutation.orderedPairs_distinct (n : ℕ)
 theorem List.product_of_ones (A : Type(0)) (multiply : A → A → A) (one : A)
         (identityLeft : ∀ (a : A). multiply(one, a) = a)
         (l : List(A)) (allOne : ∀ (x : A). x ∈ l → x = one)
-        : List.product(A, multiply, one, l) = one :=
+        : List.product(multiply, one, l) = one :=
   by induction on l with IH {
     case List.empty: reflexivity(one)
     case List.prepend(head, tail): {
@@ -152,10 +148,10 @@ theorem List.product_of_ones (A : Type(0)) (multiply : A → A → A) (one : A)
         (∀ (x : A). x ∈ tail → x = one)
             by (x : A) (xInTail : x ∈ tail) ↦
                 allOne(x, List.member.there(A, x, head, tail, xInTail)) as tailAllOne;
-        List.product(A, multiply, one, List.prepend(A, head, tail))
-           = multiply(head, List.product(A, multiply, one, tail))
-           = multiply(one, List.product(A, multiply, one, tail)) by substituting headIsOne
-           = List.product(A, multiply, one, tail) by identityLeft(List.product(A, multiply, one, tail))
+        List.product(multiply, one, List.prepend(A, head, tail))
+           = multiply(head, List.product(multiply, one, tail))
+           = multiply(one, List.product(multiply, one, tail)) by substituting headIsOne
+           = List.product(multiply, one, tail) by identityLeft(List.product(multiply, one, tail))
            = one by IH(tailAllOne);
         done
       }
@@ -178,10 +174,8 @@ theorem Permutation.pairOrient_identity (n : ℕ)
 }
 
 theorem Permutation.sign_identity (n : ℕ) : Permutation.sign(Permutation.identity(n)) = 1 := {
-  (∀ (x : ℤ). x ∈ List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), ℤ,
-      Permutation.pairOrient(Permutation.identity(n)), Permutation.orderedPairs(n)) → x = 1)
-      by (x : ℤ) (memberX : x ∈ List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), ℤ,
-          Permutation.pairOrient(Permutation.identity(n)), Permutation.orderedPairs(n))) ↦ {
+  (∀ (x : ℤ). x ∈ List.map(Permutation.pairOrient(Permutation.identity(n)), Permutation.orderedPairs(n)) → x = 1)
+      by (x : ℤ) (memberX : x ∈ List.map(Permutation.pairOrient(Permutation.identity(n)), Permutation.orderedPairs(n))) ↦ {
           ∃ (p : Pair(NaturalsBelow(n), NaturalsBelow(n))).
               p ∈ Permutation.orderedPairs(n)
                   ∧ (Permutation.pairOrient(Permutation.identity(n), p) = x)
@@ -223,7 +217,7 @@ theorem Permutation.sortPair_backward {n : ℕ} (a b : NaturalsBelow(n))
 -- A list-map is unchanged if the two functions agree on the list's members.
 theorem List.map_congruence_on (A B : Type(0)) (f g : A → B) (l : List(A))
         (agree : ∀ (x : A). x ∈ l → f(x) = g(x))
-        : List.map(A, B, f, l) = List.map(A, B, g, l) :=
+        : List.map(f, l) = List.map(g, l) :=
   by induction on l with IH {
     case List.empty: reflexivity(List.empty(B))
     case List.prepend(head, tail): {
@@ -231,11 +225,11 @@ theorem List.map_congruence_on (A B : Type(0)) (f g : A → B) (l : List(A))
         (∀ (x : A). x ∈ tail → f(x) = g(x))
             by (x : A) (xInTail : x ∈ tail) ↦
                 agree(x, List.member.there(A, x, head, tail, xInTail)) as tailAgree;
-        List.map(A, B, f, List.prepend(A, head, tail))
-           = List.prepend(B, f(head), List.map(A, B, f, tail))
-           = List.prepend(B, g(head), List.map(A, B, f, tail)) by substituting headAgree
-           = List.prepend(B, g(head), List.map(A, B, g, tail)) by substituting IH(tailAgree)
-           = List.map(A, B, g, List.prepend(A, head, tail));
+        List.map(f, List.prepend(A, head, tail))
+           = List.prepend(B, f(head), List.map(f, tail))
+           = List.prepend(B, g(head), List.map(f, tail)) by substituting headAgree
+           = List.prepend(B, g(head), List.map(g, tail)) by substituting IH(tailAgree)
+           = List.map(g, List.prepend(A, head, tail));
         done
       }
   }
@@ -243,38 +237,38 @@ theorem List.map_congruence_on (A B : Type(0)) (f g : A → B) (l : List(A))
 -- The fold-product of a pointwise Integer product splits into the product of
 -- the two fold-products.
 theorem List.product_pointwise_multiply (B : Type(0)) (f g : B → ℤ) (l : List(B))
-        : List.product(ℤ, Integer.multiply, Integer.one,
-              List.map(B, ℤ, (x : B) ↦ Integer.multiply(f(x), g(x)), l))
+        : List.product(Integer.multiply, Integer.one,
+              List.map((x : B) ↦ Integer.multiply(f(x), g(x)), l))
           = Integer.multiply(
-                List.product(ℤ, Integer.multiply, Integer.one, List.map(B, ℤ, f, l)),
-                List.product(ℤ, Integer.multiply, Integer.one, List.map(B, ℤ, g, l))) :=
+                List.product(Integer.multiply, Integer.one, List.map(f, l)),
+                List.product(Integer.multiply, Integer.one, List.map(g, l))) :=
   by induction on l with IH {
     case List.empty:
-        List.product(ℤ, Integer.multiply, Integer.one,
-                 List.map(B, ℤ, (x : B) ↦ Integer.multiply(f(x), g(x)), List.empty(B)))
+        List.product(Integer.multiply, Integer.one,
+                 List.map((x : B) ↦ Integer.multiply(f(x), g(x)), List.empty(B)))
            = Integer.multiply(
-                 List.product(ℤ, Integer.multiply, Integer.one, List.map(B, ℤ, f, List.empty(B))),
-                 List.product(ℤ, Integer.multiply, Integer.one, List.map(B, ℤ, g, List.empty(B))))
+                 List.product(Integer.multiply, Integer.one, List.map(f, List.empty(B))),
+                 List.product(Integer.multiply, Integer.one, List.map(g, List.empty(B))))
     case List.prepend(head, tail):
-        List.product(ℤ, Integer.multiply, Integer.one,
-                 List.map(B, ℤ, (x : B) ↦ Integer.multiply(f(x), g(x)), List.prepend(B, head, tail)))
+        List.product(Integer.multiply, Integer.one,
+                 List.map((x : B) ↦ Integer.multiply(f(x), g(x)), List.prepend(B, head, tail)))
            = Integer.multiply(Integer.multiply(f(head), g(head)),
-                 List.product(ℤ, Integer.multiply, Integer.one,
-                     List.map(B, ℤ, (x : B) ↦ Integer.multiply(f(x), g(x)), tail)))
+                 List.product(Integer.multiply, Integer.one,
+                     List.map((x : B) ↦ Integer.multiply(f(x), g(x)), tail)))
            = Integer.multiply(Integer.multiply(f(head), g(head)),
                  Integer.multiply(
-                     List.product(ℤ, Integer.multiply, Integer.one, List.map(B, ℤ, f, tail)),
-                     List.product(ℤ, Integer.multiply, Integer.one, List.map(B, ℤ, g, tail))))
+                     List.product(Integer.multiply, Integer.one, List.map(f, tail)),
+                     List.product(Integer.multiply, Integer.one, List.map(g, tail))))
                  by substituting IH
            = Integer.multiply(
                  Integer.multiply(f(head),
-                     List.product(ℤ, Integer.multiply, Integer.one, List.map(B, ℤ, f, tail))),
+                     List.product(Integer.multiply, Integer.one, List.map(f, tail))),
                  Integer.multiply(g(head),
-                     List.product(ℤ, Integer.multiply, Integer.one, List.map(B, ℤ, g, tail))))
+                     List.product(Integer.multiply, Integer.one, List.map(g, tail))))
                  by ring
            = Integer.multiply(
-                 List.product(ℤ, Integer.multiply, Integer.one, List.map(B, ℤ, f, List.prepend(B, head, tail))),
-                 List.product(ℤ, Integer.multiply, Integer.one, List.map(B, ℤ, g, List.prepend(B, head, tail))))
+                 List.product(Integer.multiply, Integer.one, List.map(f, List.prepend(B, head, tail))),
+                 List.product(Integer.multiply, Integer.one, List.map(g, List.prepend(B, head, tail))))
   }
 
 -- The reindexing map on ordered pairs: send (i, j) to the value-sorted image
@@ -467,8 +461,7 @@ theorem Permutation.pairFactor {n : ℕ} (sigma tau : Permutation(n))
 -- image inside the list and the same length.
 theorem Permutation.pairImage_permutes {n : ℕ} (tau : Permutation(n))
         : List.Permutation(Pair(NaturalsBelow(n), NaturalsBelow(n)),
-              List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
-                  Permutation.pairImage(tau), Permutation.orderedPairs(n)),
+              List.map(Permutation.pairImage(tau), Permutation.orderedPairs(n)),
               Permutation.orderedPairs(n)) := {
   List.Distinct(Pair(NaturalsBelow(n), NaturalsBelow(n)), Permutation.orderedPairs(n)) by Permutation.orderedPairs_distinct;
   (∀ (x y : Pair(NaturalsBelow(n), NaturalsBelow(n))).
@@ -480,16 +473,13 @@ theorem Permutation.pairImage_permutes {n : ℕ} (tau : Permutation(n))
          (imagesEqual : Permutation.pairImage(tau, x) = Permutation.pairImage(tau, y)) ↦
              done by Permutation.pairImage_injective_on;
   List.Distinct(Pair(NaturalsBelow(n), NaturalsBelow(n)),
-          List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
-              Permutation.pairImage(tau), Permutation.orderedPairs(n)))
+          List.map(Permutation.pairImage(tau), Permutation.orderedPairs(n)))
       by List.map_distinct_on;
   (∀ (x : Pair(NaturalsBelow(n), NaturalsBelow(n))).
-      x ∈ List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
-          Permutation.pairImage(tau), Permutation.orderedPairs(n))
+      x ∈ List.map(Permutation.pairImage(tau), Permutation.orderedPairs(n))
       → x ∈ Permutation.orderedPairs(n))
       by (x : Pair(NaturalsBelow(n), NaturalsBelow(n)))
-         (memberX : x ∈ List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
-             Permutation.pairImage(tau), Permutation.orderedPairs(n))) ↦ {
+         (memberX : x ∈ List.map(Permutation.pairImage(tau), Permutation.orderedPairs(n))) ↦ {
           ∃ (p : Pair(NaturalsBelow(n), NaturalsBelow(n))).
               p ∈ Permutation.orderedPairs(n)
                   ∧ (Permutation.pairImage(tau, p) = x)
@@ -506,8 +496,7 @@ theorem Permutation.pairImage_permutes {n : ℕ} (tau : Permutation(n))
               by substituting imageIsX;
           done
         };
-  length(List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
-              Permutation.pairImage(tau), Permutation.orderedPairs(n)))
+  length(List.map(Permutation.pairImage(tau), Permutation.orderedPairs(n)))
       = length(Permutation.orderedPairs(n));
   done by List.permutation_of_distinct_inclusion
 }
@@ -523,10 +512,8 @@ theorem Permutation.sign_compose {n : ℕ} (sigma tau : Permutation(n))
       by (p : Pair(NaturalsBelow(n), NaturalsBelow(n)))
          (memberP : p ∈ Permutation.orderedPairs(n)) ↦
              done by Permutation.pairFactor;
-  List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), ℤ,
-          Permutation.pairOrient(sigma ∘ tau), Permutation.orderedPairs(n))
-      = List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), ℤ,
-            (p : Pair(NaturalsBelow(n), NaturalsBelow(n))) ↦
+  List.map(Permutation.pairOrient(sigma ∘ tau), Permutation.orderedPairs(n))
+      = List.map((p : Pair(NaturalsBelow(n), NaturalsBelow(n))) ↦
                 Integer.multiply(Permutation.pairOrient(tau, p),
                     Permutation.pairOrient(sigma, Permutation.pairImage(tau, p))),
             Permutation.orderedPairs(n))
@@ -534,49 +521,40 @@ theorem Permutation.sign_compose {n : ℕ} (sigma tau : Permutation(n))
       as mapFactored;
   -- The reindexed σ-orientations have equal product (the τ-image permutes).
   List.Permutation(Pair(NaturalsBelow(n), NaturalsBelow(n)),
-          List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
-              Permutation.pairImage(tau), Permutation.orderedPairs(n)),
+          List.map(Permutation.pairImage(tau), Permutation.orderedPairs(n)),
           Permutation.orderedPairs(n))
       by Permutation.pairImage_permutes;
   List.Permutation(ℤ,
-          List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), ℤ, Permutation.pairOrient(sigma),
-              List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
-                  Permutation.pairImage(tau), Permutation.orderedPairs(n))),
-          List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), ℤ, Permutation.pairOrient(sigma),
-              Permutation.orderedPairs(n)))
+          List.map(Permutation.pairOrient(sigma),
+              List.map(Permutation.pairImage(tau), Permutation.orderedPairs(n))),
+          List.map(Permutation.pairOrient(sigma), Permutation.orderedPairs(n)))
       by List.Permutation.map;
-  List.product(ℤ, Integer.multiply, Integer.one,
-          List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), ℤ, Permutation.pairOrient(sigma),
-              List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
-                  Permutation.pairImage(tau), Permutation.orderedPairs(n))))
-      = List.product(ℤ, Integer.multiply, Integer.one,
-            List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), ℤ, Permutation.pairOrient(sigma),
-                Permutation.orderedPairs(n)))
+  List.product(Integer.multiply, Integer.one,
+          List.map(Permutation.pairOrient(sigma),
+              List.map(Permutation.pairImage(tau), Permutation.orderedPairs(n))))
+      = List.product(Integer.multiply, Integer.one,
+            List.map(Permutation.pairOrient(sigma), Permutation.orderedPairs(n)))
       by List.Permutation.product_invariant recalling Integer.multiply_associative, Integer.multiply_commutative
       as reindexedProduct;
   Permutation.sign(sigma ∘ tau)
-     = List.product(ℤ, Integer.multiply, Integer.one,
-           List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), ℤ,
-               (p : Pair(NaturalsBelow(n), NaturalsBelow(n))) ↦
+     = List.product(Integer.multiply, Integer.one,
+           List.map((p : Pair(NaturalsBelow(n), NaturalsBelow(n))) ↦
                    Integer.multiply(Permutation.pairOrient(tau, p),
                        Permutation.pairOrient(sigma, Permutation.pairImage(tau, p))),
                Permutation.orderedPairs(n)))
            by substituting mapFactored
      = Integer.multiply(
-           List.product(ℤ, Integer.multiply, Integer.one,
-               List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), ℤ, Permutation.pairOrient(tau),
-                   Permutation.orderedPairs(n))),
-           List.product(ℤ, Integer.multiply, Integer.one,
-               List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), ℤ,
-                   (p : Pair(NaturalsBelow(n), NaturalsBelow(n))) ↦
+           List.product(Integer.multiply, Integer.one,
+               List.map(Permutation.pairOrient(tau), Permutation.orderedPairs(n))),
+           List.product(Integer.multiply, Integer.one,
+               List.map((p : Pair(NaturalsBelow(n), NaturalsBelow(n))) ↦
                        Permutation.pairOrient(sigma, Permutation.pairImage(tau, p)),
                    Permutation.orderedPairs(n))))
            by List.product_pointwise_multiply
      = Integer.multiply(Permutation.sign(tau),
-           List.product(ℤ, Integer.multiply, Integer.one,
-               List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), ℤ, Permutation.pairOrient(sigma),
-                   List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
-                       Permutation.pairImage(tau), Permutation.orderedPairs(n)))))
+           List.product(Integer.multiply, Integer.one,
+               List.map(Permutation.pairOrient(sigma),
+                   List.map(Permutation.pairImage(tau), Permutation.orderedPairs(n)))))
            by substituting List.map_map
      = Integer.multiply(Permutation.sign(tau), Permutation.sign(sigma))
            by substituting reindexedProduct
@@ -589,11 +567,11 @@ theorem Permutation.sign_compose {n : ℕ} (sigma tau : Permutation(n))
 
 theorem List.product_of_units (l : List(ℤ))
         (allUnit : ∀ (x : ℤ). x ∈ l → (x = 1 ∨ x = Integer.negate(1)))
-        : List.product(ℤ, Integer.multiply, Integer.one, l) = 1
-          ∨ List.product(ℤ, Integer.multiply, Integer.one, l) = Integer.negate(1) :=
+        : List.product(Integer.multiply, Integer.one, l) = 1
+          ∨ List.product(Integer.multiply, Integer.one, l) = Integer.negate(1) :=
   by induction on l with IH {
     case List.empty: {
-        List.product(ℤ, Integer.multiply, Integer.one, List.empty(ℤ)) = 1;
+        List.product(Integer.multiply, Integer.one, List.empty(ℤ)) = 1;
         done
       }
     case List.prepend(head, tail): {
@@ -602,25 +580,25 @@ theorem List.product_of_units (l : List(ℤ))
         (∀ (x : ℤ). x ∈ tail → (x = 1 ∨ x = Integer.negate(1)))
             by (x : ℤ) (xInTail : x ∈ tail) ↦
                 allUnit(x, List.member.there(ℤ, x, head, tail, xInTail)) as tailUnit;
-        List.product(ℤ, Integer.multiply, Integer.one, tail) = 1
-            ∨ List.product(ℤ, Integer.multiply, Integer.one, tail) = Integer.negate(1)
+        List.product(Integer.multiply, Integer.one, tail) = 1
+            ∨ List.product(Integer.multiply, Integer.one, tail) = Integer.negate(1)
             by IH(tailUnit);
         done by cases {
           case head = 1 as headOne: {
               done by cases {
-                case List.product(ℤ, Integer.multiply, Integer.one, tail) = 1 as tailOne: {
-                    List.product(ℤ, Integer.multiply, Integer.one, List.prepend(ℤ, head, tail))
-                       = Integer.multiply(head, List.product(ℤ, Integer.multiply, Integer.one, tail))
-                       = Integer.multiply(1, List.product(ℤ, Integer.multiply, Integer.one, tail))
+                case List.product(Integer.multiply, Integer.one, tail) = 1 as tailOne: {
+                    List.product(Integer.multiply, Integer.one, List.prepend(ℤ, head, tail))
+                       = Integer.multiply(head, List.product(Integer.multiply, Integer.one, tail))
+                       = Integer.multiply(1, List.product(Integer.multiply, Integer.one, tail))
                              by substituting headOne
                        = Integer.multiply(1, 1) by substituting tailOne
                        = 1 as productValue;
                     done by Or.introduceLeft(productValue)
                   }
-                case List.product(ℤ, Integer.multiply, Integer.one, tail) = Integer.negate(1) as tailNegOne: {
-                    List.product(ℤ, Integer.multiply, Integer.one, List.prepend(ℤ, head, tail))
-                       = Integer.multiply(head, List.product(ℤ, Integer.multiply, Integer.one, tail))
-                       = Integer.multiply(1, List.product(ℤ, Integer.multiply, Integer.one, tail))
+                case List.product(Integer.multiply, Integer.one, tail) = Integer.negate(1) as tailNegOne: {
+                    List.product(Integer.multiply, Integer.one, List.prepend(ℤ, head, tail))
+                       = Integer.multiply(head, List.product(Integer.multiply, Integer.one, tail))
+                       = Integer.multiply(1, List.product(Integer.multiply, Integer.one, tail))
                              by substituting headOne
                        = Integer.multiply(1, Integer.negate(1)) by substituting tailNegOne
                        = Integer.negate(1) as productValue;
@@ -630,19 +608,19 @@ theorem List.product_of_units (l : List(ℤ))
             }
           case head = Integer.negate(1) as headNegOne: {
               done by cases {
-                case List.product(ℤ, Integer.multiply, Integer.one, tail) = 1 as tailOne: {
-                    List.product(ℤ, Integer.multiply, Integer.one, List.prepend(ℤ, head, tail))
-                       = Integer.multiply(head, List.product(ℤ, Integer.multiply, Integer.one, tail))
-                       = Integer.multiply(Integer.negate(1), List.product(ℤ, Integer.multiply, Integer.one, tail))
+                case List.product(Integer.multiply, Integer.one, tail) = 1 as tailOne: {
+                    List.product(Integer.multiply, Integer.one, List.prepend(ℤ, head, tail))
+                       = Integer.multiply(head, List.product(Integer.multiply, Integer.one, tail))
+                       = Integer.multiply(Integer.negate(1), List.product(Integer.multiply, Integer.one, tail))
                              by substituting headNegOne
                        = Integer.multiply(Integer.negate(1), 1) by substituting tailOne
                        = Integer.negate(1) as productValue;
                     done by Or.introduceRight(productValue)
                   }
-                case List.product(ℤ, Integer.multiply, Integer.one, tail) = Integer.negate(1) as tailNegOne: {
-                    List.product(ℤ, Integer.multiply, Integer.one, List.prepend(ℤ, head, tail))
-                       = Integer.multiply(head, List.product(ℤ, Integer.multiply, Integer.one, tail))
-                       = Integer.multiply(Integer.negate(1), List.product(ℤ, Integer.multiply, Integer.one, tail))
+                case List.product(Integer.multiply, Integer.one, tail) = Integer.negate(1) as tailNegOne: {
+                    List.product(Integer.multiply, Integer.one, List.prepend(ℤ, head, tail))
+                       = Integer.multiply(head, List.product(Integer.multiply, Integer.one, tail))
+                       = Integer.multiply(Integer.negate(1), List.product(Integer.multiply, Integer.one, tail))
                              by substituting headNegOne
                        = Integer.multiply(Integer.negate(1), Integer.negate(1)) by substituting tailNegOne
                        = 1 as productValue;
@@ -656,10 +634,8 @@ theorem List.product_of_units (l : List(ℤ))
 
 theorem Permutation.sign_is_unit {n : ℕ} (sigma : Permutation(n))
         : Permutation.sign(sigma) = 1 ∨ Permutation.sign(sigma) = Integer.negate(1) := {
-  (∀ (x : ℤ). x ∈ List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), ℤ, Permutation.pairOrient(sigma),
-      Permutation.orderedPairs(n)) → (x = 1 ∨ x = Integer.negate(1)))
-      by (x : ℤ) (memberX : x ∈ List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), ℤ, Permutation.pairOrient(sigma),
-          Permutation.orderedPairs(n))) ↦ {
+  (∀ (x : ℤ). x ∈ List.map(Permutation.pairOrient(sigma), Permutation.orderedPairs(n)) → (x = 1 ∨ x = Integer.negate(1)))
+      by (x : ℤ) (memberX : x ∈ List.map(Permutation.pairOrient(sigma), Permutation.orderedPairs(n))) ↦ {
           ∃ (p : Pair(NaturalsBelow(n), NaturalsBelow(n))).
               p ∈ Permutation.orderedPairs(n)
                   ∧ (Permutation.pairOrient(sigma, p) = x)

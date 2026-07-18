@@ -38,7 +38,7 @@ import Algebra.permutation_sign
 theorem List.product_isolate_single (B : Type(0)) (f : B → ℤ) (e0 : B)
         (l : List(B)) (distinctL : List.Distinct(B, l)) (memberE0 : e0 ∈ l)
         (othersAreOne : ∀ (x : B). x ∈ l → x ≠ e0 → f(x) = Integer.one)
-        : List.product(ℤ, Integer.multiply, Integer.one, List.map(B, ℤ, f, l)) = f(e0) :=
+        : List.product(Integer.multiply, Integer.one, List.map(f, l)) = f(e0) :=
   by induction on l with IH {
     case List.empty: {
         ¬(e0 ∈ List.empty(B)) by List.no_member_empty as notMember;
@@ -67,20 +67,19 @@ theorem List.product_isolate_single (B : Type(0)) (f : B → ℤ) (e0 : B)
                     f(x) = Integer.one;
                     done
                   } as tailOnes;
-              (∀ (y : ℤ). y ∈ List.map(B, ℤ, f, tail) → y = Integer.one)
-                  by (y : ℤ) (yInMap : y ∈ List.map(B, ℤ, f, tail)) ↦ {
+              (∀ (y : ℤ). y ∈ List.map(f, tail) → y = Integer.one)
+                  by (y : ℤ) (yInMap : y ∈ List.map(f, tail)) ↦ {
                     choose x : B such that x ∈ tail ∧ (f(x) = y) from List.map_member_invert;
                     x ∈ tail as xInTail2;
                     f(x) = y as fxIsY;
                     y = f(x) by fxIsY = Integer.one by tailOnes(x, xInTail2);
                     done
                   };
-              List.product(ℤ, Integer.multiply, Integer.one, List.map(B, ℤ, f, tail)) = Integer.one
+              List.product(Integer.multiply, Integer.one, List.map(f, tail)) = Integer.one
                   by List.product_of_ones recalling Integer.one_multiply_left as tailProductOne;
-              List.product(ℤ, Integer.multiply, Integer.one,
-                    List.map(B, ℤ, f, List.prepend(B, head, tail)))
+              List.product(Integer.multiply, Integer.one, List.map(f, List.prepend(B, head, tail)))
                  = Integer.multiply(f(head),
-                       List.product(ℤ, Integer.multiply, Integer.one, List.map(B, ℤ, f, tail)))
+                       List.product(Integer.multiply, Integer.one, List.map(f, tail)))
                  = Integer.multiply(f(head), Integer.one) by substituting tailProductOne
                  = f(head) by ring
                  = f(e0) by substituting e0IsHead;
@@ -101,14 +100,13 @@ theorem List.product_isolate_single (B : Type(0)) (f : B → ℤ) (e0 : B)
               (∀ (x : B). x ∈ tail → x ≠ e0 → f(x) = Integer.one)
                   by (x : B) (xInTail : x ∈ tail) ↦
                       othersAreOne(x, List.member.there(B, x, head, tail, xInTail)) as tailOthers;
-              List.product(ℤ, Integer.multiply, Integer.one,
-                    List.map(B, ℤ, f, List.prepend(B, head, tail)))
+              List.product(Integer.multiply, Integer.one, List.map(f, List.prepend(B, head, tail)))
                  = Integer.multiply(f(head),
-                       List.product(ℤ, Integer.multiply, Integer.one, List.map(B, ℤ, f, tail)))
+                       List.product(Integer.multiply, Integer.one, List.map(f, tail)))
                  = Integer.multiply(Integer.one,
-                       List.product(ℤ, Integer.multiply, Integer.one, List.map(B, ℤ, f, tail)))
+                       List.product(Integer.multiply, Integer.one, List.map(f, tail)))
                        by substituting fHeadIsOne
-                 = List.product(ℤ, Integer.multiply, Integer.one, List.map(B, ℤ, f, tail))
+                 = List.product(Integer.multiply, Integer.one, List.map(f, tail))
                  = f(e0) by IH(tailDistinct, e0InTail, tailOthers);
               done
             }
@@ -451,9 +449,8 @@ theorem Permutation.sign_swap_adjacent {n : ℕ} (a b : NaturalsBelow(n))
          (notThePair : p ≠ Product.make(a, b)) ↦
              done by Permutation.pairOrient_swap_adjacent_other;
   Permutation.sign(Permutation.swap(a, b))
-     = List.product(ℤ, Integer.multiply, Integer.one,
-           List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), ℤ,
-               Permutation.pairOrient(Permutation.swap(a, b)), Permutation.orderedPairs(n)))
+     = List.product(Integer.multiply, Integer.one,
+           List.map(Permutation.pairOrient(Permutation.swap(a, b)), Permutation.orderedPairs(n)))
      = Permutation.pairOrient(Permutation.swap(a, b), Product.make(a, b))
            by List.product_isolate_single
      = Permutation.orient(Permutation.swap(a, b)(a), Permutation.swap(a, b)(b))

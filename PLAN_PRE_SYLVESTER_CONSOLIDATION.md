@@ -281,7 +281,36 @@ has the same dependent-source caveat as T2.4 — same probe-then-stop rule.
 
 ---
 
-## T6 `[ ]` (L, GATED — needs owner go/no-go) Lists/Logic implicit-argument modernization
+## T6 `[x]` (L) Lists/Logic implicit-argument modernization — tier A COMPLETE; inductive-parameter tier carved out
+
+> **Ledger 2026-07-18 (owner go given).** Eight symbols implicit-ized:
+> `List.map`, `List.filter`, `List.append`, `List.cartesianProduct`,
+> `List.product`, `Function.IsInjective`/`IsSurjective`/`IsBijective` —
+> ~600 call sites across 43 files (signatures by hand; consumer sweep by
+> 8 parallel Sonnet agents on the ∈-sweep recipe; two agent whitespace
+> slips self-caught, one of mine caught by central grep). Full
+> library+tests green in 38 s; error-tests + both clean gates green.
+> **Two elaborator fixes landed en route (patterns.cpp, inference.cpp):**
+> (1) the recursive-call rewrite now accepts a self-call scrutinee at
+> BOTH the total-binder index (pre-existing convention: implicits spelled
+> positionally — `Polynomial.Coefficients.add(r, restA, …)` relies on
+> it) and the explicit-only index (natural spelling — new code omits
+> implicits); the first attempt broke the Polynomial convention and was
+> repaired to the two-candidate form. (2) `inferLeadingArguments` now
+> DEFERS a bare implicit-leading-constant argument (an operation like
+> `IntegerMod.multiply`) to a second pass while its expected domain is
+> still metavariable-open — previously the raw implicit Pi unified
+> positionally and poisoned the inference (`A := ℕ`); deferral lets a
+> sibling argument pin the metavariable first, and only ever fires on
+> shapes that previously failed. **Carve-outs, recorded:** `List.empty`/
+> `List.prepend` (constructors — inductive machinery); `Equinumerous`/
+> `HasSize` (their type args ARE the data — nothing to infer from);
+> `List.Distinct`/`List.Permutation` (INDUCTIVES — probe shows the
+> parser accepts `{A : Type(0)}` on an inductive but the elaborator does
+> not honor it at application; the library's own precedent for this is
+> the `memberOf`-style implicit WRAPPER over the explicit inductive +
+> the pure-pass-through citation bridge — a follow-up task of its own,
+> with induction-through-wrapper the risk to probe first).
 
 `List.map (A B : Type(0)) ...` (`Lists/map.math:15`) and siblings
 (`List.Distinct`, `List.Permutation`, `Function.IsInjective`, ...) predate

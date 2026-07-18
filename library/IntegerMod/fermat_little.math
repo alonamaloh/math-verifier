@@ -66,54 +66,53 @@ definition IntegerMod.multiply_by (modulus : ℕ)
 -- Scaling every element of a list by x multiplies its product by
 -- x^length: ∏ map(x·_, l) = x^|l| · ∏ l.
 theorem IntegerMod.product_map_multiply (p : ℕ) (x : IntegerMod(p)) (list : List(IntegerMod(p)))
-        : List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
-                List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x), list))
+        : List.product(IntegerMod.multiply, IntegerMod.one(p),
+                List.map(IntegerMod.multiply_by(p, x), list))
             = IntegerMod.power(p, x, length(list))
-                * List.product(IntegerMod(p), IntegerMod.multiply,
+                * List.product(IntegerMod.multiply,
                       IntegerMod.one(p), list) :=
   by induction on list with IH {
     case List.empty:
       -- map(x·_) fixes the empty list, and |empty| = 0 with x^0 = 1 the left
       -- identity. (Kept factored as 1 · ∏empty rather than reducing 1·1 — the
       -- latter forces an expensive normalisation through the IntegerMod quotient.)
-      List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
-               List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
+      List.product(IntegerMod.multiply, IntegerMod.one(p),
+               List.map(IntegerMod.multiply_by(p, x),
                    List.empty(IntegerMod(p))))
-         = List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
+         = List.product(IntegerMod.multiply, IntegerMod.one(p),
                List.empty(IntegerMod(p)))
          = IntegerMod.power(p, x, 0)
-               * List.product(IntegerMod(p), IntegerMod.multiply,
+               * List.product(IntegerMod.multiply,
                      IntegerMod.one(p), List.empty(IntegerMod(p)))
                by IntegerMod.multiply_identity_left
          = IntegerMod.power(p, x, length(List.empty(IntegerMod(p))))
-               * List.product(IntegerMod(p), IntegerMod.multiply,
+               * List.product(IntegerMod.multiply,
                      IntegerMod.one(p), List.empty(IntegerMod(p)))
                by List.length_empty
     case List.prepend(head, tail):
       -- Peel the head and exchange the four factors, then step the exponent:
       -- x · x^|tail| = x^(1 + |tail|) = x^|head :: tail|.
-      List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
-               List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
+      List.product(IntegerMod.multiply, IntegerMod.one(p),
+               List.map(IntegerMod.multiply_by(p, x),
                    List.prepend(IntegerMod(p), head, tail)))
          = (x * head)
-               * List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
-                     List.map(IntegerMod(p), IntegerMod(p),
-                         IntegerMod.multiply_by(p, x), tail))
+               * List.product(IntegerMod.multiply, IntegerMod.one(p),
+                     List.map(IntegerMod.multiply_by(p, x), tail))
          = (x * head)
                * (IntegerMod.power(p, x, length(tail))
-                   * List.product(IntegerMod(p), IntegerMod.multiply,
+                   * List.product(IntegerMod.multiply,
                          IntegerMod.one(p), tail))
                by IH
          = (x * IntegerMod.power(p, x, length(tail)))
-               * (head * List.product(IntegerMod(p), IntegerMod.multiply,
+               * (head * List.product(IntegerMod.multiply,
                      IntegerMod.one(p), tail))
          = IntegerMod.power(p, x, 1 + length(tail))
-               * List.product(IntegerMod(p), IntegerMod.multiply,
+               * List.product(IntegerMod.multiply,
                      IntegerMod.one(p), List.prepend(IntegerMod(p), head, tail))
                by substituting Natural.one_add
          = IntegerMod.power(p, x,
                length(List.prepend(IntegerMod(p), head, tail)))
-               * List.product(IntegerMod(p), IntegerMod.multiply,
+               * List.product(IntegerMod.multiply,
                      IntegerMod.one(p), List.prepend(IntegerMod(p), head, tail))
                by List.length_prepend
   }
@@ -124,7 +123,7 @@ theorem IntegerMod.product_nonzero (p : ℕ)
         (primality : Natural.is_prime(p)) (list : List(IntegerMod(p)))
         : (∀ (z : IntegerMod(p)). z ∈ list
                  → ¬(z = IntegerMod.zero(p)))
-          → ¬(List.product(IntegerMod(p), IntegerMod.multiply,
+          → ¬(List.product(IntegerMod.multiply,
                   IntegerMod.one(p), list)
               = IntegerMod.zero(p)) :=
   by induction on list with IH {
@@ -133,7 +132,7 @@ theorem IntegerMod.product_nonzero (p : ℕ)
           : ∀ (z : IntegerMod(p)). z ∈ List.empty(IntegerMod(p))
               → ¬(z = IntegerMod.zero(p)))
       (productZero
-          : List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
+          : List.product(IntegerMod.multiply, IntegerMod.one(p),
                 List.empty(IntegerMod(p)))
             = IntegerMod.zero(p)) ↦ {
         -- The empty product is 1, and 1 ≠ 0.
@@ -147,7 +146,7 @@ theorem IntegerMod.product_nonzero (p : ℕ)
               z ∈ List.prepend(IntegerMod(p), head, tail)
               → ¬(z = IntegerMod.zero(p)))
       (productZero
-          : List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
+          : List.product(IntegerMod.multiply, IntegerMod.one(p),
                 List.prepend(IntegerMod(p), head, tail))
             = IntegerMod.zero(p)) ↦ {
         -- The head is nonzero, the tail product is nonzero by recursion,
@@ -161,17 +160,17 @@ theorem IntegerMod.product_nonzero (p : ℕ)
                  membersNonzero(z,
                      List.member.there(IntegerMod(p), z, head, tail, zMember))
             as tailMembersNonzero;
-        ¬(List.product(IntegerMod(p), IntegerMod.multiply,
+        ¬(List.product(IntegerMod.multiply,
                 IntegerMod.one(p), tail)
             = IntegerMod.zero(p))
             by IH(tailMembersNonzero)
             as tailProductNonzero;
         -- Read the hypothesis at its reduced shape: head · ∏tail = 0.
-        head * List.product(IntegerMod(p), IntegerMod.multiply,
+        head * List.product(IntegerMod.multiply,
                   IntegerMod.one(p), tail)
               = IntegerMod.zero(p)
             by productZero;
-        List.product(IntegerMod(p), IntegerMod.multiply,
+        List.product(IntegerMod.multiply,
                 IntegerMod.one(p), tail)
               = IntegerMod.zero(p)
             by IntegerMod.no_zero_divisors as tailProductZero;
@@ -187,8 +186,7 @@ theorem IntegerMod.scaled_residue_member (p n : ℕ)
         (pEquation : p = 1 + n)
         (x : IntegerMod(p)) (xNonzero : ¬(x = IntegerMod.zero(p)))
         (z : IntegerMod(p))
-        (zMember : z ∈ List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
-                IntegerMod.residues_up_to(p, n)))
+        (zMember : z ∈ List.map(IntegerMod.multiply_by(p, x), IntegerMod.residues_up_to(p, n)))
         : z ∈ IntegerMod.residues_up_to(p, n) := {
   -- z = x·u for a nonzero class u, so z is itself nonzero, hence listed.
   choose u such that
@@ -214,8 +212,7 @@ theorem IntegerMod.fermat_little (p n : ℕ)
   -- The scaled list map(x·_, U) is a permutation of U: it is contained in
   -- U (scaled_residue_member), distinct (x cancels), and of equal length.
   (z : IntegerMod(p))
-        → z ∈ List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
-                  IntegerMod.residues_up_to(p, n))
+        → z ∈ List.map(IntegerMod.multiply_by(p, x), IntegerMod.residues_up_to(p, n))
         → z ∈ IntegerMod.residues_up_to(p, n)
       by IntegerMod.scaled_residue_member;
   (u v : IntegerMod(p))
@@ -225,22 +222,17 @@ theorem IntegerMod.fermat_little (p n : ℕ)
       by IntegerMod.multiply_cancel_left;
   List.Distinct(IntegerMod(p), IntegerMod.residues_up_to(p, n))
       by IntegerMod.residues_distinct;
-  List.Distinct(IntegerMod(p),
-            List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
-                IntegerMod.residues_up_to(p, n)))
+  List.Distinct(IntegerMod(p), List.map(IntegerMod.multiply_by(p, x), IntegerMod.residues_up_to(p, n)))
       by List.map_distinct_on;
-  length(List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
-                IntegerMod.residues_up_to(p, n)))
+  length(List.map(IntegerMod.multiply_by(p, x), IntegerMod.residues_up_to(p, n)))
         = length(IntegerMod.residues_up_to(p, n));
   List.Permutation(IntegerMod(p),
-            List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
-                IntegerMod.residues_up_to(p, n)),
+            List.map(IntegerMod.multiply_by(p, x), IntegerMod.residues_up_to(p, n)),
             IntegerMod.residues_up_to(p, n))
       by List.permutation_of_distinct_inclusion;
   -- Multiply out both sides of the permutation.
-  List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
-            List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
-                IntegerMod.residues_up_to(p, n)))
+  List.product(IntegerMod.multiply, IntegerMod.one(p),
+            List.map(IntegerMod.multiply_by(p, x), IntegerMod.residues_up_to(p, n)))
         = IntegerMod.residues_product(p, n)
       by List.Permutation.product_invariant
          recalling IntegerMod.multiply_associative(p),
@@ -249,9 +241,8 @@ theorem IntegerMod.fermat_little (p n : ℕ)
   IntegerMod.power(p, x,
           length(IntegerMod.residues_up_to(p, n)))
           * IntegerMod.residues_product(p, n)
-      = List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
-            List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
-                IntegerMod.residues_up_to(p, n)))
+      = List.product(IntegerMod.multiply, IntegerMod.one(p),
+            List.map(IntegerMod.multiply_by(p, x), IntegerMod.residues_up_to(p, n)))
             by IntegerMod.product_map_multiply(p, x,
                    IntegerMod.residues_up_to(p, n))
       = IntegerMod.residues_product(p, n)

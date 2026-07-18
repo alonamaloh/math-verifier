@@ -20,35 +20,35 @@ import Logic.exists
 import Equality.basics
 
 -- `f` is injective: equal outputs force equal inputs.
-definition Function.IsInjective (A B : Type(0)) (f : A → B) : Proposition :=
+definition Function.IsInjective {A B : Type(0)} (f : A → B) : Proposition :=
   (x y : A) → f(x) = f(y) → x = y
 
 -- `f` is surjective: every element of the codomain is some `f(x)`.
-definition Function.IsSurjective (A B : Type(0)) (f : A → B) : Proposition :=
+definition Function.IsSurjective {A B : Type(0)} (f : A → B) : Proposition :=
   (y : B) → ∃ (x : A). f(x) = y
 
 -- `f` is bijective: injective and surjective.
-definition Function.IsBijective (A B : Type(0)) (f : A → B) : Proposition :=
-  Function.IsInjective(A, B, f) ∧ Function.IsSurjective(A, B, f)
+definition Function.IsBijective {A B : Type(0)} (f : A → B) : Proposition :=
+  Function.IsInjective(f) ∧ Function.IsSurjective(f)
 
 -- ----------------------------------------------------------------------
 -- The identity is bijective, and both properties compose. These are the
 -- closure facts every cardinality argument leans on.
 
 theorem Function.identity_is_injective (A : Type(0))
-        : Function.IsInjective(A, A, (x : A) ↦ x) :=
+        : Function.IsInjective((x : A) ↦ x) :=
   (x y : A) (equalImages : x = y) ↦ equalImages
 
 theorem Function.identity_is_surjective (A : Type(0))
-        : Function.IsSurjective(A, A, (x : A) ↦ x) :=
+        : Function.IsSurjective((x : A) ↦ x) :=
   (y : A) ↦ witness y with reflexivity(A, y)
 
 -- The composite of injective functions is injective.
 theorem Function.compose_injective
         (A B C : Type(0)) (f : A → B) (g : B → C)
-        (fInjective : Function.IsInjective(A, B, f))
-        (gInjective : Function.IsInjective(B, C, g))
-        : Function.IsInjective(A, C, (x : A) ↦ g(f(x))) :=
+        (fInjective : Function.IsInjective(f))
+        (gInjective : Function.IsInjective(g))
+        : Function.IsInjective((x : A) ↦ g(f(x))) :=
   (x y : A) (equalImages : g(f(x)) = g(f(y))) ↦
     fInjective(x, y, gInjective(f(x), f(y), equalImages))
 
@@ -56,9 +56,9 @@ theorem Function.compose_injective
 -- through `g`, then that preimage back through `f`.
 theorem Function.compose_surjective
         (A B C : Type(0)) (f : A → B) (g : B → C)
-        (fSurjective : Function.IsSurjective(A, B, f))
-        (gSurjective : Function.IsSurjective(B, C, g))
-        : Function.IsSurjective(A, C, (x : A) ↦ g(f(x))) :=
+        (fSurjective : Function.IsSurjective(f))
+        (gSurjective : Function.IsSurjective(g))
+        : Function.IsSurjective((x : A) ↦ g(f(x))) :=
   (z : C) ↦ {
     choose y such that g(y) = z from gSurjective(z);
     choose x such that f(x) = y from fSurjective(y);

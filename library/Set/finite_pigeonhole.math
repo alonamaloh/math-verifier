@@ -56,7 +56,7 @@ definition NaturalsBelow.top (k : ℕ) : NaturalsBelow(1 + k) :=
 -- gives k = value i — impossible, since value i < k.
 theorem NaturalsBelow.pigeonhole_top_value_below (k n' : ℕ)
         (f : NaturalsBelow(1 + k) → NaturalsBelow(1 + n'))
-        (inj : Function.IsInjective(NaturalsBelow(1 + k), NaturalsBelow(1 + n'), f))
+        (inj : Function.IsInjective(f))
         (i : NaturalsBelow(k))
         (atLeast : n' ≤ NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i))))
         : NaturalsBelow.value(f(NaturalsBelow.top(k))) < n' := {
@@ -90,7 +90,7 @@ theorem NaturalsBelow.pigeonhole_top_value_below (k n' : ℕ)
 -- The redirect map itself: branch on how f(inclusion i) compares to n'.
 definition NaturalsBelow.pigeonhole_redirect (k n' : ℕ)
         (f : NaturalsBelow(1 + k) → NaturalsBelow(1 + n'))
-        (inj : Function.IsInjective(NaturalsBelow(1 + k), NaturalsBelow(1 + n'), f))
+        (inj : Function.IsInjective(f))
         : NaturalsBelow(k) → NaturalsBelow(n') :=
   (i : NaturalsBelow(k)) ↦
     if NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i))) < n' then {
@@ -111,7 +111,7 @@ definition NaturalsBelow.pigeonhole_redirect (k n' : ℕ)
 -- proof needs.
 theorem NaturalsBelow.pigeonhole_redirect_value_below (k n' : ℕ)
         (f : NaturalsBelow(1 + k) → NaturalsBelow(1 + n'))
-        (inj : Function.IsInjective(NaturalsBelow(1 + k), NaturalsBelow(1 + n'), f))
+        (inj : Function.IsInjective(f))
         (i : NaturalsBelow(k))
         (strictlyBelow : NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i))) < n')
         : NaturalsBelow.value(NaturalsBelow.pigeonhole_redirect(k, n', f, inj, i))
@@ -126,7 +126,7 @@ theorem NaturalsBelow.pigeonhole_redirect_value_below (k n' : ℕ)
 
 theorem NaturalsBelow.pigeonhole_redirect_value_at_least (k n' : ℕ)
         (f : NaturalsBelow(1 + k) → NaturalsBelow(1 + n'))
-        (inj : Function.IsInjective(NaturalsBelow(1 + k), NaturalsBelow(1 + n'), f))
+        (inj : Function.IsInjective(f))
         (i : NaturalsBelow(k))
         (atLeast : n' ≤ NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i))))
         : NaturalsBelow.value(NaturalsBelow.pigeonhole_redirect(k, n', f, inj, i))
@@ -148,7 +148,7 @@ theorem NaturalsBelow.pigeonhole_redirect_value_at_least (k n' : ℕ)
 -- (value(inclusion i) ≡ value i) gives value i = value j, hence i = j.
 theorem NaturalsBelow.pigeonhole_inclusion_image_injective (k n' : ℕ)
         (f : NaturalsBelow(1 + k) → NaturalsBelow(1 + n'))
-        (inj : Function.IsInjective(NaturalsBelow(1 + k), NaturalsBelow(1 + n'), f))
+        (inj : Function.IsInjective(f))
         (i j : NaturalsBelow(k))
         (imagesEqual : f(NaturalsBelow.inclusion(k, i)) = f(NaturalsBelow.inclusion(k, j)))
         : i = j := {
@@ -165,7 +165,7 @@ theorem NaturalsBelow.pigeonhole_inclusion_image_injective (k n' : ℕ)
 -- values gives value i = k — contradicting value i < k.
 theorem NaturalsBelow.pigeonhole_inclusion_not_top (k n' : ℕ)
         (f : NaturalsBelow(1 + k) → NaturalsBelow(1 + n'))
-        (inj : Function.IsInjective(NaturalsBelow(1 + k), NaturalsBelow(1 + n'), f))
+        (inj : Function.IsInjective(f))
         (i : NaturalsBelow(k))
         (imagesEqual : f(NaturalsBelow.inclusion(k, i)) = f(NaturalsBelow.top(k)))
         : False := {
@@ -187,9 +187,8 @@ theorem NaturalsBelow.pigeonhole_inclusion_not_top (k n' : ℕ)
 -- top-image), so they are closed by contradiction.
 theorem NaturalsBelow.pigeonhole_redirect_injective (k n' : ℕ)
         (f : NaturalsBelow(1 + k) → NaturalsBelow(1 + n'))
-        (inj : Function.IsInjective(NaturalsBelow(1 + k), NaturalsBelow(1 + n'), f))
-        : Function.IsInjective(NaturalsBelow(k), NaturalsBelow(n'),
-              NaturalsBelow.pigeonhole_redirect(k, n', f, inj)) :=
+        (inj : Function.IsInjective(f))
+        : Function.IsInjective(NaturalsBelow.pigeonhole_redirect(k, n', f, inj)) :=
   (i j : NaturalsBelow(k))
   (equalRedirect : NaturalsBelow.pigeonhole_redirect(k, n', f, inj, i)
                      = NaturalsBelow.pigeonhole_redirect(k, n', f, inj, j)) ↦ {
@@ -272,13 +271,13 @@ theorem NaturalsBelow.pigeonhole_redirect_injective (k n' : ℕ)
 theorem NaturalsBelow.injective_domain_le_codomain (n : ℕ)
         : ∀ (m : ℕ).
           (f : NaturalsBelow(m) → NaturalsBelow(n))
-          → Function.IsInjective(NaturalsBelow(m), NaturalsBelow(n), f)
+          → Function.IsInjective(f)
           → m ≤ n :=
   by induction on n with IH {
     case base: {
         take m : ℕ;
         take f : NaturalsBelow(m) → NaturalsBelow(0);
-        take inj : Function.IsInjective(NaturalsBelow(m), NaturalsBelow(0), f);
+        take inj : Function.IsInjective(f);
         by induction on m with mIH {
           case base: { okay }
           case step(k): {
@@ -293,14 +292,13 @@ theorem NaturalsBelow.injective_domain_le_codomain (n : ℕ)
     case step(n'): {
         take m : ℕ;
         take f : NaturalsBelow(m) → NaturalsBelow(1 + n');
-        take inj : Function.IsInjective(NaturalsBelow(m), NaturalsBelow(1 + n'), f);
+        take inj : Function.IsInjective(f);
         by induction on m with mIH {
           case base: { okay by Natural.zero_least }
           case step(k): {
               -- Redirect f to an injection out of NaturalsBelow(k), recurse;
               -- k ≤ n' then lifts to 1 + k ≤ 1 + n'.
-              Function.IsInjective(NaturalsBelow(k), NaturalsBelow(n'),
-                      NaturalsBelow.pigeonhole_redirect(k, n', f, inj)) as redirectInjective;
+              Function.IsInjective(NaturalsBelow.pigeonhole_redirect(k, n', f, inj)) as redirectInjective;
               k ≤ n' by IH(k, NaturalsBelow.pigeonhole_redirect(k, n', f, inj), redirectInjective);
               (1 + k) ≤ (1 + n');
             }
@@ -314,7 +312,7 @@ theorem NaturalsBelow.injective_domain_le_codomain (n : ℕ)
 theorem NaturalsBelow.no_injection_when_smaller (m n : ℕ)
         (smaller : n < m)
         (f : NaturalsBelow(m) → NaturalsBelow(n))
-        (inj : Function.IsInjective(NaturalsBelow(m), NaturalsBelow(n), f))
+        (inj : Function.IsInjective(f))
         : False := {
   m ≤ n;
   n
@@ -335,8 +333,8 @@ theorem HasSize.unique (X : Type(0)) (m n : ℕ)
   choose forward from yardsticksEquinumerous;
   choose backward such that Function.IsInverse(NaturalsBelow(m), NaturalsBelow(n), forward, backward);
   Function.IsInverse(NaturalsBelow(n), NaturalsBelow(m), backward, forward);
-  Function.IsInjective(NaturalsBelow(m), NaturalsBelow(n), forward) by Function.inverse_is_injective;
-  Function.IsInjective(NaturalsBelow(n), NaturalsBelow(m), backward) by Function.inverse_is_injective;
+  Function.IsInjective(forward) by Function.inverse_is_injective;
+  Function.IsInjective(backward) by Function.inverse_is_injective;
   m ≤ n by NaturalsBelow.injective_domain_le_codomain;
   n ≤ m by NaturalsBelow.injective_domain_le_codomain;
   done by Natural.le_antisymmetric

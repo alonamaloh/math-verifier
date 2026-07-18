@@ -24,10 +24,10 @@ import Equality.basics
 import Lists.list
 import Lists.distinct
 
-definition List.filter (A : Type(0)) (P : A → Proposition) : List(A) → List(A)
+definition List.filter {A : Type(0)} (P : A → Proposition) : List(A) → List(A)
   | List.empty => List.empty(A)
   | List.prepend(head, tail) =>
-      if P(head) then List.prepend(A, head, List.filter(A, P, tail)) else List.filter(A, P, tail)
+      if P(head) then List.prepend(A, head, List.filter(P, tail)) else List.filter(P, tail)
 
 -- The characterizing equations: filtering a prepend either keeps the
 -- head (when P holds) or drops it (when P fails). They are instances of
@@ -35,11 +35,11 @@ definition List.filter (A : Type(0)) (P : A → Proposition) : List(A) → List(
 -- every consumer below reasons propositionally through them, never
 -- re-deciding P(head).
 theorem List.filter_prepend_positive (A : Type(0)) (P : A → Proposition) (head : A) (tail : List(A)) (holds : P(head))
-        : List.filter(A, P, List.prepend(A, head, tail)) = List.prepend(A, head, List.filter(A, P, tail)) :=
+        : List.filter(P, List.prepend(A, head, tail)) = List.prepend(A, head, List.filter(P, tail)) :=
   by Logic.if_positive
 
 theorem List.filter_prepend_negative (A : Type(0)) (P : A → Proposition) (head : A) (tail : List(A)) (fails : ¬P(head))
-        : List.filter(A, P, List.prepend(A, head, tail)) = List.filter(A, P, tail) :=
+        : List.filter(P, List.prepend(A, head, tail)) = List.filter(P, tail) :=
   by Logic.if_negative
 
 -- ----------------------------------------------------------------------
@@ -47,7 +47,7 @@ theorem List.filter_prepend_negative (A : Type(0)) (P : A → Proposition) (head
 
 -- A member of the filtered list is a member of the original.
 theorem List.filter_member_subset (A : Type(0)) (P : A → Proposition) (x : A) (list : List(A))
-        : x ∈ List.filter(A, P, list)
+        : x ∈ List.filter(P, list)
           → x ∈ list :=
   by induction on list with IH {
     case List.empty:
@@ -56,10 +56,10 @@ theorem List.filter_member_subset (A : Type(0)) (P : A → Proposition) (x : A) 
         done by cases {
           case P(head): {
               -- The head was kept: the membership is in the prepend form.
-              suppose x ∈ List.filter(A, P, List.prepend(A, head, tail)) as mem;
-              x ∈ List.prepend(A, head, List.filter(A, P, tail))
+              suppose x ∈ List.filter(P, List.prepend(A, head, tail)) as mem;
+              x ∈ List.prepend(A, head, List.filter(P, tail))
                   by substituting List.filter_prepend_positive;
-              x = head ∨ x ∈ List.filter(A, P, tail)
+              x = head ∨ x ∈ List.filter(P, tail)
                   by List.member_prepend_invert;
               done by cases {
                 case x = head: {
@@ -67,14 +67,14 @@ theorem List.filter_member_subset (A : Type(0)) (P : A → Proposition) (x : A) 
                     x ∈ List.prepend(A, head, tail);
                     done
                   }
-                case x ∈ List.filter(A, P, tail) as memberFilteredTail:
+                case x ∈ List.filter(P, tail) as memberFilteredTail:
                     List.member.there(A, x, head, tail, IH(memberFilteredTail))
               }
             }
           otherwise: {
               -- The head was dropped: the membership is already in the tail.
-              suppose x ∈ List.filter(A, P, List.prepend(A, head, tail)) as mem;
-              x ∈ List.filter(A, P, tail)
+              suppose x ∈ List.filter(P, List.prepend(A, head, tail)) as mem;
+              x ∈ List.filter(P, tail)
                   by substituting List.filter_prepend_negative as memberFilteredTail;
               List.member.there(A, x, head, tail, IH(memberFilteredTail))
             }
@@ -83,7 +83,7 @@ theorem List.filter_member_subset (A : Type(0)) (P : A → Proposition) (x : A) 
 
 -- A member of the filtered list satisfies the predicate.
 theorem List.filter_member_property (A : Type(0)) (P : A → Proposition) (x : A) (list : List(A))
-        : x ∈ List.filter(A, P, list)
+        : x ∈ List.filter(P, list)
           → P(x) :=
   by induction on list with IH {
     case List.empty:
@@ -92,10 +92,10 @@ theorem List.filter_member_property (A : Type(0)) (P : A → Proposition) (x : A
     case List.prepend(head, tail):
         done by cases {
           case P(head) as propertyWitness: {
-              suppose x ∈ List.filter(A, P, List.prepend(A, head, tail)) as mem;
-              x ∈ List.prepend(A, head, List.filter(A, P, tail))
+              suppose x ∈ List.filter(P, List.prepend(A, head, tail)) as mem;
+              x ∈ List.prepend(A, head, List.filter(P, tail))
                   by substituting List.filter_prepend_positive;
-              x = head ∨ x ∈ List.filter(A, P, tail)
+              x = head ∨ x ∈ List.filter(P, tail)
                   by List.member_prepend_invert;
               done by cases {
                 case x = head: {
@@ -103,13 +103,13 @@ theorem List.filter_member_property (A : Type(0)) (P : A → Proposition) (x : A
                     P(x);
                     done
                   }
-                case x ∈ List.filter(A, P, tail) as memberFilteredTail:
+                case x ∈ List.filter(P, tail) as memberFilteredTail:
                     IH(memberFilteredTail)
               }
             }
           otherwise: {
-              suppose x ∈ List.filter(A, P, List.prepend(A, head, tail)) as mem;
-              x ∈ List.filter(A, P, tail)
+              suppose x ∈ List.filter(P, List.prepend(A, head, tail)) as mem;
+              x ∈ List.filter(P, tail)
                   by substituting List.filter_prepend_negative as memberFilteredTail;
               IH(memberFilteredTail)
             }
@@ -121,7 +121,7 @@ theorem List.filter_member_property (A : Type(0)) (P : A → Proposition) (x : A
 theorem List.filter_member_complete (A : Type(0)) (P : A → Proposition) (x : A) (list : List(A))
         : x ∈ list
           → P(x)
-          → x ∈ List.filter(A, P, list) :=
+          → x ∈ List.filter(P, list) :=
   by induction on list with IH {
     case List.empty:
         (mem : x ∈ List.empty(A))
@@ -135,18 +135,18 @@ theorem List.filter_member_complete (A : Type(0)) (P : A → Proposition) (x : A
               -- The head is kept: place x in the prepend form.
               x = head ∨ x ∈ tail
                   by List.member_prepend_invert;
-              x ∈ List.prepend(A, head, List.filter(A, P, tail))
+              x ∈ List.prepend(A, head, List.filter(P, tail))
                   by cases {
                     case x = head: {
-                        head ∈ List.prepend(A, head, List.filter(A, P, tail));
-                        x ∈ List.prepend(A, head, List.filter(A, P, tail));
+                        head ∈ List.prepend(A, head, List.filter(P, tail));
+                        x ∈ List.prepend(A, head, List.filter(P, tail));
                         done
                       }
                     case x ∈ tail as memberTail:
-                        List.member.there(A, x, head, List.filter(A, P, tail),
+                        List.member.there(A, x, head, List.filter(P, tail),
                             IH(memberTail, property))
                   };
-              List.filter(A, P, List.prepend(A, head, tail)) = List.prepend(A, head, List.filter(A, P, tail))
+              List.filter(P, List.prepend(A, head, tail)) = List.prepend(A, head, List.filter(P, tail))
                   by List.filter_prepend_positive;
               done
             }
@@ -156,7 +156,7 @@ theorem List.filter_member_complete (A : Type(0)) (P : A → Proposition) (x : A
               -- The head is dropped: x must sit in the filtered tail.
               x = head ∨ x ∈ tail
                   by List.member_prepend_invert;
-              x ∈ List.filter(A, P, tail)
+              x ∈ List.filter(P, tail)
                   by cases {
                     case x = head: {
                         -- x is the dropped head, yet P(x) holds — absurd.
@@ -166,7 +166,7 @@ theorem List.filter_member_complete (A : Type(0)) (P : A → Proposition) (x : A
                     case x ∈ tail as memberTail:
                         IH(memberTail, property)
                   };
-              List.filter(A, P, List.prepend(A, head, tail)) = List.filter(A, P, tail)
+              List.filter(P, List.prepend(A, head, tail)) = List.filter(P, tail)
                   by List.filter_prepend_negative;
               done
             }
@@ -177,7 +177,7 @@ theorem List.filter_member_complete (A : Type(0)) (P : A → Proposition) (x : A
 -- Filtering a distinct list stays distinct (a sublist of a distinct list).
 theorem List.filter_distinct (A : Type(0)) (P : A → Proposition) (list : List(A))
         : List.Distinct(A, list)
-          → List.Distinct(A, List.filter(A, P, list)) :=
+          → List.Distinct(A, List.filter(P, list)) :=
   by induction on list with IH {
     case List.empty:
         (distinct : List.Distinct(A, List.empty(A))) ↦ distinct
@@ -189,16 +189,16 @@ theorem List.filter_distinct (A : Type(0)) (P : A → Proposition) (list : List(
                   by List.Distinct.head_not_member as headNotInTail;
               List.Distinct(A, tail)
                   by List.Distinct.tail_distinct as tailDistinct;
-              ¬(head ∈ List.filter(A, P, tail))
-                  by (innerMember : head ∈ List.filter(A, P, tail)) ↦ {
+              ¬(head ∈ List.filter(P, tail))
+                  by (innerMember : head ∈ List.filter(P, tail)) ↦ {
                       head ∈ tail as headInTail;
                       headNotInTail(headInTail)
                     } as headNotInFilteredTail;
-              List.Distinct(A, List.prepend(A, head, List.filter(A, P, tail)))
-                  by List.Distinct.prepend(A, head, List.filter(A, P, tail),
+              List.Distinct(A, List.prepend(A, head, List.filter(P, tail)))
+                  by List.Distinct.prepend(A, head, List.filter(P, tail),
                         headNotInFilteredTail,
                         IH(tailDistinct));
-              List.filter(A, P, List.prepend(A, head, tail)) = List.prepend(A, head, List.filter(A, P, tail))
+              List.filter(P, List.prepend(A, head, tail)) = List.prepend(A, head, List.filter(P, tail))
                   by List.filter_prepend_positive;
               done
             }
@@ -206,9 +206,9 @@ theorem List.filter_distinct (A : Type(0)) (P : A → Proposition) (list : List(
               suppose List.Distinct(A, List.prepend(A, head, tail)) as distinct;
               List.Distinct(A, tail)
                   by List.Distinct.tail_distinct as tailDistinct;
-              List.Distinct(A, List.filter(A, P, tail))
+              List.Distinct(A, List.filter(P, tail))
                   by IH(tailDistinct);
-              List.filter(A, P, List.prepend(A, head, tail)) = List.filter(A, P, tail)
+              List.filter(P, List.prepend(A, head, tail)) = List.filter(P, tail)
                   by List.filter_prepend_negative;
               done
             }

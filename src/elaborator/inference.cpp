@@ -597,6 +597,22 @@ Elaborator::CallInferenceResult Elaborator::inferLeadingArguments(
         // (metavariable-substituted) Pi domain against the inferred
         // type to fill in any leading values that backward inference
         // didn't resolve. Then descend through the Pi.
+        //
+        // A bare implicit-leading CONSTANT argument (an operation like
+        // `IntegerMod.multiply : {m : ℕ} → …`) under a still-metavariable
+        // domain (`?A → ?A → ?A`) is DEFERRED to a second pass: elaborated
+        // bottom-up now, its type starts with the implicit Pi, whose
+        // domain (ℕ) would unify positionally against `?A` and poison the
+        // inference. A sibling argument (`IntegerMod.one(p)`) usually pins
+        // `?A`, after which the deferred argument elaborates with a
+        // concrete expected type and the bare-operation implicit insertion
+        // (dispatch) resolves it properly.
+        struct DeferredTrailingArgument {
+            size_t index;
+            ExpressionPointer unsubstitutedDomain;
+            std::string placeholderName;
+        };
+        std::vector<DeferredTrailingArgument> deferredTrailingArguments;
         std::vector<ExpressionPointer> elaboratedTrailingArguments;
         for (size_t j = 0; j < trailingArgumentsSurface.size(); ++j) {
             auto* pi = std::get_if<Pi>(&cursor->node);
@@ -608,6 +624,39 @@ Elaborator::CallInferenceResult Elaborator::inferLeadingArguments(
             }
             ExpressionPointer expectedDomain =
                 substituteFreeVariables(pi->domain, assignment);
+            if (containsNamedFreeVariable(expectedDomain,
+                                          metavariableNames)) {
+                auto* bareIdentifier = std::get_if<SurfaceIdentifier>(
+                    &trailingArgumentsSurface[j]->node);
+                bool shadowedByLocal = false;
+                if (bareIdentifier) {
+                    for (const auto& binder : localBinders) {
+                        if (binder.name == bareIdentifier->qualifiedName) {
+                            shadowedByLocal = true;
+                            break;
+                        }
+                    }
+                }
+                if (bareIdentifier && !shadowedByLocal
+                    && bareIdentifier->universeArgs.empty()) {
+                    const Declaration* argumentDeclaration =
+                        environment_.lookup(bareIdentifier->qualifiedName);
+                    if (argumentDeclaration
+                        && universeParameterCount(*argumentDeclaration) == 0
+                        && environment_.implicitArgumentCount(
+                               bareIdentifier->qualifiedName) > 0) {
+                        std::string trailingArgumentFresh =
+                            "_callTrailingArgument_" + std::to_string(j);
+                        deferredTrailingArguments.push_back(
+                            {j, pi->domain, trailingArgumentFresh});
+                        elaboratedTrailingArguments.push_back(nullptr);
+                        cursor = openBinder(pi->codomain,
+                                             trailingArgumentFresh,
+                                             FreeVariableOrigin::Internal);
+                        continue;
+                    }
+                }
+            }
             // If the expected domain still mentions an unresolved leading
             // metavariable, do NOT hand it to the trailing-arg
             // elaboration: a nested call to the same (or a related)
@@ -717,6 +766,38 @@ Elaborator::CallInferenceResult Elaborator::inferLeadingArguments(
             assignment[trailingArgumentFresh] = kernelTrailingArgument;
             cursor = openBinder(pi->codomain, trailingArgumentFresh,
                                  FreeVariableOrigin::Internal);
+        }
+
+        // Second pass: elaborate the deferred bare-operation arguments,
+        // now that the sibling arguments (and backward inference) have had
+        // their chance to pin the leading metavariables. With a concrete
+        // expected domain, the bare-operation implicit insertion in the
+        // dispatch path resolves the argument's own implicits; if the
+        // domain is somehow still metavariable-open, this degrades to the
+        // old bottom-up elaboration.
+        for (const auto& deferred : deferredTrailingArguments) {
+            ExpressionPointer expectedDomain = substituteFreeVariables(
+                deferred.unsubstitutedDomain, assignment);
+            ExpressionPointer expectedForArgument =
+                containsNamedFreeVariable(expectedDomain, metavariableNames)
+                    ? nullptr
+                    : expectedDomain;
+            ExpressionPointer kernelTrailingArgument = elaborateExpression(
+                *trailingArgumentsSurface[deferred.index], localBinders,
+                expectedForArgument);
+            ExpressionPointer inferredArgumentType =
+                closeOverLocalBinders(
+                    inferTypeInLocalContext(
+                        localBinders, kernelTrailingArgument),
+                    localBinders, localBinders.size());
+            std::vector<ExpressionPointer> binderStack;
+            unifyConstructorParameters(expectedDomain,
+                                          inferredArgumentType,
+                                          metavariableNames, assignment,
+                                          0, &binderStack);
+            elaboratedTrailingArguments[deferred.index] =
+                kernelTrailingArgument;
+            assignment[deferred.placeholderName] = kernelTrailingArgument;
         }
 
         // Instance resolution (Stage 3 + local-instance follow-on): see

@@ -1255,6 +1255,16 @@ ExpressionPointer Elaborator::buildCaseLambda(
         // Otherwise it's a thin wrapper around elaborateExpression.
         std::vector<size_t> positionToBinderIndex =
             otherFunctionArgumentPositions;
+        // A surface self-call omits implicit `{…}` outer binders (they
+        // cannot be passed positionally), so the recursive-call rewrite
+        // looks for the scrutinee at the explicit-argument position.
+        int implicitOuterBinderCount = 0;
+        for (const auto& outerBinder : declaration.arguments) {
+            if (outerBinder.isImplicit) {
+                implicitOuterBinderCount +=
+                    static_cast<int>(outerBinder.names.size());
+            }
+        }
         ExpressionPointer bodyKernel = buildBodyForCase(
             *matchedCase,
             /*patternIndex=*/1,
@@ -1262,7 +1272,9 @@ ExpressionPointer Elaborator::buildCaseLambda(
             lambdaBinders,
             bodyStack,
             expectedBodyType,
-            static_cast<int>(outerBinderStack.size()),
+            static_cast<int>(outerBinderStack.size())
+                - implicitOuterBinderCount,
+            implicitOuterBinderCount,
             recursiveArgToHypothesis,
             declaration.name);
 
@@ -1326,7 +1338,8 @@ ExpressionPointer Elaborator::buildBodyForCase(
         std::vector<LocalBinder> currentLambdaBinders,
         std::vector<LocalBinder> bodyStack,
         ExpressionPointer expectedType,
-        int outerBinderCount,
+        int recursiveCallScrutineeIndex,
+        int implicitOuterBinderCount,
         const std::map<std::string, std::string>&
             recursiveArgToHypothesis,
         const std::string& declarationName) {
@@ -1348,7 +1361,8 @@ ExpressionPointer Elaborator::buildBodyForCase(
             // recursive calls by name.
             SurfaceExpressionPointer rewrittenBody = rewriteRecursiveCalls(
                 matchedCase.body, declarationName,
-                recursiveArgToHypothesis, outerBinderCount);
+                recursiveArgToHypothesis, recursiveCallScrutineeIndex,
+                implicitOuterBinderCount);
             ExpressionPointer caseBody = elaborateExpression(
                 *rewrittenBody, bodyStack, expectedType);
             caseBody = coerceToExpectedTypeViaDiff(
@@ -1714,7 +1728,8 @@ ExpressionPointer Elaborator::buildBodyForCase(
             caseLambdaBinders,
             caseBodyStack,
             caseBodyType,
-            outerBinderCount,
+            recursiveCallScrutineeIndex,
+            implicitOuterBinderCount,
             recursiveArgToHypothesis,
             declarationName);
 
@@ -1749,7 +1764,8 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
         const std::string& thisDeclName,
         const std::map<std::string, std::string>&
             recursiveArgToHypothesis,
-        int outerBinderCount) {
+        int recursiveCallScrutineeIndex,
+        int implicitOuterBinderCount) {
 
         // Optional sub-expressions reach this pass as a null pointer — a
         // by-less calc step's `stepProof`, an omitted `let`/lambda/Pi/
@@ -1765,53 +1781,70 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
             // Recurse into function and arguments first.
             auto rewrittenFunction = rewriteRecursiveCalls(
                 application->function, thisDeclName,
-                recursiveArgToHypothesis, outerBinderCount);
+                recursiveArgToHypothesis, recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount);
             std::vector<SurfaceArgument> rewrittenArguments;
             for (const auto& argument : application->arguments) {
                 SurfaceArgument rewritten;
                 rewritten.name = argument.name;
                 rewritten.value = rewriteRecursiveCalls(
                     argument.value, thisDeclName,
-                    recursiveArgToHypothesis, outerBinderCount);
+                    recursiveArgToHypothesis, recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount);
                 rewrittenArguments.push_back(std::move(rewritten));
             }
-            // Check if this is a recursive call we should rewrite.
-            // The scrutinee sits at index `outerBinderCount` (after
-            // the user has typed out the outer binders).
+            // Check if this is a recursive call we should rewrite. A
+            // self-call may spell the implicit `{…}` outer binders
+            // positionally (the pre-existing convention — scrutinee at
+            // the total-binder index) or omit them (the natural
+            // spelling — scrutinee at the explicit-only index). Try the
+            // total index first so the spelled form keeps its meaning.
             auto* functionIdentifier = std::get_if<SurfaceIdentifier>(
                 &application->function->node);
             if (functionIdentifier
                 && functionIdentifier->qualifiedName == thisDeclName
-                && functionIdentifier->universeArgs.empty()
-                && static_cast<int>(rewrittenArguments.size())
-                       > outerBinderCount) {
-                auto* scrutineeArgumentIdentifier =
-                    std::get_if<SurfaceIdentifier>(
-                        &rewrittenArguments[outerBinderCount].value->node);
-                if (scrutineeArgumentIdentifier
-                    && scrutineeArgumentIdentifier->universeArgs.empty()) {
+                && functionIdentifier->universeArgs.empty()) {
+                std::vector<int> scrutineeIndexCandidates = {
+                    recursiveCallScrutineeIndex + implicitOuterBinderCount};
+                if (implicitOuterBinderCount > 0) {
+                    scrutineeIndexCandidates.push_back(
+                        recursiveCallScrutineeIndex);
+                }
+                for (int scrutineeIndex : scrutineeIndexCandidates) {
+                    if (static_cast<int>(rewrittenArguments.size())
+                            <= scrutineeIndex) {
+                        continue;
+                    }
+                    auto* scrutineeArgumentIdentifier =
+                        std::get_if<SurfaceIdentifier>(
+                            &rewrittenArguments[scrutineeIndex].value->node);
+                    if (!scrutineeArgumentIdentifier
+                        || !scrutineeArgumentIdentifier->universeArgs.empty()) {
+                        continue;
+                    }
                     auto iterator = recursiveArgToHypothesis.find(
                         scrutineeArgumentIdentifier->qualifiedName);
-                    if (iterator != recursiveArgToHypothesis.end()) {
-                        // Replace head with the recursion hypothesis,
-                        // dropping the outer-binder arguments and the
-                        // scrutinee (the recursor handles them implicitly).
-                        auto hypothesisIdentifier =
-                            makeSurfaceIdentifier(iterator->second, {},
-                                                   node.line, node.column);
-                        std::vector<SurfaceArgument>
-                            remainingArguments(
-                                rewrittenArguments.begin()
-                                    + outerBinderCount + 1,
-                                rewrittenArguments.end());
-                        if (remainingArguments.empty()) {
-                            return hypothesisIdentifier;
-                        }
-                        return makeSurfaceApplication(
-                            hypothesisIdentifier,
-                            std::move(remainingArguments),
-                            node.line, node.column);
+                    if (iterator == recursiveArgToHypothesis.end()) {
+                        continue;
                     }
+                    // Replace head with the recursion hypothesis,
+                    // dropping the outer-binder arguments and the
+                    // scrutinee (the recursor handles them implicitly).
+                    auto hypothesisIdentifier =
+                        makeSurfaceIdentifier(iterator->second, {},
+                                               node.line, node.column);
+                    std::vector<SurfaceArgument>
+                        remainingArguments(
+                            rewrittenArguments.begin()
+                                + scrutineeIndex + 1,
+                            rewrittenArguments.end());
+                    if (remainingArguments.empty()) {
+                        return hypothesisIdentifier;
+                    }
+                    return makeSurfaceApplication(
+                        hypothesisIdentifier,
+                        std::move(remainingArguments),
+                        node.line, node.column);
                 }
             }
             return makeSurfaceApplication(std::move(rewrittenFunction),
@@ -1823,10 +1856,12 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                 {piType->binder.names,
                  rewriteRecursiveCalls(piType->binder.type, thisDeclName,
                                         recursiveArgToHypothesis,
-                                        outerBinderCount)},
+                                        recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount)},
                 rewriteRecursiveCalls(piType->codomain, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 node.line, node.column);
         }
         if (auto* lambda = std::get_if<SurfaceLambda>(&node.node)) {
@@ -1834,10 +1869,12 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                 {lambda->binder.names,
                  rewriteRecursiveCalls(lambda->binder.type, thisDeclName,
                                         recursiveArgToHypothesis,
-                                        outerBinderCount)},
+                                        recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount)},
                 rewriteRecursiveCalls(lambda->body, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 node.line, node.column);
         }
         if (auto* let = std::get_if<SurfaceLet>(&node.node)) {
@@ -1845,13 +1882,16 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                 let->name,
                 rewriteRecursiveCalls(let->type, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 rewriteRecursiveCalls(let->value, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 rewriteRecursiveCalls(let->body, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 node.line, node.column);
         }
         if (auto* ascription = std::get_if<SurfaceAscription>(&node.node)) {
@@ -1859,10 +1899,12 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                 rewriteRecursiveCalls(ascription->expression,
                                        thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 rewriteRecursiveCalls(ascription->type, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 node.line, node.column);
         }
         if (auto* binary =
@@ -1871,10 +1913,12 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                 binary->opSymbol,
                 rewriteRecursiveCalls(binary->left, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 rewriteRecursiveCalls(binary->right, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 node.line, node.column);
         }
         if (auto* ellipsis = std::get_if<SurfaceEllipsisFold>(&node.node)) {
@@ -1883,13 +1927,15 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                 newPrefix.push_back(
                     rewriteRecursiveCalls(term, thisDeclName,
                                            recursiveArgToHypothesis,
-                                           outerBinderCount));
+                                           recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount));
             }
             return makeSurfaceEllipsisFold(
                 ellipsis->operatorSymbol, std::move(newPrefix),
                 rewriteRecursiveCalls(ellipsis->generalTerm, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 node.line, node.column);
         }
         if (auto* foldBinder = std::get_if<SurfaceFoldBinder>(&node.node)) {
@@ -1897,13 +1943,16 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                 foldBinder->operatorSymbol, foldBinder->binderName,
                 rewriteRecursiveCalls(foldBinder->lowerBound, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 rewriteRecursiveCalls(foldBinder->upperBound, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 rewriteRecursiveCalls(foldBinder->body, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 node.line, node.column);
         }
         if (auto* unary = std::get_if<SurfaceUnaryOperation>(&node.node)) {
@@ -1911,20 +1960,23 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                 unary->opSymbol,
                 rewriteRecursiveCalls(unary->operand, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 node.line, node.column);
         }
         if (auto* cases = std::get_if<SurfaceCases>(&node.node)) {
             auto rewrittenScrutinee = rewriteRecursiveCalls(
                 cases->scrutinee, thisDeclName,
-                recursiveArgToHypothesis, outerBinderCount);
+                recursiveArgToHypothesis, recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount);
             std::vector<SurfaceCasesClause> rewrittenClauses;
             for (const auto& clause : cases->clauses) {
                 SurfaceCasesClause rewrittenClause;
                 rewrittenClause.pattern = clause.pattern;
                 rewrittenClause.body = rewriteRecursiveCalls(
                     clause.body, thisDeclName,
-                    recursiveArgToHypothesis, outerBinderCount);
+                    recursiveArgToHypothesis, recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount);
                 rewrittenClause.line = clause.line;
                 rewrittenClause.column = clause.column;
                 rewrittenClauses.push_back(std::move(rewrittenClause));
@@ -1962,14 +2014,16 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                     ? rewriteRecursiveCalls(claim->proposition,
                                              thisDeclName,
                                              recursiveArgToHypothesis,
-                                             outerBinderCount)
+                                             recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount)
                     : nullptr;
             SurfaceExpressionPointer rewrittenByHint =
                 claim->byHint
                     ? rewriteRecursiveCalls(claim->byHint,
                                              thisDeclName,
                                              recursiveArgToHypothesis,
-                                             outerBinderCount)
+                                             recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount)
                     : nullptr;
             std::vector<SurfaceStructuredClaimArm> rewrittenArms;
             for (const auto& arm : claim->arms) {
@@ -1981,12 +2035,14 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                     ? rewriteRecursiveCalls(arm.disjunctType,
                                              thisDeclName,
                                              recursiveArgToHypothesis,
-                                             outerBinderCount)
+                                             recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount)
                     : nullptr;
                 rewrittenArm.body = arm.body
                     ? rewriteRecursiveCalls(arm.body, thisDeclName,
                                              recursiveArgToHypothesis,
-                                             outerBinderCount)
+                                             recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount)
                     : nullptr;
                 rewrittenArm.witnessBinders.clear();
                 for (const auto& binder : arm.witnessBinders) {
@@ -1994,7 +2050,8 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                     rewrittenBinder.type = binder.type
                         ? rewriteRecursiveCalls(binder.type, thisDeclName,
                                                  recursiveArgToHypothesis,
-                                                 outerBinderCount)
+                                                 recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount)
                         : nullptr;
                     rewrittenArm.witnessBinders.push_back(
                         std::move(rewrittenBinder));
@@ -2015,7 +2072,8 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
         if (auto* calc = std::get_if<SurfaceCalc>(&node.node)) {
             auto rewrittenInitial = rewriteRecursiveCalls(
                 calc->initialExpression, thisDeclName,
-                recursiveArgToHypothesis, outerBinderCount);
+                recursiveArgToHypothesis, recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount);
             std::vector<SurfaceCalcStep> rewrittenSteps;
             for (const auto& step : calc->steps) {
                 // Copy the whole step (relation, relationOperator, line,
@@ -2025,10 +2083,12 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                 SurfaceCalcStep rewrittenStep = step;
                 rewrittenStep.nextExpression = rewriteRecursiveCalls(
                     step.nextExpression, thisDeclName,
-                    recursiveArgToHypothesis, outerBinderCount);
+                    recursiveArgToHypothesis, recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount);
                 rewrittenStep.stepProof = rewriteRecursiveCalls(
                     step.stepProof, thisDeclName,
-                    recursiveArgToHypothesis, outerBinderCount);
+                    recursiveArgToHypothesis, recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount);
                 rewrittenSteps.push_back(std::move(rewrittenStep));
             }
             return makeSurfaceCalc(std::move(rewrittenInitial),
@@ -2044,15 +2104,18 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
             return makeSurfaceDecide(
                 rewriteRecursiveCalls(decide->proposition, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 decide->yesBinderName,
                 rewriteRecursiveCalls(decide->yesBody, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 decide->noBinderName,
                 rewriteRecursiveCalls(decide->noBody, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 node.line, node.column);
         }
         if (auto* tuple = std::get_if<SurfaceAnonymousTuple>(&node.node)) {
@@ -2060,7 +2123,8 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
             for (const auto& component : tuple->components) {
                 rewrittenComponents.push_back(rewriteRecursiveCalls(
                     component, thisDeclName,
-                    recursiveArgToHypothesis, outerBinderCount));
+                    recursiveArgToHypothesis, recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount));
             }
             return makeSurfaceAnonymousTuple(
                 std::move(rewrittenComponents), node.line, node.column,
@@ -2070,7 +2134,8 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
             auto rewriteOrNull = [&](const SurfaceExpressionPointer& sub) {
                 return sub ? rewriteRecursiveCalls(
                                  sub, thisDeclName,
-                                 recursiveArgToHypothesis, outerBinderCount)
+                                 recursiveArgToHypothesis, recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount)
                            : nullptr;
             };
             return makeSurfaceNote(
@@ -2088,22 +2153,26 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                     witnessType ? rewriteRecursiveCalls(
                                       witnessType, thisDeclName,
                                       recursiveArgToHypothesis,
-                                      outerBinderCount)
+                                      recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount)
                                 : nullptr);
             }
             return makeSurfaceChoose(
                 choose->name,
                 rewriteRecursiveCalls(choose->predicate, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 rewriteRecursiveCalls(choose->body, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 node.line, node.column,
                 choose->conditionName,
                 rewriteRecursiveCalls(choose->source, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 choose->additionalNames,
                 std::move(rewrittenWitnessTypes));
         }
@@ -2113,12 +2182,14 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                 rewriteRecursiveCalls(strongInduction->scrutinee,
                                        thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 strongInduction->subjectName,
                 strongInduction->ihName,
                 rewriteRecursiveCalls(strongInduction->body, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 node.line, node.column);
         }
         if (auto* eventuallyScope =
@@ -2127,7 +2198,8 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                 eventuallyScope->binderName,
                 rewriteRecursiveCalls(eventuallyScope->body, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 node.line, node.column);
         }
         if (auto* inductionUsing =
@@ -2136,16 +2208,19 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                 rewriteRecursiveCalls(inductionUsing->scrutinee,
                                        thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 rewriteRecursiveCalls(inductionUsing->inductionLemma,
                                        thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 inductionUsing->subjectName,
                 inductionUsing->ihName,
                 rewriteRecursiveCalls(inductionUsing->body, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 node.line, node.column);
         }
         if (auto* unfold = std::get_if<SurfaceUnfold>(&node.node)) {
@@ -2153,14 +2228,16 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                 unfold->names,
                 rewriteRecursiveCalls(unfold->body, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 node.line, node.column);
         }
         if (auto* given = std::get_if<SurfaceGiven>(&node.node)) {
             return makeSurfaceGiven(
                 rewriteRecursiveCalls(given->proposition, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 node.line, node.column);
         }
         if (auto* field = std::get_if<SurfaceField>(&node.node)) {
@@ -2168,7 +2245,8 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
             for (const auto& hypothesis : field->nonzeroHypotheses) {
                 rewrittenHypotheses.push_back(rewriteRecursiveCalls(
                     hypothesis, thisDeclName,
-                    recursiveArgToHypothesis, outerBinderCount));
+                    recursiveArgToHypothesis, recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount));
             }
             return makeSurfaceField(
                 std::move(rewrittenHypotheses), node.line, node.column);
@@ -2179,7 +2257,8 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                 rewriteRecursiveCalls(linearCombination->combination,
                                        thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 node.line, node.column);
         }
         if (auto* blockTail = std::get_if<SurfaceBlockTail>(&node.node)) {
@@ -2189,7 +2268,8 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
             return makeSurfaceBlockTail(
                 rewriteRecursiveCalls(blockTail->expression, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount),
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
                 node.line, node.column);
         }
         // Atomic forms (identifier, numeric literal, Type, Proposition,

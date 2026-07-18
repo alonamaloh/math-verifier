@@ -1276,7 +1276,8 @@ private:
         std::vector<LocalBinder> currentLambdaBinders,
         std::vector<LocalBinder> bodyStack,
         ExpressionPointer expectedType,
-        int outerBinderCount,
+        int recursiveCallScrutineeIndex,
+        int implicitOuterBinderCount,
         const std::map<std::string, std::string>&
             recursiveArgToHypothesis,
         const std::string& declarationName);
@@ -1285,9 +1286,14 @@ private:
     // `thisDeclName(<outerBinders>..., <destructuredName>, ...rest)`
     // with `<recursionHypothesis>(...rest)`, where the mapping
     // `destructuredName → recursionHypothesis` is determined by the
-    // case currently being translated. `outerBinderCount` is the
-    // number of pre-colon arguments the user must repeat in every
-    // recursive call before the scrutinee. Non-recursive calls (or
+    // case currently being translated. `recursiveCallScrutineeIndex` is
+    // the number of EXPLICIT pre-colon arguments before the scrutinee;
+    // `implicitOuterBinderCount` the number of implicit `{…}` ones. A
+    // self-call may either spell the implicit binders positionally (the
+    // pre-existing convention — scrutinee at the total index) or omit
+    // them (the natural spelling — scrutinee at the explicit-only
+    // index); both are recognized, total-index first. Non-recursive
+    // calls (or
     // recursive calls on something other than a destructured variable
     // at the right position) are left alone — the kernel will reject
     // them as ill-typed if structural recursion was actually required.
@@ -1348,7 +1354,8 @@ private:
         const std::string& thisDeclName,
         const std::map<std::string, std::string>&
             recursiveArgToHypothesis,
-        int outerBinderCount);
+        int recursiveCallScrutineeIndex,
+        int implicitOuterBinderCount);
 
     void elaborateInductive(const SurfaceInductiveDeclaration& declaration);
 

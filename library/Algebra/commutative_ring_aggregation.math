@@ -33,15 +33,15 @@ import Algebra.commutative_ring_algebra
 definition CommutativeRing.sumOver {r : CommutativeRing} {index : Type(0)}
         (term : index → CommutativeRing.carrier(r)) (items : List(index))
         : CommutativeRing.carrier(r) :=
-  List.product(CommutativeRing.carrier(r), CommutativeRing.add, CommutativeRing.zero(r),
-      List.map(index, CommutativeRing.carrier(r), term, items))
+  List.product(CommutativeRing.add, CommutativeRing.zero(r),
+      List.map(term, items))
 
 -- Multiply a ring-valued term over a list: the multiplicative fold.
 definition CommutativeRing.productOver {r : CommutativeRing} {index : Type(0)}
         (term : index → CommutativeRing.carrier(r)) (items : List(index))
         : CommutativeRing.carrier(r) :=
-  List.product(CommutativeRing.carrier(r), CommutativeRing.multiply, CommutativeRing.one(r),
-      List.map(index, CommutativeRing.carrier(r), term, items))
+  List.product(CommutativeRing.multiply, CommutativeRing.one(r),
+      List.map(term, items))
 
 -- The empty and prepend reductions, straight off the folds.
 theorem CommutativeRing.sumOver_empty {r : CommutativeRing} {index : Type(0)}
@@ -64,26 +64,26 @@ theorem CommutativeRing.productOver_prepend {r : CommutativeRing} {index : Type(
 -- Sums and products split over concatenation.
 theorem CommutativeRing.sumOver_append {r : CommutativeRing} {index : Type(0)}
         (term : index → CommutativeRing.carrier(r)) (first second : List(index))
-        : CommutativeRing.sumOver(term, List.append(index, first, second))
+        : CommutativeRing.sumOver(term, List.append(first, second))
           = CommutativeRing.sumOver(term, first) + CommutativeRing.sumOver(term, second) :=
-  CommutativeRing.sumOver(term, List.append(index, first, second))
-     = List.product(CommutativeRing.carrier(r), CommutativeRing.add, CommutativeRing.zero(r),
-           List.append(CommutativeRing.carrier(r),
-               List.map(index, CommutativeRing.carrier(r), term, first),
-               List.map(index, CommutativeRing.carrier(r), term, second)))
+  CommutativeRing.sumOver(term, List.append(first, second))
+     = List.product(CommutativeRing.add, CommutativeRing.zero(r),
+           List.append(
+               List.map(term, first),
+               List.map(term, second)))
            by substituting List.map_append
      = CommutativeRing.sumOver(term, first) + CommutativeRing.sumOver(term, second)
            by List.product_append
 
 theorem CommutativeRing.productOver_append {r : CommutativeRing} {index : Type(0)}
         (term : index → CommutativeRing.carrier(r)) (first second : List(index))
-        : CommutativeRing.productOver(term, List.append(index, first, second))
+        : CommutativeRing.productOver(term, List.append(first, second))
           = CommutativeRing.productOver(term, first) * CommutativeRing.productOver(term, second) :=
-  CommutativeRing.productOver(term, List.append(index, first, second))
-     = List.product(CommutativeRing.carrier(r), CommutativeRing.multiply, CommutativeRing.one(r),
-           List.append(CommutativeRing.carrier(r),
-               List.map(index, CommutativeRing.carrier(r), term, first),
-               List.map(index, CommutativeRing.carrier(r), term, second)))
+  CommutativeRing.productOver(term, List.append(first, second))
+     = List.product(CommutativeRing.multiply, CommutativeRing.one(r),
+           List.append(
+               List.map(term, first),
+               List.map(term, second)))
            by substituting List.map_append
      = CommutativeRing.productOver(term, first) * CommutativeRing.productOver(term, second)
            by List.product_append
@@ -92,26 +92,26 @@ theorem CommutativeRing.productOver_append {r : CommutativeRing} {index : Type(0
 theorem CommutativeRing.sumOver_map {r : CommutativeRing} {source target : Type(0)}
         (term : target → CommutativeRing.carrier(r)) (reindex : source → target)
         (items : List(source))
-        : CommutativeRing.sumOver(term, List.map(source, target, reindex, items))
+        : CommutativeRing.sumOver(term, List.map(reindex, items))
           = CommutativeRing.sumOver((x : source) ↦ term(reindex(x)), items) :=
-  CommutativeRing.sumOver(term, List.map(source, target, reindex, items))
-     = List.product(CommutativeRing.carrier(r), CommutativeRing.add, CommutativeRing.zero(r),
-           List.map(target, CommutativeRing.carrier(r), term, List.map(source, target, reindex, items)))
-     = List.product(CommutativeRing.carrier(r), CommutativeRing.add, CommutativeRing.zero(r),
-           List.map(source, CommutativeRing.carrier(r), (x : source) ↦ term(reindex(x)), items))
+  CommutativeRing.sumOver(term, List.map(reindex, items))
+     = List.product(CommutativeRing.add, CommutativeRing.zero(r),
+           List.map(term, List.map(reindex, items)))
+     = List.product(CommutativeRing.add, CommutativeRing.zero(r),
+           List.map((x : source) ↦ term(reindex(x)), items))
            by substituting List.map_map
      = CommutativeRing.sumOver((x : source) ↦ term(reindex(x)), items)
 
 theorem CommutativeRing.productOver_map {r : CommutativeRing} {source target : Type(0)}
         (term : target → CommutativeRing.carrier(r)) (reindex : source → target)
         (items : List(source))
-        : CommutativeRing.productOver(term, List.map(source, target, reindex, items))
+        : CommutativeRing.productOver(term, List.map(reindex, items))
           = CommutativeRing.productOver((x : source) ↦ term(reindex(x)), items) :=
-  CommutativeRing.productOver(term, List.map(source, target, reindex, items))
-     = List.product(CommutativeRing.carrier(r), CommutativeRing.multiply, CommutativeRing.one(r),
-           List.map(target, CommutativeRing.carrier(r), term, List.map(source, target, reindex, items)))
-     = List.product(CommutativeRing.carrier(r), CommutativeRing.multiply, CommutativeRing.one(r),
-           List.map(source, CommutativeRing.carrier(r), (x : source) ↦ term(reindex(x)), items))
+  CommutativeRing.productOver(term, List.map(reindex, items))
+     = List.product(CommutativeRing.multiply, CommutativeRing.one(r),
+           List.map(term, List.map(reindex, items)))
+     = List.product(CommutativeRing.multiply, CommutativeRing.one(r),
+           List.map((x : source) ↦ term(reindex(x)), items))
            by substituting List.map_map
      = CommutativeRing.productOver((x : source) ↦ term(reindex(x)), items)
 
@@ -357,15 +357,15 @@ theorem CommutativeRing.productOver_permutation {r : CommutativeRing} {index : T
         (perm : List.Permutation(index, items1, items2))
         : CommutativeRing.productOver(term, items1) = CommutativeRing.productOver(term, items2) :=
   CommutativeRing.productOver(term, items1)
-     = List.product(CommutativeRing.carrier(r), CommutativeRing.multiply, CommutativeRing.one(r),
-           List.map(index, CommutativeRing.carrier(r), term, items1))
-     = List.product(CommutativeRing.carrier(r), CommutativeRing.multiply, CommutativeRing.one(r),
-           List.map(index, CommutativeRing.carrier(r), term, items2))
+     = List.product(CommutativeRing.multiply, CommutativeRing.one(r),
+           List.map(term, items1))
+     = List.product(CommutativeRing.multiply, CommutativeRing.one(r),
+           List.map(term, items2))
            by List.Permutation.product_invariant(CommutativeRing.carrier(r), CommutativeRing.multiply, CommutativeRing.one(r),
                   (x y z : CommutativeRing.carrier(r)) ↦ CommutativeRing.multiply_associative(r, x, y, z),
                   (x y : CommutativeRing.carrier(r)) ↦ CommutativeRing.multiply_commutative(r, x, y),
-                  List.map(index, CommutativeRing.carrier(r), term, items1),
-                  List.map(index, CommutativeRing.carrier(r), term, items2),
+                  List.map(term, items1),
+                  List.map(term, items2),
                   List.Permutation.map(index, CommutativeRing.carrier(r), term, items1, items2, perm))
      = CommutativeRing.productOver(term, items2)
 
@@ -652,14 +652,14 @@ theorem CommutativeRing.sumOver_permutation {r : CommutativeRing} {index : Type(
         (perm : List.Permutation(index, items1, items2))
         : CommutativeRing.sumOver(term, items1) = CommutativeRing.sumOver(term, items2) :=
   CommutativeRing.sumOver(term, items1)
-     = List.product(CommutativeRing.carrier(r), CommutativeRing.add, CommutativeRing.zero(r),
-           List.map(index, CommutativeRing.carrier(r), term, items1))
-     = List.product(CommutativeRing.carrier(r), CommutativeRing.add, CommutativeRing.zero(r),
-           List.map(index, CommutativeRing.carrier(r), term, items2))
+     = List.product(CommutativeRing.add, CommutativeRing.zero(r),
+           List.map(term, items1))
+     = List.product(CommutativeRing.add, CommutativeRing.zero(r),
+           List.map(term, items2))
            by List.Permutation.product_invariant(CommutativeRing.carrier(r), CommutativeRing.add, CommutativeRing.zero(r),
                   (x y z : CommutativeRing.carrier(r)) ↦ CommutativeRing.add_associative(r, x, y, z),
                   (x y : CommutativeRing.carrier(r)) ↦ CommutativeRing.add_commutative(r, x, y),
-                  List.map(index, CommutativeRing.carrier(r), term, items1),
-                  List.map(index, CommutativeRing.carrier(r), term, items2),
+                  List.map(term, items1),
+                  List.map(term, items2),
                   List.Permutation.map(index, CommutativeRing.carrier(r), term, items1, items2, perm))
      = CommutativeRing.sumOver(term, items2)

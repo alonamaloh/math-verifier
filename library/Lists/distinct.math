@@ -145,16 +145,16 @@ theorem List.Permutation.distinct_invariant (A : Type(0)) (l1 l2 : List(A))
 -- Lists.permutation, which cannot import Lists.map — length imports permutation.)
 theorem List.Permutation.map (A B : Type(0)) (f : A → B) (l1 l2 : List(A))
         (perm : List.Permutation(A, l1, l2))
-        : List.Permutation(B, List.map(A, B, f, l1), List.map(A, B, f, l2)) :=
+        : List.Permutation(B, List.map(f, l1), List.map(f, l2)) :=
   by induction on perm {
     case List.Permutation.empty: List.Permutation.empty(B)
     case List.Permutation.skip(x, a, b, subPerm, mappedTail):
-        List.Permutation.skip(B, f(x), List.map(A, B, f, a), List.map(A, B, f, b), mappedTail)
+        List.Permutation.skip(B, f(x), List.map(f, a), List.map(f, b), mappedTail)
     case List.Permutation.swap(x, y, l):
-        List.Permutation.swap(B, f(x), f(y), List.map(A, B, f, l))
+        List.Permutation.swap(B, f(x), f(y), List.map(f, l))
     case List.Permutation.transitive(a, b, c, firstLeg, secondLeg, mappedFirst, mappedSecond):
-        List.Permutation.transitive(B, List.map(A, B, f, a), List.map(A, B, f, b),
-            List.map(A, B, f, c), mappedFirst, mappedSecond)
+        List.Permutation.transitive(B, List.map(f, a), List.map(f, b),
+            List.map(f, c), mappedFirst, mappedSecond)
   }
 
 -- range_down(n) has no duplicates.
@@ -185,7 +185,7 @@ theorem List.map_distinct_on (A B : Type(0)) (f : A → B) (list : List(A))
         : (∀ (x y : A). x ∈ list → y ∈ list
                  → f(x) = f(y) → x = y)
           → List.Distinct(A, list)
-          → List.Distinct(B, List.map(A, B, f, list)) :=
+          → List.Distinct(B, List.map(f, list)) :=
   by induction on list with IH {
     case List.empty:
       (injectiveOnList
@@ -221,9 +221,9 @@ theorem List.map_distinct_on (A B : Type(0)) (f : A → B) (list : List(A))
                      imagesEqual);
         ¬(head ∈ tail);
         List.Distinct(A, tail) as tailDistinct;
-        ¬(f(head) ∈ List.map(A, B, f, tail))
+        ¬(f(head) ∈ List.map(f, tail))
             by List.not_member_map_of_not_member_on as imageHeadNotInImageTail;
-        List.Distinct.prepend(B, f(head), List.map(A, B, f, tail),
+        List.Distinct.prepend(B, f(head), List.map(f, tail),
             imageHeadNotInImageTail,
             IH(injectiveOnTail, tailDistinct))
       }
@@ -233,11 +233,11 @@ theorem List.map_distinct_on (A B : Type(0)) (f : A → B) (list : List(A))
 theorem List.map_distinct (A B : Type(0)) (f : A → B)
         (injective : ∀ (x y : A). f(x) = f(y) → x = y)
         (list : List(A)) (distinctProof : List.Distinct(A, list))
-        : List.Distinct(B, List.map(A, B, f, list)) :=
+        : List.Distinct(B, List.map(f, list)) :=
   by induction on distinctProof with IH {
     case List.Distinct.empty: List.Distinct.empty(B)
     case List.Distinct.prepend(head, tail, headNotInTail, tailDistinct):
-        List.Distinct.prepend(B, f(head), List.map(A, B, f, tail),
+        List.Distinct.prepend(B, f(head), List.map(f, tail),
             List.not_member_map_of_not_member(A, B, f, injective, head, tail, headNotInTail),
             IH)
   }
@@ -249,7 +249,7 @@ theorem List.map_distinct (A B : Type(0)) (f : A → B)
 theorem List.distinct_append (A : Type(0)) (second : List(A)) (first : List(A))
         : List.Distinct(A, first) → List.Distinct(A, second)
           → (∀ (x : A). x ∈ first → ¬(x ∈ second))
-          → List.Distinct(A, List.append(A, first, second)) :=
+          → List.Distinct(A, List.append(first, second)) :=
   by induction on first with IH {
     case List.empty:
         (distinctFirst : List.Distinct(A, List.empty(A)))
@@ -264,8 +264,8 @@ theorem List.distinct_append (A : Type(0)) (second : List(A)) (first : List(A))
             → ¬(x ∈ second)) ↦ {
           ¬(head ∈ tail) by List.Distinct.head_not_member as headNotInTail;
           List.Distinct(A, tail) by List.Distinct.tail_distinct as tailDistinct;
-          ¬(head ∈ List.append(A, tail, second))
-              by (headInAppend : head ∈ List.append(A, tail, second)) ↦ {
+          ¬(head ∈ List.append(tail, second))
+              by (headInAppend : head ∈ List.append(tail, second)) ↦ {
                   head ∈ tail ∨ head ∈ second
                       by List.member_append_invert(A, head, second, tail, headInAppend);
                   done by cases {
@@ -277,9 +277,9 @@ theorem List.distinct_append (A : Type(0)) (second : List(A)) (first : List(A))
           (∀ (x : A). x ∈ tail → ¬(x ∈ second))
               by (x : A) (xInTail : x ∈ tail) ↦
                   disjoint(x, List.member.there(A, x, head, tail, xInTail)) as tailDisjoint;
-          List.Distinct(A, List.append(A, tail, second))
+          List.Distinct(A, List.append(tail, second))
               by IH(tailDistinct, distinctSecond, tailDisjoint) as appendTailDistinct;
-          List.Distinct.prepend(A, head, List.append(A, tail, second),
+          List.Distinct.prepend(A, head, List.append(tail, second),
               headNotInAppend, appendTailDistinct)
         }
   }
@@ -313,7 +313,7 @@ theorem List.range_up_distinct (n : ℕ)
                 }
               } as disjoint;
         List.Distinct(ℕ,
-                List.append(ℕ, List.range_up(predecessor),
+                List.append(List.range_up(predecessor),
                     List.prepend(ℕ, predecessor, List.empty(ℕ))))
             by List.distinct_append(ℕ,
                    List.prepend(ℕ, predecessor, List.empty(ℕ)),

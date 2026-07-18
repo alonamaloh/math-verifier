@@ -146,7 +146,7 @@ definition Function.emptyBelow {C : Type(0)} : NaturalsBelow(0) → C :=
 -- The row for f: extend it by each choice in turn.
 definition Function.functionRow {C : Type(0)} {k : ℕ}
         (choices : List(C)) (f : NaturalsBelow(k) → C) : List(NaturalsBelow(1 + k) → C) :=
-  List.map(C, NaturalsBelow(1 + k) → C, (v : C) ↦ Function.extendByValue(f, v), choices)
+  List.map((v : C) ↦ Function.extendByValue(f, v), choices)
 
 -- Concatenate the rows over a list of functions. Recursion on the LIST
 -- (k fixed), so no index transport arises here. The codomain `C` is explicit,
@@ -155,7 +155,7 @@ definition Function.concatFunctionRows (C : Type(0)) (k : ℕ) (choices : List(C
         : List(NaturalsBelow(k) → C) → List(NaturalsBelow(1 + k) → C)
   | List.empty => List.empty(NaturalsBelow(1 + k) → C)
   | List.prepend(f, rest) =>
-      List.append(NaturalsBelow(1 + k) → C, Function.functionRow(choices, f),
+      List.append(Function.functionRow(choices, f),
           Function.concatFunctionRows(C, k, choices, rest))
 
 -- All functions `NaturalsBelow(k) → C` whose every value is a choice. The
@@ -200,13 +200,13 @@ theorem Function.concatFunctionRows_member (C : Type(0)) (k : ℕ) (choices : Li
         : g ∈ Function.concatFunctionRows(C, k, choices, l) :=
   by induction on memF with IH {
     case List.member.here(rest): {
-        g ∈ List.append(NaturalsBelow(1 + k) → C, Function.functionRow(choices, f),
+        g ∈ List.append(Function.functionRow(choices, f),
                 Function.concatFunctionRows(C, k, choices, rest))
             by List.member_append_left;
         done
       }
     case List.member.there(head, rest, sub): {
-        g ∈ List.append(NaturalsBelow(1 + k) → C, Function.functionRow(choices, head),
+        g ∈ List.append(Function.functionRow(choices, head),
                 Function.concatFunctionRows(C, k, choices, rest))
             by List.member_append_right;
         done
@@ -289,13 +289,13 @@ theorem CommutativeRing.sumOver_concatFunctionRows {r : CommutativeRing} (C : Ty
         CommutativeRing.sumOver(fterm,
               Function.concatFunctionRows(C, m, choices, List.prepend(NaturalsBelow(m) → C, psi0, rest)))
            = CommutativeRing.sumOver(fterm,
-                 List.append(NaturalsBelow(1 + m) → C, Function.functionRow(choices, psi0),
+                 List.append(Function.functionRow(choices, psi0),
                      Function.concatFunctionRows(C, m, choices, rest)))
            = CommutativeRing.sumOver(fterm, Function.functionRow(choices, psi0))
                  + CommutativeRing.sumOver(fterm, Function.concatFunctionRows(C, m, choices, rest))
                  by CommutativeRing.sumOver_append
            = CommutativeRing.sumOver(fterm,
-                 List.map(C, NaturalsBelow(1 + m) → C, (v : C) ↦ Function.extendByValue(psi0, v), choices))
+                 List.map((v : C) ↦ Function.extendByValue(psi0, v), choices))
                  + CommutativeRing.sumOver(fterm, Function.concatFunctionRows(C, m, choices, rest))
            = CommutativeRing.sumOver((c : C) ↦ fterm(Function.extendByValue(psi0, c)), choices)
                  + CommutativeRing.sumOver(fterm, Function.concatFunctionRows(C, m, choices, rest))
@@ -333,17 +333,17 @@ theorem CommutativeRing.productOver_extendByValue_split {r : CommutativeRing} (C
         NaturalsBelow.enumerate(1 + m))
      = CommutativeRing.productOver((i : NaturalsBelow(1 + m)) ↦ h(i, Function.extendByValue(psi, c)(i)),
            List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
-               List.map(NaturalsBelow(m), NaturalsBelow(1 + m), NaturalsBelow.inclusion(m),
+               List.map(NaturalsBelow.inclusion(m),
                    NaturalsBelow.enumerate(m))))
            by substituting NaturalsBelow.enumerate_one_plus
      = h(NaturalsBelow.top(m), Function.extendByValue(psi, c)(NaturalsBelow.top(m)))
            * CommutativeRing.productOver((i : NaturalsBelow(1 + m)) ↦ h(i, Function.extendByValue(psi, c)(i)),
-                 List.map(NaturalsBelow(m), NaturalsBelow(1 + m), NaturalsBelow.inclusion(m),
+                 List.map(NaturalsBelow.inclusion(m),
                      NaturalsBelow.enumerate(m)))
            by CommutativeRing.productOver_prepend
      = h(NaturalsBelow.top(m), c)
            * CommutativeRing.productOver((i : NaturalsBelow(1 + m)) ↦ h(i, Function.extendByValue(psi, c)(i)),
-                 List.map(NaturalsBelow(m), NaturalsBelow(1 + m), NaturalsBelow.inclusion(m),
+                 List.map(NaturalsBelow.inclusion(m),
                      NaturalsBelow.enumerate(m)))
            by substituting Function.apply_extendByValue_top
      = h(NaturalsBelow.top(m), c)
@@ -447,12 +447,12 @@ theorem CommutativeRing.productOfSums_distributes {r : CommutativeRing} (C : Typ
               NaturalsBelow.enumerate(1 + m))
            = CommutativeRing.productOver((i : NaturalsBelow(1 + m)) ↦ CommutativeRing.sumOver((c : C) ↦ h(i, c), choices),
                  List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
-                     List.map(NaturalsBelow(m), NaturalsBelow(1 + m), NaturalsBelow.inclusion(m),
+                     List.map(NaturalsBelow.inclusion(m),
                          NaturalsBelow.enumerate(m))))
                  by substituting NaturalsBelow.enumerate_one_plus
            = CommutativeRing.sumOver((c : C) ↦ h(NaturalsBelow.top(m), c), choices)
                  * CommutativeRing.productOver((i : NaturalsBelow(1 + m)) ↦ CommutativeRing.sumOver((c : C) ↦ h(i, c), choices),
-                       List.map(NaturalsBelow(m), NaturalsBelow(1 + m), NaturalsBelow.inclusion(m),
+                       List.map(NaturalsBelow.inclusion(m),
                            NaturalsBelow.enumerate(m)))
                  by CommutativeRing.productOver_prepend
            = CommutativeRing.sumOver((c : C) ↦ h(NaturalsBelow.top(m), c), choices)

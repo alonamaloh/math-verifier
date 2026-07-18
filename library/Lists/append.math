@@ -14,10 +14,10 @@ import Lists.list
 import Lists.map
 
 -- Concatenation: the elements of `first` followed by those of `second`.
-definition List.append (A : Type(0)) : List(A) → List(A) → List(A)
+definition List.append {A : Type(0)} : List(A) → List(A) → List(A)
   | List.empty               => (second : List(A)) ↦ second
   | List.prepend(head, tail) => (second : List(A)) ↦
-      List.prepend(A, head, List.append(A, tail, second))
+      List.prepend(A, head, List.append(tail, second))
 
 -- The product of a concatenation is the product of the products.
 theorem List.product_append (A : Type(0)) (multiply : A → A → A) (one : A)
@@ -25,53 +25,53 @@ theorem List.product_append (A : Type(0)) (multiply : A → A → A) (one : A)
             : ∀ (a b c : A). multiply(multiply(a, b), c) = multiply(a, multiply(b, c)))
         (identityLeft : ∀ (a : A). multiply(one, a) = a)
         (first second : List(A))
-        : List.product(A, multiply, one, List.append(A, first, second))
-          = multiply(List.product(A, multiply, one, first),
-                     List.product(A, multiply, one, second)) :=
+        : List.product(multiply, one, List.append(first, second))
+          = multiply(List.product(multiply, one, first),
+                     List.product(multiply, one, second)) :=
   by induction on first with IH {
     case List.empty:
         -- append(empty, second) is second, whose product gains a harmless
         -- leading `one` — the product of the empty prefix.
-        List.product(A, multiply, one, List.append(A, List.empty(A), second))
-           = List.product(A, multiply, one, second)
-           = multiply(one, List.product(A, multiply, one, second))
-                 by identityLeft(List.product(A, multiply, one, second))
+        List.product(multiply, one, List.append(List.empty(A), second))
+           = List.product(multiply, one, second)
+           = multiply(one, List.product(multiply, one, second))
+                 by identityLeft(List.product(multiply, one, second))
     case List.prepend(head, tail):
         -- Peel the head, apply the induction hypothesis to the tail, and
         -- reassociate the head back into the first factor.
-        List.product(A, multiply, one,
-                 List.append(A, List.prepend(A, head, tail), second))
+        List.product(multiply, one,
+                 List.append(List.prepend(A, head, tail), second))
            = multiply(head,
-                 List.product(A, multiply, one, List.append(A, tail, second)))
+                 List.product(multiply, one, List.append(tail, second)))
            = multiply(head,
-                 multiply(List.product(A, multiply, one, tail),
-                          List.product(A, multiply, one, second)))
+                 multiply(List.product(multiply, one, tail),
+                          List.product(multiply, one, second)))
                  by substituting IH
-           = multiply(multiply(head, List.product(A, multiply, one, tail)),
-                      List.product(A, multiply, one, second))
-                 by associativity(head, List.product(A, multiply, one, tail),
-                        List.product(A, multiply, one, second))
+           = multiply(multiply(head, List.product(multiply, one, tail)),
+                      List.product(multiply, one, second))
+                 by associativity(head, List.product(multiply, one, tail),
+                        List.product(multiply, one, second))
   }
 
 -- `map` distributes over concatenation.
 theorem List.map_append (A B : Type(0)) (f : A → B) (first second : List(A))
-        : List.map(A, B, f, List.append(A, first, second))
-          = List.append(B, List.map(A, B, f, first), List.map(A, B, f, second)) :=
+        : List.map(f, List.append(first, second))
+          = List.append(List.map(f, first), List.map(f, second)) :=
   by induction on first with IH {
     case List.empty:
         -- Both sides reduce to map(f, second).
-        List.map(A, B, f, List.append(A, List.empty(A), second))
-           = List.append(B, List.map(A, B, f, List.empty(A)),
-                 List.map(A, B, f, second))
+        List.map(f, List.append(List.empty(A), second))
+           = List.append(List.map(f, List.empty(A)),
+                 List.map(f, second))
     case List.prepend(head, tail):
-        List.map(A, B, f, List.append(A, List.prepend(A, head, tail), second))
+        List.map(f, List.append(List.prepend(A, head, tail), second))
            = List.prepend(B, f(head),
-                 List.map(A, B, f, List.append(A, tail, second)))
+                 List.map(f, List.append(tail, second)))
            = List.prepend(B, f(head),
-                 List.append(B, List.map(A, B, f, tail), List.map(A, B, f, second)))
+                 List.append(List.map(f, tail), List.map(f, second)))
                  by substituting IH
-           = List.append(B, List.map(A, B, f, List.prepend(A, head, tail)),
-                 List.map(A, B, f, second))
+           = List.append(List.map(f, List.prepend(A, head, tail)),
+                 List.map(f, second))
   }
 
 -- ----------------------------------------------------------------------
@@ -81,47 +81,47 @@ theorem List.map_append (A B : Type(0)) (f : A → B) (first second : List(A))
 
 theorem List.member_append_left (A : Type(0)) (element : A) (first second : List(A))
         (inFirst : element ∈ first)
-        : element ∈ List.append(A, first, second) :=
+        : element ∈ List.append(first, second) :=
   by induction on inFirst {
     case List.member.here(rest):
-        List.member.here(A, element, List.append(A, rest, second))
+        List.member.here(A, element, List.append(rest, second))
     case List.member.there(head, tail, _, inAppendTail):
-        List.member.there(A, element, head, List.append(A, tail, second), inAppendTail)
+        List.member.there(A, element, head, List.append(tail, second), inAppendTail)
   }
 
 theorem List.member_append_right (A : Type(0)) (element : A) (first second : List(A))
         (inSecond : element ∈ second)
-        : element ∈ List.append(A, first, second) :=
+        : element ∈ List.append(first, second) :=
   by induction on first with IH {
     case List.empty: inSecond
     case List.prepend(head, tail):
-        List.member.there(A, element, head, List.append(A, tail, second), IH)
+        List.member.there(A, element, head, List.append(tail, second), IH)
   }
 
 -- Inversion: a member of a concatenation belongs to one of the two halves.
 -- Induct on `first` (its `prepend` head is the only new candidate at each step);
 -- the membership premise stays in the conclusion so it varies with `first`.
 theorem List.member_append_invert (A : Type(0)) (element : A) (second : List(A)) (first : List(A))
-        : element ∈ List.append(A, first, second)
+        : element ∈ List.append(first, second)
           → element ∈ first ∨ element ∈ second :=
   by induction on first with IH {
     case List.empty:
-        (inAppend : element ∈ List.append(A, List.empty(A), second)) ↦ {
+        (inAppend : element ∈ List.append(List.empty(A), second)) ↦ {
           -- append(empty, second) is second, so the member is on the right.
           element ∈ second by inAppend;
           done
         }
     case List.prepend(head, tail):
         (inAppend
-            : element ∈ List.append(A, List.prepend(A, head, tail), second)) ↦ {
-          element = head ∨ element ∈ List.append(A, tail, second)
+            : element ∈ List.append(List.prepend(A, head, tail), second)) ↦ {
+          element = head ∨ element ∈ List.append(tail, second)
               by List.member_prepend_invert;
           done by cases {
             case element = head as isHead: {
                 element ∈ List.prepend(A, head, tail) by List.member.here;
                 done
               }
-            case element ∈ List.append(A, tail, second) as inTailAppend: {
+            case element ∈ List.append(tail, second) as inTailAppend: {
                 element ∈ tail ∨ element ∈ second
                     by IH(inTailAppend);
                 done by cases {

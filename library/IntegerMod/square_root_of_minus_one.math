@@ -89,9 +89,8 @@ theorem IntegerMod.negate_one_power_even (p t : ℕ)
 -- [base+count], …, [base+1] of the Wilson product.
 definition IntegerMod.offset_residues_product (p base count : ℕ)
         : IntegerMod(p) :=
-  List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
-      List.map(ℕ, IntegerMod(p), IntegerMod.residue(p),
-          List.range_down_offset(base, count)))
+  List.product(IntegerMod.multiply, IntegerMod.one(p),
+      List.map(IntegerMod.residue(p), List.range_down_offset(base, count)))
 
 -- The recursion in `1 + n` form: the top residue times the rest.
 theorem IntegerMod.offset_residues_product_one_plus (p base count : ℕ)
@@ -99,10 +98,9 @@ theorem IntegerMod.offset_residues_product_one_plus (p base count : ℕ)
           = IntegerMod.residue(p, base + (1 + count))
                 * IntegerMod.offset_residues_product(p, base, count) :=
   IntegerMod.offset_residues_product(p, base, 1 + count)
-     = List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
-           List.map(ℕ, IntegerMod(p), IntegerMod.residue(p),
-               List.prepend(ℕ, base + (1 + count),
-                   List.range_down_offset(base, count))))
+     = List.product(IntegerMod.multiply, IntegerMod.one(p),
+           List.map(IntegerMod.residue(p),
+               List.prepend(ℕ, base + (1 + count), List.range_down_offset(base, count))))
            by substituting List.range_down_offset_one_plus
      = IntegerMod.residue(p, base + (1 + count))
            * IntegerMod.offset_residues_product(p, base, count)
@@ -207,27 +205,23 @@ theorem IntegerMod.residues_product_split (p h : ℕ)
           = IntegerMod.offset_residues_product(p, h, h)
                 * IntegerMod.residues_product(p, h) := {
   List.range_down(h + h)
-        = List.append(ℕ, List.range_down_offset(h, h), List.range_down(h))
+        = List.append(List.range_down_offset(h, h), List.range_down(h))
       by List.range_down_split as rangeSplit;
   ∀ (a b c : IntegerMod(p)). (a * b) * c = a * (b * c)
       by IntegerMod.multiply_associative as multiplyAssociative;
   ∀ (a : IntegerMod(p)). IntegerMod.one(p) * a = a
       by IntegerMod.multiply_identity_left as multiplyIdentityLeft;
   IntegerMod.residues_product(p, h + h)
-     = List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
-           List.map(ℕ, IntegerMod(p), IntegerMod.residue(p),
-               List.range_down(h + h)))
-     = List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
-           List.map(ℕ, IntegerMod(p), IntegerMod.residue(p),
-               List.append(ℕ, List.range_down_offset(h, h),
-                   List.range_down(h))))
+     = List.product(IntegerMod.multiply, IntegerMod.one(p),
+           List.map(IntegerMod.residue(p), List.range_down(h + h)))
+     = List.product(IntegerMod.multiply, IntegerMod.one(p),
+           List.map(IntegerMod.residue(p),
+               List.append(List.range_down_offset(h, h), List.range_down(h))))
            by substituting rangeSplit
-     = List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
-           List.append(IntegerMod(p),
-               List.map(ℕ, IntegerMod(p), IntegerMod.residue(p),
-                   List.range_down_offset(h, h)),
-               List.map(ℕ, IntegerMod(p), IntegerMod.residue(p),
-                   List.range_down(h))))
+     = List.product(IntegerMod.multiply, IntegerMod.one(p),
+           List.append(
+               List.map(IntegerMod.residue(p), List.range_down_offset(h, h)),
+               List.map(IntegerMod.residue(p), List.range_down(h))))
      = IntegerMod.offset_residues_product(p, h, h)
            * IntegerMod.residues_product(p, h)
            by List.product_append(

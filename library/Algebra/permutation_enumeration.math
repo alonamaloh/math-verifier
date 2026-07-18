@@ -43,18 +43,15 @@ definition NaturalsBelow.enumerate : (n : ℕ) → List(NaturalsBelow(n))
   | 0 => List.empty(NaturalsBelow(0))
   | 1 + m => unfold Natural.add in
       List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
-          List.map(NaturalsBelow(m), NaturalsBelow(1 + m), NaturalsBelow.inclusion(m),
-              NaturalsBelow.enumerate(m)))
+          List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))
 
 theorem NaturalsBelow.enumerate_one_plus (m : ℕ)
         : NaturalsBelow.enumerate(1 + m)
           = List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
-                List.map(NaturalsBelow(m), NaturalsBelow(1 + m), NaturalsBelow.inclusion(m),
-                    NaturalsBelow.enumerate(m))) :=
+                List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m))) :=
   unfold Natural.add in
   reflexivity(List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
-      List.map(NaturalsBelow(m), NaturalsBelow(1 + m), NaturalsBelow.inclusion(m),
-          NaturalsBelow.enumerate(m))))
+      List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m))))
 
 -- The enumeration lists exactly n indices.
 theorem NaturalsBelow.enumerate_length (n : ℕ)
@@ -65,11 +62,9 @@ theorem NaturalsBelow.enumerate_length (n : ℕ)
     case step(m):
         length(NaturalsBelow.enumerate(1 + m))
            = length(List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
-                 List.map(NaturalsBelow(m), NaturalsBelow(1 + m), NaturalsBelow.inclusion(m),
-                     NaturalsBelow.enumerate(m))))
+                 List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m))))
                  by substituting NaturalsBelow.enumerate_one_plus
-           = 1 + length(List.map(NaturalsBelow(m), NaturalsBelow(1 + m), NaturalsBelow.inclusion(m),
-                 NaturalsBelow.enumerate(m)))
+           = 1 + length(List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))
            = 1 + length(NaturalsBelow.enumerate(m))   by List.map_length
            = 1 + m                                    by substituting IH
   }
@@ -92,18 +87,13 @@ theorem NaturalsBelow.enumerate_complete (n : ℕ)
               let y : NaturalsBelow(m) := NaturalsBelow.make(NaturalsBelow.value(x), belowBoundary);
               x = NaturalsBelow.inclusion(m, y) by NaturalsBelow.equal_of_value as xIsInclusion;
               y ∈ NaturalsBelow.enumerate(m) by IH(y);
-              NaturalsBelow.inclusion(m, y) ∈
-                        List.map(NaturalsBelow(m), NaturalsBelow(1 + m),
-                            NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m))
+              NaturalsBelow.inclusion(m, y) ∈ List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m))
                   by List.map_member;
-              x ∈
-                        List.map(NaturalsBelow(m), NaturalsBelow(1 + m),
-                            NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m))
+              x ∈ List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m))
                   by substituting xIsInclusion;
               x ∈
                         List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
-                            List.map(NaturalsBelow(m), NaturalsBelow(1 + m),
-                                NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))
+                            List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))
                   by List.member.there;
               done by substituting NaturalsBelow.enumerate_one_plus
             }
@@ -111,13 +101,11 @@ theorem NaturalsBelow.enumerate_complete (n : ℕ)
               x = NaturalsBelow.top(m) by NaturalsBelow.equal_of_value as xIsTop;
               NaturalsBelow.top(m) ∈
                         List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
-                            List.map(NaturalsBelow(m), NaturalsBelow(1 + m),
-                                NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))
+                            List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))
                   by List.member.here;
               x ∈
                         List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
-                            List.map(NaturalsBelow(m), NaturalsBelow(1 + m),
-                                NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))
+                            List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))
                   by substituting xIsTop;
               done by substituting NaturalsBelow.enumerate_one_plus
             }
@@ -128,12 +116,8 @@ theorem NaturalsBelow.enumerate_complete (n : ℕ)
 -- The top index is not among the inclusions (they all have value below the
 -- boundary; the top has value equal to it).
 theorem NaturalsBelow.top_not_in_inclusions (m : ℕ)
-        : ¬(NaturalsBelow.top(m) ∈
-                List.map(NaturalsBelow(m), NaturalsBelow(1 + m),
-                    NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m))) :=
-  (topInImage : NaturalsBelow.top(m) ∈
-      List.map(NaturalsBelow(m), NaturalsBelow(1 + m),
-          NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m))) ↦ {
+        : ¬(NaturalsBelow.top(m) ∈ List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m))) :=
+  (topInImage : NaturalsBelow.top(m) ∈ List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m))) ↦ {
     ∃ (y : NaturalsBelow(m)). y ∈ NaturalsBelow.enumerate(m)
             ∧ (NaturalsBelow.inclusion(m, y) = NaturalsBelow.top(m))
         by List.map_member_invert as preimageExists;
@@ -161,14 +145,11 @@ theorem NaturalsBelow.enumerate_distinct (n : ℕ)
     case step(m): {
         ∀ (a b : NaturalsBelow(m)). NaturalsBelow.inclusion(m, a) = NaturalsBelow.inclusion(m, b) → a = b
             by NaturalsBelow.inclusion_injective;
-        List.Distinct(NaturalsBelow(1 + m),
-                List.map(NaturalsBelow(m), NaturalsBelow(1 + m),
-                    NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))
+        List.Distinct(NaturalsBelow(1 + m), List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))
             by List.map_distinct;
         List.Distinct(NaturalsBelow(1 + m),
                 List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
-                    List.map(NaturalsBelow(m), NaturalsBelow(1 + m),
-                        NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m))))
+                    List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m))))
             by List.Distinct.prepend;
         done by substituting NaturalsBelow.enumerate_one_plus
       }
@@ -297,8 +278,7 @@ definition Permutation.rowElement {m : Natural} (sigma : Permutation(m)) (j : Na
 
 -- The row for σ: its entries over all indices j ∈ NaturalsBelow(1 + m).
 definition Permutation.insertRow {m : Natural} (sigma : Permutation(m)) : List(Permutation(1 + m)) :=
-  List.map(NaturalsBelow(1 + m), Permutation(1 + m), Permutation.rowElement(sigma),
-      NaturalsBelow.enumerate(1 + m))
+  List.map(Permutation.rowElement(sigma), NaturalsBelow.enumerate(1 + m))
 
 -- Concatenate the rows over a list of permutations of NaturalsBelow(m).
 -- Recursion on the LIST (m fixed), so no index transport arises here.
@@ -306,7 +286,7 @@ definition Permutation.concatRows (m : ℕ)
         : List(Permutation(m)) → List(Permutation(1 + m))
   | List.empty => List.empty(Permutation(1 + m))
   | List.prepend(sigma, rest) =>
-      List.append(Permutation(1 + m), Permutation.insertRow(sigma), Permutation.concatRows(m, rest))
+      List.append(Permutation.insertRow(sigma), Permutation.concatRows(m, rest))
 
 -- All permutations of NaturalsBelow(n). The `1 + m` step recurses on the index
 -- (dependent result type), bridged by `unfold Natural.add in` exactly as
@@ -385,13 +365,13 @@ theorem Permutation.concatRows_member (m : ℕ) (l : List(Permutation(m)))
         : tau ∈ Permutation.concatRows(m, l) :=
   by induction on memSigma with IH {
     case List.member.here(rest): {
-        tau ∈ List.append(Permutation(1 + m), Permutation.insertRow(sigma), Permutation.concatRows(m, rest))
+        tau ∈ List.append(Permutation.insertRow(sigma), Permutation.concatRows(m, rest))
             by List.member_append_left;
         done
       }
     case List.member.there(head, rest, sub): {
         tau ∈ Permutation.concatRows(m, rest);
-        tau ∈ List.append(Permutation(1 + m), Permutation.insertRow(head), Permutation.concatRows(m, rest))
+        tau ∈ List.append(Permutation.insertRow(head), Permutation.concatRows(m, rest))
             by List.member_append_right;
         done
       }
@@ -471,8 +451,7 @@ theorem Permutation.concatRows_distinct (m : ℕ) (l : List(Permutation(m)))
                   done
                 };
           List.Distinct(Permutation(1 + m),
-                  List.append(Permutation(1 + m), Permutation.insertRow(sigma),
-                      Permutation.concatRows(m, rest)))
+                  List.append(Permutation.insertRow(sigma), Permutation.concatRows(m, rest)))
               by List.distinct_append;
           done
         }
