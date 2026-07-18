@@ -1,0 +1,246 @@
+-- Algebra/matrix_vector.math
+--
+-- Coordinate vectors over a commutative ring, the matrix action `A · x`,
+-- and the bilinear pairing `RingVector.innerProduct` — the objects the
+-- Gram machinery and the quadratic-form theory read (`Q_A(x) = ⟨x, A·x⟩`).
+-- The field-based `CoordinateSpace` serves the vector-space layer; this
+-- layer stays at a bare commutative ring so it applies to ℤⁿ.
+
+module Algebra.matrix_vector
+
+import Logic.basics
+import Logic.functions
+import Equality.basics
+import Natural.basics
+import Natural.classical_decidable
+import Set.finite
+import Lists.list
+import Lists.map
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.permutation_enumeration
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.matrix_transpose
+
+definition RingVector (r : CommutativeRing) (n : ℕ) : Type(0) :=
+  NaturalsBelow(n) → CommutativeRing.carrier(r)
+
+-- Pointwise operations, mirroring the matrix ones.
+definition RingVector.add {r : CommutativeRing} {n : ℕ}
+        (u v : RingVector(r, n)) : RingVector(r, n) :=
+  (k : NaturalsBelow(n)) ↦ u(k) + v(k)
+
+definition RingVector.scale {r : CommutativeRing} {n : ℕ}
+        (a : CommutativeRing.carrier(r)) (u : RingVector(r, n)) : RingVector(r, n) :=
+  (k : NaturalsBelow(n)) ↦ a * u(k)
+
+operator (+) on (RingVector, RingVector) := RingVector.add
+operator (•) on (CommutativeRing.carrier, RingVector) := RingVector.scale
+
+theorem RingVector.equal_of_pointwise {r : CommutativeRing} {n : ℕ}
+        (u v : RingVector(r, n))
+        (pointwise : ∀ (k : NaturalsBelow(n)). u(k) = v(k))
+        : u = v :=
+  done by Function.extensionality
+
+-- The matrix action: `(A · x)(i)` is the inner product of row i with x.
+definition Matrix.applyVector {r : CommutativeRing} {rows columns : ℕ}
+        (A : Matrix(r, rows, columns)) (x : RingVector(r, columns)) : RingVector(r, rows) :=
+  (i : NaturalsBelow(rows)) ↦
+      CommutativeRing.sumOver((k : NaturalsBelow(columns)) ↦ A(i, k) * x(k),
+          NaturalsBelow.enumerate(columns))
+
+operator (·) on (Matrix, RingVector) := Matrix.applyVector
+
+-- The identity acts trivially: only the diagonal entry survives the sum.
+theorem Matrix.applyVector_identity {r : CommutativeRing} {n : ℕ}
+        (x : RingVector(r, n))
+        : Matrix.identity(r, n) · x = x := {
+  ∀ (i : NaturalsBelow(n)). (Matrix.identity(r, n) · x)(i) = x(i)
+      by (i : NaturalsBelow(n)) ↦ {
+          i ∈ NaturalsBelow.enumerate(n) by NaturalsBelow.enumerate_complete;
+          List.Distinct(NaturalsBelow(n), NaturalsBelow.enumerate(n)) by NaturalsBelow.enumerate_distinct;
+          ∀ (k : NaturalsBelow(n)). k ∈ NaturalsBelow.enumerate(n) → ¬(k = i)
+              → Matrix.identity(r, n)(i, k) * x(k) = CommutativeRing.zero(r)
+              by (k : NaturalsBelow(n))
+                 (inEnumeration : k ∈ NaturalsBelow.enumerate(n)) (kNotI : ¬(k = i)) ↦ {
+                  ¬(i = k) by (equal : i = k) ↦ { k = i; done };
+                  Matrix.identity(r, n)(i, k) = CommutativeRing.zero(r) by Matrix.identity_entry_off;
+                  Matrix.identity(r, n)(i, k) * x(k)
+                     = CommutativeRing.zero(r) * x(k)   by substitution
+                     = CommutativeRing.zero(r)
+                };
+          Matrix.identity(r, n)(i, i) = CommutativeRing.one(r) by Matrix.identity_entry_diagonal;
+          (Matrix.identity(r, n) · x)(i)
+             = Matrix.identity(r, n)(i, i) * x(i)   by CommutativeRing.sumOver_single
+             = CommutativeRing.one(r) * x(i)        by substitution
+             = x(i)
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+-- The action composes with the product: (A·B)·x = A·(B·x).
+theorem Matrix.applyVector_multiply {r : CommutativeRing} {rows middle columns : ℕ}
+        (A : Matrix(r, rows, middle)) (B : Matrix(r, middle, columns)) (x : RingVector(r, columns))
+        : (A * B) · x = A · (B · x) := {
+  ∀ (i : NaturalsBelow(rows)). ((A * B) · x)(i) = (A · (B · x))(i)
+      by (i : NaturalsBelow(rows)) ↦ {
+          ((A * B) · x)(i)
+             = CommutativeRing.sumOver(
+                   (k : NaturalsBelow(columns)) ↦
+                       CommutativeRing.sumOver(
+                           (j : NaturalsBelow(middle)) ↦ A(i, j) * B(j, k), NaturalsBelow.enumerate(middle))
+                           * x(k),
+                   NaturalsBelow.enumerate(columns))
+             = CommutativeRing.sumOver(
+                   (k : NaturalsBelow(columns)) ↦
+                       CommutativeRing.sumOver(
+                           (j : NaturalsBelow(middle)) ↦ (A(i, j) * B(j, k)) * x(k),
+                           NaturalsBelow.enumerate(middle)),
+                   NaturalsBelow.enumerate(columns))
+                   by CommutativeRing.sumOver_congruence(
+                          pointwise := (k : NaturalsBelow(columns)) ↦ {
+                              done by CommutativeRing.sumOver_scale_right
+                            })
+             = CommutativeRing.sumOver(
+                   (j : NaturalsBelow(middle)) ↦
+                       CommutativeRing.sumOver(
+                           (k : NaturalsBelow(columns)) ↦ (A(i, j) * B(j, k)) * x(k),
+                           NaturalsBelow.enumerate(columns)),
+                   NaturalsBelow.enumerate(middle))
+                   by CommutativeRing.sumOver_interchange(
+                          term := (k : NaturalsBelow(columns)) ↦ (j : NaturalsBelow(middle)) ↦
+                              (A(i, j) * B(j, k)) * x(k))
+             = CommutativeRing.sumOver(
+                   (j : NaturalsBelow(middle)) ↦
+                       A(i, j) * CommutativeRing.sumOver(
+                           (k : NaturalsBelow(columns)) ↦ B(j, k) * x(k),
+                           NaturalsBelow.enumerate(columns)),
+                   NaturalsBelow.enumerate(middle))
+                   by CommutativeRing.sumOver_congruence(
+                          pointwise := (j : NaturalsBelow(middle)) ↦ {
+                              ∀ (k : NaturalsBelow(columns)).
+                                  (A(i, j) * B(j, k)) * x(k) = A(i, j) * (B(j, k) * x(k))
+                                  by (k : NaturalsBelow(columns)) ↦ done;
+                              CommutativeRing.sumOver(
+                                    (k : NaturalsBelow(columns)) ↦ (A(i, j) * B(j, k)) * x(k),
+                                    NaturalsBelow.enumerate(columns))
+                                 = CommutativeRing.sumOver(
+                                       (k : NaturalsBelow(columns)) ↦ A(i, j) * (B(j, k) * x(k)),
+                                       NaturalsBelow.enumerate(columns))
+                                       by CommutativeRing.sumOver_congruence
+                                 = A(i, j) * CommutativeRing.sumOver(
+                                       (k : NaturalsBelow(columns)) ↦ B(j, k) * x(k),
+                                       NaturalsBelow.enumerate(columns))
+                                       by CommutativeRing.sumOver_scale_left
+                            })
+             = (A · (B · x))(i)
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+-- ----------------------------------------------------------------------
+-- The bilinear pairing ⟨u, v⟩ = Σ u(k)·v(k).
+
+definition RingVector.innerProduct {r : CommutativeRing} {n : ℕ}
+        (u v : RingVector(r, n)) : CommutativeRing.carrier(r) :=
+  CommutativeRing.sumOver((k : NaturalsBelow(n)) ↦ u(k) * v(k), NaturalsBelow.enumerate(n))
+
+-- Symmetry.
+theorem RingVector.innerProduct_symmetric {r : CommutativeRing} {n : ℕ}
+        (u v : RingVector(r, n))
+        : RingVector.innerProduct(u, v) = RingVector.innerProduct(v, u) := {
+  ∀ (k : NaturalsBelow(n)). u(k) * v(k) = v(k) * u(k)
+      by CommutativeRing.multiply_commutative;
+  done by CommutativeRing.sumOver_congruence
+}
+
+-- Additivity and homogeneity in the left slot (the right slot follows by
+-- symmetry).
+theorem RingVector.innerProduct_add_left {r : CommutativeRing} {n : ℕ}
+        (u v w : RingVector(r, n))
+        : RingVector.innerProduct(u + v, w)
+          = RingVector.innerProduct(u, w) + RingVector.innerProduct(v, w) := {
+  ∀ (k : NaturalsBelow(n)). u(k) * w(k) + v(k) * w(k) = (u + v)(k) * w(k)
+      by (k : NaturalsBelow(n)) ↦ done;
+  RingVector.innerProduct(u, w) + RingVector.innerProduct(v, w)
+     = CommutativeRing.sumOver((k : NaturalsBelow(n)) ↦ u(k) * w(k) + v(k) * w(k),
+           NaturalsBelow.enumerate(n))
+           by CommutativeRing.sumOver_add
+     = RingVector.innerProduct(u + v, w)
+           by CommutativeRing.sumOver_congruence;
+  done
+}
+
+theorem RingVector.innerProduct_scale_left {r : CommutativeRing} {n : ℕ}
+        (a : CommutativeRing.carrier(r)) (u v : RingVector(r, n))
+        : RingVector.innerProduct(a • u, v) = a * RingVector.innerProduct(u, v) := {
+  ∀ (k : NaturalsBelow(n)). (a • u)(k) * v(k) = a * (u(k) * v(k))
+      by (k : NaturalsBelow(n)) ↦ done;
+  RingVector.innerProduct(a • u, v)
+     = CommutativeRing.sumOver((k : NaturalsBelow(n)) ↦ a * (u(k) * v(k)),
+           NaturalsBelow.enumerate(n))
+           by CommutativeRing.sumOver_congruence
+     = a * RingVector.innerProduct(u, v)
+           by CommutativeRing.sumOver_scale_left;
+  done
+}
+
+-- The transpose is the adjoint: ⟨Aᵀ·u, v⟩ = ⟨u, A·v⟩ — the law that turns
+-- xᵀ(MᵀM)x into ⟨M·x, M·x⟩ for the Gram machinery.
+theorem Matrix.transpose_adjoint {r : CommutativeRing} {rows columns : ℕ}
+        (A : Matrix(r, rows, columns)) (u : RingVector(r, rows)) (v : RingVector(r, columns))
+        : RingVector.innerProduct(Aᵀ · u, v) = RingVector.innerProduct(u, A · v) := {
+  RingVector.innerProduct(Aᵀ · u, v)
+     = CommutativeRing.sumOver(
+           (j : NaturalsBelow(columns)) ↦
+               CommutativeRing.sumOver(
+                   (i : NaturalsBelow(rows)) ↦ A(i, j) * u(i), NaturalsBelow.enumerate(rows))
+                   * v(j),
+           NaturalsBelow.enumerate(columns))
+     = CommutativeRing.sumOver(
+           (j : NaturalsBelow(columns)) ↦
+               CommutativeRing.sumOver(
+                   (i : NaturalsBelow(rows)) ↦ (A(i, j) * u(i)) * v(j), NaturalsBelow.enumerate(rows)),
+           NaturalsBelow.enumerate(columns))
+           by CommutativeRing.sumOver_congruence(
+                  pointwise := (j : NaturalsBelow(columns)) ↦ {
+                      done by CommutativeRing.sumOver_scale_right
+                    })
+     = CommutativeRing.sumOver(
+           (i : NaturalsBelow(rows)) ↦
+               CommutativeRing.sumOver(
+                   (j : NaturalsBelow(columns)) ↦ (A(i, j) * u(i)) * v(j),
+                   NaturalsBelow.enumerate(columns)),
+           NaturalsBelow.enumerate(rows))
+           by CommutativeRing.sumOver_interchange(
+                  term := (j : NaturalsBelow(columns)) ↦ (i : NaturalsBelow(rows)) ↦
+                      (A(i, j) * u(i)) * v(j))
+     = CommutativeRing.sumOver(
+           (i : NaturalsBelow(rows)) ↦
+               u(i) * CommutativeRing.sumOver(
+                   (j : NaturalsBelow(columns)) ↦ A(i, j) * v(j), NaturalsBelow.enumerate(columns)),
+           NaturalsBelow.enumerate(rows))
+           by CommutativeRing.sumOver_congruence(
+                  pointwise := (i : NaturalsBelow(rows)) ↦ {
+                      ∀ (j : NaturalsBelow(columns)).
+                          (A(i, j) * u(i)) * v(j) = u(i) * (A(i, j) * v(j))
+                          by (j : NaturalsBelow(columns)) ↦ done;
+                      CommutativeRing.sumOver(
+                            (j : NaturalsBelow(columns)) ↦ (A(i, j) * u(i)) * v(j),
+                            NaturalsBelow.enumerate(columns))
+                         = CommutativeRing.sumOver(
+                               (j : NaturalsBelow(columns)) ↦ u(i) * (A(i, j) * v(j)),
+                               NaturalsBelow.enumerate(columns))
+                               by CommutativeRing.sumOver_congruence
+                         = u(i) * CommutativeRing.sumOver(
+                               (j : NaturalsBelow(columns)) ↦ A(i, j) * v(j),
+                               NaturalsBelow.enumerate(columns))
+                               by CommutativeRing.sumOver_scale_left
+                    })
+     = RingVector.innerProduct(u, A · v)
+}

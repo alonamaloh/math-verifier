@@ -1,0 +1,71 @@
+-- Algebra/matrix_field_inverse.math
+--
+-- Over a field, a square matrix is invertible exactly when its
+-- determinant is nonzero: a nonzero determinant has a reciprocal, which
+-- feeds the adjugate inverse; conversely det U · det V = 1 rules out
+-- det U = 0 in a nontrivial ring.
+
+module Algebra.matrix_field_inverse
+
+import Logic.basics
+import Logic.functions
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.classical_decidable
+import Integer.basics
+import Set.finite
+import Lists.list
+import Lists.map
+import Lists.distinct
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.ring_from_integer
+import Algebra.field_bundle
+import Algebra.finite_permutation
+import Algebra.permutation_enumeration
+import Algebra.permutation_sign
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.determinant
+import Algebra.determinant_identity
+import Algebra.determinant_multiplicative
+import Algebra.alternating_collapse
+import Algebra.determinant_row_permutation
+import Algebra.adjugate
+import Algebra.matrix_inverse
+
+-- A nonzero determinant makes the matrix invertible: its reciprocal
+-- feeds the adjugate inverse.
+theorem Matrix.invertible_of_determinant_nonzero {f : Field} {n : ℕ}
+        (U : Matrix(Field.commutative_ring(f), n, n))
+        (determinantNonzero : ¬(Matrix.determinant(U) = Field.zero(f)))
+        : Matrix.IsInvertible(U) := {
+  Matrix.determinant(U) * Field.reciprocal(Matrix.determinant(U), determinantNonzero) = Field.one(f)
+      by Field.reciprocal_multiplies;
+  done by Matrix.invertible_of_unit_determinant
+}
+
+-- Conversely, an invertible matrix has a nonzero determinant: otherwise
+-- 1 = det U · det V = 0, against the field's nontriviality.
+theorem Matrix.determinant_nonzero_of_invertible {f : Field} {n : ℕ}
+        (U : Matrix(Field.commutative_ring(f), n, n))
+        (invertible : Matrix.IsInvertible(U))
+        : ¬(Matrix.determinant(U) = Field.zero(f)) := {
+  choose V : Matrix(Field.commutative_ring(f), n, n)
+      such that U * V = Matrix.identity(Field.commutative_ring(f), n)
+                    ∧ V * U = Matrix.identity(Field.commutative_ring(f), n)
+      from invertible;
+  Matrix.determinant(U) * Matrix.determinant(V) = Field.one(f)
+      by Matrix.determinant_unit_of_right_inverse as determinantsMultiplyToOne;
+  Field.zero(f) ≠ Field.one(f) by Field.nontrivial;
+  suppose Matrix.determinant(U) = Field.zero(f) as determinantZero;
+  Field.zero(f)
+     = Field.zero(f) * Matrix.determinant(V)
+     = Matrix.determinant(U) * Matrix.determinant(V)   by substituting determinantZero
+     = Field.one(f)                                    by determinantsMultiplyToOne;
+  done
+}
