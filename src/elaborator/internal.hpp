@@ -3745,6 +3745,16 @@ private:
     struct RingNormalisationContext {
         std::string carrierName;           // carrier HEAD, e.g. "Rational"
                                             // or "Ring.carrier" (bundle)
+        std::string literalCarrierName;     // carrier the goal's LITERALS are
+                                            // spelled at: carrierName for a
+                                            // concrete carrier; the WHNF
+                                            // reduct's head for a bundle
+                                            // projection carrier — e.g.
+                                            // "Integer" for
+                                            // CommutativeRing.carrier(
+                                            //   Integer.commutative_ring_bundle).
+                                            // Computed by
+                                            // populateRingEmbeddingChain.
         ExpressionPointer carrierType;      // Constant("Rational") / Ring.carrier(s)
         LevelPointer carrierUniverseLevel;  // for Equality.* applications
 
@@ -3944,6 +3954,28 @@ private:
     // names based on context.carrierName. Caller has already filled in
     // the carrier names (add, multiply, etc).
     void populateRingEmbeddingChain(RingNormalisationContext& context);
+
+    // The carrier the goal's literals are spelled at. A concrete
+    // chained carrier (Natural/Integer/Rational/Real) is its own
+    // answer; a bundle-projection carrier
+    // (`CommutativeRing.carrier(Integer.commutative_ring_bundle)`)
+    // WHNF-reduces to its concrete carrier, and the goal's literals
+    // are spelled there (`Natural.to_integer 2`) — so the embedding
+    // chain must key on the reduct, not the projection head. An
+    // abstract bundle (variable structure argument) resolves to
+    // nothing and returns carrierName unchanged.
+    std::string resolveRingLiteralCarrierName(
+        ExpressionPointer carrierType, const std::string& carrierName);
+
+    // Parse a tower-cast Natural literal at a named chained carrier
+    // (`Natural.to_integer(<literal>)` at Integer, the two/three-level
+    // towers at Rational/Real, accepting each level's named zero/one
+    // constants). Shared by the Z/p fast-fail evaluator and the
+    // fingerprint diagnostic; the normaliser's
+    // tryParseCarrierEmbeddedNaturalLiteral is the context-driven twin.
+    static std::optional<RingCoefficient> parseEmbeddedLiteralAtCarrier(
+        ExpressionPointer expression,
+        const std::string& literalCarrierName);
 
     // Build the Natural-level literal kernel node for `value`.
     ExpressionPointer buildNaturalLiteralKernel(const RingCoefficient& value);

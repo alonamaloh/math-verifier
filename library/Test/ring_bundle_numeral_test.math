@@ -1,0 +1,68 @@
+-- Matcher/normalization batch 3, item 1: `ring`/`field` recognize
+-- tower-cast numerals (`Natural.to_integer 2` for `(2 : ℤ)`) as mpz
+-- coefficients on a BUNDLE-PROJECTION carrier. The carrier of a matrix
+-- entry is `CommutativeRing.carrier(Integer.commutative_ring_bundle)`
+-- — not a chain-bearing name — so the embedding chain used to stay
+-- empty and `(2 : ℤ)` was fingerprinted as an opaque atom (error inbox
+-- 2026-07-19, rank_two_escalators). The chain now keys on the carrier
+-- type's WHNF reduct.
+module Test.ring_bundle_numeral_test
+
+import axioms
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.embedding
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.ring_from_integer
+import Algebra.integer_domain
+
+-- The rank_two_escalators decomposition SS-arm shape: the chain opens
+-- at a bundle-carrier-typed variable, so the calc carrier is the
+-- projection `CommutativeRing.carrier(Integer.commutative_ring_bundle)`;
+-- the split step collapses straight to `(2 : ℤ)` by ring.
+theorem Test.ring_bundle_two_coefficient
+        (entry : CommutativeRing.carrier(Integer.commutative_ring_bundle))
+        (border : CommutativeRing.carrier(Integer.commutative_ring_bundle))
+        (entryEq : entry = ((1 : ℤ) + border * (0 : ℤ)) + (border * (0 : ℤ) + (1 : ℤ)))
+        : entry = (2 : ℤ) := {
+  entry
+     = ((1 : ℤ) + border * (0 : ℤ)) + (border * (0 : ℤ) + (1 : ℤ)) by entryEq
+     = (2 : ℤ) by ring;
+  done
+}
+
+-- Larger literals and both directions: coefficient arithmetic on the
+-- embedded towers (2·3 + 1 = 7) at the bundle carrier.
+theorem Test.ring_bundle_coefficient_arithmetic
+        (entry : CommutativeRing.carrier(Integer.commutative_ring_bundle))
+        (entryEq : entry = (2 : ℤ) * (3 : ℤ) + (1 : ℤ))
+        : entry = (7 : ℤ) := {
+  entry
+     = (2 : ℤ) * (3 : ℤ) + (1 : ℤ) by entryEq
+     = (7 : ℤ) by ring;
+  done
+}
+
+-- A tower-cast literal as a genuine COEFFICIENT on an atom, with the
+-- split spelling on the other side.
+theorem Test.ring_bundle_coefficient_on_atom
+        (entry : CommutativeRing.carrier(Integer.commutative_ring_bundle))
+        (border : CommutativeRing.carrier(Integer.commutative_ring_bundle))
+        (entryEq : entry = border + (2 : ℤ) * border)
+        : entry = (3 : ℤ) * border := {
+  entry
+     = border + (2 : ℤ) * border by entryEq
+     = (3 : ℤ) * border by ring;
+  done
+}

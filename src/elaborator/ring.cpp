@@ -174,6 +174,13 @@ std::optional<uint64_t> Elaborator::evaluateFingerprint(
             }
         }
     }
+    // Tower-cast Natural literal at a chained carrier — mirrors the
+    // normaliser's literal recognition, so the diagnostic speaks the
+    // same coefficient language as the tactic (`(2 : ℤ)` is the
+    // coefficient 2, not an opaque atom).
+    if (auto literal = parseEmbeddedLiteralAtCarrier(expression, carrierName)) {
+        return mpz_class(*literal % kFingerprintModulus).get_ui();
+    }
     // Bare Natural literal / successor — mirrors the normaliser's
     // literal recognition on the Natural carrier.
     if (carrierName == "Natural") {
@@ -396,57 +403,8 @@ uint64_t Elaborator::evalRingMod(
         }
         // Carrier-embedded Natural literal — must mirror the ring normaliser's
         // literal recognition (which itself depends on the carrier).
-        // For Integer: Natural.to_integer(succ^k(zero)) → k.
-        // For Rational: Integer.to_rational(Natural.to_integer(...)) → k.
-        // For Real: Rational.to_real(Integer.to_rational(...)) → k.
-        // At each level we also accept the outer carrier's named
-        // zero/one constants (which the elaborator may produce in
-        // place of the coercion application for literals 0 and 1).
-        // Wrapped as a lambda so the δ-expose recogniser below shares it.
-        auto embeddedLiteralValue =
-            [&](ExpressionPointer candidate)
-                -> std::optional<RingCoefficient> {
-            // Pairs of (coercion fn name, outer carrier name) —
-            // OUTERMOST FIRST.
-            std::vector<std::pair<std::string, std::string>> outerChain;
-            if (carrierName == "Integer") {
-                outerChain = {{"Natural.to_integer", "Integer"}};
-            } else if (carrierName == "Rational") {
-                outerChain = {{"Integer.to_rational", "Rational"},
-                              {"Natural.to_integer", "Integer"}};
-            } else if (carrierName == "Real") {
-                outerChain = {{"Rational.to_real", "Real"},
-                              {"Integer.to_rational", "Rational"},
-                              {"Natural.to_integer", "Integer"}};
-            }
-            if (outerChain.empty()) return std::nullopt;
-            ExpressionPointer cursor = candidate;
-            for (const auto& [coercion, outerCarrier] : outerChain) {
-                // Check current level's zero/one named constants.
-                if (auto* nameHead =
-                        std::get_if<Constant>(&cursor->node)) {
-                    if (nameHead->name == outerCarrier + ".zero") {
-                        return RingCoefficient(0);
-                    }
-                    if (nameHead->name == outerCarrier + ".one") {
-                        return RingCoefficient(1);
-                    }
-                }
-                auto* app =
-                    std::get_if<Application>(&cursor->node);
-                if (!app) return std::nullopt;
-                auto* head =
-                    std::get_if<Constant>(&app->function->node);
-                if (!head || head->name != coercion) {
-                    return std::nullopt;
-                }
-                cursor = app->argument;
-            }
-            RingCoefficient value = 0;
-            if (tryParseNaturalLiteral(cursor, value)) return value;
-            return std::nullopt;
-        };
-        if (auto literal = embeddedLiteralValue(expression)) {
+        if (auto literal =
+                parseEmbeddedLiteralAtCarrier(expression, carrierName)) {
             return mpz_class(*literal % modulus).get_ui();
         }
         // Bare Natural literal / successor — mirrors the normaliser's
@@ -480,7 +438,8 @@ uint64_t Elaborator::evalRingMod(
                                             left, right)
                     || matchUnaryRingNegate(candidate, negateName,
                                                innerOperand)
-                    || embeddedLiteralValue(candidate).has_value();
+                    || parseEmbeddedLiteralAtCarrier(candidate, carrierName)
+                           .has_value();
             };
             ExpressionPointer exposed =
                 ringDeltaExposeAtom(expression, recognises);
@@ -935,16 +894,20 @@ ExpressionPointer Elaborator::elaborateRing(
         // polynomials over Z/p, ring CANNOT prove them equal — bail
         // immediately without doing the expensive symbolic normalise
         // + polynomial-dict comparison work. See `evalRingMod` for
-        // soundness rationale (Schwartz-Zippel).
+        // soundness rationale (Schwartz-Zippel). Literal recognition
+        // keys on the RESOLVED literal carrier so a bundle-projection
+        // carrier over ℤ/ℚ/ℝ reads `(2 : ℤ)` as the coefficient 2.
+        const std::string literalCarrierName = resolveRingLiteralCarrierName(
+            goal.carrierType, carrierName);
         if (!ringFastFailAgrees(
-                goal.leftEndpoint, goal.rightEndpoint, carrierName,
+                goal.leftEndpoint, goal.rightEndpoint, literalCarrierName,
                 scheme.opNamespace)) {
             throwElaborate(
                 "`ring`: the two sides do not agree mod 2^61 - 1 — "
                 "they are not equal as commutative-ring expressions"
                 + buildFingerprintDiagnostic(
                       goal.leftEndpoint, goal.rightEndpoint,
-                      carrierName));
+                      literalCarrierName));
         }
         // A bundled-ring carrier's operations carry a leading structure
         // argument, which the single-operator AC fast path below does not
@@ -2842,6 +2805,47 @@ bool Elaborator::tryParseNaturalSuccessor(
         return true;
     }
 
+std::optional<Elaborator::RingCoefficient>
+Elaborator::parseEmbeddedLiteralAtCarrier(
+        ExpressionPointer expression,
+        const std::string& literalCarrierName) {
+        // Pairs of (coercion fn name, outer carrier name) —
+        // OUTERMOST FIRST. At each level we also accept the outer
+        // carrier's named zero/one constants (which the elaborator may
+        // produce in place of the coercion application for 0 and 1).
+        std::vector<std::pair<std::string, std::string>> outerChain;
+        if (literalCarrierName == "Integer") {
+            outerChain = {{"Natural.to_integer", "Integer"}};
+        } else if (literalCarrierName == "Rational") {
+            outerChain = {{"Integer.to_rational", "Rational"},
+                          {"Natural.to_integer", "Integer"}};
+        } else if (literalCarrierName == "Real") {
+            outerChain = {{"Rational.to_real", "Real"},
+                          {"Integer.to_rational", "Rational"},
+                          {"Natural.to_integer", "Integer"}};
+        }
+        if (outerChain.empty()) return std::nullopt;
+        ExpressionPointer cursor = expression;
+        for (const auto& [coercion, outerCarrier] : outerChain) {
+            if (auto* nameHead = std::get_if<Constant>(&cursor->node)) {
+                if (nameHead->name == outerCarrier + ".zero") {
+                    return RingCoefficient(0);
+                }
+                if (nameHead->name == outerCarrier + ".one") {
+                    return RingCoefficient(1);
+                }
+            }
+            auto* app = std::get_if<Application>(&cursor->node);
+            if (!app) return std::nullopt;
+            auto* head = std::get_if<Constant>(&app->function->node);
+            if (!head || head->name != coercion) return std::nullopt;
+            cursor = app->argument;
+        }
+        RingCoefficient value = 0;
+        if (tryParseNaturalLiteral(cursor, value)) return value;
+        return std::nullopt;
+    }
+
 bool Elaborator::tryParseCarrierEmbeddedNaturalLiteral(
         ExpressionPointer expression,
         const RingNormalisationContext& context,
@@ -2873,7 +2877,35 @@ bool Elaborator::tryParseCarrierEmbeddedNaturalLiteral(
         return tryParseNaturalLiteral(cursor, value);
     }
 
+std::string Elaborator::resolveRingLiteralCarrierName(
+        ExpressionPointer carrierType, const std::string& carrierName) {
+        auto isChainedLiteralCarrier = [](const std::string& name) {
+            return name == "Natural" || name == "Integer"
+                || name == "Rational" || name == "Real";
+        };
+        if (isChainedLiteralCarrier(carrierName)) return carrierName;
+        try {
+            ExpressionPointer reduced =
+                weakHeadNormalForm(environment_, carrierType);
+            if (auto* head = std::get_if<Constant>(&reduced->node)) {
+                // Only the chain-bearing carriers ABOVE Natural: a
+                // hypothetical Natural-reduct bundle has no negate and
+                // no bundle literals would be Natural-bare anyway —
+                // keep today's behavior there.
+                if (head->name == "Integer" || head->name == "Rational"
+                    || head->name == "Real") {
+                    return head->name;
+                }
+            }
+        } catch (const TypeError&) {
+            // Stuck / fuel-exhausted carrier reduction: no resolution.
+        }
+        return carrierName;
+    }
+
 void Elaborator::populateRingEmbeddingChain(RingNormalisationContext& context) {
+        context.literalCarrierName = resolveRingLiteralCarrierName(
+            context.carrierType, context.carrierName);
         auto buildStep =
             [&](const std::string& coercionName,
                 const std::string& outerCarrier) -> RingEmbeddingStep {
@@ -2891,16 +2923,18 @@ void Elaborator::populateRingEmbeddingChain(RingNormalisationContext& context) {
             step.outerOneName = outerCarrier + ".one";
             return step;
         };
-        // INNERMOST FIRST.
-        if (context.carrierName == "Integer") {
+        // INNERMOST FIRST. Keyed on the resolved literal carrier so a
+        // bundle-projection carrier over ℤ/ℚ/ℝ gets its concrete
+        // carrier's chain (the goal's literals are spelled there).
+        if (context.literalCarrierName == "Integer") {
             context.embeddingChain.push_back(
                 buildStep("Natural.to_integer", "Integer"));
-        } else if (context.carrierName == "Rational") {
+        } else if (context.literalCarrierName == "Rational") {
             context.embeddingChain.push_back(
                 buildStep("Natural.to_integer", "Integer"));
             context.embeddingChain.push_back(
                 buildStep("Integer.to_rational", "Rational"));
-        } else if (context.carrierName == "Real") {
+        } else if (context.literalCarrierName == "Real") {
             context.embeddingChain.push_back(
                 buildStep("Natural.to_integer", "Integer"));
             context.embeddingChain.push_back(
@@ -6749,7 +6783,8 @@ ExpressionPointer Elaborator::elaborateRingByNormalisation(
                 "canonical forms over `" + carrierName + "` — they "
                 "are not equal as commutative-ring expressions"
                 + buildFingerprintDiagnostic(
-                      leftEndpoint, rightEndpoint, carrierName));
+                      leftEndpoint, rightEndpoint,
+                      context.literalCarrierName));
         }
         // No coefficient guard: on literal-coefficient carriers the
         // canonical form carries each coefficient as ONE embedded GMP
@@ -8234,7 +8269,7 @@ ExpressionPointer Elaborator::elaborateField(
                 "insufficient)"
                 + buildFingerprintDiagnostic(
                       goal.leftEndpoint, goal.rightEndpoint,
-                      carrierName));
+                      context.literalCarrierName));
         }
         // Coefficients are unrestricted on literal-coefficient carriers
         // (the normaliser holds them as GMP literals). Carriers without
