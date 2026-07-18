@@ -490,10 +490,12 @@ uint64_t Elaborator::evalRingMod(
                     oneName, modulus);
             }
         }
-        // Atom: use the cached bottom-up structural hash. Two
-        // structurally-equal atoms have the same hash, so they get the
-        // same Z/p value on both sides of the equation.
-        return expression->hash % modulus;
+        // Atom: use the cached bottom-up structural hash of the
+        // CANONICALIZED spelling (bounded head δβ-reduction, mirroring
+        // ringPolynomialAtom's key), so defeq reduct spellings —
+        // `restrictLeft(z)(i)` vs `z(sumLeft(i))` — get the same Z/p
+        // value on both sides of the equation.
+        return ringCanonicalizeAtomSpelling(expression)->hash % modulus;
     }
 
 bool Elaborator::ringFastFailAgrees(
@@ -2530,11 +2532,19 @@ Elaborator::RingPolynomial Elaborator::ringPolynomialOne() {
 
 Elaborator::RingPolynomial Elaborator::ringPolynomialAtom(
         RingNormalisationContext& context, ExpressionPointer atom) {
-        uint64_t atomHash = atom->hash;
+        // Atom IDENTITY is the canonicalized (bounded head δβ-reduced)
+        // spelling's hash, so defeq reducts — `restrictLeft(z)(i)` vs
+        // `z(sumLeft(i))` — collapse to one atom. The STORED expression
+        // stays the first-seen goal spelling: a reduct's inferred type
+        // can spell a sealed carrier by its raw form (`Integer` vs the
+        // underlying quotient), so the reduct must never be EMITTED into
+        // proof terms — only hashed. Each side's own spelling bridges to
+        // the stored one by reflexivity (transparent-δβ defeq).
+        uint64_t atomHash = ringCanonicalizeAtomSpelling(atom)->hash;
         auto insertion = context.atoms.emplace(atomHash, atom);
         (void)insertion;  // first writer wins; subsequent hits reuse
-                            // the existing pointer (assumed
-                            // structurally equal modulo hash collision)
+                            // the existing pointer (defeq modulo hash
+                            // collision)
         RingPolynomial polynomial;
         polynomial[RingMonomialSignature{atomHash}] = 1;
         return polynomial;
@@ -2573,11 +2583,21 @@ bool Elaborator::matchBinaryRingOp(
         std::vector<ExpressionPointer> args;
         peelSpine(expression, head, args);
         auto* headConstant = std::get_if<Constant>(&head->node);
-        if (!headConstant || headConstant->name != opName) return false;
-        if (args.size() != ringStructurePrefix_.size() + 2) return false;
-        if (!structurePrefixMatches(args)) return false;
-        leftOut = args[ringStructurePrefix_.size()];
-        rightOut = args[ringStructurePrefix_.size() + 1];
+        if (!headConstant) return false;
+        if (headConstant->name == opName) {
+            if (args.size() != ringStructurePrefix_.size() + 2) return false;
+            if (!structurePrefixMatches(args)) return false;
+            leftOut = args[ringStructurePrefix_.size()];
+            rightOut = args[ringStructurePrefix_.size() + 1];
+            return true;
+        }
+        // Bundled ring: the REDUCT spelling `Integer.add(x, y)` for
+        // `CommutativeRing.add(bundle, x, y)` — identify the bare head by
+        // weak-head normal form.
+        if (args.size() != 2) return false;
+        if (!matchesRingConstReduct(head, opName)) return false;
+        leftOut = args[0];
+        rightOut = args[1];
         return true;
     }
 
@@ -2589,10 +2609,16 @@ bool Elaborator::matchUnaryRingNegate(
         std::vector<ExpressionPointer> args;
         peelSpine(expression, head, args);
         auto* headConstant = std::get_if<Constant>(&head->node);
-        if (!headConstant || headConstant->name != negateName) return false;
-        if (args.size() != ringStructurePrefix_.size() + 1) return false;
-        if (!structurePrefixMatches(args)) return false;
-        innerOut = args[ringStructurePrefix_.size()];
+        if (!headConstant) return false;
+        if (headConstant->name == negateName) {
+            if (args.size() != ringStructurePrefix_.size() + 1) return false;
+            if (!structurePrefixMatches(args)) return false;
+            innerOut = args[ringStructurePrefix_.size()];
+            return true;
+        }
+        if (args.size() != 1) return false;
+        if (!matchesRingConstReduct(head, negateName)) return false;
+        innerOut = args[0];
         return true;
     }
 
@@ -2602,9 +2628,14 @@ bool Elaborator::matchRingZero(ExpressionPointer expression,
         std::vector<ExpressionPointer> args;
         peelSpine(expression, head, args);
         auto* headConstant = std::get_if<Constant>(&head->node);
-        if (!headConstant || headConstant->name != zeroName) return false;
-        return args.size() == ringStructurePrefix_.size()
-            && structurePrefixMatches(args);
+        if (!headConstant) return false;
+        if (headConstant->name == zeroName) {
+            return args.size() == ringStructurePrefix_.size()
+                && structurePrefixMatches(args);
+        }
+        // Bundled ring: the REDUCT spelling `Integer.zero` for
+        // `CommutativeRing.zero(bundle)`.
+        return args.empty() && matchesRingConstReduct(expression, zeroName);
     }
 
 bool Elaborator::matchRingOne(ExpressionPointer expression,
@@ -2613,9 +2644,93 @@ bool Elaborator::matchRingOne(ExpressionPointer expression,
         std::vector<ExpressionPointer> args;
         peelSpine(expression, head, args);
         auto* headConstant = std::get_if<Constant>(&head->node);
-        if (!headConstant || headConstant->name != oneName) return false;
-        return args.size() == ringStructurePrefix_.size()
-            && structurePrefixMatches(args);
+        if (!headConstant) return false;
+        if (headConstant->name == oneName) {
+            return args.size() == ringStructurePrefix_.size()
+                && structurePrefixMatches(args);
+        }
+        return args.empty() && matchesRingConstReduct(expression, oneName);
+    }
+
+ExpressionPointer Elaborator::ringConstReductWhnf(const std::string& name) {
+        auto memo = ringConstReductWhnfMemo_.find(name);
+        if (memo != ringConstReductWhnfMemo_.end()) return memo->second;
+        ExpressionPointer whnf = nullptr;
+        try {
+            whnf = weakHeadNormalForm(environment_, ringConst(name));
+        } catch (const TypeError&) {
+            // Fuel exhausted / stuck — record the failure and never
+            // identify against this constant.
+        }
+        ringConstReductWhnfMemo_[name] = whnf;
+        return whnf;
+    }
+
+bool Elaborator::matchesRingConstReduct(
+        ExpressionPointer candidateHeadOrWhole, const std::string& name) {
+        if (ringStructurePrefix_.empty()) return false;
+        if (!std::get_if<Constant>(&candidateHeadOrWhole->node)) {
+            return false;
+        }
+        ExpressionPointer target = ringConstReductWhnf(name);
+        if (!target) return false;
+        if (structurallyEqual(candidateHeadOrWhole, target)) return true;
+        try {
+            return structurallyEqual(
+                weakHeadNormalForm(environment_, candidateHeadOrWhole),
+                target);
+        } catch (const TypeError&) {
+            return false;
+        }
+    }
+
+ExpressionPointer Elaborator::ringCanonicalizeAtomSpelling(
+        ExpressionPointer expression) {
+        ExpressionPointer cursor = expression;
+        for (int step = 0; step < 8; ++step) {
+            ExpressionPointer head;
+            std::vector<ExpressionPointer> args;
+            peelSpine(cursor, head, args);
+            ExpressionPointer body;
+            if (std::get_if<Lambda>(&head->node)) {
+                if (args.empty()) return cursor;  // bare lambda: head-normal
+                body = head;
+            } else if (auto* constant = std::get_if<Constant>(&head->node)) {
+                const Declaration* declaration =
+                    environment_.lookup(constant->name);
+                if (!declaration) return cursor;
+                auto* definition = std::get_if<Definition>(declaration);
+                if (!definition) return cursor;
+                if (definition->opacity == Opacity::Opaque) return cursor;
+                if (definition->universeParameters.size()
+                        != constant->universeArguments.size()) {
+                    return cursor;
+                }
+                body = definition->body;
+                if (!body) return cursor;
+                if (!definition->universeParameters.empty()) {
+                    body = substituteUniverseLevels(
+                        body, definition->universeParameters,
+                        constant->universeArguments);
+                }
+            } else {
+                return cursor;  // variable / recursor head: head-normal
+            }
+            size_t applied = 0;
+            while (applied < args.size()) {
+                auto* lambda = std::get_if<Lambda>(&body->node);
+                if (!lambda) break;
+                body = substitute(lambda->body, 0, args[applied]);
+                ++applied;
+            }
+            for (; applied < args.size(); ++applied) {
+                body = makeApplication(body, args[applied]);
+            }
+            cursor = body;
+        }
+        // Budget exhausted mid-walk: keep the original spelling so a
+        // deep transparent definition doesn't half-unfold into its key.
+        return expression;
     }
 
 ExpressionPointer Elaborator::ringDeltaExposeAtom(
@@ -2953,9 +3068,11 @@ Elaborator::RingPolynomial Elaborator::normaliseToRingPolynomial(
                 return normaliseToRingPolynomial(exposed, context);
             }
         }
-        // Otherwise: an opaque atom. (Field division `<carrier>.divide` is
-        // unfolded up front in elaborateRingByNormalisation, so it never
-        // reaches here as an atom.)
+        // Otherwise: an opaque atom — keyed at its canonicalized
+        // spelling inside ringPolynomialAtom. (Field division
+        // `<carrier>.divide` is unfolded up front in
+        // elaborateRingByNormalisation, so it never reaches here as an
+        // atom.)
         return ringPolynomialAtom(context, expression);
     }
 
@@ -3531,11 +3648,18 @@ ExpressionPointer Elaborator::proveEqualsCanonical_impl(
                     defeqBridge, exposedProof);
             }
         }
-        // Otherwise: an opaque atom. Its canonical kernel is itself.
+        // Otherwise: an opaque atom. Its canonical kernel is the
+        // FIRST-SEEN spelling of its (canonicalized-key) atom class —
+        // possibly a different defeq spelling than this side's; a
+        // reflexivity proof at this side's spelling bridges the two
+        // (transparent-δβ defeq, accepted at the mixed-endpoint type).
         polynomialOut = ringPolynomialAtom(context, expression);
         ExpressionPointer canonicalKernel =
             buildCanonicalPolynomial(polynomialOut, context);
-        if (!structurallyEqual(expression, canonicalKernel)) {
+        if (!structurallyEqual(expression, canonicalKernel)
+            && !structurallyEqual(
+                   ringCanonicalizeAtomSpelling(expression),
+                   ringCanonicalizeAtomSpelling(canonicalKernel))) {
             throwElaborate(
                 "`ring`: atom's canonical kernel mismatched the "
                 "atom itself (internal error)");
@@ -6741,6 +6865,14 @@ ExpressionPointer Elaborator::buildFactorContractionProof(
         // pairsRemoved[i] copies of t_i and pairsRemoved[i] copies of
         // r_i. Use a multiset count.
         std::vector<bool> keep(factorList.size(), true);
+        // Factor identities in the polynomial layer's atom-key language
+        // (canonicalized-spelling hashes), matching the pair hashes.
+        std::vector<uint64_t> factorKeys;
+        factorKeys.reserve(factorList.size());
+        for (const auto& factor : factorList) {
+            factorKeys.push_back(
+                ringCanonicalizeAtomSpelling(factor)->hash);
+        }
         std::vector<size_t> removedTIndices;       // indices in factorList of removed t_i's
         std::vector<size_t> removedRIndices;       // indices in factorList of removed r_i's
         std::vector<size_t> pairIndexForRemovedT;  // pair index per removed t (parallel to removedTIndices)
@@ -6750,7 +6882,7 @@ ExpressionPointer Elaborator::buildFactorContractionProof(
             int removed = 0;
             for (size_t fi = 0; fi < factorList.size() && removed < toRemove; ++fi) {
                 if (!keep[fi]) continue;
-                if (factorList[fi]->hash == pairs[pi].baseHash) {
+                if (factorKeys[fi] == pairs[pi].baseHash) {
                     keep[fi] = false;
                     removedTIndices.push_back(fi);
                     pairIndexForRemovedT.push_back(pi);
@@ -6765,7 +6897,7 @@ ExpressionPointer Elaborator::buildFactorContractionProof(
             removed = 0;
             for (size_t fi = 0; fi < factorList.size() && removed < toRemove; ++fi) {
                 if (!keep[fi]) continue;
-                if (factorList[fi]->hash == pairs[pi].reciprocalHash) {
+                if (factorKeys[fi] == pairs[pi].reciprocalHash) {
                     keep[fi] = false;
                     removedRIndices.push_back(fi);
                     ++removed;
@@ -7971,8 +8103,11 @@ ExpressionPointer Elaborator::elaborateField(
             pair.reciprocalAtom = reciprocalAtom;
             pair.multipliesProof = multipliesProof;
             pair.nonzeroProof = hypothesisKernelOpened;
-            pair.baseHash = baseHash;
-            pair.reciprocalHash = reciprocalAtom->hash;
+            // Pair hashes speak the polynomial layer's ATOM-KEY language:
+            // the canonicalized spelling's hash (ringPolynomialAtom).
+            pair.baseHash = ringCanonicalizeAtomSpelling(baseAtom)->hash;
+            pair.reciprocalHash =
+                ringCanonicalizeAtomSpelling(reciprocalAtom)->hash;
             pairs.push_back(pair);
         }
         // Check we matched all reciprocal_function arguments. A ground
@@ -8004,8 +8139,9 @@ ExpressionPointer Elaborator::elaborateField(
             pair.reciprocalAtom = reciprocalAtom;
             pair.multipliesProof = multipliesProof;
             pair.nonzeroProof = groundNonzero;
-            pair.baseHash = recipArgHashes[i];
-            pair.reciprocalHash = reciprocalAtom->hash;
+            pair.baseHash = ringCanonicalizeAtomSpelling(baseAtom)->hash;
+            pair.reciprocalHash =
+                ringCanonicalizeAtomSpelling(reciprocalAtom)->hash;
             pairs.push_back(pair);
         }
         } else if (hasPartialReciprocal) {
@@ -8039,8 +8175,10 @@ ExpressionPointer Elaborator::elaborateField(
                 pair.reciprocalAtom = atom.reciprocalApplication;
                 pair.multipliesProof = multipliesProof;
                 pair.nonzeroProof = atom.nonzeroProof;
-                pair.baseHash = atom.base->hash;
-                pair.reciprocalHash = atom.reciprocalApplication->hash;
+                pair.baseHash =
+                    ringCanonicalizeAtomSpelling(atom.base)->hash;
+                pair.reciprocalHash = ringCanonicalizeAtomSpelling(
+                    atom.reciprocalApplication)->hash;
                 pairs.push_back(pair);
             }
         } else {

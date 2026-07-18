@@ -3376,9 +3376,11 @@ private:
             Elaborator& e, std::vector<ExpressionPointer> prefix)
             : elaborator(e), saved(e.ringStructurePrefix_) {
             elaborator.ringStructurePrefix_ = std::move(prefix);
+            elaborator.ringConstReductWhnfMemo_.clear();
         }
         ~RingStructurePrefixGuard() {
             elaborator.ringStructurePrefix_ = std::move(saved);
+            elaborator.ringConstReductWhnfMemo_.clear();
         }
     };
 
@@ -3857,6 +3859,39 @@ private:
     // True if `expression` is `<oneName>` / `<oneName>(s)`.
     bool matchRingOne(ExpressionPointer expression,
                          const std::string& oneName);
+
+    // Compare-without-reducing family, bundled-ring direction: at a
+    // CONCRETE bundle (`CommutativeRing.carrier(Integer.commutative_ring_bundle)`)
+    // the goal freely mixes the bundle spelling of a ring constant with
+    // its REDUCT — `Integer.zero` for `CommutativeRing.zero(bundle)`
+    // (from ℤ-stated lemmas), which the δβ-only atom exposure cannot
+    // reach (the reduction goes projection → reduct, never up). The
+    // matchers identify them by weak-head normal form: both spellings
+    // head-reduce (δβι, through the bundle projections) to the SAME
+    // form, so `whnf(candidate) ≡ whnf(ringConst(name))` structurally.
+    // `ringConstReductWhnf` memoizes the right-hand side per active
+    // structure prefix; returns nullptr when WHNF runs out of fuel.
+    ExpressionPointer ringConstReductWhnf(const std::string& name);
+
+    // Whether a candidate with a non-matching head can still be the ring
+    // constant `name` via WHNF identification. `operandCount` is the
+    // arity of the REDUCT spelling (0 for zero/one — the whole candidate
+    // is compared; 1/2 for negate/binary ops — the candidate's bare HEAD
+    // is compared). Only fires under a non-empty structure prefix.
+    bool matchesRingConstReduct(ExpressionPointer candidateHeadOrWhole,
+                                const std::string& name);
+
+    // Q5 companion, atom side: canonicalize an atom's spelling by
+    // bounded head δβ-reduction (budget 8) so defeq reducts —
+    // `RingVector.restrictLeft(z)(i)` vs `z(sumLeft(i))` — collapse to
+    // ONE atom. Returns the head-normal form when the walk reaches a
+    // variable / opaque / recursor head within budget; returns the
+    // ORIGINAL spelling when the budget runs out (a `determinant(A)`-
+    // sized atom must not half-unfold into a junk key). The result is
+    // definitionally equal to the input, so a reflexivity proof bridges
+    // the original spelling to the canonical atom.
+    ExpressionPointer ringCanonicalizeAtomSpelling(
+        ExpressionPointer expression);
 
     // True if `expression` is a ground Natural numeral — a NaturalLiteral
     // node, `zero`, or either under `successor` wrappers. Sets `value`
@@ -6447,6 +6482,11 @@ private:
     // elaboration; consumed by `ringConst` (term/law head builder) and by
     // the operation matchers.
     std::vector<ExpressionPointer> ringStructurePrefix_;
+    // Memo for `ringConstReductWhnf`, keyed by constant name — valid
+    // only for the ACTIVE structure prefix, so the prefix guard clears
+    // it on install and restore. nullptr entries record fuel-exhausted
+    // WHNF attempts (don't retry).
+    std::map<std::string, ExpressionPointer> ringConstReductWhnfMemo_;
     // Stack of expected types active on the current elaboration call
     // chain. The top of the stack is what the `goal` keyword resolves
     // to. Pushed at the entry to elaborateExpression whenever the
