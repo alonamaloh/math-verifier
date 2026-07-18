@@ -278,7 +278,43 @@ Remaining in this phase:
   diff-ring try is size-capped at 48 nodes. Remaining: the file
   SWEEP of now-redundant hints (exponential_imaginary + trig files,
   ~70 sites);
-- reassess the number-theory `divides` family separately.
+- ~~reassess the number-theory `divides` family separately~~
+  **SCOPED 2026-07-18 (ad2452e2, 3c1f586c) — the dominant NT shape was
+  cast moves after all, now absorbed.** Fresh clustering: 194 of 385
+  tier3-cast sites sit in GaussianInteger (96) / IntegerMod (69) /
+  Integer (29), and the head split is Equality 152 vs `divides` 20 —
+  NOT a divisibility-congruence family. Root cause: an EXPLICIT
+  ascription cast of a homogeneous compound (`((4·t² : ℕ) : ℤ)`, the
+  prove-at-ℕ-cast-wholesale idiom) never passes through the join, so
+  Option B (304d8568) left it un-normalized and `ring` declared true
+  identities FALSE (the compound cast counted as one opaque atom).
+  Fix (ad2452e2): (a) the Option-A pre-pass is REINSTATED at the top
+  of `elaborateRing` — verbatim from d8014f29, no-op without a
+  coercion-over-op; (b) an early ring seat in `autoProveCalcStepRaw`,
+  gated on `termContainsCoercionOverRingOp`, tries `ring` before the
+  structural strategies (the battery used to close these only after
+  5k–20k kernel-steps of search — over the redundancy budget, so the
+  hints could never be flagged). Library wall/CPU flat
+  (33.5s/5m46 → 31.5s/5m52); warnings identical; tests green.
+  Sweep (3c1f586c): balanced_division naturalSquare dance,
+  euclidean dSquareCast + rhsForm + fourAExpand, euler_fermat
+  totient(0) cast transport — collapsed. BONUS: the `t + t`-not-`2·t`
+  constraint documented in balanced_division's header is LIFTED
+  (`(2:ℤ)·(t:ℤ) = ((2·t : ℕ) : ℤ)` is now `ring`); restoring the
+  natural `2·t` spelling there is an enabled follow-up.
+  The residual NT closes=0 sites need NO new mechanism:
+  * `done by GaussianInteger.coordinates_injective` and kin —
+    premise-bearing citations, proper mathematical writing, KEEPS;
+  * the `divides` head sites (20: `divides_add`/`divides_negate`/
+    `divides_multiply_right` cites) — one-word closure-property
+    citations; a divisibility recursion tier is NOT warranted at this
+    thinness (same call as tier4-sign at 177);
+  * `IntegerMod.make`-interior cast+homomorphism compound steps
+    (square_root_of_minus_one:183 shape) — genuinely multi-fact,
+    load-bearing;
+  * wilson/units `by substituting <named-fact>` steps that now flag —
+    kept per redundant_by_is_half_keeps (symmetric with unflagged
+    siblings in the same chains).
 
 The pipeline is now unified: **join inserts → elaboration normalizes to
 leaf-cast form → ring reads coerced literals as coefficients.** The four
