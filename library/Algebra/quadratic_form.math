@@ -181,6 +181,29 @@ theorem Matrix.quadraticForm_submatrix {r : CommutativeRing} {n k : ℕ}
 -- ----------------------------------------------------------------------
 -- The form at a standard basis vector reads off a diagonal entry.
 
+-- Pairing with a basis vector reads off a coordinate.
+theorem RingVector.innerProduct_standardBasisRow_left {r : CommutativeRing} {n : ℕ}
+        (j : NaturalsBelow(n)) (v : RingVector(r, n))
+        : RingVector.innerProduct(Matrix.standardBasisRow(r, n, j), v) = v(j) := {
+  List.Distinct(NaturalsBelow(n), NaturalsBelow.enumerate(n)) by NaturalsBelow.enumerate_distinct;
+  j ∈ NaturalsBelow.enumerate(n) by NaturalsBelow.enumerate_complete;
+  ∀ (t : NaturalsBelow(n)). t ∈ NaturalsBelow.enumerate(n) → ¬(t = j)
+      → Matrix.standardBasisRow(r, n, j)(t) * v(t) = CommutativeRing.zero(r)
+      by (t : NaturalsBelow(n)) (tMember : t ∈ NaturalsBelow.enumerate(n)) (tNotJ : ¬(t = j)) ↦ {
+          Matrix.standardBasisRow(r, n, j)(t) = CommutativeRing.zero(r)
+              by Matrix.standardBasisRow_off;
+          Matrix.standardBasisRow(r, n, j)(t) * v(t)
+             = CommutativeRing.zero(r) * v(t)   by substitution
+             = CommutativeRing.zero(r)
+        };
+  Matrix.standardBasisRow(r, n, j)(j) = CommutativeRing.one(r)
+      by Matrix.standardBasisRow_at as basisAtJ;
+  RingVector.innerProduct(Matrix.standardBasisRow(r, n, j), v)
+     = Matrix.standardBasisRow(r, n, j)(j) * v(j)   by CommutativeRing.sumOver_single
+     = CommutativeRing.one(r) * v(j)                by substituting basisAtJ
+     = v(j)
+}
+
 theorem Matrix.applyVector_standardBasisRow {r : CommutativeRing} {n : ℕ}
         (A : Matrix(r, n, n)) (j i : NaturalsBelow(n))
         : (A · Matrix.standardBasisRow(r, n, j))(i) = A(i, j) := {

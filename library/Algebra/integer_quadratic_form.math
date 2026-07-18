@@ -138,6 +138,136 @@ theorem Matrix.positive_definite_diagonal {n : ℕ}
 }
 
 -- ----------------------------------------------------------------------
+-- The Cauchy–Schwarz entry bound: in a positive-definite form each cross
+-- entry is dominated by the diagonal, A(i,j)² < A(i,i)·A(j,j). Evaluate
+-- the form at A(j,j)·e_i − A(i,j)·e_j: its value factors as
+-- A(j,j)·(A(i,i)·A(j,j) − A(i,j)²), and both the value and A(j,j) are
+-- positive. This is the bound the reduction theory of Stage 2 runs on.
+
+theorem Matrix.cauchy_schwarz_entry_bound {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) (i j : NaturalsBelow(n))
+        (symmetric : Matrix.IsSymmetric(A))
+        (positiveDefinite : Matrix.IsPositiveDefinite(A))
+        (distinct : ¬(i = j))
+        : A(i, j) * A(i, j) < A(i, i) * A(j, j) := {
+  let diagonalEntry : CommutativeRing.carrier(Integer.commutative_ring_bundle) := A(j, j);
+  let negatedCross : CommutativeRing.carrier(Integer.commutative_ring_bundle) :=
+      CommutativeRing.negate(A(i, j));
+  let firstBasis : RingVector(Integer.commutative_ring_bundle, n) :=
+      Matrix.standardBasisRow(Integer.commutative_ring_bundle, n, i);
+  let secondBasis : RingVector(Integer.commutative_ring_bundle, n) :=
+      Matrix.standardBasisRow(Integer.commutative_ring_bundle, n, j);
+  let eliminatingVector : RingVector(Integer.commutative_ring_bundle, n) :=
+      diagonalEntry • firstBasis + negatedCross • secondBasis;
+
+  A(j, j) > (0 : ℤ) by Matrix.positive_definite_diagonal;
+  (0 : ℤ) ≠ A(j, j) by Integer.LessThan.distinct;
+
+  -- The eliminating vector is nonzero: its i-th coordinate is A(j,j).
+  firstBasis(i) = CommutativeRing.one(Integer.commutative_ring_bundle)
+      by Matrix.standardBasisRow_at as firstBasisReads;
+  secondBasis(i) = CommutativeRing.zero(Integer.commutative_ring_bundle)
+      by Matrix.standardBasisRow_off as secondBasisVanishes;
+  eliminatingVector(i)
+     = diagonalEntry * firstBasis(i) + negatedCross * secondBasis(i)
+     = diagonalEntry * CommutativeRing.one(Integer.commutative_ring_bundle)
+       + negatedCross * secondBasis(i)
+           by substituting firstBasisReads
+     = diagonalEntry * CommutativeRing.one(Integer.commutative_ring_bundle)
+       + negatedCross * CommutativeRing.zero(Integer.commutative_ring_bundle)
+           by substituting secondBasisVanishes
+     = A(j, j)
+           by ring
+  as coordinateReads;
+  ¬(eliminatingVector = RingVector.zero(Integer.commutative_ring_bundle, n)) by {
+      suppose eliminatingVector = RingVector.zero(Integer.commutative_ring_bundle, n)
+          as eliminatingZero;
+      A(j, j)
+         = eliminatingVector(i)                                          by coordinateReads
+         = RingVector.zero(Integer.commutative_ring_bundle, n)(i)        by substituting eliminatingZero
+         = Integer.zero;
+      done
+    };
+  Matrix.quadraticForm(A, eliminatingVector) > (0 : ℤ) by positiveDefinite;
+
+  -- The value factors through the discriminant: name the four summands of
+  -- the bilinear expansion, evaluate each, and let ring collect them.
+  A(j, i) = Aᵀ(i, j) = A(i, j) by substituting symmetric as mirrorEntry;
+  Matrix.quadraticForm(A, firstBasis) = A(i, i) as firstDiagonal;
+  Matrix.quadraticForm(A, secondBasis) = A(j, j) as secondDiagonal;
+  RingVector.innerProduct(firstBasis, A · secondBasis)
+     = (A · secondBasis)(i)                       by RingVector.innerProduct_standardBasisRow_left
+     = A(i, j)                                    by Matrix.applyVector_standardBasisRow
+  as firstPairing;
+  RingVector.innerProduct(secondBasis, A · firstBasis)
+     = (A · firstBasis)(j)                        by RingVector.innerProduct_standardBasisRow_left
+     = A(j, i)                                    by Matrix.applyVector_standardBasisRow
+     = A(i, j)                                    by mirrorEntry
+  as secondPairing;
+
+  Matrix.quadraticForm(A, diagonalEntry • firstBasis)
+     = (diagonalEntry * diagonalEntry) * Matrix.quadraticForm(A, firstBasis)
+     = (diagonalEntry * diagonalEntry) * A(i, i)                                          by substituting firstDiagonal
+  as firstSquare;
+  Matrix.quadraticForm(A, negatedCross • secondBasis)
+     = (negatedCross * negatedCross) * Matrix.quadraticForm(A, secondBasis)
+     = (negatedCross * negatedCross) * A(j, j)                                            by substituting secondDiagonal
+  as secondSquare;
+  RingVector.innerProduct(diagonalEntry • firstBasis, A · (negatedCross • secondBasis))
+     = RingVector.innerProduct(diagonalEntry • firstBasis, negatedCross • (A · secondBasis))
+           by substituting Matrix.applyVector_scale
+     = diagonalEntry * RingVector.innerProduct(firstBasis, negatedCross • (A · secondBasis))
+     = diagonalEntry * (negatedCross * RingVector.innerProduct(firstBasis, A · secondBasis))
+           by substituting RingVector.innerProduct_scale_right
+     = diagonalEntry * (negatedCross * A(i, j))
+           by substituting firstPairing
+  as firstCrossValue;
+  RingVector.innerProduct(negatedCross • secondBasis, A · (diagonalEntry • firstBasis))
+     = RingVector.innerProduct(negatedCross • secondBasis, diagonalEntry • (A · firstBasis))
+           by substituting Matrix.applyVector_scale
+     = negatedCross * RingVector.innerProduct(secondBasis, diagonalEntry • (A · firstBasis))
+     = negatedCross * (diagonalEntry * RingVector.innerProduct(secondBasis, A · firstBasis))
+           by substituting RingVector.innerProduct_scale_right
+     = negatedCross * (diagonalEntry * A(i, j))
+           by substituting secondPairing
+  as secondCrossValue;
+
+  Matrix.quadraticForm(A, eliminatingVector)
+     = Matrix.quadraticForm(A, diagonalEntry • firstBasis)
+       + RingVector.innerProduct(diagonalEntry • firstBasis, A · (negatedCross • secondBasis))
+       + RingVector.innerProduct(negatedCross • secondBasis, A · (diagonalEntry • firstBasis))
+       + Matrix.quadraticForm(A, negatedCross • secondBasis)
+           by Matrix.quadraticForm_add
+     = (diagonalEntry * diagonalEntry) * A(i, i)
+       + RingVector.innerProduct(diagonalEntry • firstBasis, A · (negatedCross • secondBasis))
+       + RingVector.innerProduct(negatedCross • secondBasis, A · (diagonalEntry • firstBasis))
+       + Matrix.quadraticForm(A, negatedCross • secondBasis)
+           by substituting firstSquare
+     = (diagonalEntry * diagonalEntry) * A(i, i)
+       + diagonalEntry * (negatedCross * A(i, j))
+       + RingVector.innerProduct(negatedCross • secondBasis, A · (diagonalEntry • firstBasis))
+       + Matrix.quadraticForm(A, negatedCross • secondBasis)
+           by substituting firstCrossValue
+     = (diagonalEntry * diagonalEntry) * A(i, i)
+       + diagonalEntry * (negatedCross * A(i, j))
+       + negatedCross * (diagonalEntry * A(i, j))
+       + Matrix.quadraticForm(A, negatedCross • secondBasis)
+           by substituting secondCrossValue
+     = (diagonalEntry * diagonalEntry) * A(i, i)
+       + diagonalEntry * (negatedCross * A(i, j))
+       + negatedCross * (diagonalEntry * A(i, j))
+       + (negatedCross * negatedCross) * A(j, j)
+           by substituting secondSquare
+     = A(j, j) * (A(i, i) * A(j, j) - A(i, j) * A(i, j))
+           by ring
+  as valueFactors;
+
+  A(j, j) * (A(i, i) * A(j, j) - A(i, j) * A(i, j)) > (0 : ℤ) by substituting valueFactors;
+  A(i, i) * A(j, j) - A(i, j) * A(i, j) > (0 : ℤ) by Integer.positive_of_multiply_positive;
+  done by Integer.lt_of_positive_difference
+}
+
+-- ----------------------------------------------------------------------
 -- Sublattice monotonicity: if the restriction of A along M — the pulled-back
 -- form MᵀAM — represents a number, the ambient form represents it at the
 -- image vector M·x. This is the lever of every escalator universality proof.
