@@ -573,3 +573,18 @@ theorem Matrix.multiply_adjugate {c : CommutativeRing} {n : ℕ}
         };
   done by Matrix.equal_of_entries
 }
+
+-- On vectors the adjugate inverts the action up to the determinant:
+-- A · (adj(A) · x) = det(A) · x.
+theorem Matrix.applyVector_adjugate {c : CommutativeRing} {n : ℕ}
+        (M : Matrix(c, n, n)) (x : RingVector(c, n))
+        : M · (Matrix.adjugate(M) · x) = Matrix.determinant(M) • x := {
+  (M * Matrix.adjugate(M)) · x = M · (Matrix.adjugate(M) · x)
+      by Matrix.applyVector_multiply as actionComposes;
+  Matrix.identity(c, n) · x = x by Matrix.applyVector_identity as identityActs;
+  M · (Matrix.adjugate(M) · x)
+     = (M * Matrix.adjugate(M)) · x                          by actionComposes
+     = (Matrix.determinant(M) • Matrix.identity(c, n)) · x   by substituting Matrix.multiply_adjugate
+     = Matrix.determinant(M) • (Matrix.identity(c, n) · x)   by Matrix.applyVector_scale_matrix
+     = Matrix.determinant(M) • x                             by substituting identityActs
+}

@@ -216,6 +216,21 @@ theorem RingVector.innerProduct_add_left {r : CommutativeRing} {n : ℕ}
   done
 }
 
+theorem RingVector.innerProduct_add_right {r : CommutativeRing} {n : ℕ}
+        (u v w : RingVector(r, n))
+        : RingVector.innerProduct(u, v + w)
+          = RingVector.innerProduct(u, v) + RingVector.innerProduct(u, w) := {
+  RingVector.innerProduct(v, u) = RingVector.innerProduct(u, v)
+      by RingVector.innerProduct_symmetric as leftSummandFlips;
+  RingVector.innerProduct(w, u) = RingVector.innerProduct(u, w)
+      by RingVector.innerProduct_symmetric as rightSummandFlips;
+  RingVector.innerProduct(u, v + w)
+     = RingVector.innerProduct(v + w, u)                            by RingVector.innerProduct_symmetric
+     = RingVector.innerProduct(v, u) + RingVector.innerProduct(w, u)  by RingVector.innerProduct_add_left
+     = RingVector.innerProduct(u, v) + RingVector.innerProduct(w, u)  by substituting leftSummandFlips
+     = RingVector.innerProduct(u, v) + RingVector.innerProduct(u, w)  by substituting rightSummandFlips
+}
+
 theorem RingVector.innerProduct_scale_left {r : CommutativeRing} {n : ℕ}
         (a : CommutativeRing.carrier(r)) (u v : RingVector(r, n))
         : RingVector.innerProduct(a • u, v) = a * RingVector.innerProduct(u, v) := {
@@ -228,6 +243,62 @@ theorem RingVector.innerProduct_scale_left {r : CommutativeRing} {n : ℕ}
      = a * RingVector.innerProduct(u, v)
            by CommutativeRing.sumOver_scale_left;
   done
+}
+
+theorem RingVector.innerProduct_scale_right {r : CommutativeRing} {n : ℕ}
+        (a : CommutativeRing.carrier(r)) (u v : RingVector(r, n))
+        : RingVector.innerProduct(u, a • v) = a * RingVector.innerProduct(u, v) := {
+  RingVector.innerProduct(v, u) = RingVector.innerProduct(u, v)
+      by RingVector.innerProduct_symmetric as innerFlips;
+  RingVector.innerProduct(u, a • v)
+     = RingVector.innerProduct(a • v, u)      by RingVector.innerProduct_symmetric
+     = a * RingVector.innerProduct(v, u)      by RingVector.innerProduct_scale_left
+     = a * RingVector.innerProduct(u, v)      by substituting innerFlips
+}
+
+-- The action is additive in the vector, and scaling the matrix scales the
+-- action — the remaining bilinearity laws the Schur-complement algebra reads.
+theorem Matrix.applyVector_add {r : CommutativeRing} {rows columns : ℕ}
+        (A : Matrix(r, rows, columns)) (u v : RingVector(r, columns))
+        : A · (u + v) = A · u + A · v := {
+  ∀ (i : NaturalsBelow(rows)). (A · u + A · v)(i) = (A · (u + v))(i)
+      by (i : NaturalsBelow(rows)) ↦ {
+          ∀ (k : NaturalsBelow(columns)).
+              A(i, k) * u(k) + A(i, k) * v(k) = A(i, k) * (u + v)(k)
+              by (k : NaturalsBelow(columns)) ↦ done;
+          (A · u + A · v)(i)
+             = CommutativeRing.sumOver((k : NaturalsBelow(columns)) ↦ A(i, k) * u(k),
+                   NaturalsBelow.enumerate(columns))
+               + CommutativeRing.sumOver((k : NaturalsBelow(columns)) ↦ A(i, k) * v(k),
+                     NaturalsBelow.enumerate(columns))
+             = CommutativeRing.sumOver(
+                   (k : NaturalsBelow(columns)) ↦ A(i, k) * u(k) + A(i, k) * v(k),
+                   NaturalsBelow.enumerate(columns))
+                   by CommutativeRing.sumOver_add
+             = CommutativeRing.sumOver((k : NaturalsBelow(columns)) ↦ A(i, k) * (u + v)(k),
+                   NaturalsBelow.enumerate(columns))
+                   by CommutativeRing.sumOver_congruence
+             = (A · (u + v))(i)
+        };
+  A · u + A · v = A · (u + v) by RingVector.equal_of_pointwise;
+  done
+}
+
+theorem Matrix.applyVector_scale_matrix {r : CommutativeRing} {rows columns : ℕ}
+        (c : CommutativeRing.carrier(r)) (A : Matrix(r, rows, columns)) (x : RingVector(r, columns))
+        : (c • A) · x = c • (A · x) := {
+  ∀ (i : NaturalsBelow(rows)). ((c • A) · x)(i) = (c • (A · x))(i)
+      by (i : NaturalsBelow(rows)) ↦ {
+          ∀ (k : NaturalsBelow(columns)). (c • A)(i, k) * x(k) = c * (A(i, k) * x(k))
+              by (k : NaturalsBelow(columns)) ↦ done;
+          ((c • A) · x)(i)
+             = CommutativeRing.sumOver((k : NaturalsBelow(columns)) ↦ c * (A(i, k) * x(k)),
+                   NaturalsBelow.enumerate(columns))
+                   by CommutativeRing.sumOver_congruence
+             = c * (A · x)(i)
+                   by CommutativeRing.sumOver_scale_left
+        };
+  done by RingVector.equal_of_pointwise
 }
 
 -- The transpose is the adjoint: ⟨Aᵀ·u, v⟩ = ⟨u, A·v⟩ — the law that turns

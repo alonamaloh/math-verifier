@@ -82,6 +82,38 @@ theorem Matrix.quadraticForm_scale {r : CommutativeRing} {n : ℕ}
      = c * (c * RingVector.innerProduct(x, A · x))          by RingVector.innerProduct_symmetric
      = (c * c) * Matrix.quadraticForm(A, x)
 
+-- The bilinear expansion of the form at a sum: Q(u + v) splits into the
+-- two diagonal terms and the two cross pairings.
+theorem Matrix.quadraticForm_add {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (u v : RingVector(r, n))
+        : Matrix.quadraticForm(A, u + v)
+          = Matrix.quadraticForm(A, u) + RingVector.innerProduct(u, A · v)
+            + RingVector.innerProduct(v, A · u) + Matrix.quadraticForm(A, v) := {
+  A · (u + v) = A · u + A · v by Matrix.applyVector_add as actionSplits;
+  RingVector.innerProduct(u, A · u + A · v)
+     = RingVector.innerProduct(u, A · u) + RingVector.innerProduct(u, A · v)
+      by RingVector.innerProduct_add_right as firstSummandExpands;
+  RingVector.innerProduct(v, A · u + A · v)
+     = RingVector.innerProduct(v, A · u) + RingVector.innerProduct(v, A · v)
+      by RingVector.innerProduct_add_right as secondSummandExpands;
+  Matrix.quadraticForm(A, u + v)
+     = RingVector.innerProduct(u + v, A · (u + v))
+     = RingVector.innerProduct(u, A · (u + v)) + RingVector.innerProduct(v, A · (u + v))
+           by RingVector.innerProduct_add_left
+     = RingVector.innerProduct(u, A · u + A · v) + RingVector.innerProduct(v, A · u + A · v)
+           by substituting actionSplits
+     = (RingVector.innerProduct(u, A · u) + RingVector.innerProduct(u, A · v))
+       + RingVector.innerProduct(v, A · u + A · v)
+           by substituting firstSummandExpands
+     = (RingVector.innerProduct(u, A · u) + RingVector.innerProduct(u, A · v))
+       + (RingVector.innerProduct(v, A · u) + RingVector.innerProduct(v, A · v))
+           by substituting secondSummandExpands
+     = RingVector.innerProduct(u, A · u) + RingVector.innerProduct(u, A · v)
+       + RingVector.innerProduct(v, A · u) + RingVector.innerProduct(v, A · v)
+           by ring;
+  done
+}
+
 -- Pulling back preserves symmetry, so MᵀAM is again a quadratic form.
 theorem Matrix.pullback_symmetric {r : CommutativeRing} {n k : ℕ}
         (A : Matrix(r, n, n)) (M : Matrix(r, n, k))
