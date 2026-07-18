@@ -1917,6 +1917,48 @@ ExpressionPointer Elaborator::autoProveCalcStepRaw(
             innerProof = tryClassifyDiff(
                 localBinders, openedContext, leftCursor, rightCursor);
             if (innerProof) break;
+            // Cost-gated ring on an interior pair. A diff whose closing
+            // fact is a ring identity (`x + x` vs `2 · x` under a
+            // symbolic power) sits at a level the structural walk would
+            // descend PAST — the next level down, one side matches
+            // structurally, and the ring-provable pair is never seen as
+            // a unit. Try the polynomial normaliser on any interior
+            // carrier-typed pair: a mismatch (e.g. two symbolic-power
+            // atoms) hits the fingerprint fast-fail cheaply, and a hit
+            // closes the leaf exactly where congruence wants it.
+            // Interior levels only — the top-level pair belongs to the
+            // caller's own ring/AC seats.
+            if (!pathStepsOutsideIn.empty()) {
+                bool carrierTyped = false;
+                try {
+                    carrierTyped = structurallyEqual(
+                        closeOverLocalBinders(
+                            inferTypeInLocalContext(
+                                localBinders, leftCursor),
+                            localBinders, localBinders.size()),
+                        carrierType);
+                } catch (const TypeError&) { carrierTyped = false; }
+                  catch (const ElaborateError&) { carrierTyped = false; }
+                if (carrierTyped) {
+                    ExpressionPointer leafEquality =
+                        makeConstant("Equality", {carrierLevel});
+                    leafEquality = makeApplication(
+                        leafEquality, carrierType);
+                    leafEquality = makeApplication(
+                        leafEquality, leftCursor);
+                    leafEquality = makeApplication(
+                        leafEquality, rightCursor);
+                    try {
+                        innerProof = elaborateRing(
+                            localBinders, leafEquality, line, column);
+                    } catch (const ElaborateError&) {
+                        innerProof = nullptr;
+                    } catch (const TypeError&) {
+                        innerProof = nullptr;
+                    }
+                    if (innerProof) break;
+                }
+            }
             auto* leftApp =
                 std::get_if<Application>(&leftCursor->node);
             auto* rightApp =
