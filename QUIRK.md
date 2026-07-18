@@ -333,7 +333,43 @@ literal spelling too. Lock: `Test/name_your_summands_test.math` — the
 under-binder pointwise chain cites `productOver_multiply` against a
 fully `let`-spelled goal.
 
-## Q8 — two small elaborator gaps hit while building sign_extend
+## Q8 — elaborator gaps around leading-implicit / unapplied-fact arguments
+
+- **FIXED 2026-07-19 — unapplied ∀-fact in an explicit proposition slot:**
+  `NaturalsBelow.embed(Natural.less_or_equal_add_right, element)` failed
+  ("expects n ≤ n + p but argument is (a b : ℕ) → a ≤ a + b") while the
+  same lemma passed unapplied to `NaturalsBelow.make`'s proof slot works.
+  Root cause: `make`'s implicits resolve BACKWARD (from the expected
+  return type) before its proof slot elaborates, so the slot's domain is
+  concrete and the by-name citation path fires; `embed`'s `{k n}` resolve
+  from the LATER `element` argument, so the bound slot elaborated under a
+  metavariable domain and took the lemma bottom-up (a Pi type that fits
+  nothing). Fix: `inferLeadingArguments` now DEFERS a bare-identifier
+  argument that is an unapplied ∀-fact (universal over data, Proposition
+  conclusion — `factIsUniversalOverData`) to the second pass, exactly
+  like bare implicit-leading operations (T6 (b)); the second pass
+  elaborates it against the by-then-concrete domain. Lock:
+  `Test/unapplied_fact_argument_test.math`.
+
+- **OPEN (sharpened 2026-07-19) — partial application with an unpinnable
+  leading implicit in a stated proposition:**
+  `Function.IsInjective(NaturalsBelow.shift(n));` fails with "could not
+  infer all leading arguments of 'NaturalsBelow.shift': position 0 is
+  unassigned" — `shift {p : ℕ} (n : ℕ)`'s `{p}` occurs nowhere else in
+  the claim, so the claim TEXT genuinely underdetermines it (this is NOT
+  a compare-without-reducing bug: `IsInjective`'s `?A → ?B` unifies fine,
+  it just pins nothing). Any fix must complete elaboration WITH an
+  unresolved metavariable and then ∀-GENERALIZE it at the statement
+  boundary (auto-bound implicits, Lean-style): the claim would record
+  `∀ {p}. IsInjective(shift(n))`, which the S2 ∀-instantiation machinery
+  already consumes downstream, and a theorem signature would grow a fresh
+  implicit binder. That is a core-inference redesign (a mode where
+  `inferLeadingArguments` emits a fresh generalizable free variable
+  instead of throwing, plus quantification at claim/theorem-statement
+  elaboration), not a matcher alignment — deliberately NOT forced in the
+  2026-07-19 matcher session. Workaround stands: double-paren ascription
+  `Function.IsInjective((NaturalsBelow.shift(n) : NaturalsBelow(p) →
+  NaturalsBelow(n + p)))` — 4 sites in `Algebra/matrix_direct_sum.math`.
 
 - **Implicit under `Set`-typed slot:** `List.filter(Permutation.indexPairBelow, …)`
   fails to instantiate `indexPairBelow`'s implicit `{n}` when the filter's

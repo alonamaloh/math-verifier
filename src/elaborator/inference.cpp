@@ -642,18 +642,45 @@ Elaborator::CallInferenceResult Elaborator::inferLeadingArguments(
                     const Declaration* argumentDeclaration =
                         environment_.lookup(bareIdentifier->qualifiedName);
                     if (argumentDeclaration
-                        && universeParameterCount(*argumentDeclaration) == 0
-                        && environment_.implicitArgumentCount(
-                               bareIdentifier->qualifiedName) > 0) {
-                        std::string trailingArgumentFresh =
-                            "_callTrailingArgument_" + std::to_string(j);
-                        deferredTrailingArguments.push_back(
-                            {j, pi->domain, trailingArgumentFresh});
-                        elaboratedTrailingArguments.push_back(nullptr);
-                        cursor = openBinder(pi->codomain,
-                                             trailingArgumentFresh,
-                                             FreeVariableOrigin::Internal);
-                        continue;
+                        && universeParameterCount(*argumentDeclaration)
+                               == 0) {
+                        bool implicitLeading =
+                            environment_.implicitArgumentCount(
+                                bareIdentifier->qualifiedName) > 0;
+                        // Q8: an UNAPPLIED ∀-fact (universal over data,
+                        // Proposition conclusion — an explicit-binder
+                        // lemma cited by bare name, e.g.
+                        // `NaturalsBelow.embed(less_or_equal_add_right,
+                        // x)`) can never fit a proposition domain
+                        // bottom-up: its Pi type contributes nothing to
+                        // the unification. Defer it like the
+                        // bare-operation case; the second pass
+                        // elaborates it against the by-then-concrete
+                        // domain, where the by-name citation path solves
+                        // its arguments from the slot's proposition.
+                        bool unappliedFactArgument = false;
+                        if (!implicitLeading) {
+                            ExpressionPointer argumentDeclarationType =
+                                declarationType(*argumentDeclaration);
+                            if (argumentDeclarationType) {
+                                unappliedFactArgument =
+                                    factIsUniversalOverData(
+                                        Context{},
+                                        argumentDeclarationType);
+                            }
+                        }
+                        if (implicitLeading || unappliedFactArgument) {
+                            std::string trailingArgumentFresh =
+                                "_callTrailingArgument_"
+                                + std::to_string(j);
+                            deferredTrailingArguments.push_back(
+                                {j, pi->domain, trailingArgumentFresh});
+                            elaboratedTrailingArguments.push_back(nullptr);
+                            cursor = openBinder(pi->codomain,
+                                                 trailingArgumentFresh,
+                                                 FreeVariableOrigin::Internal);
+                            continue;
+                        }
                     }
                 }
             }

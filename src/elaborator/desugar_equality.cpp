@@ -491,6 +491,35 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
                 }
             }
         }
+        // Half-match fallback: one operand's ANNOTATED type is a REDUCT of
+        // the registered carrier — a `let d : ℤ` scalar against the
+        // `(•) on (CommutativeRing.carrier, RingVector)` registration. The
+        // reduction goes bundle projection → reduct, so no unfolding of
+        // the operand's own type can ever reach the registered name (the
+        // mirror image of the alias fallbacks above). When exactly ONE
+        // registration of this symbol matches on the OTHER side's head,
+        // adopt it: the implicit fillers pin the structure from the
+        // matching operand, and the application check verifies the
+        // annotated operand really is the carrier's reduct (defeq) — a
+        // wrong operand now errors at the argument, not with "operator
+        // not supported".
+        if (targetFunction.empty()) {
+            std::string uniqueHalfMatch;
+            int halfMatchCount = 0;
+            for (const auto& [key, funcName]
+                 : environment_.operatorRegistry) {
+                const auto& [opSym, leftReg, rightReg] = key;
+                if (opSym != operatorSymbol) continue;
+                bool leftHit = leftReg == operandTypeName;
+                bool rightHit = rightReg == rightTypeName;
+                if (leftHit == rightHit) continue;  // full match handled
+                                                     // above; no match is
+                                                     // no evidence
+                ++halfMatchCount;
+                uniqueHalfMatch = funcName;
+            }
+            if (halfMatchCount == 1) targetFunction = uniqueHalfMatch;
+        }
         if (targetFunction.empty()) {
             if (operatorSymbol == "[]") {
                 throw ElaborateError(
