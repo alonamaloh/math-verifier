@@ -1,0 +1,122 @@
+-- K1 compute spike (PLAN_15_THEOREM route note): box-enumerate the
+-- represented values of x² and x² + y² up to 15, in-kernel, with
+-- explicit witnesses — and ledger the wall-clock. This measures the
+-- per-instance kernel cost of concrete-vector representation facts, the
+-- quantity that decides whether in-kernel bounded-representation
+-- computation is viable at escalator scale (S5.K1).
+--
+-- Positives only: the represented n ≤ 15 are {1, 4, 9} for x² and
+-- {1, 2, 4, 5, 8, 9, 10, 13} for x² + y². The negative side (a box
+-- bound argument) is Stage 3 theory, not a compute question.
+
+module Test.fifteen_spike_test
+
+import Logic.basics
+import Logic.functions
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.multiply_bounds
+import Natural.classical_decidable
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.embedding
+import Integer.order
+import Integer.sign
+import Set.finite
+import Set.finite_pigeonhole
+import Lists.list
+import Lists.map
+import Lists.distinct
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.ring_from_integer
+import Algebra.integer_domain
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.matrix_transpose
+import Algebra.matrix_vector
+import Algebra.matrix_submatrix
+import Algebra.adjugate
+import Algebra.quadratic_form
+import Algebra.matrix_direct_sum
+import Algebra.integer_quadratic_form
+import Algebra.square_form
+
+definition Matrix.sumOfTwoSquaresForm : Matrix(Integer.commutative_ring_bundle, 2, 2) :=
+  Matrix.directSum(Matrix.squareForm, Matrix.squareForm)
+
+-- ----------------------------------------------------------------------
+-- x²: the squares below 15.
+
+theorem Spike.squareForm_represents_four : Matrix.Represents(Matrix.squareForm, (4 : ℤ)) := {
+  Matrix.Represents(Matrix.squareForm, (2 : ℤ) * (2 : ℤ)) by Matrix.squareForm_represents_square;
+  (2 : ℤ) * (2 : ℤ) = (4 : ℤ) as valueComputes;
+  done by substituting valueComputes
+}
+
+theorem Spike.squareForm_represents_nine : Matrix.Represents(Matrix.squareForm, (9 : ℤ)) := {
+  Matrix.Represents(Matrix.squareForm, (3 : ℤ) * (3 : ℤ)) by Matrix.squareForm_represents_square;
+  (3 : ℤ) * (3 : ℤ) = (9 : ℤ) as valueComputes;
+  done by substituting valueComputes
+}
+
+-- ----------------------------------------------------------------------
+-- x² + y²: the sums of two squares below 15.
+
+theorem Spike.sumOfTwoSquares_represents (a b : ℤ) (target : ℤ)
+        (valueComputes : a * a + b * b = target)
+        : Matrix.Represents(Matrix.sumOfTwoSquaresForm, target) := {
+  Matrix.Represents(Matrix.squareForm, a * a) by Matrix.squareForm_represents_square;
+  Matrix.Represents(Matrix.squareForm, b * b) by Matrix.squareForm_represents_square;
+  Matrix.Represents(Matrix.sumOfTwoSquaresForm, a * a + b * b) by Matrix.directSum_represents_sum;
+  done by substituting valueComputes
+}
+
+theorem Spike.represents_one : Matrix.Represents(Matrix.sumOfTwoSquaresForm, (1 : ℤ)) := {
+  (1 : ℤ) * (1 : ℤ) + (0 : ℤ) * (0 : ℤ) = (1 : ℤ);
+  done by Spike.sumOfTwoSquares_represents
+}
+
+theorem Spike.represents_two : Matrix.Represents(Matrix.sumOfTwoSquaresForm, (2 : ℤ)) := {
+  (1 : ℤ) * (1 : ℤ) + (1 : ℤ) * (1 : ℤ) = (2 : ℤ);
+  done by Spike.sumOfTwoSquares_represents
+}
+
+theorem Spike.represents_four : Matrix.Represents(Matrix.sumOfTwoSquaresForm, (4 : ℤ)) := {
+  (2 : ℤ) * (2 : ℤ) + (0 : ℤ) * (0 : ℤ) = (4 : ℤ);
+  done by Spike.sumOfTwoSquares_represents
+}
+
+theorem Spike.represents_five : Matrix.Represents(Matrix.sumOfTwoSquaresForm, (5 : ℤ)) := {
+  (2 : ℤ) * (2 : ℤ) + (1 : ℤ) * (1 : ℤ) = (5 : ℤ);
+  done by Spike.sumOfTwoSquares_represents
+}
+
+theorem Spike.represents_eight : Matrix.Represents(Matrix.sumOfTwoSquaresForm, (8 : ℤ)) := {
+  (2 : ℤ) * (2 : ℤ) + (2 : ℤ) * (2 : ℤ) = (8 : ℤ);
+  done by Spike.sumOfTwoSquares_represents
+}
+
+theorem Spike.represents_nine : Matrix.Represents(Matrix.sumOfTwoSquaresForm, (9 : ℤ)) := {
+  (3 : ℤ) * (3 : ℤ) + (0 : ℤ) * (0 : ℤ) = (9 : ℤ);
+  done by Spike.sumOfTwoSquares_represents
+}
+
+theorem Spike.represents_ten : Matrix.Represents(Matrix.sumOfTwoSquaresForm, (10 : ℤ)) := {
+  (3 : ℤ) * (3 : ℤ) + (1 : ℤ) * (1 : ℤ) = (10 : ℤ);
+  done by Spike.sumOfTwoSquares_represents
+}
+
+theorem Spike.represents_thirteen : Matrix.Represents(Matrix.sumOfTwoSquaresForm, (13 : ℤ)) := {
+  (3 : ℤ) * (3 : ℤ) + (2 : ℤ) * (2 : ℤ) = (13 : ℤ);
+  done by Spike.sumOfTwoSquares_represents
+}

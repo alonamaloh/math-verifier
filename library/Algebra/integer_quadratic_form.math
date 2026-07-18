@@ -380,6 +380,30 @@ theorem Matrix.directSum_represents_right {n p : ℕ}
   done by Matrix.represents_of_sublattice
 }
 
+-- Representations add across a direct sum: place the two witnesses in
+-- their blocks and the form splits as the sum of the block values.
+theorem Matrix.directSum_represents_sum {n p : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (B : Matrix(Integer.commutative_ring_bundle, p, p)) (s t : ℤ)
+        (leftRepresented : Matrix.Represents(A, s))
+        (rightRepresented : Matrix.Represents(B, t))
+        : Matrix.Represents(Matrix.directSum(A, B), s + t) := {
+  choose u such that Matrix.quadraticForm(A, u) = s as leftValue from leftRepresented;
+  choose v such that Matrix.quadraticForm(B, v) = t as rightValue from rightRepresented;
+  Matrix.quadraticForm(Matrix.directSum(A, B),
+      Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, n, p) · u
+      + Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, n, p) · v)
+     = Matrix.quadraticForm(A, u) + Matrix.quadraticForm(B, v)
+           by Matrix.directSum_quadraticForm
+     = s + Matrix.quadraticForm(B, v)
+           by substituting leftValue
+     = s + t
+           by substituting rightValue;
+  witness Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, n, p) · u
+          + Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, n, p) · v
+      with done
+}
+
 theorem Matrix.directSum_universal_left {n p : ℕ}
         (A : Matrix(Integer.commutative_ring_bundle, n, n))
         (B : Matrix(Integer.commutative_ring_bundle, p, p))
