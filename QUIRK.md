@@ -51,6 +51,56 @@ four per-index leaves).
 explicit combining calc `A = v by lhsEq = B by rhsEq` (the named-hyp flip that
 F3 also wants).
 
+## Q9 — under-binder congruence (`by ((x) ↦ …)`) falls through when the changed slot's head is a compound application
+
+**Symptom.** A chain `=` step between two `CommutativeRing.sumOver` calls whose
+lambdas differ pointwise, justified by the under-binder pointwise-lambda form,
+fails with "bare `claim` / `done` needs an expected type from context" pointing
+into the lambda body — the congruence path silently fell through and the lambda
+was elaborated with no expected type. Trigger: the differing slot's root is an
+application whose HEAD is itself a compound application — a matrix-product
+entry `(B * Matrix.inclusionMatrix(r, sel))(p, j)` rewritten to `B(p, sel(j))`,
+or a definition application `Matrix.borderElimination(B)(k, l)` rewritten to
+`Matrix.identity(r, 1 + m)(k, l)`. The same step with a VARIABLE-headed slot
+(`C(i, j)` → `D(i, j)`, or `u(j)` → `v(j)` inside a product) fires fine, as
+does a whole-body swap where both bodies share a `*` root
+(`Test/name_your_summands_test.math`).
+
+**Repro.** Same import set as `Algebra/matrix_submatrix.math`:
+
+```math
+theorem Test.probe_entries {r : CommutativeRing} {m : ℕ}
+        (B : Matrix(r, 1 + m, 1 + m)) (i : NaturalsBelow(m))
+        : CommutativeRing.sumOver(
+              (j : NaturalsBelow(m)) ↦
+                  (B * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m)))(NaturalsBelow.inclusion(m, i), j),
+              NaturalsBelow.enumerate(m))
+          = CommutativeRing.sumOver(
+              (j : NaturalsBelow(m)) ↦ B(NaturalsBelow.inclusion(m, i), NaturalsBelow.inclusion(m, j)),
+              NaturalsBelow.enumerate(m)) :=
+  CommutativeRing.sumOver(…f…) = CommutativeRing.sumOver(…g…)
+      by ((j : NaturalsBelow(m)) ↦ { done by Matrix.multiply_inclusionMatrix_entry })
+-- fails; the identical statement closed via a stated ∀ + argument-free
+-- `by CommutativeRing.sumOver_congruence` passes (probe F).
+```
+
+**Root cause hypothesis.** The single-binder-diff detection walks the two
+lambda bodies in structural lockstep looking for the diff position; when the
+differing subterm's function position is itself an `Application` on one side
+and a variable (or different-arity spine) on the other, the walk keeps
+descending into the spines and lands on a function-level "diff" (e.g.
+`Matrix.multiply(…, B, J)` vs `B` as functions), so the assembled pointwise
+obligation doesn't match the author's lambda and the path falls through —
+another member of the "compare heads without reducing/aligning first"
+family (Q3/Q5/Q7).
+
+**Attempts.** Bisected 2026-07-18 with five probes (variable slots, product
+slots, compound-head slots, classical route); only compound-head slots fail.
+
+**Workaround.** State the pointwise fact as a named/anonymous ∀ and close the
+chain step with argument-free `by CommutativeRing.sumOver_congruence` (the
+classical form; used at four sites in `Algebra/schur_complement.math`).
+
 ## How to use this file
 
 When a new quirk shows up that's worth a dedicated session, add an
