@@ -97,3 +97,24 @@ Arguably good pedagogy at a definition's FIRST unfolding, but it taxes
 every wrapper-headed chain; the fix (δ-unfold candidate heads before
 diff-matching, symmetric to the ζ-unfold the chain endpoints already get)
 is elaborator work for a dedicated session.
+
+## Q4 — a universe-polymorphic `automatic` theorem never fires
+
+**Symptom.** `automatic theorem Equality.not_equal_symmetric {A : Type} …`
+verifies fine but the discharge never uses it: the failed-claim candidate
+listing shows it with `(A : Type _auto_u_0)` and no "needs import" note —
+in scope, shape-matched, yet not applied. Changing the binder to
+`{A : Type(0)}` makes the same lemma fire silently (T3, 2026-07-18).
+
+**Root cause hypothesis.** The automatic-lemma index stores/matches at a
+concrete universe; an unresolved `_auto_u_0` level variable in the key
+fails unification with the goal's concrete level (or the registration is
+skipped for polymorphic entries). No diagnostic distinguishes "not
+automatic" from "automatic but universe-blocked".
+
+**Attempts.** Monomorphizing to `Type(0)` — works; adopted.
+
+**Workaround / rule.** Declare `automatic` lemmas MONOMORPHIC (`Type(0)`
+carriers) until the index learns levels. Fix candidates: unify levels in
+the automatic index, or at least warn when an `automatic` declaration is
+universe-polymorphic (it silently degrades to citation-only today).
