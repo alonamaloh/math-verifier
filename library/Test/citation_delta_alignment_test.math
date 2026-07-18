@@ -1,0 +1,57 @@
+-- Matcher/normalization batch 3, item 2: citation argument inference
+-- δ-aligns a goal-side wrapper head whose body is a VALUE application
+-- (`Matrix.upperRightUnit := J_L * J_Rᵀ` applied to entry indices — the
+-- body has no lambdas, so the spine arguments re-apply onto the
+-- unfolded value). Error inbox 2026-07-19, rank_two_escalators; the
+-- converted entry lemmas there are the live acceptance sites. The
+-- probes hide the decisive metavariable so that only the δ-aligned
+-- position can pin it (a WHNF fallback overshoots the wrapper's
+-- altitude down to `+`/`*`). The second probe locks the companion
+-- flex-application shape (`select(q)` against a δ-defined constant,
+-- `select` pinned elsewhere) end-to-end through the citation pipeline.
+module Test.citation_delta_alignment_test
+
+import axioms
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+
+-- ----------------------------------------------------------------------
+-- (a) Wrapper whose δ-body is a value application: matching
+-- `Probe.pairCode(?a, ?b)` against `Probe.tag(n)` must unfold `tag`
+-- and re-apply `n` to reach `Probe.pairCode(7, n)`; `?b` occurs
+-- nowhere else in the conclusion.
+
+definition Probe.pairCode (a b : ℕ) : ℕ := a * 10 + b
+
+definition Probe.tag : ℕ → ℕ := Probe.pairCode(7)
+
+theorem Probe.pairCode_lower (a b : ℕ) : a * 10 ≤ Probe.pairCode(a, b) := {
+  a * 10 ≤ a * 10 + b by Natural.less_or_equal_add_right;
+  done
+}
+
+theorem Probe.wrapper_head_delta_aligns (n : ℕ) : 7 * 10 ≤ Probe.tag(n) := {
+  done by Probe.pairCode_lower
+}
+
+-- ----------------------------------------------------------------------
+-- Flex application against a δ-defined constant: `?select` is pinned by
+-- the function position of `table(select)`, and `?q` appears ONLY under
+-- `select(q)` — the constant `Probe.markedSpot` must be seen as
+-- `Probe.shiftedIndex(4)` somewhere in the pipeline to pin `?q`. The
+-- table stays an abstract parameter so no defeq shortcut can close the
+-- goal without the citation.
+
+definition Probe.shiftedIndex (n : ℕ) : ℕ := 1 + n
+
+definition Probe.markedSpot : ℕ := Probe.shiftedIndex(4)
+
+theorem Probe.flex_argument_delta_aligns
+        (table : (ℕ → ℕ) → ℕ → ℕ)
+        (reads : ∀ (select : ℕ → ℕ). ∀ (q : ℕ). table(select)(select(q)) = select(q))
+        : table(Probe.shiftedIndex)(Probe.markedSpot) = Probe.markedSpot := {
+  done by reads
+}

@@ -69,11 +69,22 @@ ExpressionPointer Elaborator::unfoldHeadConstantOneStep(ExpressionPointer expr) 
                 body, definition->universeParameters,
                 constant->universeArguments);
         }
-        // β-apply the spine arguments into the unfolded body.
-        for (const auto& argument : args) {
+        // β-apply the spine arguments into the unfolded body; when the
+        // body runs out of lambdas — a wrapper whose body is a VALUE
+        // application, e.g. `Matrix.upperRightUnit := J_L * J_Rᵀ`
+        // applied to entry indices — re-apply the remaining arguments
+        // instead of refusing (the result is δβ-equal either way, and
+        // the head-alignment loops that call this want to see the
+        // value's own head).
+        size_t applied = 0;
+        while (applied < args.size()) {
             auto* lambda = std::get_if<Lambda>(&body->node);
-            if (!lambda) return nullptr;
-            body = substitute(lambda->body, 0, argument);
+            if (!lambda) break;
+            body = substitute(lambda->body, 0, args[applied]);
+            ++applied;
+        }
+        for (; applied < args.size(); ++applied) {
+            body = makeApplication(body, args[applied]);
         }
         return body;
     }
