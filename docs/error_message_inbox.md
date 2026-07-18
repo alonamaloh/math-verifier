@@ -1744,3 +1744,17 @@ path was attempted but did not fire, say so — "endpoints are not a
 single-binder-diff application of a registered head (diff found at …)" —
 instead of letting the lambda elaborate bare; even just naming the
 under-binder machinery in the error would have saved the bisection.
+
+**FRICTION (citation leaves a ground premise unproved, 2026-07-19,
+fifteen_spike).** `by Spike.sumOfTwoSquares_represents(a := 1, b := 0)`
+against goal `Represents(F, 1)` fails with "could not infer hole(s) at
+position 3" — position 3 is the lemma's GROUND premise
+`a*a + b*b = target`, fully determined once a, b, and target are pinned
+(`1*1 + 0*0 = 1`, which the ground tier decides instantly). The
+citation's premise discharge tries context matching but never hands a
+remaining closed premise to the prover/ground tier. Workaround: state
+the ground fact as a bare claim first and cite argument-free (premise
+match-and-unify then pins a and b from it). Fix direction: after
+argument inference, attempt auto-proof of remaining CLOSED
+Proposition-typed premises (the ground tier makes this cheap; bound the
+attempt to avoid burying real inference failures).
