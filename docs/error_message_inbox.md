@@ -1854,3 +1854,40 @@ that respells the endpoint at the unfolded product + explicit
 `shift(1, top(0))` index. Fix direction: extend Q3's one-step head
 δ-alignment to (a) citation targets' outer wrapper heads and (b) term-side
 constants matched against flex-headed application patterns.
+
+**FRICTION (dimension-indexed pattern definition on sealed ℕ, 2026-07-19,
+escalator_tree).** A `(n : ℕ) → Matrix(…, n, n) → Proposition` pattern
+definition (`Matrix.IsEscalator`, the `enumerate` shape) hits three
+walls at USE sites: (a) at a VARIABLE `1 + n` the goal/hypothesis is a
+stuck `Natural.Raw_recursor` (sealed `Natural.add`), so `witness`/
+`choose` need an `unfold Natural.add in { … }` wrapper; (b) inside that
+wrapper `witness` still fails ("anonymous tuple needs an expected type
+from context" — the wrapper does not propagate the outer expected type
+into a block), workaround = state the ∃ as a bare claim (own expected
+type) and close with `done`; (c) at the LITERAL `1` the elaborator
+re-typechecks the unfolded definition and rejects its own stored body
+("function expects Natural.Raw → Type 0 but this argument is
+Natural → Type 0" — the Raw recursor vs the sealed-Natural motive), so
+even citing through the definition breaks. WORKING RECIPE (in
+escalator_tree): quarantine the recursion behind intro/elim faces
+(`escalator_step`, `escalator_split`) proved once with the wrapper +
+bare-claim idiom, and have every consumer — including the induction
+arms and the literal-rank theorems — go claim-first through the faces
+(`∃ … by Matrix.escalator_split as parentExists; choose … from
+parentExists`); `choose … from <face-lemma>` directly fails its strict
+unambiguous-discharge mode ("could not infer hole(s) at position 2"),
+the claim-first form does not. Cost: 3 `unfold` leak markers (budget
+394 → 397). Fix directions: let `unfold … in` thread the expected type
+into block bodies; treat a literal index against a sealed-ℕ pattern
+definition by the same constructor-view bridge the kernel uses; relax
+the choose-from-lemma discharge mode when a downstream goal validates.
+
+**FRICTION (`Matrix.corner` at a literal-dimension matrix, 2026-07-19,
+escalator_tree).** `Matrix.corner(A)` for `A : Matrix(…, 1, 1)` fails
+("could not infer all leading arguments: position 1 unassigned") — the
+implicit `{m}` needs `1 + ?m ≡ 1`, the known ground-defeq inference gap
+(S3 spine note). Workaround that reads fine: bind an ascribed let
+`let bordered : Matrix(…, 1 + 0, 1 + 0) := A;` and speak
+`Matrix.corner(bordered)` — ζ-transparency keeps every citation honest.
+Same fix direction as the S3 filing (ground evaluation inside implicit
+unification).

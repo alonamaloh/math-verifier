@@ -1,0 +1,688 @@
+-- Algebra/escalator_tree.math
+--
+-- The escalator tree (fifteen-theorem stage S3.E2). An escalator is a
+-- form reachable from the empty form by iterated escalation: the empty
+-- form is the root, and each escalation extends a node by one basis
+-- vector whose norm is the node's truant. The empty form represents
+-- exactly 0, so its truant is 1 and the unique rank-1 escalator is x²
+-- on the nose; the rank-2 classification then places every rank-2
+-- escalator next to x² + y² or x² + 2y². A non-universal escalator
+-- always has an escalation — extend diagonally, with zero border and
+-- the truant in the corner — so the tree only terminates at universal
+-- forms.
+
+module Algebra.escalator_tree
+
+import axioms
+import Logic.basics
+import Logic.functions
+import Logic.exists
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.one_plus_induction
+import Natural.order
+import Natural.add_order
+import Natural.subtraction
+import Natural.classical_decidable
+import Natural.least_number
+import Natural.multiply_bounds
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.embedding
+import Integer.order
+import Integer.order_multiply
+import Integer.sign
+import Integer.units
+import Integer.integral_domain
+import Set.finite
+import Set.finite_pigeonhole
+import Lists.list
+import Lists.map
+import Lists.append
+import Lists.distinct
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.ring_from_integer
+import Algebra.integer_domain
+import Algebra.finite_permutation
+import Algebra.permutation_enumeration
+import Algebra.permutation_sign
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.matrix_transpose
+import Algebra.matrix_vector
+import Algebra.matrix_submatrix
+import Algebra.matrix_direct_sum
+import Algebra.determinant
+import Algebra.determinant_identity
+import Algebra.determinant_transpose
+import Algebra.determinant_multiplicative
+import Algebra.alternating_collapse
+import Algebra.determinant_row_permutation
+import Algebra.adjugate
+import Algebra.matrix_inverse
+import Algebra.determinant_bordered
+import Algebra.quadratic_form
+import Algebra.schur_complement
+import Algebra.integer_quadratic_form
+import Algebra.square_form
+import Algebra.truant
+import Algebra.escalation
+import Algebra.rank_two_escalators
+
+-- ----------------------------------------------------------------------
+-- Rank zero: the empty form. Its only vector is zero, so it represents
+-- exactly 0 — its truant is 1 — and symmetry and positive-definiteness
+-- hold vacuously.
+
+theorem Matrix.zero_dimension_quadraticForm
+        (A : Matrix(Integer.commutative_ring_bundle, 0, 0))
+        (x : RingVector(Integer.commutative_ring_bundle, 0))
+        : Matrix.quadraticForm(A, x) = (0 : ℤ) := {
+  Matrix.quadraticForm(A, x)
+     = CommutativeRing.sumOver((k : NaturalsBelow(0)) ↦ x(k) * (A · x)(k), NaturalsBelow.enumerate(0))
+     = CommutativeRing.zero(Integer.commutative_ring_bundle) by CommutativeRing.sumOver_empty
+     = (0 : ℤ);
+  done
+}
+
+theorem Matrix.zero_dimension_represents_zero
+        (A : Matrix(Integer.commutative_ring_bundle, 0, 0))
+        : Matrix.Represents(A, (0 : ℤ)) := {
+  Matrix.quadraticForm(A, RingVector.zero(Integer.commutative_ring_bundle, 0)) = (0 : ℤ)
+      by Matrix.zero_dimension_quadraticForm as valueAtZero;
+  witness RingVector.zero(Integer.commutative_ring_bundle, 0) with valueAtZero
+}
+
+theorem Matrix.zero_dimension_represents
+        (A : Matrix(Integer.commutative_ring_bundle, 0, 0)) (target : ℤ)
+        (represents : Matrix.Represents(A, target))
+        : target = (0 : ℤ) := {
+  choose x such that Matrix.quadraticForm(A, x) = target from represents;
+  target
+     = Matrix.quadraticForm(A, x)
+     = (0 : ℤ) by Matrix.zero_dimension_quadraticForm;
+  done
+}
+
+theorem Matrix.zero_dimension_not_universal
+        (A : Matrix(Integer.commutative_ring_bundle, 0, 0))
+        : ¬(Matrix.IsUniversal(A)) := {
+  suppose Matrix.IsUniversal(A) as universal for contradiction {
+    Matrix.Represents(A, ((1 : ℕ) : ℤ)) by universal;
+    ((1 : ℕ) : ℤ) = (0 : ℤ) by Matrix.zero_dimension_represents;
+    ¬(((1 : ℕ) : ℤ) = (0 : ℤ)) by Integer.one_not_zero;
+    done
+  }
+}
+
+theorem Matrix.zero_dimension_truant
+        (A : Matrix(Integer.commutative_ring_bundle, 0, 0))
+        : Matrix.truant(A) = 1 := {
+  ¬(Matrix.Represents(A, ((1 : ℕ) : ℤ)))
+      by (represents : Matrix.Represents(A, ((1 : ℕ) : ℤ))) ↦ {
+          ((1 : ℕ) : ℤ) = (0 : ℤ) by Matrix.zero_dimension_represents;
+          ¬(((1 : ℕ) : ℤ) = (0 : ℤ)) by Integer.one_not_zero;
+          done
+        };
+  ∀ (s : ℕ). s ≥ 1 → s < 1 → Matrix.Represents(A, (s : ℤ))
+      by (s : ℕ) (sPositive : s ≥ 1) (sBelow : s < 1) ↦ {
+          s < 1 ≤ s;
+          False;
+          done
+        };
+  1 ≥ 1;
+  Matrix.IsTruant(A, 1);
+  done by Matrix.truant_equals
+}
+
+theorem Matrix.zero_dimension_symmetric
+        (A : Matrix(Integer.commutative_ring_bundle, 0, 0))
+        : Matrix.IsSymmetric(A) := {
+  Aᵀ = A by Matrix.zero_dimension_unique;
+  done
+}
+
+theorem Matrix.zero_dimension_positive_definite
+        (A : Matrix(Integer.commutative_ring_bundle, 0, 0))
+        : Matrix.IsPositiveDefinite(A) := {
+  take x : RingVector(Integer.commutative_ring_bundle, 0);
+  suppose ¬(x = RingVector.zero(Integer.commutative_ring_bundle, 0)) as nonzero;
+  x = RingVector.zero(Integer.commutative_ring_bundle, 0) by RingVector.zero_dimension_unique;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The escalator tree: reachable from the empty form by iterated
+-- escalation.
+
+definition Matrix.IsEscalator : (n : ℕ) → Matrix(Integer.commutative_ring_bundle, n, n) → Proposition
+  | 0 => (B : Matrix(Integer.commutative_ring_bundle, 0, 0)) ↦ True
+  | 1 + m => unfold Natural.add in
+      (B : Matrix(Integer.commutative_ring_bundle, 1 + m, 1 + m)) ↦
+          ∃ (A : Matrix(Integer.commutative_ring_bundle, m, m)).
+              Matrix.IsEscalator(m, A) ∧ Matrix.IsEscalation(A, B)
+
+theorem Matrix.escalator_empty
+        (A : Matrix(Integer.commutative_ring_bundle, 0, 0))
+        : Matrix.IsEscalator(0, A) := {
+  done by True.trivial
+}
+
+theorem Matrix.escalator_step {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n))
+        (escalator : Matrix.IsEscalator(n, A)) (escalation : Matrix.IsEscalation(A, B))
+        : Matrix.IsEscalator(1 + n, B) :=
+  unfold Natural.add in {
+    Matrix.IsEscalator(n, A) ∧ Matrix.IsEscalation(A, B) as reachable;
+    ∃ (parent : Matrix(Integer.commutative_ring_bundle, n, n)).
+        Matrix.IsEscalator(n, parent) ∧ Matrix.IsEscalation(parent, B)
+      by { witness A with reachable };
+    done
+  }
+
+-- The elimination face: an escalator of positive rank names its parent.
+-- (Consumers split through this lemma; the pattern-matched definition
+-- itself stays behind the `1 + m` boundary.)
+
+theorem Matrix.escalator_split {m : ℕ}
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + m, 1 + m))
+        (escalator : Matrix.IsEscalator(1 + m, B))
+        : ∃ (A : Matrix(Integer.commutative_ring_bundle, m, m)).
+              Matrix.IsEscalator(m, A) ∧ Matrix.IsEscalation(A, B) :=
+  unfold Natural.add in {
+    done by escalator
+  }
+
+-- Every escalator of positive rank is symmetric and positive-definite
+-- (its last escalation says so); the empty form is both vacuously.
+
+theorem Matrix.escalator_symmetric {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (escalator : Matrix.IsEscalator(n, A))
+        : Matrix.IsSymmetric(A) :=
+  by induction on n with IH {
+    case base: done by Matrix.zero_dimension_symmetric
+    case step(m): {
+        ∃ (parent : Matrix(Integer.commutative_ring_bundle, m, m)).
+            Matrix.IsEscalator(m, parent) ∧ Matrix.IsEscalation(parent, A)
+            by Matrix.escalator_split as parentExists;
+        choose parent : Matrix(Integer.commutative_ring_bundle, m, m) such that
+            Matrix.IsEscalator(m, parent) ∧ Matrix.IsEscalation(parent, A) from parentExists;
+        Matrix.IsEscalation(parent, A);
+        done by Matrix.IsEscalation.symmetric
+      }
+  }
+
+theorem Matrix.escalator_positive_definite {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (escalator : Matrix.IsEscalator(n, A))
+        : Matrix.IsPositiveDefinite(A) :=
+  by induction on n with IH {
+    case base: done by Matrix.zero_dimension_positive_definite
+    case step(m): {
+        ∃ (parent : Matrix(Integer.commutative_ring_bundle, m, m)).
+            Matrix.IsEscalator(m, parent) ∧ Matrix.IsEscalation(parent, A)
+            by Matrix.escalator_split as parentExists;
+        choose parent : Matrix(Integer.commutative_ring_bundle, m, m) such that
+            Matrix.IsEscalator(m, parent) ∧ Matrix.IsEscalation(parent, A) from parentExists;
+        Matrix.IsEscalation(parent, A);
+        done by Matrix.IsEscalation.positive_definite
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- The unique rank-1 escalator is x², on the nose: an escalation of the
+-- empty form is a 1×1 matrix whose sole entry is the empty form's
+-- truant, 1.
+
+theorem Matrix.escalator_rank_one
+        (A : Matrix(Integer.commutative_ring_bundle, 1, 1))
+        (escalator : Matrix.IsEscalator(1, A))
+        : A = Matrix.squareForm := {
+  ∃ (parent : Matrix(Integer.commutative_ring_bundle, 0, 0)).
+      Matrix.IsEscalator(0, parent) ∧ Matrix.IsEscalation(parent, A)
+      by Matrix.escalator_split as parentExists;
+  choose empty : Matrix(Integer.commutative_ring_bundle, 0, 0) such that
+      Matrix.IsEscalator(0, empty) ∧ Matrix.IsEscalation(empty, A) from parentExists;
+  Matrix.IsEscalation(empty, A);
+  let bordered : Matrix(Integer.commutative_ring_bundle, 1 + 0, 1 + 0) := A;
+  Matrix.corner(bordered)
+     = (Matrix.truant(empty) : ℤ) by Matrix.IsEscalation.corner_is_truant
+     = ((1 : ℕ) : ℤ) by substituting Matrix.zero_dimension_truant
+     = (1 : ℤ)
+  as cornerIsOne;
+  ∀ (i : NaturalsBelow(1)). ∀ (j : NaturalsBelow(1)). A(i, j) = Matrix.squareForm(i, j)
+      by (i : NaturalsBelow(1)) (j : NaturalsBelow(1)) ↦ {
+          i = NaturalsBelow.top(0) by NaturalsBelow.below_one_unique as iTop;
+          j = NaturalsBelow.top(0) by NaturalsBelow.below_one_unique as jTop;
+          Matrix.squareForm(NaturalsBelow.top(0), NaturalsBelow.top(0)) = (1 : ℤ)
+              by Matrix.identity_entry_diagonal as formEntry;
+          A(i, j)
+             = A(NaturalsBelow.top(0), j)                     by substituting iTop
+             = A(NaturalsBelow.top(0), NaturalsBelow.top(0))  by substituting jTop
+             = Matrix.corner(bordered)
+             = (1 : ℤ)                                        by cornerIsOne
+             = Matrix.squareForm(NaturalsBelow.top(0), NaturalsBelow.top(0)) by formEntry
+             = Matrix.squareForm(NaturalsBelow.top(0), j)     by substituting jTop
+             = Matrix.squareForm(i, j)                        by substituting iTop;
+          done
+        };
+  done by Matrix.equal_of_entries
+}
+
+-- The rank-2 classification, restated for the tree: every rank-2
+-- escalator sits next to x² + y² or x² + 2y².
+
+theorem Matrix.escalator_rank_two
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 1, 1 + 1))
+        (escalator : Matrix.IsEscalator(1 + 1, B))
+        : Matrix.IsIsometric(B, Matrix.sumOfTwoSquaresForm)
+          ∨ Matrix.IsIsometric(B, Matrix.squarePlusDoubleSquareForm) := {
+  ∃ (parent : Matrix(Integer.commutative_ring_bundle, 1, 1)).
+      Matrix.IsEscalator(1, parent) ∧ Matrix.IsEscalation(parent, B)
+      by Matrix.escalator_split as parentExists;
+  choose A : Matrix(Integer.commutative_ring_bundle, 1, 1) such that
+      Matrix.IsEscalator(1, A) ∧ Matrix.IsEscalation(A, B) from parentExists;
+  Matrix.IsEscalator(1, A);
+  A = Matrix.squareForm by Matrix.escalator_rank_one as parentIsSquare;
+  Matrix.IsEscalation(A, B);
+  Matrix.IsEscalation(Matrix.squareForm, B) by substituting parentIsSquare;
+  done by Matrix.rank_two_escalators
+}
+
+-- ----------------------------------------------------------------------
+-- The diagonal extension: a block placed by the boundary inclusion,
+-- zero border, and a chosen corner. The generic constructor behind
+-- escalation existence — and, with an enumerated border, behind the
+-- tree stages' explicit escalation lists.
+
+definition NaturalsBelow.topSelector (m : ℕ) : NaturalsBelow(1) → NaturalsBelow(1 + m) :=
+  (k : NaturalsBelow(1)) ↦ NaturalsBelow.top(m)
+
+theorem NaturalsBelow.topSelector_is_injective (m : ℕ)
+        : Function.IsInjective((NaturalsBelow.topSelector(m) : NaturalsBelow(1) → NaturalsBelow(1 + m))) := {
+  take a : NaturalsBelow(1); take b : NaturalsBelow(1);
+  suppose NaturalsBelow.topSelector(m, a) = NaturalsBelow.topSelector(m, b);
+  a = NaturalsBelow.top(0) by NaturalsBelow.below_one_unique;
+  b = NaturalsBelow.top(0) by NaturalsBelow.below_one_unique;
+  a = b by substitution;
+  done
+}
+
+definition Matrix.topUnit (r : CommutativeRing) (m : ℕ) : Matrix(r, 1 + m, 1 + m) :=
+  Matrix.inclusionMatrix(r, NaturalsBelow.topSelector(m))
+  * Matrix.inclusionMatrix(r, NaturalsBelow.topSelector(m))ᵀ
+
+theorem Matrix.topUnit_corner {r : CommutativeRing} {m : ℕ}
+        : Matrix.topUnit(r, m)(NaturalsBelow.top(m), NaturalsBelow.top(m)) = CommutativeRing.one(r) := {
+  Function.IsInjective((NaturalsBelow.topSelector(m) : NaturalsBelow(1) → NaturalsBelow(1 + m)))
+      by NaturalsBelow.topSelector_is_injective;
+  Matrix.topUnit(r, m)(NaturalsBelow.top(m), NaturalsBelow.top(m))
+     = Matrix.inclusionMatrix(r, NaturalsBelow.topSelector(m))(NaturalsBelow.top(m), NaturalsBelow.top(0))
+           by Matrix.multiply_inclusionMatrix_transpose_entry_selected
+     = CommutativeRing.one(r)
+           by Matrix.inclusionMatrix_entry_at;
+  done
+}
+
+theorem Matrix.topUnit_column_off {r : CommutativeRing} {m : ℕ}
+        (p : NaturalsBelow(1 + m)) (j : NaturalsBelow(m))
+        : Matrix.topUnit(r, m)(p, NaturalsBelow.inclusion(m, j)) = CommutativeRing.zero(r) := {
+  ∀ (t : NaturalsBelow(1)). ¬(NaturalsBelow.inclusion(m, j) = NaturalsBelow.topSelector(m, t))
+      by (t : NaturalsBelow(1)) ↦ {
+          ¬(NaturalsBelow.top(m) = NaturalsBelow.inclusion(m, j)) by NaturalsBelow.top_not_inclusion;
+          done
+        };
+  done by Matrix.multiply_inclusionMatrix_transpose_entry_off
+}
+
+theorem Matrix.topUnit_row_off {r : CommutativeRing} {m : ℕ}
+        (i : NaturalsBelow(m)) (q : NaturalsBelow(1 + m))
+        : Matrix.topUnit(r, m)(NaturalsBelow.inclusion(m, i), q) = CommutativeRing.zero(r) := {
+  ∀ (t : NaturalsBelow(1)). ¬(NaturalsBelow.inclusion(m, i) = NaturalsBelow.topSelector(m, t))
+      by (t : NaturalsBelow(1)) ↦ {
+          ¬(NaturalsBelow.top(m) = NaturalsBelow.inclusion(m, i)) by NaturalsBelow.top_not_inclusion;
+          done
+        };
+  done by Matrix.inclusionMatrix_multiply_entry_off
+}
+
+definition Matrix.diagonalExtension {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (c : CommutativeRing.carrier(r)) : Matrix(r, 1 + n, 1 + n) :=
+  Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) * A
+      * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ
+  + c • Matrix.topUnit(r, n)
+
+-- The three faces of the extension, entrywise.
+
+theorem Matrix.diagonalExtension_block_entry {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (i : NaturalsBelow(n)) (j : NaturalsBelow(n))
+        : (Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) * A
+           * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ)(
+              NaturalsBelow.inclusion(n, i), NaturalsBelow.inclusion(n, j))
+          = A(i, j) := {
+  Function.IsInjective(NaturalsBelow.inclusion(n)) by NaturalsBelow.inclusion_is_injective;
+  (Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) * A
+   * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ)(
+      NaturalsBelow.inclusion(n, i), NaturalsBelow.inclusion(n, j))
+     = (Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) * A)(NaturalsBelow.inclusion(n, i), j)
+           by Matrix.multiply_inclusionMatrix_transpose_entry_selected
+     = A(i, j)
+           by Matrix.inclusionMatrix_multiply_entry_selected;
+  done
+}
+
+theorem Matrix.diagonalExtension_block_column_off {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (p : NaturalsBelow(1 + n))
+        : (Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) * A
+           * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ)(p, NaturalsBelow.top(n))
+          = CommutativeRing.zero(r) := {
+  ∀ (t : NaturalsBelow(n)). ¬(NaturalsBelow.top(n) = NaturalsBelow.inclusion(n, t))
+      by (t : NaturalsBelow(n)) ↦ { done by NaturalsBelow.top_not_inclusion };
+  done by Matrix.multiply_inclusionMatrix_transpose_entry_off
+}
+
+theorem Matrix.diagonalExtension_block_row_off {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (q : NaturalsBelow(1 + n))
+        : (Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) * A
+           * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ)(NaturalsBelow.top(n), q)
+          = CommutativeRing.zero(r) := {
+  ∀ (t : NaturalsBelow(n)). ¬(NaturalsBelow.top(n) = NaturalsBelow.inclusion(n, t))
+      by (t : NaturalsBelow(n)) ↦ { done by NaturalsBelow.top_not_inclusion };
+  Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) * A
+      * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ
+     = Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))
+       * (A * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ)
+      by Matrix.multiply_associative as reassociated;
+  (Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) * A
+   * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ)(NaturalsBelow.top(n), q)
+     = (Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))
+        * (A * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ))(NaturalsBelow.top(n), q)
+           by substituting reassociated
+     = CommutativeRing.zero(r)
+           by Matrix.inclusionMatrix_multiply_entry_off;
+  done
+}
+
+theorem Matrix.diagonalExtension_leadingBlock {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (c : CommutativeRing.carrier(r))
+        : Matrix.leadingBlock(Matrix.diagonalExtension(A, c)) = A := {
+  ∀ (i : NaturalsBelow(n)). ∀ (j : NaturalsBelow(n)).
+      Matrix.leadingBlock(Matrix.diagonalExtension(A, c))(i, j) = A(i, j)
+      by (i : NaturalsBelow(n)) (j : NaturalsBelow(n)) ↦ {
+          (Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) * A
+           * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ)(
+              NaturalsBelow.inclusion(n, i), NaturalsBelow.inclusion(n, j)) = A(i, j)
+              by Matrix.diagonalExtension_block_entry as blockEntry;
+          Matrix.topUnit(r, n)(NaturalsBelow.inclusion(n, i), NaturalsBelow.inclusion(n, j))
+              = CommutativeRing.zero(r) by Matrix.topUnit_row_off as unitEntry;
+          Matrix.leadingBlock(Matrix.diagonalExtension(A, c))(i, j)
+             = (Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) * A
+                * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ)(
+                   NaturalsBelow.inclusion(n, i), NaturalsBelow.inclusion(n, j))
+               + c * Matrix.topUnit(r, n)(NaturalsBelow.inclusion(n, i), NaturalsBelow.inclusion(n, j))
+             = A(i, j)
+               + c * Matrix.topUnit(r, n)(NaturalsBelow.inclusion(n, i), NaturalsBelow.inclusion(n, j))
+                   by substituting blockEntry
+             = A(i, j) + c * CommutativeRing.zero(r) by substituting unitEntry
+             = A(i, j) by ring;
+          done
+        };
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.diagonalExtension_borderColumn {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (c : CommutativeRing.carrier(r))
+        : Matrix.borderColumn(Matrix.diagonalExtension(A, c)) = RingVector.zero(r, n) := {
+  ∀ (i : NaturalsBelow(n)).
+      Matrix.borderColumn(Matrix.diagonalExtension(A, c))(i) = RingVector.zero(r, n)(i)
+      by (i : NaturalsBelow(n)) ↦ {
+          (Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) * A
+           * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ)(
+              NaturalsBelow.inclusion(n, i), NaturalsBelow.top(n)) = CommutativeRing.zero(r)
+              by Matrix.diagonalExtension_block_column_off as blockEntry;
+          Matrix.topUnit(r, n)(NaturalsBelow.inclusion(n, i), NaturalsBelow.top(n))
+              = CommutativeRing.zero(r) by Matrix.topUnit_row_off as unitEntry;
+          Matrix.borderColumn(Matrix.diagonalExtension(A, c))(i)
+             = (Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) * A
+                * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ)(
+                   NaturalsBelow.inclusion(n, i), NaturalsBelow.top(n))
+               + c * Matrix.topUnit(r, n)(NaturalsBelow.inclusion(n, i), NaturalsBelow.top(n))
+             = CommutativeRing.zero(r)
+               + c * Matrix.topUnit(r, n)(NaturalsBelow.inclusion(n, i), NaturalsBelow.top(n))
+                   by substituting blockEntry
+             = CommutativeRing.zero(r) + c * CommutativeRing.zero(r) by substituting unitEntry
+             = RingVector.zero(r, n)(i) by ring;
+          done
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+theorem Matrix.diagonalExtension_corner {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (c : CommutativeRing.carrier(r))
+        : Matrix.corner(Matrix.diagonalExtension(A, c)) = c := {
+  (Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) * A
+   * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ)(NaturalsBelow.top(n), NaturalsBelow.top(n))
+      = CommutativeRing.zero(r) by Matrix.diagonalExtension_block_column_off as blockEntry;
+  Matrix.topUnit(r, n)(NaturalsBelow.top(n), NaturalsBelow.top(n)) = CommutativeRing.one(r)
+      by Matrix.topUnit_corner as unitEntry;
+  Matrix.corner(Matrix.diagonalExtension(A, c))
+     = (Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) * A
+        * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ)(NaturalsBelow.top(n), NaturalsBelow.top(n))
+       + c * Matrix.topUnit(r, n)(NaturalsBelow.top(n), NaturalsBelow.top(n))
+     = CommutativeRing.zero(r) + c * Matrix.topUnit(r, n)(NaturalsBelow.top(n), NaturalsBelow.top(n))
+           by substituting blockEntry
+     = CommutativeRing.zero(r) + c * CommutativeRing.one(r) by substituting unitEntry
+     = c by ring;
+  done
+}
+
+theorem Matrix.diagonalExtension_symmetric {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (c : CommutativeRing.carrier(r))
+        (symmetric : Matrix.IsSymmetric(A))
+        : Matrix.IsSymmetric(Matrix.diagonalExtension(A, c)) := {
+  let J : Matrix(r, 1 + n, n) := Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n));
+  let T : Matrix(r, 1 + n, 1) := Matrix.inclusionMatrix(r, NaturalsBelow.topSelector(n));
+  Aᵀ = A by symmetric as blockSymmetric;
+  Matrix.diagonalExtension(A, c)ᵀ
+     = (J * A * Jᵀ)ᵀ + (c • (T * Tᵀ))ᵀ                by Matrix.transpose_add
+     = (J * A * Jᵀ)ᵀ + c • (T * Tᵀ)ᵀ                  by substituting Matrix.transpose_scale
+     = (Jᵀ)ᵀ * (J * A)ᵀ + c • (T * Tᵀ)ᵀ               by substituting Matrix.transpose_multiply
+     = (Jᵀ)ᵀ * (Aᵀ * Jᵀ) + c • (T * Tᵀ)ᵀ              by substituting Matrix.transpose_multiply
+     = J * (Aᵀ * Jᵀ) + c • (T * Tᵀ)ᵀ                  by substituting Matrix.transpose_transpose
+     = J * (Aᵀ * Jᵀ) + c • ((Tᵀ)ᵀ * Tᵀ)               by substituting Matrix.transpose_multiply
+     = J * (Aᵀ * Jᵀ) + c • (T * Tᵀ)                   by substituting Matrix.transpose_transpose
+     = J * (A * Jᵀ) + c • (T * Tᵀ)                    by substituting blockSymmetric
+     = J * A * Jᵀ + c • (T * Tᵀ)                      by substituting Matrix.multiply_associative
+     = Matrix.diagonalExtension(A, c);
+  done
+}
+
+-- Positive-definiteness of the extension: the bordered splitting with a
+-- zero border leaves Q(A, y) + c·t², positive whenever A is positive-
+-- definite and the corner is positive.
+
+theorem Matrix.diagonalExtension_quadraticForm {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) (c : ℤ)
+        (symmetric : Matrix.IsSymmetric(A))
+        (x : RingVector(Integer.commutative_ring_bundle, 1 + n))
+        : Matrix.quadraticForm(Matrix.diagonalExtension(A, c), x)
+          = Matrix.quadraticForm(A, RingVector.restrict(x))
+            + x(NaturalsBelow.top(n)) * x(NaturalsBelow.top(n)) * c := {
+  let y : RingVector(Integer.commutative_ring_bundle, n) := RingVector.restrict(x);
+  let t : ℤ := x(NaturalsBelow.top(n));
+  Matrix.IsSymmetric(Matrix.diagonalExtension(A, c)) by Matrix.diagonalExtension_symmetric;
+  Matrix.leadingBlock(Matrix.diagonalExtension(A, c)) = A
+      by Matrix.diagonalExtension_leadingBlock as blockReads;
+  Matrix.borderColumn(Matrix.diagonalExtension(A, c)) = RingVector.zero(Integer.commutative_ring_bundle, n)
+      by Matrix.diagonalExtension_borderColumn as borderReads;
+  Matrix.corner(Matrix.diagonalExtension(A, c)) = c
+      by Matrix.diagonalExtension_corner as cornerReads;
+  RingVector.innerProduct(y, RingVector.zero(Integer.commutative_ring_bundle, n)) = (0 : ℤ)
+      by RingVector.innerProduct_zero_right as rightZero;
+  RingVector.innerProduct(RingVector.zero(Integer.commutative_ring_bundle, n), y)
+     = RingVector.innerProduct(y, RingVector.zero(Integer.commutative_ring_bundle, n))
+           by RingVector.innerProduct_symmetric
+     = (0 : ℤ) by rightZero
+  as leftZero;
+  Matrix.quadraticForm(Matrix.diagonalExtension(A, c), x)
+     = Matrix.quadraticForm(Matrix.leadingBlock(Matrix.diagonalExtension(A, c)), y)
+       + t * RingVector.innerProduct(y, Matrix.borderColumn(Matrix.diagonalExtension(A, c)))
+       + t * RingVector.innerProduct(Matrix.borderColumn(Matrix.diagonalExtension(A, c)), y)
+       + (t * t) * Matrix.corner(Matrix.diagonalExtension(A, c))
+           by Matrix.quadraticForm_bordered
+     = Matrix.quadraticForm(A, y)
+       + t * RingVector.innerProduct(y, Matrix.borderColumn(Matrix.diagonalExtension(A, c)))
+       + t * RingVector.innerProduct(Matrix.borderColumn(Matrix.diagonalExtension(A, c)), y)
+       + (t * t) * Matrix.corner(Matrix.diagonalExtension(A, c))
+           by substituting blockReads
+     = Matrix.quadraticForm(A, y)
+       + t * RingVector.innerProduct(y, RingVector.zero(Integer.commutative_ring_bundle, n))
+       + t * RingVector.innerProduct(RingVector.zero(Integer.commutative_ring_bundle, n), y)
+       + (t * t) * Matrix.corner(Matrix.diagonalExtension(A, c))
+           by substituting borderReads
+     = Matrix.quadraticForm(A, y)
+       + t * RingVector.innerProduct(y, RingVector.zero(Integer.commutative_ring_bundle, n))
+       + t * RingVector.innerProduct(RingVector.zero(Integer.commutative_ring_bundle, n), y)
+       + (t * t) * c
+           by substituting cornerReads
+     = Matrix.quadraticForm(A, y)
+       + t * (0 : ℤ)
+       + t * RingVector.innerProduct(RingVector.zero(Integer.commutative_ring_bundle, n), y)
+       + (t * t) * c
+           by substituting rightZero
+     = Matrix.quadraticForm(A, y) + t * (0 : ℤ) + t * (0 : ℤ) + (t * t) * c
+           by substituting leftZero
+     = Matrix.quadraticForm(A, y) + t * t * c
+           by ring;
+  done
+}
+
+theorem Matrix.diagonalExtension_positive_definite {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) (c : ℤ)
+        (symmetric : Matrix.IsSymmetric(A))
+        (positiveDefinite : Matrix.IsPositiveDefinite(A))
+        (cornerPositive : c > (0 : ℤ))
+        : Matrix.IsPositiveDefinite(Matrix.diagonalExtension(A, c)) := {
+  take x : RingVector(Integer.commutative_ring_bundle, 1 + n);
+  suppose ¬(x = RingVector.zero(Integer.commutative_ring_bundle, 1 + n)) as nonzero;
+  let y : RingVector(Integer.commutative_ring_bundle, n) := RingVector.restrict(x);
+  let t : ℤ := x(NaturalsBelow.top(n));
+  Matrix.quadraticForm(Matrix.diagonalExtension(A, c), x)
+      = Matrix.quadraticForm(A, y) + t * t * c
+      by Matrix.diagonalExtension_quadraticForm as valueSplits;
+  y = RingVector.zero(Integer.commutative_ring_bundle, n)
+      ∨ ¬(y = RingVector.zero(Integer.commutative_ring_bundle, n)) by Logic.excluded_middle;
+  done by cases {
+    case y = RingVector.zero(Integer.commutative_ring_bundle, n) as yZero: {
+        ¬(t = (0 : ℤ)) by (tZero : t = (0 : ℤ)) ↦ {
+            ∀ (k : NaturalsBelow(1 + n)).
+                x(k) = RingVector.zero(Integer.commutative_ring_bundle, 1 + n)(k)
+                by (k : NaturalsBelow(1 + n)) ↦ {
+                    (∃ (i : NaturalsBelow(n)). k = NaturalsBelow.inclusion(n, i))
+                        ∨ k = NaturalsBelow.top(n) by NaturalsBelow.inclusion_or_top;
+                    done by cases {
+                      case ∃ (i : NaturalsBelow(n)). k = NaturalsBelow.inclusion(n, i) as below: {
+                          choose i such that k = NaturalsBelow.inclusion(n, i) from below;
+                          x(k)
+                             = x(NaturalsBelow.inclusion(n, i))
+                                   by substituting (k = NaturalsBelow.inclusion(n, i))
+                             = y(i)
+                             = (0 : ℤ) by substituting yZero
+                             = RingVector.zero(Integer.commutative_ring_bundle, 1 + n)(k);
+                          done
+                        }
+                      case k = NaturalsBelow.top(n) as atTop: {
+                          x(k)
+                             = t by substituting atTop
+                             = (0 : ℤ) by tZero
+                             = RingVector.zero(Integer.commutative_ring_bundle, 1 + n)(k);
+                          done
+                        }
+                    }
+                  };
+            x = RingVector.zero(Integer.commutative_ring_bundle, 1 + n)
+                by RingVector.equal_of_pointwise;
+            done
+          };
+        t * t > (0 : ℤ) by Integer.square_positive_of_nonzero;
+        t * t * c > (0 : ℤ) by Integer.multiply_positive;
+        Matrix.quadraticForm(Matrix.diagonalExtension(A, c), x)
+           = Matrix.quadraticForm(A, y) + t * t * c            by valueSplits
+           = Matrix.quadraticForm(A, RingVector.zero(Integer.commutative_ring_bundle, n)) + t * t * c
+                 by substituting yZero
+           = (0 : ℤ) + t * t * c                               by substituting Matrix.quadraticForm_zero
+           = t * t * c                                         by ring
+        as valueCollapses;
+        Matrix.quadraticForm(Matrix.diagonalExtension(A, c), x) > (0 : ℤ)
+            by substituting valueCollapses;
+        done
+      }
+    case ¬(y = RingVector.zero(Integer.commutative_ring_bundle, n)) as yNonzero: {
+        Matrix.quadraticForm(A, y) > (0 : ℤ) by positiveDefinite;
+        Integer.IsNonneg(t * t) by Integer.square_IsNonneg;
+        c ≥ (0 : ℤ) by Integer.LessThan.weaken;
+        Integer.IsNonneg(c) by Integer.nonneg_of_zero_less_or_equal;
+        Integer.IsNonneg(t * t * c) by Integer.multiply_nonneg;
+        t * t * c ≥ (0 : ℤ) by Integer.zero_less_or_equal_of_nonneg;
+        Matrix.quadraticForm(A, y) + t * t * c > (0 : ℤ);
+        Matrix.quadraticForm(Matrix.diagonalExtension(A, c), x) > (0 : ℤ)
+            by substituting valueSplits;
+        done
+      }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- Escalation existence: a symmetric positive-definite non-universal
+-- form always escalates — diagonally, with the truant in the corner.
+-- In particular the escalator tree only terminates at universal forms.
+
+theorem Matrix.escalation_exists {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (symmetric : Matrix.IsSymmetric(A))
+        (positiveDefinite : Matrix.IsPositiveDefinite(A))
+        (notUniversal : ¬(Matrix.IsUniversal(A)))
+        : ∃ (B : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n)). Matrix.IsEscalation(A, B) := {
+  Matrix.IsTruant(A, Matrix.truant(A)) by Matrix.truant_is_truant;
+  Matrix.truant(A) ≥ 1 by Matrix.IsTruant.positive;
+  Matrix.truant(A) > 0;
+  (Matrix.truant(A) : ℤ) > (0 : ℤ) by Natural.to_integer.positive_preserves;
+  Matrix.IsSymmetric(Matrix.diagonalExtension(A, (Matrix.truant(A) : ℤ)))
+      by Matrix.diagonalExtension_symmetric;
+  Matrix.IsPositiveDefinite(Matrix.diagonalExtension(A, (Matrix.truant(A) : ℤ)))
+      by Matrix.diagonalExtension_positive_definite;
+  Matrix.leadingBlock(Matrix.diagonalExtension(A, (Matrix.truant(A) : ℤ))) = A
+      by Matrix.diagonalExtension_leadingBlock;
+  Matrix.corner(Matrix.diagonalExtension(A, (Matrix.truant(A) : ℤ))) = (Matrix.truant(A) : ℤ)
+      by Matrix.diagonalExtension_corner;
+  Matrix.IsEscalation(A, Matrix.diagonalExtension(A, (Matrix.truant(A) : ℤ))) as extends;
+  witness Matrix.diagonalExtension(A, (Matrix.truant(A) : ℤ)) with extends
+}
+
+theorem Matrix.escalator_escalation_exists {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (escalator : Matrix.IsEscalator(n, A))
+        (notUniversal : ¬(Matrix.IsUniversal(A)))
+        : ∃ (B : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n)).
+              Matrix.IsEscalation(A, B) ∧ Matrix.IsEscalator(1 + n, B) := {
+  Matrix.IsSymmetric(A) by Matrix.escalator_symmetric;
+  Matrix.IsPositiveDefinite(A) by Matrix.escalator_positive_definite;
+  ∃ (B : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n)). Matrix.IsEscalation(A, B)
+      by Matrix.escalation_exists;
+  choose B such that Matrix.IsEscalation(A, B);
+  Matrix.IsEscalator(1 + n, B) by Matrix.escalator_step;
+  Matrix.IsEscalation(A, B) ∧ Matrix.IsEscalator(1 + n, B) as child;
+  witness B with child
+}

@@ -233,7 +233,14 @@ CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
 # (quadratic_form, integer_quadratic_form) at ZERO counted leaks;
 # supporting additions to matrix_vector / matrix_inverse / Integer/units /
 # unimodular also leak-free (measured in the same breath, both axes).
-CLEAN_LEAK_BUDGET ?= 394
+# 2026-07-19: 394 → 397. escalator_tree manifest-added with THREE
+# `unfold Natural.add` boundary markers — the `Matrix.IsEscalator`
+# rank-recursion boundary (the pattern-match arm at `1 + m`, plus the
+# two faces `escalator_step`/`escalator_split` that quarantine it, so
+# no consumer ever unfolds the recursion) — the same intended-boundary
+# class as `NaturalsBelow.enumerate`'s markers. Everything else in the
+# file is leak-free.
+CLEAN_LEAK_BUDGET ?= 397
 # Second, independent axis: user-written `⟨…⟩` over a logical connective
 # (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the
 # elaborator under MATH_CHECK_ANON_TUPLES (see `clean-anon-ratchet`). Held at the
