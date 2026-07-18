@@ -67,7 +67,7 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
 - `S0.V2` `[ ]` (S) Bilinear pairing `⟨·,·⟩ : Vec R n → Vec R n → R`; bilinearity, symmetry. — owes: S0.V1 · *Feeder: `Real/cauchy_schwarz.math` has the ℝ case.*
 - `S0.M1` `[x]` (S) Matrices `Mat R m n`; matrix–vector and matrix–matrix product. — owes: S0.V1 · **DONE:** `Algebra/matrix.math` (`Matrix(c, m, n)`, multiply/add/scale/identity; matrix–vector product still implicit via 1-column).
 - `S0.M2` `[x]` (M) Product associativity & distributivity; identity matrix `I`; `I·A = A`. — owes: S0.M1 · **DONE:** `Algebra/matrix_ring.math` + the `Matrix.ring` bundle (Cayley–Hamilton C5).
-- `S0.M3` `[ ]` (S) Transpose; `(AB)ᵀ = BᵀAᵀ`, `(Aᵀ)ᵀ = A`. — owes: S0.M1 · **GAP — first brick of the arc.**
+- `S0.M3` `[x]` (S) Transpose; `(AB)ᵀ = BᵀAᵀ`, `(Aᵀ)ᵀ = A`. — owes: S0.M1 · **DONE 2026-07-18:** `Algebra/matrix_transpose.math` — postfix `ᵀ` (new lexer token, wired like `⁻¹`; postfix results accept call arguments, so `Aᵀ(j, i)` reads naturally), `transpose_entry`, `transpose_transpose`, `transpose_add`/`_scale`, `Iᵀ = I`, `(A·B)ᵀ = Bᵀ·Aᵀ`.
 
 **Permutations & sign (prerequisite for the Leibniz determinant)**
 - `S0.P1` `[x]` (M) ★ Permutations of `Fin n`: group structure (compose, inverse, id). — owes: — · **DONE:** `Algebra/finite_permutation.math` (compose/inverse/identity + laws, swaps, extend).

@@ -1,0 +1,105 @@
+-- Algebra/matrix_transpose.math
+--
+-- The transpose `Aᵀ` — rows become columns — with the algebra the Gram
+-- machinery and the form theory read off it: `(Aᵀ)ᵀ = A`, transposition
+-- distributes over the entrywise operations, `Iᵀ = I`, and the
+-- product-reversal law `(A·B)ᵀ = Bᵀ·Aᵀ`. The postfix `ᵀ` resolves through
+-- the operator registry, like `⁻¹`.
+
+module Algebra.matrix_transpose
+
+import Logic.basics
+import Logic.functions
+import Equality.basics
+import Natural.basics
+import Natural.classical_decidable
+import Set.finite
+import Lists.list
+import Lists.map
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.permutation_enumeration
+import Algebra.matrix
+import Algebra.matrix_ring
+
+definition Matrix.transpose {r : CommutativeRing} {rows columns : ℕ}
+        (A : Matrix(r, rows, columns)) : Matrix(r, columns, rows) :=
+  (j : NaturalsBelow(columns)) ↦ (i : NaturalsBelow(rows)) ↦ A(i, j)
+
+operator (ᵀ) on (Matrix) := Matrix.transpose
+
+-- The entry formula, read straight off the definition.
+theorem Matrix.transpose_entry {r : CommutativeRing} {rows columns : ℕ}
+        (A : Matrix(r, rows, columns)) (j : NaturalsBelow(columns)) (i : NaturalsBelow(rows))
+        : Aᵀ(j, i) = A(i, j) :=
+  done
+
+-- Transposing twice is the identity.
+theorem Matrix.transpose_transpose {r : CommutativeRing} {rows columns : ℕ}
+        (A : Matrix(r, rows, columns)) : (Aᵀ)ᵀ = A := {
+  ∀ (i : NaturalsBelow(rows)). ∀ (j : NaturalsBelow(columns)). (Aᵀ)ᵀ(i, j) = A(i, j)
+      by (i : NaturalsBelow(rows)) (j : NaturalsBelow(columns)) ↦ done;
+  done by Matrix.equal_of_entries
+}
+
+-- Transposition is entrywise, so it commutes with the entrywise operations.
+theorem Matrix.transpose_add {r : CommutativeRing} {rows columns : ℕ}
+        (A B : Matrix(r, rows, columns)) : (A + B)ᵀ = Aᵀ + Bᵀ := {
+  ∀ (j : NaturalsBelow(columns)). ∀ (i : NaturalsBelow(rows)). (A + B)ᵀ(j, i) = (Aᵀ + Bᵀ)(j, i)
+      by (j : NaturalsBelow(columns)) (i : NaturalsBelow(rows)) ↦ done;
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.transpose_scale {r : CommutativeRing} {rows columns : ℕ}
+        (scalar : CommutativeRing.carrier(r)) (A : Matrix(r, rows, columns))
+        : (scalar • A)ᵀ = scalar • Aᵀ := {
+  ∀ (j : NaturalsBelow(columns)). ∀ (i : NaturalsBelow(rows)). (scalar • A)ᵀ(j, i) = (scalar • Aᵀ)(j, i)
+      by (j : NaturalsBelow(columns)) (i : NaturalsBelow(rows)) ↦ done;
+  done by Matrix.equal_of_entries
+}
+
+-- The identity is symmetric.
+theorem Matrix.transpose_identity {n : ℕ} (r : CommutativeRing)
+        : Matrix.identity(r, n)ᵀ = Matrix.identity(r, n) := {
+  ∀ (i : NaturalsBelow(n)). ∀ (j : NaturalsBelow(n)).
+      Matrix.identity(r, n)ᵀ(i, j) = Matrix.identity(r, n)(i, j)
+      by (i : NaturalsBelow(n)) (j : NaturalsBelow(n)) ↦ {
+          done by cases {
+            case i = j: {
+                Matrix.identity(r, n)(j, i) = CommutativeRing.one(r) by Matrix.identity_entry_diagonal;
+                Matrix.identity(r, n)(i, j) = CommutativeRing.one(r) by Matrix.identity_entry_diagonal;
+                done
+              }
+            otherwise: {
+                ¬(j = i) by { suppose j = i for contradiction { i = j; done } };
+                Matrix.identity(r, n)(j, i) = CommutativeRing.zero(r) by Matrix.identity_entry_off;
+                Matrix.identity(r, n)(i, j) = CommutativeRing.zero(r) by Matrix.identity_entry_off;
+                done
+              }
+          }
+        };
+  done by Matrix.equal_of_entries
+}
+
+-- Product reversal: `(A·B)ᵀ = Bᵀ·Aᵀ`. Entrywise, both sides are the same
+-- inner product over the shared middle index, with the two factors swapped.
+theorem Matrix.transpose_multiply {r : CommutativeRing} {rows middle columns : ℕ}
+        (A : Matrix(r, rows, middle)) (B : Matrix(r, middle, columns))
+        : (A * B)ᵀ = Bᵀ * Aᵀ := {
+  ∀ (j : NaturalsBelow(columns)). ∀ (i : NaturalsBelow(rows)). (A * B)ᵀ(j, i) = (Bᵀ * Aᵀ)(j, i)
+      by (j : NaturalsBelow(columns)) (i : NaturalsBelow(rows)) ↦ {
+          ∀ (k : NaturalsBelow(middle)). A(i, k) * B(k, j) = B(k, j) * A(i, k)
+              by CommutativeRing.multiply_commutative;
+          (A * B)ᵀ(j, i)
+             = CommutativeRing.sumOver((k : NaturalsBelow(middle)) ↦ A(i, k) * B(k, j),
+                   NaturalsBelow.enumerate(middle))
+             = CommutativeRing.sumOver((k : NaturalsBelow(middle)) ↦ B(k, j) * A(i, k),
+                   NaturalsBelow.enumerate(middle))
+                   by CommutativeRing.sumOver_congruence
+             = (Bᵀ * Aᵀ)(j, i)
+        };
+  done by Matrix.equal_of_entries
+}

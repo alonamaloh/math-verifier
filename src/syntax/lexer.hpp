@@ -96,6 +96,7 @@ enum class TokenKind {
     Monus,           // "∸" (truncated subtraction, additive precedence)
     InverseSuperscript,  // "⁻¹" (postfix operator symbol, e.g. group inverse)
     SquareSuperscript,   // "²" (postfix squaring; parse-time sugar for E * E)
+    TransposeSuperscript, // "ᵀ" (postfix operator symbol, e.g. matrix transpose)
     Bang,            // "!" (postfix operator symbol, e.g. factorial). There is
                      // no "!=" spelling of ≠, so `k!=1` reads as `k! = 1`.
     Less, Greater, LessOrEqual, GreaterOrEqual,

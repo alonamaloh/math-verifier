@@ -378,6 +378,7 @@ private:
             {"∸", TokenKind::Monus},
             {"⁻¹", TokenKind::InverseSuperscript},
             {"²", TokenKind::SquareSuperscript},
+            {"ᵀ", TokenKind::TransposeSuperscript},
         };
         for (const auto& entry : table) {
             if (matchPrefix(entry.text)) {
@@ -594,6 +595,7 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::Monus:                return "'∸'";
         case TokenKind::InverseSuperscript:   return "'⁻¹'";
         case TokenKind::SquareSuperscript:    return "'²'";
+        case TokenKind::TransposeSuperscript: return "'ᵀ'";
         case TokenKind::Bang:                 return "'!'";
         case TokenKind::Less:                 return "'<'";
         case TokenKind::Greater:              return "'>'";

@@ -91,6 +91,7 @@ bool isOperatorSymbolToken(TokenKind kind) {
         case TokenKind::SetMinus:
         case TokenKind::Approx:
         case TokenKind::InverseSuperscript:
+        case TokenKind::TransposeSuperscript:
         case TokenKind::Bang:
             return true;
         default:
@@ -3467,6 +3468,7 @@ private:
         // sees ordinary multiplication.
         auto base = parseApplication();
         while (peek().kind == TokenKind::InverseSuperscript
+               || peek().kind == TokenKind::TransposeSuperscript
                || peek().kind == TokenKind::Bang
                || peek().kind == TokenKind::SquareSuperscript) {
             Token op = consumeAny();
@@ -3477,6 +3479,9 @@ private:
                 base = makeSurfaceUnaryOperation(
                     op.lexeme, std::move(base), op.line, op.column);
             }
+            // A postfix result is a value like any other: let it keep
+            // taking call/index arguments (`Aᵀ(j, i)`, `Aᵀ[k]`).
+            base = parseCallSuffixes(std::move(base));
         }
         return base;
     }
@@ -3490,7 +3495,13 @@ private:
     // dispatch resolves it; chains and mixes with calls (`p[k](m)`,
     // `f(a)[k]`, `m[i][j]`).
     SurfaceExpressionPointer parseApplication() {
-        auto head = parseAtom();
+        return parseCallSuffixes(parseAtom());
+    }
+
+    // The call/index suffix chain after a head expression. Split out of
+    // parseApplication so a postfix operator's result can keep accepting
+    // arguments — `Aᵀ(j, i)` is `(Aᵀ)(j, i)`.
+    SurfaceExpressionPointer parseCallSuffixes(SurfaceExpressionPointer head) {
         while (peek().kind == TokenKind::LeftParen
                || peek().kind == TokenKind::LeftBracket) {
             if (peek().kind == TokenKind::LeftBracket) {
