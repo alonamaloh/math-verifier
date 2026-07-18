@@ -224,13 +224,30 @@ splits with in-term nonzero proofs. Validated: the four reciprocal
 dances in Real/exponential.math collapsed to two-line natural
 spellings (−58 lines).
 
+**Second milestone (e214c10e):** `divide_cross_multiply` at ℝ/ℚ (the
+canonical a/b = c/d ⇐ a·d = c·b comparison), two elaborator fixes
+(the context-equality bridge typechecks its transport — the ill-typed
+divide-denominator motive used to escape as a hard kernel error; the
+5b premise scan is direction-blind for equality premises via
+Equality.symmetry), and the binomial_reciprocal_split dance in
+exponential_addition.math collapsed (−33). Corpus grep shows no other
+multiply-through dances outside triangular_series (the ℂ exponential
+reciprocalOne is already compact).
+
 Remaining in this phase:
-- sweep the same dance pattern through the ℂ exponential/trig cone
-  and the remaining Real files;
-- the power-congruence budget blowup (AM-GM :144 shape:
-  `(x+x)^n·P = (2·x)^n·P` exhausts the prover budget instead of
-  trying the cheap diff-congruence + ring route first) — the
-  cost-gated-ring backlog item, elaborator-side;
+- **`field` compound-denominator bug (next):** `2/(x·(1+x)) = 2/x −
+  2/(1+x)` is declared FALSE — a cancellation fails to fire for a
+  reciprocal whose base is a compound that also appears factored as
+  other denominators. Blocks the triangular_series telescope (whose
+  natural 8-line spelling is otherwise ready — probe in
+  scratchpad/tri_probe5.math, first two steps close by-less via
+  cross-multiply + denominator congruence).
+- the budget-exhaustion-before-cheap-route failures, seen twice
+  (AM-GM :144 power congruence; the by-less cross fact at 181k
+  kernel-steps) — the cost-gated-ring backlog item, elaborator-side;
+- the ℂ coordinate-evaluation rewrite family (exponential_imaginary
+  23, trig files ~46: `realPart(i)`-style hints) — needs its own
+  mechanism look (rewrite-index reach, not division);
 - reassess the number-theory `divides` family separately.
 
 The pipeline is now unified: **join inserts → elaboration normalizes to
