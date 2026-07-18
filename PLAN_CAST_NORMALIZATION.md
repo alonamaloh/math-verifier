@@ -235,13 +235,22 @@ multiply-through dances outside triangular_series (the ℂ exponential
 reciprocalOne is already compact).
 
 Remaining in this phase:
-- **`field` compound-denominator bug (next):** `2/(x·(1+x)) = 2/x −
-  2/(1+x)` is declared FALSE — a cancellation fails to fire for a
-  reciprocal whose base is a compound that also appears factored as
-  other denominators. Blocks the triangular_series telescope (whose
-  natural 8-line spelling is otherwise ready — probe in
-  scratchpad/tri_probe5.math, first two steps close by-less via
-  cross-multiply + denominator congruence).
+- **`field` sum-base denominator limitation (next, DESIGN READY):**
+  `2/(x·(1+x)) = 2/x − 2/(1+x)` is declared FALSE. Diagnosis: the
+  clearing routes (cofactor synthesis and monomial contraction,
+  ring.cpp ~7403/7822) cancel `bᵢ·rᵢ = 1` only when the base appears
+  as whole monomial FACTORS — a base containing a SUM (`1+x`) is
+  distributed across monomials by the polynomial expansion, so the
+  pairing is unrecoverable at the atom level (atomizing the sum
+  instead loses the `B = 1+x` relation partial fractions need). The
+  correct fix is standard multivariate reduction modulo the relations
+  `bᵢ·rᵢ − 1`: with base polynomial b and lead term ℓ(b), rewrite
+  `ℓ(b)·rᵢ → rᵢ·(ℓ(b) − b) + 1` to a fixpoint (degree in ℓ's atom
+  strictly drops), then compare; the contraction-proof builder must
+  emit one multiplies-fact + ring step per reduction. Blocks the
+  triangular_series telescope, whose natural 8-line spelling is
+  otherwise ready (probe scratchpad/tri_probe5.math — cross-multiply
+  and denominator-congruence steps already close by-less).
 - the budget-exhaustion-before-cheap-route failures, seen twice
   (AM-GM :144 power congruence; the by-less cross fact at 181k
   kernel-steps) — the cost-gated-ring backlog item, elaborator-side;
