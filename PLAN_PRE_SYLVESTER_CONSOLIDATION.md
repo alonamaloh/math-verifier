@@ -101,7 +101,33 @@ probe module deleted; nothing else changed.
 
 ---
 
-## T2 `[ ]` (M) ★ NaturalsBelow order — the Sylvester gate
+## T2 `[x]` (M) ★ NaturalsBelow order — the Sylvester gate
+
+> **Ledger 2026-07-18.** (1) Gap re-verified: no order operators existed.
+> (2) `NaturalsBelow.LessThan`/`LessOrEqual` (transparent value
+> comparisons) + `<`/`≤` operators landed in `Set/finite.math`, with four
+> monomorphic `automatic` value-bridges in both directions (Q4 rule; the
+> bidirectional-pair shape has precedent in `add_one_le_of_lt`/
+> `lt_of_add_one_le`, and no search widening appeared — full tests 28.7 s).
+> **All five acceptance theorems pass** (`Test/naturals_below_order_test.math`,
+> permanent): ℕ order lemmas (`lt_transitive`, `LessOrEqual.transitive`,
+> `not_equal_of_greater_than`) cite straight through the operators — the
+> transparent definition needed no bridging for citations; the bridges
+> serve silent side-condition discharge, including the swap-style
+> distinctness shape. (3) Relocations done as pure moves:
+> `lt_or_gt_of_ne` + `lt_asymmetric` → `Natural/order.math`,
+> `ne_of_value_ne` → `Set/finite.math`, `Product.eta` →
+> `Logic/product.math`, `one_multiply_left` → `Integer/algebra.math`
+> (NOT deleted — its call sites pass it as the `identityLeft` DATA of
+> `List.product_of_ones`, so it is a value-level argument, not a
+> discharge hint); `ne_of_lt` DELETED as a re-proof of
+> `Natural.not_equal_of_less_than`, six sites retargeted; two mechanical
+> `import Integer.algebra` additions. Full rebuild 36 s, green.
+> (4) Value-coercion probe: REJECTED at registration — the coercion
+> registry validates the function's FIRST parameter head, which for
+> `NaturalsBelow.value` is the implicit `{n : ℕ}`; dependent sources are
+> out until the registry skips implicit binders. Recorded; stopped per
+> the probe-then-stop rule. Old proof bodies untouched throughout.
 
 **The tax.** `NaturalsBelow` (`Set/finite.math:27`) has only
 `value`/`make`/`below`. Every index comparison in the library is spelled

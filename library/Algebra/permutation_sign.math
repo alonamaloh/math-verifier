@@ -13,6 +13,7 @@ import Natural.basics
 import Natural.order
 import Natural.classical_decidable
 import Integer.basics
+import Integer.algebra
 import Algebra.integer_domain
 import Logic.product
 import Lists.list
@@ -24,23 +25,6 @@ import Lists.distinct
 import Lists.cartesian
 import Algebra.finite_permutation
 import Algebra.permutation_enumeration
-
--- Two Natural order facts the antisymmetry proof leans on.
-theorem Natural.lt_or_gt_of_ne (a b : ℕ) (distinct : a ≠ b) : a < b ∨ b < a := {
-  a < b ∨ a = b ∨ b < a by Natural.lt_trichotomy;
-  done by cases {
-    case a < b as below: below
-    case a = b as equal: absurd(distinct(equal))
-    case b < a as above: above
-  }
-}
-
-theorem Natural.lt_asymmetric (a b : ℕ) (below : a < b) : ¬(b < a) :=
-  (above : b < a) ↦ {
-    a < a by Natural.lt_transitive;
-    False by Natural.lt_irreflexive;
-    done
-  }
 
 -- The orientation of an ordered pair: +1 if x precedes y by value, −1 otherwise.
 -- On a pair of DISTINCT indices this is the sign of the value difference.
@@ -156,9 +140,6 @@ theorem Permutation.orderedPairs_distinct (n : ℕ)
   done by List.filter_distinct
 }
 
--- The multiplicative unit of Integer, as the identity the fold-product needs.
-theorem Integer.one_multiply_left (a : ℤ) : Integer.multiply(Integer.one, a) = a := ring
-
 -- A fold-product of a list every element of which is `one` is `one`.
 theorem List.product_of_ones (A : Type(0)) (multiply : A → A → A) (one : A)
         (identityLeft : ∀ (a : A). multiply(one, a) = a)
@@ -223,13 +204,6 @@ theorem Permutation.sign_identity (n : ℕ) : Permutation.sign(Permutation.ident
 -- factors pairwise into a τ-orientation and a σ-orientation on the τ-image of
 -- the pair; the first product reassembles sign τ and the second, reindexed by
 -- the τ-image (a permutation of the ordered pairs), reassembles sign σ.
-
--- A pair is its own components reassembled.
-theorem Product.eta (A B : Type(0)) (p : Pair(A, B))
-        : p = Product.make(Product.first(p), Product.second(p)) :=
-  by induction on p {
-    case Product.make(a, b): reflexivity(Product.make(a, b))
-  }
 
 -- Sorting a pair of indices into value order.
 definition Permutation.sortPair {n : ℕ} (a b : NaturalsBelow(n))
@@ -426,15 +400,6 @@ theorem Permutation.pairImage_injective_on {n : ℕ} (tau : Permutation(n))
     = Permutation.pairImage(Permutation.inverse(tau), Permutation.pairImage(tau, q))
           by substituting imagesEqual
     = q by Permutation.pairImage_cancel
-
--- Distinct values force distinct indices.
-theorem NaturalsBelow.ne_of_value_ne {n : ℕ} (a b : NaturalsBelow(n))
-        (valuesNe : NaturalsBelow.value(a) ≠ NaturalsBelow.value(b)) : a ≠ b :=
-  (equal : a = b) ↦ {
-    NaturalsBelow.value(a) = NaturalsBelow.value(b) by substituting equal;
-    False;
-    done
-  }
 
 -- The pointwise factorization: on an ordered pair, the composite's orientation
 -- is the τ-orientation times the σ-orientation on the sorted τ-image.

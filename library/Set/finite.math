@@ -53,6 +53,48 @@ automatic theorem NaturalsBelow.equal_of_value (n : ℕ) (a b : NaturalsBelow(n)
         (valuesEqual : NaturalsBelow.value(a) = NaturalsBelow.value(b)) : a = b :=
   { done by Subtype.equal_of_value_equal }
 
+-- Order on index elements: comparison of the underlying values, so `i < j`
+-- reads directly in index-heavy proofs (minors, transposition bookkeeping)
+-- instead of the spelled-out `NaturalsBelow.value(i) < NaturalsBelow.value(j)`.
+-- The definitions are one δ-step from the ℕ comparison; the automatic
+-- bridges below hop between the two spellings in both directions, so a fact
+-- in either form silently discharges a side condition stated in the other.
+
+definition NaturalsBelow.LessThan {n : ℕ} (a b : NaturalsBelow(n)) : Proposition :=
+  NaturalsBelow.value(a) < NaturalsBelow.value(b)
+
+definition NaturalsBelow.LessOrEqual {n : ℕ} (a b : NaturalsBelow(n)) : Proposition :=
+  NaturalsBelow.value(a) ≤ NaturalsBelow.value(b)
+
+operator (<) on (NaturalsBelow, NaturalsBelow) := NaturalsBelow.LessThan
+operator (≤) on (NaturalsBelow, NaturalsBelow) := NaturalsBelow.LessOrEqual
+
+automatic theorem NaturalsBelow.value_less_than {n : ℕ} (a b : NaturalsBelow(n))
+        (below : a < b) : NaturalsBelow.value(a) < NaturalsBelow.value(b) :=
+  below
+
+automatic theorem NaturalsBelow.less_than_of_value {n : ℕ} (a b : NaturalsBelow(n))
+        (below : NaturalsBelow.value(a) < NaturalsBelow.value(b)) : a < b :=
+  below
+
+automatic theorem NaturalsBelow.value_less_or_equal {n : ℕ} (a b : NaturalsBelow(n))
+        (atMost : a ≤ b) : NaturalsBelow.value(a) ≤ NaturalsBelow.value(b) :=
+  atMost
+
+automatic theorem NaturalsBelow.less_or_equal_of_value {n : ℕ} (a b : NaturalsBelow(n))
+        (atMost : NaturalsBelow.value(a) ≤ NaturalsBelow.value(b)) : a ≤ b :=
+  atMost
+
+-- Distinct values force distinct indices — the contrapositive companion of
+-- `equal_of_value`.
+theorem NaturalsBelow.ne_of_value_ne {n : ℕ} (a b : NaturalsBelow(n))
+        (valuesNe : NaturalsBelow.value(a) ≠ NaturalsBelow.value(b)) : a ≠ b :=
+  (equal : a = b) ↦ {
+    NaturalsBelow.value(a) = NaturalsBelow.value(b) by substituting equal;
+    False;
+    done
+  }
+
 -- `HasSize(X, n)`: X has exactly n elements — it is the same size as the
 -- canonical n-element type.
 definition HasSize (X : Type(0)) (n : ℕ) : Proposition :=
