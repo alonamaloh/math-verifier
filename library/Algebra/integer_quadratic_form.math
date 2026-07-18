@@ -40,10 +40,12 @@ import Algebra.integer_domain
 import Algebra.finite_permutation
 import Algebra.permutation_enumeration
 import Algebra.permutation_sign
+import Integer.integral_domain
 import Algebra.matrix
 import Algebra.matrix_ring
 import Algebra.matrix_transpose
 import Algebra.matrix_vector
+import Algebra.matrix_submatrix
 import Algebra.determinant
 import Algebra.determinant_identity
 import Algebra.determinant_transpose
@@ -74,6 +76,66 @@ definition Matrix.IsPositiveDefinite {n : ℕ}
   ∀ (x : RingVector(Integer.commutative_ring_bundle, n)).
       ¬(x = RingVector.zero(Integer.commutative_ring_bundle, n))
       → Matrix.quadraticForm(A, x) > (0 : ℤ)
+
+-- ----------------------------------------------------------------------
+-- Sections of a positive-definite form are positive-definite: an injective
+-- index selection embeds vectors without collapsing anything, so the
+-- section's values are among the ambient form's values away from zero.
+-- In particular every leading principal section is positive-definite, and
+-- every diagonal entry — the form at a standard basis vector — is positive.
+
+theorem Matrix.positive_definite_section {n k : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (select : NaturalsBelow(k) → NaturalsBelow(n))
+        (injective : Function.IsInjective(select))
+        (positiveDefinite : Matrix.IsPositiveDefinite(A))
+        : Matrix.IsPositiveDefinite(Matrix.submatrix(A, select, select)) := {
+  take x : RingVector(Integer.commutative_ring_bundle, k);
+  suppose ¬(x = RingVector.zero(Integer.commutative_ring_bundle, k));
+  ¬(Matrix.inclusionMatrix(Integer.commutative_ring_bundle, select) · x
+        = RingVector.zero(Integer.commutative_ring_bundle, n))
+      by Matrix.inclusionMatrix_applyVector_nonzero;
+  Matrix.quadraticForm(A, Matrix.inclusionMatrix(Integer.commutative_ring_bundle, select) · x)
+      > (0 : ℤ) by positiveDefinite;
+  Matrix.quadraticForm(Matrix.submatrix(A, select, select), x)
+     = Matrix.quadraticForm(A, Matrix.inclusionMatrix(Integer.commutative_ring_bundle, select) · x)
+         by Matrix.quadraticForm_submatrix as sectionAgrees;
+  done by substituting sectionAgrees
+}
+
+theorem Matrix.positive_definite_leadingSubmatrix {n k : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) (bound : k ≤ n)
+        (positiveDefinite : Matrix.IsPositiveDefinite(A))
+        : Matrix.IsPositiveDefinite(Matrix.leadingSubmatrix(A, bound)) := {
+  Function.IsInjective(NaturalsBelow.embed(bound)) by NaturalsBelow.embed_injective;
+  Matrix.IsPositiveDefinite(
+        Matrix.submatrix(A, NaturalsBelow.embed(bound), NaturalsBelow.embed(bound)))
+      by Matrix.positive_definite_section;
+  done
+}
+
+theorem Matrix.positive_definite_diagonal {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) (j : NaturalsBelow(n))
+        (positiveDefinite : Matrix.IsPositiveDefinite(A))
+        : A(j, j) > (0 : ℤ) := {
+  -- The standard basis vector is nonzero: its j-th coordinate is 1.
+  ¬(Matrix.standardBasisRow(Integer.commutative_ring_bundle, n, j)
+        = RingVector.zero(Integer.commutative_ring_bundle, n))
+      by (basisZero : Matrix.standardBasisRow(Integer.commutative_ring_bundle, n, j)
+              = RingVector.zero(Integer.commutative_ring_bundle, n)) ↦ {
+          Matrix.standardBasisRow(Integer.commutative_ring_bundle, n, j)(j) = Integer.one
+              by Matrix.standardBasisRow_at as basisAtJ;
+          Integer.one
+             = Matrix.standardBasisRow(Integer.commutative_ring_bundle, n, j)(j)   by basisAtJ
+             = RingVector.zero(Integer.commutative_ring_bundle, n)(j)              by substituting basisZero
+             = Integer.zero;
+          Integer.one ≠ Integer.zero by Integer.one_is_nonzero;
+          done
+        };
+  Matrix.quadraticForm(A, Matrix.standardBasisRow(Integer.commutative_ring_bundle, n, j)) > (0 : ℤ)
+      by positiveDefinite;
+  done by substituting Matrix.quadraticForm_standardBasis
+}
 
 -- ----------------------------------------------------------------------
 -- Sublattice monotonicity: if the restriction of A along M — the pulled-back

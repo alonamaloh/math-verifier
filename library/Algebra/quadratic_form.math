@@ -36,6 +36,7 @@ import Algebra.matrix
 import Algebra.matrix_ring
 import Algebra.matrix_transpose
 import Algebra.matrix_vector
+import Algebra.matrix_submatrix
 import Algebra.determinant
 import Algebra.determinant_identity
 import Algebra.determinant_transpose
@@ -92,6 +93,102 @@ theorem Matrix.pullback_symmetric {r : CommutativeRing} {n k : ℕ}
      = Mᵀ * (Aᵀ * M)
      = Mᵀ * (A * M)             by substituting symmetric
      = Mᵀ * A * M
+
+-- ----------------------------------------------------------------------
+-- Sections of a form: reindexing a symmetric matrix along an index
+-- selection is again symmetric, and evaluating the reindexed form is
+-- evaluating the ambient form at the embedded vector — the submatrix
+-- pullback is a special case of the pullback law.
+
+theorem Matrix.submatrix_symmetric {r : CommutativeRing} {n k : ℕ}
+        (A : Matrix(r, n, n)) (select : NaturalsBelow(k) → NaturalsBelow(n))
+        (symmetric : Matrix.IsSymmetric(A))
+        : Matrix.IsSymmetric(Matrix.submatrix(A, select, select)) := {
+  ∀ (i : NaturalsBelow(k)). ∀ (j : NaturalsBelow(k)).
+      Matrix.submatrix(A, select, select)ᵀ(i, j) = Matrix.submatrix(A, select, select)(i, j)
+      by (i : NaturalsBelow(k)) (j : NaturalsBelow(k)) ↦ {
+          Matrix.submatrix(A, select, select)ᵀ(i, j)
+             = Aᵀ(select(i), select(j))
+             = A(select(i), select(j))                       by substituting symmetric
+             = Matrix.submatrix(A, select, select)(i, j);
+          done
+        };
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.quadraticForm_submatrix {r : CommutativeRing} {n k : ℕ}
+        (A : Matrix(r, n, n)) (select : NaturalsBelow(k) → NaturalsBelow(n))
+        (x : RingVector(r, k))
+        : Matrix.quadraticForm(Matrix.submatrix(A, select, select), x)
+          = Matrix.quadraticForm(A, Matrix.inclusionMatrix(r, select) · x) := {
+  (Matrix.inclusionMatrix(r, select)ᵀ * A) * Matrix.inclusionMatrix(r, select)
+      = Matrix.submatrix(A, select, select) by Matrix.submatrix_pullback as pullbackFactors;
+  Matrix.quadraticForm(Matrix.submatrix(A, select, select), x)
+     = Matrix.quadraticForm((Matrix.inclusionMatrix(r, select)ᵀ * A) * Matrix.inclusionMatrix(r, select), x)
+           by substituting pullbackFactors
+     = Matrix.quadraticForm(A, Matrix.inclusionMatrix(r, select) · x)
+           by Matrix.quadraticForm_pullback
+}
+
+-- ----------------------------------------------------------------------
+-- The form at a standard basis vector reads off a diagonal entry.
+
+theorem Matrix.applyVector_standardBasisRow {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (j i : NaturalsBelow(n))
+        : (A · Matrix.standardBasisRow(r, n, j))(i) = A(i, j) := {
+  List.Distinct(NaturalsBelow(n), NaturalsBelow.enumerate(n)) by NaturalsBelow.enumerate_distinct;
+  j ∈ NaturalsBelow.enumerate(n) by NaturalsBelow.enumerate_complete;
+  ∀ (t : NaturalsBelow(n)). t ∈ NaturalsBelow.enumerate(n) → ¬(t = j)
+      → A(i, t) * Matrix.standardBasisRow(r, n, j)(t) = CommutativeRing.zero(r)
+      by (t : NaturalsBelow(n)) (tMember : t ∈ NaturalsBelow.enumerate(n)) (tNotJ : ¬(t = j)) ↦ {
+          Matrix.standardBasisRow(r, n, j)(t) = CommutativeRing.zero(r)
+              by Matrix.standardBasisRow_off;
+          A(i, t) * Matrix.standardBasisRow(r, n, j)(t)
+             = A(i, t) * CommutativeRing.zero(r)   by substitution
+             = CommutativeRing.zero(r)
+        };
+  Matrix.standardBasisRow(r, n, j)(j) = CommutativeRing.one(r)
+      by Matrix.standardBasisRow_at as basisAtJ;
+  (A · Matrix.standardBasisRow(r, n, j))(i)
+     = CommutativeRing.sumOver(
+           (t : NaturalsBelow(n)) ↦ A(i, t) * Matrix.standardBasisRow(r, n, j)(t),
+           NaturalsBelow.enumerate(n))
+     = A(i, j) * Matrix.standardBasisRow(r, n, j)(j)   by CommutativeRing.sumOver_single
+     = A(i, j) * CommutativeRing.one(r)                by substituting basisAtJ
+     = A(i, j)
+}
+
+theorem Matrix.quadraticForm_standardBasis {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (j : NaturalsBelow(n))
+        : Matrix.quadraticForm(A, Matrix.standardBasisRow(r, n, j)) = A(j, j) := {
+  List.Distinct(NaturalsBelow(n), NaturalsBelow.enumerate(n)) by NaturalsBelow.enumerate_distinct;
+  j ∈ NaturalsBelow.enumerate(n) by NaturalsBelow.enumerate_complete;
+  ∀ (t : NaturalsBelow(n)). t ∈ NaturalsBelow.enumerate(n) → ¬(t = j)
+      → Matrix.standardBasisRow(r, n, j)(t) * (A · Matrix.standardBasisRow(r, n, j))(t)
+        = CommutativeRing.zero(r)
+      by (t : NaturalsBelow(n)) (tMember : t ∈ NaturalsBelow.enumerate(n)) (tNotJ : ¬(t = j)) ↦ {
+          Matrix.standardBasisRow(r, n, j)(t) = CommutativeRing.zero(r)
+              by Matrix.standardBasisRow_off;
+          Matrix.standardBasisRow(r, n, j)(t) * (A · Matrix.standardBasisRow(r, n, j))(t)
+             = CommutativeRing.zero(r) * (A · Matrix.standardBasisRow(r, n, j))(t)   by substitution
+             = CommutativeRing.zero(r)
+        };
+  Matrix.standardBasisRow(r, n, j)(j) = CommutativeRing.one(r)
+      by Matrix.standardBasisRow_at as basisAtJ;
+  (A · Matrix.standardBasisRow(r, n, j))(j) = A(j, j)
+      by Matrix.applyVector_standardBasisRow as actionAtJ;
+  Matrix.quadraticForm(A, Matrix.standardBasisRow(r, n, j))
+     = RingVector.innerProduct(Matrix.standardBasisRow(r, n, j), A · Matrix.standardBasisRow(r, n, j))
+     = CommutativeRing.sumOver(
+           (t : NaturalsBelow(n)) ↦
+               Matrix.standardBasisRow(r, n, j)(t) * (A · Matrix.standardBasisRow(r, n, j))(t),
+           NaturalsBelow.enumerate(n))
+     = Matrix.standardBasisRow(r, n, j)(j) * (A · Matrix.standardBasisRow(r, n, j))(j)
+           by CommutativeRing.sumOver_single
+     = CommutativeRing.one(r) * (A · Matrix.standardBasisRow(r, n, j))(j)   by substituting basisAtJ
+     = (A · Matrix.standardBasisRow(r, n, j))(j)
+     = A(j, j)                                                              by actionAtJ
+}
 
 -- ----------------------------------------------------------------------
 -- Isometry: B = UᵀAU for an invertible U (over ℤ, U ∈ GLₙ(ℤ)). An

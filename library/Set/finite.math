@@ -14,6 +14,7 @@
 module Set.finite
 
 import Logic.basics
+import Logic.functions
 import Logic.exists
 import Equality.basics
 import Set.subtype
@@ -94,6 +95,39 @@ theorem NaturalsBelow.ne_of_value_ne {n : ℕ} (a b : NaturalsBelow(n))
     False;
     done
   }
+
+-- ----------------------------------------------------------------------
+-- Embedding along a widened bound: NaturalsBelow(k) ↪ NaturalsBelow(n) for
+-- k ≤ n — keep the value, loosen the bound. This is the map whose image is
+-- the first k indices of NaturalsBelow(n); the leading principal submatrix
+-- machinery reindexes along it.
+
+theorem NaturalsBelow.value_below_of_less_or_equal {k n : ℕ} (bound : k ≤ n)
+        (element : NaturalsBelow(k)) : NaturalsBelow.value(element) < n :=
+  NaturalsBelow.value(element)
+     < k
+     ≤ n by bound
+
+definition NaturalsBelow.embed {k n : ℕ} (bound : k ≤ n) (element : NaturalsBelow(k))
+        : NaturalsBelow(n) :=
+  NaturalsBelow.make(NaturalsBelow.value(element), NaturalsBelow.value_below_of_less_or_equal)
+
+theorem NaturalsBelow.embed_value {k n : ℕ} (bound : k ≤ n) (element : NaturalsBelow(k))
+        : NaturalsBelow.value(NaturalsBelow.embed(bound, element)) = NaturalsBelow.value(element) :=
+  done
+
+-- The embedding keeps the value, so it is injective.
+theorem NaturalsBelow.embed_injective {k n : ℕ} (bound : k ≤ n)
+        : Function.IsInjective(NaturalsBelow.embed(bound)) := {
+  take x : NaturalsBelow(k);
+  take y : NaturalsBelow(k);
+  suppose NaturalsBelow.embed(bound, x) = NaturalsBelow.embed(bound, y) as imagesEqual;
+  NaturalsBelow.value(x)
+     = NaturalsBelow.value(NaturalsBelow.embed(bound, x))
+     = NaturalsBelow.value(NaturalsBelow.embed(bound, y))    by imagesEqual
+     = NaturalsBelow.value(y);
+  done by NaturalsBelow.equal_of_value
+}
 
 -- `HasSize(X, n)`: X has exactly n elements — it is the same size as the
 -- canonical n-element type.

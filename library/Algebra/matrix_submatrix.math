@@ -1,0 +1,208 @@
+-- Algebra/matrix_submatrix.math
+--
+-- Submatrices as reindexings: `Matrix.submatrix(A, rowSelect, columnSelect)`
+-- reads the entries of A along a pair of index maps. The bridge to the
+-- matrix algebra is the inclusion matrix of an index map — the 0/1 matrix
+-- with a single 1 per column, at the selected row — through which a
+-- submatrix is a pullback: Mᵀ·A·N picks out exactly the selected entries.
+-- For an injective selection the inclusion matrix also embeds vectors
+-- without collapsing anything: coordinates survive, and nonzero vectors
+-- stay nonzero. Instantiating the selection at `NaturalsBelow.embed` gives
+-- the leading principal submatrices — the objects of Sylvester's criterion.
+
+module Algebra.matrix_submatrix
+
+import Logic.basics
+import Logic.functions
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.classical_decidable
+import Set.finite
+import Lists.list
+import Lists.map
+import Lists.distinct
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.permutation_enumeration
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.matrix_transpose
+import Algebra.matrix_vector
+
+definition Matrix.submatrix {r : CommutativeRing} {rows columns k l : ℕ}
+        (A : Matrix(r, rows, columns))
+        (rowSelect : NaturalsBelow(k) → NaturalsBelow(rows))
+        (columnSelect : NaturalsBelow(l) → NaturalsBelow(columns))
+        : Matrix(r, k, l) :=
+  (i : NaturalsBelow(k)) ↦ (j : NaturalsBelow(l)) ↦ A(rowSelect(i), columnSelect(j))
+
+-- The leading principal k×k submatrix: reindex along the value-preserving
+-- embedding of the first k indices.
+definition Matrix.leadingSubmatrix {r : CommutativeRing} {n k : ℕ}
+        (A : Matrix(r, n, n)) (bound : k ≤ n) : Matrix(r, k, k) :=
+  Matrix.submatrix(A, NaturalsBelow.embed(bound), NaturalsBelow.embed(bound))
+
+-- ----------------------------------------------------------------------
+-- The inclusion matrix of an index map: column j carries a single 1, at
+-- row select(j). Multiplying by it (and its transpose) reindexes.
+
+definition Matrix.inclusionMatrix {n k : ℕ} (r : CommutativeRing)
+        (select : NaturalsBelow(k) → NaturalsBelow(n)) : Matrix(r, n, k) :=
+  (i : NaturalsBelow(n)) ↦ (j : NaturalsBelow(k)) ↦
+      if i = select(j) then CommutativeRing.one(r) else CommutativeRing.zero(r)
+
+theorem Matrix.inclusionMatrix_entry_at {n k : ℕ} (r : CommutativeRing)
+        (select : NaturalsBelow(k) → NaturalsBelow(n))
+        (i : NaturalsBelow(n)) (j : NaturalsBelow(k)) (equal : i = select(j))
+        : Matrix.inclusionMatrix(r, select)(i, j) = CommutativeRing.one(r) :=
+  by Logic.if_positive
+
+theorem Matrix.inclusionMatrix_entry_off {n k : ℕ} (r : CommutativeRing)
+        (select : NaturalsBelow(k) → NaturalsBelow(n))
+        (i : NaturalsBelow(n)) (j : NaturalsBelow(k)) (notEqual : ¬(i = select(j)))
+        : Matrix.inclusionMatrix(r, select)(i, j) = CommutativeRing.zero(r) :=
+  by Logic.if_negative
+
+-- Multiplying by the inclusion matrix on the right selects columns: the
+-- inner product with the single-1 column collapses to the selected entry.
+theorem Matrix.multiply_inclusionMatrix_entry {r : CommutativeRing} {rows n k : ℕ}
+        (A : Matrix(r, rows, n)) (select : NaturalsBelow(k) → NaturalsBelow(n))
+        (i : NaturalsBelow(rows)) (q : NaturalsBelow(k))
+        : (A * Matrix.inclusionMatrix(r, select))(i, q) = A(i, select(q)) := {
+  List.Distinct(NaturalsBelow(n), NaturalsBelow.enumerate(n)) by NaturalsBelow.enumerate_distinct;
+  select(q) ∈ NaturalsBelow.enumerate(n) by NaturalsBelow.enumerate_complete;
+  ∀ (t : NaturalsBelow(n)). t ∈ NaturalsBelow.enumerate(n) → ¬(t = select(q))
+      → A(i, t) * Matrix.inclusionMatrix(r, select)(t, q) = CommutativeRing.zero(r)
+      by (t : NaturalsBelow(n)) (tMember : t ∈ NaturalsBelow.enumerate(n))
+         (tOffSelect : ¬(t = select(q))) ↦ {
+          Matrix.inclusionMatrix(r, select)(t, q) = CommutativeRing.zero(r)
+              by Matrix.inclusionMatrix_entry_off;
+          A(i, t) * Matrix.inclusionMatrix(r, select)(t, q)
+             = A(i, t) * CommutativeRing.zero(r)   by substitution
+             = CommutativeRing.zero(r)
+        };
+  Matrix.inclusionMatrix(r, select)(select(q), q) = CommutativeRing.one(r)
+      by Matrix.inclusionMatrix_entry_at as entryAtSelect;
+  (A * Matrix.inclusionMatrix(r, select))(i, q)
+     = CommutativeRing.sumOver(
+           (t : NaturalsBelow(n)) ↦ A(i, t) * Matrix.inclusionMatrix(r, select)(t, q),
+           NaturalsBelow.enumerate(n))
+     = A(i, select(q)) * Matrix.inclusionMatrix(r, select)(select(q), q)
+           by CommutativeRing.sumOver_single
+     = A(i, select(q)) * CommutativeRing.one(r)   by substituting entryAtSelect
+     = A(i, select(q))
+}
+
+-- Multiplying by the transposed inclusion matrix on the left selects rows.
+theorem Matrix.inclusionMatrix_transpose_multiply_entry {r : CommutativeRing} {n k columns : ℕ}
+        (A : Matrix(r, n, columns)) (select : NaturalsBelow(k) → NaturalsBelow(n))
+        (p : NaturalsBelow(k)) (j : NaturalsBelow(columns))
+        : (Matrix.inclusionMatrix(r, select)ᵀ * A)(p, j) = A(select(p), j) := {
+  List.Distinct(NaturalsBelow(n), NaturalsBelow.enumerate(n)) by NaturalsBelow.enumerate_distinct;
+  select(p) ∈ NaturalsBelow.enumerate(n) by NaturalsBelow.enumerate_complete;
+  ∀ (t : NaturalsBelow(n)). t ∈ NaturalsBelow.enumerate(n) → ¬(t = select(p))
+      → Matrix.inclusionMatrix(r, select)(t, p) * A(t, j) = CommutativeRing.zero(r)
+      by (t : NaturalsBelow(n)) (tMember : t ∈ NaturalsBelow.enumerate(n))
+         (tOffSelect : ¬(t = select(p))) ↦ {
+          Matrix.inclusionMatrix(r, select)(t, p) = CommutativeRing.zero(r)
+              by Matrix.inclusionMatrix_entry_off;
+          Matrix.inclusionMatrix(r, select)(t, p) * A(t, j)
+             = CommutativeRing.zero(r) * A(t, j)   by substitution
+             = CommutativeRing.zero(r)
+        };
+  Matrix.inclusionMatrix(r, select)(select(p), p) = CommutativeRing.one(r)
+      by Matrix.inclusionMatrix_entry_at as entryAtSelect;
+  (Matrix.inclusionMatrix(r, select)ᵀ * A)(p, j)
+     = CommutativeRing.sumOver(
+           (t : NaturalsBelow(n)) ↦ Matrix.inclusionMatrix(r, select)(t, p) * A(t, j),
+           NaturalsBelow.enumerate(n))
+     = Matrix.inclusionMatrix(r, select)(select(p), p) * A(select(p), j)
+           by CommutativeRing.sumOver_single
+     = CommutativeRing.one(r) * A(select(p), j)   by substituting entryAtSelect
+     = A(select(p), j)
+}
+
+-- A submatrix is a pullback along the inclusion matrices: row selection on
+-- the left, column selection on the right.
+theorem Matrix.submatrix_pullback {r : CommutativeRing} {rows columns k l : ℕ}
+        (A : Matrix(r, rows, columns))
+        (rowSelect : NaturalsBelow(k) → NaturalsBelow(rows))
+        (columnSelect : NaturalsBelow(l) → NaturalsBelow(columns))
+        : (Matrix.inclusionMatrix(r, rowSelect)ᵀ * A) * Matrix.inclusionMatrix(r, columnSelect)
+          = Matrix.submatrix(A, rowSelect, columnSelect) := {
+  ∀ (p : NaturalsBelow(k)). ∀ (q : NaturalsBelow(l)).
+      ((Matrix.inclusionMatrix(r, rowSelect)ᵀ * A) * Matrix.inclusionMatrix(r, columnSelect))(p, q)
+      = Matrix.submatrix(A, rowSelect, columnSelect)(p, q)
+      by (p : NaturalsBelow(k)) (q : NaturalsBelow(l)) ↦ {
+          ((Matrix.inclusionMatrix(r, rowSelect)ᵀ * A) * Matrix.inclusionMatrix(r, columnSelect))(p, q)
+             = (Matrix.inclusionMatrix(r, rowSelect)ᵀ * A)(p, columnSelect(q))
+                   by Matrix.multiply_inclusionMatrix_entry
+             = A(rowSelect(p), columnSelect(q))
+                   by Matrix.inclusionMatrix_transpose_multiply_entry
+             = Matrix.submatrix(A, rowSelect, columnSelect)(p, q);
+          done
+        };
+  done by Matrix.equal_of_entries
+}
+
+-- ----------------------------------------------------------------------
+-- The inclusion matrix embeds vectors: for an injective selection every
+-- coordinate of x survives at its selected position, so a nonzero vector
+-- stays nonzero.
+
+theorem Matrix.inclusionMatrix_applyVector_entry {r : CommutativeRing} {n k : ℕ}
+        (select : NaturalsBelow(k) → NaturalsBelow(n))
+        (injective : Function.IsInjective(select))
+        (x : RingVector(r, k)) (p : NaturalsBelow(k))
+        : (Matrix.inclusionMatrix(r, select) · x)(select(p)) = x(p) := {
+  List.Distinct(NaturalsBelow(k), NaturalsBelow.enumerate(k)) by NaturalsBelow.enumerate_distinct;
+  p ∈ NaturalsBelow.enumerate(k) by NaturalsBelow.enumerate_complete;
+  ∀ (j : NaturalsBelow(k)). j ∈ NaturalsBelow.enumerate(k) → ¬(j = p)
+      → Matrix.inclusionMatrix(r, select)(select(p), j) * x(j) = CommutativeRing.zero(r)
+      by (j : NaturalsBelow(k)) (jMember : j ∈ NaturalsBelow.enumerate(k)) (jNotP : ¬(j = p)) ↦ {
+          ¬(select(p) = select(j)) by (imagesEqual : select(p) = select(j)) ↦ {
+              p = j by injective;
+              j = p;
+              done
+            };
+          Matrix.inclusionMatrix(r, select)(select(p), j) = CommutativeRing.zero(r)
+              by Matrix.inclusionMatrix_entry_off;
+          Matrix.inclusionMatrix(r, select)(select(p), j) * x(j)
+             = CommutativeRing.zero(r) * x(j)   by substitution
+             = CommutativeRing.zero(r)
+        };
+  Matrix.inclusionMatrix(r, select)(select(p), p) = CommutativeRing.one(r)
+      by Matrix.inclusionMatrix_entry_at as entryAtSelect;
+  (Matrix.inclusionMatrix(r, select) · x)(select(p))
+     = CommutativeRing.sumOver(
+           (j : NaturalsBelow(k)) ↦ Matrix.inclusionMatrix(r, select)(select(p), j) * x(j),
+           NaturalsBelow.enumerate(k))
+     = Matrix.inclusionMatrix(r, select)(select(p), p) * x(p)
+           by CommutativeRing.sumOver_single
+     = CommutativeRing.one(r) * x(p)   by substituting entryAtSelect
+     = x(p)
+}
+
+theorem Matrix.inclusionMatrix_applyVector_nonzero {r : CommutativeRing} {n k : ℕ}
+        (select : NaturalsBelow(k) → NaturalsBelow(n))
+        (injective : Function.IsInjective(select))
+        (x : RingVector(r, k))
+        (xNonzero : ¬(x = RingVector.zero(r, k)))
+        : ¬(Matrix.inclusionMatrix(r, select) · x = RingVector.zero(r, n)) := {
+  suppose Matrix.inclusionMatrix(r, select) · x = RingVector.zero(r, n) as imageZero;
+  ∀ (p : NaturalsBelow(k)). x(p) = RingVector.zero(r, k)(p)
+      by (p : NaturalsBelow(k)) ↦ {
+          x(p)
+             = (Matrix.inclusionMatrix(r, select) · x)(select(p))
+                   by Matrix.inclusionMatrix_applyVector_entry
+             = RingVector.zero(r, n)(select(p))   by substituting imageZero
+             = RingVector.zero(r, k)(p);
+          done
+        };
+  x = RingVector.zero(r, k) by RingVector.equal_of_pointwise;
+  done
+}
