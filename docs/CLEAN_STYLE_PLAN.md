@@ -2,7 +2,7 @@
 
 The overriding goal of this project is that proofs read like what a
 mathematician would write in a textbook, with the kernel doing the
-typechecking (see `docs/conventions/proof-style.md`). This document tracks the
+typechecking (see `docs/style.md`). This document tracks the
 plan for extending that *clean* style from a small seed set to the entire
 library.
 
@@ -50,7 +50,7 @@ confirming read; that backlog is worked as part of the cleaning loop.
 anonymous tuples) is where the readability read *starts*, not proof a file is
 done — "leak-clean" ≠ "clean". Two things neither axis sees: a pattern-match
 `cases <value> { | zero => … | successor(k) => … }` in a proof (discouraged in
-`proof-style.md` in favour of a proposition split that keeps the scrutinee
+`docs/style.md` in favour of an equation-shaped split that keeps the scrutinee
 abstract, but with no scanner), and `successor` leaking outside `Natural/` (its
 own deferred ratchet, kept out of `clean-check` per the
 successor-elimination campaign). A file can score 0/0 and still read like

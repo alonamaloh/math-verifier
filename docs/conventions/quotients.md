@@ -111,8 +111,8 @@ collapse to a sequence of bare stated facts with no `Equality.symmetry`:
 theorem Rational.zero_not_equal_one : Not(Rational.zero = Rational.one) :=
   (zeroEqOne : Rational.zero = Rational.one) ↦ {
     Integer.zero = Integer.one as integerZeroEqualsOne;
-    successor(0) = (0 : Natural) as successorZeroEqualsZero;
-    Natural.successor_not_zero(0, successorZeroEqualsZero)
+    (1 : Natural) = 0;
+    done
   }
 ```
 
@@ -259,7 +259,7 @@ over naming the raw representative constructor
 The raw constructor remains available as an escape hatch; this is a
 readability convention, not an elaborator-enforced restriction.
 
-## Patterns in binders — `take`, `suppose`, `cases` on quotients
+## Public quotient destructuring
 
 The unifying principle: a binder accepts a pattern, and the elaborator
 picks the eliminator from the type. This is the standard idiom for
@@ -267,67 +267,42 @@ picks the eliminator from the type. This is the standard idiom for
 
 ### `by_representatives` — the multi-scrutinee elimination idiom
 
-`by_representatives x as <pat>, y as <pat>, … ↦ body` is the preferred
-"WLOG pick representatives" form. It desugars to nested quotient-`cases`
-(one per scrutinee), so it is exactly the nested `cases` below but reads
-as one line. The pattern after `as` is a tuple `⟨a, b⟩` (the carrier's
+`by_representatives x as <pat>, y as <pat>, … => body` is the preferred
+"WLOG pick representatives" form. It applies the quotient eliminator once
+per scrutinee while keeping that machinery off the page. The pattern after
+`as` is a tuple `⟨a, b⟩` (the carrier's
 sole constructor is resolved from the type — `RationalRepresentative.make`
 need not be named), an explicit constructor pattern, or a bare name.
 
 ```math
 theorem Rational.triangle_inequality (x y : Rational)
         : abs(x + y) ≤ abs(x) + abs(y) :=
-  by_representatives x as ⟨n1, d1⟩, y as ⟨n2, d2⟩ ↦
+  by_representatives x as ⟨n1, d1⟩, y as ⟨n2, d2⟩ =>
     Rational.triangle_inequality_at_representatives(n1, n2, d1, d2)
 ```
 
-### `cases` on a quotient — direct destructure
-
-The pattern can be a bare name (bind the rep), a constructor pattern
-over the carrier type (destructure the rep), a tuple `⟨a, b⟩` (same, with
-the constructor name resolved from the type), or the explicit
-`Quotient.class_of(<inner>)` wrap (legacy). Prefer `by_representatives` (above)
-when destructuring one or more scrutinees with no extra `cases` plumbing.
-
-```math
--- Bare name: bind rep_x to the representative.
-cases x { | rep_x ↦ …use rep_x… }
-
--- Constructor pattern: destructure the rep directly.
-cases x { | IntegerRepresentative.make(a, b) =>
-    …use a and b… }
-
--- Tuple pattern: destructure without naming the constructor.
-cases x { | ⟨a, b⟩ => …use a and b… }
-
--- Two-binder cases nest naturally (or use `by_representatives`):
-cases x { | IntegerRepresentative.make(a, b) =>
-  cases y { | IntegerRepresentative.make(c, d) =>
-    …use a, b, c, d… } }
-```
-
-### Hypotheses about `x` refine through the destructure automatically
+### Hypotheses refine through representative selection
 
 Hypotheses about `x` (e.g. `xPos : 0 < x`) are threaded through the
-destructure automatically, so the inner body sees their refined types.
-Works on inductive scrutinees AND quotient scrutinees.
+destructure automatically, so the inner body sees their representative-level
+forms.
 
 ```math
 theorem Rational.multiply_positive_positive
         (x y : Rational) (xPos : 0 < x) (yPos : 0 < y)
         : 0 < x * y :=
-  cases x { | RationalRepresentative.make(n_x, d_x, dxNonzero) =>
-    cases y { | RationalRepresentative.make(n_y, d_y, dyNonzero) =>
-      …use xPos (seen here as 0 < [n_x/d_x]) … } }
+  by_representatives
+      x as ⟨n_x, d_x, dxNonzero⟩,
+      y as ⟨n_y, d_y, dyNonzero⟩ => {
+    …use xPos (seen here as 0 < [n_x/d_x]) …
+  }
 ```
 
 ### `take x as <pattern> : T;` — statement-level intro with destructure
 
 In a `{ … }` block body, `take x as <pattern> : T;` introduces a
-Pi-binder of type T and immediately destructures it. Equivalent to
-`take x : T; cases x { | <pattern> => <rest> };`. Dispatch is
-type-directed: inductive T uses cases; quotient T uses the
-quotient-cases path above.
+Pi-binder of type T and immediately destructures it through the type’s
+registered public eliminator.
 
 For a quotient, the preferred pattern is the mathematical
 `representative(…)` spelling (A5) — the carrier's constructor is
@@ -343,20 +318,9 @@ theorem Integer.triangle_inequality
 }
 ```
 
-The same pattern works in a quotient `cases`:
-`cases x { | representative(a, b) => … }`. The constructor-spelled
-form (`IntegerRepresentative.make(a, b)`) remains legal but is the
-representation-leaking spelling; prefer `representative`.
-
-### `suppose <P> as <pattern>;` — destructure on intro for hypotheses
-
-Symmetric form for propositional intros. The pattern can be a bare
-name (current behavior) or a tuple/constructor pattern (destructure
-into named pieces).
+For existential hypotheses, use `choose` rather than destructuring their
+internal tuple representation:
 
 ```math
-suppose ∃ (n : Natural). P(n) as ⟨witness, proof⟩;
--- equivalent to:
--- suppose ∃ (n : Natural). P(n) as h;
--- choose witness such that P(witness) as proof from h;
+choose witness such that P(witness) from existenceProof;
 ```

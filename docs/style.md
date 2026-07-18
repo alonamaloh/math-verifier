@@ -1,143 +1,152 @@
 # Style guide
 
-The overriding goal: **a proof reads like what a mathematician would write
-in a textbook**, with the kernel doing the typechecking. Optimize for
-readability, not terseness. (Depth: `docs/conventions/`.)
+The standard is simple: a proof should read like mathematics, with the
+kernel checking it. The files in `scripts/clean_manifest.txt` are the best
+current examples.
 
-## Naming
+## Start from the public interface
 
-- **No abbreviations in declared identifiers**: `representative`, not
-  `rep`. Use namespaces for brevity (`Natural.divides`), not truncation.
-  Local-variable abbreviations are fine.
-- Numerals `0`/`1`/`2` over `zero`/`successor(zero)`; `1 + n` over
-  `successor(n)` in expressions.
+Read `library/<Area>/README.md` before using an area. Prefer its named
+definitions and theorems to representation details.
 
-## Let the prover work
+Outside `Natural/`, use `ℕ`, numerals, and arithmetic. Do not use
+`zero`, `successor`, `Natural.Raw`, constructor patterns, or the raw
+recursor. Write `n + 1` or `1 + n` and use equation-shaped cases and
+induction.
 
-- **Default to the auto-prover** (a by-less `calc`/`claim` step). Reach for
-  a hint only when it fails.
-- **The by-less prover sees only `automatic` lemmas** (plus the local
-  context and the ring/field/equality battery) — it no longer sweeps every
-  imported lemma. So the threshold for a `by` is now sharp and mechanical:
-  **add `by <lemma>` exactly when the lemma is *not* `automatic`**, and
-  otherwise leave the step bare. Don't annotate a step the prover already
-  closes — `by triangle_inequality`, `by weaken`, `by add_preserves` are
-  the kind of "obvious" facts a mathematician never spells out; if
-  they're `automatic`, drop them. When a *non*-automatic lemma is needed
-  at many sites and is itself obvious, prefer **marking it `automatic`**
-  over naming it at every call (mind the prover-perturbation risk — test
-  the whole build). A redundant `by` is kept only for the rare
-  *non-obvious strategic reason* that genuinely helps the reader
-  (accepting the checker's warning); never for routine plumbing.
-  (`since`, the old exempt-explanation keyword, has been removed.)
-- **`ring` / `field` first** for any commutative-ring / field identity.
-  Reach for hand-written associativity/congruence only after they fail.
+Do not unfold an opaque abstraction in consumer code. If its public
+interface is missing a useful characterization, add that boundary theorem.
 
-## Don't call proof lemmas
+## State the mathematics
 
-- **Never apply a proof lemma to positional arguments** (`Foo.bar(a, b,
-  proof)`, even `Foo.bar(proof)`). State the fact and cite it: `claim T by
-  Foo.bar;` (arguments inferred, premises discharged from context), or
-  chain it through `calc`. This is the single biggest readability lever;
-  `scripts/cic_leak_report` counts every such call.
-- **Recursion is `by induction`**, so the recursive call is the local `IH`,
-  not a self-call to the theorem.
+Use a relation chain when the argument is transitivity, rewriting, or
+calculation:
 
-## Avoid raw CIC
+```math
+first
+   = middle by reason
+   ≤ last
+```
 
-These are kernel bureaucracy a mathematician would never write — the
-linter counts them, and there is always a math-like form:
+Inside a proof block, state intermediate propositions directly:
 
-| Instead of | Write |
-|---|---|
-| `congruenceOf(f, eq)` | a one-step chain `f(a) = f(b)` (diff-inference) |
-| `rewrite(eq, term)` | state the transported proposition bare (`P;` / `P by <fact>;`) |
-| `Equality.symmetry(eq)` | a reversed by-less chain step |
-| `transport_proposition(…)` | `substituting`, or an element-interface lemma |
-| a positional lemma call | `P by <lemma>` / `done by <lemma>` |
-| **`P by { <chain> }` restating the chain's endpoints** | **the bare chain statement** (add `as NAME` only if referenced) |
-| raw `Subtype.make(…)` | the structure's `construction`/intro form |
-| `⟨pA, pB⟩ : A ∧ B`, `⟨v, p⟩ : ∃…` | see "Connectives aren't tuples" |
-| `Not(a = b)`, `¬(a = b)` | `a ≠ b` (the operator desugars to it) |
+```math
+P;
+Q by theoremName;
+```
 
-`a ≠ b` is the surface spelling of `Not(a = b)`; prefer it everywhere — in
-hypotheses, claims, and goals — over the raw `¬(…)` / `Not(…)` forms.
+Name a fact with `as name` only when later text explicitly uses the name.
+Anonymous facts remain available by their propositions.
 
-**Never restate a chain's endpoints around the chain** (`P by { <chain> }`
-where `P` is just the chain's `first <relation> last`). This is an
-anti-pattern, with no exceptions. A relation chain at statement position *is*
-already a stated fact: it binds its `first <relation> last` endpoints into
-context (anonymously, found by type-match), so wrapping it in a stated
-proposition only restates what the chain concludes — pure repetition, and the
-linter counts it as a CIC leak (`claim-by-calc`). Write the bare chain
-statement, and add `as NAME` only when a later step references the result
-*by name*. The same goes for the whole-proof case: when a chain is the entire
-proof, return it directly (`:= <chain>`), never wrap it in a block that
-restates it. Full mechanics: `conventions/calc-and-rewrite.md`.
+## Let inference remove plumbing
 
-## Connectives aren't tuples
+Try a by-less fact or chain step first. The prover uses local hypotheses,
+`automatic` declarations, and its built-in equality, order, sign, and
+algebra reasoning.
 
-`And` and `Exists` happen to be single-constructor inductives, but a reader
-should never see the `⟨…⟩` tuple encoding of a logical connective. (Genuine
-data records — `Ring`, a quotient representative, `Subtype` — **are** tuples;
-`⟨…⟩` and `by_representatives x as ⟨a, b⟩` are fine for those.)
+When help is needed, cite the operative theorem without positional proof
+arguments:
 
-- **Build `A ∧ B`**: state the parts and let the prover conjoin — bare `done`,
-  or `claim A by …; claim B by …; done`. Not `⟨proofA, proofB⟩`.
-- **Build a bundle from named proofs** (`IsField`, `IsEquivalenceRelation`, …):
-  `claim <proofTerm>;` for each component, then `done`. `claim` accepts a
-  *proof* (a lemma/hypothesis) and introduces its type as the fact, so you cite
-  the names without restating the long types — and the exact-typed facts let
-  `done` conjoin them directly. So `claim Rational.is_commutative_ring; claim
-  Rational.zero_not_equal_one; claim …; done`, not
-  `⟨Rational.is_commutative_ring, …⟩`.
-- **Build `∃ x. P`**: `witness v with <proof of P(v)>`. Not `⟨v, proof⟩`.
-- **Destructure `∃`**: `choose v such that P from h`. `obtain ⟨…⟩` / `let ⟨…⟩`
-  are the same tell — avoid them.
-- **Use an `∧` hypothesis**: the prover already has both legs in context, so
-  cite the fact / `done` — don't `let ⟨a, b⟩ := h` to name them.
-- **Project one axiom from a bundled proof** (e.g. associativity out of an
-  in-scope `IsGroup`/`IsRing`): a bare `done` — the prover decomposes the
-  conjunction and finds the leg.
+```math
+desiredFact by ImportantTheorem;
+```
 
-Audit with `make anon-tuple-report` (type-aware; opt-in via
-`MATH_CHECK_ANON_TUPLES=1`). `make check` enforces it: `clean-anon-ratchet`
-fails if the manifest's connective-`⟨…⟩` count exceeds `CLEAN_ANON_BUDGET`, so a
-new one can't land in the clean set. Depth: `conventions/proof-style.md`.
+Avoid:
 
-## Layer the file
+```math
+ImportantTheorem(a, b, premise)
+```
 
-Keep proof-assistant machinery out of the mathematical proof. Standard
-shape: **definition/construction → boundary lemmas → representation-level
-kernel → thin adapter → public theorem.** Every lifted operation publishes a
-representative-computation boundary lemma; consumers compare opaque-quotient
-values through those lemmas, never `Quotient.class_of`/the bridge directly;
-state the math lemma in boundary terms and quarantine the `cases` bridge in a
-thin adapter. Name vacuous constructions (empty-type bijections, …) behind the
-concept. Lead comments with the math; pull kernel/elaborator mechanics into a
-`-- Implementation note:` aside. Depth: `conventions/proof-style.md`.
+unless an argument is genuine mathematical data that cannot be inferred.
 
-## Closers & names
+For commutative-ring identities, try `ring` first. For field identities
+with division, try `field(nonzeroFacts...)`.
 
-- Close the goal with `done` / `okay` (a bare goal restate); `goal` alone is
-  not a closer.
-- **Name a stated fact (`… as NAME`) only if you reference the name.** A
-  dead name is noise — drop it (anonymous `P;` / bare chain); the
-  auto-prover still finds the fact by type. Verify with
-  `make … --check-redundant-by` (unused-name + redundant-`by` warnings).
+## Use the proof structure that matches the argument
 
-## Mechanics
+- Universal statement: `take`.
+- Implication: `suppose`.
+- Existential introduction: `witness`.
+- Existential elimination: `choose`.
+- Inductive argument: `by induction`.
+- Structural alternatives: equation-shaped `done by cases`.
+- Classical condition: `done by cases { case P: ... otherwise: ... }`.
+- Conditional data: `if P then ... else ...`.
+- Contradiction: `suppose ... for contradiction` or a directly stated
+  impossible fact followed by `done`.
 
-- **Wrap at column 140**, and only when the line genuinely needs it.
-- **Build with `make -j 16 library`** (never bare `make`); validate
-  elaborator changes with a clean `make tests`.
-- **Commit coherent pieces often**; working directly on `main` is fine.
+Raw scrutinee pattern splitting is not part of the proof language. Use the
+equation-shaped alternatives, induction, or the public data-destructuring
+form for the type.
 
-## The smell test
+## Keep logical connectives mathematical
 
-If a proof looks like term-soup — nested positional calls, `congruenceOf`,
-raw `rewrite`, `⟨…⟩` over an `And`/`Exists`, `cases <proof> { | Or.introduceLeft
-… }` over a disjunction, anonymous `Or.introduceLeft(…)` chains — rewrite it as
-the mathematician's sentence: state each fact, justify it by its reason, and let
-`claim`/`calc`/`done`/`by induction`/`choose`/`witness`/`done by cases { … }`
-carry the structure.
+Do not expose the tuple encoding of `∧` and `∃`.
+
+- Build `A ∧ B` by establishing `A`, then `B`, then `done`.
+- Use a conjunction by stating the needed leg.
+- Build `∃ x. P(x)` with `witness`.
+- Use it with `choose`.
+- Prove `A ∨ B` by establishing the true side and closing.
+- Eliminate a disjunction with `done by cases`.
+
+Tuple syntax remains appropriate for genuine data records.
+
+## Prefer readable local structure
+
+Use `let` for a long expression repeated several times. Keep a coercion or
+type ascription visible at one binding rather than repeating it throughout a
+chain.
+
+Use descriptive declared names. Long qualified names are searchable.
+Short conventional local variables such as `i`, `n`, or `x` are fine.
+
+Wrap at roughly 140 columns, but do not create unnecessary vertical sprawl.
+
+## Comments explain strategy, not steps
+
+The proof text should say what each mathematical step establishes. A comment
+that merely paraphrases the next line is evidence that the line should be
+made clearer.
+
+A short comment may explain a non-obvious strategy. Representation or
+elaborator mechanics belong only in foundational implementation code and
+should be marked as an implementation note.
+
+## Separate construction from use
+
+A clean abstraction file normally has:
+
+1. a representation or construction;
+2. characterizing boundary theorems;
+3. representation-level proofs kept close to the construction;
+4. thin public adapters;
+5. consumer theorems written entirely through the public interface.
+
+Do not let quotient, subtype, raw-constructor, or transport machinery leak
+into ordinary mathematical results.
+
+## Check the result
+
+Build the library:
+
+```sh
+make -j 16 library
+```
+
+For language and elaborator work:
+
+```sh
+make -j 16 tests
+```
+
+For files in the clean manifest:
+
+```sh
+make clean-check
+make clean-anon-ratchet
+```
+
+The redundancy checks can find removable hints and unused names, but their
+output is a polishing aid rather than a substitute for reading the proof.
+The final test is whether the proof communicates the mathematical argument.

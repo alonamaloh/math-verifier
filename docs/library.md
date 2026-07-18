@@ -1,5 +1,8 @@
 # Library guide
 
+For LLM-oriented entry points colocated with the code, start with
+[`library/README.md`](../library/README.md).
+
 A map of `library/`. Imports flow **up** the dependency layers: a module
 may import from its own layer and below, never above. (Build/layout depth:
 `docs/conventions/build-and-layout.md`.)
@@ -15,7 +18,8 @@ may import from its own layer and below, never above. (Build/layout depth:
 
 ## Numbers
 
-- **`Natural/`** (the largest area) — Peano `Natural`: `arithmetic`,
+- **`Natural/`** (start with [`Natural/README.md`](../library/Natural/README.md))
+  — Peano `Natural`: `arithmetic`,
   `order`, `divisibility`, `gcd`/`bezout`, primality and prime
   factorization, division-with-remainder + `modulo`, truncated subtraction
   (`monus`), `strong_recursion`, and decidability of `=`/`≤`/`∣`.
@@ -43,7 +47,8 @@ may import from its own layer and below, never above. (Build/layout depth:
   `polynomial_vector_space` (F[x] with the {xⁿ} basis),
   `exchange_lemma` (the Steinitz inequality `independent_le_spanning`:
   an independent family is ≤ a spanning one — where `Field.reciprocal`
-  enters).
+  enters). The quadratic-form/escalator development has its own concise map
+  at [`Algebra/fifteen-theorem.md`](../library/Algebra/fifteen-theorem.md).
 - **`Polynomial/`** — the polynomial ring over a coefficient ring:
   `addition`/`multiplication`, `degree` (+ degree-of-product), `division`,
   `bezout`, `irreducible`, `units`, `quotient_field`.

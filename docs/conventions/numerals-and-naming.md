@@ -1,6 +1,6 @@
 # Naming, line width, numerals, and casts
 
-No abbreviations; the 140-column rule; `1 + n` vs `successor(n)`; binding a repeated cast with `let`.
+No abbreviations; the 140-column rule; arithmetic Natural notation; binding a repeated cast with `let`.
 
 *(Part of the project conventions; see `CLAUDE.md` for the index.)*
 
@@ -22,54 +22,25 @@ modern screens display 140-column lines without effort. Wrap when
 the line genuinely needs it (a multi-argument function call where
 each arg is itself complex), not because of a column limit.
 
-## `successor(n)`, `1 + n`, and `n + 1`
+## Natural successors: use arithmetic outside `Natural/`
 
-`successor(n)` is the Peano constructor; `1 + n` and `n + 1` are the same
-value written with the carrier's `+`. **There is no house preference among
-them** — write whichever reads most naturally (mathematicians usually write
-`n + 1`). The points below are about *mechanics*, not style.
+Modules outside `library/Natural/` treat `Natural` as a sealed arithmetic
+type. Write `n + 1` or `1 + n`; do not write `successor(n)`, pattern-match on
+`successor`, cite successor-facing boundary lemmas, or unfold
+`Natural.add`/`Natural.multiply`. Use ordinary arithmetic theorems, `ring`,
+and arithmetic case or induction arms such as
+`case n = 1 + k for some k:`.
 
-**They are only propositionally equal, not defeq.** `Natural.add` is
-`opaque`, so the kernel does NOT silently reduce `1 + n` to `successor(n)`.
-The bridge is the lemma `Natural.one_add : 1 + n = successor(n)` (and
-`ring` / `add_commutative` to move between `1 + n` and `n + 1`). Under an
-explicit `unfold Natural.add`, `1 + n` *does* reduce to `successor(n)` —
-but `n + 1` does not, because `add` recurses on its FIRST argument.
+Choose between `n + 1` and `1 + n` for mathematical readability. They are
+equal by the public arithmetic laws, but they need not be definitionally
+equal because `Natural.add` is opaque. A consumer proof must not depend on
+which argument the hidden implementation recurses over.
 
-This left/right asymmetry is intrinsic to structural recursion and is the
-thing to actually watch: `0 + a ≡ a` is one ι-step but `a + 0 = a` needs
-induction; `successor(k) + b` and `1 + k` reduce, `k + 1` is stuck. **Keep
-any reasoning that leans on it (anything needing `unfold Natural.add` /
-`unfold Natural.multiply`) inside the `Natural/` floor.** Above that floor,
-go through lemmas / `ring` so the asymmetry is invisible — e.g. both
-`t + 0 = t` and `0 + t = t` are just `:= ring`. Opacity + `ring` are
-exactly what make the prover see no difference between the two forms; a
-non-foundational proof that has to `unfold` add to compute is a smell.
-
-**Exception: patterns.** Pattern positions (`| successor(k) => ...`)
-require the bare constructor — the parser accepts neither `1 + k` nor
-`k + 1` there. Companion memory: [[prefer_numeric_literals]] covers the
-related `0`/`1`/`2` over `zero`/`successor(zero)`/`two` rule (that one *is*
-still a preference).
-
-**Where `successor(n)` reads best.** Two cases, learned the hard way:
-
-- **Structural reduction sites in foundational files.** `Natural.add` and
-  `Natural.multiply` reduce on the `successor` constructor of the first
-  argument (`successor(k) + b ≡ successor(k + b)`,
-  `d * successor(q) ≡ d + d * q`). Rewrite/calc matchers see the
-  `successor(...)` form structurally but not always the reduced form
-  behind `1 + k`. In `library/Natural/arithmetic.math` (`add_commutative`'s
-  successor case) the calc starts at the reduced `successor(predecessor + b)`
-  precisely so a downstream rewrite finds `predecessor + b` as a subterm;
-  `(1 + predecessor) + b` would hide it. This is fine — it lives on the
-  `Natural/` floor where the constructor belongs.
-
-- **Structural-atom slots.** When `successor(n)` is a "positive successor"
-  atom (e.g. a positive denominator in Rational cross-multiplication),
-  `(successor(d) : Integer)` reads as one concept — "the *d*th positive
-  denominator." `((1 + d) : Integer)` adds a paren pair and makes the
-  reader parse a sum first (saw this on `Rational/basics.math`).
+Constructor spellings are confined to the implementation of the Natural
+boundary itself. Code there may need `Natural.Raw.successor`, the temporary
+`successor` wrapper, or explicit unfolding to prove the arithmetic-facing
+interface. That is representation-level machinery, not a general proof
+style or an exception available to downstream modules.
 
 ## Numeral coercion: argument positions, and why `0`/`1` differ from `2`
 
@@ -84,10 +55,10 @@ varies is whether the *position* lifts it up the coercion tower:
   the bare form.** Likewise prefer real division `(x + y) / 2` over
   `(x + y) * (Rational.one_half : Real)` — it reads as the mathematics, and
   `field` proves identities over it directly (see `algebra-tactics.md`).
-- **Calc heads with an all-numeral first relation do NOT.** `calc 0 = 0 + 0 ≤ …`
+- **All-numeral chain heads do not.** A chain beginning `0 = 0 + 0 ≤ …`
   can't pin a carrier from `0 = 0 + 0`, so it defaults to `Natural`; seed it
-  with one cast — `calc (0 : Real)`. A first relation with a non-numeral
-  operand (`calc 0 ≤ abs(x)`) seeds fine — only the all-numeral case needs the
+  with one cast—`(0 : Real) = 0 + 0 ≤ …`. A first relation with a non-numeral
+  operand (`0 ≤ abs(x)`) seeds fine—only the all-numeral case needs the
   ascription. (The C++ `std::string("a") + "b"` situation: you seed the first
   operation, and a typed operand appearing *later* in the chain can't reach
   back to fix it.)
@@ -103,7 +74,7 @@ equal to `Real.one + Real.one` (real addition) — only ring-equal. Consequences
   citation against a `1 + 1`-producing lemma compares structurally and fails.
 - To use `2` where a proof otherwise carries `1 + 1`: make the WHOLE proof use
   `2` (so nothing has to match `1 + 1` against `2`), with ONE bridge at the spot
-  a lemma forces the `1 + 1` form — `calc … ≤ Real.one + Real.one = 2`. (AGM's
+  a lemma forces the `1 + 1` form—`… ≤ Real.one + Real.one = 2`. (AGM's
   `means_inequality_double` does exactly this for its doubling factor.)
 - An ALL-numeral product keeps at least one ascription: `(2 : Real) * (2 : Real)`,
   never bare `2 * 2` (which elaborates as the `Natural` literal `4`).
@@ -111,9 +82,9 @@ equal to `Real.one + Real.one` (real addition) — only ring-equal. Consequences
 ## Bind a repeated cast with `let`, don't re-ascribe it
 
 A coercion is shown at one syntactic site by design (see the
-coercion-registry principle). In a calc that lives entirely in one
+coercion-registry principle). In a relation chain that lives entirely in one
 carrier, that principle backfires: the same ascription
-`(successor(d) : Integer)` gets re-typed at every term — eight times
+`((1 + d) : Integer)` gets re-typed at every term — eight times
 in a Rational cross-multiplication is common. The fix is NOT to hide
 the cast (a carrier-scoped region would move it off-screen and weaken
 "coercions visible at one site"); it is to **name it once** with a
@@ -121,19 +92,19 @@ the cast (a carrier-scoped region would move it off-screen and weaken
 
 ```math
 -- Noisy: the cast is re-ascribed on every line.
-calc (successor(d_x) : Integer) * n_y + (successor(d_y) : Integer) * n_x
-   = …(successor(d_x) : Integer)…(successor(d_y) : Integer)…
+((1 + d_x) : Integer) * n_y + ((1 + d_y) : Integer) * n_x
+   = …((1 + d_x) : Integer)…((1 + d_y) : Integer)…
 
 -- Clean: bind each positive denominator once, reuse the name.
-let dx : Integer := (successor(d_x) : Integer);
-let dy : Integer := (successor(d_y) : Integer);
-calc dx * n_y + dy * n_x
+let dx : Integer := ((1 + d_x) : Integer);
+let dy : Integer := ((1 + d_y) : Integer);
+dx * n_y + dy * n_x
    = …dx…dy…
 ```
 
 The kernel ζ-unfolds the `let` whenever def-eq is needed (see the
 `let` and ζ section), so the auto-prover and `rewrite` still see
-through `dx` to `(successor(d_x) : Integer)`. The cast appears
+through `dx` to `((1 + d_x) : Integer)`. The cast appears
 exactly once — at the binding — which is *more* faithful to "one
 visible site" than the inline form, not less. Reach for this
 whenever a single coercion appears 3+ times in one proof.
@@ -154,11 +125,11 @@ through the name to its value), `ring` and `field` ζ-unfold the goal (and
 `field` reads its nonzero hypotheses at the same let-free spelling), and the
 sign battery retries a declined sign/positivity goal at the ζ-unfolded
 spelling — so `mean * mean - x*y = halfDiff * halfDiff by field` with
-`let mean := (x + y) / 2` and bare `tolerance > 0` claims over a `let` both
+`let mean := (x + y) / 2` and bare `tolerance > 0` facts over a `let` both
 work as written (pinned by `Test/zeta_let_test.math`). The one remaining atom
 treatment is `linear_combination`, whose cited hypothesis equations feed its
 coefficient bookkeeping at their stated spellings — keep explicit forms
 there. The dual caveat is reduction: a `cases`/`if` refinement won't compute
 *through* a `let`, so when a goal `P(augmentedRow(k))` must ι-reduce as `k`
 is refined, keep the full application `P(augmentedScaledRow(s, m, k))` in the
-claim's *type* (only the `let` name in the surrounding prose).
+fact's *type* (only the `let` name in the surrounding prose).

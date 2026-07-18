@@ -1,366 +1,298 @@
-# Tutorial
+# Tutorial: writing a proof
 
-This is a gentle introduction to writing proofs in this system, aimed at a
-mathematician who has not worked with a proof assistant before. You do not
-need to know anything about the underlying logic (the Calculus of
-Inductive Constructions, "CIC"); we explain the little that matters as we
-go. The guiding idea is simple:
+This tutorial introduces the math-facing proof language. Its proof forms are
+exercised by files in the clean manifest.
 
-> **A proof should read like one you would write on paper.** You say *what*
-> is true at each step; the machine works out *how* to check it.
+Before writing a proof, read the brief `README.md` in the relevant library
+directory. It gives the public definitions, useful theorem names, and
+abstraction rules for that area.
 
-Build your file with `make -j 16 library` from the project root.
+Build from the repository root:
 
-## What a proof *is*, and why style matters
-
-In CIC, a proof of a proposition is a *term*, and a theorem or lemma is —
-quite literally — a function: you can apply it to arguments and it hands
-you back a proof of its conclusion. So you *can* write an entire proof as
-one big nested function call, and the kernel will happily check it.
-
-The trouble is readability. Suppose `successor_injective` is the fact "if
-`successor(a) = successor(b)` then `a = b`". Invoked as a function it looks
-like:
-
-```
-Natural.successor_injective(a, b, equationProof)
+```sh
+make -j 16 library
 ```
 
-This type-checks, but a reader cannot *see* what it produces (`a = b`)
-without looking up the lemma's signature and mentally tracking the argument
-order. With several arguments, or calls nested inside calls, the
-*statement* being proved disappears into plumbing.
+## A module and a theorem
 
-So this system nudges you toward a different style: **state the fact, and
-just name the reason.** You can always be fully explicit about how a lemma
-is used, but a proof usually reads better if you only mention the lemma's
-name — `by <lemma>`, with no arguments, letting the system fill them in —
-or if you skip the citation entirely and let the automatic prover find it:
+A source file begins with a module name and imports:
 
-```
-a = b by Natural.successor_injective;
-```
-
-Now the line says exactly what is now true (`a = b`) and, parenthetically,
-why. The rest of this tutorial is mostly about the constructs that let you
-write in this "what, not how" style.
-
-## A first theorem
-
-A file is a module. It declares what it imports and then states theorems
-and definitions. Every theorem has the shape `name (parameters) :
-statement := proof`.
-
-```
+```math
 module Tutorial.intro
 
+import Logic.basics
+import Equality.basics
 import Natural.basics
 import Natural.arithmetic
-import Equality.basics
+```
 
--- `0 + n` reduces to `n` automatically (addition is defined by recursion
--- on its first argument), so to the kernel the goal `0 + n = n` is
--- *literally* `n = n` — true on the nose, with nothing to prove. `done`
--- says "the goal holds"; the automatic prover sees both sides are the
--- same term and accepts it.
-theorem Tutorial.zero_add (n : Natural) : 0 + n = n :=
+A theorem has parameters, a proposition, and a proof:
+
+```math
+theorem Tutorial.zero_add (n : ℕ) : 0 + n = n :=
   done
 ```
 
-Some equalities hold "on the nose" like this (the kernel reduces both
-sides to the same thing); most do not and need a real argument. For any
-identity in a **commutative ring** (`Integer`, `Rational`, `Real`, the
-polynomial and algebra towers, …) the one-liner is the `ring` tactic, with
-`field(h, …)` when you divide. (`Natural` is only a semiring, so there you
-lean on the automatic prover and named lemmas, which we meet next.)
+`done` asks the prover to close the current goal. Here the imported
+arithmetic interface already knows the result.
 
-## The automatic prover, and relation chains
+## Relation chains
 
-Most equational reasoning is a relation chain (informally, a "calc"
-chain): a sequence of steps, each a relation, that compose end to end.
-Relations may mix — `=` with `≤`, `<`, `∣` — as long as they chain:
+Write equality and order reasoning directly as a chain:
 
-```
-theorem Tutorial.chain (a b : Natural) : a + b ≤ b + a + 1 :=
-  a + b
-     = b + a          -- the automatic prover closes this (commutativity)
-     ≤ b + a + 1      -- and this
+```math
+theorem Tutorial.reassociate (a b c : ℕ)
+        : (a + b) + c = a + (b + c) :=
+  (a + b) + c
+      = a + (b + c) by Natural.add_associative
 ```
 
-A step with no annotation is handed to the **automatic prover**, a search
-that tries to close the step from facts already in scope and a library of
-basic lemmas. When it can manage on its own, say nothing — that is the
-cleanest a proof gets.
+The expression on each line is visible, while `by` names the reason for a
+step that the automatic prover does not find itself. Do not apply a proof
+theorem to positional arguments when the goal already determines them:
 
-When a step needs help, justify it by its *reason*. Here the first step
-rewrites the left-hand side with the lemma
-`Natural.add_successor : a + successor(b) = successor(a + b)`, and the
-second step is left to the prover:
-
-```
-theorem Tutorial.add_successor_commute (a b : Natural)
-        : a + successor(b) = successor(b + a) :=
-  a + successor(b)
-     = successor(a + b)   by Natural.add_successor
-     = successor(b + a)   -- the automatic prover closes this (commutativity)
+```math
+a + (b + c) = (a + b) + c by Natural.add_associative
 ```
 
-Notice the lemma is named with **no arguments**: `by Natural.add_successor`,
-not `Natural.add_successor(a, b)`. The system infers the arguments from the
-shape of the step. This is the heart of the preferred style — you cite the
-operative fact, not the call.
+is preferred to a nested theorem call.
 
-The citation keyword is **`by <lemma>`**. Usually it means "the prover
-needs this hint to close the step", but it is also right to keep a `by`
-the prover doesn't strictly need when the lemma is illuminating (an
-induction hypothesis, the key lemma) — the redundancy checker will flag
-it, and keeping it anyway is a deliberate author's call. (An older
-keyword `since` marked exactly those kept explanations; it has been
-removed from the language.)
+Chains may mix compatible relations:
 
-## Stating intermediate facts
-
-A stated proposition `P` at statement position asserts `P` and adds it to
-the context, where the automatic prover and later steps can use it. By
-default the prover discharges it; a `by` hint helps when needed, and
-`as NAME` gives the fact a name for later citation:
-
+```math
+0 ≤ n
+  < n + 1
 ```
-theorem Tutorial.two_divides_six : 2 ∣ 6 := {
-  note goal : ∃ (quotient : Natural). 6 = 2 * quotient;   -- this is what `2 ∣ 6` means
-  6 = 2 * 3 as sixIsTwoTimesThree;                        -- the prover checks this
-  witness 3 with sixIsTwoTimesThree
+
+The strongest relation in the chain is its result, so this establishes
+`0 < n + 1`.
+
+## Intermediate facts
+
+Inside a proof block, state a proposition directly:
+
+```math
+theorem Tutorial.cancel (a b c : ℕ)
+        (equality : a + c = b + c) : a = b := {
+  a + c = b + c;
+  done by Natural.add_cancel_right
 }
 ```
 
-A few things to read off this example:
+The semicolon keeps the fact in scope. The prover can retrieve it by its
+statement, so most facts do not need names.
 
-- The proof is a `{ … }` *block*: a sequence of statements ending in `;`,
-  whose final (un-`;`-terminated) expression is the proof's result.
-- **`note goal : T;` is a checked comment.** It asserts that the current
-  goal is, by definition, `T` — here it spells out that `2 ∣ 6` unfolds to
-  `∃ quotient. 6 = 2 * quotient`. The system verifies the two really are
-  the same, then discards the line: it changes nothing and binds nothing,
-  so you could delete it and the proof would still work. Its only job is to
-  remind the reader (and you) what must actually be produced.
-- **Name a stated fact only if you use the name.** Here we reference
-  `sixIsTwoTimesThree` in the `witness`, so it earns a name (`as
-  sixIsTwoTimesThree`). If you never refer to it, drop the name — write
-  `6 = 2 * 3;` — and the prover will still find the fact by its type. An
-  unused name is just noise.
-- `witness w with proof` proves an existential `∃ x. P(x)` by exhibiting
-  the witness `w` and a proof of `P(w)`. Here the witness is the quotient
-  `3` and the proof is `sixIsTwoTimesThree`. (`d ∣ n` is *defined* as
-  `∃ q. n = d * q`, which is why a witness closes it.)
+Name a fact only when later text refers to that name:
 
-## Writing the proposition where a proof is expected
-
-That example is more ceremony than it needs. **Anywhere the system expects
-a *proof*, you may instead write the *proposition* it should prove, and the
-automatic prover is dispatched to establish it.** It is the same idea as a
-bare stated proposition at statement position: you say *what* must hold,
-the machine works out *how*. So the whole block above collapses to one
-line:
-
-```
-theorem Tutorial.two_divides_six : 2 ∣ 6 :=
-  witness 3 with 6 = 2 * 3
+```math
+a + c
+   = b + c
+   = c + b
+as rotatedEquality;
 ```
 
-The `6 = 2 * 3` sitting in the proof slot is not a proof term — it is the
-proposition the witness obliges you to discharge, and the prover closes it.
-This works in *every* proof-expecting position, not just `witness`: a
-component of a tuple `⟨…, P⟩`, an argument you pass to a lemma, a `let`
-value, even the whole body of a theorem (`theorem T : P := <P written out>`).
+To transport a proposition across a named equality, write
+`by substituting equalityName`.
 
-Two things to keep in mind:
+## Introducing variables and hypotheses
 
-- The proposition you write must be (definitionally) *the* obligation at
-  that spot — you are restating what is needed, not substituting a
-  different claim. An unrelated proposition fails loudly rather than being
-  quietly "corrected".
-- The prover still has to *succeed*. If the fact needs a real argument,
-  you must supply one (a proof term, or `… by <lemma>`). And when a fact
-  is reused or genuinely illuminating, stating it as a *named* fact reads
-  better than inlining it — the terse form is for the steps that are
-  obvious once stated.
+For a universal or implication goal, introduce what the goal asks for:
 
-## Closing the goal
-
-To close the current goal, write `done` or `okay`. They are precisely a
-bare restatement of the goal itself — read as "and this proves the goal"
-(the type the context expects). Like any stated proposition they take an
-optional `by`:
-
-```
-  1 ≤ d by Natural.some_lemma as divisorPositive;
-  done
+```math
+take x : X;
+suppose P(x) as propertyOfX;
+...
 ```
 
-The word `goal` on its own just names the goal's type (handy in
-`done by …` or in a comment like `note goal : T`); it is not a standalone
-closer.
+Use the name only if the proof refers to it explicitly. An anonymous
+hypothesis remains available by its statement.
 
-## Using a hypothesis you already have
+For contradiction:
 
-When a fact is sitting in your context — a parameter, a stated fact, an
-induction hypothesis — you do *not* cite it with `by`; you simply let the
-prover use it, or apply it by name if it is a function. Applying a *local*
-hypothesis like `IH(k)` or `notEqual(proof)` is fine and reads well — it is
-only *library lemmas* that we avoid invoking positionally.
-
-## Existentials: `witness` and `choose`
-
-We saw `witness` for *proving* an existential. To *use* one — to get at the
-thing it claims exists — `choose` names the witness and (optionally) states the
-property it satisfies:
-
-```
-  choose quotient such that a = d * quotient from dDividesA;   -- from a fact in scope
+```math
+suppose n + 1 = 0;
+0 = n + 1
+  = 1 + n;
+done
 ```
 
-The `such that …` is a verified, in-place reminder of what `quotient` gives
-you — better than making the reader unfold what `dDividesA` means. `from`
-also takes a lemma, cited argument-free:
+The final `done` sees the contradiction with the public Natural fact that
+zero is not one plus a natural.
 
+## Existentials
+
+To prove an existential, provide a witness:
+
+```math
+witness n with P(n)
 ```
-  choose quotient such that a = b + quotient from Natural.subtraction_witness;
+
+To use an existential, choose its witness:
+
+```math
+choose n such that P(n) from existsProof;
 ```
 
-Add `as <name>` to name the property for later citation, or leave it off and a
-later by-less step picks it up. (`choose` is the ONLY spelling for `∃`/`∧`
-elimination — the retired `obtain`'s tuple `⟨w, p⟩` exposed that connectives
-happen to be encoded as tuples, which isn't how you think about them. The
-tuple form `let ⟨a, b⟩ := …` survives for genuine data records.)
+Together:
 
-A context `A ∧ B` gives you both `A` and `B` as facts directly — no projecting
-a pair — and `absurd(0 = successor(k))` lets you state a contradictory fact and
-have it proved-then-contradicted.
-
-## Induction
-
-Recursion is written as `by induction`. The crucial payoff: the recursive
-call becomes a *named hypothesis* `IH` in the successor case, so it reads as
-"by the induction hypothesis" rather than as a function calling itself.
-
+```math
+theorem Tutorial.existential_round_trip
+        (P : ℕ → Proposition)
+        (existsProof : ∃ (n : ℕ). P(n))
+        : ∃ (n : ℕ). P(n) := {
+  choose n such that P(n) from existsProof;
+  witness n with P(n)
+}
 ```
-theorem Tutorial.add_zero (n : Natural) : n + 0 = n :=
+
+Several nested witnesses can be opened or supplied on one line:
+
+```math
+choose m, n such that R(m, n) from existenceTheorem;
+witness m with witness n with R(m, n)
+```
+
+## Natural numbers are arithmetic
+
+Outside `library/Natural/`, do not use `zero`, `successor`,
+`Natural.Raw`, or Natural constructor patterns. Use numerals, arithmetic,
+and equation-shaped arms.
+
+Induction:
+
+```math
+theorem Tutorial.add_zero (n : ℕ) : n + 0 = n :=
   by induction on n with IH {
     case n = 0: done
-    case n = k + 1 for some k: {
-        k + 0 = k by IH;
-        done
-      }
+    case n = 1 + k for some k: {
+      k + 0 = k;
+      done
+    }
   }
 ```
 
-The arm states the constructor form as an equation on the inducted
-variable (`for some k` is documentation — the pattern binds `k`); the
-recursive arm restates the induction hypothesis and the goal closes
-from it.
+`IH` has the induction-hypothesis type for `k`. In this example the stated
+fact `k + 0 = k` is found from that hypothesis automatically.
 
-Here `IH` has type `k + 0 = k`, and `by IH` tells the reader the last
-step rests on it. Two common extensions:
+A non-recursive structural split:
 
-- **Hypotheses about the inducted variable just work** — a hypothesis
-  whose type mentions the variable is generalised automatically, so each
-  case sees it in the right shape and the IH quantifies over it.
-- **`generalizing b, c`** — induction loading: list extra binders the IH
-  should quantify over (`by induction on a with IH generalizing b { … }`
-  reads "induct on a, keeping b arbitrary").
-- **`by strong induction on n with hypothesis IH;`** — well-founded
-  induction, where `IH` covers *every* `k < n`; the rest of the block is
-  the induction body.
-
-## Case analysis
-
-`cases` splits a value built by constructors (a `Natural`, an `Or`, …):
-
-```
-  cases b {
-    | zero => …
-    | successor(m) => …
+```math
+theorem Tutorial.zero_or_positive (n : ℕ) : n = 0 ∨ 1 ≤ n :=
+  done by cases {
+    case n = 0: done
+    case n = 1 + k for some k: {
+      1 ≤ 1 + k;
+      done
+    }
   }
 ```
 
-Useful variants:
+The arm equation refines the goal automatically. Add `as equationName` to
+an arm only when the equation itself is used later.
 
-- **Need the split equation on the page?** State it in a by-cases arm:
-  `by cases { case e = 0 as eq: … case e = successor(k) for some (k :
-  Natural) as eq: … }` — each arm's equation is an ordinary hypothesis.
-- **Hypotheses about the scrutinee just work** — a hypothesis whose type
-  mentions `e` is generalised automatically, so each arm sees it refined
-  to that arm's constructor form.
-- **`cases by <lemma> { | C(args) => … }`** splits on a disjunction a lemma
-  produces, inferring its arguments.
-- **`by cases { case P: … otherwise: … }`** is the classical case-split
-  on whether `P` holds; `if P then a else b` is its value-level sibling
-  for *building data* (reason about the result via `Logic.if_positive` /
-  `Logic.if_negative`).
+## Other inductive types
 
-## Introducing things, step by step
+Proofs over exposed inductive types also use equation-shaped induction
+arms:
 
-Inside a block you often build up the context before proving:
-
-```
-  take x : Natural;            -- peel off a ∀-bound variable
-  suppose 1 ≤ x as positivity; -- assume a hypothesis (and name it)
-  let m := x + 1;              -- a local abbreviation
+```math
+theorem Tutorial.list_reflexive
+        (A : Type(0)) (xs : List(A)) : xs = xs :=
+  by induction on xs with IH {
+    case xs = List.empty: done
+    case xs = List.prepend(head, tail) for some head, tail: done
+  }
 ```
 
-## Proving a disjunction
+The witness list after `for some` documents and binds the constructor
+arguments. A recursive arm may name its own induction hypothesis:
 
-To prove `A ∨ B`, get one of the disjuncts into your context and then
-`done` — the prover does the "or-introduction" for you:
-
-```
-  0 ≤ b by Natural.zero_least;
-  done                                -- closes the goal `0 ≤ b ∨ …`
+```math
+case xs = List.prepend(head, tail) for some head, tail, with tailIH: ...
 ```
 
-No need to mention `Or.introduceLeft` / `Or.introduceRight`.
+Do not write a raw `cases value { | constructor => ... }` split. In a proof,
+use equation-shaped `by cases` or `by induction`. For genuine data
+destructuring, use the type’s public eliminator or its documented `let`/`take`
+form.
 
-## `note`: a checked comment
+## Splitting on propositions
 
-Sometimes you want to point something out to the reader without using it.
-`note P;` asks the kernel to *verify* that `P` holds at this point — so the
-comment cannot lie — but, unlike a stated proposition, it does **not**
-add `P` to the context. It is pure documentation:
+For alternatives already expressed as propositions:
 
-```
-  note 1 ≤ successor(k);   -- observed, checked, but not bound
-```
-
-If a later step needs the fact, state it bare (which binds), not `note`.
-
-## A worked example
-
-Putting the pieces together — "if `d` divides `a` and `d` divides `b`,
-then `d` divides `a + b`":
-
-```
-theorem Tutorial.divides_add (d a b : Natural)
-        (dDividesA : d ∣ a) (dDividesB : d ∣ b)
-        : d ∣ (a + b) := {
-  choose q1 such that a = d * q1 from dDividesA;
-  choose q2 such that b = d * q2 from dDividesB;
-  witness q1 + q2 with
-    a + b
-       = d * q1 + d * q2       -- using the two equations in context
-       = d * (q1 + q2)         -- distributivity
+```math
+done by cases {
+  case P as proofOfP: ...
+  case Q as proofOfQ: ...
 }
 ```
 
-Read it aloud: "write `a` and `b` as `d·q₁` and `d·q₂`; then `a + b = d·q₁ +
-d·q₂ = d·(q₁+q₂)`, so `q₁+q₂` witnesses that `d` divides `a + b`." That is
-the proof a mathematician would write — and every step is kernel-checked.
+For a classical split:
 
-## Where to go next
+```math
+done by cases {
+  case x = 0: ...
+  otherwise as xNonzero: ...
+}
+```
 
-- `docs/reference.md` — a catalogue of every construct.
-- `docs/style.md` — the readability principles, distilled.
-- `docs/library.md` — a map of what is already proved, by area.
-- `docs/conventions/` — depth on `calc`, the algebra tactics, quotients,
-  and more.
-- `library/Test/` — a worked, checked example of essentially every
-  construct.
+`otherwise` is the complement of the preceding cases and must be last.
+
+When defining data by a condition, use:
+
+```math
+if P then valueWhenTrue else valueWhenFalse
+```
+
+Reason about it with `Logic.if_positive` and `Logic.if_negative`.
+
+## Conjunctions and disjunctions
+
+State the mathematical pieces and let `done` assemble them:
+
+```math
+A;
+B;
+done
+```
+
+To prove an existential, use `witness`. To use one, use `choose`. Avoid
+exposing the tuple representation of logical connectives.
+
+For a disjunction, state the true side and finish:
+
+```math
+A by reason;
+done
+```
+
+## `note`, `done`, and `okay`
+
+`done` and `okay` close the current goal. Both may take a reason:
+
+```math
+done by theoremName
+```
+
+`note P;` checks `P` but deliberately does not keep it in scope. Use it for
+a machine-checked observation. If a later step needs `P`, state `P;`
+instead.
+
+## Algebra
+
+Try the domain tactic before expanding an algebraic identity:
+
+```math
+theorem Tutorial.square_sum (x y : ℤ)
+        : (x + y) * (x + y) = x*x + x*y + y*x + y*y :=
+  ring
+```
+
+Use `field(nonzeroFacts...)` when division or reciprocals occur.
+
+## What to read next
+
+- `docs/reference.md` lists the supported surface forms.
+- `docs/style.md` explains how clean library proofs are written.
+- `library/<Area>/README.md` is the entry point for a mathematical area.
+- `docs/conventions/` contains focused notes for advanced topics.

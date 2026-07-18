@@ -41,7 +41,7 @@ write in a textbook, with the kernel doing the typechecking. Optimize for
   A one-line *why* comment (a non-obvious strategy) may still earn its
   place, for now; kernel mechanics stay quarantined as
   `-- Implementation note:` in the foundational files only. Full rule +
-  the what/why split: `docs/conventions/proof-style.md`.
+  the what/why split: `docs/style.md`.
 - **`ring` / `field` first.** For any commutative-ring identity, the
   default is `:= ring` (or `field(h1, ...)` when reciprocals are
   involved). Reach for hand-written `congruenceOf`/associativity only
@@ -55,12 +55,14 @@ write in a textbook, with the kernel doing the typechecking. Optimize for
   ascription there; prefer `(x + y) / 2` over `* (one_half)`. Caveat:
   `(2 : Real)` is *not* defeq to `1 + 1`, and `let`s are still opaque to
   `linear_combination` (`ring`/`field` and the sign battery now ζ-unfold
-  them) — see the `2`-vs-`1+1` and `let`-caveat rules. No house
-  preference on `1 + n` vs `n + 1`. See
+  them) — see the `2`-vs-`1+1` and `let`-caveat rules. Outside
+  `Natural/`, never use `successor`; write `1 + n` or `n + 1`. See
   `docs/conventions/numerals-and-naming.md`.
 
 ## Documentation (`docs/`)
 
+- **`library/<Area>/README.md`** — the brief LLM-oriented entry point for a
+  library area. Read it before using or extending that area.
 - **tutorial.md** — a 10-minute, example-driven introduction to writing
   proofs. Start here.
 - **reference.md** — a catalogue of every surface construct.
@@ -73,23 +75,13 @@ write in a textbook, with the kernel doing the typechecking. Optimize for
 - **quotients.md** — `Quotient.mk`/`.sound`/`.lift`/`.induct[_two/_three]`
   short forms, `construction` intro forms, and pattern-binders
   (`by_representatives`, `cases`, `take`, `suppose`) on quotients.
-- **calc-and-rewrite.md** — the bare relation-chain form with mixed
+- **relation-chains.md** — the bare relation-chain form with mixed
   `=`/`≤`/`<`/`≥`/`>`, chains over preorders (`∣`/`⊆`), by-less `=` steps
   via the full prover, `let` abbreviations, `<chain> as NAME`,
   `… by substituting`, equation transport (`rewrite(…)` is retired),
   diff-inferred `by`, and rewrite-under-binder.
 - **algebra-tactics.md** — `ring`, `field`, `linear_combination`, and the
   foundational-vs-derived ring-lemma split.
-- **proof-style.md** — math-like phrasing; **what an ideal proof looks
-  like and the raw-CIC tells to avoid** (no `congruenceOf`/
-  `transport_proposition`/raw `Subtype.make`/positional lemma calls —
-  read this BEFORE writing proofs); `cases`/`by_induction` over
-  pattern-match; `cases ... with`; `decide`; statement-level sugar
-  (a bare stated proposition/`goal`/`choose`/`take`/`suppose`/`let`/
-  `note`/`change`/`unfold`); `note … by` (the verified comment; `since`
-  is retired); CIC-noise-reduction idioms; and the **redundancy-check
-  polishing workflow** (`--check-redundant-by`… + the unused-name cascade
-  and how to settle it).
 - **structures-and-inference.md** — name-bound `convention`s, implicit
   arguments `{x : T}`, canonical `instance` inference, operator
   overloading (including the `·` group operator and postfix `⁻¹`), and

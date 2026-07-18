@@ -68,17 +68,30 @@ endif
 
 # GMP (PLAN_FAST_NUMERALS): the kernel's NaturalLiteral node stores an
 # mpz_class, so libgmpxx/libgmp are hard build dependencies (owner
-# decision, 2026-07-10). Debian/Ubuntu: `apt install libgmp-dev`;
-# macOS: `brew install gmp` (add -I/-L via CXXFLAGS if not on the
-# default search path).
+# decision, 2026-07-10). Debian/Ubuntu: `apt install libgmp-dev`.
+# Homebrew installs GMP keg-only on macOS, so discover its prefix there;
+# `-isystem` keeps warnings in the third-party header out of our `-Werror`
+# policy. Linux keeps the ordinary system include/library lookup.
+ifeq ($(UNAME_S),Darwin)
+GMP_PREFIX := $(shell brew --prefix gmp 2>/dev/null)
+ifneq ($(GMP_PREFIX),)
+GMP_CPPFLAGS := -isystem $(GMP_PREFIX)/include
+LDFLAGS_GMP := -L$(GMP_PREFIX)/lib -lgmpxx -lgmp
+else
+GMP_CPPFLAGS :=
 LDFLAGS_GMP := -lgmpxx -lgmp
+endif
+else
+GMP_CPPFLAGS :=
+LDFLAGS_GMP := -lgmpxx -lgmp
+endif
 
 kernel: $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(LDFLAGS_MIMALLOC) $(LDFLAGS_GMP)
 
 $(OBJDIR)/%.o: src/%.cpp
 	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+	$(CXX) $(CXXFLAGS) $(GMP_CPPFLAGS) -c $< -o $@
 
 -include $(OBJS:.o=.d)
 
@@ -93,7 +106,7 @@ clean:
 # "can't find <header>" / c++20-syntax diagnostics. We strip -Werror
 # from CXXFLAGS so clangd reports rather than hard-errors. Regenerate
 # after adding/removing a .cpp.
-CDB_FLAGS := $(filter-out -Werror -MMD -MP,$(CXXFLAGS))
+CDB_FLAGS := $(filter-out -Werror -MMD -MP,$(CXXFLAGS)) $(GMP_CPPFLAGS)
 
 compile_commands.json:
 	@printf '[\n' > $@

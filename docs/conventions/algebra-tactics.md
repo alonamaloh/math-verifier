@@ -34,7 +34,7 @@ real limitation:
   an endpoint mentions the carrier's `/` or reciprocal and the nonzero
   facts are ground or in scope — so routine division arithmetic
   (`ε/4 + ε/4 = ε/2`, `(1/a)·(1/b) = 1/(a·b)`) closes as a bare
-  relation step or claim, no `by field` needed. Write the hint only
+  relation step or stated proposition, no `by field` needed. Write the hint only
   when the bare step genuinely fails (pinned by
   `Test/field_battery_test.math`).
 - **`let`-bound values are transparent to `ring`/`field` (and the sign
@@ -177,7 +177,7 @@ theorem _ (a b c d : Integer) (h1 : a = b) (h2 : c = d) : a - c = b - d :=
   linear_combination(h1 - h2)
 ```
 
-Works as a calc-step `by` proof too. Scope/limits:
+Works as a relation-step `by` proof too. Scope/limits:
 - **Concrete carriers** (Integer/Rational/Real/…) **and the bundled
   commutative-ring carrier `CommutativeRing.carrier(c)`** (the ops are
   resolved as the `CommutativeRing.*(c)` projections and the instance
@@ -201,7 +201,7 @@ dropping identity, and cancelling inverses; `monoid` is the
 inverse-free variant. Both find the structure from an in-scope
 `IsGroup` / `IsMonoid` hypothesis and emit an explicit
 `L = canon = R` chain the kernel rechecks. They fire as a bare
-relation-chain step too (the calc bridge probes them off-group as a
+relation-chain step too (the chain bridge probes them off-group as a
 cheap no-op).
 
 **Abelian / vector-space mode.** When the goal's carrier is

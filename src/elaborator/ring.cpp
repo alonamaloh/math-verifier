@@ -11,6 +11,14 @@
 
 #include <limits>
 
+namespace {
+
+mpz_class mpzFromUint64(uint64_t value) {
+    return mpz_class(std::to_string(value));
+}
+
+} // namespace
+
 // ---- Numerical fast-fail fingerprints (GF(2^64 - 59)) --------------------
 //
 // Before the expensive symbolic normalise + polynomial-dict comparison,
@@ -179,14 +187,16 @@ std::optional<uint64_t> Elaborator::evaluateFingerprint(
     // same coefficient language as the tactic (`(2 : ℤ)` is the
     // coefficient 2, not an opaque atom).
     if (auto literal = parseEmbeddedLiteralAtCarrier(expression, carrierName)) {
-        return mpz_class(*literal % kFingerprintModulus).get_ui();
+        return mpz_class(
+            *literal % mpzFromUint64(kFingerprintModulus)).get_ui();
     }
     // Bare Natural literal / successor — mirrors the normaliser's
     // literal recognition on the Natural carrier.
     if (carrierName == "Natural") {
         RingCoefficient literalValue = 0;
         if (tryParseNaturalLiteral(expression, literalValue)) {
-            return mpz_class(literalValue % kFingerprintModulus).get_ui();
+            return mpz_class(
+                literalValue % mpzFromUint64(kFingerprintModulus)).get_ui();
         }
         ExpressionPointer successorInner;
         if (tryParseNaturalSuccessor(expression, successorInner)) {
@@ -405,14 +415,16 @@ uint64_t Elaborator::evalRingMod(
         // literal recognition (which itself depends on the carrier).
         if (auto literal =
                 parseEmbeddedLiteralAtCarrier(expression, carrierName)) {
-            return mpz_class(*literal % modulus).get_ui();
+            return mpz_class(
+                *literal % mpzFromUint64(modulus)).get_ui();
         }
         // Bare Natural literal / successor — mirrors the normaliser's
         // literal recognition on the Natural carrier.
         if (carrierName == "Natural") {
             RingCoefficient literalValue = 0;
             if (tryParseNaturalLiteral(expression, literalValue)) {
-                return mpz_class(literalValue % modulus).get_ui();
+                return mpz_class(
+                    literalValue % mpzFromUint64(modulus)).get_ui();
             }
             ExpressionPointer successorInner;
             if (tryParseNaturalSuccessor(expression, successorInner)) {
@@ -8369,4 +8381,3 @@ ExpressionPointer Elaborator::elaborateField(
         return closeOverLocalBinders(
             chain12345, localBinders, localBinders.size());
     }
-

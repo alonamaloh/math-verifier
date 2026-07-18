@@ -40,15 +40,15 @@ So the only way to see through an opaque head is to ask for it explicitly:
   a postfix `by`-hint modifier (parallel to `recalling`) that discharges the
   step with `Foo` transparent. It piles onto any hint and stands alone:
   `done by unfolding Foo` (auto-prover), `done by <lemma> unfolding Foo`,
-  `claim P by substituting eq unfolding Foo`, `… = … by unfolding Foo` (calc
-  step). It reads "*I claim this, as you can check by unfolding the definition
-  of Foo*" — the claimed proposition stays on the page; the unfold is just the
+  `P by substituting eq unfolding Foo`, `… = … by unfolding Foo` (chain
+  step). It reads "*this follows by unfolding the definition of Foo*"—the
+  proposition stays on the page; the unfold is just the
   cited reason. (Contrast `unfold Foo in <body>`, which silently reshapes the
   goal you then write `<body>` against — that hidden-goal style is on the CIC
   naughty list.)
 - **`unfold Foo in <body>`** (the wrapper) survives only as an escape hatch for
   a body that can't sit after `by`: a multi-statement `{ … }` block, a
-  multi-arm `cases`, a `calc`, or a mid-expression term use
+  multi-arm proof, or a mid-expression term use
   (`(unfold Foo in h)(args)`). Prefer the `by … unfolding` form everywhere else.
 - **Boundary / characterising lemmas** — the preferred route. Prove the
   fold/unfold *once* in a tiny named lemma (whose body is the `unfold`), and
@@ -98,8 +98,8 @@ order transports needed hand-written transport plumbing (the since-retired
 
 Marking `IsNonneg` opaque makes WHNF stop at `IsNonneg(z - x)` — exactly
 the form the characterising lemmas use. The transports then convert to
-`claim IsNonneg(diff) by substituting eq` (see
-`calc-and-rewrite.md`); the auto-prover discharges the rewritten goal
+`IsNonneg(diff) by substituting eq` (see
+`relation-chains.md`); the auto-prover discharges the rewritten goal
 from the characterising lemma plus the order hypotheses in context. It
 also stops the `Quotient.lift`/`IsEventuallyNonneg` implementation from
 leaking into every order proof.
@@ -127,7 +127,8 @@ theorem Rational.IsNonneg.numerator_denominator
 pair over `CauchyRationalSequence.IsEventuallyNonneg`. The consumer rule:
 
 - **destruct** — route through `.numerator_denominator` / `.eventually_nonneg`.
-  After `cases x { | rep => … }` (h refines automatically), `h : IsNonneg(mk rep)`; feed it to
+  After `by_representatives x as rep => …` (h refines automatically),
+  `h : IsNonneg(mk rep)`; feed it to
   the destructor to recover the rep-level fact (`Integer.IsNonneg(n · d)`). Sites
   that *apply* an IsNonneg value as the `∀ε∃N` form use
   `(unfold Real.IsNonneg in h)(…)`.
@@ -148,10 +149,10 @@ special, since `LessOrEqual`/`LessThan` are transparent and reduce to
 `IsNonneg(diff)` without touching the opaque head.
 
 The `by substituting` idiom (for the order transports) has one wrinkle:
-substituting only fires on a goal whose head it can see, so state the claim in
+substituting only fires on a goal whose head it can see, so state the proposition in
 the **`IsNonneg(diff)` form** (defeq to the `≤` goal but syntactically exposing
 `diff`) and give the equation as `(ring : <expanded> = <diff>)` with the
-subtraction written the same way on both sides. `claim x ≤ z by substituting …`
+subtraction written the same way on both sides. `x ≤ z by substituting …`
 reports `0 occurrences` because the `≤`/`LessOrEqual` head, though transparent,
 isn't what carries `diff` for the match.
 
@@ -186,7 +187,7 @@ synthetic motive because two `b`s collided," revert.
    equation, each body an `unfold Foo in <reflexivity / substituting>`. The
    `unfold` is what lets the declared `Foo(constructor args)` reduce to the
    body's value; outside it the head stays stuck. An equation that case-splits
-   on a hypothesis pairs `unfold` with `claim by substituting …`, which then
+   on a hypothesis pairs `unfold` with a bare proposition using `by substituting …`, which then
    sees `Foo`'s inner `cases` while keeping the substituted endpoint's head
    intact. Example for `Natural.monus`:
    ```math
@@ -204,12 +205,12 @@ synthetic motive because two `b`s collided," revert.
 3. Audit downstream proofs. Each `reflexivity` that used to close
    via `Foo`'s ι-reduction now needs a citation to a
    characterising lemma. Common idioms:
-   - `claim equation_for_foo : Foo(args) = explicit_value by
-     <characterising lemma>` then continue.
+   - `Foo(args) = explicit_value by <characterising lemma>
+     as equationForFoo;` then continue.
    - Bridge `rewrite` failures by ascribing the goal's `Foo(…)`
      subexpression to the form the lemma produces.
    - For inductively recursive proofs that previously rode the
-     kernel's ι, add an explicit calc step `Foo(succ k) =
+     kernel's ι, add an explicit chain step `Foo(succ k) =
      <recursive case body> by <succ_succ lemma>`.
 
 ### Failure modes to expect

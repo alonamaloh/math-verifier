@@ -45,12 +45,12 @@ types + data members); each method's body lives out-of-line in a topical
 dispatch        the core elaborateExpression dispatch
 statements      top-level declarations (definitions, axioms, instances, ...)
 patterns        pattern-matching definitions + inductive types
-induction       by-induction / strong-induction / choose / structured-claim
+induction       induction / strong induction / choose / structured statements
 cases           cases-on-expression family + sorry / note / if-conditional / tuple
 inference       identifier + leading-argument/hole inference, lambda/Pi
 prover          the auto-prover (context facts/equalities, bridges)
-claim           claim-by-substitution / claim-by-cases
-calc            the calc tactic + per-step diff proving
+proofs          structured statements, substitution, and case splits
+chains          relation chains and per-step difference proving
 coercion        coerce-to-expected-type + quotient/equivalence bridges
 diff_bridges    diff-based proof bridges + pattern match
 rewrite         rewrite + simplify tactics

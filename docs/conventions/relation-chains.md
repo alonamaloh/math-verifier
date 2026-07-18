@@ -1,6 +1,6 @@
 # Relation chains, let, and rewrite
 
-Relation chains (informally "calc") with mixed relations, `let` abbreviations (ζ), preferring a chain over nested transitivity, `<chain> as NAME`, `rewrite`, diff-inferred congruence, and rewrite-under-binder.
+Relation chains with mixed relations, `let` abbreviations (ζ), preferring a chain over nested transitivity, `<chain> as NAME`, equation transport, diff-inferred congruence, and rewriting under a binder.
 
 *(Part of the project conventions; see `CLAUDE.md` for the index.)*
 
@@ -10,19 +10,18 @@ A relation chain supports all five relations as step separators: `=`,
 `≤`, `<`, `≥`, `>`. The chain's result picks the strongest relation
 across its steps (any `<`/`>` makes it strict; otherwise `≤`/`≥` if
 present; else `=`). Mixing forward (`<`/`≤`) with backward (`>`/`≥`)
-is rejected — `=` is allowed in either direction. The chain is written
-bare — at statement position, as a `:=`/arm body, or inside `{ … }` in
-argument positions; the old `calc` anchor keyword is retired (A1
-Phase 3).
+is rejected—`=` is allowed in either direction. The chain is written
+bare at statement position, as a `:=` or arm body, or inside `{ … }` in
+argument positions.
 
 ```math
 Rational.absolute_value(s(m) * (t(m) - t(n)))
    = Rational.absolute_value(s(m))
        * Rational.absolute_value(t(m) - t(n))   by abs_first_eq
-   ≤ (successor(K_s) : Rational)
+   ≤ ((1 + K_s) : Rational)
        * Rational.absolute_value(t(m) - t(n))   by first_factor_bound
-   ≤ (successor(K_s) : Rational) * delta_t     by first_factor_bound_2
-   ≤ Rational.halve(Rational.halve(epsilon))   by succ_K_s_delta_t_bound
+   ≤ ((1 + K_s) : Rational) * delta_t          by first_factor_bound_2
+   ≤ Rational.halve(Rational.halve(epsilon))   by positive_bound
 ```
 
 The carrier-specific transitivity lemmas (`<T>.LessOrEqual.transitive`,
@@ -215,15 +214,9 @@ match via the lemma index. The naturalProduct stated fact in
 `PAdic/absolute_value.math` went from 5-deep transitivity to a 4-link
 chain with ZERO `by` clauses this way.
 
-Sibling diagnostic: pass `--check-redundant-calc-steps` to the
-verifier (off by default — the per-pair auto-prover dispatch is
-expensive on long chains) to also warn when an intermediate chain
-TERM (not just a `by` annotation) is redundant — i.e., the
-auto-prover can close the combined step from the previous endpoint
-directly to the next-next endpoint. The warning cites the line of
-the redundant intermediate so you know which `= midpoint` to
-delete. Useful for trimming over-written chain proofs after the
-auto-prover gains a new rule.
+During polishing, read every intermediate term and remove those that add no
+mathematical information. A strategically illuminating midpoint can be worth
+keeping even when the prover could bridge around it.
 
 Two-step transitivity (`Equality.transitivity(stepA, stepB)`) is
 borderline — a 3-link chain is the same length. Use whichever reads
@@ -232,9 +225,8 @@ more clearly; a chain usually wins because the intermediate form is named.
 ### The bare chain statement forms — `<chain> as NAME;` and bare `<chain>;`
 
 A relation chain at statement position (inside a `{ … }` block,
-terminated by `;`) binds its result into local scope, no naming
-ceremony required (the old `calc` anchor keyword is retired — A1
-Phase 3):
+terminated by `;`) binds its result into local scope with no naming
+ceremony:
 
 ```math
 -- Named binding — for downstream references:
@@ -252,7 +244,7 @@ a = c        -- this step auto-closes via the binding above
 
 Both forms bind `first <strongest-relation> last` (from the chain's
 endpoints) into scope; the anonymous form synthesises a name like
-`_calc_<line>_<col>`. Either way the binding is in scope for the rest of
+an internal generated name. Either way the binding is in scope for the rest of
 the block, so the auto-prover's local-hypothesis matcher picks it up.
 
 **Never hand-write `T by (chain)` to name a chain's result.** It restates
@@ -263,7 +255,7 @@ a hard style rule.
 Mixed-relation chains work at statement position too: the binding gets
 the chain's strongest relation. `a ≤ b = c as h;` binds `h : a ≤ c`;
 the bare `a ≤ b = c;` binds it anonymously. (There is no "all-`=`
-only" restriction — that earlier claim was wrong. A named-typed `by`
+only" restriction—that earlier statement was wrong. A named-typed `by`
 wrapper around a chain is never needed.)
 
 Restriction:
@@ -474,44 +466,19 @@ Two caveats remain:
   matching. The conditional's elaborator ζ-unfolds the target up front; other
   paths may need explicit ζ-unfold or binding a stated fact to align shapes.
 
-- **Function-valued `let`s and β.** `let f := (k) ↦ g(k);` makes `f(i)`
-  ζ-unfold to `(λk. g k) i` — a β-redex. As of 2026-07-18 the main
-  consumers contract it: `ring` β/δ-exposes a definition- or
-  lambda-headed application whose reduct is a ring operation (so
-  `f(i)` participates in normalisation as `g(i)`), and `by substituting`
-  searches a ζ+deep-WHNF goal form, so an instance spelled only through
-  `let` names is still found (see "name your summands" below). Residual
-  caveat: argument-free `by`-citation matching outside those paths may
-  still see `f(i)` and `g(i)` as distinct spellings — if a citation
-  inexplicably misses, try the `g(i)` spelling or pass the argument
-  explicitly.
+- **Function-valued `let`s produce a β-redex after ζ.** `let f := (k) ↦
+  g(k);` makes `f(i)` unfold to `(λk. g k) i`. The main consumers now
+  contract it: `ring` exposes definition- and lambda-headed applications
+  whose reduct is a ring operation, and `by substituting` searches a
+  ζ-reduced, deeply weak-head-normal goal. An argument-free citation
+  outside those paths can still distinguish the two spellings; if it misses,
+  write `g(i)` or supply the argument explicitly.
 
-### Name your summands
+### Name recurring summands
 
-When an aggregation's summand is a multi-line lambda that recurs across a
-chain (the determinant corpus once spelled one six-line summand ~8 times in
-a single proof), bind each summand to a `let` and write the chain over the
-names. Rewriting under the Σ then reads as one pointwise step (the
-under-binder lambda form above; `CommutativeRing.sumOver`/`productOver`
-have registered congruences), quantified `substituting` citations find
-their instances through the names, and `ring` closes the leaf
-rearrangements with the `let`s intact. The worked example is
-`Test/name_your_summands_test.math` — `Matrix.phi_inner_sum`'s 72-line
-proof restated in 20 honest lines:
-
-```math
-let aFactor : CommutativeRing.carrier(r) :=
-    CommutativeRing.productOver((i : NaturalsBelow(n)) ↦ A(i, phi(i)), NaturalsBelow.enumerate(n));
-let bTerm : Permutation(n) → CommutativeRing.carrier(r) := (sigma : Permutation(n)) ↦ …;
-let abTerm : Permutation(n) → CommutativeRing.carrier(r) := (sigma : Permutation(n)) ↦ …;
-CommutativeRing.sumOver(abTerm, Permutation.allPermutations(n))
-   = CommutativeRing.sumOver((sigma : Permutation(n)) ↦ aFactor * bTerm(sigma), Permutation.allPermutations(n))
-         by ((sigma : Permutation(n)) ↦ {
-             abTerm(sigma)
-                = … by substituting CommutativeRing.productOver_multiply
-                = aFactor * bTerm(sigma) by ring;
-             done
-           })
-   = aFactor * CommutativeRing.sumOver(bTerm, Permutation.allPermutations(n)) by CommutativeRing.sumOver_scale_left;
-done
-```
+When a long aggregation summand recurs, bind it with `let` and write the
+chain using the name. Registered under-binder congruences let a pointwise
+lambda rewrite the summand; quantified `by substituting` citations see
+through the name; and `ring` closes the leaf algebra without expanding the
+summand everywhere. See `Test/name_your_summands_test.math` for a worked
+example.
