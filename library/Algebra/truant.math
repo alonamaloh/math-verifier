@@ -147,12 +147,12 @@ theorem Matrix.truant_exists {n : ℕ}
           suppose ¬(Matrix.Represents(A, (s : ℤ))) for contradiction;
           s ≥ 1 ∧ ¬(Matrix.Represents(A, (s : ℤ)));
           minimum ≤ s;
-          minimum ≤ s < minimum by sBelowMinimum;
+          minimum ≤ s < minimum;
           done
         };
   minimum ≥ 1;
   ¬(Matrix.Represents(A, (minimum : ℤ)));
-  Matrix.IsTruant(A, minimum) by done as minimumIsTruant;
+  Matrix.IsTruant(A, minimum) as minimumIsTruant;
   witness minimum with minimumIsTruant
 }
 
@@ -249,15 +249,21 @@ theorem Matrix.truant_predicate_unique {n : ℕ}
 }
 
 definition Matrix.truant {n : ℕ}
-        (A : Matrix(Integer.commutative_ring_bundle, n, n)) : ℕ :=
-  Logic.the(ℕ, (t : ℕ) ↦ Matrix.truantPredicate(A, t),
-      Matrix.truant_predicate_exists(A), Matrix.truant_predicate_unique(A))
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) : ℕ := {
+  ∃ (t : ℕ). Matrix.truantPredicate(A, t) by Matrix.truant_predicate_exists as existence;
+  ∀ (s t : ℕ). Matrix.truantPredicate(A, s) → Matrix.truantPredicate(A, t) → s = t
+      by Matrix.truant_predicate_unique as uniqueness;
+  Logic.the(ℕ, (t : ℕ) ↦ Matrix.truantPredicate(A, t), existence, uniqueness)
+}
 
 theorem Matrix.truant_satisfies {n : ℕ}
         (A : Matrix(Integer.commutative_ring_bundle, n, n))
-        : Matrix.truantPredicate(A, Matrix.truant(A)) :=
-  Logic.the_satisfies(ℕ, (t : ℕ) ↦ Matrix.truantPredicate(A, t),
-      Matrix.truant_predicate_exists(A), Matrix.truant_predicate_unique(A))
+        : Matrix.truantPredicate(A, Matrix.truant(A)) := {
+  ∃ (t : ℕ). Matrix.truantPredicate(A, t) by Matrix.truant_predicate_exists as existence;
+  ∀ (s t : ℕ). Matrix.truantPredicate(A, s) → Matrix.truantPredicate(A, t) → s = t
+      by Matrix.truant_predicate_unique as uniqueness;
+  Logic.the_satisfies(ℕ, (t : ℕ) ↦ Matrix.truantPredicate(A, t), existence, uniqueness)
+}
 
 -- On a non-universal form the function value is a genuine truant …
 theorem Matrix.truant_is_truant {n : ℕ}
@@ -294,7 +300,7 @@ theorem Matrix.squareForm_not_universal : ¬(Matrix.IsUniversal(Matrix.squareFor
   suppose Matrix.IsUniversal(Matrix.squareForm) as universal;
   Matrix.Represents(Matrix.squareForm, ((2 : ℕ) : ℤ)) by universal;
   ((2 : ℕ) : ℤ) = (2 : ℤ);
-  Matrix.Represents(Matrix.squareForm, (2 : ℤ)) by substitution;
+  Matrix.Represents(Matrix.squareForm, (2 : ℤ));
   ¬(Matrix.Represents(Matrix.squareForm, (2 : ℤ))) by Matrix.squareForm_not_represents_two;
   done
 }
@@ -304,7 +310,7 @@ theorem Matrix.squareForm_truant_two : Matrix.IsTruant(Matrix.squareForm, 2) := 
   ¬(Matrix.Represents(Matrix.squareForm, ((2 : ℕ) : ℤ))) by {
       suppose Matrix.Represents(Matrix.squareForm, ((2 : ℕ) : ℤ)) as represented;
       ((2 : ℕ) : ℤ) = (2 : ℤ);
-      Matrix.Represents(Matrix.squareForm, (2 : ℤ)) by substitution;
+      Matrix.Represents(Matrix.squareForm, (2 : ℤ));
       ¬(Matrix.Represents(Matrix.squareForm, (2 : ℤ))) by Matrix.squareForm_not_represents_two;
       done
     };
@@ -317,7 +323,7 @@ theorem Matrix.squareForm_truant_two : Matrix.IsTruant(Matrix.squareForm, 2) := 
           Matrix.Represents(Matrix.squareForm, ((1 : ℕ) : ℤ)) by {
               ((1 : ℕ) : ℤ) = (1 : ℤ);
               Matrix.Represents(Matrix.squareForm, (1 : ℤ)) by Matrix.squareForm_represents_one;
-              done by substitution
+              done
             };
           done by substituting (s = 1)
         };
