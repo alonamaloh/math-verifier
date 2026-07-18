@@ -118,3 +118,36 @@ automatic" from "automatic but universe-blocked".
 carriers) until the index learns levels. Fix candidates: unify levels in
 the automatic index, or at least warn when an `automatic` declaration is
 universe-polymorphic (it silently degrades to citation-only today).
+
+**Audit 2026-07-18.** Full-library scan of every `automatic` declaration
+(259: 258 `:=`-form + `And.right`'s pattern-match form) for bare-`Type`
+binders: **none polymorphic — no registration is silently dead.** The
+exposure is confined to future declarations until the index fix lands;
+the rule above is the guard.
+
+## Q5 — `ring` atomizes definition applications: `(a • x)(k)` never reduces
+
+**Symptom.** In a goal like `A(i, k) * (a • x)(k) = a * (A(i, k) * x(k))`
+(where `(a • x)(k)` β/δ-reduces to `a * x(k)`), `ring` fails with "the two
+sides do not agree mod 2^61 − 1 … the identity is FALSE" — it treats the
+unreduced application `(a • x)(k)` as an opaque atom, so the polynomial
+fingerprints genuinely differ. The identity is true; the report of
+falsity is an artifact of the atomization. Hit in
+`Matrix.applyVector_scale` (T5.1, 2026-07-18). Sylvester's inequality
+work will produce this shape constantly (index applications of scaled /
+added vector definitions).
+
+**Root cause hypothesis.** `ring`'s atom collection normalizes numerals
+and ζ-unfolds `let`s but does not β/δ-reduce a definition applied to
+arguments before deciding atomhood — same family of blindness as Q3
+(matcher/diff-congruence) and the T5.3 registry head checks: subsystems
+compare heads without reducing first.
+
+**Attempts.** None (found mid-T5; workaround adopted).
+
+**Workaround.** Either state the pointwise fact at the already-reduced
+spelling, or close the step with `done by substituting
+<operative-lemma>` (the auto-prover's rewrite search DOES see through
+the application — it closed the same goal that `ring` refused). The
+misleading "identity is FALSE" wording deserves a caveat when any
+non-variable application was atomized.
