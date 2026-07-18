@@ -1,0 +1,396 @@
+-- Algebra/sylvester.math
+--
+-- Sylvester's criterion over ℤ, fraction-free: a symmetric integer matrix
+-- is positive-definite exactly when all its leading principal minors are
+-- positive. Both directions run by induction on the bordered
+-- decomposition through the two Schur-complement identities
+-- (`Algebra/schur_complement.math`): identity (i) evaluates the completed
+-- square — at the eliminating vector (−adj(A')·b; det A') for the minors
+-- direction, at an arbitrary nonzero vector split on its top coordinate
+-- for the definiteness direction — and identity (ii) converts between
+-- det(B) and the Schur complement s without ever dividing.
+
+module Algebra.sylvester
+
+import Logic.basics
+import Logic.functions
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+import Natural.classical_decidable
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.embedding
+import Integer.order
+import Integer.order_multiply
+import Integer.units
+import Integer.integral_domain
+import Set.finite
+import Set.finite_pigeonhole
+import Lists.list
+import Lists.map
+import Lists.distinct
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.ring_from_integer
+import Algebra.integer_domain
+import Algebra.finite_permutation
+import Algebra.permutation_enumeration
+import Algebra.permutation_sign
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.matrix_transpose
+import Algebra.matrix_vector
+import Algebra.matrix_submatrix
+import Algebra.determinant
+import Algebra.determinant_identity
+import Algebra.determinant_transpose
+import Algebra.determinant_multiplicative
+import Algebra.alternating_collapse
+import Algebra.determinant_row_permutation
+import Algebra.adjugate
+import Algebra.matrix_inverse
+import Algebra.determinant_bordered
+import Algebra.quadratic_form
+import Algebra.schur_complement
+import Algebra.integer_quadratic_form
+
+-- All leading principal minors are positive — the Sylvester condition.
+definition Matrix.HasPositiveLeadingMinors {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) : Proposition :=
+  ∀ (k : ℕ). ∀ (bound : k ≤ n).
+      Matrix.determinant(Matrix.leadingSubmatrix(A, bound)) > (0 : ℤ)
+
+-- ----------------------------------------------------------------------
+-- Positive-definite ⇒ positive determinant, by induction on the size.
+-- The leading block inherits definiteness, so its determinant d is
+-- positive; evaluating identity (i) at the eliminating vector
+-- (−adj(A')·b; d) collapses the completed square to zero, leaving
+-- d³·s = d²·Q_B > 0, so s > 0 — and identity (ii) turns s into det(B).
+
+theorem Matrix.determinant_positive_of_positive_definite {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (symmetric : Matrix.IsSymmetric(A))
+        (positiveDefinite : Matrix.IsPositiveDefinite(A))
+        : Matrix.determinant(A) > (0 : ℤ) :=
+  by induction on n with IH {
+    case base: {
+        A = Matrix.identity(Integer.commutative_ring_bundle, 0)
+            by Matrix.zero_dimension_unique as isIdentity;
+        Matrix.determinant(A)
+           = Matrix.determinant(Matrix.identity(Integer.commutative_ring_bundle, 0))
+                 by substituting isIdentity
+           = Integer.one
+                 by Matrix.determinant_identity;
+        Integer.one > (0 : ℤ);
+        done
+      }
+    case step(m): {
+        let block : Matrix(Integer.commutative_ring_bundle, m, m) := Matrix.leadingBlock(A);
+        let d : CommutativeRing.carrier(Integer.commutative_ring_bundle) := Matrix.determinant(block);
+        let w : RingVector(Integer.commutative_ring_bundle, m) :=
+            Matrix.adjugate(block) · Matrix.borderColumn(A);
+        let topBasis : RingVector(Integer.commutative_ring_bundle, 1 + m) :=
+            Matrix.standardBasisRow(Integer.commutative_ring_bundle, 1 + m, NaturalsBelow.top(m));
+        let eliminatingVector : RingVector(Integer.commutative_ring_bundle, 1 + m) :=
+            RingVector.extend(RingVector.negate(w)) + d • topBasis;
+
+        Matrix.IsSymmetric(block) by Matrix.submatrix_symmetric as blockSymmetric;
+        Function.IsInjective(NaturalsBelow.inclusion(m)) by NaturalsBelow.inclusion_is_injective;
+        Matrix.IsPositiveDefinite(block) by Matrix.positive_definite_section as blockPositiveDefinite;
+        d > (0 : ℤ) by IH as leadingDeterminantPositive;
+        (0 : ℤ) ≠ d by Integer.LessThan.distinct;
+
+        -- The eliminating vector: top coordinate d, restriction −w.
+        eliminatingVector(NaturalsBelow.top(m))
+           = RingVector.extend(RingVector.negate(w))(NaturalsBelow.top(m)) + d * topBasis(NaturalsBelow.top(m))
+           = Integer.zero + d * topBasis(NaturalsBelow.top(m))
+                 by substituting RingVector.extend_top
+           = Integer.zero + d * Integer.one
+                 by substituting Matrix.standardBasisRow_at
+           = d
+        as topCoordinate;
+        ∀ (i : NaturalsBelow(m)).
+            RingVector.restrict(eliminatingVector)(i) = RingVector.negate(w)(i)
+            by (i : NaturalsBelow(m)) ↦ {
+                ¬(NaturalsBelow.top(m) = NaturalsBelow.inclusion(m, i)) by NaturalsBelow.top_not_inclusion;
+                topBasis(NaturalsBelow.inclusion(m, i)) = Integer.zero
+                    by Matrix.standardBasisRow_off as basisVanishes;
+                RingVector.restrict(eliminatingVector)(i)
+                   = RingVector.extend(RingVector.negate(w))(NaturalsBelow.inclusion(m, i))
+                     + d * topBasis(NaturalsBelow.inclusion(m, i))
+                   = RingVector.negate(w)(i) + d * topBasis(NaturalsBelow.inclusion(m, i))
+                         by substituting RingVector.extend_inclusion
+                   = RingVector.negate(w)(i) + d * Integer.zero
+                         by substituting basisVanishes
+                   = RingVector.negate(w)(i);
+                done
+              };
+        RingVector.restrict(eliminatingVector) = RingVector.negate(w)
+            by RingVector.equal_of_pointwise as eliminatingRestriction;
+        ¬(eliminatingVector = RingVector.zero(Integer.commutative_ring_bundle, 1 + m)) by {
+            suppose eliminatingVector = RingVector.zero(Integer.commutative_ring_bundle, 1 + m)
+                as eliminatingZero;
+            d  = eliminatingVector(NaturalsBelow.top(m))
+                     by topCoordinate
+               = RingVector.zero(Integer.commutative_ring_bundle, 1 + m)(NaturalsBelow.top(m))
+                     by substituting eliminatingZero
+               = Integer.zero;
+            done
+          } as eliminatingNonzero;
+        Matrix.quadraticForm(A, eliminatingVector) > (0 : ℤ) by positiveDefinite as valuePositive;
+
+        -- Identity (i) at the eliminating vector: the completed square
+        -- collapses (d·(−w) + d·w = 0), leaving d²·Q = d²·(d·s).
+        ∀ (i : NaturalsBelow(m)).
+            (d • RingVector.negate(w) + d • w)(i)
+            = RingVector.zero(Integer.commutative_ring_bundle, m)(i)
+            by (i : NaturalsBelow(m)) ↦ {
+                (d • RingVector.negate(w) + d • w)(i)
+                   = d * CommutativeRing.negate(w(i)) + d * w(i)
+                   = RingVector.zero(Integer.commutative_ring_bundle, m)(i)   by ring;
+                done
+              };
+        d • RingVector.negate(w) + d • w = RingVector.zero(Integer.commutative_ring_bundle, m)
+            by RingVector.equal_of_pointwise as shiftedVanishes;
+        (d * d) * Matrix.quadraticForm(A, eliminatingVector)
+           = Matrix.quadraticForm(block,
+                 d • RingVector.restrict(eliminatingVector) + eliminatingVector(NaturalsBelow.top(m)) • w)
+             + (eliminatingVector(NaturalsBelow.top(m)) * eliminatingVector(NaturalsBelow.top(m)))
+               * (d * Matrix.schurComplement(A))
+                 by Matrix.quadraticForm_schurComplement
+           = Matrix.quadraticForm(block,
+                 d • RingVector.negate(w) + eliminatingVector(NaturalsBelow.top(m)) • w)
+             + (eliminatingVector(NaturalsBelow.top(m)) * eliminatingVector(NaturalsBelow.top(m)))
+               * (d * Matrix.schurComplement(A))
+                 by substituting eliminatingRestriction
+           = Matrix.quadraticForm(block, d • RingVector.negate(w) + d • w)
+             + (eliminatingVector(NaturalsBelow.top(m)) * eliminatingVector(NaturalsBelow.top(m)))
+               * (d * Matrix.schurComplement(A))
+                 by substituting topCoordinate
+           = Matrix.quadraticForm(block, d • RingVector.negate(w) + d • w)
+             + (d * eliminatingVector(NaturalsBelow.top(m))) * (d * Matrix.schurComplement(A))
+                 by substituting topCoordinate
+           = Matrix.quadraticForm(block, d • RingVector.negate(w) + d • w)
+             + (d * d) * (d * Matrix.schurComplement(A))
+                 by substituting topCoordinate
+           = Matrix.quadraticForm(block, RingVector.zero(Integer.commutative_ring_bundle, m))
+             + (d * d) * (d * Matrix.schurComplement(A))
+                 by substituting shiftedVanishes
+           = Integer.zero + (d * d) * (d * Matrix.schurComplement(A))
+                 by substituting Matrix.quadraticForm_zero
+           = (d * d) * (d * Matrix.schurComplement(A))
+        as scaledValue;
+
+        -- Positivity flows down to s, then across identity (ii) to det(A).
+        d * d > (0 : ℤ) by Integer.multiply_positive as squarePositive;
+        (d * d) * Matrix.quadraticForm(A, eliminatingVector) > (0 : ℤ) by Integer.multiply_positive;
+        (d * d) * (d * Matrix.schurComplement(A)) > (0 : ℤ) by substituting scaledValue;
+        d * Matrix.schurComplement(A) > (0 : ℤ) by Integer.positive_of_multiply_positive;
+        Matrix.schurComplement(A) > (0 : ℤ) by Integer.positive_of_multiply_positive;
+        d * Matrix.determinant(A) = d * Matrix.schurComplement(A)
+            by Matrix.determinant_schurComplement;
+        Matrix.determinant(A) = Matrix.schurComplement(A)
+            by Integer.multiply_cancel_left_by_nonzero as determinantIsComplement;
+        done by substituting determinantIsComplement
+      }
+  }
+
+-- Positive-definite ⇒ all leading minors positive: every leading
+-- submatrix inherits symmetry and definiteness, and its determinant is
+-- positive by the theorem above.
+theorem Matrix.positive_leading_minors_of_positive_definite {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (symmetric : Matrix.IsSymmetric(A))
+        (positiveDefinite : Matrix.IsPositiveDefinite(A))
+        : Matrix.HasPositiveLeadingMinors(A) := {
+  take k : ℕ;
+  take bound : k ≤ n;
+  Function.IsInjective(NaturalsBelow.embed(bound)) by NaturalsBelow.embed_injective;
+  Matrix.IsSymmetric(Matrix.leadingSubmatrix(A, bound)) by Matrix.submatrix_symmetric;
+  Matrix.IsPositiveDefinite(Matrix.leadingSubmatrix(A, bound))
+      by Matrix.positive_definite_leadingSubmatrix;
+  done by Matrix.determinant_positive_of_positive_definite
+}
+
+-- ----------------------------------------------------------------------
+-- All leading minors positive ⇒ positive-definite, by induction on the
+-- size. The leading block satisfies the criterion at every level, so it
+-- is definite by induction; identity (ii) recovers s = det(B) > 0, and
+-- identity (i) makes d²·Q_B(x) a sum of a square-term (nonnegative by the
+-- block's definiteness) and t²·d·s — positive unless t = 0, in which case
+-- the block term d²·Q_{A'}(y) carries the positivity.
+
+theorem Matrix.positive_definite_of_positive_leading_minors {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (symmetric : Matrix.IsSymmetric(A))
+        (minors : Matrix.HasPositiveLeadingMinors(A))
+        : Matrix.IsPositiveDefinite(A) :=
+  by induction on n with IH {
+    case base: {
+        take x : RingVector(Integer.commutative_ring_bundle, 0);
+        suppose ¬(x = RingVector.zero(Integer.commutative_ring_bundle, 0));
+        x = RingVector.zero(Integer.commutative_ring_bundle, 0) by RingVector.zero_dimension_unique;
+        done
+      }
+    case step(m): {
+        let block : Matrix(Integer.commutative_ring_bundle, m, m) := Matrix.leadingBlock(A);
+        let d : CommutativeRing.carrier(Integer.commutative_ring_bundle) := Matrix.determinant(block);
+        let w : RingVector(Integer.commutative_ring_bundle, m) :=
+            Matrix.adjugate(block) · Matrix.borderColumn(A);
+
+        m ≤ 1 + m as leadingBound;
+        block = Matrix.leadingSubmatrix(A, leadingBound)
+            by Matrix.leadingBlock_leadingSubmatrix as blockBridge;
+        Matrix.IsSymmetric(block) by Matrix.submatrix_symmetric as blockSymmetric;
+
+        -- The block satisfies the criterion at every level.
+        Matrix.HasPositiveLeadingMinors(block) by {
+            take k : ℕ;
+            take bound : k ≤ m;
+            k ≤ m ≤ 1 + m as compositeBound;
+            Matrix.leadingSubmatrix(block, bound)
+               = Matrix.leadingSubmatrix(Matrix.leadingSubmatrix(A, leadingBound), bound)
+                     by substituting blockBridge
+               = Matrix.leadingSubmatrix(A, compositeBound)
+                     by Matrix.leadingSubmatrix_compose
+            as minorBridge;
+            Matrix.determinant(Matrix.leadingSubmatrix(A, compositeBound)) > (0 : ℤ) by minors;
+            done by substituting minorBridge
+          } as blockMinors;
+        Matrix.IsPositiveDefinite(block) by IH as blockPositiveDefinite;
+
+        -- d and det(A) are minors; identity (ii) then puts s = det(A).
+        Matrix.determinant(Matrix.leadingSubmatrix(A, leadingBound)) > (0 : ℤ) by minors;
+        d > (0 : ℤ) by substituting blockBridge as leadingDeterminantPositive;
+        (0 : ℤ) ≠ d by Integer.LessThan.distinct;
+        1 + m ≤ 1 + m as fullBound;
+        Matrix.leadingSubmatrix(A, fullBound) = A by Matrix.leadingSubmatrix_full as fullMinorIsA;
+        Matrix.determinant(Matrix.leadingSubmatrix(A, fullBound)) > (0 : ℤ) by minors;
+        Matrix.determinant(A) > (0 : ℤ) by substituting fullMinorIsA as determinantPositive;
+        d * Matrix.determinant(A) = d * Matrix.schurComplement(A)
+            by Matrix.determinant_schurComplement;
+        Matrix.determinant(A) = Matrix.schurComplement(A)
+            by Integer.multiply_cancel_left_by_nonzero as determinantIsComplement;
+        Matrix.schurComplement(A) > (0 : ℤ) by substituting determinantIsComplement
+            as complementPositive;
+        d * d > (0 : ℤ) by Integer.multiply_positive as squarePositive;
+
+        take x : RingVector(Integer.commutative_ring_bundle, 1 + m);
+        suppose ¬(x = RingVector.zero(Integer.commutative_ring_bundle, 1 + m)) as xNonzero;
+        let t : CommutativeRing.carrier(Integer.commutative_ring_bundle) := x(NaturalsBelow.top(m));
+        let y : RingVector(Integer.commutative_ring_bundle, m) := RingVector.restrict(x);
+        let scalarZero : CommutativeRing.carrier(Integer.commutative_ring_bundle) :=
+            CommutativeRing.zero(Integer.commutative_ring_bundle);
+        (d * d) * Matrix.quadraticForm(A, x)
+           = Matrix.quadraticForm(block, d • y + t • w) + (t * t) * (d * Matrix.schurComplement(A))
+            by Matrix.quadraticForm_schurComplement as squareIdentity;
+
+        done by cases {
+          case t = scalarZero as topVanishes: {
+              -- x lives in the block: its restriction is nonzero, and the
+              -- block's definiteness carries the value.
+              ¬(y = RingVector.zero(Integer.commutative_ring_bundle, m)) by {
+                  suppose y = RingVector.zero(Integer.commutative_ring_bundle, m) as restrictionZero;
+                  x = RingVector.extend(y)
+                      + t • Matrix.standardBasisRow(Integer.commutative_ring_bundle, 1 + m, NaturalsBelow.top(m))
+                      by RingVector.bordered_decomposition as decomposition;
+                  ∀ (k : NaturalsBelow(1 + m)).
+                      x(k) = RingVector.zero(Integer.commutative_ring_bundle, 1 + m)(k)
+                      by (k : NaturalsBelow(1 + m)) ↦ {
+                          x(k)
+                             = RingVector.extend(y)(k)
+                               + t * Matrix.standardBasisRow(Integer.commutative_ring_bundle,
+                                     1 + m, NaturalsBelow.top(m))(k)
+                                   by substituting decomposition
+                             = RingVector.extend(RingVector.zero(Integer.commutative_ring_bundle, m))(k)
+                               + t * Matrix.standardBasisRow(Integer.commutative_ring_bundle,
+                                     1 + m, NaturalsBelow.top(m))(k)
+                                   by substituting restrictionZero
+                             = RingVector.zero(Integer.commutative_ring_bundle, 1 + m)(k)
+                               + t * Matrix.standardBasisRow(Integer.commutative_ring_bundle,
+                                     1 + m, NaturalsBelow.top(m))(k)
+                                   by substituting Matrix.applyVector_zero
+                             = RingVector.zero(Integer.commutative_ring_bundle, 1 + m)(k)
+                               + scalarZero * Matrix.standardBasisRow(Integer.commutative_ring_bundle,
+                                     1 + m, NaturalsBelow.top(m))(k)
+                                   by substituting topVanishes
+                             = RingVector.zero(Integer.commutative_ring_bundle, 1 + m)(k)
+                                   by ring;
+                          done
+                        };
+                  x = RingVector.zero(Integer.commutative_ring_bundle, 1 + m)
+                      by RingVector.equal_of_pointwise;
+                  done
+                } as restrictionNonzero;
+              Matrix.quadraticForm(block, y) > (0 : ℤ) by blockPositiveDefinite;
+              ∀ (i : NaturalsBelow(m)). (d • y + t • w)(i) = (d • y)(i)
+                  by (i : NaturalsBelow(m)) ↦ {
+                      (d • y + t • w)(i)
+                         = d * y(i) + t * w(i)
+                         = d * y(i) + scalarZero * w(i)   by substituting topVanishes
+                         = (d • y)(i)                       by ring;
+                      done
+                    };
+              d • y + t • w = d • y by RingVector.equal_of_pointwise as shiftIsScale;
+              (d * d) * Matrix.quadraticForm(A, x)
+                 = Matrix.quadraticForm(block, d • y + t • w) + (t * t) * (d * Matrix.schurComplement(A))
+                       by squareIdentity
+                 = Matrix.quadraticForm(block, d • y) + (t * t) * (d * Matrix.schurComplement(A))
+                       by substituting shiftIsScale
+                 = (d * d) * Matrix.quadraticForm(block, y) + (t * t) * (d * Matrix.schurComplement(A))
+                       by substituting Matrix.quadraticForm_scale
+                 = (d * d) * Matrix.quadraticForm(block, y)
+                   + (scalarZero * t) * (d * Matrix.schurComplement(A))
+                       by substituting topVanishes
+                 = (d * d) * Matrix.quadraticForm(block, y)
+                   + (scalarZero * scalarZero) * (d * Matrix.schurComplement(A))
+                       by substituting topVanishes
+                 = (d * d) * Matrix.quadraticForm(block, y)
+                       by ring
+              as scaledValue;
+              (d * d) * Matrix.quadraticForm(block, y) > (0 : ℤ) by Integer.multiply_positive;
+              (d * d) * Matrix.quadraticForm(A, x) > (0 : ℤ) by substituting scaledValue;
+              done by Integer.positive_of_multiply_positive
+            }
+          otherwise as topNonzero: {
+              -- The residue t²·d·s is positive; the completed square is at
+              -- worst zero.
+              t * t > (0 : ℤ) by Integer.square_positive_of_nonzero;
+              Matrix.quadraticForm(block, d • y + t • w) ≥ (0 : ℤ) by {
+                  done by cases {
+                    case d • y + t • w = RingVector.zero(Integer.commutative_ring_bundle, m)
+                            as shiftVanishes: {
+                        Matrix.quadraticForm(block, d • y + t • w)
+                           = Matrix.quadraticForm(block, RingVector.zero(Integer.commutative_ring_bundle, m))
+                                 by substituting shiftVanishes
+                           = Integer.zero
+                                 by Matrix.quadraticForm_zero;
+                        done
+                      }
+                    otherwise as shiftNonzero: {
+                        Matrix.quadraticForm(block, d • y + t • w) > (0 : ℤ) by blockPositiveDefinite;
+                        done by Integer.LessThan.weaken
+                      }
+                  }
+                };
+              d * Matrix.schurComplement(A) > (0 : ℤ) by Integer.multiply_positive;
+              (t * t) * (d * Matrix.schurComplement(A)) > (0 : ℤ) by Integer.multiply_positive;
+              Matrix.quadraticForm(block, d • y + t • w)
+                + (t * t) * (d * Matrix.schurComplement(A)) > (0 : ℤ)
+                  by Integer.add_nonneg_positive;
+              (d * d) * Matrix.quadraticForm(A, x) > (0 : ℤ) by substituting squareIdentity;
+              done by Integer.positive_of_multiply_positive
+            }
+        }
+      }
+  }

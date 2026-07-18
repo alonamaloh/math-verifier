@@ -68,6 +68,31 @@ definition Matrix.corner {r : CommutativeRing} {m : ℕ}
         (B : Matrix(r, 1 + m, 1 + m)) : CommutativeRing.carrier(r) :=
   B(NaturalsBelow.top(m), NaturalsBelow.top(m))
 
+-- The leading block is the largest proper leading principal submatrix:
+-- the boundary inclusion and the value-preserving embedding agree.
+theorem Matrix.leadingBlock_leadingSubmatrix {r : CommutativeRing} {m : ℕ}
+        (B : Matrix(r, 1 + m, 1 + m)) (bound : m ≤ 1 + m)
+        : Matrix.leadingBlock(B) = Matrix.leadingSubmatrix(B, bound) := {
+  ∀ (i : NaturalsBelow(m)). NaturalsBelow.inclusion(m, i) = NaturalsBelow.embed(bound, i)
+      by (i : NaturalsBelow(m)) ↦ {
+          NaturalsBelow.value(NaturalsBelow.inclusion(m, i))
+             = NaturalsBelow.value(i)
+             = NaturalsBelow.value(NaturalsBelow.embed(bound, i))   by NaturalsBelow.embed_value;
+          done by NaturalsBelow.equal_of_value
+        } as indexingAgrees;
+  ∀ (i : NaturalsBelow(m)). ∀ (j : NaturalsBelow(m)).
+      Matrix.leadingBlock(B)(i, j) = Matrix.leadingSubmatrix(B, bound)(i, j)
+      by (i : NaturalsBelow(m)) (j : NaturalsBelow(m)) ↦ {
+          Matrix.leadingBlock(B)(i, j)
+             = B(NaturalsBelow.inclusion(m, i), NaturalsBelow.inclusion(m, j))
+             = B(NaturalsBelow.embed(bound, i), NaturalsBelow.inclusion(m, j))   by substituting indexingAgrees
+             = B(NaturalsBelow.embed(bound, i), NaturalsBelow.embed(bound, j))   by substituting indexingAgrees
+             = Matrix.leadingSubmatrix(B, bound)(i, j);
+          done
+        };
+  done by Matrix.equal_of_entries
+}
+
 definition RingVector.restrict {r : CommutativeRing} {m : ℕ}
         (x : RingVector(r, 1 + m)) : RingVector(r, m) :=
   (i : NaturalsBelow(m)) ↦ x(NaturalsBelow.inclusion(m, i))
