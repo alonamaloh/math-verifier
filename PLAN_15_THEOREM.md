@@ -25,6 +25,18 @@ Hosted PDF: <http://www.fen.bilkent.edu.tr/~franz/mat/15.pdf>
 
 **Stage roll-up (skilled person-time; AI assistance compresses wall-clock more than the hard-reasoning stages):**
 
+> **Gap assessment 2026-07-18:** the linear-algebra build (PLAN_LINEAR_ALGEBRA,
+> rank–nullity + det(AB)) and the Cayley–Hamilton arc (PLAN_CAYLEY_HAMILTON,
+> C1–C6) landed most of Stage 0 since this sheet was written — determinant,
+> permutation sign, multiplicativity, Laplace expansion, and the adjugate all
+> exist over an abstract `CommutativeRing`. **Stage 0's dominant risk
+> ("determinant + permutation sign from scratch") is retired.** Remaining
+> Stage 0 gaps: transpose (S0.M3, and with it det Aᵀ), the unimodular group
+> (S0.D7), the Gram block (S0.G1–G3, not needed before Stage 2), the abstract
+> bilinear pairing (S0.V2), and the field-invertibility/Cramer half of S0.D6.
+> Stage 1 is untouched but its Stage-0 inputs are now nearly all on the shelf.
+> Item-level status boxes below updated with file pointers.
+
 | Stage | Theme | Effort | Dominant risk |
 |------|-------|--------|---------------|
 | 0 | Linear algebra over ℤ/ℚ | ~4–6 wk | determinant + permutation sign from scratch |
@@ -51,24 +63,24 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
 *Library: `Algebra/` (IsRing/IsCommutativeRing/IsField), `Integer/`, `Rational/`, `Lists/` (permutations exist here), `Real/` for the ℝ-coefficient lemmas.*
 
 **Vectors & matrices**
-- `S0.V1` `[ ]` (S) Coordinate space `Vec R n` (`Fin n → R` or fixed-length list); module laws over a commutative ring. — owes: —
-- `S0.V2` `[ ]` (S) Bilinear pairing `⟨·,·⟩ : Vec R n → Vec R n → R`; bilinearity, symmetry. — owes: S0.V1
-- `S0.M1` `[ ]` (S) Matrices `Mat R m n`; matrix–vector and matrix–matrix product. — owes: S0.V1
-- `S0.M2` `[ ]` (M) Product associativity & distributivity; identity matrix `I`; `I·A = A`. — owes: S0.M1
-- `S0.M3` `[ ]` (S) Transpose; `(AB)ᵀ = BᵀAᵀ`, `(Aᵀ)ᵀ = A`. — owes: S0.M1
+- `S0.V1` `[x]` (S) Coordinate space `Vec R n` (`Fin n → R` or fixed-length list); module laws over a commutative ring. — owes: — · **DONE:** `Algebra/coordinate_space.math` (`CoordinateSpace` + `vector_space`); plus span/dimension/subspace/rank–nullity beyond this sheet's ask.
+- `S0.V2` `[ ]` (S) Bilinear pairing `⟨·,·⟩ : Vec R n → Vec R n → R`; bilinearity, symmetry. — owes: S0.V1 · *Feeder: `Real/cauchy_schwarz.math` has the ℝ case.*
+- `S0.M1` `[x]` (S) Matrices `Mat R m n`; matrix–vector and matrix–matrix product. — owes: S0.V1 · **DONE:** `Algebra/matrix.math` (`Matrix(c, m, n)`, multiply/add/scale/identity; matrix–vector product still implicit via 1-column).
+- `S0.M2` `[x]` (M) Product associativity & distributivity; identity matrix `I`; `I·A = A`. — owes: S0.M1 · **DONE:** `Algebra/matrix_ring.math` + the `Matrix.ring` bundle (Cayley–Hamilton C5).
+- `S0.M3` `[ ]` (S) Transpose; `(AB)ᵀ = BᵀAᵀ`, `(Aᵀ)ᵀ = A`. — owes: S0.M1 · **GAP — first brick of the arc.**
 
 **Permutations & sign (prerequisite for the Leibniz determinant)**
-- `S0.P1` `[ ]` (M) ★ Permutations of `Fin n`: group structure (compose, inverse, id). — owes: — · *Library: reuse `Lists/` permutation scaffolding if it generalizes; otherwise build on `Fin`.*
-- `S0.P2` `[ ]` (L) ★ Sign of a permutation; well-defined parity; `sign` is a homomorphism (`sign(στ) = sign σ · sign τ`). — owes: S0.P1
+- `S0.P1` `[x]` (M) ★ Permutations of `Fin n`: group structure (compose, inverse, id). — owes: — · **DONE:** `Algebra/finite_permutation.math` (compose/inverse/identity + laws, swaps, extend).
+- `S0.P2` `[x]` (L) ★ Sign of a permutation; well-defined parity; `sign` is a homomorphism (`sign(στ) = sign σ · sign τ`). — owes: S0.P1 · **DONE:** `Algebra/permutation_sign.math` (`Permutation.sign_compose`, `sign_is_unit`) + `permutation_transposition_sign.math` (`sign_swap`).
 
 **Determinant**
-- `S0.D1` `[ ]` (M) Determinant via the Leibniz sum `det A = Σ_σ sign(σ) ∏ᵢ A[i,σi]`. — owes: S0.M1, S0.P2
-- `S0.D2` `[ ]` (S) `det I = 1`; `det Aᵀ = det A`. — owes: S0.D1, S0.M3
-- `S0.D3` `[ ]` (M) Multilinear & alternating in rows/columns; row swap flips sign; repeated row ⇒ `det = 0`. — owes: S0.D1
-- `S0.D4` `[ ]` (L) ★ Multiplicativity: `det(AB) = det A · det B`. — owes: S0.D1, S0.D3
-- `S0.D5` `[ ]` (M) Cofactor (Laplace) expansion along a row/column. — owes: S0.D1
-- `S0.D6` `[ ]` (M) Adjugate; `A·adj(A) = det(A)·I`; over a field `A` invertible ⇔ `det A ≠ 0`; Cramer's rule. — owes: S0.D4, S0.D5
-- `S0.D7` `[ ]` (M) Unimodular group `GLₙ(ℤ)`: integer `U` invertible over ℤ ⇔ `det U = ±1`. — owes: S0.D4, S0.D6
+- `S0.D1` `[x]` (M) Determinant via the Leibniz sum `det A = Σ_σ sign(σ) ∏ᵢ A[i,σi]`. — owes: S0.M1, S0.P2 · **DONE:** `Algebra/determinant.math` (`Matrix.determinant`, `determinant_expansion`), over an abstract `CommutativeRing`.
+- `S0.D2` `[~]` (S) `det I = 1`; `det Aᵀ = det A`. — owes: S0.D1, S0.M3 · *`det I = 1` is an easy corollary of the landed machinery (no named lemma yet); `det Aᵀ` blocked on S0.M3.*
+- `S0.D3` `[x]` (M) Multilinear & alternating in rows/columns; row swap flips sign; repeated row ⇒ `det = 0`. — owes: S0.D1 · **DONE (rows):** `Algebra/determinant_row_permutation.math` + `alternating_collapse.math` + `adjugate.math` (`determinant_updateRow_*`, repeated row). Column versions follow from `det Aᵀ` once S0.M3 lands.
+- `S0.D4` `[x]` (L) ★ Multiplicativity: `det(AB) = det A · det B`. — owes: S0.D1, S0.D3 · **DONE:** `Algebra/determinant_multiplicative.math` (`Matrix.determinant_multiply`).
+- `S0.D5` `[x]` (M) Cofactor (Laplace) expansion along a row/column. — owes: S0.D1 · **DONE (rows):** `Algebra/adjugate.math` (`Matrix.determinant_row_expansion`, landed with the Cayley–Hamilton arc).
+- `S0.D6` `[~]` (M) Adjugate; `A·adj(A) = det(A)·I`; over a field `A` invertible ⇔ `det A ≠ 0`; Cramer's rule. — owes: S0.D4, S0.D5 · **Adjugate + `Matrix.multiply_adjugate` DONE** (`Algebra/adjugate.math`); the field invertibility ⇔ `det ≠ 0` equivalence and Cramer remain.
+- `S0.D7` `[ ]` (M) Unimodular group `GLₙ(ℤ)`: integer `U` invertible over ℤ ⇔ `det U = ±1`. — owes: S0.D4, S0.D6 · **GAP — second brick; the adjugate gives the ⇐ direction almost for free.**
 
 **Gram machinery (the bridge to forms)**
 - `S0.G1` `[ ]` (S) Gram matrix `G = MᵀM` is symmetric; `xᵀGx = ‖Mx‖²`. — owes: S0.M3
@@ -128,7 +140,7 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
 ## Stage 4 — Ternary representation theory (deep core)
 
 *Goal: for each ternary section used in Stage 5, prove exactly which integers it represents.*
-*Library note: **p-adics are not currently in `library/`** (removed) — block **4·P** re-introduces them. The existing feeders are `IntegerMod/` (ℤ/pᵏ, and F_p at a prime), `FiniteField/`, `Polynomial/`, and `Rational/`.*
+*Library note: **p-adics are not currently in `library/`** (removed) — block **4·P** re-introduces them. The existing feeders are `IntegerMod/` (ℤ/pᵏ, and F_p at a prime), `FiniteField/`, `Polynomial/`, and `Rational/`. As of 2026-07-18 the `IntegerMod/` feeder is substantially richer than when this sheet was written: Euler–Fermat, Wilson, √−1 mod p ≡ 1 (mod 4), the F_p field instance — and `GaussianInteger/fermat_two_squares.math` (Freek #20) is proved, which is the two-squares prototype of exactly the `S4.S*` escape-hatch style.*
 
 > **The fork that decides this stage's size.** Hasse–Minkowski gives representation
 > over **ℚ** (`∃ x ∈ ℚⁿ`); the theorem needs representation over **ℤ** (`∃ x ∈ ℤⁿ`).
