@@ -1,0 +1,50 @@
+module Test.expected_carrier_propagation_test
+
+import Algebra.escalation
+import Rational.embedding
+import Rational.order
+
+-- Expected-carrier propagation (PLAN_ELABORATOR_ERGONOMICS.md, step E0).
+--
+-- These are ELABORATION probes: each states a proposition and asserts only
+-- that it elaborates at the intended carrier without an operand annotation.
+-- Nothing here is proved, because what is under test is operator and relation
+-- DISPATCH, not provability.
+--
+-- Everything in this file already elaborates today. That is the point: E3
+-- (bidirectional relation elaboration) reorders dispatch for expressions that
+-- currently compile, so this file is the regression net for that step, not a
+-- wish list. The probes that do NOT yet elaborate live in library/ErrorTest as
+-- carrier_pending_*.math, and move HERE as E1-E3 land.
+
+-- A syntactic Integer operand seeds the relation; the numeral follows it.
+definition Test.carrier_integer_relation (b : ℤ) : Proposition :=
+  b * b < 3
+
+-- A positive numeral inherits the Integer carrier across `=`.
+definition Test.carrier_integer_equality (b : ℤ) : Proposition :=
+  b = 1
+
+-- A Natural VARIABLE lifts, not just a literal — the mechanism must not be
+-- numeral-specific.
+definition Test.carrier_natural_variable_lifts (b : ℤ) (m : ℕ) : Proposition :=
+  b = m
+
+-- The same lift under `+` and `*`, on both sides of the relation.
+definition Test.carrier_natural_variable_under_add (b : ℤ) (m : ℕ) : Proposition :=
+  b + m = 2
+
+definition Test.carrier_natural_variable_under_multiply (b : ℤ) (m : ℕ) : Proposition :=
+  b * m ≤ 5
+
+-- A TWO-EDGE lift (ℕ → ℤ → ℚ), so the mechanism is the coercion registry
+-- rather than an Integer special case.
+definition Test.carrier_two_edge_lift (q : ℚ) (m : ℕ) : Proposition :=
+  q + m = 1
+
+definition Test.carrier_two_edge_numeral (q : ℚ) : Proposition :=
+  q ≤ 2
+
+-- A numeral on both sides of an operator whose other operand fixes the carrier.
+definition Test.carrier_numeral_both_positions (b : ℤ) : Proposition :=
+  b + 1 = 2
