@@ -1,0 +1,550 @@
+-- Algebra/rank_two_truants.math
+--
+-- The truants of the two canonical rank-2 escalators. The sum of two
+-- squares represents 1 and 2 but misses 3, while x² + 2y² represents
+-- 1 through 4 but misses 5. These are the corner values for the two
+-- families of rank-3 escalations.
+
+module Algebra.rank_two_truants
+
+import Logic.basics
+import Logic.functions
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+import Natural.multiply_bounds
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.embedding
+import Integer.order
+import Integer.order_multiply
+import Integer.sign
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.matrix_vector
+import Algebra.matrix_direct_sum
+import Algebra.quadratic_form
+import Algebra.integer_quadratic_form
+import Algebra.square_form
+import Algebra.truant
+import Algebra.rank_two_escalators
+
+-- ----------------------------------------------------------------------
+-- Small-square arithmetic used by the two nonrepresentation proofs.
+
+theorem Natural.below_two (m : ℕ) (bound : m < 2) : m = 0 ∨ m = 1 := {
+  m = 0 ∨ ∃ (k : ℕ). m = 1 + k;
+  done by cases {
+    case m = 0: done
+    case ∃ (k : ℕ). m = 1 + k: {
+        choose k such that m = 1 + k;
+        1 ≤ m;
+        m ≤ 1 by Natural.le_of_lt_one_plus;
+        m = 1 by Natural.le_antisymmetric;
+        done
+      }
+  }
+}
+
+theorem Natural.square_below_four (m : ℕ) (bound : m * m < 4)
+        : m = 0 ∨ m = 1 := {
+  m < 2 ∨ m = 2 ∨ 2 < m by Natural.lt_trichotomy;
+  done by cases {
+    case m < 2: done by Natural.below_two
+    case m = 2 ∨ 2 < m: {
+        2 ≤ m by cases {
+            case m = 2: done
+            case 2 < m: done by Natural.LessThan.weaken
+          };
+        2 * 2 ≤ 2 * m by Natural.multiply_monotone_left
+              = m * 2
+              ≤ m * m by Natural.multiply_monotone_left;
+        m * m < 4 = 2 * 2 ≤ m * m;
+        False by Natural.lt_irreflexive;
+        done
+      }
+  }
+}
+
+theorem Natural.square_below_six (m : ℕ) (bound : m * m < 6)
+        : m = 0 ∨ m = 1 ∨ m = 2 := {
+  m < 3 ∨ m = 3 ∨ 3 < m by Natural.lt_trichotomy;
+  done by cases {
+    case m < 3 as belowThree: {
+        m < 2 ∨ m = 2 ∨ 2 < m by Natural.lt_trichotomy;
+        done by cases {
+          case m < 2: {
+              m = 0 ∨ m = 1 by Natural.below_two;
+              done by cases {
+                case m = 0: done
+                case m = 1: done
+              }
+            }
+          case m = 2: done
+          case 2 < m: {
+              3 ≤ m;
+              m < 3 ≤ m;
+              False by Natural.lt_irreflexive;
+              done
+            }
+        }
+      }
+    case m = 3 ∨ 3 < m: {
+        3 ≤ m by cases {
+            case m = 3: done
+            case 3 < m: done by Natural.LessThan.weaken
+          };
+        3 * 3 ≤ 3 * m by Natural.multiply_monotone_left
+              = m * 3
+              ≤ m * m by Natural.multiply_monotone_left;
+        m * m < 6 < 3 * 3 ≤ m * m;
+        False by Natural.lt_irreflexive;
+        done
+      }
+  }
+}
+
+theorem Natural.positive_below_five (m : ℕ) (positive : m ≥ 1) (bound : m < 5)
+        : m = 1 ∨ m = 2 ∨ m = 3 ∨ m = 4 := {
+  m < 4 ∨ m = 4 ∨ 4 < m by Natural.lt_trichotomy;
+  done by cases {
+    case m < 4 as belowFour: {
+        m < 3 ∨ m = 3 ∨ 3 < m by Natural.lt_trichotomy;
+        done by cases {
+          case m < 3 as belowThree: {
+              m < 2 ∨ m = 2 ∨ 2 < m by Natural.lt_trichotomy;
+              done by cases {
+                case m < 2: {
+                    m ≤ 1 by Natural.le_of_lt_one_plus;
+                    m = 1 by Natural.le_antisymmetric;
+                    done
+                  }
+                case m = 2: done
+                case 2 < m: {
+                    3 ≤ m;
+                    m < 3 ≤ m;
+                    False by Natural.lt_irreflexive;
+                    done
+                  }
+              }
+            }
+          case m = 3: done
+          case 3 < m: {
+              4 ≤ m;
+              m < 4 ≤ m;
+              False by Natural.lt_irreflexive;
+              done
+            }
+        }
+      }
+    case m = 4: done
+    case 4 < m: {
+        5 ≤ m;
+        m < 5 ≤ m;
+        False by Natural.lt_irreflexive;
+        done
+      }
+  }
+}
+
+theorem Integer.square_as_natural_square (a : ℤ)
+        : ∃ (m : ℕ). a * a = ((m * m : ℕ) : ℤ) := {
+  Integer.IsNonneg(a) ∨ ∃ (m : ℕ). a = -(m : ℤ) by Integer.sign_split;
+  done by cases {
+    case Integer.IsNonneg(a): {
+        choose m such that a = (m : ℤ);
+        witness m with
+            a * a
+               = (m : ℤ) * (m : ℤ)
+               = ((m * m : ℕ) : ℤ)
+      }
+    case ∃ (m : ℕ). a = -(m : ℤ): {
+        choose m such that a = -(m : ℤ);
+        witness m with
+            a * a
+               = (-(m : ℤ)) * (-(m : ℤ))
+               = (m : ℤ) * (m : ℤ)
+               = ((m * m : ℕ) : ℤ)
+      }
+  }
+}
+
+theorem Natural.three_not_sum_of_two_squares (m n : ℕ)
+        : ¬(m * m + n * n = 3) := {
+  suppose m * m + n * n = 3 as sumIsThree;
+  m * m ≤ m * m + n * n = 3 < 4;
+  n * n ≤ n * n + m * m = m * m + n * n by Natural.add_commutative = 3 < 4;
+  m = 0 ∨ m = 1 by Natural.square_below_four;
+  n = 0 ∨ n = 1 by Natural.square_below_four;
+  done by cases {
+    case m = 0 as mZero: done by cases {
+        case n = 0 as nZero: {
+            3 = m * m + n * n by sumIsThree
+              = 0 * 0 + n * n by substituting mZero
+              = 0 * 0 + 0 * 0 by substituting nZero
+              = 0;
+            done
+          }
+        case n = 1 as nOne: {
+            3 = m * m + n * n by sumIsThree
+              = 0 * 0 + n * n by substituting mZero
+              = 0 * 0 + 1 * 1 by substituting nOne
+              = 1;
+            done
+          }
+      }
+    case m = 1 as mOne: done by cases {
+        case n = 0 as nZero: {
+            3 = m * m + n * n by sumIsThree
+              = 1 * 1 + n * n by substituting mOne
+              = 1 * 1 + 0 * 0 by substituting nZero
+              = 1;
+            done
+          }
+        case n = 1 as nOne: {
+            3 = m * m + n * n by sumIsThree
+              = 1 * 1 + n * n by substituting mOne
+              = 1 * 1 + 1 * 1 by substituting nOne
+              = 2;
+            done
+          }
+      }
+  }
+}
+
+theorem Natural.five_not_square_plus_double_square (m n : ℕ)
+        : ¬(m * m + 2 * (n * n) = 5) := {
+  suppose m * m + 2 * (n * n) = 5 as sumIsFive;
+  m * m ≤ m * m + 2 * (n * n) = 5 < 6;
+  n * n ≤ 2 * (n * n) by Natural.le_multiply_when_factor_at_least_one
+        ≤ m * m + 2 * (n * n) by Natural.less_or_equal_add_left
+        = 5 < 6;
+  m = 0 ∨ m = 1 ∨ m = 2 by Natural.square_below_six;
+  n = 0 ∨ n = 1 ∨ n = 2 by Natural.square_below_six;
+  done by cases {
+    case m = 0 as mZero: done by cases {
+        case n = 0 as nZero: {
+            5 = m * m + 2 * (n * n) by sumIsFive
+              = 0 * 0 + 2 * (n * n) by substituting mZero
+              = 0 * 0 + 2 * (0 * 0) by substituting nZero
+              = 0;
+            done
+          }
+        case n = 1 ∨ n = 2: done by cases {
+            case n = 1 as nOne: {
+                5 = m * m + 2 * (n * n) by sumIsFive
+                  = 0 * 0 + 2 * (n * n) by substituting mZero
+                  = 0 * 0 + 2 * (1 * 1) by substituting nOne
+                  = 2;
+                done
+              }
+            case n = 2 as nTwo: {
+                5 = m * m + 2 * (n * n) by sumIsFive
+                  = 0 * 0 + 2 * (n * n) by substituting mZero
+                  = 0 * 0 + 2 * (2 * 2) by substituting nTwo
+                  = 8;
+                done
+              }
+          }
+      }
+    case m = 1 ∨ m = 2: done by cases {
+        case m = 1 as mOne: done by cases {
+            case n = 0 as nZero: {
+                5 = m * m + 2 * (n * n) by sumIsFive
+                  = 1 * 1 + 2 * (n * n) by substituting mOne
+                  = 1 * 1 + 2 * (0 * 0) by substituting nZero
+                  = 1;
+                done
+              }
+            case n = 1 ∨ n = 2: done by cases {
+                case n = 1 as nOne: {
+                    5 = m * m + 2 * (n * n) by sumIsFive
+                      = 1 * 1 + 2 * (n * n) by substituting mOne
+                      = 1 * 1 + 2 * (1 * 1) by substituting nOne
+                      = 3;
+                    done
+                  }
+                case n = 2 as nTwo: {
+                    5 = m * m + 2 * (n * n) by sumIsFive
+                      = 1 * 1 + 2 * (n * n) by substituting mOne
+                      = 1 * 1 + 2 * (2 * 2) by substituting nTwo
+                      = 9;
+                    done
+                  }
+              }
+          }
+        case m = 2 as mTwo: done by cases {
+            case n = 0 as nZero: {
+                5 = m * m + 2 * (n * n) by sumIsFive
+                  = 2 * 2 + 2 * (n * n) by substituting mTwo
+                  = 2 * 2 + 2 * (0 * 0) by substituting nZero
+                  = 4;
+                done
+              }
+            case n = 1 ∨ n = 2: done by cases {
+                case n = 1 as nOne: {
+                    5 = m * m + 2 * (n * n) by sumIsFive
+                      = 2 * 2 + 2 * (n * n) by substituting mTwo
+                      = 2 * 2 + 2 * (1 * 1) by substituting nOne
+                      = 6;
+                    done
+                  }
+                case n = 2 as nTwo: {
+                    5 = m * m + 2 * (n * n) by sumIsFive
+                      = 2 * 2 + 2 * (n * n) by substituting mTwo
+                      = 2 * 2 + 2 * (2 * 2) by substituting nTwo
+                      = 12;
+                    done
+                  }
+              }
+          }
+      }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- Values of the two direct sums are respectively a²+b² and a²+2b².
+
+theorem Matrix.quadraticForm_scale_matrix {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (c : CommutativeRing.carrier(r)) (x : RingVector(r, n))
+        : Matrix.quadraticForm(c • A, x) = c * Matrix.quadraticForm(A, x) :=
+  Matrix.quadraticForm(c • A, x)
+     = RingVector.innerProduct(x, (c • A) · x)
+     = RingVector.innerProduct(x, c • (A · x)) by Matrix.applyVector_scale_matrix
+     = c * RingVector.innerProduct(x, A · x) by RingVector.innerProduct_scale_right
+     = c * Matrix.quadraticForm(A, x)
+
+theorem Matrix.doubleSquareForm_represents_two
+        : Matrix.Represents((2 : ℤ) • Matrix.squareForm, (2 : ℤ)) := {
+  let e : RingVector(Integer.commutative_ring_bundle, 1) :=
+      Matrix.standardBasisRow(Integer.commutative_ring_bundle, 1, NaturalsBelow.top(0));
+  Matrix.quadraticForm(Matrix.squareForm, e)
+     = Matrix.squareForm(NaturalsBelow.top(0), NaturalsBelow.top(0))
+          by Matrix.quadraticForm_standardBasis
+     = (1 : ℤ)
+          by Matrix.identity_entry_diagonal
+  as squareValue;
+  Matrix.quadraticForm((2 : ℤ) • Matrix.squareForm, e)
+     = (2 : ℤ) * Matrix.quadraticForm(Matrix.squareForm, e)
+          by Matrix.quadraticForm_scale_matrix
+     = (2 : ℤ) * (1 : ℤ) by substituting squareValue
+     = (2 : ℤ);
+  witness e with done
+}
+
+theorem Matrix.sumOfTwoSquaresForm_represents_only_squares (target : ℤ)
+        (represented : Matrix.Represents(Matrix.sumOfTwoSquaresForm, target))
+        : ∃ (a b : ℤ). target = a * a + b * b := {
+  choose z : RingVector(Integer.commutative_ring_bundle, 1 + 1) such that
+      Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm, z) = target
+      from represented;
+  let u : RingVector(Integer.commutative_ring_bundle, 1) :=
+      (RingVector.restrictLeft :
+          RingVector(Integer.commutative_ring_bundle, 1 + 1)
+          → RingVector(Integer.commutative_ring_bundle, 1))(z);
+  let v : RingVector(Integer.commutative_ring_bundle, 1) :=
+      (RingVector.restrictRight :
+          RingVector(Integer.commutative_ring_bundle, 1 + 1)
+          → RingVector(Integer.commutative_ring_bundle, 1))(z);
+  z = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1) · u
+      + Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1) · v
+      by RingVector.directSum_decomposition as decomposition;
+  target
+     = Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm, z)
+     = Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm,
+           Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1) · u
+           + Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1) · v)
+           by substituting decomposition
+     = Matrix.quadraticForm(Matrix.squareForm, u) + Matrix.quadraticForm(Matrix.squareForm, v)
+           by Matrix.directSum_quadraticForm
+     = RingVector.coordinate(u) * RingVector.coordinate(u) + Matrix.quadraticForm(Matrix.squareForm, v)
+           by substituting Matrix.squareForm_value
+     = RingVector.coordinate(u) * RingVector.coordinate(u)
+       + RingVector.coordinate(v) * RingVector.coordinate(v)
+           by substituting Matrix.squareForm_value;
+  witness RingVector.coordinate(u) with
+      witness RingVector.coordinate(v) with done
+}
+
+theorem Matrix.squarePlusDoubleSquareForm_represents_only_squares (target : ℤ)
+        (represented : Matrix.Represents(Matrix.squarePlusDoubleSquareForm, target))
+        : ∃ (a b : ℤ). target = a * a + (2 : ℤ) * (b * b) := {
+  choose z : RingVector(Integer.commutative_ring_bundle, 1 + 1) such that
+      Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm, z) = target
+      from represented;
+  let u : RingVector(Integer.commutative_ring_bundle, 1) :=
+      (RingVector.restrictLeft :
+          RingVector(Integer.commutative_ring_bundle, 1 + 1)
+          → RingVector(Integer.commutative_ring_bundle, 1))(z);
+  let v : RingVector(Integer.commutative_ring_bundle, 1) :=
+      (RingVector.restrictRight :
+          RingVector(Integer.commutative_ring_bundle, 1 + 1)
+          → RingVector(Integer.commutative_ring_bundle, 1))(z);
+  z = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1) · u
+      + Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1) · v
+      by RingVector.directSum_decomposition as decomposition;
+  target
+     = Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm, z)
+     = Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm,
+           Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1) · u
+           + Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1) · v)
+           by substituting decomposition
+     = Matrix.quadraticForm(Matrix.squareForm, u)
+       + Matrix.quadraticForm((2 : ℤ) • Matrix.squareForm, v)
+           by Matrix.directSum_quadraticForm
+     = Matrix.quadraticForm(Matrix.squareForm, u)
+       + (2 : ℤ) * Matrix.quadraticForm(Matrix.squareForm, v)
+           by substituting Matrix.quadraticForm_scale_matrix
+     = RingVector.coordinate(u) * RingVector.coordinate(u)
+       + (2 : ℤ) * Matrix.quadraticForm(Matrix.squareForm, v)
+           by substituting Matrix.squareForm_value
+     = RingVector.coordinate(u) * RingVector.coordinate(u)
+       + (2 : ℤ) * (RingVector.coordinate(v) * RingVector.coordinate(v))
+           by substituting Matrix.squareForm_value;
+  witness RingVector.coordinate(u) with
+      witness RingVector.coordinate(v) with done
+}
+
+-- ----------------------------------------------------------------------
+-- The two truant calculations.
+
+theorem Matrix.sumOfTwoSquaresForm_not_represents_three
+        : ¬(Matrix.Represents(Matrix.sumOfTwoSquaresForm, (3 : ℤ))) := {
+  suppose Matrix.Represents(Matrix.sumOfTwoSquaresForm, (3 : ℤ)) as represented;
+  ∃ (a b : ℤ). (3 : ℤ) = a * a + b * b
+      by Matrix.sumOfTwoSquaresForm_represents_only_squares;
+  choose a such that ∃ (b : ℤ). (3 : ℤ) = a * a + b * b;
+  choose b such that (3 : ℤ) = a * a + b * b;
+  ∃ (m : ℕ). a * a = ((m * m : ℕ) : ℤ) by Integer.square_as_natural_square;
+  choose m such that a * a = ((m * m : ℕ) : ℤ);
+  ∃ (n : ℕ). b * b = ((n * n : ℕ) : ℤ) by Integer.square_as_natural_square;
+  choose n such that b * b = ((n * n : ℕ) : ℤ);
+  ((3 : ℕ) : ℤ)
+     = (3 : ℤ)
+     = a * a + b * b
+     = ((m * m : ℕ) : ℤ) + ((n * n : ℕ) : ℤ)
+     = ((m * m + n * n : ℕ) : ℤ);
+  3 = m * m + n * n by Natural.to_integer.injective;
+  m * m + n * n = 3;
+  done by Natural.three_not_sum_of_two_squares
+}
+
+theorem Matrix.squarePlusDoubleSquareForm_not_represents_five
+        : ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareForm, (5 : ℤ))) := {
+  suppose Matrix.Represents(Matrix.squarePlusDoubleSquareForm, (5 : ℤ)) as represented;
+  ∃ (a b : ℤ). (5 : ℤ) = a * a + (2 : ℤ) * (b * b)
+      by Matrix.squarePlusDoubleSquareForm_represents_only_squares;
+  choose a such that ∃ (b : ℤ). (5 : ℤ) = a * a + (2 : ℤ) * (b * b);
+  choose b such that (5 : ℤ) = a * a + (2 : ℤ) * (b * b);
+  ∃ (m : ℕ). a * a = ((m * m : ℕ) : ℤ) by Integer.square_as_natural_square;
+  choose m such that a * a = ((m * m : ℕ) : ℤ);
+  ∃ (n : ℕ). b * b = ((n * n : ℕ) : ℤ) by Integer.square_as_natural_square;
+  choose n such that b * b = ((n * n : ℕ) : ℤ);
+  ((5 : ℕ) : ℤ)
+     = (5 : ℤ)
+     = a * a + (2 : ℤ) * (b * b)
+     = ((m * m : ℕ) : ℤ) + (2 : ℤ) * ((n * n : ℕ) : ℤ)
+     = ((m * m + 2 * (n * n) : ℕ) : ℤ);
+  5 = m * m + 2 * (n * n) by Natural.to_integer.injective;
+  m * m + 2 * (n * n) = 5;
+  done by Natural.five_not_square_plus_double_square
+}
+
+theorem Matrix.sumOfTwoSquaresForm_truant_three
+        : Matrix.IsTruant(Matrix.sumOfTwoSquaresForm, 3) := {
+  3 ≥ 1;
+  ¬(Matrix.Represents(Matrix.sumOfTwoSquaresForm, ((3 : ℕ) : ℤ))) by {
+      ((3 : ℕ) : ℤ) = (3 : ℤ);
+      done by Matrix.sumOfTwoSquaresForm_not_represents_three
+    };
+  ∀ (s : ℕ). s ≥ 1 → s < 3 → Matrix.Represents(Matrix.sumOfTwoSquaresForm, (s : ℤ))
+      by (s : ℕ) (positive : s ≥ 1) (belowThree : s < 3) ↦ {
+          s = 1 ∨ s = 2 by {
+              s < 2 ∨ s = 2 ∨ 2 < s by Natural.lt_trichotomy;
+              done by cases {
+                case s < 2: {
+                    s ≤ 1 by Natural.le_of_lt_one_plus;
+                    s = 1 by Natural.le_antisymmetric;
+                    done
+                  }
+                case s = 2: done
+                case 2 < s: {
+                    3 ≤ s;
+                    s < 3 ≤ s;
+                    False by Natural.lt_irreflexive;
+                    done
+                  }
+              }
+            };
+          done by cases {
+            case s = 1: {
+                Matrix.Represents(Matrix.sumOfTwoSquaresForm, (1 : ℤ))
+                    by Matrix.directSum_represents_left;
+                done
+              }
+            case s = 2: {
+                Matrix.Represents(Matrix.sumOfTwoSquaresForm, (1 : ℤ) + (1 : ℤ))
+                    by Matrix.directSum_represents_sum;
+                done
+              }
+          }
+        };
+  done
+}
+
+theorem Matrix.squarePlusDoubleSquareForm_truant_five
+        : Matrix.IsTruant(Matrix.squarePlusDoubleSquareForm, 5) := {
+  5 ≥ 1;
+  ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareForm, ((5 : ℕ) : ℤ))) by {
+      ((5 : ℕ) : ℤ) = (5 : ℤ);
+      done by Matrix.squarePlusDoubleSquareForm_not_represents_five
+    };
+  ∀ (s : ℕ). s ≥ 1 → s < 5 → Matrix.Represents(Matrix.squarePlusDoubleSquareForm, (s : ℤ))
+      by (s : ℕ) (positive : s ≥ 1) (belowFive : s < 5) ↦ {
+          s = 1 ∨ s = 2 ∨ s = 3 ∨ s = 4 by Natural.positive_below_five;
+          done by cases {
+            case s = 1: {
+                Matrix.Represents(Matrix.squarePlusDoubleSquareForm, (1 : ℤ))
+                    by Matrix.directSum_represents_left;
+                done
+              }
+            case s = 2 ∨ s = 3 ∨ s = 4: done by cases {
+                case s = 2: {
+                    Matrix.Represents((2 : ℤ) • Matrix.squareForm, (2 : ℤ))
+                        by Matrix.doubleSquareForm_represents_two;
+                    done by Matrix.directSum_represents_right
+                  }
+                case s = 3: {
+                    Matrix.Represents(Matrix.squarePlusDoubleSquareForm, (1 : ℤ) + (2 : ℤ))
+                        by Matrix.directSum_represents_sum;
+                    done
+                  }
+                case s = 4: {
+                    Matrix.Represents(Matrix.squareForm, (2 : ℤ) * (2 : ℤ))
+                        by Matrix.squareForm_represents_square;
+                    done by Matrix.directSum_represents_left
+                  }
+              }
+          }
+        };
+  done
+}
+
+theorem Matrix.sumOfTwoSquaresForm_truant
+        : Matrix.truant(Matrix.sumOfTwoSquaresForm) = 3 :=
+  by Matrix.truant_equals
+
+theorem Matrix.squarePlusDoubleSquareForm_truant
+        : Matrix.truant(Matrix.squarePlusDoubleSquareForm) = 5 :=
+  by Matrix.truant_equals

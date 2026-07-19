@@ -253,6 +253,8 @@ CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
 # no consumer ever unfolds the recursion) — the same intended-boundary
 # class as `NaturalsBelow.enumerate`'s markers. Everything else in the
 # file is leak-free.
+# 2026-07-19: 397 → 397. rank_two_truants manifest-added at ZERO counted
+# leaks; exact truants 3 and 5 now feed the rank-3 escalation enumeration.
 CLEAN_LEAK_BUDGET ?= 397
 # Second, independent axis: user-written `⟨…⟩` over a logical connective
 # (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the

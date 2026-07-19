@@ -47,7 +47,9 @@ proved; the foundations and the escalator tree through rank two are.
   `Matrix.escalator_symmetric`, and `Matrix.escalator_positive_definite`.
 - Low ranks: `Matrix.escalator_rank_one` identifies \(x^2\);
   `Matrix.rank_two_escalators` and `Matrix.escalator_rank_two` classify rank
-  two up to isometry as \(x^2+y^2\) or \(x^2+2y^2\).
+  two up to isometry as \(x^2+y^2\) or \(x^2+2y^2\). Their truants are
+  respectively 3 and 5 (`Matrix.sumOfTwoSquaresForm_truant` and
+  `Matrix.squarePlusDoubleSquareForm_truant`).
 
 ## Module path
 
@@ -55,4 +57,5 @@ Read `quadratic_form` → `integer_quadratic_form` first. Then use
 `matrix_direct_sum`, `schur_complement`/`sylvester`, and
 `representation_bound` as needed. The escalation spine is
 `square_form` → `truant` → `escalation` → `rank_two_escalators` →
-`escalator_tree`. `PLAN_15_THEOREM.md` records unfinished stages.
+`rank_two_truants` → `escalator_tree`. `PLAN_15_THEOREM.md` records
+unfinished stages.
