@@ -509,3 +509,13 @@ export-check: library
 .PHONY: export-check
 
 .PHONY: check
+
+# ----------------------------------------------------------------------
+# Library documentation freshness: every backticked qualified name in
+# library/**/*.md must resolve to a declaration (or module), and the
+# docs-vocabulary rules hold. Run after changing library/ or its docs;
+# the update-library-docs skill runs it as its verification step.
+docs-check:
+	@python3 scripts/check_library_docs.py
+
+.PHONY: docs-check

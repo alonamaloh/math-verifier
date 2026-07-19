@@ -14,7 +14,8 @@ construction boundary.
 - Sign and order: `Rational.IsNonneg`, `Rational.LessOrEqual`, and
   `Rational.LessThan`
 - `Rational.absolute_value`, `Rational.power`, and the reciprocal function
-- Bundles `Rational.ring_bundle` and `Rational.field_bundle`
+- Bundles `Rational.ring`, `Rational.commutative_ring`, and
+  `Rational.field` in the `ring_bundle` and `field_bundle` modules
 
 ## Main theorems
 
