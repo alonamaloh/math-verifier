@@ -289,32 +289,15 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
                 }
             }
         }
-        // Alias fallback: the operand type may be a definition that
-        // abbreviates a registered type — e.g. `GaussianInteger :=
-        // RingModulo(…)`, `ComplexNumber := RingModulo(…)`. Unfold each
-        // operand type's head one δ-step at a time, collecting the heads it
-        // passes through, and retry the registry over those. A SINGLE-step
-        // unfold (not full WHNF) is essential: `RingModulo` is itself a
-        // definition for `Quotient(…)`, so WHNF would blow past the
-        // `RingModulo` registration all the way to `Quotient`. We try the
-        // raw head first (already done above), then successive unfoldings,
-        // so an alias dispatches exactly like the type it names.
+        // Shared head-candidate fallback. Besides raw and successive alias
+        // heads, this exposes a concrete carrier behind a CLOSED bundle
+        // projection without over-reducing it. The raw lookup and raw coercion
+        // join above keep priority, so these candidates only widen dispatch.
+        std::vector<std::string> leftHeadCandidates;
+        std::vector<std::string> rightHeadCandidates;
         if (targetFunction.empty()) {
-            auto collectHeads = [&](ExpressionPointer typeExpr) {
-                std::vector<std::string> heads;
-                ExpressionPointer current = typeExpr;
-                for (int step = 0; step < 64; ++step) {
-                    current = unfoldHeadConstantOneStep(current);
-                    if (!current) break;
-                    std::string head = headConstantName(current);
-                    if (!head.empty()) heads.push_back(head);
-                }
-                return heads;
-            };
-            std::vector<std::string> leftHeads = collectHeads(leftTypeRaw);
-            std::vector<std::string> rightHeads = collectHeads(rightTypeRaw);
-            leftHeads.insert(leftHeads.begin(), operandTypeName);
-            rightHeads.insert(rightHeads.begin(), rightTypeName);
+            leftHeadCandidates = carrierHeadCandidates(leftTypeRaw);
+            rightHeadCandidates = carrierHeadCandidates(rightTypeRaw);
             // Reverse-alias enrichment: an operand can arrive with its
             // type ALREADY normalised (a recursive self-reference in a
             // pattern-definition body gets the declared return type
@@ -361,9 +344,9 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
                 return heads;
             };
             auto tryHeadPairs = [&]() {
-                for (const auto& lh : leftHeads) {
+                for (const auto& lh : leftHeadCandidates) {
                     if (!targetFunction.empty()) break;
-                    for (const auto& rh : rightHeads) {
+                    for (const auto& rh : rightHeadCandidates) {
                         if (lh.empty() || rh.empty()) continue;
                         std::string reg = environment_.lookupOperator(
                             operatorSymbol, lh, rh);
@@ -374,55 +357,58 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
             tryHeadPairs();
             if (targetFunction.empty()) {
                 for (const auto& head : reverseAliasHeads(leftTypeRaw)) {
-                    leftHeads.push_back(head);
+                    leftHeadCandidates.push_back(head);
                 }
                 for (const auto& head : reverseAliasHeads(rightTypeRaw)) {
-                    rightHeads.push_back(head);
+                    rightHeadCandidates.push_back(head);
                 }
                 tryHeadPairs();
             }
         }
-        // Final registry fallback: WHNF the operand types to expose a
-        // CONCRETE carrier head. A value whose type is a bundle projection
-        // over a concrete ring — `Ring.carrier(Real.polynomial_ring)` (from
-        // a `divides` existential), or `Ring.carrier(Real.ring)` — reduces
-        // to the concrete carrier (`Polynomial(...)`, `Real`), so it then
-        // dispatches like that concrete type. An ABSTRACT carrier
-        // (`Ring.carrier(s)` for a variable `s`) stays stuck under WHNF, so
-        // its bundle dispatch is unchanged. Only consulted after the
-        // raw-head lookup failed, so this never overrides an existing
-        // dispatch — it can only turn a mixed/projected head pair that
-        // would otherwise error into a successful one.
+        // Candidate-aware coercion join. Exact heterogeneous registrations
+        // (including alias, reverse-alias, and projection fallbacks) have all
+        // had priority above. Only now try to reconcile two normalized carrier
+        // candidates and dispatch homogeneously at their join. This is the
+        // missing path for
+        //   CommutativeRing.carrier(Integer.bundle) × Natural
+        // where the useful registry heads are Integer × Natural.
         if (targetFunction.empty()) {
-            // Resolve a carrier PROJECTION over a concrete ring to the
-            // carrier field as written in the bundle's constructor (NOT
-            // further reduced — full WHNF would blow past `Polynomial(…)`
-            // to its underlying `Quotient(…)`). So a value typed
-            // `Ring.carrier(Real.polynomial_ring)` (from a `divides`
-            // existential) dispatches like `Polynomial`. An abstract
-            // `Ring.carrier(s)` resolves to nothing (the bundle arg is
-            // stuck), so its dispatch is unchanged.
-            ExpressionPointer leftProj =
-                carrierProjectionField(leftTypeRaw);
-            ExpressionPointer rightProj =
-                carrierProjectionField(rightTypeRaw);
-            std::string leftProjHead =
-                leftProj ? headConstantName(leftProj) : std::string();
-            std::string rightProjHead =
-                rightProj ? headConstantName(rightProj) : std::string();
-            const std::string leftCandidates[2] =
-                {leftProjHead, operandTypeName};
-            const std::string rightCandidates[2] =
-                {rightProjHead, rightTypeName};
-            for (int li = 0; li < 2 && targetFunction.empty(); ++li) {
-                for (int ri = 0; ri < 2 && targetFunction.empty(); ++ri) {
-                    if (li == 1 && ri == 1) continue;  // raw×raw already tried
-                    if (leftCandidates[li].empty()
-                        || rightCandidates[ri].empty()) continue;
-                    std::string reg = environment_.lookupOperator(
-                        operatorSymbol, leftCandidates[li],
-                        rightCandidates[ri]);
-                    if (!reg.empty()) targetFunction = reg;
+            ExpressionPointer rightTypeClosed = closeOverLocalBinders(
+                rightTypeRaw, localBinders, localBinders.size());
+            bool joined = false;
+            for (const auto& leftHead : leftHeadCandidates) {
+                if (joined) break;
+                for (const auto& rightHead : rightHeadCandidates) {
+                    if (leftHead == rightHead) continue;
+                    auto combined = combineOperands(
+                        leftHead, rightHead,
+                        leftTypeClosed, rightTypeClosed);
+                    if (!combined) continue;
+                    std::string atJoin = environment_.lookupOperator(
+                        operatorSymbol, combined->resultHead,
+                        combined->resultHead);
+                    if (atJoin.empty()) continue;
+
+                    leftKernel = applyCoercionChain(
+                        std::move(leftKernel), combined->coerceLeft);
+                    if (!combined->coerceLeft.empty()) {
+                        leftKernel =
+                            castPushToLeaves(leftKernel, localBinders).term;
+                    }
+                    rightKernel = applyCoercionChain(
+                        std::move(rightKernel), combined->coerceRight);
+                    if (!combined->coerceRight.empty()) {
+                        rightKernel =
+                            castPushToLeaves(rightKernel, localBinders).term;
+                    }
+                    leftTypeRaw = combined->resultType;
+                    leftTypeClosed = combined->resultType;
+                    rightTypeRaw = combined->resultType;
+                    operandTypeName = combined->resultHead;
+                    rightTypeName = combined->resultHead;
+                    targetFunction = std::move(atJoin);
+                    joined = true;
+                    break;
                 }
             }
         }
@@ -1198,4 +1184,3 @@ ExpressionPointer Elaborator::desugarEqualityTransitivity(
         (void)column;
         return call;
     }
-

@@ -1957,6 +1957,13 @@ ExpressionPointer Elaborator::elaborateExpression(
                 ExpressionPointer rightKernel =
                     elaborateExpression(*binary->right, localBinders,
                                           leftType);
+                // `elaborateExpression` treats expected types as inference
+                // hints; it does not itself insert a registered tower cast.
+                // Do that explicitly here so a Natural right operand can lift
+                // into a concrete carrier presented through a bundle
+                // projection.
+                rightKernel = coerceToExpectedTypeViaRegistry(
+                    localBinders, std::move(rightKernel), leftType);
                 // Mixed-type equality (`(n : Natural) = (x : Real)`):
                 // reconcile both sides to their join via the coercion
                 // order, so the `Equality` runs at the common type rather
@@ -1967,25 +1974,53 @@ ExpressionPointer Elaborator::elaborateExpression(
                         inferTypeInLocalContext(localBinders, rightKernel);
                     ExpressionPointer rightType = closeOverLocalBinders(
                         rightTypeOpen, localBinders, localBinders.size());
-                    std::string leftHead = headConstantName(leftType);
-                    std::string rightHead = headConstantName(rightType);
-                    if (leftHead != rightHead) {
-                        if (auto combined = combineOperands(
-                                leftHead, rightHead, leftType, rightType)) {
+                    bool reconciled = false;
+                    auto applyCombined =
+                        [&](CombineResult combined) {
                             leftKernel = applyCoercionChain(
-                                std::move(leftKernel), combined->coerceLeft);
-                            if (!combined->coerceLeft.empty()) {
+                                std::move(leftKernel), combined.coerceLeft);
+                            if (!combined.coerceLeft.empty()) {
                                 leftKernel = castPushToLeaves(
                                     leftKernel, localBinders).term;
                             }
                             rightKernel = applyCoercionChain(
                                 std::move(rightKernel),
-                                combined->coerceRight);
-                            if (!combined->coerceRight.empty()) {
+                                combined.coerceRight);
+                            if (!combined.coerceRight.empty()) {
                                 rightKernel = castPushToLeaves(
                                     rightKernel, localBinders).term;
                             }
-                            leftType = combined->resultType;
+                            leftType = combined.resultType;
+                            reconciled = true;
+                        };
+                    std::string leftHead = headConstantName(leftType);
+                    std::string rightHead = headConstantName(rightType);
+                    if (leftHead != rightHead) {
+                        if (auto combined = combineOperands(
+                                leftHead, rightHead, leftType, rightType)) {
+                            applyCombined(std::move(*combined));
+                        }
+                    }
+                    // Raw heads can miss a concrete carrier hidden behind a
+                    // closed bundle projection. Search normalized candidate
+                    // pairs only after today's raw join fails, preserving the
+                    // existing behavior wherever it already resolves.
+                    if (!reconciled) {
+                        const auto leftHeads =
+                            carrierHeadCandidates(leftType);
+                        const auto rightHeads =
+                            carrierHeadCandidates(rightType);
+                        for (const auto& candidateLeft : leftHeads) {
+                            if (reconciled) break;
+                            for (const auto& candidateRight : rightHeads) {
+                                if (candidateLeft == candidateRight) continue;
+                                if (auto combined = combineOperands(
+                                        candidateLeft, candidateRight,
+                                        leftType, rightType)) {
+                                    applyCombined(std::move(*combined));
+                                    break;
+                                }
+                            }
                         }
                     }
                 }

@@ -470,6 +470,42 @@ bool Elaborator::structureHeadIsClass(const std::string& name) {
         return level != nullptr && level->value == 0;
     }
 
+std::vector<std::string> Elaborator::carrierHeadCandidates(
+        ExpressionPointer type) {
+        std::vector<std::string> candidates;
+        std::unordered_set<std::string> seen;
+        auto addHead = [&](ExpressionPointer expression) {
+            if (!expression) return;
+            std::string head = headConstantName(expression);
+            if (head.empty() || head == "<unknown>") return;
+            if (seen.insert(head).second) {
+                candidates.push_back(std::move(head));
+            }
+        };
+
+        // Preserve the user's source-level name whenever it is useful.
+        addHead(type);
+
+        // Stop at every alias layer instead of WHNF-reducing through useful
+        // registered heads such as RingModulo on the way to Quotient.
+        ExpressionPointer unfolded = type;
+        for (int step = 0; step < 64; ++step) {
+            unfolded = unfoldHeadConstantOneStep(unfolded);
+            if (!unfolded) break;
+            addHead(unfolded);
+        }
+
+        // A closed bundle remembers its concrete carrier even when the type
+        // presented to dispatch is `<Structure>.carrier(bundle)`. The helper
+        // intentionally returns null for an abstract bundle variable.
+        addHead(carrierProjectionField(type));
+
+        // Last resort only: full WHNF can expose a useful concrete head, but
+        // it can also reduce past a user-facing alias, hence its low priority.
+        addHead(weakHeadNormalForm(environment_, type));
+        return candidates;
+    }
+
 ExpressionPointer Elaborator::carrierProjectionField(ExpressionPointer type) {
         auto* application = std::get_if<Application>(&type->node);
         if (!application) return nullptr;
@@ -1719,4 +1755,3 @@ bool Elaborator::containsNamedFreeVariable(
         }
         return false;
     }
-

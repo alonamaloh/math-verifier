@@ -768,11 +768,15 @@ private:
         const SurfaceCoercionDeclaration& declaration);
 
     // Result of reconciling two operand types for a binary operator: the
-    // type `C` the operator runs at, and the coercion chains lifting each
-    // operand up to `C` (empty when that operand is already `C`). See
-    // PLAN_COERCIONS.md.
+    // type `C` the operator runs at, its dispatch head, and the coercion
+    // chains lifting each operand up to `C` (empty when that operand is
+    // already `C`). `resultHead` is kept separately because `resultType`
+    // may retain a definitionally-equal bundled spelling such as
+    // `CommutativeRing.carrier(Integer.commutative_ring_bundle)`, whose raw
+    // head is not the `Integer` name used by the registries.
     struct CombineResult {
         ExpressionPointer resultType;
+        std::string resultHead;
         std::vector<std::string> coerceLeft;
         std::vector<std::string> coerceRight;
     };
@@ -5779,6 +5783,14 @@ private:
     std::string headConstantName(ExpressionPointer typeExpression) {
         return ::headConstantName(environment_, typeExpression);
     }
+
+    // Ordered, deduplicated registry-head candidates for a type. Keeps the
+    // raw source spelling first, then successive one-step alias unfoldings,
+    // then the concrete field behind a closed bundle-carrier projection, and
+    // finally WHNF. An abstract bundle projection stays stuck and contributes
+    // no concrete candidate. Consumers must preserve this order so a dispatch
+    // that already resolves on the raw spelling continues to win.
+    std::vector<std::string> carrierHeadCandidates(ExpressionPointer type);
 
     // If `type` is `Ring.carrier(bundle)` / `CommutativeRing.carrier(bundle)`
     // and `bundle` WHNF-reduces to a `<Struct>.make(carrier, …)`

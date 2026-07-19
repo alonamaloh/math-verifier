@@ -807,10 +807,12 @@ std::optional<Elaborator::CombineResult> Elaborator::combineOperands(
         // Comparable cases — the join is the upper of the two. Covers the
         // entire linear tower (`Rational + Real`, `Natural < Real`, …).
         if (auto chain = reach(leftHead, rightHead)) {
-            return CombineResult{rightTypeClosed, std::move(*chain), {}};
+            return CombineResult{
+                rightTypeClosed, rightHead, std::move(*chain), {}};
         }
         if (auto chain = reach(rightHead, leftHead)) {
-            return CombineResult{leftTypeClosed, {}, std::move(*chain)};
+            return CombineResult{
+                leftTypeClosed, leftHead, {}, std::move(*chain)};
         }
         // Incomparable: search for a least common upper bound. Never runs
         // for a chain; present for forward-compat with a branching order
@@ -844,9 +846,9 @@ std::optional<Elaborator::CombineResult> Elaborator::combineOperands(
                 + "' and '" + rightHead + "'; cast one explicitly");
         }
         const std::string& target = least.front();
-        return CombineResult{makeConstant(target),
-                              *reach(leftHead, target),
-                              *reach(rightHead, target)};
+        return CombineResult{makeConstant(target), target,
+                             *reach(leftHead, target),
+                             *reach(rightHead, target)};
     }
 
 bool Elaborator::typeHasHeadName(ExpressionPointer expressionType,
@@ -2381,4 +2383,3 @@ void Elaborator::elaborateTheoremStatementOnly(
         currentDeclarationName_.clear();
         resetAutoBoundState();
     }
-

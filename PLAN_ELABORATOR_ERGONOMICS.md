@@ -130,7 +130,9 @@ its tension with E4.
 
 ### E0. Freeze the failures as small tests
 
-Status: `[ ]`
+Status: `[x]` — frozen in
+`library/Test/expected_carrier_propagation_test.math` and the focused
+`library/ErrorTest/*carrier*` controls.
 
 Add one focused feature test and corresponding negative controls before
 changing the elaborator. The feature test should cover:
@@ -157,19 +159,24 @@ like `1 + 2` obviously stays legal. What must stay rejected is an expression
 whose *only* reading needs a non-Natural carrier that nothing supplies — a
 standalone `-1`, or an untyped division with no expected type in sight.
 
-Likely files:
+Files:
 
 - `library/Test/expected_carrier_propagation_test.math`
-- `library/ErrorTest/ambiguous_expected_carrier.math`
+- `library/ErrorTest/abstract_carrier_stays_stuck.math`
+- `library/ErrorTest/no_downward_carrier_coercion.math`
+- `library/ErrorTest/unrelated_carriers_stay_rejected.math`
+- `library/ErrorTest/unseeded_negative_numeral.math`
+- the temporary `carrier_pending_*` fixtures promoted as E1/E2 land
 
 ### E1. Share one notion of the carrier head
 
-Status: `[ ]`
+Status: `[x]`
 
 Promote the existing `carrierProjectionField` into one shared entry point, and
 route the consumers through it — relation dispatch, binary operator dispatch,
-expected-type coercion, and citation matching — so there are not four slightly
-different notions of "this is Integer".
+and expected-type coercion — so there are not three slightly different notions
+of "this is Integer". Make the same entry point available to citation matching
+only if conditional step E4 proves necessary.
 
 **Return candidates, not a single name.** A single `-> std::string` is too
 lossy: a raw head can exist and still be unhelpful (`CommutativeRing.carrier`),
@@ -181,21 +188,28 @@ carrierHeadCandidates(type) -> std::vector<std::string>   // ordered, deduplicat
 ```
 
 producing, in order: the raw head, alias unfoldings, the concrete carrier
-projection, then bounded weak-head normalization. Cache per elaboration. Names
-rather than `ExpressionPointer`s keep this composable with `headConstantName`'s
-~87 existing call sites.
+projection, then bounded weak-head normalization. Names rather than
+`ExpressionPointer`s keep this composable with `headConstantName`'s ~87 existing
+call sites. The first implementation computes the short list on demand; cache
+only if profiling justifies it, because the environment grows while a module is
+elaborated and a module-lifetime cache would need invalidation.
 
-This is a generalization of the existing `collectHeads`
-(`desugar_equality.cpp:303`), which already returns raw-head-then-unfoldings;
-E1 adds the carrier-projection and WHNF tiers to it.
+This replaces the local `collectHeads` in binary dispatch, adding the
+carrier-projection and WHNF tiers while keeping raw-head-then-unfoldings first.
 
-**Pair-search semantics — inherit them, do not invent them.** Where both
-operands yield candidate lists, reuse `tryHeadPairs` (`:363`) unchanged:
-left-major iteration, first resolving registration wins, earlier candidates
-strictly preferred. Determinism then follows from list order, which is why the
-order above is normative rather than advisory — the concrete carrier projection
-must come *after* the raw head and alias unfoldings, so adding it cannot change
-any dispatch that resolves today.
+**Keep exact dispatch and coercion joining separate.** Exact heterogeneous
+operator registrations retain first priority. Binary dispatch first searches
+the ordered candidate pairs for an exact registration. Only after every exact
+fallback fails does it search the same pairs with `combineOperands`, require a
+homogeneous registration at the resulting join head, and apply the returned
+coercion chains. `CombineResult` carries that normalized result head separately:
+its `resultType` may deliberately retain the definitionally equal spelling
+`CommutativeRing.carrier(bundle)`, whose raw head would otherwise lose
+`Integer` again.
+
+Expected-type coercion similarly searches ordered source/target candidate pairs
+for a registered upward chain. Raw×raw stays first everywhere, so existing
+dispatch wins unchanged.
 
 **Preserve the reverse-alias phase.** The two-phase structure at `:374-382` —
 run `tryHeadPairs`, and only on failure enrich both lists with
@@ -205,9 +219,9 @@ so this is not subsumed by adding tiers to `collectHeads`. Keep it as the
 outermost phase: E1's new tiers join the first pass, and the reverse-alias
 retry stays last.
 
-One duplicate to fold up while here: the `.carrier` string-suffix test in unary
-dispatch at `dispatch.cpp:2107` is a hand-rolled second implementation of the
-same idea.
+The `.carrier` string-suffix test in unary dispatch remains until E2: abstract
+bundles use the bundle's own negation and have no concrete candidate, so folding
+that path into the shared helper belongs with the unary change and its probes.
 
 **Out of scope for this step:** the hardcoded projector whitelist at
 `desugar_eliminators.cpp:485`. Deriving it from the registered bundles does not
@@ -227,11 +241,10 @@ M(i,i) < 3
 M(i,i) = 0
 ```
 
-Equality is expected to improve **here**, not at E3: the `=` path already
-performs a `combineOperands` join (`dispatch.cpp:1963`) and fails only because
-`headConstantName` hands it `CommutativeRing.carrier`. Feeding it candidates
-should be sufficient. If `M(i,i) = 0` still fails after E1, that is a finding to
-record — it means the `=` path needs the operand reordering of E3 as well.
+Equality improves **here**, not at E3. Its right operand is explicitly reconciled
+with the left expected type through the candidate-aware coercion lookup; its
+existing mixed-type join also retries normalized candidate pairs when that
+direct coercion does not apply.
 
 ### E2. Let expected carriers reach the operand leaf
 

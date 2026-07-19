@@ -38,17 +38,26 @@ ExpressionPointer Elaborator::coerceToExpectedTypeViaRegistry(
                                        termTypeOpened, expectedTypeOpened)) {
                 return term;
             }
-            // The registry is keyed on the source-level type head name
-            // (`Natural`, `Integer`, …), not the unfolded representation, so
-            // match on the raw head. `headConstantName` peels Applications so
-            // parameterised types report their head.
-            std::string termHead = headConstantName(termTypeOpened);
-            std::string expectedHead = headConstantName(expectedTypeOpened);
-            if (termHead.empty() || expectedHead.empty()) return term;
-            auto entry = environment_.coercionRegistry.find(
-                std::make_tuple(termHead, expectedHead));
-            if (entry == environment_.coercionRegistry.end()) return term;
-            return applyCoercionChain(std::move(term), entry->second);
+            // The registry is keyed on source-level carrier names. A type may
+            // instead arrive as a concrete bundle projection, so search the
+            // ordered source/target candidate pairs while keeping raw×raw
+            // first. This is still deterministic: the coercion registry is
+            // transitively closed and diamond-free.
+            const auto termHeads = carrierHeadCandidates(termTypeOpened);
+            const auto expectedHeads =
+                carrierHeadCandidates(expectedTypeOpened);
+            for (const auto& termHead : termHeads) {
+                for (const auto& expectedHead : expectedHeads) {
+                    if (termHead == expectedHead) continue;
+                    auto entry = environment_.coercionRegistry.find(
+                        std::make_tuple(termHead, expectedHead));
+                    if (entry != environment_.coercionRegistry.end()) {
+                        return applyCoercionChain(
+                            std::move(term), entry->second);
+                    }
+                }
+            }
+            return term;
         } catch (const TypeError&) {
             // term's type couldn't be inferred — leave it for the
             // authoritative use-site check to report.
@@ -1142,4 +1151,3 @@ ExpressionPointer Elaborator::tryQuotientExactBridge(
         }
         return nullptr;
     }
-
