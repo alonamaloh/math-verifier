@@ -70,6 +70,625 @@ import Algebra.square_form
 import Algebra.truant
 
 -- ----------------------------------------------------------------------
+-- Canonical bordered assembly. This is the matrix constructor used by an
+-- explicit escalation list: a fixed leading block, a varying border vector,
+-- and a fixed corner.
+
+definition Matrix.outerProduct {r : CommutativeRing} {rows columns : ℕ}
+        (u : RingVector(r, rows)) (v : RingVector(r, columns))
+        : Matrix(r, rows, columns) :=
+  (i : NaturalsBelow(rows)) ↦ (j : NaturalsBelow(columns)) ↦ u(i) * v(j)
+
+definition Matrix.borderedAssembly {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (b : RingVector(r, n))
+        (c : CommutativeRing.carrier(r)) : Matrix(r, 1 + n, 1 + n) :=
+  let J : Matrix(r, 1 + n, n) :=
+      Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) in
+  let y : RingVector(r, 1 + n) := RingVector.extend(b) in
+  let e : RingVector(r, 1 + n) :=
+      Matrix.standardBasisRow(r, 1 + n, NaturalsBelow.top(n)) in
+  J * A * Jᵀ
+    + Matrix.outerProduct(y, e)
+    + Matrix.outerProduct(e, y)
+    + c • Matrix.outerProduct(e, e)
+
+theorem Matrix.outerProduct_entry {r : CommutativeRing} {rows columns : ℕ}
+        (u : RingVector(r, rows)) (v : RingVector(r, columns))
+        (i : NaturalsBelow(rows)) (j : NaturalsBelow(columns))
+        : Matrix.outerProduct(u, v)(i, j) = u(i) * v(j) :=
+  done
+
+theorem Matrix.outerProduct_transpose {r : CommutativeRing} {rows columns : ℕ}
+        (u : RingVector(r, rows)) (v : RingVector(r, columns))
+        : Matrix.outerProduct(u, v)ᵀ = Matrix.outerProduct(v, u) := {
+  ∀ (j : NaturalsBelow(columns)). ∀ (i : NaturalsBelow(rows)).
+      Matrix.outerProduct(u, v)ᵀ(j, i) = Matrix.outerProduct(v, u)(j, i)
+      by (j : NaturalsBelow(columns)) (i : NaturalsBelow(rows)) ↦ ring;
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.borderedAssembly_block_entry {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (b : RingVector(r, n))
+        (c : CommutativeRing.carrier(r))
+        (i j : NaturalsBelow(n))
+        : Matrix.borderedAssembly(A, b, c)(
+              NaturalsBelow.inclusion(n, i), NaturalsBelow.inclusion(n, j))
+          = A(i, j) := {
+  let J : Matrix(r, 1 + n, n) :=
+      Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n));
+  let y : RingVector(r, 1 + n) := RingVector.extend(b);
+  let e : RingVector(r, 1 + n) :=
+      Matrix.standardBasisRow(r, 1 + n, NaturalsBelow.top(n));
+  Function.IsInjective(NaturalsBelow.inclusion(n))
+      by NaturalsBelow.inclusion_is_injective;
+  (J * A * Jᵀ)(
+      NaturalsBelow.inclusion(n, i), NaturalsBelow.inclusion(n, j))
+     = (J * A)(NaturalsBelow.inclusion(n, i), j)
+           by Matrix.multiply_inclusionMatrix_transpose_entry_selected
+     = A(i, j)
+           by Matrix.inclusionMatrix_multiply_entry_selected
+  as blockReads;
+  y(NaturalsBelow.inclusion(n, i)) = b(i)
+      by RingVector.extend_inclusion as yReadsI;
+  y(NaturalsBelow.inclusion(n, j)) = b(j)
+      by RingVector.extend_inclusion as yReadsJ;
+  ¬(NaturalsBelow.top(n) = NaturalsBelow.inclusion(n, i))
+      by NaturalsBelow.top_not_inclusion;
+  e(NaturalsBelow.inclusion(n, i)) = CommutativeRing.zero(r)
+      by Matrix.standardBasisRow_off as eVanishesI;
+  ¬(NaturalsBelow.top(n) = NaturalsBelow.inclusion(n, j))
+      by NaturalsBelow.top_not_inclusion;
+  e(NaturalsBelow.inclusion(n, j)) = CommutativeRing.zero(r)
+      by Matrix.standardBasisRow_off as eVanishesJ;
+  Matrix.borderedAssembly(A, b, c)(
+      NaturalsBelow.inclusion(n, i), NaturalsBelow.inclusion(n, j))
+     = (J * A * Jᵀ)(
+           NaturalsBelow.inclusion(n, i), NaturalsBelow.inclusion(n, j))
+       + y(NaturalsBelow.inclusion(n, i))
+           * e(NaturalsBelow.inclusion(n, j))
+       + e(NaturalsBelow.inclusion(n, i))
+           * y(NaturalsBelow.inclusion(n, j))
+       + c * (e(NaturalsBelow.inclusion(n, i))
+           * e(NaturalsBelow.inclusion(n, j)))
+  as assemblyReads;
+  Matrix.borderedAssembly(A, b, c)(
+      NaturalsBelow.inclusion(n, i), NaturalsBelow.inclusion(n, j))
+     = (J * A * Jᵀ)(
+           NaturalsBelow.inclusion(n, i), NaturalsBelow.inclusion(n, j))
+       + y(NaturalsBelow.inclusion(n, i))
+           * e(NaturalsBelow.inclusion(n, j))
+       + e(NaturalsBelow.inclusion(n, i))
+           * y(NaturalsBelow.inclusion(n, j))
+       + c * (e(NaturalsBelow.inclusion(n, i))
+           * e(NaturalsBelow.inclusion(n, j)))
+           by assemblyReads
+     = A(i, j)
+       + y(NaturalsBelow.inclusion(n, i))
+           * e(NaturalsBelow.inclusion(n, j))
+       + e(NaturalsBelow.inclusion(n, i))
+           * y(NaturalsBelow.inclusion(n, j))
+       + c * (e(NaturalsBelow.inclusion(n, i))
+           * e(NaturalsBelow.inclusion(n, j)))
+           by substituting blockReads
+     = A(i, j)
+       + b(i) * e(NaturalsBelow.inclusion(n, j))
+       + e(NaturalsBelow.inclusion(n, i))
+           * y(NaturalsBelow.inclusion(n, j))
+       + c * (e(NaturalsBelow.inclusion(n, i))
+           * e(NaturalsBelow.inclusion(n, j)))
+           by substituting yReadsI
+     = A(i, j)
+       + b(i) * e(NaturalsBelow.inclusion(n, j))
+       + e(NaturalsBelow.inclusion(n, i)) * b(j)
+       + c * (e(NaturalsBelow.inclusion(n, i))
+           * e(NaturalsBelow.inclusion(n, j)))
+           by substituting yReadsJ
+     = A(i, j)
+       + b(i) * e(NaturalsBelow.inclusion(n, j))
+       + CommutativeRing.zero(r) * b(j)
+       + c * (CommutativeRing.zero(r)
+           * e(NaturalsBelow.inclusion(n, j)))
+           by substituting eVanishesI
+     = A(i, j)
+       + b(i) * CommutativeRing.zero(r)
+       + CommutativeRing.zero(r) * b(j)
+       + c * (CommutativeRing.zero(r) * CommutativeRing.zero(r))
+           by substituting eVanishesJ
+     = A(i, j)
+           by ring;
+  done
+}
+
+theorem Matrix.borderedAssembly_leadingBlock {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (b : RingVector(r, n))
+        (c : CommutativeRing.carrier(r))
+        : Matrix.leadingBlock(Matrix.borderedAssembly(A, b, c)) = A := {
+  ∀ (i : NaturalsBelow(n)). ∀ (j : NaturalsBelow(n)).
+      Matrix.leadingBlock(Matrix.borderedAssembly(A, b, c))(i, j) = A(i, j)
+      by (i : NaturalsBelow(n)) (j : NaturalsBelow(n)) ↦ {
+          done by Matrix.borderedAssembly_block_entry
+        };
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.leadingBlockEmbedding_column_off {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (p : NaturalsBelow(1 + n))
+        : (Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) * A
+           * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ)(
+              p, NaturalsBelow.top(n))
+          = CommutativeRing.zero(r) := {
+  ∀ (t : NaturalsBelow(n)).
+      ¬(NaturalsBelow.top(n) = NaturalsBelow.inclusion(n, t))
+      by (t : NaturalsBelow(n)) ↦ {
+          done by NaturalsBelow.top_not_inclusion
+        };
+  done by Matrix.multiply_inclusionMatrix_transpose_entry_off
+}
+
+theorem Matrix.leadingBlockEmbedding_row_off {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (q : NaturalsBelow(1 + n))
+        : (Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) * A
+           * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ)(
+              NaturalsBelow.top(n), q)
+          = CommutativeRing.zero(r) := {
+  ∀ (t : NaturalsBelow(n)).
+      ¬(NaturalsBelow.top(n) = NaturalsBelow.inclusion(n, t))
+      by (t : NaturalsBelow(n)) ↦ {
+          done by NaturalsBelow.top_not_inclusion
+        };
+  Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) * A
+      * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ
+     = Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))
+       * (A * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ)
+           by Matrix.multiply_associative as reassociated;
+  (Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) * A
+   * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ)(
+      NaturalsBelow.top(n), q)
+     = (Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))
+        * (A * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ))(
+            NaturalsBelow.top(n), q)
+           by substituting reassociated
+     = CommutativeRing.zero(r)
+           by Matrix.inclusionMatrix_multiply_entry_off;
+  done
+}
+
+theorem Matrix.borderedAssembly_border_entry {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (b : RingVector(r, n))
+        (c : CommutativeRing.carrier(r)) (i : NaturalsBelow(n))
+        : Matrix.borderedAssembly(A, b, c)(
+              NaturalsBelow.inclusion(n, i), NaturalsBelow.top(n))
+          = b(i) := {
+  let J : Matrix(r, 1 + n, n) :=
+      Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n));
+  let y : RingVector(r, 1 + n) := RingVector.extend(b);
+  let e : RingVector(r, 1 + n) :=
+      Matrix.standardBasisRow(r, 1 + n, NaturalsBelow.top(n));
+  (J * A * Jᵀ)(NaturalsBelow.inclusion(n, i), NaturalsBelow.top(n))
+      = CommutativeRing.zero(r)
+      by Matrix.leadingBlockEmbedding_column_off as blockVanishes;
+  y(NaturalsBelow.inclusion(n, i)) = b(i)
+      by RingVector.extend_inclusion as yReads;
+  y(NaturalsBelow.top(n)) = CommutativeRing.zero(r)
+      by RingVector.extend_top as yVanishes;
+  ¬(NaturalsBelow.top(n) = NaturalsBelow.inclusion(n, i))
+      by NaturalsBelow.top_not_inclusion;
+  e(NaturalsBelow.inclusion(n, i)) = CommutativeRing.zero(r)
+      by Matrix.standardBasisRow_off as eVanishes;
+  e(NaturalsBelow.top(n)) = CommutativeRing.one(r)
+      by Matrix.standardBasisRow_at as eReads;
+  Matrix.borderedAssembly(A, b, c)(
+      NaturalsBelow.inclusion(n, i), NaturalsBelow.top(n))
+     = (J * A * Jᵀ)(NaturalsBelow.inclusion(n, i), NaturalsBelow.top(n))
+       + y(NaturalsBelow.inclusion(n, i)) * e(NaturalsBelow.top(n))
+       + e(NaturalsBelow.inclusion(n, i)) * y(NaturalsBelow.top(n))
+       + c * (e(NaturalsBelow.inclusion(n, i)) * e(NaturalsBelow.top(n)))
+  as assemblyReads;
+  Matrix.borderedAssembly(A, b, c)(
+      NaturalsBelow.inclusion(n, i), NaturalsBelow.top(n))
+     = (J * A * Jᵀ)(NaturalsBelow.inclusion(n, i), NaturalsBelow.top(n))
+       + y(NaturalsBelow.inclusion(n, i)) * e(NaturalsBelow.top(n))
+       + e(NaturalsBelow.inclusion(n, i)) * y(NaturalsBelow.top(n))
+       + c * (e(NaturalsBelow.inclusion(n, i)) * e(NaturalsBelow.top(n)))
+           by assemblyReads
+     = CommutativeRing.zero(r)
+       + y(NaturalsBelow.inclusion(n, i)) * e(NaturalsBelow.top(n))
+       + e(NaturalsBelow.inclusion(n, i)) * y(NaturalsBelow.top(n))
+       + c * (e(NaturalsBelow.inclusion(n, i)) * e(NaturalsBelow.top(n)))
+           by substituting blockVanishes
+     = CommutativeRing.zero(r) + b(i) * e(NaturalsBelow.top(n))
+       + e(NaturalsBelow.inclusion(n, i)) * y(NaturalsBelow.top(n))
+       + c * (e(NaturalsBelow.inclusion(n, i)) * e(NaturalsBelow.top(n)))
+           by substituting yReads
+     = CommutativeRing.zero(r) + b(i) * e(NaturalsBelow.top(n))
+       + e(NaturalsBelow.inclusion(n, i)) * CommutativeRing.zero(r)
+       + c * (e(NaturalsBelow.inclusion(n, i)) * e(NaturalsBelow.top(n)))
+           by substituting yVanishes
+     = CommutativeRing.zero(r) + b(i) * e(NaturalsBelow.top(n))
+       + CommutativeRing.zero(r) * CommutativeRing.zero(r)
+       + c * (CommutativeRing.zero(r) * e(NaturalsBelow.top(n)))
+           by substituting eVanishes
+     = CommutativeRing.zero(r) + b(i) * CommutativeRing.one(r)
+       + CommutativeRing.zero(r) * CommutativeRing.zero(r)
+       + c * (CommutativeRing.zero(r) * CommutativeRing.one(r))
+           by substituting eReads
+     = b(i)
+           by ring;
+  done
+}
+
+theorem Matrix.borderedAssembly_borderColumn {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (b : RingVector(r, n))
+        (c : CommutativeRing.carrier(r))
+        : Matrix.borderColumn(Matrix.borderedAssembly(A, b, c)) = b := {
+  ∀ (i : NaturalsBelow(n)).
+      Matrix.borderColumn(Matrix.borderedAssembly(A, b, c))(i) = b(i)
+      by (i : NaturalsBelow(n)) ↦ {
+          done by Matrix.borderedAssembly_border_entry
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+theorem Matrix.borderedAssembly_border_row_entry {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (b : RingVector(r, n))
+        (c : CommutativeRing.carrier(r)) (i : NaturalsBelow(n))
+        : Matrix.borderedAssembly(A, b, c)(
+              NaturalsBelow.top(n), NaturalsBelow.inclusion(n, i))
+          = b(i) := {
+  let J : Matrix(r, 1 + n, n) :=
+      Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n));
+  let y : RingVector(r, 1 + n) := RingVector.extend(b);
+  let e : RingVector(r, 1 + n) :=
+      Matrix.standardBasisRow(r, 1 + n, NaturalsBelow.top(n));
+  (J * A * Jᵀ)(NaturalsBelow.top(n), NaturalsBelow.inclusion(n, i))
+      = CommutativeRing.zero(r)
+      by Matrix.leadingBlockEmbedding_row_off as blockVanishes;
+  y(NaturalsBelow.inclusion(n, i)) = b(i)
+      by RingVector.extend_inclusion as yReads;
+  y(NaturalsBelow.top(n)) = CommutativeRing.zero(r)
+      by RingVector.extend_top as yVanishes;
+  ¬(NaturalsBelow.top(n) = NaturalsBelow.inclusion(n, i))
+      by NaturalsBelow.top_not_inclusion;
+  e(NaturalsBelow.inclusion(n, i)) = CommutativeRing.zero(r)
+      by Matrix.standardBasisRow_off as eVanishes;
+  e(NaturalsBelow.top(n)) = CommutativeRing.one(r)
+      by Matrix.standardBasisRow_at as eReads;
+  Matrix.borderedAssembly(A, b, c)(
+      NaturalsBelow.top(n), NaturalsBelow.inclusion(n, i))
+     = (J * A * Jᵀ)(NaturalsBelow.top(n), NaturalsBelow.inclusion(n, i))
+       + y(NaturalsBelow.top(n)) * e(NaturalsBelow.inclusion(n, i))
+       + e(NaturalsBelow.top(n)) * y(NaturalsBelow.inclusion(n, i))
+       + c * (e(NaturalsBelow.top(n)) * e(NaturalsBelow.inclusion(n, i)))
+  as assemblyReads;
+  Matrix.borderedAssembly(A, b, c)(
+      NaturalsBelow.top(n), NaturalsBelow.inclusion(n, i))
+     = (J * A * Jᵀ)(NaturalsBelow.top(n), NaturalsBelow.inclusion(n, i))
+       + y(NaturalsBelow.top(n)) * e(NaturalsBelow.inclusion(n, i))
+       + e(NaturalsBelow.top(n)) * y(NaturalsBelow.inclusion(n, i))
+       + c * (e(NaturalsBelow.top(n)) * e(NaturalsBelow.inclusion(n, i)))
+           by assemblyReads
+     = CommutativeRing.zero(r)
+       + y(NaturalsBelow.top(n)) * e(NaturalsBelow.inclusion(n, i))
+       + e(NaturalsBelow.top(n)) * y(NaturalsBelow.inclusion(n, i))
+       + c * (e(NaturalsBelow.top(n)) * e(NaturalsBelow.inclusion(n, i)))
+           by substituting blockVanishes
+     = CommutativeRing.zero(r)
+       + CommutativeRing.zero(r) * e(NaturalsBelow.inclusion(n, i))
+       + e(NaturalsBelow.top(n)) * y(NaturalsBelow.inclusion(n, i))
+       + c * (e(NaturalsBelow.top(n)) * e(NaturalsBelow.inclusion(n, i)))
+           by substituting yVanishes
+     = CommutativeRing.zero(r)
+       + CommutativeRing.zero(r) * e(NaturalsBelow.inclusion(n, i))
+       + e(NaturalsBelow.top(n)) * b(i)
+       + c * (e(NaturalsBelow.top(n)) * e(NaturalsBelow.inclusion(n, i)))
+           by substituting yReads
+     = CommutativeRing.zero(r)
+       + CommutativeRing.zero(r) * CommutativeRing.zero(r)
+       + e(NaturalsBelow.top(n)) * b(i)
+       + c * (e(NaturalsBelow.top(n)) * CommutativeRing.zero(r))
+           by substituting eVanishes
+     = CommutativeRing.zero(r)
+       + CommutativeRing.zero(r) * CommutativeRing.zero(r)
+       + CommutativeRing.one(r) * b(i)
+       + c * (CommutativeRing.one(r) * CommutativeRing.zero(r))
+           by substituting eReads
+     = b(i)
+           by ring;
+  done
+}
+
+theorem Matrix.borderedAssembly_corner {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (b : RingVector(r, n))
+        (c : CommutativeRing.carrier(r))
+        : Matrix.corner(Matrix.borderedAssembly(A, b, c)) = c := {
+  let J : Matrix(r, 1 + n, n) :=
+      Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n));
+  let y : RingVector(r, 1 + n) := RingVector.extend(b);
+  let e : RingVector(r, 1 + n) :=
+      Matrix.standardBasisRow(r, 1 + n, NaturalsBelow.top(n));
+  (J * A * Jᵀ)(NaturalsBelow.top(n), NaturalsBelow.top(n))
+      = CommutativeRing.zero(r)
+      by Matrix.leadingBlockEmbedding_column_off as blockVanishes;
+  y(NaturalsBelow.top(n)) = CommutativeRing.zero(r)
+      by RingVector.extend_top as yVanishes;
+  e(NaturalsBelow.top(n)) = CommutativeRing.one(r)
+      by Matrix.standardBasisRow_at as eReads;
+  Matrix.corner(Matrix.borderedAssembly(A, b, c))
+     = (J * A * Jᵀ)(NaturalsBelow.top(n), NaturalsBelow.top(n))
+       + y(NaturalsBelow.top(n)) * e(NaturalsBelow.top(n))
+       + e(NaturalsBelow.top(n)) * y(NaturalsBelow.top(n))
+       + c * (e(NaturalsBelow.top(n)) * e(NaturalsBelow.top(n)))
+  as assemblyReads;
+  Matrix.corner(Matrix.borderedAssembly(A, b, c))
+     = (J * A * Jᵀ)(NaturalsBelow.top(n), NaturalsBelow.top(n))
+       + y(NaturalsBelow.top(n)) * e(NaturalsBelow.top(n))
+       + e(NaturalsBelow.top(n)) * y(NaturalsBelow.top(n))
+       + c * (e(NaturalsBelow.top(n)) * e(NaturalsBelow.top(n)))
+           by assemblyReads
+     = CommutativeRing.zero(r)
+       + y(NaturalsBelow.top(n)) * e(NaturalsBelow.top(n))
+       + e(NaturalsBelow.top(n)) * y(NaturalsBelow.top(n))
+       + c * (e(NaturalsBelow.top(n)) * e(NaturalsBelow.top(n)))
+           by substituting blockVanishes
+     = CommutativeRing.zero(r)
+       + CommutativeRing.zero(r) * e(NaturalsBelow.top(n))
+       + e(NaturalsBelow.top(n)) * CommutativeRing.zero(r)
+       + c * (e(NaturalsBelow.top(n)) * e(NaturalsBelow.top(n)))
+           by substituting yVanishes
+     = CommutativeRing.zero(r)
+       + CommutativeRing.zero(r) * CommutativeRing.one(r)
+       + CommutativeRing.one(r) * CommutativeRing.zero(r)
+       + c * (CommutativeRing.one(r) * CommutativeRing.one(r))
+           by substituting eReads
+     = c
+           by ring;
+  done
+}
+
+theorem Matrix.entry_equal_of_both_top {r : CommutativeRing} {n : ℕ}
+        (B C : Matrix(r, 1 + n, 1 + n))
+        (p q : NaturalsBelow(1 + n))
+        (pTop : p = NaturalsBelow.top(n))
+        (qTop : q = NaturalsBelow.top(n))
+        (cornersEqual : Matrix.corner(B) = Matrix.corner(C))
+        : B(p, q) = C(p, q) := {
+  B(p, q)
+     = B(NaturalsBelow.top(n), q)
+           by substituting pTop
+     = B(NaturalsBelow.top(n), NaturalsBelow.top(n))
+           by substituting qTop
+     = Matrix.corner(B)
+     = Matrix.corner(C)
+           by cornersEqual
+     = C(NaturalsBelow.top(n), NaturalsBelow.top(n))
+     = C(p, NaturalsBelow.top(n))
+           by substituting pTop
+     = C(p, q)
+           by substituting qTop
+  as entryReads;
+  done by entryReads
+}
+
+theorem Matrix.borderedAssembly_symmetric {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (b : RingVector(r, n))
+        (c : CommutativeRing.carrier(r)) (symmetric : Matrix.IsSymmetric(A))
+        : Matrix.IsSymmetric(Matrix.borderedAssembly(A, b, c)) := {
+  Aᵀ = A by symmetric as blockSymmetric;
+  ∀ (p : NaturalsBelow(1 + n)). ∀ (q : NaturalsBelow(1 + n)).
+      Matrix.borderedAssembly(A, b, c)ᵀ(p, q)
+        = Matrix.borderedAssembly(A, b, c)(p, q)
+      by (p : NaturalsBelow(1 + n)) (q : NaturalsBelow(1 + n)) ↦ {
+          (∃ (i : NaturalsBelow(n)). p = NaturalsBelow.inclusion(n, i))
+              ∨ p = NaturalsBelow.top(n)
+              by NaturalsBelow.inclusion_or_top;
+          done by cases {
+            case ∃ (i : NaturalsBelow(n)).
+                p = NaturalsBelow.inclusion(n, i): {
+                choose i such that p = NaturalsBelow.inclusion(n, i);
+                (∃ (j : NaturalsBelow(n)).
+                    q = NaturalsBelow.inclusion(n, j))
+                    ∨ q = NaturalsBelow.top(n)
+                    by NaturalsBelow.inclusion_or_top;
+                done by cases {
+                  case ∃ (j : NaturalsBelow(n)).
+                      q = NaturalsBelow.inclusion(n, j): {
+                      choose j such that q = NaturalsBelow.inclusion(n, j);
+                      A(j, i)
+                         = Aᵀ(i, j)
+                         = A(i, j) by substituting blockSymmetric
+                      as blockEntriesSwap;
+                      Matrix.borderedAssembly(A, b, c)ᵀ(p, q)
+                         = Matrix.borderedAssembly(A, b, c)(q, p)
+                         = Matrix.borderedAssembly(A, b, c)(
+                               NaturalsBelow.inclusion(n, j),
+                               NaturalsBelow.inclusion(n, i))
+                         = A(j, i)
+                               by Matrix.borderedAssembly_block_entry
+                         = A(i, j)
+                               by blockEntriesSwap
+                         = Matrix.borderedAssembly(A, b, c)(
+                               NaturalsBelow.inclusion(n, i),
+                               NaturalsBelow.inclusion(n, j))
+                               by Matrix.borderedAssembly_block_entry
+                         = Matrix.borderedAssembly(A, b, c)(p, q);
+                      done
+                    }
+                  case q = NaturalsBelow.top(n): {
+                      Matrix.borderedAssembly(A, b, c)ᵀ(p, q)
+                         = Matrix.borderedAssembly(A, b, c)(q, p)
+                         = Matrix.borderedAssembly(A, b, c)(
+                               NaturalsBelow.top(n),
+                               NaturalsBelow.inclusion(n, i))
+                         = b(i)
+                               by Matrix.borderedAssembly_border_row_entry
+                         = Matrix.borderedAssembly(A, b, c)(
+                               NaturalsBelow.inclusion(n, i),
+                               NaturalsBelow.top(n))
+                               by Matrix.borderedAssembly_border_entry
+                         = Matrix.borderedAssembly(A, b, c)(p, q);
+                      done
+                    }
+                }
+              }
+            case p = NaturalsBelow.top(n) as pTop: {
+                (∃ (j : NaturalsBelow(n)).
+                    q = NaturalsBelow.inclusion(n, j))
+                    ∨ q = NaturalsBelow.top(n)
+                    by NaturalsBelow.inclusion_or_top;
+                done by cases {
+                  case ∃ (j : NaturalsBelow(n)).
+                      q = NaturalsBelow.inclusion(n, j): {
+                      choose j such that q = NaturalsBelow.inclusion(n, j);
+                      Matrix.borderedAssembly(A, b, c)ᵀ(p, q)
+                         = Matrix.borderedAssembly(A, b, c)(q, p)
+                         = Matrix.borderedAssembly(A, b, c)(
+                               NaturalsBelow.inclusion(n, j),
+                               NaturalsBelow.top(n))
+                         = b(j)
+                               by Matrix.borderedAssembly_border_entry
+                         = Matrix.borderedAssembly(A, b, c)(
+                               NaturalsBelow.top(n),
+                               NaturalsBelow.inclusion(n, j))
+                               by Matrix.borderedAssembly_border_row_entry
+                         = Matrix.borderedAssembly(A, b, c)(p, q);
+                      done
+                    }
+                  case q = NaturalsBelow.top(n) as qTop: {
+                      Matrix.borderedAssembly(A, b, c)ᵀ(p, q)
+                         = Matrix.borderedAssembly(A, b, c)(q, p)
+                         = Matrix.borderedAssembly(A, b, c)(
+                               NaturalsBelow.top(n), p)
+                               by substituting qTop
+                         = Matrix.borderedAssembly(A, b, c)(
+                               NaturalsBelow.top(n), NaturalsBelow.top(n))
+                               by substituting pTop
+                         = Matrix.corner(Matrix.borderedAssembly(A, b, c))
+                         = c by Matrix.borderedAssembly_corner
+                         = Matrix.corner(Matrix.borderedAssembly(A, b, c))
+                               by Matrix.borderedAssembly_corner
+                         = Matrix.borderedAssembly(A, b, c)(
+                               NaturalsBelow.top(n), NaturalsBelow.top(n))
+                         = Matrix.borderedAssembly(A, b, c)(
+                               p, NaturalsBelow.top(n))
+                               by substituting pTop
+                         = Matrix.borderedAssembly(A, b, c)(p, q)
+                               by substituting qTop;
+                      done
+                    }
+                }
+              }
+          }
+        };
+  done by Matrix.equal_of_entries
+}
+
+-- A symmetric matrix is determined by precisely these three faces.
+theorem Matrix.symmetric_eq_borderedAssembly {r : CommutativeRing} {n : ℕ}
+        (B : Matrix(r, 1 + n, 1 + n)) (symmetric : Matrix.IsSymmetric(B))
+        : B = Matrix.borderedAssembly(
+              Matrix.leadingBlock(B), Matrix.borderColumn(B), Matrix.corner(B)) := {
+  Bᵀ = B by symmetric as matrixSymmetric;
+  ∀ (p : NaturalsBelow(1 + n)). ∀ (q : NaturalsBelow(1 + n)).
+      B(p, q)
+        = Matrix.borderedAssembly(
+            Matrix.leadingBlock(B), Matrix.borderColumn(B), Matrix.corner(B))(p, q)
+      by (p : NaturalsBelow(1 + n)) (q : NaturalsBelow(1 + n)) ↦ {
+          (∃ (i : NaturalsBelow(n)). p = NaturalsBelow.inclusion(n, i))
+              ∨ p = NaturalsBelow.top(n)
+              by NaturalsBelow.inclusion_or_top;
+          done by cases {
+            case ∃ (i : NaturalsBelow(n)).
+                p = NaturalsBelow.inclusion(n, i): {
+                choose i such that p = NaturalsBelow.inclusion(n, i);
+                (∃ (j : NaturalsBelow(n)).
+                    q = NaturalsBelow.inclusion(n, j))
+                    ∨ q = NaturalsBelow.top(n)
+                    by NaturalsBelow.inclusion_or_top;
+                done by cases {
+                  case ∃ (j : NaturalsBelow(n)).
+                      q = NaturalsBelow.inclusion(n, j): {
+                      choose j such that q = NaturalsBelow.inclusion(n, j);
+                      B(p, q)
+                         = Matrix.leadingBlock(B)(i, j)
+                         = Matrix.borderedAssembly(
+                               Matrix.leadingBlock(B),
+                               Matrix.borderColumn(B),
+                               Matrix.corner(B))(
+                                 NaturalsBelow.inclusion(n, i),
+                                 NaturalsBelow.inclusion(n, j))
+                               by Matrix.borderedAssembly_block_entry
+                         = Matrix.borderedAssembly(
+                               Matrix.leadingBlock(B),
+                               Matrix.borderColumn(B),
+                               Matrix.corner(B))(p, q);
+                      done
+                    }
+                  case q = NaturalsBelow.top(n): {
+                      B(p, q)
+                         = Matrix.borderColumn(B)(i)
+                         = Matrix.borderedAssembly(
+                               Matrix.leadingBlock(B),
+                               Matrix.borderColumn(B),
+                               Matrix.corner(B))(
+                                 NaturalsBelow.inclusion(n, i),
+                                 NaturalsBelow.top(n))
+                               by Matrix.borderedAssembly_border_entry
+                         = Matrix.borderedAssembly(
+                               Matrix.leadingBlock(B),
+                               Matrix.borderColumn(B),
+                               Matrix.corner(B))(p, q);
+                      done
+                    }
+                }
+              }
+            case p = NaturalsBelow.top(n) as pTop: {
+                (∃ (j : NaturalsBelow(n)).
+                    q = NaturalsBelow.inclusion(n, j))
+                    ∨ q = NaturalsBelow.top(n)
+                    by NaturalsBelow.inclusion_or_top;
+                done by cases {
+                  case ∃ (j : NaturalsBelow(n)).
+                      q = NaturalsBelow.inclusion(n, j): {
+                      choose j such that q = NaturalsBelow.inclusion(n, j);
+                      B(NaturalsBelow.top(n), NaturalsBelow.inclusion(n, j))
+                         = Bᵀ(NaturalsBelow.top(n), NaturalsBelow.inclusion(n, j))
+                               by substituting matrixSymmetric
+                         = B(NaturalsBelow.inclusion(n, j), NaturalsBelow.top(n))
+                         = Matrix.borderColumn(B)(j)
+                      as rowReads;
+                      B(p, q)
+                         = Matrix.borderColumn(B)(j)
+                               by rowReads
+                         = Matrix.borderedAssembly(
+                               Matrix.leadingBlock(B),
+                               Matrix.borderColumn(B),
+                               Matrix.corner(B))(
+                                 NaturalsBelow.top(n),
+                                 NaturalsBelow.inclusion(n, j))
+                               by Matrix.borderedAssembly_border_row_entry
+                         = Matrix.borderedAssembly(
+                               Matrix.leadingBlock(B),
+                               Matrix.borderColumn(B),
+                               Matrix.corner(B))(p, q);
+                      done
+                    }
+                  case q = NaturalsBelow.top(n) as qTop: {
+                      Matrix.corner(B)
+                         = Matrix.corner(Matrix.borderedAssembly(
+                               Matrix.leadingBlock(B),
+                               Matrix.borderColumn(B),
+                               Matrix.corner(B)))
+                               by Matrix.borderedAssembly_corner;
+                      done by Matrix.entry_equal_of_both_top
+                    }
+                }
+              }
+          }
+        };
+  done by Matrix.equal_of_entries
+}
+
+-- ----------------------------------------------------------------------
 -- An escalation of A: a symmetric positive-definite bordered extension
 -- whose corner — the norm of the new basis vector — is the truant of A.
 -- (A universal form has no escalations: its junk truant 0 cannot be a
@@ -125,6 +744,29 @@ theorem Matrix.IsEscalation.corner_is_truant {n : ℕ}
   ∧ Matrix.IsPositiveDefinite(B)
   ∧ Matrix.leadingBlock(B) = A
   ∧ Matrix.corner(B) = (Matrix.truant(A) : ℤ) by escalation;
+  done
+}
+
+theorem Matrix.IsEscalation.eq_borderedAssembly {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n))
+        (escalation : Matrix.IsEscalation(A, B))
+        : B = Matrix.borderedAssembly(
+              A, Matrix.borderColumn(B), (Matrix.truant(A) : ℤ)) := {
+  Matrix.IsSymmetric(B) by Matrix.IsEscalation.symmetric;
+  Matrix.leadingBlock(B) = A by Matrix.IsEscalation.block as blockReads;
+  Matrix.corner(B) = (Matrix.truant(A) : ℤ)
+      by Matrix.IsEscalation.corner_is_truant as cornerReads;
+  B
+     = Matrix.borderedAssembly(
+           Matrix.leadingBlock(B), Matrix.borderColumn(B), Matrix.corner(B))
+           by Matrix.symmetric_eq_borderedAssembly
+     = Matrix.borderedAssembly(
+           A, Matrix.borderColumn(B), Matrix.corner(B))
+           by substituting blockReads
+     = Matrix.borderedAssembly(
+           A, Matrix.borderColumn(B), (Matrix.truant(A) : ℤ))
+           by substituting cornerReads;
   done
 }
 

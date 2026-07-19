@@ -1,8 +1,9 @@
 # Quadratic forms and the Fifteen Theorem
 
 This development formalizes the escalation route toward the Fifteen Theorem.
-The final theorem and the rank-three/rank-four classification are not yet
-proved; the foundations and the escalator tree through rank two are.
+The final theorem and the deduplicated rank-three/rank-four classifications
+are not yet proved; the foundations and the raw rank-three candidate family
+are.
 
 ## Main definitions
 
@@ -21,6 +22,8 @@ proved; the foundations and the escalator tree through rank two are.
   harmless fallback value zero.
 - An extension by the parent's truant: `Matrix.IsEscalation`; a form reachable
   from the empty form by repeated extensions: `Matrix.IsEscalator`.
+- Canonical bordered matrices: `Matrix.borderedAssembly(A, b, c)`, with
+  `Matrix.IsEscalation.eq_borderedAssembly` reconstructing every escalation.
 
 ## Main theorems
 
@@ -50,6 +53,20 @@ proved; the foundations and the escalator tree through rank two are.
   two up to isometry as \(x^2+y^2\) or \(x^2+2y^2\). Their truants are
   respectively 3 and 5 (`Matrix.sumOfTwoSquaresForm_truant` and
   `Matrix.squarePlusDoubleSquareForm_truant`).
+- Rank-three search boxes:
+  `Matrix.sumOfTwoSquares_escalation_border_values` confines each border
+  coordinate to \(\{-1,0,1\}\);
+  `Matrix.squarePlusDoubleSquare_escalation_first_border_values` and
+  `Matrix.squarePlusDoubleSquare_escalation_second_border_values` give
+  the raw box \(\{-2,\ldots,2\}\times\{-3,\ldots,3\}\). The coupled theorem
+  `Matrix.squarePlusDoubleSquare_escalation_coupled_border_bound` sharpens
+  this to \(2a^2+b^2<10\), and
+  `Matrix.squarePlusDoubleSquare_escalation_border_pairs` groups the exactly
+  23 surviving pairs into the \(a=0\), \(a=\pm1\), and \(a=\pm2\) bands.
+  `Matrix.sumOfTwoSquares_escalation_nine_candidates` and
+  `Matrix.squarePlusDoubleSquare_escalation_twenty_three_candidates` then
+  turn the 9 + 23 coordinate pairs into canonical bordered matrices. Isometry
+  deduplication of those 32 raw matrices remains.
 
 ## Module path
 
@@ -57,5 +74,5 @@ Read `quadratic_form` → `integer_quadratic_form` first. Then use
 `matrix_direct_sum`, `schur_complement`/`sylvester`, and
 `representation_bound` as needed. The escalation spine is
 `square_form` → `truant` → `escalation` → `rank_two_escalators` →
-`rank_two_truants` → `escalator_tree`. `PLAN_15_THEOREM.md` records
-unfinished stages.
+`rank_two_truants` → `rank_three_escalation_bounds` → `escalator_tree`.
+`PLAN_15_THEOREM.md` records unfinished stages.

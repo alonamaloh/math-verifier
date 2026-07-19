@@ -255,6 +255,9 @@ CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
 # file is leak-free.
 # 2026-07-19: 397 → 397. rank_two_truants manifest-added at ZERO counted
 # leaks; exact truants 3 and 5 now feed the rank-3 escalation enumeration.
+# 2026-07-19: 397 → 397. rank_three_escalation_bounds manifest-added at
+# ZERO counted leaks; the rank-3 boxes, coupled 23-pair bound, and all 32
+# canonical bordered candidates are explicit.
 CLEAN_LEAK_BUDGET ?= 397
 # Second, independent axis: user-written `⟨…⟩` over a logical connective
 # (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the

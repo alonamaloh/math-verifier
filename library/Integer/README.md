@@ -28,8 +28,8 @@ than `IntegerRepresentative`.
 - Positive-factor cancellation:
   `Integer.cancel_le_by_positive` and `Integer.cancel_lt_by_positive`
 - `Integer.divide_balanced` for nearest/balanced quotient and remainder
-- `Integer.sum_of_squares_zero` and `Integer.square_as_natural_square`
-  (every integer square is the cast of a natural square)
+- `Integer.sum_of_squares_zero`, `Integer.square_as_natural_square`,
+  and `Integer.square_below_three`/`_five`/`_eight`/`_ten`
 
 `Integer.absolute_value` is implemented from `Natural.distance`; the
 natural-valued form is the norm used by Euclidean and divisibility arguments.

@@ -1,0 +1,922 @@
+-- Algebra/rank_three_escalation_bounds.math
+--
+-- The explicit finite boxes for rank-3 escalation (fifteen-theorem stage
+-- S3.E4). Above x²+y², whose truant is 3, both border entries lie in
+-- {-1,0,1}. Above x²+2y², whose truant is 5, the first border entry lies
+-- in {-2,...,2} and the second in {-3,...,3}; positive-definiteness couples
+-- them by 2a²+b²<10, leaving exactly 23 pairs. Together with the 9 pairs
+-- above x²+y², these are the finite families that the rank-3 enumerator
+-- must generate and deduplicate.
+
+module Algebra.rank_three_escalation_bounds
+
+import Logic.basics
+import Logic.functions
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+import Natural.add_order
+import Natural.multiply_bounds
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.embedding
+import Integer.order
+import Integer.order_multiply
+import Integer.sign
+import Integer.integral_domain
+import Integer.sum_of_squares
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.matrix_vector
+import Algebra.matrix_submatrix
+import Algebra.matrix_direct_sum
+import Algebra.quadratic_form
+import Algebra.integer_quadratic_form
+import Algebra.square_form
+import Algebra.schur_complement
+import Algebra.truant
+import Algebra.escalation
+import Algebra.rank_two_escalators
+import Algebra.rank_two_truants
+
+-- A concrete two-coordinate vector, used to turn the coordinate bounds
+-- below into actual bordered matrices.
+definition RingVector.twoCoordinates {r : CommutativeRing}
+        (a b : CommutativeRing.carrier(r)) : RingVector(r, 2) :=
+  a • Matrix.standardBasisRow(r, 2, NaturalsBelow.firstOfTwo)
+    + b • Matrix.standardBasisRow(r, 2, NaturalsBelow.secondOfTwo)
+
+theorem RingVector.twoCoordinates_first {r : CommutativeRing}
+        (a b : CommutativeRing.carrier(r))
+        : RingVector.twoCoordinates(a, b)(NaturalsBelow.firstOfTwo) = a := {
+  let firstBasis : RingVector(r, 2) :=
+      Matrix.standardBasisRow(r, 2, NaturalsBelow.firstOfTwo);
+  let secondBasis : RingVector(r, 2) :=
+      Matrix.standardBasisRow(r, 2, NaturalsBelow.secondOfTwo);
+  firstBasis(NaturalsBelow.firstOfTwo) = CommutativeRing.one(r)
+      by Matrix.standardBasisRow_at as firstReads;
+  ¬(NaturalsBelow.firstOfTwo = NaturalsBelow.secondOfTwo)
+      by NaturalsBelow.firstOfTwo_not_secondOfTwo;
+  secondBasis(NaturalsBelow.firstOfTwo) = CommutativeRing.zero(r)
+      by Matrix.standardBasisRow_off as secondVanishes;
+  RingVector.twoCoordinates(a, b)(NaturalsBelow.firstOfTwo)
+     = a * firstBasis(NaturalsBelow.firstOfTwo)
+       + b * secondBasis(NaturalsBelow.firstOfTwo)
+     = a * CommutativeRing.one(r)
+       + b * secondBasis(NaturalsBelow.firstOfTwo)
+           by substituting firstReads
+     = a * CommutativeRing.one(r) + b * CommutativeRing.zero(r)
+           by substituting secondVanishes
+     = a
+           by ring
+  as valueReads;
+  done by valueReads
+}
+
+theorem RingVector.twoCoordinates_second {r : CommutativeRing}
+        (a b : CommutativeRing.carrier(r))
+        : RingVector.twoCoordinates(a, b)(NaturalsBelow.secondOfTwo) = b := {
+  let firstBasis : RingVector(r, 2) :=
+      Matrix.standardBasisRow(r, 2, NaturalsBelow.firstOfTwo);
+  let secondBasis : RingVector(r, 2) :=
+      Matrix.standardBasisRow(r, 2, NaturalsBelow.secondOfTwo);
+  ¬(NaturalsBelow.secondOfTwo = NaturalsBelow.firstOfTwo) by {
+      suppose NaturalsBelow.secondOfTwo = NaturalsBelow.firstOfTwo;
+      done by NaturalsBelow.firstOfTwo_not_secondOfTwo
+    };
+  firstBasis(NaturalsBelow.secondOfTwo) = CommutativeRing.zero(r)
+      by Matrix.standardBasisRow_off as firstVanishes;
+  secondBasis(NaturalsBelow.secondOfTwo) = CommutativeRing.one(r)
+      by Matrix.standardBasisRow_at as secondReads;
+  RingVector.twoCoordinates(a, b)(NaturalsBelow.secondOfTwo)
+     = a * firstBasis(NaturalsBelow.secondOfTwo)
+       + b * secondBasis(NaturalsBelow.secondOfTwo)
+     = a * CommutativeRing.zero(r)
+       + b * secondBasis(NaturalsBelow.secondOfTwo)
+           by substituting firstVanishes
+     = a * CommutativeRing.zero(r) + b * CommutativeRing.one(r)
+           by substituting secondReads
+     = b
+           by ring
+  as valueReads;
+  done by valueReads
+}
+
+theorem RingVector.eq_twoCoordinates {r : CommutativeRing}
+        (z : RingVector(r, 2))
+        : z = RingVector.twoCoordinates(
+              z(NaturalsBelow.firstOfTwo), z(NaturalsBelow.secondOfTwo)) := {
+  ∀ (i : NaturalsBelow(2)).
+      z(i) = RingVector.twoCoordinates(
+          z(NaturalsBelow.firstOfTwo), z(NaturalsBelow.secondOfTwo))(i)
+      by (i : NaturalsBelow(2)) ↦ {
+          i = NaturalsBelow.firstOfTwo ∨ i = NaturalsBelow.secondOfTwo
+              by NaturalsBelow.two_split;
+          done by cases {
+            case i = NaturalsBelow.firstOfTwo:
+                done by RingVector.twoCoordinates_first
+            case i = NaturalsBelow.secondOfTwo:
+                done by RingVector.twoCoordinates_second
+          }
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+-- The two-coordinate pairing, in the named order used by the rank-2
+-- escalators. The canonical enumeration runs top-first, so the final
+-- ring step restores the mathematical first-then-second presentation.
+theorem RingVector.innerProduct_two {r : CommutativeRing}
+        (u v : RingVector(r, 2))
+        : RingVector.innerProduct(u, v)
+          = u(NaturalsBelow.firstOfTwo) * v(NaturalsBelow.firstOfTwo)
+            + u(NaturalsBelow.secondOfTwo) * v(NaturalsBelow.secondOfTwo) := {
+  let term : NaturalsBelow(2) → CommutativeRing.carrier(r) :=
+      (i : NaturalsBelow(2)) ↦ u(i) * v(i);
+  NaturalsBelow.enumerate(1)
+     = List.prepend(NaturalsBelow(1), NaturalsBelow.top(0),
+           List.map(NaturalsBelow.inclusion(0), NaturalsBelow.enumerate(0)))
+           by NaturalsBelow.enumerate_one_plus
+     = List.prepend(NaturalsBelow(1), NaturalsBelow.top(0),
+           List.empty(NaturalsBelow(1)))
+  as enumerateOne;
+  List.map(NaturalsBelow.inclusion(1), NaturalsBelow.enumerate(1))
+     = List.map(NaturalsBelow.inclusion(1),
+           List.prepend(NaturalsBelow(1), NaturalsBelow.top(0),
+             List.empty(NaturalsBelow(1))))
+           by substituting enumerateOne
+     = List.prepend(NaturalsBelow(2),
+           NaturalsBelow.inclusion(1, NaturalsBelow.top(0)),
+           List.empty(NaturalsBelow(2)))
+     = List.prepend(NaturalsBelow(2),
+           NaturalsBelow.firstOfTwo, List.empty(NaturalsBelow(2)))
+           by substituting NaturalsBelow.firstOfTwo_is_inclusion
+  as mappedOne;
+  NaturalsBelow.enumerate(2)
+     = List.prepend(NaturalsBelow(2), NaturalsBelow.top(1),
+           List.map(NaturalsBelow.inclusion(1), NaturalsBelow.enumerate(1)))
+           by NaturalsBelow.enumerate_one_plus
+     = List.prepend(NaturalsBelow(2), NaturalsBelow.secondOfTwo,
+           List.map(NaturalsBelow.inclusion(1), NaturalsBelow.enumerate(1)))
+           by substituting NaturalsBelow.secondOfTwo_is_top
+     = List.prepend(NaturalsBelow(2), NaturalsBelow.secondOfTwo,
+           List.prepend(NaturalsBelow(2),
+             NaturalsBelow.firstOfTwo, List.empty(NaturalsBelow(2))))
+           by substituting mappedOne
+  as enumerateTwo;
+  CommutativeRing.sumOver(term, List.empty(NaturalsBelow(2)))
+      = CommutativeRing.zero(r) by CommutativeRing.sumOver_empty as emptySum;
+  term(NaturalsBelow.firstOfTwo)
+      = u(NaturalsBelow.firstOfTwo) * v(NaturalsBelow.firstOfTwo) as firstTerm;
+  RingVector.innerProduct(u, v)
+     = CommutativeRing.sumOver(term, NaturalsBelow.enumerate(2))
+     = CommutativeRing.sumOver(term,
+           List.prepend(NaturalsBelow(2), NaturalsBelow.secondOfTwo,
+             List.prepend(NaturalsBelow(2),
+               NaturalsBelow.firstOfTwo, List.empty(NaturalsBelow(2)))))
+           by substituting enumerateTwo
+     = term(NaturalsBelow.secondOfTwo)
+       + CommutativeRing.sumOver(term,
+           List.prepend(NaturalsBelow(2),
+             NaturalsBelow.firstOfTwo, List.empty(NaturalsBelow(2))))
+     = term(NaturalsBelow.secondOfTwo)
+       + (term(NaturalsBelow.firstOfTwo)
+          + CommutativeRing.sumOver(term, List.empty(NaturalsBelow(2))))
+     = term(NaturalsBelow.secondOfTwo)
+       + (term(NaturalsBelow.firstOfTwo) + CommutativeRing.zero(r))
+           by substituting emptySum
+     = u(NaturalsBelow.firstOfTwo) * v(NaturalsBelow.firstOfTwo)
+       + u(NaturalsBelow.secondOfTwo) * v(NaturalsBelow.secondOfTwo)
+           by substituting firstTerm;
+  done
+}
+
+-- The coordinate formula for the second rank-2 parent.
+theorem Matrix.squarePlusDoubleSquareForm_value
+        (z : RingVector(Integer.commutative_ring_bundle, 2))
+        : Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm, z)
+          = z(NaturalsBelow.firstOfTwo) * z(NaturalsBelow.firstOfTwo)
+            + (2 : ℤ) * (z(NaturalsBelow.secondOfTwo) * z(NaturalsBelow.secondOfTwo)) := {
+  let u : RingVector(Integer.commutative_ring_bundle, 1) :=
+      (RingVector.restrictLeft :
+          RingVector(Integer.commutative_ring_bundle, 1 + 1)
+          → RingVector(Integer.commutative_ring_bundle, 1))(z);
+  let v : RingVector(Integer.commutative_ring_bundle, 1) :=
+      (RingVector.restrictRight :
+          RingVector(Integer.commutative_ring_bundle, 1 + 1)
+          → RingVector(Integer.commutative_ring_bundle, 1))(z);
+  z = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1) · u
+      + Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1) · v
+      by RingVector.directSum_decomposition as decomposition;
+  RingVector.coordinate(u)
+     = z(NaturalsBelow.sumLeft(1, 1, NaturalsBelow.top(0)))
+     = z(NaturalsBelow.firstOfTwo)
+  as firstCoordinate;
+  RingVector.coordinate(v)
+     = z(NaturalsBelow.shift(1, NaturalsBelow.top(0)))
+     = z(NaturalsBelow.secondOfTwo)
+  as secondCoordinate;
+  Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm, z)
+     = Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm,
+           Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1) · u
+           + Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1) · v)
+           by substituting decomposition
+     = Matrix.quadraticForm(Matrix.squareForm, u)
+       + Matrix.quadraticForm((2 : ℤ) • Matrix.squareForm, v)
+           by Matrix.directSum_quadraticForm
+     = RingVector.coordinate(u) * RingVector.coordinate(u)
+       + Matrix.quadraticForm((2 : ℤ) • Matrix.squareForm, v)
+           by substituting Matrix.squareForm_value
+     = RingVector.coordinate(u) * RingVector.coordinate(u)
+       + (2 : ℤ) * Matrix.quadraticForm(Matrix.squareForm, v)
+           by substituting Matrix.quadraticForm_scale_matrix
+     = RingVector.coordinate(u) * RingVector.coordinate(u)
+       + (2 : ℤ) * (RingVector.coordinate(v) * RingVector.coordinate(v))
+           by substituting Matrix.squareForm_value
+     = z(NaturalsBelow.firstOfTwo) * z(NaturalsBelow.firstOfTwo)
+       + (2 : ℤ) * (RingVector.coordinate(v) * RingVector.coordinate(v))
+           by substituting firstCoordinate
+     = z(NaturalsBelow.firstOfTwo) * z(NaturalsBelow.firstOfTwo)
+       + (2 : ℤ) * (z(NaturalsBelow.secondOfTwo) * z(NaturalsBelow.secondOfTwo))
+           by substituting secondCoordinate;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The diagonal entries of the two rank-2 parents.
+
+theorem Matrix.sumOfTwoSquaresForm_diagonal (i : NaturalsBelow(2))
+        : Matrix.sumOfTwoSquaresForm(i, i) = (1 : ℤ) :=
+  Matrix.sumOfTwoSquaresForm(i, i)
+     = Matrix.identity(Integer.commutative_ring_bundle, 2)(i, i)
+           by substituting Matrix.sumOfTwoSquaresForm_is_identity
+     = (1 : ℤ)
+           by Matrix.identity_entry_diagonal
+
+theorem Matrix.squarePlusDoubleSquareForm_first_diagonal
+        : Matrix.squarePlusDoubleSquareForm(
+              NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo) = (1 : ℤ) :=
+  Matrix.squarePlusDoubleSquareForm(
+      NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo)
+     = (Matrix.identity(Integer.commutative_ring_bundle, 2) + Matrix.lowerRightUnit)(
+           NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo)
+           by substituting Matrix.squarePlusDoubleSquareForm_splits
+     = Matrix.identity(Integer.commutative_ring_bundle, 2)(
+           NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo)
+       + Matrix.lowerRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo)
+     = (1 : ℤ) + Matrix.lowerRightUnit(NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo)
+           by substituting Matrix.identity_entry_diagonal
+     = (1 : ℤ)
+           by substituting Matrix.lowerRightUnit_column_vanishes
+
+theorem Matrix.squarePlusDoubleSquareForm_second_diagonal
+        : Matrix.squarePlusDoubleSquareForm(
+              NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo) = (2 : ℤ) :=
+  Matrix.squarePlusDoubleSquareForm(
+      NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo)
+     = (Matrix.identity(Integer.commutative_ring_bundle, 2) + Matrix.lowerRightUnit)(
+           NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo)
+           by substituting Matrix.squarePlusDoubleSquareForm_splits
+     = Matrix.identity(Integer.commutative_ring_bundle, 2)(
+           NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo)
+       + Matrix.lowerRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo)
+     = (1 : ℤ) + Matrix.lowerRightUnit(NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo)
+           by substituting Matrix.identity_entry_diagonal
+     = (2 : ℤ)
+           by substituting Matrix.lowerRightUnit_entry_unit
+
+definition Integer.IsTernaryBorderValue (a : ℤ) : Proposition :=
+  a = -(1 : ℤ) ∨ a = 0 ∨ a = 1
+
+-- The 23 pairs surviving 2a²+b²<10, grouped by |a|.
+definition Integer.IsSquarePlusDoubleSquareBorderPair (a b : ℤ) : Proposition :=
+  (a = 0
+      ∧ (b = -(3 : ℤ) ∨ b = -(2 : ℤ) ∨ b = -(1 : ℤ)
+         ∨ b = 0 ∨ b = 1 ∨ b = 2 ∨ b = 3))
+    ∨ ((a = -(1 : ℤ) ∨ a = 1)
+        ∧ (b = -(2 : ℤ) ∨ b = -(1 : ℤ) ∨ b = 0 ∨ b = 1 ∨ b = 2))
+    ∨ ((a = -(2 : ℤ) ∨ a = 2)
+        ∧ (b = -(1 : ℤ) ∨ b = 0 ∨ b = 1))
+
+-- ----------------------------------------------------------------------
+-- The matrix-facing box theorems.
+
+theorem Matrix.sumOfTwoSquares_escalation_border_square_bound
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2))
+        (escalation : Matrix.IsEscalation(Matrix.sumOfTwoSquaresForm, B))
+        (i : NaturalsBelow(2))
+        : Matrix.borderColumn(B)(i) * Matrix.borderColumn(B)(i) < (3 : ℤ) := {
+  (Matrix.truant(Matrix.sumOfTwoSquaresForm) : ℤ)
+      = 3 by substituting Matrix.sumOfTwoSquaresForm_truant as truantReads;
+  Matrix.borderColumn(B)(i) * Matrix.borderColumn(B)(i)
+     < Matrix.sumOfTwoSquaresForm(i, i)
+       * (Matrix.truant(Matrix.sumOfTwoSquaresForm) : ℤ);
+  Matrix.sumOfTwoSquaresForm(i, i) = (1 : ℤ) as diagonalReads;
+  Matrix.borderColumn(B)(i) * Matrix.borderColumn(B)(i)
+      < (1 : ℤ) * (Matrix.truant(Matrix.sumOfTwoSquaresForm) : ℤ)
+      by substituting diagonalReads;
+  done by substituting truantReads
+}
+
+theorem Matrix.sumOfTwoSquares_escalation_border_values
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2))
+        (escalation : Matrix.IsEscalation(Matrix.sumOfTwoSquaresForm, B))
+        (i : NaturalsBelow(2))
+        : Matrix.borderColumn(B)(i) = -(1 : ℤ)
+          ∨ Matrix.borderColumn(B)(i) = (0 : ℤ)
+          ∨ Matrix.borderColumn(B)(i) = (1 : ℤ) := {
+  Matrix.borderColumn(B)(i) * Matrix.borderColumn(B)(i) < (3 : ℤ)
+      by Matrix.sumOfTwoSquares_escalation_border_square_bound;
+  done by Integer.square_below_three
+}
+
+theorem Matrix.squarePlusDoubleSquare_escalation_first_border_square_bound
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2))
+        (escalation : Matrix.IsEscalation(Matrix.squarePlusDoubleSquareForm, B))
+        : Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo)
+            * Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo) < (5 : ℤ) := {
+  (Matrix.truant(Matrix.squarePlusDoubleSquareForm) : ℤ)
+      = 5 by substituting Matrix.squarePlusDoubleSquareForm_truant as truantReads;
+  Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo)
+      * Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo)
+     < Matrix.squarePlusDoubleSquareForm(
+           NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo)
+       * (Matrix.truant(Matrix.squarePlusDoubleSquareForm) : ℤ);
+  Matrix.squarePlusDoubleSquareForm(
+      NaturalsBelow.firstOfTwo, NaturalsBelow.firstOfTwo) = (1 : ℤ) as diagonalReads;
+  Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo)
+      * Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo)
+      < (1 : ℤ) * (Matrix.truant(Matrix.squarePlusDoubleSquareForm) : ℤ)
+      by substituting diagonalReads;
+  done by substituting truantReads
+}
+
+theorem Matrix.squarePlusDoubleSquare_escalation_first_border_values
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2))
+        (escalation : Matrix.IsEscalation(Matrix.squarePlusDoubleSquareForm, B))
+        : Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo) = -(2 : ℤ)
+          ∨ Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo) = -(1 : ℤ)
+          ∨ Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo) = (0 : ℤ)
+          ∨ Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo) = (1 : ℤ)
+          ∨ Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo) = (2 : ℤ) := {
+  Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo)
+      * Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo) < (5 : ℤ)
+      by Matrix.squarePlusDoubleSquare_escalation_first_border_square_bound;
+  done by Integer.square_below_five
+}
+
+theorem Matrix.squarePlusDoubleSquare_escalation_second_border_square_bound
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2))
+        (escalation : Matrix.IsEscalation(Matrix.squarePlusDoubleSquareForm, B))
+        : Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo)
+            * Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) < (10 : ℤ) := {
+  (Matrix.truant(Matrix.squarePlusDoubleSquareForm) : ℤ)
+      = 5 by substituting Matrix.squarePlusDoubleSquareForm_truant as truantReads;
+  Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo)
+      * Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo)
+     < Matrix.squarePlusDoubleSquareForm(
+           NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo)
+       * (Matrix.truant(Matrix.squarePlusDoubleSquareForm) : ℤ);
+  Matrix.squarePlusDoubleSquareForm(
+      NaturalsBelow.secondOfTwo, NaturalsBelow.secondOfTwo) = (2 : ℤ) as diagonalReads;
+  Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo)
+      * Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo)
+      < (2 : ℤ) * (Matrix.truant(Matrix.squarePlusDoubleSquareForm) : ℤ)
+      by substituting diagonalReads;
+  done by substituting truantReads
+}
+
+-- Positive-definiteness couples the two coordinate bounds. Evaluating the
+-- bordered form at (-2a,-b,2) gives
+--
+--     0 < 20 - 4a² - 2b² = 2(10 - (2a²+b²)).
+--
+-- This is the exact Schur-complement inequality without introducing the
+-- rank-2 adjugate explicitly.
+theorem Matrix.squarePlusDoubleSquare_escalation_coupled_border_bound
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2))
+        (escalation : Matrix.IsEscalation(Matrix.squarePlusDoubleSquareForm, B))
+        : (2 : ℤ)
+            * (Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo)
+               * Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo))
+          + Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo)
+            * Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo)
+          < (10 : ℤ) := {
+  let a : ℤ := Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo);
+  let b : ℤ := Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo);
+  let firstBasis : RingVector(Integer.commutative_ring_bundle, 2) :=
+      Matrix.standardBasisRow(
+          Integer.commutative_ring_bundle, 2, NaturalsBelow.firstOfTwo);
+  let secondBasis : RingVector(Integer.commutative_ring_bundle, 2) :=
+      Matrix.standardBasisRow(
+          Integer.commutative_ring_bundle, 2, NaturalsBelow.secondOfTwo);
+  let y : RingVector(Integer.commutative_ring_bundle, 2) :=
+      (-(2 : ℤ) * a) • firstBasis + (-b) • secondBasis;
+  let topBasis : RingVector(Integer.commutative_ring_bundle, 1 + 2) :=
+      Matrix.standardBasisRow(
+          Integer.commutative_ring_bundle, 1 + 2, NaturalsBelow.top(2));
+  let eliminatingVector : RingVector(Integer.commutative_ring_bundle, 1 + 2) :=
+      RingVector.extend(y) + (2 : ℤ) • topBasis;
+
+  ¬(NaturalsBelow.firstOfTwo = NaturalsBelow.secondOfTwo)
+      by NaturalsBelow.firstOfTwo_not_secondOfTwo;
+  ¬(NaturalsBelow.secondOfTwo = NaturalsBelow.firstOfTwo) by {
+      suppose NaturalsBelow.secondOfTwo = NaturalsBelow.firstOfTwo;
+      done
+    };
+  firstBasis(NaturalsBelow.firstOfTwo) = (1 : ℤ)
+      by Matrix.standardBasisRow_at as firstBasisAtFirst;
+  secondBasis(NaturalsBelow.firstOfTwo) = (0 : ℤ)
+      by Matrix.standardBasisRow_off as secondBasisAtFirst;
+  firstBasis(NaturalsBelow.secondOfTwo) = (0 : ℤ)
+      by Matrix.standardBasisRow_off as firstBasisAtSecond;
+  secondBasis(NaturalsBelow.secondOfTwo) = (1 : ℤ)
+      by Matrix.standardBasisRow_at as secondBasisAtSecond;
+  y(NaturalsBelow.firstOfTwo)
+     = (-(2 : ℤ) * a) * firstBasis(NaturalsBelow.firstOfTwo)
+       + (-b) * secondBasis(NaturalsBelow.firstOfTwo)
+     = (-(2 : ℤ) * a) * (1 : ℤ)
+       + (-b) * secondBasis(NaturalsBelow.firstOfTwo)
+           by substituting firstBasisAtFirst
+     = (-(2 : ℤ) * a) * (1 : ℤ) + (-b) * (0 : ℤ)
+           by substituting secondBasisAtFirst
+     = -(2 : ℤ) * a
+           by ring
+  as yFirst;
+  y(NaturalsBelow.secondOfTwo)
+     = (-(2 : ℤ) * a) * firstBasis(NaturalsBelow.secondOfTwo)
+       + (-b) * secondBasis(NaturalsBelow.secondOfTwo)
+     = (-(2 : ℤ) * a) * (0 : ℤ)
+       + (-b) * secondBasis(NaturalsBelow.secondOfTwo)
+           by substituting firstBasisAtSecond
+     = (-(2 : ℤ) * a) * (0 : ℤ) + (-b) * (1 : ℤ)
+           by substituting secondBasisAtSecond
+     = -b
+           by ring
+  as ySecond;
+
+  eliminatingVector(NaturalsBelow.top(2))
+     = RingVector.extend(y)(NaturalsBelow.top(2))
+       + (2 : ℤ) * topBasis(NaturalsBelow.top(2))
+     = (0 : ℤ) + (2 : ℤ) * topBasis(NaturalsBelow.top(2))
+           by substituting RingVector.extend_top
+     = (0 : ℤ) + (2 : ℤ) * (1 : ℤ)
+           by substituting Matrix.standardBasisRow_at
+     = (2 : ℤ)
+           by ring
+  as topCoordinate;
+  ∀ (i : NaturalsBelow(2)).
+      RingVector.restrict(eliminatingVector)(i) = y(i)
+      by (i : NaturalsBelow(2)) ↦ {
+          ¬(NaturalsBelow.top(2) = NaturalsBelow.inclusion(2, i))
+              by NaturalsBelow.top_not_inclusion;
+          topBasis(NaturalsBelow.inclusion(2, i)) = (0 : ℤ)
+              by Matrix.standardBasisRow_off as topBasisVanishes;
+          RingVector.restrict(eliminatingVector)(i)
+             = RingVector.extend(y)(NaturalsBelow.inclusion(2, i))
+               + (2 : ℤ) * topBasis(NaturalsBelow.inclusion(2, i))
+             = y(i) + (2 : ℤ) * topBasis(NaturalsBelow.inclusion(2, i))
+                   by substituting RingVector.extend_inclusion
+             = y(i) + (2 : ℤ) * (0 : ℤ)
+                   by substituting topBasisVanishes
+             = y(i)
+                   by ring
+          as restrictionReads;
+          done by restrictionReads
+        };
+  RingVector.restrict(eliminatingVector) = y
+      by RingVector.equal_of_pointwise as eliminatingRestriction;
+  ¬(eliminatingVector = RingVector.zero(
+      Integer.commutative_ring_bundle, 1 + 2)) by {
+    suppose eliminatingVector = RingVector.zero(
+        Integer.commutative_ring_bundle, 1 + 2) as eliminatingZero;
+    (2 : ℤ)
+       = eliminatingVector(NaturalsBelow.top(2))
+             by topCoordinate
+       = RingVector.zero(
+             Integer.commutative_ring_bundle, 1 + 2)(NaturalsBelow.top(2))
+             by substituting eliminatingZero
+       = (0 : ℤ);
+    (2 : ℤ) > (0 : ℤ);
+    (0 : ℤ) ≠ (2 : ℤ) by Integer.LessThan.distinct;
+    done
+  };
+
+  Matrix.IsSymmetric(B) by Matrix.IsEscalation.symmetric;
+  Matrix.IsPositiveDefinite(B) by Matrix.IsEscalation.positive_definite
+      as positiveDefinite;
+  Matrix.leadingBlock(B) = Matrix.squarePlusDoubleSquareForm
+      by Matrix.IsEscalation.block as blockReads;
+  Matrix.corner(B)
+     = (Matrix.truant(Matrix.squarePlusDoubleSquareForm) : ℤ)
+           by Matrix.IsEscalation.corner_is_truant
+     = (5 : ℤ)
+           by substituting Matrix.squarePlusDoubleSquareForm_truant
+  as cornerReads;
+  Matrix.quadraticForm(B, eliminatingVector) > (0 : ℤ)
+      by positiveDefinite as valuePositive;
+
+  Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm, y)
+     = y(NaturalsBelow.firstOfTwo) * y(NaturalsBelow.firstOfTwo)
+       + (2 : ℤ) * (
+           y(NaturalsBelow.secondOfTwo) * y(NaturalsBelow.secondOfTwo))
+           by Matrix.squarePlusDoubleSquareForm_value
+     = (-(2 : ℤ) * a) * (-(2 : ℤ) * a)
+       + (2 : ℤ) * (
+           y(NaturalsBelow.secondOfTwo) * y(NaturalsBelow.secondOfTwo))
+           by substituting yFirst
+     = (-(2 : ℤ) * a) * (-(2 : ℤ) * a)
+       + (2 : ℤ) * ((-b) * (-b))
+           by substituting ySecond
+     = (4 : ℤ) * (a * a) + (2 : ℤ) * (b * b)
+           by ring
+  as parentValue;
+  RingVector.innerProduct(y, Matrix.borderColumn(B))
+     = y(NaturalsBelow.firstOfTwo)
+         * Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo)
+       + y(NaturalsBelow.secondOfTwo)
+         * Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo)
+           by RingVector.innerProduct_two
+     = (-(2 : ℤ) * a)
+         * Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo)
+       + y(NaturalsBelow.secondOfTwo)
+         * Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo)
+           by substituting yFirst
+     = (-(2 : ℤ) * a)
+         * Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo)
+       + (-b) * Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo)
+           by substituting ySecond
+     = (-(2 : ℤ) * a) * a + (-b) * b
+           by ring
+  as pairingValue;
+  RingVector.innerProduct(Matrix.borderColumn(B), y)
+     = RingVector.innerProduct(y, Matrix.borderColumn(B))
+           by RingVector.innerProduct_symmetric
+     = (-(2 : ℤ) * a) * a + (-b) * b
+           by pairingValue
+  as reversePairingValue;
+  Matrix.quadraticForm(
+      Matrix.leadingBlock(B), RingVector.restrict(eliminatingVector))
+     = Matrix.quadraticForm(
+         Matrix.squarePlusDoubleSquareForm,
+         RingVector.restrict(eliminatingVector))
+           by substituting blockReads
+  as blockFormReads;
+
+  Matrix.quadraticForm(B, eliminatingVector)
+     = Matrix.quadraticForm(
+           Matrix.leadingBlock(B), RingVector.restrict(eliminatingVector))
+       + eliminatingVector(NaturalsBelow.top(2))
+         * RingVector.innerProduct(
+             RingVector.restrict(eliminatingVector), Matrix.borderColumn(B))
+       + eliminatingVector(NaturalsBelow.top(2))
+         * RingVector.innerProduct(
+             Matrix.borderColumn(B), RingVector.restrict(eliminatingVector))
+       + (eliminatingVector(NaturalsBelow.top(2))
+          * eliminatingVector(NaturalsBelow.top(2))) * Matrix.corner(B)
+           by Matrix.quadraticForm_bordered
+     = Matrix.quadraticForm(
+           Matrix.squarePlusDoubleSquareForm,
+           RingVector.restrict(eliminatingVector))
+       + eliminatingVector(NaturalsBelow.top(2))
+         * RingVector.innerProduct(
+             RingVector.restrict(eliminatingVector), Matrix.borderColumn(B))
+       + eliminatingVector(NaturalsBelow.top(2))
+         * RingVector.innerProduct(
+             Matrix.borderColumn(B), RingVector.restrict(eliminatingVector))
+       + (eliminatingVector(NaturalsBelow.top(2))
+          * eliminatingVector(NaturalsBelow.top(2))) * Matrix.corner(B)
+           by substituting blockFormReads
+     = Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm, y)
+       + eliminatingVector(NaturalsBelow.top(2))
+         * RingVector.innerProduct(y, Matrix.borderColumn(B))
+       + eliminatingVector(NaturalsBelow.top(2))
+         * RingVector.innerProduct(Matrix.borderColumn(B), y)
+       + (eliminatingVector(NaturalsBelow.top(2))
+          * eliminatingVector(NaturalsBelow.top(2))) * Matrix.corner(B)
+           by substituting eliminatingRestriction
+     = Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm, y)
+       + (2 : ℤ) * RingVector.innerProduct(y, Matrix.borderColumn(B))
+       + (2 : ℤ) * RingVector.innerProduct(Matrix.borderColumn(B), y)
+       + ((2 : ℤ) * (2 : ℤ)) * Matrix.corner(B)
+           by substituting topCoordinate
+     = Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm, y)
+       + (2 : ℤ) * RingVector.innerProduct(y, Matrix.borderColumn(B))
+       + (2 : ℤ) * RingVector.innerProduct(Matrix.borderColumn(B), y)
+       + ((2 : ℤ) * (2 : ℤ)) * (5 : ℤ)
+           by substituting cornerReads
+     = ((4 : ℤ) * (a * a) + (2 : ℤ) * (b * b))
+       + (2 : ℤ) * RingVector.innerProduct(y, Matrix.borderColumn(B))
+       + (2 : ℤ) * RingVector.innerProduct(Matrix.borderColumn(B), y)
+       + ((2 : ℤ) * (2 : ℤ)) * (5 : ℤ)
+           by substituting parentValue
+     = ((4 : ℤ) * (a * a) + (2 : ℤ) * (b * b))
+       + (2 : ℤ) * ((-(2 : ℤ) * a) * a + (-b) * b)
+       + (2 : ℤ) * RingVector.innerProduct(Matrix.borderColumn(B), y)
+       + ((2 : ℤ) * (2 : ℤ)) * (5 : ℤ)
+           by substituting pairingValue
+     = ((4 : ℤ) * (a * a) + (2 : ℤ) * (b * b))
+       + (2 : ℤ) * ((-(2 : ℤ) * a) * a + (-b) * b)
+       + (2 : ℤ) * ((-(2 : ℤ) * a) * a + (-b) * b)
+       + ((2 : ℤ) * (2 : ℤ)) * (5 : ℤ)
+           by substituting reversePairingValue
+     = (20 : ℤ) - (4 : ℤ) * (a * a) - (2 : ℤ) * (b * b)
+           by ring
+  as eliminatingValue;
+  (2 : ℤ) * (
+      (10 : ℤ) - ((2 : ℤ) * (a * a) + b * b))
+     = (20 : ℤ) - (4 : ℤ) * (a * a) - (2 : ℤ) * (b * b)
+           by ring
+     = Matrix.quadraticForm(B, eliminatingVector)
+           by eliminatingValue
+     > (0 : ℤ)
+           by valuePositive;
+  (2 : ℤ) > (0 : ℤ);
+  (10 : ℤ) - ((2 : ℤ) * (a * a) + b * b) > (0 : ℤ)
+      by Integer.positive_of_multiply_positive;
+  (2 : ℤ) * (a * a) + b * b < (10 : ℤ)
+      by Integer.lt_of_positive_difference;
+  done
+}
+
+theorem Matrix.squarePlusDoubleSquare_escalation_second_border_values
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2))
+        (escalation : Matrix.IsEscalation(Matrix.squarePlusDoubleSquareForm, B))
+        : Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = -(3 : ℤ)
+          ∨ Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = -(2 : ℤ)
+          ∨ Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = -(1 : ℤ)
+          ∨ Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = (0 : ℤ)
+          ∨ Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = (1 : ℤ)
+          ∨ Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = (2 : ℤ)
+          ∨ Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = (3 : ℤ) := {
+  Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo)
+      * Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) < (10 : ℤ)
+      by Matrix.squarePlusDoubleSquare_escalation_second_border_square_bound;
+  done by Integer.square_below_ten
+}
+
+-- The coupled bound leaves 7 + 2·5 + 2·3 = 23 border pairs. Grouping
+-- them by the first coordinate records the finite family without a
+-- twenty-three-arm disjunction.
+theorem Matrix.squarePlusDoubleSquare_escalation_border_pairs
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2))
+        (escalation : Matrix.IsEscalation(Matrix.squarePlusDoubleSquareForm, B))
+        : (Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo) = (0 : ℤ)
+            ∧ (Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = -(3 : ℤ)
+               ∨ Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = -(2 : ℤ)
+               ∨ Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = -(1 : ℤ)
+               ∨ Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = (0 : ℤ)
+               ∨ Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = (1 : ℤ)
+               ∨ Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = (2 : ℤ)
+               ∨ Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = (3 : ℤ)))
+          ∨ ((Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo) = -(1 : ℤ)
+               ∨ Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo) = (1 : ℤ))
+              ∧ (Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = -(2 : ℤ)
+                 ∨ Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = -(1 : ℤ)
+                 ∨ Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = (0 : ℤ)
+                 ∨ Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = (1 : ℤ)
+                 ∨ Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = (2 : ℤ)))
+          ∨ ((Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo) = -(2 : ℤ)
+               ∨ Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo) = (2 : ℤ))
+              ∧ (Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = -(1 : ℤ)
+                 ∨ Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = (0 : ℤ)
+                 ∨ Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = (1 : ℤ))) := {
+  let a : ℤ := Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo);
+  let b : ℤ := Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo);
+  a = -(2 : ℤ) ∨ a = -(1 : ℤ) ∨ a = (0 : ℤ) ∨ a = (1 : ℤ) ∨ a = (2 : ℤ)
+      by Matrix.squarePlusDoubleSquare_escalation_first_border_values;
+  (2 : ℤ) * (a * a) + b * b < (10 : ℤ)
+      by Matrix.squarePlusDoubleSquare_escalation_coupled_border_bound;
+  (10 : ℤ) - ((2 : ℤ) * (a * a) + b * b) > (0 : ℤ)
+      by Integer.positive_difference_of_lt as gapPositive;
+  (a = (0 : ℤ)
+      ∧ (b = -(3 : ℤ) ∨ b = -(2 : ℤ) ∨ b = -(1 : ℤ)
+         ∨ b = (0 : ℤ) ∨ b = (1 : ℤ) ∨ b = (2 : ℤ) ∨ b = (3 : ℤ)))
+    ∨ ((a = -(1 : ℤ) ∨ a = (1 : ℤ))
+        ∧ (b = -(2 : ℤ) ∨ b = -(1 : ℤ) ∨ b = (0 : ℤ)
+           ∨ b = (1 : ℤ) ∨ b = (2 : ℤ)))
+    ∨ ((a = -(2 : ℤ) ∨ a = (2 : ℤ))
+        ∧ (b = -(1 : ℤ) ∨ b = (0 : ℤ) ∨ b = (1 : ℤ)))
+  by cases {
+    case a = -(2 : ℤ) as aNegativeTwo: {
+        a * a = (4 : ℤ) by substituting aNegativeTwo as aSquare;
+        (2 : ℤ) - b * b
+           = (10 : ℤ) - ((2 : ℤ) * (4 : ℤ) + b * b)
+                 by ring
+           = (10 : ℤ) - ((2 : ℤ) * (a * a) + b * b)
+                 by substituting aSquare
+           > (0 : ℤ)
+                 by gapPositive;
+        b * b < (2 : ℤ) by Integer.lt_of_positive_difference;
+        b = -(1 : ℤ) ∨ b = (0 : ℤ) ∨ b = (1 : ℤ)
+            by Integer.square_below_two as bSmall;
+        done by Or.introduceRight(Or.introduceRight(
+            And.introduction(Or.introduceLeft(aNegativeTwo), bSmall)))
+      }
+    case a = -(1 : ℤ) ∨ a = (0 : ℤ) ∨ a = (1 : ℤ) ∨ a = (2 : ℤ):
+        done by cases {
+          case a = -(1 : ℤ) as aNegativeOne: {
+              a * a = (1 : ℤ) by substituting aNegativeOne as aSquare;
+              (8 : ℤ) - b * b
+                 = (10 : ℤ) - ((2 : ℤ) * (1 : ℤ) + b * b)
+                       by ring
+                 = (10 : ℤ) - ((2 : ℤ) * (a * a) + b * b)
+                       by substituting aSquare
+                 > (0 : ℤ)
+                       by gapPositive;
+              b * b < (8 : ℤ) by Integer.lt_of_positive_difference;
+              b = -(2 : ℤ) ∨ b = -(1 : ℤ) ∨ b = (0 : ℤ)
+                  ∨ b = (1 : ℤ) ∨ b = (2 : ℤ)
+                  by Integer.square_below_eight as bMedium;
+              done by Or.introduceRight(Or.introduceLeft(
+                  And.introduction(Or.introduceLeft(aNegativeOne), bMedium)))
+            }
+          case a = (0 : ℤ) ∨ a = (1 : ℤ) ∨ a = (2 : ℤ): done by cases {
+              case a = (0 : ℤ) as aZero: {
+                  a * a = (0 : ℤ) by substituting aZero as aSquare;
+                  (10 : ℤ) - b * b
+                     = (10 : ℤ) - ((2 : ℤ) * (0 : ℤ) + b * b)
+                           by ring
+                     = (10 : ℤ) - ((2 : ℤ) * (a * a) + b * b)
+                           by substituting aSquare
+                     > (0 : ℤ)
+                           by gapPositive;
+                  b * b < (10 : ℤ) by Integer.lt_of_positive_difference;
+                  b = -(3 : ℤ) ∨ b = -(2 : ℤ) ∨ b = -(1 : ℤ)
+                      ∨ b = (0 : ℤ) ∨ b = (1 : ℤ) ∨ b = (2 : ℤ) ∨ b = (3 : ℤ)
+                      by Integer.square_below_ten as bLarge;
+                  done by Or.introduceLeft(And.introduction(aZero, bLarge))
+                }
+              case a = (1 : ℤ) ∨ a = (2 : ℤ): done by cases {
+                  case a = (1 : ℤ) as aOne: {
+                      a * a = (1 : ℤ) by substituting aOne as aSquare;
+                      (8 : ℤ) - b * b
+                         = (10 : ℤ) - ((2 : ℤ) * (1 : ℤ) + b * b)
+                               by ring
+                         = (10 : ℤ) - ((2 : ℤ) * (a * a) + b * b)
+                               by substituting aSquare
+                         > (0 : ℤ)
+                               by gapPositive;
+                      b * b < (8 : ℤ) by Integer.lt_of_positive_difference;
+                      b = -(2 : ℤ) ∨ b = -(1 : ℤ) ∨ b = (0 : ℤ)
+                          ∨ b = (1 : ℤ) ∨ b = (2 : ℤ)
+                          by Integer.square_below_eight as bMedium;
+                      done by Or.introduceRight(Or.introduceLeft(
+                          And.introduction(Or.introduceRight(aOne), bMedium)))
+                    }
+                  case a = (2 : ℤ) as aTwo: {
+                      a * a = (4 : ℤ) by substituting aTwo as aSquare;
+                      (2 : ℤ) - b * b
+                         = (10 : ℤ) - ((2 : ℤ) * (4 : ℤ) + b * b)
+                               by ring
+                         = (10 : ℤ) - ((2 : ℤ) * (a * a) + b * b)
+                               by substituting aSquare
+                         > (0 : ℤ)
+                               by gapPositive;
+                      b * b < (2 : ℤ) by Integer.lt_of_positive_difference;
+                      b = -(1 : ℤ) ∨ b = (0 : ℤ) ∨ b = (1 : ℤ)
+                          by Integer.square_below_two as bSmall;
+                      done by Or.introduceRight(Or.introduceRight(
+                          And.introduction(Or.introduceRight(aTwo), bSmall)))
+                    }
+                }
+            }
+        }
+  } as classified;
+  done by classified
+}
+
+theorem Matrix.squarePlusDoubleSquare_escalation_border_pair_is_admissible
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2))
+        (escalation : Matrix.IsEscalation(Matrix.squarePlusDoubleSquareForm, B))
+        : Integer.IsSquarePlusDoubleSquareBorderPair(
+            Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo),
+            Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo)) := {
+  Matrix.squarePlusDoubleSquare_escalation_border_pairs;
+  done
+}
+
+-- Every escalation above x²+y² is one of the 3·3 = 9 matrices obtained
+-- by inserting the admissible coordinates into the canonical border.
+theorem Matrix.sumOfTwoSquares_escalation_nine_candidates
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2))
+        (escalation : Matrix.IsEscalation(Matrix.sumOfTwoSquaresForm, B))
+        : ∃ (a b : ℤ).
+            Integer.IsTernaryBorderValue(a)
+            ∧ Integer.IsTernaryBorderValue(b)
+            ∧ B = Matrix.borderedAssembly(
+                Matrix.sumOfTwoSquaresForm,
+                RingVector.twoCoordinates(a, b),
+                (3 : ℤ)) := {
+  let a : ℤ := Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo);
+  let b : ℤ := Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo);
+  Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo) = -(1 : ℤ)
+      ∨ Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo) = (0 : ℤ)
+      ∨ Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo) = (1 : ℤ)
+      by Matrix.sumOfTwoSquares_escalation_border_values
+  as firstBorderAdmissible;
+  Integer.IsTernaryBorderValue(a)
+      by firstBorderAdmissible
+  as aAdmissible;
+  Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = -(1 : ℤ)
+      ∨ Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = (0 : ℤ)
+      ∨ Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo) = (1 : ℤ)
+      by Matrix.sumOfTwoSquares_escalation_border_values
+  as secondBorderAdmissible;
+  Integer.IsTernaryBorderValue(b)
+      by secondBorderAdmissible
+      as bAdmissible;
+  Matrix.borderColumn(B) = RingVector.twoCoordinates(a, b)
+      by RingVector.eq_twoCoordinates as borderReads;
+  B = Matrix.borderedAssembly(
+      Matrix.sumOfTwoSquaresForm,
+      Matrix.borderColumn(B),
+      (Matrix.truant(Matrix.sumOfTwoSquaresForm) : ℤ))
+      by Matrix.IsEscalation.eq_borderedAssembly as assembled;
+  (Matrix.truant(Matrix.sumOfTwoSquaresForm) : ℤ) = 3
+      by substituting Matrix.sumOfTwoSquaresForm_truant as cornerReads;
+  B
+     = Matrix.borderedAssembly(
+           Matrix.sumOfTwoSquaresForm,
+           Matrix.borderColumn(B),
+           (Matrix.truant(Matrix.sumOfTwoSquaresForm) : ℤ))
+           by assembled
+     = Matrix.borderedAssembly(
+           Matrix.sumOfTwoSquaresForm,
+           RingVector.twoCoordinates(a, b),
+           (Matrix.truant(Matrix.sumOfTwoSquaresForm) : ℤ))
+           by substituting borderReads
+     = Matrix.borderedAssembly(
+           Matrix.sumOfTwoSquaresForm,
+           RingVector.twoCoordinates(a, b),
+           (3 : ℤ))
+           by substituting cornerReads
+  as candidateReads;
+  witness a with
+      witness b with
+          done by And.introduction(
+              aAdmissible,
+              And.introduction(bAdmissible, candidateReads))
+}
+
+-- Every escalation above x²+2y² is one of the 23 matrices isolated by
+-- the coupled inequality.
+theorem Matrix.squarePlusDoubleSquare_escalation_twenty_three_candidates
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2))
+        (escalation : Matrix.IsEscalation(Matrix.squarePlusDoubleSquareForm, B))
+        : ∃ (a b : ℤ).
+            Integer.IsSquarePlusDoubleSquareBorderPair(a, b)
+            ∧ B = Matrix.borderedAssembly(
+                Matrix.squarePlusDoubleSquareForm,
+                RingVector.twoCoordinates(a, b),
+                (5 : ℤ)) := {
+  let a : ℤ := Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo);
+  let b : ℤ := Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo);
+  Integer.IsSquarePlusDoubleSquareBorderPair(
+      Matrix.borderColumn(B)(NaturalsBelow.firstOfTwo),
+      Matrix.borderColumn(B)(NaturalsBelow.secondOfTwo))
+      by Matrix.squarePlusDoubleSquare_escalation_border_pair_is_admissible
+  as borderPairAdmissible;
+  Integer.IsSquarePlusDoubleSquareBorderPair(a, b)
+      by borderPairAdmissible
+      as pairAdmissible;
+  Matrix.borderColumn(B) = RingVector.twoCoordinates(a, b)
+      by RingVector.eq_twoCoordinates as borderReads;
+  B = Matrix.borderedAssembly(
+      Matrix.squarePlusDoubleSquareForm,
+      Matrix.borderColumn(B),
+      (Matrix.truant(Matrix.squarePlusDoubleSquareForm) : ℤ))
+      by Matrix.IsEscalation.eq_borderedAssembly as assembled;
+  (Matrix.truant(Matrix.squarePlusDoubleSquareForm) : ℤ) = 5
+      by substituting Matrix.squarePlusDoubleSquareForm_truant as cornerReads;
+  B
+     = Matrix.borderedAssembly(
+           Matrix.squarePlusDoubleSquareForm,
+           Matrix.borderColumn(B),
+           (Matrix.truant(Matrix.squarePlusDoubleSquareForm) : ℤ))
+           by assembled
+     = Matrix.borderedAssembly(
+           Matrix.squarePlusDoubleSquareForm,
+           RingVector.twoCoordinates(a, b),
+           (Matrix.truant(Matrix.squarePlusDoubleSquareForm) : ℤ))
+           by substituting borderReads
+     = Matrix.borderedAssembly(
+           Matrix.squarePlusDoubleSquareForm,
+           RingVector.twoCoordinates(a, b),
+           (5 : ℤ))
+           by substituting cornerReads
+  as candidateReads;
+  witness a with
+      witness b with
+          done by And.introduction(pairAdmissible, candidateReads)
+}

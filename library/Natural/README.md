@@ -71,7 +71,7 @@ recursion, or [number-theory.md](number-theory.md) for division, gcd, and primes
   `Natural.infinitely_many_primes`.
 - Small-square bounds in [multiply_bounds.math](multiply_bounds.math):
   `Natural.below_two`, `Natural.positive_below_five`,
-  `Natural.square_below_two`/`_four`/`_six`,
+  `Natural.square_below_two`/`_four`/`_six`/`_ten`,
   `Natural.two_is_not_a_square`, `Natural.three_not_sum_of_two_squares`,
   and `Natural.five_not_square_plus_double_square`.
 
