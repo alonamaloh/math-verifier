@@ -6,6 +6,7 @@
 
 #include "elaborator/internal.hpp"
 
+#include <exception>
 #include <iostream>
 
 ExpressionPointer Elaborator::desugarArithmeticOperator(
@@ -140,20 +141,54 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
         // cast like `(expr + 1 : Integer)` does not push `Integer` into
         // `expr` — it elaborates `expr + 1` in its own type and coerces the
         // *result*. This keeps a data expression's type independent of
-        // context. (The left operand's actual type is still propagated to
-        // the RIGHT operand below, since the operator is homogeneous.)
-        ExpressionPointer leftKernel =
-            elaborateExpression(leftSurface, localBinders);
-        // Determine the operand type by inferring the type of the left
-        // operand. Check the raw inferred type first: if a binder was
-        // declared with a named type like `Integer` (which δ-reduces
-        // to `Quotient(IntegerRepresentative, IntegerEquivalent)`),
-        // we want to dispatch on `Integer`, not the unfolded form.
-        // Only WHNF as a fallback for types that are themselves
-        // computations (rare in practice but used by let-bindings
-        // whose type-annotation is a reducible expression).
-        ExpressionPointer leftTypeRaw =
-            inferTypeInLocalContext(localBinders, leftKernel);
+        // context. An operand's actual type may still guide its sibling:
+        // normally left-to-right, and right-to-left only if the left fails
+        // to synthesize, since a homogeneous operator must reconcile both.
+        ExpressionPointer leftKernel;
+        ExpressionPointer leftTypeRaw;
+        ExpressionPointer rightKernel;
+        ExpressionPointer rightTypeRaw;
+        bool rightElaboratedBottomUp = false;
+        auto retryLeftFromRight = [&](std::exception_ptr leftFailure) {
+            try {
+                rightKernel =
+                    elaborateExpression(rightSurface, localBinders);
+                rightTypeRaw =
+                    inferTypeInLocalContext(localBinders, rightKernel);
+                ExpressionPointer rightTypeClosed = closeOverLocalBinders(
+                    rightTypeRaw, localBinders, localBinders.size());
+                leftKernel = elaborateExpression(
+                    leftSurface, localBinders, rightTypeClosed);
+                leftTypeRaw =
+                    inferTypeInLocalContext(localBinders, leftKernel);
+                rightElaboratedBottomUp = true;
+            } catch (const ElaborateError&) {
+                std::rethrow_exception(leftFailure);
+            } catch (const TypeError&) {
+                std::rethrow_exception(leftFailure);
+            }
+        };
+        try {
+            leftKernel = elaborateExpression(leftSurface, localBinders);
+            // Determine the operand type by inferring the type of the left
+            // operand. Check the raw inferred type first: if a binder was
+            // declared with a named type like `Integer` (which δ-reduces
+            // to `Quotient(IntegerRepresentative, IntegerEquivalent)`),
+            // we want to dispatch on `Integer`, not the unfolded form.
+            // Only WHNF as a fallback for types that are themselves
+            // computations (rare in practice but used by let-bindings
+            // whose type-annotation is a reducible expression).
+            leftTypeRaw = inferTypeInLocalContext(localBinders, leftKernel);
+        } catch (const ElaborateError&) {
+            // A left operand such as `-n` cannot synthesize a carrier by
+            // itself, even when the right operand (`a` in `-n * a`) fixes
+            // one. Elaborate the right bottom-up and retry the left with that
+            // carrier as a guarded hint. If the right is no help, preserve
+            // the original left-hand diagnostic.
+            retryLeftFromRight(std::current_exception());
+        } catch (const TypeError&) {
+            retryLeftFromRight(std::current_exception());
+        }
         // Propagate the left operand's type as expected type for the
         // right operand. This lets short-form `Quotient.class_of(rep)` (with
         // R inferred from expected type) fire in operand position of
@@ -170,20 +205,21 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
         // on the operand's own type either way.
         ExpressionPointer leftTypeClosed = closeOverLocalBinders(
             leftTypeRaw, localBinders, localBinders.size());
-        ExpressionPointer rightKernel;
-        ExpressionPointer rightTypeRaw;
         auto elaborateRightBottomUp = [&]() {
             rightKernel = elaborateExpression(rightSurface, localBinders);
             rightTypeRaw = inferTypeInLocalContext(localBinders, rightKernel);
         };
-        try {
-            rightKernel = elaborateExpression(rightSurface, localBinders,
-                                              leftTypeClosed);
-            rightTypeRaw = inferTypeInLocalContext(localBinders, rightKernel);
-        } catch (const ElaborateError&) {
-            elaborateRightBottomUp();
-        } catch (const TypeError&) {
-            elaborateRightBottomUp();
+        if (!rightElaboratedBottomUp) {
+            try {
+                rightKernel = elaborateExpression(
+                    rightSurface, localBinders, leftTypeClosed);
+                rightTypeRaw =
+                    inferTypeInLocalContext(localBinders, rightKernel);
+            } catch (const ElaborateError&) {
+                elaborateRightBottomUp();
+            } catch (const TypeError&) {
+                elaborateRightBottomUp();
+            }
         }
         // Use `headConstantName` to extract the type head — peels through
         // Applications so parameterised types like `Set(T)` report `Set`
