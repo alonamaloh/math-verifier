@@ -1965,11 +1965,19 @@ ExpressionPointer Elaborator::elaborateExpression(
                 // retry the right side bottom-up, matching binary dispatch.
                 ExpressionPointer rightKernel;
                 ExpressionPointer rightTypeOpen;
+                auto coerceRightToLeft = [&]() {
+                    ExpressionPointer beforeCoercion = rightKernel;
+                    rightKernel = coerceToExpectedTypeViaRegistry(
+                        localBinders, std::move(rightKernel), leftType);
+                    if (rightKernel != beforeCoercion) {
+                        rightKernel = castPushToLeaves(
+                            rightKernel, localBinders).term;
+                    }
+                };
                 auto elaborateRightBottomUp = [&]() {
                     rightKernel = elaborateExpression(
                         *binary->right, localBinders);
-                    rightKernel = coerceToExpectedTypeViaRegistry(
-                        localBinders, std::move(rightKernel), leftType);
+                    coerceRightToLeft();
                     rightTypeOpen = inferTypeInLocalContext(
                         localBinders, rightKernel);
                 };
@@ -1980,9 +1988,12 @@ ExpressionPointer Elaborator::elaborateExpression(
                     // hints; it does not itself insert a registered tower
                     // cast. Do that explicitly so a Natural right operand can
                     // lift into a concrete carrier presented through a bundle
-                    // projection.
-                    rightKernel = coerceToExpectedTypeViaRegistry(
-                        localBinders, std::move(rightKernel), leftType);
+                    // projection. When a cast was inserted, immediately push
+                    // it to compound leaves: wrapping the whole RHS `a + b`
+                    // as `↑(a + b)` would silently weaken
+                    // `((a + b : ℝ) = a + b)` to reflexivity instead of the
+                    // intended additive-homomorphism statement.
+                    coerceRightToLeft();
                     rightTypeOpen = inferTypeInLocalContext(
                         localBinders, rightKernel);
                 } catch (const ElaborateError&) {

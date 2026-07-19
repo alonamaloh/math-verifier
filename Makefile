@@ -169,7 +169,8 @@ TEST_MATHV_IFACE_FILES := $(TEST_MATHV_FILES:.mathv=.mathv.iface)
 
 library: $(LIBRARY_MATHV_FILES) $(LIBRARY_MATHV_IFACE_FILES)
 
-tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES) checker-tests
+tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES) checker-tests \
+	carrier-normal-form-check
 
 # ----------------------------------------------------------------------
 # The clean set (see docs/CLEAN_STYLE_PLAN.md). `scripts/clean_manifest.txt`
@@ -288,6 +289,14 @@ checker-tests: library $(TEST_MATHV_FILES)
 	    > /dev/null 2> build/numeral-table-check.log \
 	  && echo "numeral-table-check: PASS" \
 	  || { echo "numeral-table-check: FAIL — the accelerated GMP op table disagrees with the library definitions:"; cat build/numeral-table-check.log; exit 1; }
+
+# Equality carrier propagation must preserve cast-normal form. Ordinary source
+# verification cannot catch a proposition silently weakening to reflexivity,
+# so inspect the elaborated declaration itself.
+carrier-normal-form-check: $(BUILD_DIR)/library/Test/expected_carrier_propagation_test.mathv
+	@bash scripts/check_carrier_normal_form.sh ./kernel $<
+
+.PHONY: carrier-normal-form-check
 
 # B3.4 — morphism-packet audit: re-verify the audit surface module
 # (which imports every packet-lemma home) with the audit flag on and
