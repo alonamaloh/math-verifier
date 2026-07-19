@@ -324,3 +324,86 @@ internal tuple representation:
 ```math
 choose witness such that P(witness) from existenceProof;
 ```
+
+## Layering and machinery quarantine
+
+### Layer the file
+
+Keep proof-assistant bureaucracy out of the mathematical proof by giving
+the file a consistent layering:
+
+    definition / construction     -- the object
+    boundary lemmas               -- the only way in and out of the encoding
+    representation-level kernel    -- the math, stated in boundary terms
+    thin adapter (if needed)      -- bridges the encoding to the kernel
+    public theorem
+
+The discipline that makes this pay off, for an **opaque quotient** like
+`Integer` (the difference-class quotient of `IntegerRepresentative`):
+
+- **Every lifted operation publishes a representative-computation boundary
+  lemma.** `Integer.from_difference_times_natural : from_difference(p, q) ·
+  (c : Integer) = from_difference(p·c, q·c)` lets a consumer scale a
+  difference *at the boundary* instead of unfolding the `multiply` lift at
+  representatives. Without it the proof drowns in `make(p·c + q·0, …)` noise.
+
+- **Consumers compare quotient values only through the boundary lemmas**
+  (`difference_equal` / `difference_equal_implies`), never
+  `Quotient.class_of` / `.equivalent_implies_equal` /
+  `.equal_implies_equivalent` directly. Those are construction-internal.
+
+- **State the mathematical lemma in boundary terms; quarantine the quotient
+  `cases` bridge in a thin adapter.** In `Integer/cancellation.math` the
+  heart is `multiply_cancel_right_at_differences`, proved purely in
+  `from_difference` — no `Quotient.class_of` in sight; a one-line
+  `*_at_representatives` adapter bridges what `cases` produces to it. The
+  math reads clean and the maintainer still sees where induction enters.
+
+- **Name vacuous / structural constructions behind the concept.** A
+  bijection between two empty types is `Equinumerous.empty_types`, not a
+  nested `⟨absurd(…), ⟨absurd(…), …⟩⟩` at the use site. Likewise maps out
+  of `False`, identity inverses, subtype proof-irrelevance.
+
+The smell: if a *consumer's* proof mentions the encoding (`Quotient.class_of`,
+a raw `make(…)` rep, an `unfold <Opaque>`), a boundary lemma is missing — add
+it next to the operation, not a workaround at the call site.
+
+### Pattern-match at constructor representatives for lifted proofs
+
+The bad shape (~80 lines): `Quotient.induct_two` whose at-rep body
+threads bridge lemmas (`sequenceFunction_add`, etc.) through a
+relation chain to reach a pointwise Rational fact.
+
+The good shape (~20 lines): a separate `*_at_make` theorem that
+pattern-matches the reps to expose the underlying sequences, plus a
+top-level `Quotient.induct[_two|_three]` lift. When the rep is in
+constructor form, the kernel's β/ι reduces every
+`sequenceFunction(add(make(sx, _), make(sy, _)), n)` to
+`sx(n) + sy(n)` and the bridge proofs become reflexivity.
+
+```math
+theorem Foo_at_make
+        : (rep_x rep_y : CauchyRationalSequence) → … (Quotient.mk rep_x) … (Quotient.mk rep_y) …
+  | CauchyRationalSequence.make(sx, sx_cauchy),
+    CauchyRationalSequence.make(sy, sy_cauchy) ↦
+      Quotient.sound(…, …, (n : Natural) ↦ Rational.foo(sx(n), sy(n)))
+
+theorem Foo (x y : Real) : … :=
+  Quotient.induct_two(motive, Foo_at_make, x, y)
+```
+
+Caveat: when the at-make body needs to refer to a rep AGAIN
+(typically when passing it to `Quotient.sound` or
+`equivalent_when_sequenceFunction_equal`), the pattern wildcards must
+each have a fresh NAME (`sx_cauchy`, `sy_cauchy`). Using `_` makes
+the kernel re-bind a single fresh variable and the Cauchy proofs
+collapse to the wrong type.
+
+### Avoid auxiliary `CauchyXxx` definitions for one-off proofs
+
+A standalone `definition CauchyRationalSequence.foo_residual : … →
+CauchyRationalSequence` plus a `sequenceFunction_foo_residual`
+bridge lemma is almost always a red flag — pattern-matching at make
+inside an `at_make` theorem subsumes it without the auxiliary
+definition. A previous draft of the triangle-inequality proof spent
+200 lines on this pattern; the at-make refactor took 40.

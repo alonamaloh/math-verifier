@@ -81,8 +81,11 @@ write in a textbook, with the kernel doing the typechecking. Optimize for
 ## Convention files (`docs/conventions/`)
 
 - **quotients.md** — `Quotient.mk`/`.sound`/`.lift`/`.induct[_two/_three]`
-  short forms, `construction` intro forms, and pattern-binders
-  (`by_representatives`, `cases`, `take`, `suppose`) on quotients.
+  short forms, `construction` intro forms, pattern-binders
+  (`by_representatives`, `take`, `suppose`) on quotients, and the
+  layering/machinery-quarantine patterns (boundary lemmas,
+  pattern-match at constructor representatives, auxiliary-definition
+  red flags).
 - **relation-chains.md** — the bare relation-chain form with mixed
   `=`/`≤`/`<`/`≥`/`>`, chains over preorders (`∣`/`⊆`), by-less `=` steps
   via the full prover, `let` abbreviations, `<chain> as NAME`,
