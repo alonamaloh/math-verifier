@@ -26,6 +26,8 @@ class-wide · **P2** real but localized · **P3** nice-to-have.
 
 Related living docs this consolidates from (do not duplicate — extend):
 `PLAN_CAST_NORMALIZATION.md` (mixed-type cast association),
+`PLAN_ELABORATOR_ERGONOMICS.md` (the bounded carrier-propagation project
+exposed by the Fifteen Theorem),
 `PLAN_LANGUAGE_IMPROVEMENT.md` (statement language + tiered auto-prover),
 `TODO.md` / `docs/TODO.md` (idea backlogs),
 `docs/error_message_inbox.md` + `docs/error_message_corpus.md` (error triage),
