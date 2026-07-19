@@ -51,8 +51,20 @@ exists, and the work is largely unification rather than new construction.
 - **The join primitive**: `Elaborator::combineOperands`,
   `src/elaborator/statements.cpp:787` (~63 lines, pure, isolated). Computes the
   canonical upper bound of two head names plus both coercion chains, and errors
-  on an ambiguous join. **E1, E3 and E4 all want exactly this primitive.** It
-  needs no redesign — only better inputs.
+  on an ambiguous join. **E1 and E3 want exactly this primitive.** It needs no
+  redesign — only better inputs. (E4 does *not*; see that section.)
+- **Candidate lists and pair search already exist**: `collectHeads` and
+  `tryHeadPairs`, `src/elaborator/desugar_equality.cpp:303` and `:363`. Each
+  operand already yields an ordered head list (raw head first, then successive
+  single-step unfoldings), and `tryHeadPairs` searches the pairs left-major,
+  taking the first registration that resolves. E1 should extend these, not
+  invent a parallel mechanism.
+- **Reverse-alias enrichment**: `reverseAliasHeads`,
+  `src/elaborator/desugar_equality.cpp:327`, used at `:376`/`:379`. This handles
+  an operand arriving *already* normalized (a recursive self-reference whose
+  declared return type got reduced, so `ComplexNumber` shows up as
+  `Quotient(…)`), which the forward unfold can never find. It runs as a second
+  phase only after the first `tryHeadPairs` fails.
 - **Carrier normalization already exists**: `Elaborator::carrierProjectionField`,
   `src/elaborator/desugar_eliminators.cpp:473`. Peels `<S>.carrier(bundle)` to
   the carrier as written, and correctly stays stuck on an *abstract* bundle so
@@ -92,9 +104,12 @@ exists, and the work is largely unification rather than new construction.
 
 ## The ordering constraint
 
-E1, E3 and E4 all consume the same primitive: *given two operands, produce a
-common carrier plus coercion chains.* That is `combineOperands`, and it is
-already clean. What it lacks is normalized head names for its inputs.
+E1 and E3 consume the same primitive: *given two operands, produce a common
+carrier plus coercion chains.* That is `combineOperands`, and it is already
+clean. What it lacks is normalized head names for its inputs.
+
+E4 is not in that group — it compares whole proposition trees, not an operand
+pair — which is a second reason to sequence it last and treat it as conditional.
 
 **Therefore carrier normalization comes first.** Doing it first makes
 bidirectional relation elaboration and citation reconciliation substantially
@@ -123,7 +138,12 @@ changing the elaborator. The feature test should cover:
 - positive Integer numerals and Natural variables on the right of `=`, `<`,
   `≤`, `+`, and `*`;
 - unary `-` under an Integer-typed equality and inequality;
-- integer matrix entries, so the abstract-carrier path is exercised;
+- integer matrix entries, so the **concrete bundled-carrier** path is exercised
+  — `Matrix(Integer.commutative_ring_bundle, …)` presents entries as
+  `CommutativeRing.carrier(Integer.commutative_ring_bundle)`, a projection over
+  a *closed* bundle that must reduce to `Integer`. This is the opposite of the
+  abstract case below, and the two must not be conflated: concrete reduces,
+  abstract stays stuck;
 - a citation whose conclusion contains bare numeral leaves;
 - one two-edge lift, such as Natural to Rational, to ensure the solution uses
   the coercion registry rather than an Integer special case.
@@ -161,10 +181,29 @@ carrierHeadCandidates(type) -> std::vector<std::string>   // ordered, deduplicat
 ```
 
 producing, in order: the raw head, alias unfoldings, the concrete carrier
-projection, then bounded weak-head normalization. Callers walk the list and take
-the first that resolves a registration. Cache per elaboration. Names rather than
-`ExpressionPointer`s keep this composable with `headConstantName`'s ~87 existing
-call sites.
+projection, then bounded weak-head normalization. Cache per elaboration. Names
+rather than `ExpressionPointer`s keep this composable with `headConstantName`'s
+~87 existing call sites.
+
+This is a generalization of the existing `collectHeads`
+(`desugar_equality.cpp:303`), which already returns raw-head-then-unfoldings;
+E1 adds the carrier-projection and WHNF tiers to it.
+
+**Pair-search semantics — inherit them, do not invent them.** Where both
+operands yield candidate lists, reuse `tryHeadPairs` (`:363`) unchanged:
+left-major iteration, first resolving registration wins, earlier candidates
+strictly preferred. Determinism then follows from list order, which is why the
+order above is normative rather than advisory — the concrete carrier projection
+must come *after* the raw head and alias unfoldings, so adding it cannot change
+any dispatch that resolves today.
+
+**Preserve the reverse-alias phase.** The two-phase structure at `:374-382` —
+run `tryHeadPairs`, and only on failure enrich both lists with
+`reverseAliasHeads` and retry — must survive. Forward unfolding of the operand
+type cannot reach a registration whose *definition body* reduces to that type,
+so this is not subsumed by adding tiers to `collectHeads`. Keep it as the
+outermost phase: E1's new tiers join the first pass, and the reverse-alias
+retry stays last.
 
 One duplicate to fold up while here: the `.carrier` string-suffix test in unary
 dispatch at `dispatch.cpp:2107` is a hand-rolled second implementation of the
