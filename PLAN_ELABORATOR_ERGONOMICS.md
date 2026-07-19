@@ -56,18 +56,23 @@ exists, and the work is largely unification rather than new construction.
 - **Carrier normalization already exists**: `Elaborator::carrierProjectionField`,
   `src/elaborator/desugar_eliminators.cpp:473`. Peels `<S>.carrier(bundle)` to
   the carrier as written, and correctly stays stuck on an *abstract* bundle so
-  dispatch is unchanged. It has only **three** call sites
-  (`statements.cpp:216`, `desugar_equality.cpp:406/408`, `:677`).
+  dispatch is unchanged. It has only **four** external call sites
+  (`statements.cpp:216`; `desugar_equality.cpp:406`, `:408`, and `:677` — the
+  last inside `applyOperatorImplicitFillers`, not the dispatch tiers).
 - **Two separate relation paths**, which is why the probes fail two different ways:
   - `=` is an inline block at `src/elaborator/dispatch.cpp:1917`. It does *not*
     call `carrierProjectionField`, so the join is simply dead for bundled carriers.
   - `<`, `≤`, `+`, `*`, … go through `desugarArithmeticOperator`,
-    `src/elaborator/desugar_equality.cpp:11` (~570 lines, twelve ordered fallback
-    tiers). It *does* call `carrierProjectionField`, but at tier 11, gated behind
-    everything else failing.
+    `src/elaborator/desugar_equality.cpp:11-583` (573 lines, twelve ordered
+    fallback tiers). It *does* call `carrierProjectionField`, but at tier 11,
+    gated behind everything else failing. (The four helpers that follow it —
+    `applyOperatorImplicitFillers` at `:584`, `tryProvePositive` at `:795`,
+    `tryProveNonzero` at `:885`, `dischargeTrailingSideConditions` at `:935` —
+    are separate functions; do not count them as one ~980-line body.)
 - **Head names today**: free function `headConstantName`,
-  `src/elaborator/term_utilities.cpp:7`, with **91 call sites**. Any new notion
-  of "this is Integer" must coexist with it, not race it.
+  `src/elaborator/term_utilities.cpp:7`, with ~87 call sites (91 textual
+  occurrences including its declaration and definition). Any new notion of
+  "this is Integer" must coexist with it, not race it.
 
 ## Design constraints
 
@@ -117,9 +122,14 @@ changing the elaborator. The feature test should cover:
 - one two-edge lift, such as Natural to Rational, to ensure the solution uses
   the coercion registry rather than an Integer special case.
 
-Negative controls must keep unrelated carriers, downward coercions, and an
-unseeded all-Natural expression rejected. In particular an **abstract** bundle
-(`Ring.carrier(s)` for a variable `s`) must still fail to dispatch.
+Negative controls must keep unrelated carriers and downward coercions rejected,
+and must hold an **abstract** bundle (`Ring.carrier(s)` for a variable `s`)
+stuck, so it still fails to dispatch.
+
+The unseeded controls must be named precisely: an ordinary Natural expression
+like `1 + 2` obviously stays legal. What must stay rejected is an expression
+whose *only* reading needs a non-Natural carrier that nothing supplies — a
+standalone `-1`, or an untyped division with no expected type in sight.
 
 Likely files:
 
@@ -130,35 +140,53 @@ Likely files:
 
 Status: `[ ]`
 
-Promote the existing `carrierProjectionField` into a single shared
-`normalizedCarrierHead(type) -> std::string` that tries, in order: the raw head,
-the carrier projection, then bounded weak-head normalization. Cache the result
-for the duration of one elaboration.
+Promote the existing `carrierProjectionField` into one shared entry point, and
+route the consumers through it — relation dispatch, binary operator dispatch,
+expected-type coercion, and citation matching — so there are not four slightly
+different notions of "this is Integer".
 
-Route the four consumers through it — relation dispatch, binary operator
-dispatch, expected-type coercion, and citation matching — so there are not four
-slightly different notions of "this is Integer".
+**Return candidates, not a single name.** A single `-> std::string` is too
+lossy: a raw head can exist and still be unhelpful (`CommutativeRing.carrier`),
+and returning it would *mask* the projected concrete carrier — which is exactly
+today's `M(i,i) < 3` failure. The shape should be
 
-Two duplicates to fold up while here:
+```text
+carrierHeadCandidates(type) -> std::vector<std::string>   // ordered, deduplicated
+```
 
-- the hardcoded projector whitelist at `desugar_eliminators.cpp:485`
-  (`Ring`/`CommutativeRing`/`Field`/`VectorSpace`), which should derive from the
-  registered bundles rather than being enumerated;
-- the `.carrier` string-suffix test in unary dispatch at `dispatch.cpp:2107`,
-  which is a hand-rolled second implementation of the same idea.
+producing, in order: the raw head, alias unfoldings, the concrete carrier
+projection, then bounded weak-head normalization. Callers walk the list and take
+the first that resolves a registration. Cache per elaboration. Names rather than
+`ExpressionPointer`s keep this composable with `headConstantName`'s ~87 existing
+call sites.
 
-A name-returning signature is preferred over an `ExpressionPointer` one, so the
-result composes with `headConstantName`'s existing 91 call sites.
+One duplicate to fold up while here: the `.carrier` string-suffix test in unary
+dispatch at `dispatch.cpp:2107` is a hand-rolled second implementation of the
+same idea.
+
+**Out of scope for this step:** the hardcoded projector whitelist at
+`desugar_eliminators.cpp:485`. Deriving it from the registered bundles does not
+work as stated — `canonicalBundleRegistry` (`kernel.hpp:196`) maps a structure
+and carrier to a bundle, but does not encode *which constructor argument is the
+carrier field*, and that layout differs per structure (`Ring.make` takes it
+first; `CommutativeRing.make`/`Field.make` recurse through the nested layer;
+`VectorSpace.make` is a parameterized inductive where the field parameter comes
+first). Generalizing it needs a real carrier-projection descriptor. File that
+separately rather than smuggling it into E1.
 
 Acceptance probes:
 
 ```text
 M(i,i) * truant(A)
 M(i,i) < 3
+M(i,i) = 0
 ```
 
-No operand annotations required. `M(i,i) = 0` is expected to still fail here —
-it needs E3.
+Equality is expected to improve **here**, not at E3: the `=` path already
+performs a `combineOperands` join (`dispatch.cpp:1963`) and fails only because
+`headConstantName` hands it `CommutativeRing.carrier`. Feeding it candidates
+should be sufficient. If `M(i,i) = 0` still fails after E1, that is a finding to
+record — it means the `=` path needs the operand reordering of E3 as well.
 
 ### E2. Let expected carriers reach the operand leaf
 
@@ -246,11 +274,23 @@ M(i,i) < 3
 M(i,i) = 0
 ```
 
-All three elaborate to Integer relations without annotations.
+All three elaborate to Integer relations without annotations. The latter two may
+already pass after E1; re-measure before starting, and narrow this step to
+whatever remains.
 
 ### E4. Reconcile citation conclusions and premises after carrier inference
 
-Status: `[ ]`
+Status: `[ ]` — **conditional; re-measure after E3 before starting.**
+
+E1–E3 may make citation goals match already, since the goal's numeral leaves
+will elaborate at the right carrier in the first place. Run the regression below
+after E3 and skip this step entirely if it passes.
+
+If it does not pass, note that this is **not** a matter of calling
+`combineOperands`. That primitive reconciles two operands; citation matching
+compares entire proposition trees, so reconciliation has to walk the goal and
+the conclusion in parallel and coerce at corresponding leaves. Scope that work
+before committing to it.
 
 Once a goal fixes the carrier, citation matching should compare conclusions
 after applying the same canonical coercion reconciliation used for ordinary
@@ -268,11 +308,14 @@ Natural insertion point: on match failure, between the peel loop and
 Regression from this proof:
 
 ```text
-done by Integer.square_below_three(Matrix.borderColumn(B)(i))
+done by Integer.square_below_three
 ```
 
 This should close a goal written with bare `0` and `1`; it must not fail because
-the goal's numeral leaves were elaborated as Naturals before matching.
+the goal's numeral leaves were elaborated as Naturals before matching. Note the
+argument-free citation: the goal-driven form is the house style, and the earlier
+positional spelling `Integer.square_below_three(Matrix.borderColumn(B)(i))` is
+not what this project should be making work.
 
 Keep this scoped to registered coercions and conclusion-directed inference.
 Do not add search over arbitrary equality theorems.
