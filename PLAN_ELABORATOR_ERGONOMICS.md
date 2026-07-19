@@ -102,8 +102,14 @@ smaller changes, because both then inherit one shared notion of the carrier
 instead of each growing its own.
 
 Sections below are ordered for execution. Relative to the first draft of this
-plan, only the old E1 and E3 have swapped places; E2 keeps its number but its
-diagnosis is corrected, and E4–E6 are unchanged.
+plan the only **label** change is that the old E1 and E3 swapped places — E1 is
+now carrier normalization, E3 is bidirectional relation elaboration. E0 and
+E2–E6 keep their numbers.
+
+Every section's **content** has since been revised, so read them rather than
+diffing against memory of the first draft. In particular E2's diagnosis is
+corrected, E4 is now conditional on E1–E3 not already closing it, and E5 records
+its tension with E4.
 
 ## Work plan
 
