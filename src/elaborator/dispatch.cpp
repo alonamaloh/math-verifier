@@ -1951,27 +1951,51 @@ ExpressionPointer Elaborator::elaborateExpression(
                     inferTypeInLocalContext(localBinders, leftKernel);
                 ExpressionPointer leftType = closeOverLocalBinders(
                     leftTypeOpen, localBinders, localBinders.size());
-                // Pass leftType as expected type for the right side.
+                // Pass leftType as an inference hint for the right side.
                 // This lets `Quotient.class_of(rep2)` (implicit T, R) back-
                 // infer R from the carrier when the left side fixes it.
-                ExpressionPointer rightKernel =
-                    elaborateExpression(*binary->right, localBinders,
-                                          leftType);
-                // `elaborateExpression` treats expected types as inference
-                // hints; it does not itself insert a registered tower cast.
-                // Do that explicitly here so a Natural right operand can lift
-                // into a concrete carrier presented through a bundle
-                // projection.
-                rightKernel = coerceToExpectedTypeViaRegistry(
-                    localBinders, std::move(rightKernel), leftType);
+                //
+                // The hint is not authoritative: the right operand may carry
+                // independent evidence for a wider or heterogeneous type. In
+                // particular, a Natural left literal can poison the implicit
+                // `{A}` of `Subtype.value(x)` even though `x` fixes `A`.
+                // Include result-type inference in the guarded attempt,
+                // because a poisoned application can elaborate first and
+                // fail only when its type is inferred. On either failure,
+                // retry the right side bottom-up, matching binary dispatch.
+                ExpressionPointer rightKernel;
+                ExpressionPointer rightTypeOpen;
+                auto elaborateRightBottomUp = [&]() {
+                    rightKernel = elaborateExpression(
+                        *binary->right, localBinders);
+                    rightKernel = coerceToExpectedTypeViaRegistry(
+                        localBinders, std::move(rightKernel), leftType);
+                    rightTypeOpen = inferTypeInLocalContext(
+                        localBinders, rightKernel);
+                };
+                try {
+                    rightKernel = elaborateExpression(
+                        *binary->right, localBinders, leftType);
+                    // `elaborateExpression` treats expected types as inference
+                    // hints; it does not itself insert a registered tower
+                    // cast. Do that explicitly so a Natural right operand can
+                    // lift into a concrete carrier presented through a bundle
+                    // projection.
+                    rightKernel = coerceToExpectedTypeViaRegistry(
+                        localBinders, std::move(rightKernel), leftType);
+                    rightTypeOpen = inferTypeInLocalContext(
+                        localBinders, rightKernel);
+                } catch (const ElaborateError&) {
+                    elaborateRightBottomUp();
+                } catch (const TypeError&) {
+                    elaborateRightBottomUp();
+                }
                 // Mixed-type equality (`(n : Natural) = (x : Real)`):
                 // reconcile both sides to their join via the coercion
                 // order, so the `Equality` runs at the common type rather
                 // than forcing the right side into the left's type. See
                 // PLAN_COERCIONS.md.
                 {
-                    ExpressionPointer rightTypeOpen =
-                        inferTypeInLocalContext(localBinders, rightKernel);
                     ExpressionPointer rightType = closeOverLocalBinders(
                         rightTypeOpen, localBinders, localBinders.size());
                     bool reconciled = false;

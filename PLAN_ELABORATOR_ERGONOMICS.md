@@ -286,47 +286,30 @@ permanent error fixtures.
 
 ### E3. Make relation elaboration genuinely bidirectional
 
-Status: `[ ]`
+Status: `[x]`
 
-For `=`, `<`, and `≤`, collect carrier evidence from both operands before
-committing to a relation implementation:
+**Re-measurement.** After E1, all three original acceptance probes already
+elaborated at Integer. The arithmetic path already has the required
+bidirectional shape: it elaborates the left operand bottom-up, tries the right
+with the left carrier only as a guarded hint, retries the right bottom-up if
+either elaboration or result-type inference fails, and performs raw and
+candidate-aware coercion joins before selecting a registered relation or the
+Natural built-in. New reverse-orientation probes (`3 < b * b` and
+`3 < M(i,i)`) confirm that a bare left numeral does not commit `<` to Natural.
+Consequently no dispatch reordering was needed in
+`desugarArithmeticOperator`, and its `>`/`≥` flip and redundant-cast probe were
+left untouched.
 
-1. elaborate the informative operand;
-2. normalize its type via E1;
-3. elaborate the other operand with that carrier as its expected type;
-4. use the coercion registry if its inferred type is lower;
-5. select the relation only after both operands have been reconciled.
-
-Do not let a bare numeral select `Natural.LessThan` while the opposite operand
-already determines Integer. Preserve the existing carrier-join behavior for
-two independently informative operands.
-
-**This step is not additive, and that is the project's main risk.** Every
-existing fallback tier in `desugar_equality.cpp` is documented as safe
-*precisely because* it is reached only where elaboration previously errored
-(see the comment at `:453`). Reordering dispatch changes behavior for
-expressions that **compile today**, and a mis-dispatch to a different carrier
-can still typecheck rather than erroring. Full library re-verification from a
-cold cache is the only thing that catches this; treat it as a required gate for
-this step, not an optional one.
-
-Three specific hazards:
-
-- `desugar_equality.cpp:135` carries an explicit design comment stating that a
-  data operator's operand types are synthesized bottom-up and *"NEVER from an
-  enclosing context."* That invariant is deliberate and correct for data
-  operators. Scope this step to **relations only** — both paths already
-  special-case relation symbols — and revise that comment to record the split
-  rather than silently violating it.
-- The `≥`/`>` flip at `desugar_equality.cpp:46` swaps operands, so it inverts
-  which side is "informative".
-- The `--check-redundant-casts` probe at `desugar_equality.cpp:66` re-runs this
-  function up to three times and depends on structural-equality invariants.
-
-The `=` path (`dispatch.cpp:1956`) also lacks the bottom-up retry that the
-arithmetic path has (`desugar_equality.cpp:174`). Add the symmetric try/catch
-so a failed expected-type attempt degrades to today's behavior instead of
-erroring.
+**Implemented remainder.** Equality had the one real asymmetry. It propagated
+the left type into the right operand but did not guard that attempt. A Natural
+left numeral could therefore poison independent implicit evidence on the
+right: in `0 = Subtype.value(x)` for an Integer subtype, expected-result
+inference chose `A := Natural` and rejected `x` before the existing mixed-type
+join ran. The `=` path now guards expected-type elaboration, registry coercion,
+and result-type inference together, and retries the right operand bottom-up on
+either an elaboration or type error. The ordinary coercion join then lifts the
+left zero to Integer. This mirrors the established arithmetic retry without
+changing successful dispatch.
 
 Acceptance probes:
 
@@ -334,15 +317,19 @@ Acceptance probes:
 b * b < 3
 M(i,i) < 3
 M(i,i) = 0
+3 < b * b
+3 < M(i,i)
+0 = M(i,i)
+0 = Subtype.value(x)  -- x independently fixes an Integer subtype
 ```
 
-All three elaborate to Integer relations without annotations. The latter two may
-already pass after E1; re-measure before starting, and narrow this step to
-whatever remains.
+All elaborate without annotations. The original three and both reverse `<`
+probes passed before the E3 code change; the `Subtype.value` equality probe
+failed before the guarded retry and passes afterward.
 
 ### E4. Reconcile citation conclusions and premises after carrier inference
 
-Status: `[ ]` — **conditional; re-measure after E3 before starting.**
+Status: `[x]` — **skipped after re-measurement; no code was necessary.**
 
 E1–E3 may make citation goals match already, since the goal's numeral leaves
 will elaborate at the right carrier in the first place. Run the regression below
@@ -381,6 +368,14 @@ not what this project should be making work.
 
 Keep this scoped to registered coercions and conclusion-directed inference.
 Do not add search over arbitrary equality theorems.
+
+The exact argument-free regression already appears in
+`Matrix.sumOfTwoSquares_escalation_border_values` in
+`library/Algebra/rank_three_escalation_bounds.math`, and direct verification
+passes after E3. The goal is now elaborated at Integer before citation matching,
+so conclusion and premises match without a proposition-tree reconciliation
+retry. E4 is therefore deliberately omitted, avoiding the prover-cost risk
+described below.
 
 ### E5. Improve the failure mode and prover budget behavior
 

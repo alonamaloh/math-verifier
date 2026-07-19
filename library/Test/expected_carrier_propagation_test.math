@@ -97,3 +97,28 @@ definition Test.carrier_unary_bundled {n : ℕ}
 definition Test.carrier_postfix_expected
         (oneNonzero : ¬(Real.one = Real.zero)) : Real :=
   1⁻¹
+
+-- E3: relation evidence is bidirectional. A bare numeral on the left must not
+-- commit `<` to Natural when the right operand independently fixes Integer.
+definition Test.carrier_integer_relation_from_right (b : ℤ) : Proposition :=
+  3 < b * b
+
+-- The same reverse orientation through a closed bundle projection.
+definition Test.carrier_bundled_relation_from_right {n : ℕ}
+        (M : Matrix(Integer.commutative_ring_bundle, n, n))
+        (i : NaturalsBelow(n)) : Proposition :=
+  3 < M(i, i)
+
+definition Test.carrier_bundled_equality_from_right {n : ℕ}
+        (M : Matrix(Integer.commutative_ring_bundle, n, n))
+        (i : NaturalsBelow(n)) : Proposition :=
+  0 = M(i, i)
+
+-- Equality propagates the left type as a hint to the right. If that hint
+-- poisons implicit inference (`A := Natural` here), retry the right operand
+-- bottom-up: `x` independently determines `A := Integer`, after which the
+-- ordinary coercion join lifts the left zero.
+definition Test.carrier_equality_right_retry
+        (predicate : ℤ → Proposition)
+        (x : Subtype(ℤ, predicate)) : Proposition :=
+  0 = Subtype.value(x)
