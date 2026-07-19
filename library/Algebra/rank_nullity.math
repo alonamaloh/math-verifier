@@ -400,6 +400,9 @@ theorem VectorSpace.linearCombination_drop_zero_position {f : Field} {V : Vector
                  = VectorSpace.linearCombination(family,
                        (i : ℕ) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
                        (i : ℕ) ↦ selection(NaturalsBelow.skipValue(p, i)), 1 + q)
+                           by VectorSpace.linearCombination_pointwise_below
+                  as droppedResult;
+              done by substituting droppedResult
             }
         }
       }
@@ -1082,7 +1085,7 @@ theorem VectorSpace.InSpanOf.of_combination_covered {f : Field} {V : VectorSpace
         VectorSpace.linearCombination(inner, coefficients, selection, 1 + m)
            = VectorSpace.linearCombination(inner, coefficients, selection, m)
              + coefficients(m) • inner(selection(m))
-             by VectorSpace.linearCombination_add_one as peelEq;
+             by VectorSpace.linearCombination_add_one;
 
         coefficients(m) • inner(selection(m)) = VectorSpace.zero(V)
             ∨ VectorSpace.InSpanOf(outer, coefficients(m) • inner(selection(m)))
@@ -1126,7 +1129,7 @@ theorem VectorSpace.InSpanOf.of_combination_covered {f : Field} {V : VectorSpace
                                  by substituting prefixZero
                            = VectorSpace.zero(V) + VectorSpace.zero(V) by substituting termZero
                            = VectorSpace.zero(V);
-                        done
+                        done by Or.introduceLeft
                       }
                     case VectorSpace.InSpanOf(outer, coefficients(m) • inner(selection(m))) as termInSpan: {
                         VectorSpace.linearCombination(inner, coefficients, selection, m)
@@ -1134,12 +1137,12 @@ theorem VectorSpace.InSpanOf.of_combination_covered {f : Field} {V : VectorSpace
                            = VectorSpace.zero(V) + coefficients(m) • inner(selection(m))
                                  by substituting prefixZero
                            = coefficients(m) • inner(selection(m))
-                           as sumIsTerm;
+                                 by VectorSpace.zero_add;
                         VectorSpace.InSpanOf(outer,
                             VectorSpace.linearCombination(inner, coefficients, selection, m)
                             + coefficients(m) • inner(selection(m)))
-                            by { done by substituting sumIsTerm };
-                        done
+                            by VectorSpace.InSpanOf.of_equal;
+                        done by Or.introduceRight
                       }
                   }
                 }
@@ -1154,26 +1157,45 @@ theorem VectorSpace.InSpanOf.of_combination_covered {f : Field} {V : VectorSpace
                            = VectorSpace.linearCombination(inner, coefficients, selection, m) + VectorSpace.zero(V)
                                  by substituting termZero
                            = VectorSpace.linearCombination(inner, coefficients, selection, m)
-                                 by VectorSpace.add_zero
-                           as sumIsPrefix;
+                                 by VectorSpace.add_zero;
                         VectorSpace.InSpanOf(outer,
                             VectorSpace.linearCombination(inner, coefficients, selection, m)
                             + coefficients(m) • inner(selection(m)))
-                            by { done by substituting sumIsPrefix };
-                        done
+                            by VectorSpace.InSpanOf.of_equal;
+                        done by Or.introduceRight
                       }
                     case VectorSpace.InSpanOf(outer, coefficients(m) • inner(selection(m))) as termInSpan: {
                         VectorSpace.InSpanOf(outer,
                             VectorSpace.linearCombination(inner, coefficients, selection, m)
                             + coefficients(m) • inner(selection(m)))
                             by VectorSpace.InSpanOf.add;
-                        done
+                        done by Or.introduceRight
                       }
                   }
                 }
             }
           };
-        done by substituting peelEq
+        done by cases {
+          case VectorSpace.linearCombination(inner, coefficients, selection, m)
+                    + coefficients(m) • inner(selection(m)) = VectorSpace.zero(V)
+              as sumIsZero: {
+            VectorSpace.linearCombination(inner, coefficients, selection, 1 + m)
+               = VectorSpace.linearCombination(inner, coefficients, selection, m)
+                 + coefficients(m) • inner(selection(m))
+                     by VectorSpace.linearCombination_add_one
+               = VectorSpace.zero(V) by sumIsZero;
+            done by Or.introduceLeft
+          }
+          case VectorSpace.InSpanOf(outer,
+                    VectorSpace.linearCombination(inner, coefficients, selection, m)
+                    + coefficients(m) • inner(selection(m)))
+              as sumInSpan: {
+            VectorSpace.InSpanOf(outer,
+                VectorSpace.linearCombination(inner, coefficients, selection, 1 + m))
+                by VectorSpace.InSpanOf.of_equal;
+            done by Or.introduceRight
+          }
+        }
       }
   }
 
@@ -1865,7 +1887,7 @@ theorem LinearMap.appended_images_independent {f : Field} {V W : VectorSpace(f)}
            = VectorSpace.linearCombination(Function.extendBelow(e, VectorSpace.zero(V)), dPrime,
                  (i : ℕ) ↦ i, k)
            = VectorSpace.linearCombination(ext, dPrime, idE, k)
-          ;
+          as prefixReindex;
 
         -- Difference of the two `ext`-combinations vanishes; concatenate.
         VectorSpace.negate(VectorSpace.linearCombination(ext, dPrime, idE, k))
@@ -1878,8 +1900,11 @@ theorem LinearMap.appended_images_independent {f : Field} {V W : VectorSpace(f)}
            = VectorSpace.linearCombination(ext, coeff, selExt, cnt)
              + VectorSpace.negate(VectorSpace.linearCombination(ext, dPrime, idE, k)) by negatedPrefix
            = VectorSpace.linearCombination(aFamily, coeff, sel, cnt)
-             + VectorSpace.negate(VectorSpace.linearCombination(aFamily, coeff, sel, cnt))
+             + VectorSpace.negate(VectorSpace.linearCombination(ext, dPrime, idE, k))
                  by substituting aReindex
+           = VectorSpace.linearCombination(aFamily, coeff, sel, cnt)
+             + VectorSpace.negate(VectorSpace.linearCombination(aFamily, coeff, sel, cnt))
+                 by substituting prefixReindex
            = VectorSpace.zero(V) by VectorSpace.add_negate_right
            as combinedVanishesRaw;
         VectorSpace.linearCombination(ext,
@@ -2086,11 +2111,8 @@ theorem LinearMap.rank_nullity {f : Field} (V W : VectorSpace(f))
       ∧ VectorSpace.IsBasis(ext)
       ∧ (∀ (i : NaturalsBelow(sz)). ∀ (j : NaturalsBelow(kdim)).
             NaturalsBelow.value(i) = NaturalsBelow.value(j) → ext(i) = e(j))
-      from extendExists;
-  sz = kdim + rr as szEq;
-  VectorSpace.IsBasis(ext) as extBasis;
-  ∀ (i : NaturalsBelow(sz)). ∀ (j : NaturalsBelow(kdim)).
-      NaturalsBelow.value(i) = NaturalsBelow.value(j) → ext(i) = e(j) as extPrefix;
+      as extension from extendExists;
+  let ⟨szEq, extBasis, extPrefix⟩ := extension;
   VectorSpace.LinearlyIndependent(ext) by VectorSpace.IsBasis.linearly_independent as extIndependent;
   VectorSpace.Spans(ext) by VectorSpace.IsBasis.spans as extSpans;
 

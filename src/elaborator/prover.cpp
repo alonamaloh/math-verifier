@@ -3029,10 +3029,37 @@ ExpressionPointer Elaborator::structuralDiffProve(
 ExpressionPointer Elaborator::tryQuotientSoundBridge(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders) {
+        // Shape-gate ONCE before collecting/scanning facts. The wrapper helper
+        // below also validates this shape, but calling it per fact repeated
+        // the goal's WHNF + quotient-class peel for every local binder even
+        // when the goal was not a quotient equality. Hypothesis-heavy proofs
+        // made that failed tactic surprisingly expensive.
+        const int binderCount = static_cast<int>(localBinders.size());
+        ExpressionPointer equivalenceGoalOpened;
+        try {
+            ExpressionPointer goalOpened = openOverLocalBinders(
+                goalClosed, localBinders, binderCount);
+            equivalenceGoalOpened =
+                relaxClassEqualityToEquivalence(goalOpened);
+        } catch (const TypeError&) {
+            return nullptr;
+        } catch (const ElaborateError&) {
+            return nullptr;
+        }
+        if (!equivalenceGoalOpened) return nullptr;
+
+        Context openedContext = buildContextFromLocalBinders(localBinders);
         std::vector<ContextFact> soundFacts =
             collectLocalBinderFacts(localBinders);
         for (const ContextFact& fact : soundFacts) {
             autoProveSpend(1);
+            ExpressionPointer factTypeOpened = openOverLocalBinders(
+                fact.type, localBinders, binderCount);
+            if (!isDefinitionallyEqual(
+                    environment_, openedContext,
+                    factTypeOpened, equivalenceGoalOpened)) {
+                continue;
+            }
             ExpressionPointer wrapped =
                 tryQuotientSoundForClassEquality(
                     localBinders, fact.proofTerm, fact.type, goalClosed);
@@ -3557,4 +3584,3 @@ std::string Elaborator::goalHeadName(ExpressionPointer expression) {
         if (std::holds_alternative<FreeVariable>(head->node)) return "<fv>";
         return "<?>";
     }
-

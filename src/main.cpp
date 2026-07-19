@@ -3611,8 +3611,8 @@ void runErrorMessageTests() {
         }
     };
 
-    // Cases body type mismatch: the case-for-Constructor frame should
-    // appear, along with expected vs actual types.
+    // The retired expression-style `cases h { | ... }` spelling should
+    // produce the migration diagnostic rather than reaching elaboration.
     expectErrorContains(R"(
 module Test.errors_cases
 
@@ -3624,12 +3624,11 @@ theorem wrong_branch (A B : Proposition) (h : And(A, B)) : A :=
     | And.introduction(a, b) => b
   }
 )",
-        {"case for 'And.introduction'",
-         "cases expression at line",
-         "theorem 'wrong_branch'",
-         "this case's result has the wrong type",
-         "but this case gives: B"},
-        "cases-branch type mismatch",
+        {"cases <scrutinee>",
+         "pattern-match was retired",
+         "by cases",
+         "let ⟨…⟩ := x"},
+        "retired expression-style cases",
         __LINE__);
 
     // Under-applied inference with explicit `{x : T}` binders: when
@@ -3896,10 +3895,8 @@ theorem lift_reduces_to_f_of_x
         "Quotient.lift on Quotient.class_of reduces to f(x) definitionally",
         __LINE__);
 
-    // Pattern-match definition with a recursive call inside a cases
-    // clause's body. Exercises rewriteRecursiveCalls's descent into
-    // SurfaceCases — without it the recursive call wouldn't be
-    // rewritten to the recursion hypothesis and elaboration fails.
+    // A nested constructor pattern with a recursive call. This is the
+    // definition-side replacement for the retired `cases` expression.
     expectVerifies(R"(
 module Test.recursive_call_inside_cases
 
@@ -3908,14 +3905,12 @@ inductive Natural : Type(0) where
   | successor : Natural → Natural
 
 definition recursive_through_cases : Natural → Natural
-  | zero                   => zero
-  | successor(predecessor) =>
-      cases predecessor {
-        | zero               => successor(zero)
-        | successor(_inner)  => recursive_through_cases(predecessor)
-      }
+  | zero                         => zero
+  | successor(zero)              => successor(zero)
+  | successor(successor(inner))  =>
+      recursive_through_cases(successor(inner))
 )",
-        "recursive call inside cases body is rewritten",
+        "recursive call under a nested constructor pattern is rewritten",
         __LINE__);
 
     // Numeric literal: `2` bridges to `successor(successor(zero))`.
@@ -4040,7 +4035,7 @@ theorem flipped : Equality.{0}(Natural, zero, zero) := {
         "suffices reduces the goal via a lemma",
         __LINE__);
 
-    // `cases E { | Pattern => body … }` — case-split on a disjunction.
+    // Current proof-style case split on a disjunction stated in context.
     expectVerifies(R"(
 module Test.cases_on_disjunction
 
@@ -4048,10 +4043,21 @@ inductive Or (A B : Proposition) : Proposition where
   | Or.introduceLeft  : A → Or(A, B)
   | Or.introduceRight : B → Or(A, B)
 
+definition Or.eliminate
+        (A B Goal : Proposition)
+        (handleLeft : A → Goal) (handleRight : B → Goal)
+        (disjunction : Or(A, B)) : Goal :=
+  Or_recursor(
+      A, B, (_ : Or(A, B)) ↦ Goal,
+      handleLeft, handleRight, disjunction)
+
 theorem disjunction_swap (A B : Proposition) (h : Or(A, B)) : Or(B, A) :=
-  cases h {
-    | Or.introduceLeft(a)  => Or.introduceRight(B, A, a)
-    | Or.introduceRight(b) => Or.introduceLeft(B, A, b)
+  {
+    Or(A, B) by h;
+    done by cases {
+      case A as a: done by Or.introduceRight
+      case B as b: done by Or.introduceLeft
+    }
   }
 )",
         "cases on a disjunction swaps it",
@@ -4633,12 +4639,16 @@ axiom Equality.congruence.{u, v}
   : (A : Type(u)) -> (B : Type(v)) -> (f : A -> B)
     -> (x y : A) -> Equality.{u}(A, x, y) -> Equality.{v}(B, f(x), f(y))
 
-theorem Natural.add_zero : (a : Natural) -> Equality.{0}(Natural, Natural.add(a, zero), a)
-  | zero         => reflexivity.{0}(Natural, zero)
-  | successor(k) => Equality.congruence.{0, 0}(
-                       Natural, Natural, successor,
-                       Natural.add(k, zero), k,
-                       Natural.add_zero(k))
+theorem Natural.add_zero (a : Natural)
+    : Equality.{0}(Natural, Natural.add(a, zero), a) :=
+  by induction on a with IH {
+       case zero:
+         reflexivity.{0}(Natural, zero)
+       case successor(k):
+         Equality.congruence.{0, 0}(
+             Natural, Natural, successor,
+             Natural.add(k, zero), k, IH)
+     }
 )");
         EXPECT_TRUE(environment.lookup("Natural.add_zero") != nullptr);
     }
