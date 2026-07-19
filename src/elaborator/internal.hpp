@@ -2469,6 +2469,18 @@ private:
         ExpressionPointer term,
         ExpressionPointer expectedTypeClosed);
 
+    // Report a failed relation/equality carrier join before a misleading
+    // low-level application TypeError chooses one operand's implementation.
+    // Includes both inferred types, the normalized carrier candidates E1
+    // considered, and a concrete next step (or explains why an abstract
+    // bundle cannot be repaired by annotating only a numeral).
+    [[noreturn]] void throwCarrierReconciliationError(
+        const std::string& operatorSymbol,
+        ExpressionPointer leftTypeClosed,
+        ExpressionPointer rightTypeClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line);
+
     // Coerce a Proposition-valued term into a proof of itself when
     // the term equals the expected type. Returns nullptr if either
     // (a) the term isn't of type Proposition, or (b) the term isn't

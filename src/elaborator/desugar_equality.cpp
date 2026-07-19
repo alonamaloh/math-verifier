@@ -380,9 +380,21 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
                 if (joined) break;
                 for (const auto& rightHead : rightHeadCandidates) {
                     if (leftHead == rightHead) continue;
-                    auto combined = combineOperands(
-                        leftHead, rightHead,
-                        leftTypeClosed, rightTypeClosed);
+                    std::optional<CombineResult> combined;
+                    try {
+                        combined = combineOperands(
+                            leftHead, rightHead,
+                            leftTypeClosed, rightTypeClosed);
+                    } catch (const ElaborateError&) {
+                        // A later normalized candidate can expose an
+                        // ambiguous branching join even though the raw pair
+                        // had no join at all. It is not a resolving candidate:
+                        // keep the E1 candidate order and let a later pair
+                        // succeed. The raw×raw call above remains
+                        // authoritative and still reports a genuine
+                        // ambiguity exactly as before E1.
+                        continue;
+                    }
                     if (!combined) continue;
                     std::string atJoin = environment_.lookupOperator(
                         operatorSymbol, combined->resultHead,
@@ -496,6 +508,13 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
                  : environment_.operatorRegistry) {
                 const auto& [opSym, leftReg, rightReg] = key;
                 if (opSym != operatorSymbol) continue;
+                // This fallback exists for genuinely heterogeneous
+                // registrations such as scalar action. A homogeneous
+                // relation like `(Natural, Natural)` matching only the
+                // numeral side is not evidence that the other carrier is
+                // Natural; adopting it merely defers the mismatch to a
+                // misleading application TypeError.
+                if (leftReg == rightReg) continue;
                 bool leftHit = leftReg == operandTypeName;
                 bool rightHit = rightReg == rightTypeName;
                 if (leftHit == rightHit) continue;  // full match handled
@@ -507,6 +526,13 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
             if (halfMatchCount == 1) targetFunction = uniqueHalfMatch;
         }
         if (targetFunction.empty()) {
+            if (operatorSymbol == "<" || operatorSymbol == "≤") {
+                throwCarrierReconciliationError(
+                    operatorSymbol, leftTypeClosed,
+                    closeOverLocalBinders(
+                        rightTypeRaw, localBinders, localBinders.size()),
+                    localBinders, line);
+            }
             if (operatorSymbol == "[]") {
                 throw ElaborateError(
                     "no indexing operator is registered for type '"

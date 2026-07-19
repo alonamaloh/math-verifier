@@ -246,6 +246,15 @@ with the left expected type through the candidate-aware coercion lookup; its
 existing mixed-type join also retries normalized candidate pairs when that
 direct coercion does not apply.
 
+**Post-review semantic hardening.** That direct coercion initially wrapped a
+compound RHS without putting it in cast-normal form, silently weakening
+`((a + b : ℝ) = a + b)` to `↑(a + b) = ↑(a + b)`. Equality now pushes a
+registry-inserted RHS cast to the leaves immediately. Because ordinary
+verification cannot detect a theorem statement that remains well-typed but
+becomes vacuous, `carrier-normal-form-check` permanently inspects the
+elaborated feature declaration and requires the non-vacuous
+`↑(a + b) = ↑a + ↑b` shape.
+
 ### E2. Let expected carriers reach the operand leaf
 
 Status: `[x]`
@@ -379,7 +388,7 @@ described below.
 
 ### E5. Improve the failure mode and prover budget behavior
 
-Status: `[ ]`
+Status: `[x]`
 
 When expected-carrier propagation fails, report:
 
@@ -400,6 +409,33 @@ whose own comments name that re-entry as the dominant cost. Measure the failing
 path before and after E4; if the added reconciliation attempt widens it, gate
 the retry on the goal and conclusion actually having distinct carrier heads, so
 it costs nothing when carriers already agree.
+
+**Implemented and measured.** Failed `<`/`≤` dispatch and heterogeneous
+equality now share a carrier-reconciliation diagnostic. It prints both inferred
+operand types, both ordered E1 candidate lists, states that no registered
+upward coercion joins them, and gives the appropriate next step. A stuck bundle
+projection is called out as abstract, with the explicit warning that annotating
+only the numeral cannot choose an ordered carrier; two concrete unrelated
+carriers instead suggest an explicit cast to an intended shared registered
+carrier.
+
+The measurement also exposed a dispatch bug beneath the old diagnostic: the
+unique half-match fallback, intended for heterogeneous registrations such as
+scalar action, could adopt homogeneous `Natural.LessThan` merely because the
+numeral side matched. It is now restricted to registrations whose left and
+right carriers genuinely differ; the existing annotated-Integer scalar-action
+probe remains green.
+
+Candidate-aware join loops now treat an ambiguity exposed only by a later
+normalized candidate as a non-resolving candidate and continue in the
+deterministic E1 order. Raw-head ambiguity remains authoritative and reports
+exactly as before E1. This hardens the currently unreachable branch noted in
+review without changing today's coercion graph.
+
+No prover-budget change was needed. The exact argument-free rank-three
+citation verifies directly in 1.23 seconds after E1–E3 and never falls into the
+generic auto-prover failure path. Since E4's reconciliation retry was skipped,
+the re-entry/budget risk it would have introduced does not exist.
 
 ### E6. Sweep real proofs and measure the result
 

@@ -2045,16 +2045,44 @@ ExpressionPointer Elaborator::elaborateExpression(
                             carrierHeadCandidates(leftType);
                         const auto rightHeads =
                             carrierHeadCandidates(rightType);
+                        bool sharesCarrierCandidate = false;
                         for (const auto& candidateLeft : leftHeads) {
                             if (reconciled) break;
                             for (const auto& candidateRight : rightHeads) {
-                                if (candidateLeft == candidateRight) continue;
-                                if (auto combined = combineOperands(
+                                if (candidateLeft == candidateRight) {
+                                    sharesCarrierCandidate = true;
+                                    continue;
+                                }
+                                std::optional<CombineResult> combined;
+                                try {
+                                    combined = combineOperands(
                                         candidateLeft, candidateRight,
-                                        leftType, rightType)) {
+                                        leftType, rightType);
+                                } catch (const ElaborateError&) {
+                                    // An ambiguous join exposed only by a
+                                    // later normalized candidate must not
+                                    // pre-empt later candidate pairs. Raw
+                                    // ambiguity was already authoritative
+                                    // above, preserving pre-E1 behavior.
+                                    continue;
+                                }
+                                if (combined) {
                                     applyCombined(std::move(*combined));
                                     break;
                                 }
+                            }
+                        }
+                        if (!reconciled && !leftHeads.empty()
+                            && !rightHeads.empty()
+                            && !sharesCarrierCandidate) {
+                            Context context =
+                                buildContextFromLocalBinders(localBinders);
+                            if (!isDefinitionallyEqual(
+                                    environment_, context,
+                                    leftTypeOpen, rightTypeOpen)) {
+                                throwCarrierReconciliationError(
+                                    "=", leftType, rightType,
+                                    localBinders, expression.line);
                             }
                         }
                     }

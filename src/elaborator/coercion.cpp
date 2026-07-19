@@ -65,6 +65,76 @@ ExpressionPointer Elaborator::coerceToExpectedTypeViaRegistry(
         }
     }
 
+[[noreturn]] void Elaborator::throwCarrierReconciliationError(
+        const std::string& operatorSymbol,
+        ExpressionPointer leftTypeClosed,
+        ExpressionPointer rightTypeClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line) {
+        const auto leftHeads = carrierHeadCandidates(leftTypeClosed);
+        const auto rightHeads = carrierHeadCandidates(rightTypeClosed);
+        auto formatHeads = [](const std::vector<std::string>& heads) {
+            if (heads.empty()) return std::string{"<none>"};
+            std::string result;
+            for (const auto& head : heads) {
+                if (!result.empty()) result += ", ";
+                result += head;
+            }
+            return result;
+        };
+        auto isAbstractCarrier =
+            [&](ExpressionPointer type,
+                const std::vector<std::string>& heads) {
+                if (heads.empty()
+                    || !heads.front().ends_with(".carrier")) {
+                    return false;
+                }
+                // Alias/WHNF candidates such as `Ring.carrier` and its
+                // recursor do not make the carrier concrete. The E1
+                // projection resolver is the authoritative distinction:
+                // it returns the constructor's carrier field for a closed
+                // bundle and nullptr when the bundle remains opaque.
+                return carrierProjectionField(type) == nullptr;
+            };
+
+        std::string subject = operatorSymbol == "="
+            ? "equality"
+            : "operator '" + operatorSymbol + "'";
+        std::string message =
+            subject + " cannot reconcile its operand carriers"
+            "\n  left operand type: "
+            + prettyPrintInLocalScope(leftTypeClosed, localBinders)
+            + "\n  right operand type: "
+            + prettyPrintInLocalScope(rightTypeClosed, localBinders)
+            + "\n  carrier heads considered: left ["
+            + formatHeads(leftHeads) + "], right ["
+            + formatHeads(rightHeads) + "]"
+            + "\n  no registered upward coercion joins these carriers";
+        if (operatorSymbol != "=") {
+            message += ", and no matching '" + operatorSymbol
+                + "' implementation accepts the pair";
+        }
+        bool leftAbstract =
+            isAbstractCarrier(leftTypeClosed, leftHeads);
+        bool rightAbstract =
+            isAbstractCarrier(rightTypeClosed, rightHeads);
+        if (leftAbstract || rightAbstract) {
+            const char* side =
+                leftAbstract ? "left" : "right";
+            message +=
+                "\n  the " + std::string(side)
+                + " carrier is still abstract because its bundle is not "
+                  "concrete; supply a concrete ordered carrier or write/"
+                  "register the intended relation — annotating only the "
+                  "numeral cannot determine it";
+        } else {
+            message +=
+                "\n  if a common carrier was intended, cast one operand "
+                  "explicitly to that registered carrier";
+        }
+        throw ElaborateError(message, line, 0);
+    }
+
 ExpressionPointer Elaborator::coerceToExpectedTypeViaDiff(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer term,
