@@ -1,10 +1,12 @@
 -- Natural/multiply_bounds.math
 --
--- Two arithmetic facts the product rule of counting leans on:
---   * multiplication is monotone in its right factor, and
---   * the quotient and remainder of a division are unique.
--- Both are elementary, but stating them once here keeps the counting
--- bijection (Set/finite_product.math) free of arithmetic bookkeeping.
+-- Elementary multiplicative bounds, stated once so consumers stay free
+-- of arithmetic bookkeeping:
+--   * multiplication is monotone in its right factor,
+--   * the quotient and remainder of a division are unique (the counting
+--     bijection in Set/finite_product.math leans on both), and
+--   * the small-square bounds — which roots square below 2, 4, 6, and
+--     which small values are not sums of two squares / of m² + 2n².
 
 module Natural.multiply_bounds
 
@@ -117,6 +119,66 @@ theorem Natural.le_multiply_when_factor_at_least_one
      = p * x
 }
 
+-- Below 2 there is only 0 and 1 — the base of the small-value splits
+-- the square bounds below run on.
+theorem Natural.below_two (m : ℕ) (bound : m < 2) : m = 0 ∨ m = 1 := {
+  m = 0 ∨ ∃ (k : ℕ). m = 1 + k;
+  done by cases {
+    case m = 0: done
+    case ∃ (k : ℕ). m = 1 + k: {
+        choose k such that m = 1 + k;
+        1 ≤ m;
+        m ≤ 1 by Natural.le_of_lt_one_plus;
+        m = 1 by Natural.le_antisymmetric;
+        done
+      }
+  }
+}
+
+-- Every positive value below 5 is one of 1, 2, 3, 4.
+theorem Natural.positive_below_five (m : ℕ) (positive : m ≥ 1) (bound : m < 5)
+        : m = 1 ∨ m = 2 ∨ m = 3 ∨ m = 4 := {
+  m < 4 ∨ m = 4 ∨ 4 < m by Natural.lt_trichotomy;
+  done by cases {
+    case m < 4 as belowFour: {
+        m < 3 ∨ m = 3 ∨ 3 < m by Natural.lt_trichotomy;
+        done by cases {
+          case m < 3 as belowThree: {
+              m < 2 ∨ m = 2 ∨ 2 < m by Natural.lt_trichotomy;
+              done by cases {
+                case m < 2: {
+                    m ≤ 1 by Natural.le_of_lt_one_plus;
+                    m = 1 by Natural.le_antisymmetric;
+                    done
+                  }
+                case m = 2: done
+                case 2 < m: {
+                    3 ≤ m;
+                    m < 3 ≤ m;
+                    False by Natural.lt_irreflexive;
+                    done
+                  }
+              }
+            }
+          case m = 3: done
+          case 3 < m: {
+              4 ≤ m;
+              m < 4 ≤ m;
+              False by Natural.lt_irreflexive;
+              done
+            }
+        }
+      }
+    case m = 4: done
+    case 4 < m: {
+        5 ≤ m;
+        m < 5 ≤ m;
+        False by Natural.lt_irreflexive;
+        done
+      }
+  }
+}
+
 -- A square below 2 has root 0 or 1: any root of at least 2 squares to at
 -- least 4.
 theorem Natural.square_below_two (m : ℕ) (bound : m * m < 2) : m = 0 ∨ m = 1 := {
@@ -151,6 +213,66 @@ theorem Natural.square_below_two (m : ℕ) (bound : m * m < 2) : m = 0 ∨ m = 1
   }
 }
 
+-- A square below 4 also has root 0 or 1 — 4 is itself the next square.
+theorem Natural.square_below_four (m : ℕ) (bound : m * m < 4)
+        : m = 0 ∨ m = 1 := {
+  m < 2 ∨ m = 2 ∨ 2 < m by Natural.lt_trichotomy;
+  done by cases {
+    case m < 2: done by Natural.below_two
+    case m = 2 ∨ 2 < m: {
+        2 ≤ m by cases {
+            case m = 2: done
+            case 2 < m: done by Natural.LessThan.weaken
+          };
+        2 * 2 ≤ 2 * m by Natural.multiply_monotone_left
+              = m * 2
+              ≤ m * m by Natural.multiply_monotone_left;
+        m * m < 4 = 2 * 2 ≤ m * m;
+        False by Natural.lt_irreflexive;
+        done
+      }
+  }
+}
+
+-- A square below 6 has root 0, 1, or 2: the next square up is 9.
+theorem Natural.square_below_six (m : ℕ) (bound : m * m < 6)
+        : m = 0 ∨ m = 1 ∨ m = 2 := {
+  m < 3 ∨ m = 3 ∨ 3 < m by Natural.lt_trichotomy;
+  done by cases {
+    case m < 3 as belowThree: {
+        m < 2 ∨ m = 2 ∨ 2 < m by Natural.lt_trichotomy;
+        done by cases {
+          case m < 2: {
+              m = 0 ∨ m = 1 by Natural.below_two;
+              done by cases {
+                case m = 0: done
+                case m = 1: done
+              }
+            }
+          case m = 2: done
+          case 2 < m: {
+              3 ≤ m;
+              m < 3 ≤ m;
+              False by Natural.lt_irreflexive;
+              done
+            }
+        }
+      }
+    case m = 3 ∨ 3 < m: {
+        3 ≤ m by cases {
+            case m = 3: done
+            case 3 < m: done by Natural.LessThan.weaken
+          };
+        3 * 3 ≤ 3 * m by Natural.multiply_monotone_left
+              = m * 3
+              ≤ m * m by Natural.multiply_monotone_left;
+        m * m < 6 < 3 * 3 ≤ m * m;
+        False by Natural.lt_irreflexive;
+        done
+      }
+  }
+}
+
 -- 2 lies strictly between the consecutive squares 1 and 4, so it is not a
 -- square: a root would be at most 1 (square too small) or at least 2
 -- (square too large).
@@ -172,5 +294,142 @@ theorem Natural.two_is_not_a_square (m : ℕ) : ¬(m * m = 2) := {
         m * m = 2 by squareIsTwo < 4 ≤ 2 * m by Natural.multiply_monotone_left = m * 2 ≤ m * m by Natural.multiply_monotone_left;
         done
     }
+  }
+}
+
+-- 3 is not a sum of two squares: both roots are below 2 (each square is
+-- at most 3), and 0, 1, 2 are the only reachable sums.
+theorem Natural.three_not_sum_of_two_squares (m n : ℕ)
+        : ¬(m * m + n * n = 3) := {
+  suppose m * m + n * n = 3 as sumIsThree;
+  m * m ≤ m * m + n * n = 3 < 4;
+  n * n ≤ n * n + m * m = m * m + n * n by Natural.add_commutative = 3 < 4;
+  m = 0 ∨ m = 1 by Natural.square_below_four;
+  n = 0 ∨ n = 1 by Natural.square_below_four;
+  done by cases {
+    case m = 0 as mZero: done by cases {
+        case n = 0 as nZero: {
+            3 = m * m + n * n by sumIsThree
+              = 0 * 0 + n * n by substituting mZero
+              = 0 * 0 + 0 * 0 by substituting nZero
+              = 0;
+            done
+          }
+        case n = 1 as nOne: {
+            3 = m * m + n * n by sumIsThree
+              = 0 * 0 + n * n by substituting mZero
+              = 0 * 0 + 1 * 1 by substituting nOne
+              = 1;
+            done
+          }
+      }
+    case m = 1 as mOne: done by cases {
+        case n = 0 as nZero: {
+            3 = m * m + n * n by sumIsThree
+              = 1 * 1 + n * n by substituting mOne
+              = 1 * 1 + 0 * 0 by substituting nZero
+              = 1;
+            done
+          }
+        case n = 1 as nOne: {
+            3 = m * m + n * n by sumIsThree
+              = 1 * 1 + n * n by substituting mOne
+              = 1 * 1 + 1 * 1 by substituting nOne
+              = 2;
+            done
+          }
+      }
+  }
+}
+
+-- 5 is not of the form m² + 2n²: both roots are below 3, and the nine
+-- reachable values are 0, 1, 2, 3, 4, 6, 8, 9, 12.
+theorem Natural.five_not_square_plus_double_square (m n : ℕ)
+        : ¬(m * m + 2 * (n * n) = 5) := {
+  suppose m * m + 2 * (n * n) = 5 as sumIsFive;
+  m * m ≤ m * m + 2 * (n * n) = 5 < 6;
+  n * n ≤ 2 * (n * n) by Natural.le_multiply_when_factor_at_least_one
+        ≤ m * m + 2 * (n * n) by Natural.less_or_equal_add_left
+        = 5 < 6;
+  m = 0 ∨ m = 1 ∨ m = 2 by Natural.square_below_six;
+  n = 0 ∨ n = 1 ∨ n = 2 by Natural.square_below_six;
+  done by cases {
+    case m = 0 as mZero: done by cases {
+        case n = 0 as nZero: {
+            5 = m * m + 2 * (n * n) by sumIsFive
+              = 0 * 0 + 2 * (n * n) by substituting mZero
+              = 0 * 0 + 2 * (0 * 0) by substituting nZero
+              = 0;
+            done
+          }
+        case n = 1 ∨ n = 2: done by cases {
+            case n = 1 as nOne: {
+                5 = m * m + 2 * (n * n) by sumIsFive
+                  = 0 * 0 + 2 * (n * n) by substituting mZero
+                  = 0 * 0 + 2 * (1 * 1) by substituting nOne
+                  = 2;
+                done
+              }
+            case n = 2 as nTwo: {
+                5 = m * m + 2 * (n * n) by sumIsFive
+                  = 0 * 0 + 2 * (n * n) by substituting mZero
+                  = 0 * 0 + 2 * (2 * 2) by substituting nTwo
+                  = 8;
+                done
+              }
+          }
+      }
+    case m = 1 ∨ m = 2: done by cases {
+        case m = 1 as mOne: done by cases {
+            case n = 0 as nZero: {
+                5 = m * m + 2 * (n * n) by sumIsFive
+                  = 1 * 1 + 2 * (n * n) by substituting mOne
+                  = 1 * 1 + 2 * (0 * 0) by substituting nZero
+                  = 1;
+                done
+              }
+            case n = 1 ∨ n = 2: done by cases {
+                case n = 1 as nOne: {
+                    5 = m * m + 2 * (n * n) by sumIsFive
+                      = 1 * 1 + 2 * (n * n) by substituting mOne
+                      = 1 * 1 + 2 * (1 * 1) by substituting nOne
+                      = 3;
+                    done
+                  }
+                case n = 2 as nTwo: {
+                    5 = m * m + 2 * (n * n) by sumIsFive
+                      = 1 * 1 + 2 * (n * n) by substituting mOne
+                      = 1 * 1 + 2 * (2 * 2) by substituting nTwo
+                      = 9;
+                    done
+                  }
+              }
+          }
+        case m = 2 as mTwo: done by cases {
+            case n = 0 as nZero: {
+                5 = m * m + 2 * (n * n) by sumIsFive
+                  = 2 * 2 + 2 * (n * n) by substituting mTwo
+                  = 2 * 2 + 2 * (0 * 0) by substituting nZero
+                  = 4;
+                done
+              }
+            case n = 1 ∨ n = 2: done by cases {
+                case n = 1 as nOne: {
+                    5 = m * m + 2 * (n * n) by sumIsFive
+                      = 2 * 2 + 2 * (n * n) by substituting mTwo
+                      = 2 * 2 + 2 * (1 * 1) by substituting nOne
+                      = 6;
+                    done
+                  }
+                case n = 2 as nTwo: {
+                    5 = m * m + 2 * (n * n) by sumIsFive
+                      = 2 * 2 + 2 * (n * n) by substituting mTwo
+                      = 2 * 2 + 2 * (2 * 2) by substituting nTwo
+                      = 12;
+                    done
+                  }
+              }
+          }
+      }
   }
 }
