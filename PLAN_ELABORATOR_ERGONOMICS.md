@@ -248,27 +248,28 @@ direct coercion does not apply.
 
 ### E2. Let expected carriers reach the operand leaf
 
-Status: `[ ]`
+Status: `[x]`
 
-**Corrected diagnosis.** The plumbing already exists: `dispatch.cpp:2076`
-propagates the expected type into the unary `-` operand whenever that type has
-a `Constant` head. The failure is one level lower —
+**Baseline diagnosis.** The plumbing already existed: unary dispatch propagated
+an expected type only when it was a bare `Constant`. The failure was one level
+lower —
 `Elaborator::elaborateNumericLiteral` (`src/elaborator/inference.cpp:3047`)
 takes only `(numeric, line, column)` and unconditionally emits a
 `NaturalLiteral`. The expected type never reaches the leaf, so the operand types
 as `Natural`, `Natural.negate` does not exist, and dispatch reports that Natural
 has no negation.
 
-Preferred fix, in order of preference:
+**Implemented fix.** Prefix negation now accepts an expected type when one of
+its E1 carrier candidates provides `<T>.negate`, elaborates the operand with
+that hint, then calls `coerceToExpectedTypeViaRegistry` on the resulting term.
+Numeric literals remain honestly Natural at the leaf; the registered coercion
+is inserted immediately above it. Negation dispatch itself now consumes the E1
+candidate list, replacing its hand-written forward-alias loop while preserving
+the abstract-bundle and reverse-alias fallbacks.
 
-1. call `coerceToExpectedTypeViaRegistry` (`src/elaborator/coercion.cpp:26`) on
-   the operand after `dispatch.cpp:2088` — a small change reusing existing
-   machinery, and the same call that argument positions already make;
-2. only if that proves insufficient, make numeric literals expected-type-aware.
-
-Also relax the "bare `Constant` only" gate at `dispatch.cpp:2078` to accept an
-E1-normalized carrier, and mirror the propagation into the postfix path
-(`dispatch.cpp:2240`), which today passes no expected type at all.
+Registered postfix operators mirror the same rule: a known result carrier
+reaches the operand only when that carrier registers the postfix symbol, then
+the operand is reconciled through the coercion registry before dispatch.
 
 Acceptance probes:
 
@@ -276,9 +277,12 @@ Acceptance probes:
 b = -1
 b = -m          -- b : ℤ, m : ℕ
 q < -n          -- q : ℚ, n : ℕ
+M(i,i) = -1     -- concrete bundled Integer carrier
+1⁻¹ : ℝ         -- expected-carrier propagation through postfix dispatch
 ```
 
-A standalone `-m` with no expected carrier must remain rejected.
+Both standalone `-1` and `-m` with no expected carrier remain rejected in
+permanent error fixtures.
 
 ### E3. Make relation elaboration genuinely bidirectional
 

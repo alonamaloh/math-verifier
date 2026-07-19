@@ -3,6 +3,7 @@ module Test.expected_carrier_propagation_test
 import Algebra.escalation
 import Rational.embedding
 import Rational.order
+import Real.field
 
 -- Expected-carrier propagation (PLAN_ELABORATOR_ERGONOMICS.md, step E0).
 --
@@ -71,3 +72,28 @@ definition Test.carrier_bundled_operand {n : ℕ}
         (A : Matrix(Integer.commutative_ring_bundle, n, n))
         (i : NaturalsBelow(n)) : Proposition :=
   M(i, i) * Matrix.truant(A) = 0
+
+-- Expected carriers reach through unary negation to a literal and to a
+-- Natural variable; the operand is lifted before `<T>.negate` is selected.
+definition Test.carrier_unary_numeral (b : ℤ) : Proposition :=
+  b = -1
+
+definition Test.carrier_unary_natural (b : ℤ) (m : ℕ) : Proposition :=
+  b = -m
+
+-- The rule is the coercion tower, not an Integer special case.
+definition Test.carrier_unary_rational (q : ℚ) (n : ℕ) : Proposition :=
+  q < -n
+
+-- E1-normalized expected carriers propagate through unary negation too.
+definition Test.carrier_unary_bundled {n : ℕ}
+        (M : Matrix(Integer.commutative_ring_bundle, n, n))
+        (i : NaturalsBelow(n)) : Proposition :=
+  M(i, i) = -1
+
+-- Registered postfix operators use the same expected-carrier rule. The
+-- hypothesis supplies the reciprocal's honest nonzero side condition; the
+-- operand itself remains a bare Natural numeral.
+definition Test.carrier_postfix_expected
+        (oneNonzero : ¬(Real.one = Real.zero)) : Real :=
+  1⁻¹

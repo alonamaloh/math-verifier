@@ -2102,35 +2102,42 @@ ExpressionPointer Elaborator::elaborateExpression(
                             *call, localBinders, expectedType);
                     }
                 }
-                // Dispatch unary `-` based on the operand's head type:
-                // Integer.negate / Rational.negate / etc. If the raw
-                // head type doesn't have a `.negate`, try operand-type
-                // names from the binary `-` registry whose definition
-                // δ-reduces to the operand's actual type — same fallback
-                // as the binary operator dispatch.
-                //
-                // Propagate the outer expected type to the operand
-                // when it has a Constant head — `-` is type-preserving
-                // for numeric carriers, so short-form `Quotient.class_of(rep)`
-                // can fire under it.
+                // Unary `-` is carrier-preserving. Propagate an outer expected
+                // type when its normalized carrier has a negation, then lift a
+                // lower operand into that carrier through the coercion
+                // registry. A literal still elaborates initially as Natural;
+                // the expected carrier is applied here at the unary leaf.
                 ExpressionPointer operandExpectedType = nullptr;
-                if (expectedType
-                    && std::holds_alternative<Constant>(
-                            expectedType->node)) {
-                    operandExpectedType = expectedType;
+                if (expectedType) {
+                    for (const auto& candidate :
+                         carrierHeadCandidates(expectedType)) {
+                        if (environment_.lookup(candidate + ".negate")
+                            != nullptr) {
+                            operandExpectedType = expectedType;
+                            break;
+                        }
+                    }
                 }
                 ExpressionPointer operandKernel =
                     elaborateExpression(*unary->operand, localBinders,
                                          operandExpectedType);
+                if (operandExpectedType) {
+                    operandKernel = coerceToExpectedTypeViaRegistry(
+                        localBinders, std::move(operandKernel),
+                        operandExpectedType);
+                }
                 ExpressionPointer operandType =
                     inferTypeInLocalContext(localBinders, operandKernel);
                 std::string operandTypeName =
                     headConstantName(operandType);
                 std::string negateFunction;
-                if (!operandTypeName.empty()
-                    && environment_.lookup(operandTypeName + ".negate")
-                       != nullptr) {
-                    negateFunction = operandTypeName + ".negate";
+                for (const auto& candidate :
+                     carrierHeadCandidates(operandType)) {
+                    if (environment_.lookup(candidate + ".negate")
+                        != nullptr) {
+                        negateFunction = candidate + ".negate";
+                        break;
+                    }
                 }
                 // Bundle carrier: an operand of type `X.carrier(...)`
                 // negates via `X.negate` (the bundle's own negation),
@@ -2159,49 +2166,6 @@ ExpressionPointer Elaborator::elaborateExpression(
                                 expression.line, expression.column);
                         return elaborateExpression(
                             *call, localBinders, expectedType);
-                    }
-                }
-                if (negateFunction.empty()) {
-                    // An operand whose type is (an alias of) an applied
-                    // type former `F(args…)` with an `F.negate`: unfold
-                    // bare alias heads step by step and check each head —
-                    // `ComplexNumber` → `RingModulo(c, m)` dispatches to
-                    // `RingModulo.negate` (implicits filled by the
-                    // re-elaboration below).
-                    ExpressionPointer aliasCursor = operandType;
-                    for (int unfoldStep = 0;
-                         unfoldStep < 8 && negateFunction.empty();
-                         ++unfoldStep) {
-                        ExpressionPointer aliasHead;
-                        std::vector<ExpressionPointer> aliasArgs;
-                        peelSpine(aliasCursor, aliasHead, aliasArgs);
-                        auto* aliasConstant =
-                            std::get_if<Constant>(&aliasHead->node);
-                        if (!aliasConstant) break;
-                        if (environment_.lookup(
-                                aliasConstant->name + ".negate")
-                            != nullptr) {
-                            negateFunction =
-                                aliasConstant->name + ".negate";
-                            break;
-                        }
-                        if (!aliasArgs.empty()
-                            || !aliasConstant->universeArguments.empty()) {
-                            break;
-                        }
-                        const Declaration* aliasDeclaration =
-                            environment_.lookup(aliasConstant->name);
-                        if (!aliasDeclaration) break;
-                        auto* aliasDefinition =
-                            std::get_if<Definition>(aliasDeclaration);
-                        if (!aliasDefinition
-                            || aliasDefinition->opacity
-                                   != Opacity::Transparent
-                            || !aliasDefinition->universeParameters
-                                    .empty()) {
-                            break;
-                        }
-                        aliasCursor = aliasDefinition->body;
                     }
                 }
                 if (negateFunction.empty()) {
@@ -2274,13 +2238,39 @@ ExpressionPointer Elaborator::elaborateExpression(
                             *call, localBinders, expectedType);
                     }
                 }
+                // Like prefix negation, a registered postfix operator is
+                // carrier-preserving. Let a known result carrier reach the
+                // operand, but only when that carrier actually registers this
+                // postfix symbol.
+                ExpressionPointer operandExpectedType = nullptr;
+                if (expectedType) {
+                    for (const auto& candidate :
+                         carrierHeadCandidates(expectedType)) {
+                        if (!environment_.lookupOperator(
+                                unary->opSymbol, candidate, "").empty()) {
+                            operandExpectedType = expectedType;
+                            break;
+                        }
+                    }
+                }
                 ExpressionPointer operandKernel =
-                    elaborateExpression(*unary->operand, localBinders);
+                    elaborateExpression(*unary->operand, localBinders,
+                                         operandExpectedType);
+                if (operandExpectedType) {
+                    operandKernel = coerceToExpectedTypeViaRegistry(
+                        localBinders, std::move(operandKernel),
+                        operandExpectedType);
+                }
                 ExpressionPointer operandType =
                     inferTypeInLocalContext(localBinders, operandKernel);
                 std::string operandTypeName = headConstantName(operandType);
-                std::string postfixFunction = environment_.lookupOperator(
-                    unary->opSymbol, operandTypeName, "");
+                std::string postfixFunction;
+                for (const auto& candidate :
+                     carrierHeadCandidates(operandType)) {
+                    postfixFunction = environment_.lookupOperator(
+                        unary->opSymbol, candidate, "");
+                    if (!postfixFunction.empty()) break;
+                }
                 // δ-reduce fallback: a bundle-carrier / alias operand
                 // (head e.g. `Quotient`) matches a registered operand
                 // type whose definition body reduces to the same WHNF.
