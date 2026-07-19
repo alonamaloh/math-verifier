@@ -18,7 +18,7 @@ terms. The kernel remains unchanged and checks every generated term.
 Probes re-run 2026-07-19 against `library/Algebra/rank_three_escalation_bounds.math`
 and the `Integer`/`Matrix` cones.
 
-| Surface expression | Result today | Root cause |
+| Surface expression | Baseline result | Root cause |
 |---|---|---|
 | `b * b < 3`, for `b : ℤ` | accepts | A syntactic Integer operand seeds the relation correctly. |
 | `b = 1`, for `b : ℤ` | accepts | The `=` path passes the left type to the right operand. |
@@ -320,6 +320,14 @@ either an elaboration or type error. The ordinary coercion join then lifts the
 left zero to Integer. This mirrors the established arithmetic retry without
 changing successful dispatch.
 
+The E6 proof sweep exposed the corresponding failure-before-sibling case for
+ordinary operators: the left operand of `-m * a` cannot synthesize unary
+negation before the right operand reveals `a : Integer`. Binary dispatch now
+guards that initial failure, elaborates the right operand bottom-up, and retries
+the left with the right carrier as its expected type. The already-successful
+left-to-right path is unchanged, and if the right operand supplies no usable
+carrier the original left-hand diagnostic is preserved.
+
 Acceptance probes:
 
 ```text
@@ -330,6 +338,7 @@ M(i,i) = 0
 3 < M(i,i)
 0 = M(i,i)
 0 = Subtype.value(x)  -- x independently fixes an Integer subtype
+-m * a = 0            -- a : ℤ, m : ℕ
 ```
 
 All elaborate without annotations. The original three and both reverse `<`
@@ -439,7 +448,7 @@ the re-entry/budget risk it would have introduced does not exist.
 
 ### E6. Sweep real proofs and measure the result
 
-Status: `[ ]`
+Status: `[x]`
 
 Use `library/Algebra/rank_three_escalation_bounds.math` as the first acceptance
 file — its 297 explicit integer casts are the measured baseline — then sample
@@ -458,6 +467,34 @@ Primary target:
 
 Record before/after counts, compile time, and any annotation that survives with
 an explanation. Do not run a blind repository-wide rewrite.
+
+**Measured result.** The rank-three file fell from **297** explicit integer
+numeral annotations to **16**: 281 removed (**94.6%**). The redundant-cast
+checker is silent on the result. The surviving annotations fall into four
+observable boundaries:
+
+- three heterogeneous scalar actions, where a matrix or vector cannot by
+  itself choose the scalar carrier;
+- three final calc endpoints whose substitution proof requires the endpoint
+  to be elaborated at Integer;
+- six calc/ground-arithmetic seeds where every local leaf would otherwise be
+  Natural; and
+- four dependent `Matrix.borderedAssembly` arguments whose ring bundle is
+  still implicit when the integer corner argument is elaborated.
+
+There are no nested numeral casts. The targeted sample was
+`Algebra.matrix_vector` (0 integer numeral annotations),
+`Algebra.characteristic_polynomial` (0), and
+`Algebra.integer_quadratic_form` (24); all three verify with
+`MATH_CHECK_REDUNDANT_CASTS=1` without a warning, so no blind follow-on rewrite
+was justified.
+
+Five warm direct verifications with the current kernel measured a median
+**1.57 s** for the original 297-cast revision and **2.75 s** for the cleaned
+revision. The extra 1.18 s is the elaboration cost of asking the coercion join
+to infer 281 previously pre-ascribed sites; the dispatch changes themselves
+remain cost-gated, and the full-suite gates below stay green. This is an
+explicit ergonomics/performance tradeoff rather than an unmeasured regression.
 
 ## Implementation order and commits
 

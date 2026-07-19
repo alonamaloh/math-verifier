@@ -47,12 +47,24 @@ style or an exception available to downstream modules.
 A bare numeral parses as a `Natural` (the literal default never changes). What
 varies is whether the *position* lifts it up the coercion tower:
 
-- **Function-argument and operator-operand positions DO coerce.** When the
-  expected type is a registered coercion target, a bare numeral (or a bare
-  `Natural` variable) is lifted automatically. So `Real.power(2, m)` and
-  `Real.power(m, m)` need no ascription — the base `2` / `m` is `Natural`,
-  lifted to `Real` exactly as `(2 : Real)` / `(m : Real)` would be. **Prefer
-  the bare form.** Likewise prefer real division `(x + y) / 2` over
+**Predictable carrier rule.** A bare numeral or bare `Natural` term remains
+Natural until a concrete carrier is available. In a homogeneous equality,
+order relation, or arithmetic operator, either successfully typed operand may
+supply that carrier and the other operand is lifted along the registered
+upward coercion chain, including through unary/postfix notation (`a = -m`,
+`-m * a`, `1⁻¹ : Real`). A concrete function-argument type supplies the same
+evidence. Nothing is coerced downward or between unrelated carriers, and an
+abstract bundle, an all-Natural expression, a heterogeneous scalar action, or
+a dependent argument whose bundle is still being inferred needs one explicit
+annotation at that boundary.
+
+- **Concrete function-argument and homogeneous operator/relation positions do
+  coerce.** When the expected type or another operand is a registered coercion
+  target, a bare numeral (or a bare `Natural` variable) is lifted
+  automatically. So `Real.power(2, m)` and `Real.power(m, m)` need no
+  ascription — the base `2` / `m` is `Natural`, lifted to `Real` exactly as
+  `(2 : Real)` / `(m : Real)` would be. **Prefer the bare form.** Likewise
+  prefer real division `(x + y) / 2` over
   `(x + y) * (Rational.one_half : Real)` — it reads as the mathematics, and
   `field` proves identities over it directly (see `algebra-tactics.md`).
 - **All-numeral chain heads do not.** A chain beginning `0 = 0 + 0 ≤ …`
