@@ -165,10 +165,9 @@ ExpressionPointer Elaborator::tryLemmaIndexLookup(
             keys.push_back(wildcardKey);
         }
         for (uint64_t key : keys) {
-        auto range = lemmaIndex_.equal_range(key);
-        for (auto iterator = range.first;
-             iterator != range.second; ++iterator) {
-            const RewriteLemma& lemma = iterator->second;
+        auto bucket = lemmaIndex_.find(key);
+        if (bucket == lemmaIndex_.end()) continue;
+        for (const RewriteLemma& lemma : bucket->second) {
             std::vector<ExpressionPointer> bindings(lemma.binderCount);
             ExpressionPointer patternFor = lemma.reverseDirection
                 ? lemma.rhs : lemma.lhs;

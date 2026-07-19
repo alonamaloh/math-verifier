@@ -1642,12 +1642,16 @@ void Elaborator::registerGenericRewriteLemma(const std::string& theoremName,
         bool lhsIsNumeral = asNumeralLiteral(lhs).has_value();
         bool rhsIsNumeral = asNumeralLiteral(rhs).has_value();
         if (!lhsIsNumeral) {
-            if (lhsRawKey) lemmaIndex_.emplace(*lhsRawKey, forwardEntry);
-            lemmaIndex_.emplace(lhsKey, std::move(forwardEntry));
+            if (lhsRawKey) {
+                lemmaIndex_[*lhsRawKey].push_back(forwardEntry);
+            }
+            lemmaIndex_[lhsKey].push_back(std::move(forwardEntry));
         }
         if (!rhsIsNumeral) {
-            if (rhsRawKey) lemmaIndex_.emplace(*rhsRawKey, reverseEntry);
-            lemmaIndex_.emplace(rhsKey, std::move(reverseEntry));
+            if (rhsRawKey) {
+                lemmaIndex_[*rhsRawKey].push_back(reverseEntry);
+            }
+            lemmaIndex_[rhsKey].push_back(std::move(reverseEntry));
         }
     }
 

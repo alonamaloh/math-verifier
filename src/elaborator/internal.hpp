@@ -6643,7 +6643,12 @@ private:
         // `Equality.symmetry`).
         bool reverseDirection = false;
     };
-    std::unordered_multimap<uint64_t, RewriteLemma> lemmaIndex_;
+    // A hash lookup finds a bucket, but candidate traversal within that
+    // bucket follows registration order. `unordered_multimap::equal_range`
+    // exposed the standard library's unspecified equal-key iteration order
+    // here, so libc++ and libstdc++ could select different first-successful
+    // proofs from the same source.
+    std::unordered_map<uint64_t, std::vector<RewriteLemma>> lemmaIndex_;
     // Notation-wrapper → raw-head bridge for the lemma index. A `definition`
     // registered as an `overload` alias target or an `operator` dispatch
     // target (`List.lengthOf` for `length`, `List.removeFrom` for `∖`) is a

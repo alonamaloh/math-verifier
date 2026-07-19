@@ -1326,10 +1326,9 @@ void Elaborator::collectLibraryEqualitiesAtNode(
         }
         for (int keyIndex = 0; keyIndex < keyCount; ++keyIndex) {
         uint64_t key = keyBuffer[keyIndex];
-        auto range = lemmaIndex_.equal_range(key);
-        for (auto iterator = range.first;
-             iterator != range.second; ++iterator) {
-            const RewriteLemma& lemma = iterator->second;
+        auto bucket = lemmaIndex_.find(key);
+        if (bucket == lemmaIndex_.end()) continue;
+        for (const RewriteLemma& lemma : bucket->second) {
             ExpressionPointer pattern = lemma.reverseDirection
                 ? lemma.rhs : lemma.lhs;
             if (std::holds_alternative<BoundVariable>(
@@ -1447,7 +1446,7 @@ ExpressionPointer Elaborator::tryContextEqualityBridge(
         std::vector<ContextEquality> equalities =
             collectContextEqualities(
                 goalClosed, localBinders, line);
-        std::sort(equalities.begin(), equalities.end(),
+        std::stable_sort(equalities.begin(), equalities.end(),
             [](const ContextEquality& a, const ContextEquality& b) {
                 return a.cost < b.cost;
             });
