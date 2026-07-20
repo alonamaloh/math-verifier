@@ -575,7 +575,7 @@ clean check pass, with the cleanliness budget unchanged at 397. The complete
 interface; interface diffs for `matrix_ring`, `matrix_inverse`, and
 `escalation` consist only of the five new supporting declarations.
 
-### M4. Time-box concrete small-matrix evaluation `[ ]`
+### M4. Time-box concrete small-matrix evaluation `[-]`
 
 This is a probe-gated optional stage, not permission to build a general
 decision procedure.
@@ -617,7 +617,37 @@ dependent eliminator or more infrastructure than the evaluator itself, record
 the finding and mark M4 `[-]`. In that case, prefer generated entry lemmas
 using the M1 API during the Fifteen-Theorem enumeration.
 
-### M5. Validate on the Fifteen-Theorem frontier and stop `[ ]`
+#### M4 result — 2026-07-20
+
+The probe reached the stop condition, so no `matrix_compute` syntax or
+elaborator code was added.
+
+`NaturalsBelow.enumerate(n)` supplies a complete list, but the library has no
+dependent list predicate/eliminator that turns proofs at the listed elements
+into `∀ (i : NaturalsBelow(n)). P(i)`. The reusable successor decomposition
+`NaturalsBelow.inclusion_or_top` instead exposes an existential predecessor.
+For a fixed `3×3` or `4×4` equality, a tactic would therefore need either:
+
+- a new general dependent `List.All`-style certificate family, its lookup
+  theorem, and a matrix extensionality theorem built on it; or
+- tactic-side generation of nested existential case trees, transports, and
+  scalar subgoals.
+
+The first option is a general dependent-programming addition whose design and
+library placement are larger than the bounded evaluator. The second makes the
+elaborator own a fragile proof-language case compiler. Both violate this
+stage's probe gate and the request to keep the tactic architecture durable.
+The existing one- and two-index special lemmas do not extend cleanly to the
+initial bound of five.
+
+The two `ErrorTest` fixtures remain as executable documentation of the desired
+diagnostics. They should continue to fail as unknown syntax until a future
+consumer justifies the missing finite-elimination infrastructure. M5 uses the
+promised fallback: structured, generated proofs assembled from the M1 block
+API, the M3 shear API, and ordinary isometry composition, with no handwritten
+matrix-entry case trees.
+
+### M5. Validate on the Fifteen-Theorem frontier and stop `[~]`
 
 Apply the landed machinery to a deliberately small consumer set:
 
