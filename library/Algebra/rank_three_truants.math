@@ -161,19 +161,8 @@ theorem Matrix.sumOfTwoSquaresPlusTripleSquareForm_not_represents_six
      = (6 : ℤ)
   as valueIsSix;
 
-  Matrix.Represents(Matrix.sumOfTwoSquaresForm, q)
-      by { witness y with done };
-  ∃ (a b : ℤ). q = a * a + b * b
-      by Matrix.sumOfTwoSquaresForm_represents_only_squares;
-  choose a such that ∃ (b : ℤ). q = a * a + b * b;
-  choose b such that q = a * a + b * b as qIsSquares;
-  (0 : ℤ) ≤ a * a by Integer.zero_less_or_equal_of_nonneg;
-  (0 : ℤ) ≤ b * b by Integer.zero_less_or_equal_of_nonneg;
-  b * b
-     = 0 + b * b
-     ≤ a * a + b * b by Integer.add_preserves_less_or_equal;
-  (0 : ℤ) ≤ a * a + b * b by Integer.LessOrEqual.transitive;
-  (0 : ℤ) ≤ q by substituting qIsSquares;
+  (0 : ℤ) ≤ q
+      by Matrix.sumOfTwoSquaresForm_quadraticForm_nonnegative;
 
   3 * (t * t)
      = t * t * 3
@@ -270,4 +259,206 @@ theorem Matrix.sumOfTwoSquaresPlusTripleSquareForm_truant_six
 theorem Matrix.sumOfTwoSquaresPlusTripleSquareForm_truant
         : Matrix.truant(
             Matrix.sumOfTwoSquaresPlusTripleSquareForm) = 6 :=
+  by Matrix.truant_equals
+
+-- ----------------------------------------------------------------------
+-- The diagonal representative x²+y²+z². The two-nonzero-border child
+-- above x²+y² completes squares to this form; the explicit integral
+-- shear connecting them is the next isometry-classification step.
+
+definition Matrix.sumOfThreeSquaresForm
+        : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2) :=
+  Matrix.diagonalExtension(Matrix.sumOfTwoSquaresForm, (1 : ℤ))
+
+theorem Matrix.sumOfThreeSquaresForm_value
+        (x : RingVector(Integer.commutative_ring_bundle, 1 + 2))
+        : Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, x)
+          = Matrix.quadraticForm(
+                Matrix.sumOfTwoSquaresForm, RingVector.restrict(x))
+            + x(NaturalsBelow.top(2)) * x(NaturalsBelow.top(2)) := {
+  Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, x)
+     = Matrix.quadraticForm(
+           Matrix.sumOfTwoSquaresForm, RingVector.restrict(x))
+       + x(NaturalsBelow.top(2)) * x(NaturalsBelow.top(2)) * 1
+           by Matrix.diagonalExtension_quadraticForm(
+               symmetric := Matrix.sumOfTwoSquaresForm_symmetric)
+     = Matrix.quadraticForm(
+           Matrix.sumOfTwoSquaresForm, RingVector.restrict(x))
+       + x(NaturalsBelow.top(2)) * x(NaturalsBelow.top(2))
+           by ring
+  as valueReads;
+  done by valueReads
+}
+
+theorem Matrix.sumOfThreeSquaresForm_represents_parent
+        (target : ℤ)
+        (represented : Matrix.Represents(Matrix.sumOfTwoSquaresForm, target))
+        : Matrix.Represents(Matrix.sumOfThreeSquaresForm, target) := {
+  done by Matrix.diagonalExtension_represents_parent(
+      symmetric := Matrix.sumOfTwoSquaresForm_symmetric,
+      represented := represented)
+}
+
+theorem Matrix.sumOfThreeSquaresForm_represents_one
+        : Matrix.Represents(Matrix.sumOfThreeSquaresForm, (1 : ℤ)) := {
+  Matrix.Represents(Matrix.sumOfTwoSquaresForm, (1 : ℤ))
+      by Matrix.sumOfTwoSquaresForm_represents(a := 1, b := 0);
+  done by Matrix.sumOfThreeSquaresForm_represents_parent
+}
+
+theorem Matrix.sumOfThreeSquaresForm_represents_two
+        : Matrix.Represents(Matrix.sumOfThreeSquaresForm, (2 : ℤ)) := {
+  Matrix.Represents(Matrix.sumOfTwoSquaresForm, (2 : ℤ))
+      by Matrix.sumOfTwoSquaresForm_represents(a := 1, b := 1);
+  done by Matrix.sumOfThreeSquaresForm_represents_parent
+}
+
+theorem Matrix.sumOfThreeSquaresForm_represents_three
+        : Matrix.Represents(Matrix.sumOfThreeSquaresForm, (3 : ℤ)) := {
+  Matrix.Represents(Matrix.sumOfTwoSquaresForm, (2 : ℤ))
+      by Matrix.sumOfTwoSquaresForm_represents(a := 1, b := 1) as parentRepresentsTwo;
+  Matrix.Represents(
+      Matrix.sumOfThreeSquaresForm, (2 : ℤ) + 1 * 1 * 1)
+      by Matrix.diagonalExtension_represents_parent_plus_square(
+          symmetric := Matrix.sumOfTwoSquaresForm_symmetric,
+          represented := parentRepresentsTwo);
+  done
+}
+
+theorem Matrix.sumOfThreeSquaresForm_represents_four
+        : Matrix.Represents(Matrix.sumOfThreeSquaresForm, (4 : ℤ)) := {
+  Matrix.Represents(Matrix.sumOfTwoSquaresForm, (4 : ℤ))
+      by Matrix.sumOfTwoSquaresForm_represents(a := 2, b := 0);
+  done by Matrix.sumOfThreeSquaresForm_represents_parent
+}
+
+theorem Matrix.sumOfThreeSquaresForm_represents_five
+        : Matrix.Represents(Matrix.sumOfThreeSquaresForm, (5 : ℤ)) := {
+  Matrix.Represents(Matrix.sumOfTwoSquaresForm, (5 : ℤ))
+      by Matrix.sumOfTwoSquaresForm_represents(a := 2, b := 1);
+  done by Matrix.sumOfThreeSquaresForm_represents_parent
+}
+
+theorem Matrix.sumOfThreeSquaresForm_represents_six
+        : Matrix.Represents(Matrix.sumOfThreeSquaresForm, (6 : ℤ)) := {
+  Matrix.Represents(Matrix.sumOfTwoSquaresForm, (5 : ℤ))
+      by Matrix.sumOfTwoSquaresForm_represents(a := 2, b := 1) as parentRepresentsFive;
+  Matrix.Represents(
+      Matrix.sumOfThreeSquaresForm, (5 : ℤ) + 1 * 1 * 1)
+      by Matrix.diagonalExtension_represents_parent_plus_square(
+          symmetric := Matrix.sumOfTwoSquaresForm_symmetric,
+          represented := parentRepresentsFive);
+  done
+}
+
+theorem Matrix.sumOfThreeSquaresForm_not_represents_seven
+        : ¬(Matrix.Represents(Matrix.sumOfThreeSquaresForm, (7 : ℤ))) := {
+  suppose Matrix.Represents(
+      Matrix.sumOfThreeSquaresForm, (7 : ℤ)) as represented;
+  choose x : RingVector(Integer.commutative_ring_bundle, 1 + 2) such that
+      Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, x) = (7 : ℤ)
+      from represented;
+  let y : RingVector(Integer.commutative_ring_bundle, 2) :=
+      RingVector.restrict(x);
+  let t : ℤ := x(NaturalsBelow.top(2));
+  let q : ℤ := Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm, y);
+  q + t * t
+     = Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, x)
+           by Matrix.sumOfThreeSquaresForm_value
+     = (7 : ℤ)
+  as valueIsSeven;
+  Matrix.Represents(Matrix.sumOfTwoSquaresForm, q)
+      by { witness y with done };
+  (0 : ℤ) ≤ q
+      by Matrix.sumOfTwoSquaresForm_quadraticForm_nonnegative;
+  t * t
+     = 0 + t * t
+     ≤ q + t * t by Integer.add_preserves_less_or_equal
+     = 7 by valueIsSeven;
+  t * t ≤ 7 < 8;
+  t * t < 8 by Integer.LessThan.transitive_left;
+  t = -(2 : ℤ) ∨ t = -(1 : ℤ) ∨ t = 0 ∨ t = 1 ∨ t = 2
+      by Integer.square_below_eight;
+  done by cases {
+    case t = -(2 : ℤ): {
+        q + (-(2 : ℤ)) * (-(2 : ℤ)) = 7
+            by substituting (t = -(2 : ℤ)) as specializedValue;
+        q = 3 by linear_combination(specializedValue) as qIsThree;
+        Matrix.Represents(Matrix.sumOfTwoSquaresForm, (3 : ℤ))
+            by substituting qIsThree;
+        done by Matrix.sumOfTwoSquaresForm_not_represents_three
+      }
+    case t = -(1 : ℤ) ∨ t = 0 ∨ t = 1 ∨ t = 2: done by cases {
+        case t = -(1 : ℤ): {
+            q + (-(1 : ℤ)) * (-(1 : ℤ)) = 7
+                by substituting (t = -(1 : ℤ)) as specializedValue;
+            q = 6 by linear_combination(specializedValue) as qIsSix;
+            Matrix.Represents(Matrix.sumOfTwoSquaresForm, (6 : ℤ))
+                by substituting qIsSix;
+            done by Matrix.sumOfTwoSquaresForm_not_represents_six
+          }
+        case t = 0 ∨ t = 1 ∨ t = 2: done by cases {
+            case t = 0: {
+                q + 0 * 0 = 7 by substituting (t = 0) as specializedValue;
+                q = 7 by linear_combination(specializedValue) as qIsSeven;
+                Matrix.Represents(Matrix.sumOfTwoSquaresForm, (7 : ℤ))
+                    by substituting qIsSeven;
+                done by Matrix.sumOfTwoSquaresForm_not_represents_seven
+              }
+            case t = 1 ∨ t = 2: done by cases {
+                case t = 1: {
+                    q + 1 * 1 = 7
+                        by substituting (t = 1) as specializedValue;
+                    q = 6 by linear_combination(specializedValue) as qIsSix;
+                    Matrix.Represents(Matrix.sumOfTwoSquaresForm, (6 : ℤ))
+                        by substituting qIsSix;
+                    done by Matrix.sumOfTwoSquaresForm_not_represents_six
+                  }
+                case t = 2: {
+                    q + 2 * 2 = 7
+                        by substituting (t = 2) as specializedValue;
+                    q = 3 by linear_combination(specializedValue) as qIsThree;
+                    Matrix.Represents(Matrix.sumOfTwoSquaresForm, (3 : ℤ))
+                        by substituting qIsThree;
+                    done by Matrix.sumOfTwoSquaresForm_not_represents_three
+                  }
+              }
+          }
+      }
+  }
+}
+
+theorem Matrix.sumOfThreeSquaresForm_truant_seven
+        : Matrix.IsTruant(Matrix.sumOfThreeSquaresForm, 7) := {
+  7 ≥ 1;
+  ¬(Matrix.Represents(Matrix.sumOfThreeSquaresForm, ((7 : ℕ) : ℤ))) by {
+    done by Matrix.sumOfThreeSquaresForm_not_represents_seven
+  };
+  ∀ (s : ℕ). s ≥ 1 → s < 7 →
+      Matrix.Represents(Matrix.sumOfThreeSquaresForm, (s : ℤ))
+      by (s : ℕ) (positive : s ≥ 1) (belowSeven : s < 7) ↦ {
+          s = 1 ∨ s = 2 ∨ s = 3 ∨ s = 4 ∨ s = 5 ∨ s = 6
+              by Natural.positive_below_seven;
+          done by cases {
+            case s = 1: done by Matrix.sumOfThreeSquaresForm_represents_one
+            case s = 2 ∨ s = 3 ∨ s = 4 ∨ s = 5 ∨ s = 6: done by cases {
+                case s = 2: done by Matrix.sumOfThreeSquaresForm_represents_two
+                case s = 3 ∨ s = 4 ∨ s = 5 ∨ s = 6: done by cases {
+                    case s = 3: done by Matrix.sumOfThreeSquaresForm_represents_three
+                    case s = 4 ∨ s = 5 ∨ s = 6: done by cases {
+                        case s = 4: done by Matrix.sumOfThreeSquaresForm_represents_four
+                        case s = 5 ∨ s = 6: done by cases {
+                            case s = 5: done by Matrix.sumOfThreeSquaresForm_represents_five
+                            case s = 6: done by Matrix.sumOfThreeSquaresForm_represents_six
+                          }
+                      }
+                  }
+              }
+          }
+        };
+  done
+}
+
+theorem Matrix.sumOfThreeSquaresForm_truant
+        : Matrix.truant(Matrix.sumOfThreeSquaresForm) = 7 :=
   by Matrix.truant_equals

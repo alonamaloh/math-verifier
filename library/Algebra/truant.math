@@ -93,6 +93,36 @@ theorem Matrix.IsTruant.represents_below {n : ℕ}
   done
 }
 
+-- Isometry preserves the complete least-missed-value predicate.
+theorem Matrix.isometric_isTruant {n : ℕ}
+        (A B : Matrix(Integer.commutative_ring_bundle, n, n)) (t : ℕ)
+        (isometric : Matrix.IsIsometric(A, B))
+        (isTruant : Matrix.IsTruant(A, t))
+        : Matrix.IsTruant(B, t) := {
+  t ≥ 1 by Matrix.IsTruant.positive;
+  ¬(Matrix.Represents(B, (t : ℤ))) by {
+    suppose Matrix.Represents(B, (t : ℤ)) as representedByB;
+    Matrix.Represents(A, (t : ℤ))
+        by Matrix.isometric_represents(
+            isometric := isometric, represented := representedByB);
+    ¬(Matrix.Represents(A, (t : ℤ))) by Matrix.IsTruant.missed;
+    done
+  };
+  ∀ (s : ℕ). s ≥ 1 → s < t → Matrix.Represents(B, (s : ℤ))
+      by (s : ℕ) (positive : s ≥ 1) (below : s < t) ↦ {
+          Matrix.Represents(A, (s : ℤ))
+              by Matrix.IsTruant.represents_below(
+                  isTruant := isTruant,
+                  sPositive := positive,
+                  sBelowTruant := below) as representedByA;
+          Matrix.IsIsometric(B, A)
+              by Matrix.IsIsometric.symmetric as reverseIsometry;
+          done by Matrix.isometric_represents(
+              isometric := reverseIsometry, represented := representedByA)
+        };
+  done
+}
+
 -- A form with a truant is not universal: the truant itself is missed.
 theorem Matrix.IsTruant.not_universal {n : ℕ}
         (A : Matrix(Integer.commutative_ring_bundle, n, n)) (t : ℕ)
@@ -290,6 +320,16 @@ theorem Matrix.truant_equals {n : ℕ}
   ¬(Matrix.IsUniversal(A)) by Matrix.IsTruant.not_universal;
   Matrix.IsTruant(A, Matrix.truant(A)) by Matrix.truant_is_truant;
   done by Matrix.truant_unique
+}
+
+theorem Matrix.isometric_truant_equals {n : ℕ}
+        (A B : Matrix(Integer.commutative_ring_bundle, n, n)) (t : ℕ)
+        (isometric : Matrix.IsIsometric(A, B))
+        (isTruant : Matrix.IsTruant(A, t))
+        : Matrix.truant(B) = t := {
+  Matrix.IsTruant(B, t)
+      by Matrix.isometric_isTruant;
+  done by Matrix.truant_equals
 }
 
 -- ----------------------------------------------------------------------
