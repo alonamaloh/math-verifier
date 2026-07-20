@@ -178,9 +178,14 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
   `Matrix.sumOfTwoSquaresForm_not_represents_six`). The next diagonal representative is also done:
   **`x²+y²+z²` has exact truant 7** (`Matrix.sumOfThreeSquaresForm_truant`); its failure at 7 reduces, according to
   `z∈{-2,-1,0,1,2}`, to the binary failures at 3, 6, and 7. `Matrix.isometric_isTruant` and
-  `Matrix.isometric_truant_equals` now make exact truants transport across each deduplication proof. Next: develop the
-  reusable outer-product shear calculus and connect the raw two-nonzero-border candidates explicitly to the
-  sum-of-three-squares representative, then continue through the remaining isometry classes.
+  `Matrix.isometric_truant_equals` make exact truants transport across each deduplication proof. The first actual
+  deduplication orbit is now formal too: generic outer-product multiplication, the square-zero invertibility of
+  `Matrix.topShear(v)`, and **`topShear_pullback_diagonalExtension`** prove the integral completion-of-squares identity
+  `diag(A,c)[y↦y+tv] ≅ borderedAssembly(A,A·v,c+Q_A(v))`. Specializing to `A=I₂` shows that **all four raw borders
+  `(±1,±1)` are isometric to `x²+y²+z²` and have truant 7** (`sumOfThreeSquaresForm_isometric_unitBorderCandidate`,
+  `sumOfTwoSquaresUnitBorderCandidate_truant`). Thus five of the nine raw candidates over `x²+y²` are now assigned to
+  two proved classes: the zero border (truant 6) and the four two-unit borders (truant 7). Next: collapse the remaining
+  four one-unit-border candidates, then move to the 23 candidates over `x²+2y²`.
 - `S3.E5` `[ ]` (XL) ★★ The rank-4 escalators: machine-generate and dedup to the **≈207** isometry classes. *(Large mechanical lemma; the count is the checkpoint.)* — owes: S3.E2, S2.R4
 - `S3.C1` `[ ]` (M) ★ The set of truants occurring anywhere in the tree is exactly **{1,2,3,5,6,7,10,14,15}**. — owes: S3.E3, S3.E4, S3.E5
 - `S3.C2` `[ ]` (L) ★★ **Master reduction:** if `Q` represents the nine critical numbers then `Q` is universal — via: a non-universal `Q` would embed an escalator missing its truant ∈ {nine}. *(Depends on rank-4 universality, Stage 5.)* — owes: S3.C1, S3.E5, S5.U2

@@ -73,8 +73,10 @@ and the first exact rank-three truant are.
   `Matrix.sumOfTwoSquaresPlusTripleSquareForm_truant` proves its exact truant
   is 6. The diagonal representative `Matrix.sumOfThreeSquaresForm` represents
   1 through 6 and misses 7, so `Matrix.sumOfThreeSquaresForm_truant` gives
-  exact truant 7. Its explicit integral shear to the raw two-nonzero-border
-  candidate remains part of isometry deduplication. Generic value-lifting
+  exact truant 7. The generic integral completion-of-squares theorem
+  `Matrix.topShear_pullback_diagonalExtension` shows that every raw border
+  \((a,b)\) with \(a^2=b^2=1\) is isometric to this representative; hence
+  all four \((\pm1,\pm1)\) candidates have truant 7. Generic value-lifting
   lemmas for diagonal extensions are
   `Matrix.diagonalExtension_represents_parent` and
   `Matrix.diagonalExtension_represents_corner`; truant transport across a
