@@ -286,7 +286,7 @@ one-use renamed copy of the old proof. Warm control verification remains
 clean check all pass; the cleanliness budget remains 397 and no search warning
 was added.
 
-### M2a. Extend `ring` with unconditional ordered-word mode `[ ]`
+### M2a. Extend `ring` with unconditional ordered-word mode `[x]`
 
 M0 found that most of the ordered engine already exists under the historical
 name `proveAbstractRingAC`. Do not reimplement it. This stage must first audit
@@ -371,6 +371,50 @@ Stop condition: if proof construction requires duplicating most of the
 commutative `ring` implementation without a reusable certificate layer, first
 extract that layer or mark M2a `[B]`. Do not land a second large, divergent
 normalizer.
+
+#### M2a results — 2026-07-20
+
+The historical `proveAbstractRingAC` engine is now
+`proveOrderedRingEquality`. It remains the single certificate-producing
+implementation for `Ring.carrier(s)` and square matrices; no commutative
+normalizer was copied. A carrier is first resolved to an `OrderedRingView`,
+then its surface operations are definitionally re-expressed through one
+uniform `Ring` bundle. The first registered surface view is
+`Matrix.ring(c,n)`.
+
+The entry boundary is explicit in two independent types:
+
+- `RingInvocation` records whether `elaborateRing` came from an explicit
+  tactic or internal proof search;
+- `OrderedRingViewPolicy` grants either only an existing abstract projection
+  or registered surface views.
+
+Every caller must choose a policy; there is no permissive default. Thus
+`by ring` can normalize square-matrix words, while the generic equality
+battery retains its old carrier set and search behavior. An ErrorTest locks
+this boundary.
+
+The engine expands by distributivity, preserves factor order, handles zero,
+one, subtraction, and negation, and emits ordinary equality certificates from
+the `Ring` laws. Its existing proof-directed canonical representation is a
+sorted additive collection of signed ordered products: repeated equal words
+represent integer multiplicity and inverse pairs cancel. This is
+mathematically the finite word-to-integer map specified above, but it is not a
+new data-level map. Retaining that representation avoided a second
+normalizer; a compact coefficient IR should be extracted only if a measured
+large-word consumer justifies changing the mature certificate path.
+
+The required expansion is now a six-line declaration whose proof is the
+single token `ring`, down from the 21-line baseline. Additional probes cover
+`(I+N)(I-N)=I-N²` and ensure a rectangular product nested in a square-matrix
+sum remains an opaque ordered-ring atom. `A*B=B*A`, missing square-zero
+evidence, and automatic use without an explicit tactic all remain negative.
+
+Warm verification of the focused control file is **0.14 s**, unchanged from
+M0. Full tests, 71/71 error tests, and the clean check pass; the cleanliness
+budget remains 397. A pre/post comparison of all 626 existing interface files
+found exactly one difference, the focused Test interface that gained the new
+positive declarations. All 625 unaffected interfaces were byte-identical.
 
 ### M2b. Add strictly reducing caller-supplied monomial rules `[ ]`
 
