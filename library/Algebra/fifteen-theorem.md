@@ -67,13 +67,18 @@ and the first exact rank-three truant are.
   `Matrix.squarePlusDoubleSquare_escalation_twenty_three_candidates` then
   turn the 9 + 23 coordinate pairs into canonical bordered matrices. Isometry
   deduplication of those 32 raw matrices remains.
-- First rank-three truant: the zero-border candidate
+- First rank-three truants: the zero-border candidate
   `Matrix.sumOfTwoSquaresPlusTripleSquareForm`, representing
   \(x^2+y^2+3z^2\), represents 1 through 5 and misses 6. Thus
   `Matrix.sumOfTwoSquaresPlusTripleSquareForm_truant` proves its exact truant
-  is 6. Generic value-lifting lemmas for diagonal extensions are
+  is 6. The diagonal representative `Matrix.sumOfThreeSquaresForm` represents
+  1 through 6 and misses 7, so `Matrix.sumOfThreeSquaresForm_truant` gives
+  exact truant 7. Its explicit integral shear to the raw two-nonzero-border
+  candidate remains part of isometry deduplication. Generic value-lifting
+  lemmas for diagonal extensions are
   `Matrix.diagonalExtension_represents_parent` and
-  `Matrix.diagonalExtension_represents_corner`.
+  `Matrix.diagonalExtension_represents_corner`; truant transport across a
+  proved isometry is `Matrix.isometric_isTruant`.
 
 ## Module path
 

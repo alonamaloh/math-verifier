@@ -175,8 +175,12 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
   representations lift through the new generic `diagonalExtension_represents_parent`, the top basis vector gives
   `diagonalExtension_represents_corner`, and the nonrepresentation proof reduces `x²+y²+3z²=6` via `z²≤2` to the binary
   impossibilities at 3 and 6 (`Natural.six_not_sum_of_two_squares`,
-  `Matrix.sumOfTwoSquaresForm_not_represents_six`). Next: compute more representatives' truants while developing the
-  integral-isometry deduplication of all 32 raw matrices.
+  `Matrix.sumOfTwoSquaresForm_not_represents_six`). The next diagonal representative is also done:
+  **`x²+y²+z²` has exact truant 7** (`Matrix.sumOfThreeSquaresForm_truant`); its failure at 7 reduces, according to
+  `z∈{-2,-1,0,1,2}`, to the binary failures at 3, 6, and 7. `Matrix.isometric_isTruant` and
+  `Matrix.isometric_truant_equals` now make exact truants transport across each deduplication proof. Next: develop the
+  reusable outer-product shear calculus and connect the raw two-nonzero-border candidates explicitly to the
+  sum-of-three-squares representative, then continue through the remaining isometry classes.
 - `S3.E5` `[ ]` (XL) ★★ The rank-4 escalators: machine-generate and dedup to the **≈207** isometry classes. *(Large mechanical lemma; the count is the checkpoint.)* — owes: S3.E2, S2.R4
 - `S3.C1` `[ ]` (M) ★ The set of truants occurring anywhere in the tree is exactly **{1,2,3,5,6,7,10,14,15}**. — owes: S3.E3, S3.E4, S3.E5
 - `S3.C2` `[ ]` (L) ★★ **Master reduction:** if `Q` represents the nine critical numbers then `Q` is universal — via: a non-universal `Q` would embed an escalator missing its truant ∈ {nine}. *(Depends on rank-4 universality, Stage 5.)* — owes: S3.C1, S3.E5, S5.U2
