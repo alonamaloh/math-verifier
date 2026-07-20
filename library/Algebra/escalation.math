@@ -241,6 +241,88 @@ theorem Matrix.outerProduct_multiply_outerProduct {r : CommutativeRing}
   done by Matrix.equal_of_entries
 }
 
+-- Pulling a symmetric form through an outer-product shear. The hypotheses
+-- name the only mathematical data the calculation needs; ordered `ring`
+-- bookkeeping and the three outer-product products are packaged here.
+theorem Matrix.outerProductShear_pullback
+        {r : CommutativeRing} {n : ℕ}
+        (D : Matrix(r, n, n)) (y e w : RingVector(r, n))
+        (q : CommutativeRing.carrier(r))
+        (symmetric : Dᵀ = D)
+        (action : D · y = w)
+        (pairing : RingVector.innerProduct(w, y) = q)
+        : ((Matrix.identity(r, n) + Matrix.outerProduct(y, e))ᵀ * D)
+            * (Matrix.identity(r, n) + Matrix.outerProduct(y, e))
+          = (D + Matrix.outerProduct(e, w))
+            + (Matrix.outerProduct(w, e)
+                + q • Matrix.outerProduct(e, e)) := {
+  let N : Matrix(r, n, n) := Matrix.outerProduct(y, e);
+  let T : Matrix(r, n, n) := Matrix.outerProduct(e, y);
+  let E : Matrix(r, n, n) := Matrix.outerProduct(e, e);
+  Nᵀ = T by Matrix.outerProduct_transpose as transposeReads;
+  T * D
+     = Matrix.outerProduct(e, Dᵀ · y)
+           by Matrix.outerProduct_multiply
+     = Matrix.outerProduct(e, D · y)
+           by substituting symmetric
+     = Matrix.outerProduct(e, w)
+           by substituting action
+  as leftCrossReads;
+  D * N
+     = Matrix.outerProduct(D · y, e)
+           by Matrix.multiply_outerProduct
+     = Matrix.outerProduct(w, e)
+           by substituting action
+  as rightCrossReads;
+  (T * D) * N
+     = Matrix.outerProduct(e, w) * Matrix.outerProduct(y, e)
+           by substituting leftCrossReads
+     = RingVector.innerProduct(w, y) • E
+           by Matrix.outerProduct_multiply_outerProduct
+     = q • E by substituting pairing
+  as cornerCorrectionReads;
+  ((Matrix.identity(r, n) + N)ᵀ * D)
+      * (Matrix.identity(r, n) + N)
+     = ((Matrix.identity(r, n)ᵀ + Nᵀ) * D)
+         * (Matrix.identity(r, n) + N)
+           by substituting Matrix.transpose_add
+     = ((Matrix.identity(r, n) + Nᵀ) * D)
+         * (Matrix.identity(r, n) + N)
+           by substituting Matrix.transpose_identity
+     = ((Matrix.identity(r, n) + T) * D)
+         * (Matrix.identity(r, n) + N)
+           by substituting transposeReads
+     = (D + T * D) + (D * N + (T * D) * N)
+           by ring
+     = (D + Matrix.outerProduct(e, w))
+         + (D * N + (T * D) * N)
+           by substituting leftCrossReads
+     = (D + Matrix.outerProduct(e, w))
+         + (Matrix.outerProduct(w, e) + (T * D) * N)
+           by substituting rightCrossReads
+     = (D + Matrix.outerProduct(e, w))
+         + (Matrix.outerProduct(w, e) + q • E)
+           by substituting cornerCorrectionReads;
+  done
+}
+
+-- Collect the two scalar contributions to a distinguished matrix summand
+-- while retaining the order of all matrix products hidden in B, C, and F.
+theorem Matrix.collect_scaled_corner
+        {r : CommutativeRing} {n : ℕ}
+        (B C F E : Matrix(r, n, n))
+        (s t : CommutativeRing.carrier(r))
+        : ((B + s • E) + C) + (F + t • E)
+          = ((B + F) + C) + (s + t) • E := {
+  (s + t) • E = s • E + t • E
+      by Matrix.scale_add_scalar as splitScale;
+  ((B + s • E) + C) + (F + t • E)
+     = ((B + F) + C) + (s • E + t • E) by ring
+     = ((B + F) + C) + (s + t) • E
+           by substituting splitScale;
+  done
+}
+
 theorem Matrix.borderedAssembly_block_entry {r : CommutativeRing} {n : ℕ}
         (A : Matrix(r, n, n)) (b : RingVector(r, n))
         (c : CommutativeRing.carrier(r))

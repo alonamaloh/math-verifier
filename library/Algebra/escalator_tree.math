@@ -584,43 +584,12 @@ theorem Matrix.topShear_invertible {r : CommutativeRing} {n : ℕ}
   let N : Matrix(r, 1 + n, 1 + n) := Matrix.outerProduct(y, e);
   N * N = Matrix.zero(r, 1 + n, 1 + n)
       by Matrix.topShear_offset_square_zero;
-  IsRing(
-      Matrix(r, 1 + n, 1 + n),
-      Matrix.add,
-      Matrix.zero(r, 1 + n, 1 + n),
-      Matrix.negate,
-      Matrix.multiply,
-      Matrix.identity(r, 1 + n))
-      by Matrix.is_ring;
-  let V : Matrix(r, 1 + n, 1 + n) :=
-      Matrix.identity(r, 1 + n) + Matrix.negate(N);
-  (Matrix.identity(r, 1 + n) + N)
-      * V
-      = (Matrix.identity(r, 1 + n) + N)
-        * (Matrix.identity(r, 1 + n) + Matrix.negate(N))
-      = Matrix.identity(r, 1 + n)
-      by Ring.one_add_square_zero_multiply_inverse
-  as rightInverse;
-  V
-      * (Matrix.identity(r, 1 + n) + N)
-      = (Matrix.identity(r, 1 + n) + Matrix.negate(N))
-        * (Matrix.identity(r, 1 + n) + N)
-      = Matrix.identity(r, 1 + n)
-      by Ring.one_add_square_zero_inverse_multiply
-  as leftInverse;
+  Matrix.IsInvertible(Matrix.identity(r, 1 + n) + N)
+      by Matrix.one_add_square_zero_invertible;
   Matrix.topShear(v)
      = Matrix.identity(r, 1 + n) + N
   as shearReads;
-  Matrix.topShear(v) * V
-     = (Matrix.identity(r, 1 + n) + N) * V by substituting shearReads
-     = Matrix.identity(r, 1 + n) by rightInverse
-  as productRight;
-  V * Matrix.topShear(v)
-     = V * (Matrix.identity(r, 1 + n) + N) by substituting shearReads
-     = Matrix.identity(r, 1 + n) by leftInverse
-  as productLeft;
-  witness V with
-      done by And.introduction(productRight, productLeft)
+  done by substituting shearReads
 }
 
 -- The three faces of the extension, entrywise.
@@ -899,11 +868,8 @@ theorem Matrix.topShear_pullback_diagonalExtension {n : ℕ}
   Matrix.topShear(v)
       = Matrix.identity(Integer.commutative_ring_bundle, 1 + n) + N
   as shearReads;
-  Nᵀ = Matrix.outerProduct(e, y)
-      by Matrix.outerProduct_transpose as offsetTransposeReads;
-  Dᵀ = D by Matrix.diagonalExtension_symmetric as extensionSymmetric;
-  D · y = w
-      by Matrix.diagonalExtension_apply_extend as blockAction;
+  Dᵀ = D by Matrix.diagonalExtension_symmetric;
+  D · y = w by Matrix.diagonalExtension_apply_extend;
   RingVector.innerProduct(w, y)
      = RingVector.innerProduct(A · v, RingVector.restrict(y))
            by RingVector.innerProduct_extend_left
@@ -911,31 +877,7 @@ theorem Matrix.topShear_pullback_diagonalExtension {n : ℕ}
            by substituting RingVector.restrict_extend
      = RingVector.innerProduct(v, A · v)
            by RingVector.innerProduct_symmetric
-     = q
-  as pairingReads;
-  D * N
-     = Matrix.outerProduct(D · y, e)
-           by Matrix.multiply_outerProduct
-     = Matrix.outerProduct(w, e)
-           by substituting blockAction
-  as rightCrossReads;
-  Nᵀ * D
-     = Matrix.outerProduct(e, y) * D
-           by substituting offsetTransposeReads
-     = Matrix.outerProduct(e, Dᵀ · y)
-           by Matrix.outerProduct_multiply
-     = Matrix.outerProduct(e, D · y)
-           by substituting extensionSymmetric
-     = Matrix.outerProduct(e, w)
-           by substituting blockAction
-  as leftCrossReads;
-  (Nᵀ * D) * N
-     = Matrix.outerProduct(e, w) * Matrix.outerProduct(y, e)
-           by substituting leftCrossReads
-     = RingVector.innerProduct(w, y) • E
-           by Matrix.outerProduct_multiply_outerProduct
-     = q • E by substituting pairingReads
-  as cornerCorrectionReads;
+     = q;
   D
      = J * A * Jᵀ + c • Matrix.topUnit(
            Integer.commutative_ring_bundle, n)
@@ -943,64 +885,20 @@ theorem Matrix.topShear_pullback_diagonalExtension {n : ℕ}
            by substituting Matrix.topUnit_eq_outerProduct_topBasis
   as diagonalReads;
 
-  ((J * A * Jᵀ + c • E) + Matrix.outerProduct(e, w))
-      + (Matrix.outerProduct(w, e) + q • E)
-    = ((J * A * Jᵀ + Matrix.outerProduct(w, e))
-       + Matrix.outerProduct(e, w))
-      + (c + q) • E
-      by {
-          ∀ (i : NaturalsBelow(1 + n)). ∀ (j : NaturalsBelow(1 + n)).
-              (((J * A * Jᵀ + c • E) + Matrix.outerProduct(e, w))
-                + (Matrix.outerProduct(w, e) + q • E))(i, j)
-              = (((J * A * Jᵀ + Matrix.outerProduct(w, e))
-                   + Matrix.outerProduct(e, w))
-                 + (c + q) • E)(i, j)
-              by (i : NaturalsBelow(1 + n))
-                 (j : NaturalsBelow(1 + n)) ↦ ring;
-          done by Matrix.equal_of_entries
-        }
-  as termsReorder;
-
   (Matrix.topShear(v)ᵀ * D) * Matrix.topShear(v)
-     = (((Matrix.identity(Integer.commutative_ring_bundle, 1 + n) + N)ᵀ * D)
-         * (Matrix.identity(Integer.commutative_ring_bundle, 1 + n) + N))
+     = ((Matrix.identity(Integer.commutative_ring_bundle, 1 + n) + N)ᵀ * D)
+         * (Matrix.identity(Integer.commutative_ring_bundle, 1 + n) + N)
            by substituting shearReads
-     = ((Matrix.identity(Integer.commutative_ring_bundle, 1 + n)ᵀ + Nᵀ) * D)
-         * (Matrix.identity(Integer.commutative_ring_bundle, 1 + n) + N)
-           by substituting Matrix.transpose_add
-     = ((Matrix.identity(Integer.commutative_ring_bundle, 1 + n) + Nᵀ) * D)
-         * (Matrix.identity(Integer.commutative_ring_bundle, 1 + n) + N)
-           by substituting Matrix.transpose_identity
-     = (Matrix.identity(Integer.commutative_ring_bundle, 1 + n) * D + Nᵀ * D)
-         * (Matrix.identity(Integer.commutative_ring_bundle, 1 + n) + N)
-           by substituting Matrix.distributivity_right
-     = (D + Nᵀ * D)
-         * (Matrix.identity(Integer.commutative_ring_bundle, 1 + n) + N)
-           by substituting Matrix.one_multiply
-     = (D + Nᵀ * D)
-         * Matrix.identity(Integer.commutative_ring_bundle, 1 + n)
-       + (D + Nᵀ * D) * N
-           by Matrix.distributivity_left
-     = (D + Nᵀ * D) + (D + Nᵀ * D) * N
-           by substituting Matrix.multiply_one
-     = (D + Nᵀ * D) + (D * N + (Nᵀ * D) * N)
-           by substituting Matrix.distributivity_right
      = (D + Matrix.outerProduct(e, w))
-       + (D * N + (Nᵀ * D) * N)
-           by substituting leftCrossReads
-     = (D + Matrix.outerProduct(e, w))
-       + (Matrix.outerProduct(w, e) + (Nᵀ * D) * N)
-           by substituting rightCrossReads
-     = (D + Matrix.outerProduct(e, w))
-       + (Matrix.outerProduct(w, e) + q • E)
-           by substituting cornerCorrectionReads
+         + (Matrix.outerProduct(w, e) + q • E)
+           by Matrix.outerProductShear_pullback
      = ((J * A * Jᵀ + c • E) + Matrix.outerProduct(e, w))
        + (Matrix.outerProduct(w, e) + q • E)
            by substituting diagonalReads
      = ((J * A * Jᵀ + Matrix.outerProduct(w, e))
         + Matrix.outerProduct(e, w))
        + (c + q) • E
-           by termsReorder
+           by Matrix.collect_scaled_corner
      = Matrix.borderedAssembly(A, A · v, c + q);
   done
 }

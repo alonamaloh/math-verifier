@@ -44,6 +44,26 @@ definition Matrix.IsInvertible {c : CommutativeRing} {n : ℕ} (U : Matrix(c, n,
   ∃ (V : Matrix(c, n, n)).
       U * V = Matrix.identity(c, n) ∧ V * U = Matrix.identity(c, n)
 
+-- The inverse of a square-zero unipotent is the opposite unipotent.
+theorem Matrix.one_add_square_zero_invertible
+        {c : CommutativeRing} {n : ℕ}
+        (N : Matrix(c, n, n))
+        (squareZero : N * N = Matrix.zero(c, n, n))
+        : Matrix.IsInvertible(Matrix.identity(c, n) + N) := {
+  let V : Matrix(c, n, n) :=
+      Matrix.identity(c, n) + Matrix.negate(N);
+  (Matrix.identity(c, n) + N) * V
+      = Matrix.identity(c, n)
+      by Matrix.one_add_square_zero_multiply_inverse
+  as rightInverse;
+  V * (Matrix.identity(c, n) + N)
+      = Matrix.identity(c, n)
+      by Matrix.one_add_square_zero_inverse_multiply
+  as leftInverse;
+  witness V with
+      done by And.introduction(rightInverse, leftInverse)
+}
+
 -- The adjugate right inverse: when the determinant has inverse e,
 -- U · (e • adj U) = I.
 theorem Matrix.adjugate_right_inverse {c : CommutativeRing} {n : ℕ}

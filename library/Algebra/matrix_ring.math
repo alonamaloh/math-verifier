@@ -369,6 +369,38 @@ definition Matrix.ring (c : CommutativeRing) (n : ℕ) : Ring :=
 -- `Matrix.ring(c, n)`.
 instance Matrix.ring
 
+-- Matrix-vocabulary wrappers around the generic noncommutative ring lemmas.
+-- Keeping the `IsRing` plumbing here makes downstream inverse proofs state
+-- only the mathematical hypothesis N² = 0.
+
+theorem Matrix.one_add_square_zero_multiply_inverse
+        {c : CommutativeRing} {n : ℕ}
+        (N : Matrix(c, n, n))
+        (squareZero : N * N = Matrix.zero(c, n, n))
+        : (Matrix.identity(c, n) + N)
+            * (Matrix.identity(c, n) + Matrix.negate(N))
+          = Matrix.identity(c, n) := {
+  IsRing(
+      Matrix(c, n, n), Matrix.add, Matrix.zero(c, n, n),
+      Matrix.negate, Matrix.multiply, Matrix.identity(c, n))
+      by Matrix.is_ring;
+  done by Ring.one_add_square_zero_multiply_inverse
+}
+
+theorem Matrix.one_add_square_zero_inverse_multiply
+        {c : CommutativeRing} {n : ℕ}
+        (N : Matrix(c, n, n))
+        (squareZero : N * N = Matrix.zero(c, n, n))
+        : (Matrix.identity(c, n) + Matrix.negate(N))
+            * (Matrix.identity(c, n) + N)
+          = Matrix.identity(c, n) := {
+  IsRing(
+      Matrix(c, n, n), Matrix.add, Matrix.zero(c, n, n),
+      Matrix.negate, Matrix.multiply, Matrix.identity(c, n))
+      by Matrix.is_ring;
+  done by Ring.one_add_square_zero_inverse_multiply
+}
+
 -- ----------------------------------------------------------------------
 -- The scalar action and its interaction with the product: scalars pull
 -- through either factor, and scalar multiples of the identity are
