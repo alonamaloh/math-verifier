@@ -501,7 +501,7 @@ identity `(I+N)(I-N)=I-N²` remains available for a readable two-step
 calculation. Reconsider M2b only when a real consumer presents a relation not
 already captured by a reusable ring theorem.
 
-### M3. Build the structured pullback layer `[ ]`
+### M3. Build the structured pullback layer `[x]`
 
 Use M1 and M2a, plus M2b if it passes its gate, to package the recurring
 change-of-basis calculation.
@@ -535,6 +535,45 @@ Acceptance:
 M3 is the minimum successful endpoint of this plan. Even if concrete
 evaluation is deferred, the symbolic matrix layer must no longer require
 manual distributive choreography.
+
+#### M3 results — 2026-07-20
+
+The structured layer now separates three reusable facts.
+
+- `Matrix.one_add_square_zero_multiply_inverse` and its left-handed companion
+  expose the existing generic `Ring` results in matrix vocabulary.
+- `Matrix.one_add_square_zero_invertible` packages the opposite unipotent as
+  the two-sided inverse once `N²=0` is supplied.
+- `Matrix.outerProductShear_pullback` takes exactly the structural data
+  `Dᵀ=D`, `D·y=w`, and `⟨w,y⟩=q`; its single ordered `ring` step performs the
+  unconditional expansion, while the existing outer-product laws identify
+  the three cross terms.
+
+`Matrix.collect_scaled_corner` is the small companion that reorders the
+additive matrix terms and applies `Matrix.scale_add_scalar` to combine the two
+corner coefficients. It replaces the former entrywise matrix extensionality
+proof.
+
+The live `Matrix.topShear_pullback_diagonalExtension` declaration is now 63
+lines, with a **55-line proof body**, down from the 139-line body baseline.
+It contains no entry indices and no explicit associativity, distributivity,
+or identity citations. Its matrix expansion is one citation of
+`Matrix.outerProductShear_pullback`. `Matrix.topShear_invertible` is now a
+16-line declaration and cites the generic square-zero invertibility theorem
+instead of restating both products.
+
+During integration, an exact-shape matrix expansion theorem was briefly added
+to the global library. The generic proof search then solved M2a's
+explicit-tactic negative control by citing that theorem, even though it never
+entered ordered `ring`. The theorem was removed and the reusable shear lemma
+keeps its `ring` invocation internally. This preserves the intended automation
+boundary as well as the ErrorTest that locks it.
+
+Warm focused verification is **0.12 s**. Full tests, 71/71 error tests, and the
+clean check pass, with the cleanliness budget unchanged at 397. The complete
+`Algebra.escalator_tree` interface is byte-identical to the frozen pre-M3
+interface; interface diffs for `matrix_ring`, `matrix_inverse`, and
+`escalation` consist only of the five new supporting declarations.
 
 ### M4. Time-box concrete small-matrix evaluation `[ ]`
 
