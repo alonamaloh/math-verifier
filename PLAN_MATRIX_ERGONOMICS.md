@@ -416,7 +416,7 @@ budget remains 397. A pre/post comparison of all 626 existing interface files
 found exactly one difference, the focused Test interface that gained the new
 positive declarations. All 625 unaffected interfaces were byte-identical.
 
-### M2b. Add strictly reducing caller-supplied monomial rules `[ ]`
+### M2b. Add strictly reducing caller-supplied monomial rules `[-]`
 
 Do this only after M2a is correct and measured. The first consumer is the
 square-zero fact in the shear inverse:
@@ -472,6 +472,34 @@ Acceptance:
 M2b is optional for the minimum plan endpoint. If its proof plumbing begins to
 grow into arbitrary equational rewriting, retain the two-line
 `by ring; by substituting squareZero` proof style and mark M2b `[-]`.
+
+#### M2b decision — deliberately skipped 2026-07-20
+
+The required consumer does not justify the mechanism. The library already has
+both noncommutative square-zero inverse directions as
+`Ring.one_add_square_zero_multiply_inverse` and
+`Ring.one_add_square_zero_inverse_multiply`. M3 can expose these once in the
+matrix vocabulary, after which a matrix consumer supplies `N²=0` and cites one
+ordinary theorem.
+
+By contrast, relation-aware `ring` would not be a small extension of M2a. It
+would require:
+
+- changing `SurfaceRing` and every surface-expression copier/visitor to carry
+  and elaborate relation arguments;
+- introducing a stable data-level ordered-word IR (the present engine emits
+  certificates while transforming expressions);
+- validating carrier, orientation, monomial shape, strict length decrease,
+  and overlaps; and
+- building certified subword replacement through multiplication contexts and
+  the outer additive collection.
+
+That is a useful design if several consumers need distinct word relations, but
+for the sole `N²=0` case it is a general rewrite subsystem whose result is no
+shorter than the existing named mathematical API. The unconditional M2a
+identity `(I+N)(I-N)=I-N²` remains available for a readable two-step
+calculation. Reconsider M2b only when a real consumer presents a relation not
+already captured by a reusable ring theorem.
 
 ### M3. Build the structured pullback layer `[ ]`
 
