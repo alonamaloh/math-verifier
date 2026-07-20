@@ -66,7 +66,7 @@ and the first exact rank-three truant are.
   `Matrix.sumOfTwoSquares_escalation_nine_candidates` and
   `Matrix.squarePlusDoubleSquare_escalation_twenty_three_candidates` then
   turn the 9 + 23 coordinate pairs into canonical bordered matrices. Isometry
-  deduplication of those 32 raw matrices remains.
+  deduplication of the 23 candidates over \(x^2+2y^2\) remains.
 - First rank-three truants: the zero-border candidate
   `Matrix.sumOfTwoSquaresPlusTripleSquareForm`, representing
   \(x^2+y^2+3z^2\), represents 1 through 5 and misses 6. Thus
@@ -76,8 +76,17 @@ and the first exact rank-three truant are.
   exact truant 7. The generic integral completion-of-squares theorem
   `Matrix.topShear_pullback_diagonalExtension` shows that every raw border
   \((a,b)\) with \(a^2=b^2=1\) is isometric to this representative; hence
-  all four \((\pm1,\pm1)\) candidates have truant 7. Generic value-lifting
-  lemmas for diagonal extensions are
+  all four \((\pm1,\pm1)\) candidates have truant 7. The diagonal form
+  `Matrix.sumOfTwoSquaresPlusDoubleSquareForm`, representing
+  \(x^2+y^2+2z^2\), represents 1 through 13 and misses 14. Thus
+  `Matrix.sumOfTwoSquaresPlusDoubleSquareForm_truant` proves its exact
+  truant is 14. The parameterized theorem
+  `Matrix.sumOfTwoSquaresPlusDoubleSquareForm_isometric_oneUnitBorderCandidate`
+  identifies it with every border satisfying \(a^2+b^2=1\); hence all four
+  \((\pm1,0),(0,\pm1)\) candidates have truant 14. The nine raw candidates
+  over \(x^2+y^2\) are now completely classified into the truant-6,
+  truant-7, and truant-14 orbits. Generic value-lifting lemmas for diagonal
+  extensions are
   `Matrix.diagonalExtension_represents_parent` and
   `Matrix.diagonalExtension_represents_corner`; truant transport across a
   proved isometry is `Matrix.isometric_isTruant`.

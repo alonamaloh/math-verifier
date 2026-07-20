@@ -183,9 +183,14 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
   `Matrix.topShear(v)`, and **`topShear_pullback_diagonalExtension`** prove the integral completion-of-squares identity
   `diag(A,c)[y↦y+tv] ≅ borderedAssembly(A,A·v,c+Q_A(v))`. Specializing to `A=I₂` shows that **all four raw borders
   `(±1,±1)` are isometric to `x²+y²+z²` and have truant 7** (`sumOfThreeSquaresForm_isometric_unitBorderCandidate`,
-  `sumOfTwoSquaresUnitBorderCandidate_truant`). Thus five of the nine raw candidates over `x²+y²` are now assigned to
-  two proved classes: the zero border (truant 6) and the four two-unit borders (truant 7). Next: collapse the remaining
-  four one-unit-border candidates, then move to the 23 candidates over `x²+2y²`.
+  `sumOfTwoSquaresUnitBorderCandidate_truant`). The remaining orbit is now complete too:
+  **`x²+y²+2z²` has exact truant 14** (`sumOfTwoSquaresPlusDoubleSquareForm_truant`); the failure at 14 reduces,
+  for `z∈{-2,-1,0,1,2}`, to the binary failures at 6, 12, and 14. A single parameterized isometry theorem,
+  `sumOfTwoSquaresPlusDoubleSquareForm_isometric_oneUnitBorderCandidate`, handles every border with
+  `a²+b²=1`, so all four `(±1,0),(0,±1)` candidates have truant 14. **All nine raw candidates over `x²+y²`
+  are therefore classified into three proved orbits:** one zero-border form of truant 6, four two-unit-border
+  forms of truant 7, and four one-unit-border forms of truant 14. The matrix-ergonomics plan now runs before
+  the sustained attack on the 23 candidates over `x²+2y²`.
 - `S3.E5` `[ ]` (XL) ★★ The rank-4 escalators: machine-generate and dedup to the **≈207** isometry classes. *(Large mechanical lemma; the count is the checkpoint.)* — owes: S3.E2, S2.R4
 - `S3.C1` `[ ]` (M) ★ The set of truants occurring anywhere in the tree is exactly **{1,2,3,5,6,7,10,14,15}**. — owes: S3.E3, S3.E4, S3.E5
 - `S3.C2` `[ ]` (L) ★★ **Master reduction:** if `Q` represents the nine critical numbers then `Q` is universal — via: a non-universal `Q` would embed an escalator missing its truant ∈ {nine}. *(Depends on rank-4 universality, Stage 5.)* — owes: S3.C1, S3.E5, S5.U2

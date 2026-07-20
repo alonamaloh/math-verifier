@@ -55,14 +55,16 @@ new mode will need.
 
 ## Execution boundary
 
-The remaining four one-unit borders over `x²+y²` should first be finished with
-the existing shear theorem. They are expected to collapse to
-`x²+y²+2z²`; this is useful mathematics and a final control sample for the
-current experience.
+**Reached 2026-07-20.** The four one-unit borders over `x²+y²` have been
+finished with the existing shear theorem. One parameterized isometry collapses
+all four to `x²+y²+2z²`, whose exact truant is 14. The proof added 776 lines
+across the arithmetic lemmas, binary-form consequences, ternary
+representative, orbit theorem, and cleanliness ledger. It is the final control
+sample for the current matrix-proof experience.
 
-Start this ergonomics plan immediately after that orbit and before a sustained
-attack on the 23 candidates over `x²+2y²`. It must be complete, deliberately
-stopped, or explicitly deferred before rank-four enumeration begins.
+This ergonomics plan now runs before a sustained attack on the 23 candidates
+over `x²+2y²`. It must be complete, deliberately stopped, or explicitly
+deferred before rank-four enumeration begins.
 
 ## Scope
 
