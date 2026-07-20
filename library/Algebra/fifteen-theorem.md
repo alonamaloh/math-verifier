@@ -65,8 +65,7 @@ and the first exact rank-three truant are.
   23 surviving pairs into the \(a=0\), \(a=\pm1\), and \(a=\pm2\) bands.
   `Matrix.sumOfTwoSquares_escalation_nine_candidates` and
   `Matrix.squarePlusDoubleSquare_escalation_twenty_three_candidates` then
-  turn the 9 + 23 coordinate pairs into canonical bordered matrices. Isometry
-  deduplication of the 23 candidates over \(x^2+2y^2\) remains.
+  turn the 9 + 23 coordinate pairs into canonical bordered matrices.
 - First rank-three truants: the zero-border candidate
   `Matrix.sumOfTwoSquaresPlusTripleSquareForm`, representing
   \(x^2+y^2+3z^2\), represents 1 through 5 and misses 6. Thus
@@ -90,6 +89,18 @@ and the first exact rank-three truant are.
   `Matrix.diagonalExtension_represents_parent` and
   `Matrix.diagonalExtension_represents_corner`; truant transport across a
   proved isometry is `Matrix.isometric_isTruant`.
+- The 23 candidates over \(x^2+2y^2\) are deduplicated in
+  `Algebra/rank_three_orbits` to eight proved representatives:
+  \(x^2+2y^2+cz^2\) for \(c=1,\ldots,5\), \(x^2+y^2+z^2\), and
+  \(x^2+2y^2+2yz+cz^2\) for \(c=4,5\).
+  `Matrix.topShear_pullback_borderedAssembly` gives the generic bordered
+  shear identity, and
+  `Matrix.squarePlusDoubleSquareCandidate_isometric_shear` specializes it
+  to these candidates. The theorem
+  `Matrix.squarePlusDoubleSquare_escalation_eight_representatives` is the
+  complete reduction from any escalation of \(x^2+2y^2\). Exact truants for
+  the seven representatives other than the already-known sum of three
+  squares are the next rank-three task.
 
 ## Module path
 
@@ -98,5 +109,5 @@ Read `quadratic_form` → `integer_quadratic_form` first. Then use
 `representation_bound` as needed. The escalation spine is
 `square_form` → `truant` → `escalation` → `rank_two_escalators` →
 `rank_two_truants` → `rank_three_escalation_bounds` →
-`rank_three_truants` → `escalator_tree`.
+`rank_three_truants` → `escalator_tree` → `rank_three_orbits`.
 `PLAN_15_THEOREM.md` records unfinished stages.

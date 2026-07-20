@@ -1,0 +1,1671 @@
+-- Algebra/rank_three_orbits.math
+--
+-- Integral top shears reduce all 23 rank-three escalations of
+-- x² + 2y² to eight explicit isometry representatives.  Keep the generic
+-- bordered shear identity in escalator_tree; this module contains only the
+-- two-coordinate specialization and the finite orbit classification.
+
+module Algebra.rank_three_orbits
+
+import Algebra.rank_three_truants
+
+definition Matrix.squarePlusDoubleSquareCandidate
+        (a b c : ℤ)
+        : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2) :=
+  Matrix.borderedAssembly(
+      Matrix.squarePlusDoubleSquareForm,
+      RingVector.twoCoordinates(a, b),
+      c)
+
+definition Matrix.squarePlusDoubleSquareDiagonalForm
+        (c : ℤ)
+        : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2) :=
+  Matrix.diagonalExtension(Matrix.squarePlusDoubleSquareForm, c)
+
+definition Matrix.squarePlusDoubleSquareOddForm
+        (c : ℤ)
+        : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2) :=
+  Matrix.squarePlusDoubleSquareCandidate(0, 1, c)
+
+theorem RingVector.twoCoordinates_add {r : CommutativeRing}
+        (a b x y : CommutativeRing.carrier(r))
+        : RingVector.twoCoordinates(a, b)
+            + RingVector.twoCoordinates(x, y)
+          = RingVector.twoCoordinates(a + x, b + y) := {
+  ∀ (i : NaturalsBelow(2)).
+      (RingVector.twoCoordinates(a, b)
+        + RingVector.twoCoordinates(x, y))(i)
+      = RingVector.twoCoordinates(a + x, b + y)(i)
+      by (i : NaturalsBelow(2)) ↦ {
+          i = NaturalsBelow.firstOfTwo
+            ∨ i = NaturalsBelow.secondOfTwo
+            by NaturalsBelow.two_split;
+          done by cases {
+            case i = NaturalsBelow.firstOfTwo as first: {
+                (RingVector.twoCoordinates(a, b)
+                  + RingVector.twoCoordinates(x, y))(i)
+                   = RingVector.twoCoordinates(a, b)(
+                       NaturalsBelow.firstOfTwo)
+                     + RingVector.twoCoordinates(x, y)(
+                         NaturalsBelow.firstOfTwo)
+                         by substituting first
+                   = a + RingVector.twoCoordinates(x, y)(
+                         NaturalsBelow.firstOfTwo)
+                         by substituting RingVector.twoCoordinates_first
+                   = a + x
+                         by substituting RingVector.twoCoordinates_first
+                   = RingVector.twoCoordinates(a + x, b + y)(
+                       NaturalsBelow.firstOfTwo)
+                         by RingVector.twoCoordinates_first
+                   = RingVector.twoCoordinates(a + x, b + y)(i)
+                         by substituting first
+                as entryReads;
+                done by entryReads
+              }
+            case i = NaturalsBelow.secondOfTwo as second: {
+                (RingVector.twoCoordinates(a, b)
+                  + RingVector.twoCoordinates(x, y))(i)
+                   = RingVector.twoCoordinates(a, b)(
+                       NaturalsBelow.secondOfTwo)
+                     + RingVector.twoCoordinates(x, y)(
+                         NaturalsBelow.secondOfTwo)
+                         by substituting second
+                   = b + RingVector.twoCoordinates(x, y)(
+                         NaturalsBelow.secondOfTwo)
+                         by substituting RingVector.twoCoordinates_second
+                   = b + y
+                         by substituting RingVector.twoCoordinates_second
+                   = RingVector.twoCoordinates(a + x, b + y)(
+                       NaturalsBelow.secondOfTwo)
+                         by RingVector.twoCoordinates_second
+                   = RingVector.twoCoordinates(a + x, b + y)(i)
+                         by substituting second
+                as entryReads;
+                done by entryReads
+              }
+          }
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+theorem Matrix.squarePlusDoubleSquareForm_apply_firstBasis
+        : Matrix.squarePlusDoubleSquareForm
+            · Matrix.standardBasisRow(
+                Integer.commutative_ring_bundle,
+                2, NaturalsBelow.firstOfTwo)
+          = (RingVector.twoCoordinates((1 : ℤ), (0 : ℤ))
+              : RingVector(Integer.commutative_ring_bundle, 2)) := {
+  let e : RingVector(Integer.commutative_ring_bundle, 2) :=
+      Matrix.standardBasisRow(
+          Integer.commutative_ring_bundle,
+          2, NaturalsBelow.firstOfTwo);
+  let firstColumn : RingVector(Integer.commutative_ring_bundle, 2) :=
+      RingVector.twoCoordinates((1 : ℤ), (0 : ℤ));
+  ∀ (i : NaturalsBelow(2)).
+      (Matrix.squarePlusDoubleSquareForm · e)(i)
+        = firstColumn(i)
+      by (i : NaturalsBelow(2)) ↦ {
+          i = NaturalsBelow.firstOfTwo
+            ∨ i = NaturalsBelow.secondOfTwo
+            by NaturalsBelow.two_split;
+          done by cases {
+            case i = NaturalsBelow.firstOfTwo as first: {
+                (Matrix.squarePlusDoubleSquareForm · e)(i)
+                   = (Matrix.squarePlusDoubleSquareForm · e)(
+                       NaturalsBelow.firstOfTwo)
+                         by substituting first
+                   = Matrix.squarePlusDoubleSquareForm(
+                       NaturalsBelow.firstOfTwo,
+                       NaturalsBelow.firstOfTwo)
+                         by Matrix.applyVector_standardBasisRow
+                   = (1 : ℤ)
+                         by Matrix.squarePlusDoubleSquareForm_first_diagonal
+                   = firstColumn(NaturalsBelow.firstOfTwo)
+                         by RingVector.twoCoordinates_first
+                   = firstColumn(i)
+                         by substituting first
+                as entryReads;
+                done by entryReads
+              }
+            case i = NaturalsBelow.secondOfTwo as second: {
+                ¬(NaturalsBelow.secondOfTwo
+                    = NaturalsBelow.firstOfTwo) by {
+                  suppose NaturalsBelow.secondOfTwo
+                      = NaturalsBelow.firstOfTwo;
+                  NaturalsBelow.firstOfTwo
+                      = NaturalsBelow.secondOfTwo;
+                  done by NaturalsBelow.firstOfTwo_not_secondOfTwo
+                }
+                as indicesDiffer;
+                Matrix.squarePlusDoubleSquareForm(
+                    NaturalsBelow.secondOfTwo,
+                    NaturalsBelow.firstOfTwo)
+                   = (Matrix.identity(
+                         Integer.commutative_ring_bundle, 2)
+                       + Matrix.lowerRightUnit)(
+                           NaturalsBelow.secondOfTwo,
+                           NaturalsBelow.firstOfTwo)
+                         by substituting
+                             Matrix.squarePlusDoubleSquareForm_splits
+                   = Matrix.identity(
+                         Integer.commutative_ring_bundle, 2)(
+                           NaturalsBelow.secondOfTwo,
+                           NaturalsBelow.firstOfTwo)
+                     + Matrix.lowerRightUnit(
+                         NaturalsBelow.secondOfTwo,
+                         NaturalsBelow.firstOfTwo)
+                   = (0 : ℤ) + Matrix.lowerRightUnit(
+                         NaturalsBelow.secondOfTwo,
+                         NaturalsBelow.firstOfTwo)
+                         by Matrix.identity_entry_off(
+                             r := Integer.commutative_ring_bundle,
+                             i := NaturalsBelow.secondOfTwo,
+                             j := NaturalsBelow.firstOfTwo,
+                             notEqual := indicesDiffer)
+                   = (0 : ℤ)
+                         by substituting
+                             Matrix.lowerRightUnit_column_vanishes
+                as offDiagonalVanishes;
+                (Matrix.squarePlusDoubleSquareForm · e)(i)
+                   = (Matrix.squarePlusDoubleSquareForm · e)(
+                       NaturalsBelow.secondOfTwo)
+                         by substituting second
+                   = Matrix.squarePlusDoubleSquareForm(
+                       NaturalsBelow.secondOfTwo,
+                       NaturalsBelow.firstOfTwo)
+                         by Matrix.applyVector_standardBasisRow
+                   = (0 : ℤ) by offDiagonalVanishes
+                   = firstColumn(NaturalsBelow.secondOfTwo)
+                         by RingVector.twoCoordinates_second
+                   = firstColumn(i)
+                         by substituting second
+                as entryReads;
+                done by entryReads
+              }
+          }
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+theorem Matrix.squarePlusDoubleSquareForm_apply_twoCoordinates
+        (a b : ℤ)
+        : Matrix.squarePlusDoubleSquareForm
+            · (RingVector.twoCoordinates(a, b)
+                : RingVector(Integer.commutative_ring_bundle, 2))
+          = (RingVector.twoCoordinates(a, 2 * b)
+              : RingVector(Integer.commutative_ring_bundle, 2)) := {
+  let firstBasis : RingVector(Integer.commutative_ring_bundle, 2) :=
+      Matrix.standardBasisRow(
+          Integer.commutative_ring_bundle,
+          2, NaturalsBelow.firstOfTwo);
+  let secondBasis : RingVector(Integer.commutative_ring_bundle, 2) :=
+      Matrix.standardBasisRow(
+          Integer.commutative_ring_bundle,
+          2, NaturalsBelow.secondOfTwo);
+  let input : RingVector(Integer.commutative_ring_bundle, 2) :=
+      RingVector.twoCoordinates(a, b);
+  let output : RingVector(Integer.commutative_ring_bundle, 2) :=
+      RingVector.twoCoordinates(a, 2 * b);
+  let firstColumn : RingVector(Integer.commutative_ring_bundle, 2) :=
+      RingVector.twoCoordinates((1 : ℤ), (0 : ℤ));
+  let secondColumn : RingVector(Integer.commutative_ring_bundle, 2) :=
+      RingVector.twoCoordinates((0 : ℤ), (2 : ℤ));
+  Matrix.squarePlusDoubleSquareForm
+      · input
+     = Matrix.squarePlusDoubleSquareForm
+         · (a • firstBasis + b • secondBasis)
+     = Matrix.squarePlusDoubleSquareForm · (a • firstBasis)
+       + Matrix.squarePlusDoubleSquareForm · (b • secondBasis)
+           by Matrix.applyVector_add
+     = a • (Matrix.squarePlusDoubleSquareForm · firstBasis)
+       + Matrix.squarePlusDoubleSquareForm · (b • secondBasis)
+           by substituting Matrix.applyVector_scale
+     = a • (Matrix.squarePlusDoubleSquareForm · firstBasis)
+       + b • (Matrix.squarePlusDoubleSquareForm · secondBasis)
+           by substituting Matrix.applyVector_scale
+     = a • firstColumn
+       + b • (Matrix.squarePlusDoubleSquareForm · secondBasis)
+           by substituting
+               Matrix.squarePlusDoubleSquareForm_apply_firstBasis
+     = a • firstColumn + b • secondColumn
+           by substituting
+               Matrix.squarePlusDoubleSquareForm_apply_secondBasis
+     = output by {
+           ∀ (i : NaturalsBelow(2)).
+               (a • firstColumn + b • secondColumn)(i)
+               = output(i)
+               by (i : NaturalsBelow(2)) ↦ {
+                   i = NaturalsBelow.firstOfTwo
+                     ∨ i = NaturalsBelow.secondOfTwo
+                     by NaturalsBelow.two_split;
+                   done by cases {
+                     case i = NaturalsBelow.firstOfTwo: {
+                         firstColumn(i) = (1 : ℤ)
+                             by RingVector.twoCoordinates_first;
+                         secondColumn(i) = (0 : ℤ)
+                             by RingVector.twoCoordinates_first;
+                         output(i) = a
+                             by RingVector.twoCoordinates_first;
+                         done by ring
+                       }
+                     case i = NaturalsBelow.secondOfTwo: {
+                         firstColumn(i) = (0 : ℤ)
+                             by RingVector.twoCoordinates_second;
+                         secondColumn(i) = (2 : ℤ)
+                             by RingVector.twoCoordinates_second;
+                         output(i) = 2 * b
+                             by RingVector.twoCoordinates_second;
+                         done by ring
+                       }
+                   }
+                 };
+           done by RingVector.equal_of_pointwise
+         };
+  done
+}
+
+theorem Matrix.squarePlusDoubleSquareForm_twoCoordinates_value
+        (a b : ℤ)
+        : Matrix.quadraticForm(
+            Matrix.squarePlusDoubleSquareForm,
+            RingVector.twoCoordinates(a, b))
+          = a * a + 2 * (b * b) := {
+  let v : RingVector(Integer.commutative_ring_bundle, 2) :=
+      RingVector.twoCoordinates(a, b);
+  Matrix.quadraticForm(
+      Matrix.squarePlusDoubleSquareForm,
+      v)
+     = v(NaturalsBelow.firstOfTwo)
+         * v(NaturalsBelow.firstOfTwo)
+       + 2 * (v(NaturalsBelow.secondOfTwo)
+         * v(NaturalsBelow.secondOfTwo))
+           by Matrix.squarePlusDoubleSquareForm_value
+     = a * a
+       + 2 * (v(NaturalsBelow.secondOfTwo)
+         * v(NaturalsBelow.secondOfTwo))
+           by substituting RingVector.twoCoordinates_first
+     = a * a + 2 * (b * b)
+           by substituting RingVector.twoCoordinates_second;
+  done
+}
+
+theorem RingVector.innerProduct_twoCoordinates
+        (a b x y : ℤ)
+        : RingVector.innerProduct(
+            (RingVector.twoCoordinates(a, b)
+              : RingVector(Integer.commutative_ring_bundle, 2)),
+            RingVector.twoCoordinates(x, y))
+          = a * x + b * y := {
+  let left : RingVector(Integer.commutative_ring_bundle, 2) :=
+      RingVector.twoCoordinates(a, b);
+  let right : RingVector(Integer.commutative_ring_bundle, 2) :=
+      RingVector.twoCoordinates(x, y);
+  RingVector.innerProduct(left, right)
+     = left(NaturalsBelow.firstOfTwo)
+         * right(NaturalsBelow.firstOfTwo)
+       + left(NaturalsBelow.secondOfTwo)
+         * right(NaturalsBelow.secondOfTwo)
+           by RingVector.innerProduct_two
+     = a * right(NaturalsBelow.firstOfTwo)
+       + left(NaturalsBelow.secondOfTwo)
+         * right(NaturalsBelow.secondOfTwo)
+           by substituting RingVector.twoCoordinates_first
+     = a * x
+       + left(NaturalsBelow.secondOfTwo)
+         * right(NaturalsBelow.secondOfTwo)
+           by substituting RingVector.twoCoordinates_first
+     = a * x + b * right(NaturalsBelow.secondOfTwo)
+           by substituting RingVector.twoCoordinates_second
+     = a * x + b * y
+           by substituting RingVector.twoCoordinates_second;
+  done
+}
+
+theorem Matrix.squarePlusDoubleSquareCandidate_isometric_shear
+        (a b c x y : ℤ)
+        : Matrix.IsIsometric(
+            Matrix.squarePlusDoubleSquareCandidate(a, b, c),
+            Matrix.squarePlusDoubleSquareCandidate(
+                a + x,
+                b + 2 * y,
+                c + 2 * (a * x + b * y) + x * x + 2 * (y * y))) := {
+  let border : RingVector(Integer.commutative_ring_bundle, 2) :=
+      RingVector.twoCoordinates(a, b);
+  let shift : RingVector(Integer.commutative_ring_bundle, 2) :=
+      RingVector.twoCoordinates(x, y);
+  Matrix.IsIsometric(
+      Matrix.borderedAssembly(
+          Matrix.squarePlusDoubleSquareForm, border, c),
+      Matrix.borderedAssembly(
+          Matrix.squarePlusDoubleSquareForm,
+          border + Matrix.squarePlusDoubleSquareForm · shift,
+          c + RingVector.innerProduct(border, shift)
+            + RingVector.innerProduct(border, shift)
+            + Matrix.quadraticForm(
+                Matrix.squarePlusDoubleSquareForm, shift)))
+      by Matrix.borderedAssembly_isometric_topShear(
+          symmetric := Matrix.squarePlusDoubleSquareForm_symmetric);
+  Matrix.squarePlusDoubleSquareForm · shift
+      = RingVector.twoCoordinates(x, 2 * y)
+      by Matrix.squarePlusDoubleSquareForm_apply_twoCoordinates
+  as actionReads;
+  border + Matrix.squarePlusDoubleSquareForm · shift
+     = border + RingVector.twoCoordinates(x, 2 * y)
+           by substituting actionReads
+     = RingVector.twoCoordinates(a + x, b + 2 * y)
+           by RingVector.twoCoordinates_add
+  as borderReads;
+  RingVector.innerProduct(border, shift)
+      = a * x + b * y
+      by RingVector.innerProduct_twoCoordinates
+  as pairingReads;
+  Matrix.quadraticForm(
+      Matrix.squarePlusDoubleSquareForm, shift)
+      = x * x + 2 * (y * y)
+      by Matrix.squarePlusDoubleSquareForm_twoCoordinates_value
+  as valueReads;
+  c + RingVector.innerProduct(border, shift)
+      + RingVector.innerProduct(border, shift)
+      + Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm, shift)
+     = c + (a * x + b * y)
+       + RingVector.innerProduct(border, shift)
+       + Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm, shift)
+           by substituting pairingReads
+     = c + (a * x + b * y) + (a * x + b * y)
+       + Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm, shift)
+           by substituting pairingReads
+     = c + (a * x + b * y) + (a * x + b * y)
+       + (x * x + 2 * (y * y))
+           by substituting valueReads
+     = c + 2 * (a * x + b * y) + x * x + 2 * (y * y)
+           by ring
+  as cornerReads;
+  Matrix.borderedAssembly(
+      Matrix.squarePlusDoubleSquareForm,
+      border + Matrix.squarePlusDoubleSquareForm · shift,
+      c + RingVector.innerProduct(border, shift)
+        + RingVector.innerProduct(border, shift)
+        + Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm, shift))
+     = Matrix.borderedAssembly(
+           Matrix.squarePlusDoubleSquareForm,
+           RingVector.twoCoordinates(a + x, b + 2 * y),
+           c + RingVector.innerProduct(border, shift)
+             + RingVector.innerProduct(border, shift)
+             + Matrix.quadraticForm(
+                 Matrix.squarePlusDoubleSquareForm, shift))
+           by substituting borderReads
+     = Matrix.borderedAssembly(
+           Matrix.squarePlusDoubleSquareForm,
+           RingVector.twoCoordinates(a + x, b + 2 * y),
+           c + 2 * (a * x + b * y) + x * x + 2 * (y * y))
+           by substituting cornerReads
+     = Matrix.squarePlusDoubleSquareCandidate(
+           a + x,
+           b + 2 * y,
+           c + 2 * (a * x + b * y) + x * x + 2 * (y * y))
+  as targetReads;
+  done by substituting targetReads
+}
+
+theorem Matrix.squarePlusDoubleSquareDiagonalForm_isometric_zeroBorder
+        (c : ℤ)
+        : Matrix.IsIsometric(
+            Matrix.squarePlusDoubleSquareDiagonalForm(c),
+            Matrix.squarePlusDoubleSquareCandidate(0, 0, c)) := {
+  let zero : RingVector(Integer.commutative_ring_bundle, 2) :=
+      RingVector.twoCoordinates((0 : ℤ), (0 : ℤ));
+  Matrix.squarePlusDoubleSquareForm · zero
+      = zero
+      by Matrix.squarePlusDoubleSquareForm_apply_twoCoordinates
+  as actionReads;
+  Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm, zero) = 0
+      by Matrix.squarePlusDoubleSquareForm_twoCoordinates_value
+  as valueReads;
+  Matrix.IsIsometric(
+      Matrix.diagonalExtension(Matrix.squarePlusDoubleSquareForm, c),
+      Matrix.borderedAssembly(
+          Matrix.squarePlusDoubleSquareForm,
+          Matrix.squarePlusDoubleSquareForm · zero,
+          c + Matrix.quadraticForm(
+              Matrix.squarePlusDoubleSquareForm, zero)))
+      by Matrix.diagonalExtension_isometric_borderedAssembly(
+          symmetric := Matrix.squarePlusDoubleSquareForm_symmetric);
+  c + (0 : ℤ) = c by ring as cornerReads;
+  Matrix.borderedAssembly(
+      Matrix.squarePlusDoubleSquareForm,
+      Matrix.squarePlusDoubleSquareForm · zero,
+      c + Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm, zero))
+     = Matrix.borderedAssembly(
+           Matrix.squarePlusDoubleSquareForm,
+           zero,
+           c + Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm, zero))
+           by substituting actionReads
+     = Matrix.borderedAssembly(
+           Matrix.squarePlusDoubleSquareForm,
+           zero, c + 0)
+           by substituting valueReads
+     = Matrix.borderedAssembly(
+           Matrix.squarePlusDoubleSquareForm,
+           zero, c)
+           by substituting cornerReads
+     = Matrix.squarePlusDoubleSquareCandidate(0, 0, c)
+  as targetReads;
+  done by substituting targetReads
+}
+
+theorem Matrix.secondBasis_outerProduct
+        : Matrix.outerProduct(
+            Matrix.standardBasisRow(
+                Integer.commutative_ring_bundle,
+                2, NaturalsBelow.secondOfTwo),
+            Matrix.standardBasisRow(
+                Integer.commutative_ring_bundle,
+                2, NaturalsBelow.secondOfTwo))
+          = Matrix.lowerRightUnit := {
+  let e : RingVector(Integer.commutative_ring_bundle, 2) :=
+      Matrix.standardBasisRow(
+          Integer.commutative_ring_bundle,
+          2, NaturalsBelow.secondOfTwo);
+  ∀ (i : NaturalsBelow(2)). ∀ (j : NaturalsBelow(2)).
+      Matrix.outerProduct(e, e)(i, j) = Matrix.lowerRightUnit(i, j)
+      by (i : NaturalsBelow(2)) (j : NaturalsBelow(2)) ↦ {
+          j = NaturalsBelow.firstOfTwo
+            ∨ j = NaturalsBelow.secondOfTwo
+            by NaturalsBelow.two_split;
+          done by cases {
+            case j = NaturalsBelow.firstOfTwo as firstColumn: {
+                ¬(NaturalsBelow.secondOfTwo
+                    = NaturalsBelow.firstOfTwo) by {
+                  suppose NaturalsBelow.secondOfTwo
+                      = NaturalsBelow.firstOfTwo;
+                  NaturalsBelow.firstOfTwo
+                      = NaturalsBelow.secondOfTwo;
+                  done by NaturalsBelow.firstOfTwo_not_secondOfTwo
+                };
+                e(NaturalsBelow.firstOfTwo) = (0 : ℤ)
+                    by Matrix.standardBasisRow_off as eVanishes;
+                Matrix.outerProduct(e, e)(i, j)
+                   = e(i) * e(NaturalsBelow.firstOfTwo)
+                         by substituting firstColumn
+                   = e(i) * 0 by substituting eVanishes
+                   = (0 : ℤ) by ring
+                   = Matrix.lowerRightUnit(
+                       i, NaturalsBelow.firstOfTwo)
+                         by Matrix.lowerRightUnit_column_vanishes
+                   = Matrix.lowerRightUnit(i, j)
+                         by substituting firstColumn
+                as entryReads;
+                done by entryReads
+              }
+            case j = NaturalsBelow.secondOfTwo as secondColumn: {
+                i = NaturalsBelow.firstOfTwo
+                  ∨ i = NaturalsBelow.secondOfTwo
+                  by NaturalsBelow.two_split;
+                done by cases {
+                  case i = NaturalsBelow.firstOfTwo as firstRow: {
+                      ¬(NaturalsBelow.secondOfTwo
+                          = NaturalsBelow.firstOfTwo) by {
+                        suppose NaturalsBelow.secondOfTwo
+                            = NaturalsBelow.firstOfTwo;
+                        NaturalsBelow.firstOfTwo
+                            = NaturalsBelow.secondOfTwo;
+                        done by NaturalsBelow.firstOfTwo_not_secondOfTwo
+                      };
+                      e(NaturalsBelow.firstOfTwo) = (0 : ℤ)
+                          by Matrix.standardBasisRow_off as eVanishes;
+                      Matrix.outerProduct(e, e)(i, j)
+                         = e(NaturalsBelow.firstOfTwo) * e(j)
+                               by substituting firstRow
+                         = e(NaturalsBelow.firstOfTwo)
+                             * e(NaturalsBelow.secondOfTwo)
+                               by substituting secondColumn
+                         = 0 * e(NaturalsBelow.secondOfTwo)
+                               by substituting eVanishes
+                         = (0 : ℤ) by ring
+                         = Matrix.lowerRightUnit(
+                             NaturalsBelow.firstOfTwo,
+                             NaturalsBelow.secondOfTwo)
+                               by Matrix.lowerRightUnit_top_vanishes
+                         = Matrix.lowerRightUnit(
+                             NaturalsBelow.firstOfTwo, j)
+                               by substituting secondColumn
+                         = Matrix.lowerRightUnit(i, j)
+                               by substituting firstRow
+                      as entryReads;
+                      done by entryReads
+                    }
+                  case i = NaturalsBelow.secondOfTwo as secondRow: {
+                      e(NaturalsBelow.secondOfTwo) = (1 : ℤ)
+                          by Matrix.standardBasisRow_at as eReads;
+                      Matrix.outerProduct(e, e)(i, j)
+                         = e(NaturalsBelow.secondOfTwo) * e(j)
+                               by substituting secondRow
+                         = e(NaturalsBelow.secondOfTwo)
+                             * e(NaturalsBelow.secondOfTwo)
+                               by substituting secondColumn
+                         = (1 : ℤ) by substituting eReads
+                         = Matrix.lowerRightUnit(
+                             NaturalsBelow.secondOfTwo,
+                             NaturalsBelow.secondOfTwo)
+                               by Matrix.lowerRightUnit_entry_unit
+                         = Matrix.lowerRightUnit(
+                             NaturalsBelow.secondOfTwo, j)
+                               by substituting secondColumn
+                         = Matrix.lowerRightUnit(i, j)
+                               by substituting secondRow
+                      as entryReads;
+                      done by entryReads
+                    }
+                }
+              }
+          }
+        };
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.sumOfThreeSquaresForm_isometric_determinantOneOddForm
+        : Matrix.IsIsometric(
+            Matrix.sumOfThreeSquaresForm,
+            Matrix.squarePlusDoubleSquareOddForm(1)) := {
+  let secondBasis : RingVector(Integer.commutative_ring_bundle, 2) :=
+      Matrix.standardBasisRow(
+          Integer.commutative_ring_bundle,
+          2, NaturalsBelow.secondOfTwo);
+  let y : RingVector(Integer.commutative_ring_bundle, 1 + 2) :=
+      Matrix.standardBasisRow(
+          Integer.commutative_ring_bundle,
+          1 + 2, NaturalsBelow.top(2));
+  let e : RingVector(Integer.commutative_ring_bundle, 1 + 2) :=
+      RingVector.extend(secondBasis);
+  let D : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2) :=
+      Matrix.sumOfThreeSquaresForm;
+  let N : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2) :=
+      Matrix.outerProduct(y, e);
+  let U : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2) :=
+      Matrix.identity(Integer.commutative_ring_bundle, 1 + 2) + N;
+  let R : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2) :=
+      (D + Matrix.outerProduct(e, y))
+        + (Matrix.outerProduct(y, e)
+            + (1 : ℤ) • Matrix.outerProduct(e, e));
+  let unitBorder : RingVector(Integer.commutative_ring_bundle, 2) :=
+      RingVector.twoCoordinates((0 : ℤ), (1 : ℤ));
+
+  RingVector.restrict(y)
+      = RingVector.zero(Integer.commutative_ring_bundle, 2) by {
+    ∀ (i : NaturalsBelow(2)).
+        RingVector.restrict(y)(i)
+          = RingVector.zero(Integer.commutative_ring_bundle, 2)(i)
+        by (i : NaturalsBelow(2)) ↦ {
+            ¬(NaturalsBelow.top(2)
+                = NaturalsBelow.inclusion(2, i))
+                by NaturalsBelow.top_not_inclusion;
+            done by Matrix.standardBasisRow_off
+          };
+    done by RingVector.equal_of_pointwise
+  }
+  as yRestrictsToZero;
+  RingVector.innerProduct(e, y)
+     = RingVector.innerProduct(
+           secondBasis, RingVector.restrict(y))
+           by RingVector.innerProduct_extend_left
+     = RingVector.innerProduct(
+           secondBasis,
+           RingVector.zero(Integer.commutative_ring_bundle, 2))
+           by substituting yRestrictsToZero
+     = (0 : ℤ)
+           by RingVector.innerProduct_zero_right
+  as orthogonal;
+  N * N
+     = RingVector.innerProduct(e, y)
+         • Matrix.outerProduct(y, e)
+           by Matrix.outerProduct_multiply_outerProduct
+     = (0 : ℤ) • Matrix.outerProduct(y, e)
+           by substituting orthogonal
+     = Matrix.zero(Integer.commutative_ring_bundle, 1 + 2, 1 + 2)
+           by Matrix.scale_zero_scalar
+  as squareZero;
+  Matrix.IsInvertible(U)
+      by Matrix.one_add_square_zero_invertible(
+          squareZero := squareZero)
+  as invertible;
+
+  D · y = y by {
+    ∀ (p : NaturalsBelow(1 + 2)). (D · y)(p) = y(p)
+        by (p : NaturalsBelow(1 + 2)) ↦ {
+            (∃ (i : NaturalsBelow(2)).
+                p = NaturalsBelow.inclusion(2, i))
+              ∨ p = NaturalsBelow.top(2)
+              by NaturalsBelow.inclusion_or_top;
+            done by cases {
+              case ∃ (i : NaturalsBelow(2)).
+                  p = NaturalsBelow.inclusion(2, i): {
+                  choose i such that
+                      p = NaturalsBelow.inclusion(2, i) as below;
+                  Matrix.borderColumn(D)
+                      = RingVector.zero(
+                          Integer.commutative_ring_bundle, 2)
+                      by Matrix.diagonalExtension_borderColumn
+                  as borderVanishes;
+                  ¬(NaturalsBelow.inclusion(2, i)
+                      = NaturalsBelow.top(2)) by {
+                    suppose NaturalsBelow.inclusion(2, i)
+                        = NaturalsBelow.top(2);
+                    NaturalsBelow.top(2)
+                        = NaturalsBelow.inclusion(2, i);
+                    done by NaturalsBelow.top_not_inclusion
+                  }
+                  as belowNotTop;
+                  (D · y)(p)
+                     = (D · y)(NaturalsBelow.inclusion(2, i))
+                           by substituting below
+                     = D(
+                         NaturalsBelow.inclusion(2, i),
+                         NaturalsBelow.top(2))
+                           by Matrix.applyVector_standardBasisRow
+                     = Matrix.borderColumn(D)(i)
+                     = RingVector.zero(
+                         Integer.commutative_ring_bundle, 2)(i)
+                           by substituting borderVanishes
+                     = (0 : ℤ)
+                     = y(NaturalsBelow.inclusion(2, i))
+                           by Matrix.standardBasisRow_off(
+                               c := Integer.commutative_ring_bundle,
+                               j := NaturalsBelow.top(2),
+                               t := NaturalsBelow.inclusion(2, i),
+                               notEqual := belowNotTop)
+                     = y(p) by substituting below
+                  as entryReads;
+                  done by entryReads
+                }
+              case p = NaturalsBelow.top(2) as top: {
+                  Matrix.corner(D) = (1 : ℤ)
+                      by Matrix.diagonalExtension_corner as cornerReads;
+                  (D · y)(p)
+                     = (D · y)(NaturalsBelow.top(2))
+                           by substituting top
+                     = D(NaturalsBelow.top(2), NaturalsBelow.top(2))
+                           by Matrix.applyVector_standardBasisRow
+                     = Matrix.corner(D)
+                     = (1 : ℤ) by cornerReads
+                     = y(NaturalsBelow.top(2))
+                           by Matrix.standardBasisRow_at(
+                               c := Integer.commutative_ring_bundle,
+                               j := NaturalsBelow.top(2),
+                               t := NaturalsBelow.top(2),
+                               equal := reflexivity(
+                                   NaturalsBelow(1 + 2),
+                                   NaturalsBelow.top(2)))
+                     = y(p) by substituting top
+                  as entryReads;
+                  done by entryReads
+                }
+            }
+          };
+    done by RingVector.equal_of_pointwise
+  }
+  as actionReads;
+  RingVector.innerProduct(y, y)
+     = y(NaturalsBelow.top(2))
+           by RingVector.innerProduct_standardBasisRow_left
+     = (1 : ℤ) by Matrix.standardBasisRow_at
+  as pairingReads;
+  (Uᵀ * D) * U
+     = ((Matrix.identity(Integer.commutative_ring_bundle, 1 + 2)
+          + Matrix.outerProduct(y, e))ᵀ * D)
+       * (Matrix.identity(Integer.commutative_ring_bundle, 1 + 2)
+          + Matrix.outerProduct(y, e))
+     = R
+           by Matrix.outerProductShear_pullback(
+               w := y,
+               q := (1 : ℤ),
+               symmetric := Matrix.sumOfThreeSquaresForm_symmetric,
+               action := actionReads,
+               pairing := pairingReads)
+  as pullbackReads;
+  Matrix.IsSymmetric(R) by {
+    Matrix.IsSymmetric(Uᵀ * D * U)
+        by Matrix.pullback_symmetric(
+            symmetric := Matrix.sumOfThreeSquaresForm_symmetric);
+    done by substituting pullbackReads
+  }
+  as rSymmetric;
+  Matrix.IsSymmetric(
+      Matrix.squarePlusDoubleSquareOddForm(1))
+      by Matrix.borderedAssembly_symmetric
+  as targetSymmetric;
+
+  Matrix.leadingBlock(R)
+      = Matrix.squarePlusDoubleSquareForm by {
+    Matrix.leadingBlock(D) = Matrix.sumOfTwoSquaresForm
+        by Matrix.diagonalExtension_leadingBlock as dBlock;
+    ∀ (i : NaturalsBelow(2)). ∀ (j : NaturalsBelow(2)).
+        Matrix.leadingBlock(R)(i, j)
+          = Matrix.squarePlusDoubleSquareForm(i, j)
+        by (i : NaturalsBelow(2)) (j : NaturalsBelow(2)) ↦ {
+            y(NaturalsBelow.inclusion(2, i))
+               = RingVector.restrict(y)(i)
+               = RingVector.zero(
+                   Integer.commutative_ring_bundle, 2)(i)
+                    by substituting yRestrictsToZero
+               = (0 : ℤ)
+            as yVanishesI;
+            y(NaturalsBelow.inclusion(2, j))
+               = RingVector.restrict(y)(j)
+               = RingVector.zero(
+                   Integer.commutative_ring_bundle, 2)(j)
+                    by substituting yRestrictsToZero
+               = (0 : ℤ)
+            as yVanishesJ;
+            e(NaturalsBelow.inclusion(2, i)) = secondBasis(i)
+                by RingVector.extend_inclusion as eReadsI;
+            e(NaturalsBelow.inclusion(2, j)) = secondBasis(j)
+                by RingVector.extend_inclusion as eReadsJ;
+            D(NaturalsBelow.inclusion(2, i), NaturalsBelow.inclusion(2, j))
+               = Matrix.leadingBlock(D)(i, j)
+               = Matrix.sumOfTwoSquaresForm(i, j)
+                    by substituting dBlock
+            as dReads;
+            Matrix.outerProduct(secondBasis, secondBasis)(i, j)
+                = Matrix.lowerRightUnit(i, j)
+                by Matrix.secondBasis_outerProduct as lowerRightReads;
+            Matrix.sumOfTwoSquaresForm(i, j)
+               = Matrix.identity(
+                   Integer.commutative_ring_bundle, 2)(i, j)
+                    by substituting Matrix.sumOfTwoSquaresForm_is_identity
+            as parentReads;
+            Matrix.squarePlusDoubleSquareForm(i, j)
+               = (Matrix.identity(
+                   Integer.commutative_ring_bundle, 2)
+                   + Matrix.lowerRightUnit)(i, j)
+                    by substituting
+                        Matrix.squarePlusDoubleSquareForm_splits
+               = Matrix.identity(
+                   Integer.commutative_ring_bundle, 2)(i, j)
+                 + Matrix.lowerRightUnit(i, j)
+            as targetReads;
+            Matrix.leadingBlock(R)(i, j)
+               = (D(NaturalsBelow.inclusion(2, i), NaturalsBelow.inclusion(2, j))
+                    + e(NaturalsBelow.inclusion(2, i))
+                        * y(NaturalsBelow.inclusion(2, j)))
+                 + (y(NaturalsBelow.inclusion(2, i))
+                        * e(NaturalsBelow.inclusion(2, j))
+                    + 1 * (e(NaturalsBelow.inclusion(2, i))
+                        * e(NaturalsBelow.inclusion(2, j))))
+               = (Matrix.sumOfTwoSquaresForm(i, j)
+                    + e(NaturalsBelow.inclusion(2, i))
+                        * y(NaturalsBelow.inclusion(2, j)))
+                 + (y(NaturalsBelow.inclusion(2, i))
+                        * e(NaturalsBelow.inclusion(2, j))
+                    + 1 * (e(NaturalsBelow.inclusion(2, i))
+                        * e(NaturalsBelow.inclusion(2, j))))
+                    by substituting dReads
+               = (Matrix.sumOfTwoSquaresForm(i, j)
+                    + secondBasis(i)
+                        * y(NaturalsBelow.inclusion(2, j)))
+                 + (y(NaturalsBelow.inclusion(2, i))
+                        * e(NaturalsBelow.inclusion(2, j))
+                    + 1 * (secondBasis(i)
+                        * e(NaturalsBelow.inclusion(2, j))))
+                    by substituting eReadsI
+               = (Matrix.sumOfTwoSquaresForm(i, j)
+                    + secondBasis(i) * 0)
+                 + (y(NaturalsBelow.inclusion(2, i))
+                        * e(NaturalsBelow.inclusion(2, j))
+                    + 1 * (secondBasis(i)
+                        * e(NaturalsBelow.inclusion(2, j))))
+                    by substituting yVanishesJ
+               = (Matrix.sumOfTwoSquaresForm(i, j)
+                    + secondBasis(i) * 0)
+                 + (0 * e(NaturalsBelow.inclusion(2, j))
+                    + 1 * (secondBasis(i)
+                        * e(NaturalsBelow.inclusion(2, j))))
+                    by substituting yVanishesI
+               = (Matrix.sumOfTwoSquaresForm(i, j)
+                    + secondBasis(i) * 0)
+                 + (0 * secondBasis(j)
+                    + 1 * (secondBasis(i) * secondBasis(j)))
+                    by substituting eReadsJ
+               = Matrix.sumOfTwoSquaresForm(i, j)
+                 + secondBasis(i) * secondBasis(j)
+                    by ring
+               = Matrix.sumOfTwoSquaresForm(i, j)
+                 + Matrix.outerProduct(secondBasis, secondBasis)(i, j)
+                    by reflexivity
+               = Matrix.sumOfTwoSquaresForm(i, j)
+                 + Matrix.lowerRightUnit(i, j)
+                    by substituting lowerRightReads
+               = Matrix.identity(
+                   Integer.commutative_ring_bundle, 2)(i, j)
+                 + Matrix.lowerRightUnit(i, j)
+                    by substituting parentReads
+               = Matrix.squarePlusDoubleSquareForm(i, j)
+                    by targetReads
+            as entryReads;
+            done by entryReads
+          };
+    done by Matrix.equal_of_entries
+  }
+  as blocks;
+
+  Matrix.borderColumn(R)
+      = unitBorder by {
+    ∀ (i : NaturalsBelow(2)).
+        Matrix.borderColumn(R)(i)
+          = unitBorder(i)
+        by (i : NaturalsBelow(2)) ↦ {
+            Matrix.borderColumn(D)
+                = RingVector.zero(
+                    Integer.commutative_ring_bundle, 2)
+                by Matrix.diagonalExtension_borderColumn
+            as dBorder;
+            y(NaturalsBelow.top(2)) = (1 : ℤ)
+                by Matrix.standardBasisRow_at as yTop;
+            e(NaturalsBelow.top(2)) = (0 : ℤ)
+                by RingVector.extend_top as eTop;
+            y(NaturalsBelow.inclusion(2, i))
+               = RingVector.restrict(y)(i)
+               = RingVector.zero(
+                   Integer.commutative_ring_bundle, 2)(i)
+                    by substituting yRestrictsToZero
+               = (0 : ℤ)
+            as yBelow;
+            e(NaturalsBelow.inclusion(2, i)) = secondBasis(i)
+                by RingVector.extend_inclusion as eBelow;
+            Matrix.borderColumn(R)(i)
+               = (D(NaturalsBelow.inclusion(2, i), NaturalsBelow.top(2))
+                    + e(NaturalsBelow.inclusion(2, i))
+                        * y(NaturalsBelow.top(2)))
+                 + (y(NaturalsBelow.inclusion(2, i))
+                        * e(NaturalsBelow.top(2))
+                    + 1 * (e(NaturalsBelow.inclusion(2, i))
+                        * e(NaturalsBelow.top(2))))
+               = (Matrix.borderColumn(D)(i)
+                    + secondBasis(i) * y(NaturalsBelow.top(2)))
+                 + (y(NaturalsBelow.inclusion(2, i))
+                        * e(NaturalsBelow.top(2))
+                    + 1 * (secondBasis(i) * e(NaturalsBelow.top(2))))
+                    by substituting eBelow
+               = (Matrix.borderColumn(D)(i) + secondBasis(i) * 1)
+                 + (y(NaturalsBelow.inclusion(2, i))
+                        * e(NaturalsBelow.top(2))
+                    + 1 * (secondBasis(i) * e(NaturalsBelow.top(2))))
+                    by substituting yTop
+               = (Matrix.borderColumn(D)(i) + secondBasis(i) * 1)
+                 + (0 * e(NaturalsBelow.top(2))
+                    + 1 * (secondBasis(i) * e(NaturalsBelow.top(2))))
+                    by substituting yBelow
+               = (Matrix.borderColumn(D)(i) + secondBasis(i) * 1)
+                 + (0 * 0 + 1 * (secondBasis(i) * 0))
+                    by substituting eTop
+               = (RingVector.zero(
+                     Integer.commutative_ring_bundle, 2)(i)
+                    + secondBasis(i) * 1)
+                 + (0 * 0 + 1 * (secondBasis(i) * 0))
+                    by substituting dBorder
+               = secondBasis(i)
+                    by ring
+               = unitBorder(i) by {
+                   i = NaturalsBelow.firstOfTwo
+                     ∨ i = NaturalsBelow.secondOfTwo
+                     by NaturalsBelow.two_split;
+                   done by cases {
+                     case i = NaturalsBelow.firstOfTwo: {
+                         secondBasis(NaturalsBelow.firstOfTwo) = (0 : ℤ)
+                             by Matrix.standardBasisRow_off(
+                                 c := Integer.commutative_ring_bundle,
+                                 j := NaturalsBelow.secondOfTwo,
+                                 t := NaturalsBelow.firstOfTwo,
+                                 notEqual :=
+                                     NaturalsBelow.firstOfTwo_not_secondOfTwo);
+                         unitBorder(i) = (0 : ℤ)
+                             by RingVector.twoCoordinates_first;
+                         done
+                       }
+                     case i = NaturalsBelow.secondOfTwo: {
+                         secondBasis(NaturalsBelow.secondOfTwo) = (1 : ℤ)
+                             by Matrix.standardBasisRow_at(
+                                 c := Integer.commutative_ring_bundle,
+                                 j := NaturalsBelow.secondOfTwo,
+                                 t := NaturalsBelow.secondOfTwo,
+                                 equal := reflexivity(
+                                     NaturalsBelow(2),
+                                     NaturalsBelow.secondOfTwo));
+                         unitBorder(i) = (1 : ℤ)
+                             by RingVector.twoCoordinates_second;
+                         done
+                       }
+                   }
+                 }
+            as entryReads;
+            done by entryReads
+          };
+    done by RingVector.equal_of_pointwise
+  }
+  as columns;
+
+  Matrix.corner(R) = (1 : ℤ) by {
+    Matrix.corner(D) = (1 : ℤ)
+        by Matrix.diagonalExtension_corner as dCorner;
+    y(NaturalsBelow.top(2)) = (1 : ℤ)
+        by Matrix.standardBasisRow_at as yTop;
+    e(NaturalsBelow.top(2)) = (0 : ℤ)
+        by RingVector.extend_top as eTop;
+    Matrix.corner(R)
+       = (D(NaturalsBelow.top(2), NaturalsBelow.top(2))
+            + e(NaturalsBelow.top(2)) * y(NaturalsBelow.top(2)))
+         + (y(NaturalsBelow.top(2)) * e(NaturalsBelow.top(2))
+            + 1 * (e(NaturalsBelow.top(2)) * e(NaturalsBelow.top(2))))
+       = ((1 : ℤ) + e(NaturalsBelow.top(2))
+            * y(NaturalsBelow.top(2)))
+         + (y(NaturalsBelow.top(2)) * e(NaturalsBelow.top(2))
+            + 1 * (e(NaturalsBelow.top(2)) * e(NaturalsBelow.top(2))))
+            by substituting dCorner
+       = ((1 : ℤ) + 0 * y(NaturalsBelow.top(2)))
+         + (y(NaturalsBelow.top(2)) * 0 + 1 * (0 * 0))
+            by substituting eTop
+       = ((1 : ℤ) + 0 * 1) + (1 * 0 + 1 * (0 * 0))
+            by substituting yTop
+       = (1 : ℤ) by ring;
+    done
+  }
+  as corners;
+
+  Matrix.leadingBlock(R)
+     = Matrix.squarePlusDoubleSquareForm by blocks
+     = Matrix.leadingBlock(Matrix.squarePlusDoubleSquareOddForm(1))
+           by Matrix.borderedAssembly_leadingBlock
+  as sameBlocks;
+  Matrix.borderColumn(R)
+     = unitBorder by columns
+     = Matrix.borderColumn(Matrix.squarePlusDoubleSquareOddForm(1))
+           by Matrix.borderedAssembly_borderColumn
+  as sameBorderColumns;
+  Matrix.corner(R)
+     = (1 : ℤ) by corners
+     = Matrix.corner(Matrix.squarePlusDoubleSquareOddForm(1))
+           by Matrix.borderedAssembly_corner
+  as sameCorners;
+  R = Matrix.squarePlusDoubleSquareOddForm(1)
+      by Matrix.symmetric_bordered_extensionality(
+          symmetricB := rSymmetric,
+          symmetricC := targetSymmetric,
+          blocks := sameBlocks,
+          borderColumns := sameBorderColumns,
+          corners := sameCorners)
+  as targetReads;
+  Matrix.squarePlusDoubleSquareOddForm(1)
+     = R by targetReads
+     = Uᵀ * D * U by pullbackReads;
+  witness U with done by And.introduction(invertible, done)
+}
+
+theorem Matrix.squarePlusDoubleSquareCandidate_isometric_diagonal
+        (a b c x y d : ℤ)
+        (firstVanishes : a + x = 0)
+        (secondVanishes : b + 2 * y = 0)
+        (cornerReads :
+            c + 2 * (a * x + b * y) + x * x + 2 * (y * y) = d)
+        : Matrix.IsIsometric(
+            Matrix.squarePlusDoubleSquareCandidate(a, b, c),
+            Matrix.squarePlusDoubleSquareDiagonalForm(d)) := {
+  Matrix.IsIsometric(
+      Matrix.squarePlusDoubleSquareCandidate(a, b, c),
+      Matrix.squarePlusDoubleSquareCandidate(
+          a + x,
+          b + 2 * y,
+          c + 2 * (a * x + b * y) + x * x + 2 * (y * y)))
+      by Matrix.squarePlusDoubleSquareCandidate_isometric_shear;
+  Matrix.squarePlusDoubleSquareCandidate(
+      a + x,
+      b + 2 * y,
+      c + 2 * (a * x + b * y) + x * x + 2 * (y * y))
+     = Matrix.squarePlusDoubleSquareCandidate(
+           0,
+           b + 2 * y,
+           c + 2 * (a * x + b * y) + x * x + 2 * (y * y))
+           by substituting firstVanishes
+     = Matrix.squarePlusDoubleSquareCandidate(
+           0, 0,
+           c + 2 * (a * x + b * y) + x * x + 2 * (y * y))
+           by substituting secondVanishes
+     = Matrix.squarePlusDoubleSquareCandidate(0, 0, d)
+           by substituting cornerReads
+  as zeroBorderReads;
+  Matrix.IsIsometric(
+      Matrix.squarePlusDoubleSquareCandidate(a, b, c),
+      Matrix.squarePlusDoubleSquareCandidate(0, 0, d))
+      by substituting zeroBorderReads
+  as reduced;
+  Matrix.IsIsometric(
+      Matrix.squarePlusDoubleSquareCandidate(0, 0, d),
+      Matrix.squarePlusDoubleSquareDiagonalForm(d))
+      by Matrix.IsIsometric.symmetric(
+          isometric :=
+              Matrix.squarePlusDoubleSquareDiagonalForm_isometric_zeroBorder(
+                  c := d))
+  as diagonalized;
+  done by Matrix.IsIsometric.transitive(
+      leftIsometric := reduced,
+      rightIsometric := diagonalized)
+}
+
+theorem Matrix.squarePlusDoubleSquareCandidate_isometric_oddForm
+        (a b c x y d : ℤ)
+        (firstVanishes : a + x = 0)
+        (secondIsOne : b + 2 * y = 1)
+        (cornerReads :
+            c + 2 * (a * x + b * y) + x * x + 2 * (y * y) = d)
+        : Matrix.IsIsometric(
+            Matrix.squarePlusDoubleSquareCandidate(a, b, c),
+            Matrix.squarePlusDoubleSquareOddForm(d)) := {
+  Matrix.IsIsometric(
+      Matrix.squarePlusDoubleSquareCandidate(a, b, c),
+      Matrix.squarePlusDoubleSquareCandidate(
+          a + x,
+          b + 2 * y,
+          c + 2 * (a * x + b * y) + x * x + 2 * (y * y)))
+      by Matrix.squarePlusDoubleSquareCandidate_isometric_shear;
+  Matrix.squarePlusDoubleSquareCandidate(
+      a + x,
+      b + 2 * y,
+      c + 2 * (a * x + b * y) + x * x + 2 * (y * y))
+     = Matrix.squarePlusDoubleSquareCandidate(
+           0,
+           b + 2 * y,
+           c + 2 * (a * x + b * y) + x * x + 2 * (y * y))
+           by substituting firstVanishes
+     = Matrix.squarePlusDoubleSquareCandidate(
+           0, 1,
+           c + 2 * (a * x + b * y) + x * x + 2 * (y * y))
+           by substituting secondIsOne
+     = Matrix.squarePlusDoubleSquareCandidate(0, 1, d)
+           by substituting cornerReads
+     = Matrix.squarePlusDoubleSquareOddForm(d)
+  as targetReads;
+  done by substituting targetReads
+}
+
+theorem Matrix.squarePlusDoubleSquareCandidate_isometric_sumOfThreeSquares
+        (a b c x y : ℤ)
+        (firstVanishes : a + x = 0)
+        (secondIsOne : b + 2 * y = 1)
+        (cornerReads :
+            c + 2 * (a * x + b * y) + x * x + 2 * (y * y) = 1)
+        : Matrix.IsIsometric(
+            Matrix.squarePlusDoubleSquareCandidate(a, b, c),
+            Matrix.sumOfThreeSquaresForm) := {
+  Matrix.IsIsometric(
+      Matrix.squarePlusDoubleSquareCandidate(a, b, c),
+      Matrix.squarePlusDoubleSquareOddForm(1))
+      by Matrix.squarePlusDoubleSquareCandidate_isometric_oddForm
+      as reduced;
+  Matrix.IsIsometric(
+      Matrix.squarePlusDoubleSquareOddForm(1),
+      Matrix.sumOfThreeSquaresForm)
+      by Matrix.IsIsometric.symmetric(
+          isometric :=
+              Matrix.sumOfThreeSquaresForm_isometric_determinantOneOddForm)
+      as determinantOne;
+  done by Matrix.IsIsometric.transitive(
+      leftIsometric := reduced,
+      rightIsometric := determinantOne)
+}
+
+definition Matrix.IsSquarePlusDoubleSquareRankThreeRepresentative
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2))
+        : Proposition :=
+  Matrix.IsIsometric(B, Matrix.squarePlusDoubleSquareDiagonalForm(1))
+    ∨ Matrix.IsIsometric(B, Matrix.squarePlusDoubleSquareDiagonalForm(2))
+    ∨ Matrix.IsIsometric(B, Matrix.squarePlusDoubleSquareDiagonalForm(3))
+    ∨ Matrix.IsIsometric(B, Matrix.squarePlusDoubleSquareDiagonalForm(4))
+    ∨ Matrix.IsIsometric(B, Matrix.squarePlusDoubleSquareDiagonalForm(5))
+    ∨ Matrix.IsIsometric(B, Matrix.sumOfThreeSquaresForm)
+    ∨ Matrix.IsIsometric(B, Matrix.squarePlusDoubleSquareOddForm(4))
+    ∨ Matrix.IsIsometric(B, Matrix.squarePlusDoubleSquareOddForm(5))
+
+theorem Matrix.squarePlusDoubleSquareRankThreeRepresentative_diagonalOne
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2))
+        (isometric :
+            Matrix.IsIsometric(
+                B, Matrix.squarePlusDoubleSquareDiagonalForm(1)))
+        : Matrix.IsSquarePlusDoubleSquareRankThreeRepresentative(B) := {
+  done by Or.introduceLeft(isometric)
+}
+
+theorem Matrix.squarePlusDoubleSquareRankThreeRepresentative_diagonalTwo
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2))
+        (isometric :
+            Matrix.IsIsometric(
+                B, Matrix.squarePlusDoubleSquareDiagonalForm(2)))
+        : Matrix.IsSquarePlusDoubleSquareRankThreeRepresentative(B) := {
+  done by Or.introduceRight(Or.introduceLeft(isometric))
+}
+
+theorem Matrix.squarePlusDoubleSquareRankThreeRepresentative_diagonalThree
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2))
+        (isometric :
+            Matrix.IsIsometric(
+                B, Matrix.squarePlusDoubleSquareDiagonalForm(3)))
+        : Matrix.IsSquarePlusDoubleSquareRankThreeRepresentative(B) := {
+  done by Or.introduceRight(
+      Or.introduceRight(Or.introduceLeft(isometric)))
+}
+
+theorem Matrix.squarePlusDoubleSquareRankThreeRepresentative_diagonalFour
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2))
+        (isometric :
+            Matrix.IsIsometric(
+                B, Matrix.squarePlusDoubleSquareDiagonalForm(4)))
+        : Matrix.IsSquarePlusDoubleSquareRankThreeRepresentative(B) := {
+  done by Or.introduceRight(Or.introduceRight(
+      Or.introduceRight(Or.introduceLeft(isometric))))
+}
+
+theorem Matrix.squarePlusDoubleSquareRankThreeRepresentative_diagonalFive
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2))
+        (isometric :
+            Matrix.IsIsometric(
+                B, Matrix.squarePlusDoubleSquareDiagonalForm(5)))
+        : Matrix.IsSquarePlusDoubleSquareRankThreeRepresentative(B) := {
+  done by Or.introduceRight(Or.introduceRight(Or.introduceRight(
+      Or.introduceRight(Or.introduceLeft(isometric)))))
+}
+
+theorem Matrix.squarePlusDoubleSquareRankThreeRepresentative_threeSquares
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2))
+        (isometric : Matrix.IsIsometric(B, Matrix.sumOfThreeSquaresForm))
+        : Matrix.IsSquarePlusDoubleSquareRankThreeRepresentative(B) := {
+  done by Or.introduceRight(Or.introduceRight(Or.introduceRight(
+      Or.introduceRight(Or.introduceRight(
+        Or.introduceLeft(isometric))))))
+}
+
+theorem Matrix.squarePlusDoubleSquareRankThreeRepresentative_oddFour
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2))
+        (isometric :
+            Matrix.IsIsometric(
+                B, Matrix.squarePlusDoubleSquareOddForm(4)))
+        : Matrix.IsSquarePlusDoubleSquareRankThreeRepresentative(B) := {
+  done by Or.introduceRight(Or.introduceRight(Or.introduceRight(
+      Or.introduceRight(Or.introduceRight(Or.introduceRight(
+        Or.introduceLeft(isometric)))))))
+}
+
+theorem Matrix.squarePlusDoubleSquareRankThreeRepresentative_oddFive
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2))
+        (isometric :
+            Matrix.IsIsometric(
+                B, Matrix.squarePlusDoubleSquareOddForm(5)))
+        : Matrix.IsSquarePlusDoubleSquareRankThreeRepresentative(B) := {
+  done by Or.introduceRight(Or.introduceRight(Or.introduceRight(
+      Or.introduceRight(Or.introduceRight(Or.introduceRight(
+        Or.introduceRight(isometric)))))))
+}
+
+theorem Matrix.squarePlusDoubleSquareCandidate_is_representative
+        (a b : ℤ)
+        (admissible : Integer.IsSquarePlusDoubleSquareBorderPair(a, b))
+        : Matrix.IsSquarePlusDoubleSquareRankThreeRepresentative(
+            Matrix.squarePlusDoubleSquareCandidate(a, b, 5)) := {
+  done by cases {
+    case a = 0
+        ∧ (b = -3 ∨ b = -2 ∨ b = -1
+           ∨ b = 0 ∨ b = 1 ∨ b = 2 ∨ b = 3): {
+        a = 0;
+        b = -3 ∨ b = -2 ∨ b = -1
+          ∨ b = 0 ∨ b = 1 ∨ b = 2 ∨ b = 3;
+        done by cases {
+          case b = -3: {
+              Matrix.IsIsometric(
+                  Matrix.squarePlusDoubleSquareCandidate(0, -3, 5),
+                  Matrix.sumOfThreeSquaresForm)
+                  by Matrix.squarePlusDoubleSquareCandidate_isometric_sumOfThreeSquares(
+                      x := 0, y := 2,
+                      firstVanishes := (ring : (0 : ℤ) + 0 = 0),
+                      secondIsOne := (ring : (-3 : ℤ) + 2 * 2 = 1),
+                      cornerReads :=
+                        (ring : (5 : ℤ) + 2 * (0 * 0 + (-(3 : ℤ)) * 2)
+                          + 0 * 0 + 2 * (2 * 2) = 1))
+                  as orbit;
+              done by Matrix.squarePlusDoubleSquareRankThreeRepresentative_threeSquares(
+                  isometric := orbit)
+            }
+          case b = -2 ∨ b = -1 ∨ b = 0 ∨ b = 1 ∨ b = 2 ∨ b = 3:
+            done by cases {
+              case b = -2: {
+                  Matrix.IsIsometric(
+                      Matrix.squarePlusDoubleSquareCandidate(0, -2, 5),
+                      Matrix.squarePlusDoubleSquareDiagonalForm(3))
+                      by Matrix.squarePlusDoubleSquareCandidate_isometric_diagonal(
+                          x := 0, y := 1,
+                          firstVanishes := (ring : (0 : ℤ) + 0 = 0),
+                          secondVanishes := (ring : (-2 : ℤ) + 2 * 1 = 0),
+                          cornerReads :=
+                            (ring : (5 : ℤ) + 2 * (0 * 0 + (-(2 : ℤ)) * 1)
+                              + 0 * 0 + 2 * (1 * 1) = 3))
+                      as orbit;
+                  done by Matrix.squarePlusDoubleSquareRankThreeRepresentative_diagonalThree(
+                      isometric := orbit)
+                }
+              case b = -1 ∨ b = 0 ∨ b = 1 ∨ b = 2 ∨ b = 3:
+                done by cases {
+                  case b = -1: {
+                      Matrix.IsIsometric(
+                          Matrix.squarePlusDoubleSquareCandidate(0, -1, 5),
+                          Matrix.squarePlusDoubleSquareOddForm(5))
+                          by Matrix.squarePlusDoubleSquareCandidate_isometric_oddForm(
+                              x := 0, y := 1,
+                              firstVanishes := (ring : (0 : ℤ) + 0 = 0),
+                              secondIsOne := (ring : (-1 : ℤ) + 2 * 1 = 1),
+                              cornerReads :=
+                                (ring : (5 : ℤ) + 2 * (0 * 0 + (-(1 : ℤ)) * 1)
+                                  + 0 * 0 + 2 * (1 * 1) = 5))
+                          as orbit;
+                      done by Matrix.squarePlusDoubleSquareRankThreeRepresentative_oddFive(
+                          isometric := orbit)
+                    }
+                  case b = 0 ∨ b = 1 ∨ b = 2 ∨ b = 3:
+                    done by cases {
+                      case b = 0: {
+                          Matrix.IsIsometric(
+                              Matrix.squarePlusDoubleSquareCandidate(0, 0, 5),
+                              Matrix.squarePlusDoubleSquareDiagonalForm(5))
+                              by Matrix.squarePlusDoubleSquareCandidate_isometric_diagonal(
+                                  x := 0, y := 0,
+                                  firstVanishes := (ring : (0 : ℤ) + 0 = 0),
+                                  secondVanishes := (ring : (0 : ℤ) + 2 * 0 = 0),
+                                  cornerReads :=
+                                    (ring : (5 : ℤ) + 2 * (0 * 0 + 0 * 0)
+                                      + 0 * 0 + 2 * (0 * 0) = 5))
+                              as orbit;
+                          done by Matrix.squarePlusDoubleSquareRankThreeRepresentative_diagonalFive(
+                              isometric := orbit)
+                        }
+                      case b = 1 ∨ b = 2 ∨ b = 3: done by cases {
+                          case b = 1: {
+                              Matrix.IsIsometric(
+                                  Matrix.squarePlusDoubleSquareCandidate(0, 1, 5),
+                                  Matrix.squarePlusDoubleSquareOddForm(5))
+                                  by Matrix.squarePlusDoubleSquareCandidate_isometric_oddForm(
+                                      x := 0, y := 0,
+                                      firstVanishes := (ring : (0 : ℤ) + 0 = 0),
+                                      secondIsOne := (ring : (1 : ℤ) + 2 * 0 = 1),
+                                      cornerReads :=
+                                        (ring : (5 : ℤ) + 2 * (0 * 0 + 1 * 0)
+                                          + 0 * 0 + 2 * (0 * 0) = 5))
+                                  as orbit;
+                              done by Matrix.squarePlusDoubleSquareRankThreeRepresentative_oddFive(
+                                  isometric := orbit)
+                            }
+                          case b = 2 ∨ b = 3: done by cases {
+                              case b = 2: {
+                                  Matrix.IsIsometric(
+                                      Matrix.squarePlusDoubleSquareCandidate(0, 2, 5),
+                                      Matrix.squarePlusDoubleSquareDiagonalForm(3))
+                                      by Matrix.squarePlusDoubleSquareCandidate_isometric_diagonal(
+                                          x := 0, y := -1,
+                                          firstVanishes := (ring : (0 : ℤ) + 0 = 0),
+                                          secondVanishes := (ring : (2 : ℤ) + 2 * (-(1 : ℤ)) = 0),
+                                          cornerReads :=
+                                            (ring : (5 : ℤ) + 2 * (0 * 0 + 2 * (-(1 : ℤ)))
+                                              + 0 * 0 + 2 * ((-(1 : ℤ)) * (-(1 : ℤ))) = 3))
+                                      as orbit;
+                                  done by Matrix.squarePlusDoubleSquareRankThreeRepresentative_diagonalThree(
+                                      isometric := orbit)
+                                }
+                              case b = 3: {
+                                  Matrix.IsIsometric(
+                                      Matrix.squarePlusDoubleSquareCandidate(0, 3, 5),
+                                      Matrix.sumOfThreeSquaresForm)
+                                      by Matrix.squarePlusDoubleSquareCandidate_isometric_sumOfThreeSquares(
+                                          x := 0, y := -1,
+                                          firstVanishes := (ring : (0 : ℤ) + 0 = 0),
+                                          secondIsOne := (ring : (3 : ℤ) + 2 * (-(1 : ℤ)) = 1),
+                                          cornerReads :=
+                                            (ring : (5 : ℤ) + 2 * (0 * 0 + 3 * (-(1 : ℤ)))
+                                              + 0 * 0 + 2 * ((-(1 : ℤ)) * (-(1 : ℤ))) = 1))
+                                      as orbit;
+                                  done by Matrix.squarePlusDoubleSquareRankThreeRepresentative_threeSquares(
+                                      isometric := orbit)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+      }
+    case ((a = -1 ∨ a = 1)
+          ∧ (b = -2 ∨ b = -1 ∨ b = 0 ∨ b = 1 ∨ b = 2))
+        ∨ ((a = -2 ∨ a = 2)
+          ∧ (b = -1 ∨ b = 0 ∨ b = 1)):
+      done by cases {
+        case ((a = -1 ∨ a = 1)
+            ∧ (b = -2 ∨ b = -1 ∨ b = 0 ∨ b = 1 ∨ b = 2)): {
+            a = -1 ∨ a = 1;
+            b = -2 ∨ b = -1 ∨ b = 0 ∨ b = 1 ∨ b = 2;
+            done by cases {
+              case a = -1: done by cases {
+                  case b = -2: {
+                      Matrix.IsIsometric(
+                          Matrix.squarePlusDoubleSquareCandidate(-1, -2, 5),
+                          Matrix.squarePlusDoubleSquareDiagonalForm(2))
+                          by Matrix.squarePlusDoubleSquareCandidate_isometric_diagonal(
+                              x := 1, y := 1,
+                              firstVanishes := (ring : (-1 : ℤ) + 1 = 0),
+                              secondVanishes := (ring : (-2 : ℤ) + 2 * 1 = 0),
+                              cornerReads :=
+                                (ring : (5 : ℤ) + 2 * ((-(1 : ℤ)) * 1 + (-(2 : ℤ)) * 1)
+                                  + 1 * 1 + 2 * (1 * 1) = 2))
+                          as orbit;
+                      done by Matrix.squarePlusDoubleSquareRankThreeRepresentative_diagonalTwo(
+                          isometric := orbit)
+                    }
+                  case b = -1 ∨ b = 0 ∨ b = 1 ∨ b = 2: done by cases {
+                      case b = -1: {
+                          Matrix.IsIsometric(
+                              Matrix.squarePlusDoubleSquareCandidate(-1, -1, 5),
+                              Matrix.squarePlusDoubleSquareOddForm(4))
+                              by Matrix.squarePlusDoubleSquareCandidate_isometric_oddForm(
+                                  x := 1, y := 1,
+                                  firstVanishes := (ring : (-1 : ℤ) + 1 = 0),
+                                  secondIsOne := (ring : (-1 : ℤ) + 2 * 1 = 1),
+                                  cornerReads :=
+                                    (ring : (5 : ℤ) + 2 * ((-(1 : ℤ)) * 1 + (-(1 : ℤ)) * 1)
+                                      + 1 * 1 + 2 * (1 * 1) = 4))
+                              as orbit;
+                          done by Matrix.squarePlusDoubleSquareRankThreeRepresentative_oddFour(
+                              isometric := orbit)
+                        }
+                      case b = 0 ∨ b = 1 ∨ b = 2: done by cases {
+                          case b = 0: {
+                              Matrix.IsIsometric(
+                                  Matrix.squarePlusDoubleSquareCandidate(-1, 0, 5),
+                                  Matrix.squarePlusDoubleSquareDiagonalForm(4))
+                                  by Matrix.squarePlusDoubleSquareCandidate_isometric_diagonal(
+                                      x := 1, y := 0,
+                                      firstVanishes := (ring : (-1 : ℤ) + 1 = 0),
+                                      secondVanishes := (ring : (0 : ℤ) + 2 * 0 = 0),
+                                      cornerReads :=
+                                        (ring : (5 : ℤ) + 2 * ((-(1 : ℤ)) * 1 + 0 * 0)
+                                          + 1 * 1 + 2 * (0 * 0) = 4))
+                                  as orbit;
+                              done by Matrix.squarePlusDoubleSquareRankThreeRepresentative_diagonalFour(
+                                  isometric := orbit)
+                            }
+                          case b = 1 ∨ b = 2: done by cases {
+                              case b = 1: {
+                                  Matrix.IsIsometric(
+                                      Matrix.squarePlusDoubleSquareCandidate(-1, 1, 5),
+                                      Matrix.squarePlusDoubleSquareOddForm(4))
+                                      by Matrix.squarePlusDoubleSquareCandidate_isometric_oddForm(
+                                          x := 1, y := 0,
+                                          firstVanishes := (ring : (-1 : ℤ) + 1 = 0),
+                                          secondIsOne := (ring : (1 : ℤ) + 2 * 0 = 1),
+                                          cornerReads :=
+                                            (ring : (5 : ℤ) + 2 * ((-(1 : ℤ)) * 1 + 1 * 0)
+                                              + 1 * 1 + 2 * (0 * 0) = 4))
+                                      as orbit;
+                                  done by Matrix.squarePlusDoubleSquareRankThreeRepresentative_oddFour(
+                                      isometric := orbit)
+                                }
+                              case b = 2: {
+                                  Matrix.IsIsometric(
+                                      Matrix.squarePlusDoubleSquareCandidate(-1, 2, 5),
+                                      Matrix.squarePlusDoubleSquareDiagonalForm(2))
+                                      by Matrix.squarePlusDoubleSquareCandidate_isometric_diagonal(
+                                          x := 1, y := -1,
+                                          firstVanishes := (ring : (-1 : ℤ) + 1 = 0),
+                                          secondVanishes := (ring : (2 : ℤ) + 2 * (-(1 : ℤ)) = 0),
+                                          cornerReads :=
+                                            (ring : (5 : ℤ) + 2 * ((-(1 : ℤ)) * 1 + 2 * (-(1 : ℤ)))
+                                              + 1 * 1 + 2 * ((-(1 : ℤ)) * (-(1 : ℤ))) = 2))
+                                      as orbit;
+                                  done by Matrix.squarePlusDoubleSquareRankThreeRepresentative_diagonalTwo(
+                                      isometric := orbit)
+                                }
+                            }
+                        }
+                    }
+                }
+              case a = 1: done by cases {
+                  case b = -2: {
+                      Matrix.IsIsometric(
+                          Matrix.squarePlusDoubleSquareCandidate(1, -2, 5),
+                          Matrix.squarePlusDoubleSquareDiagonalForm(2))
+                          by Matrix.squarePlusDoubleSquareCandidate_isometric_diagonal(
+                              x := -1, y := 1,
+                              firstVanishes := (ring : (1 : ℤ) + (-(1 : ℤ)) = 0),
+                              secondVanishes := (ring : (-2 : ℤ) + 2 * 1 = 0),
+                              cornerReads :=
+                                (ring : (5 : ℤ) + 2 * (1 * (-(1 : ℤ)) + (-(2 : ℤ)) * 1)
+                                  + (-(1 : ℤ)) * (-(1 : ℤ)) + 2 * (1 * 1) = 2))
+                          as orbit;
+                      done by Matrix.squarePlusDoubleSquareRankThreeRepresentative_diagonalTwo(
+                          isometric := orbit)
+                    }
+                  case b = -1 ∨ b = 0 ∨ b = 1 ∨ b = 2: done by cases {
+                      case b = -1: {
+                          Matrix.IsIsometric(
+                              Matrix.squarePlusDoubleSquareCandidate(1, -1, 5),
+                              Matrix.squarePlusDoubleSquareOddForm(4))
+                              by Matrix.squarePlusDoubleSquareCandidate_isometric_oddForm(
+                                  x := -1, y := 1,
+                                  firstVanishes := (ring : (1 : ℤ) + (-(1 : ℤ)) = 0),
+                                  secondIsOne := (ring : (-1 : ℤ) + 2 * 1 = 1),
+                                  cornerReads :=
+                                    (ring : (5 : ℤ) + 2 * (1 * (-(1 : ℤ)) + (-(1 : ℤ)) * 1)
+                                      + (-(1 : ℤ)) * (-(1 : ℤ)) + 2 * (1 * 1) = 4))
+                              as orbit;
+                          done by Matrix.squarePlusDoubleSquareRankThreeRepresentative_oddFour(
+                              isometric := orbit)
+                        }
+                      case b = 0 ∨ b = 1 ∨ b = 2: done by cases {
+                          case b = 0: {
+                              Matrix.IsIsometric(
+                                  Matrix.squarePlusDoubleSquareCandidate(1, 0, 5),
+                                  Matrix.squarePlusDoubleSquareDiagonalForm(4))
+                                  by Matrix.squarePlusDoubleSquareCandidate_isometric_diagonal(
+                                      x := -1, y := 0,
+                                      firstVanishes := (ring : (1 : ℤ) + (-(1 : ℤ)) = 0),
+                                      secondVanishes := (ring : (0 : ℤ) + 2 * 0 = 0),
+                                      cornerReads :=
+                                        (ring : (5 : ℤ) + 2 * (1 * (-(1 : ℤ)) + 0 * 0)
+                                          + (-(1 : ℤ)) * (-(1 : ℤ)) + 2 * (0 * 0) = 4))
+                                  as orbit;
+                              done by Matrix.squarePlusDoubleSquareRankThreeRepresentative_diagonalFour(
+                                  isometric := orbit)
+                            }
+                          case b = 1 ∨ b = 2: done by cases {
+                              case b = 1: {
+                                  Matrix.IsIsometric(
+                                      Matrix.squarePlusDoubleSquareCandidate(1, 1, 5),
+                                      Matrix.squarePlusDoubleSquareOddForm(4))
+                                      by Matrix.squarePlusDoubleSquareCandidate_isometric_oddForm(
+                                          x := -1, y := 0,
+                                          firstVanishes := (ring : (1 : ℤ) + (-(1 : ℤ)) = 0),
+                                          secondIsOne := (ring : (1 : ℤ) + 2 * 0 = 1),
+                                          cornerReads :=
+                                            (ring : (5 : ℤ) + 2 * (1 * (-(1 : ℤ)) + 1 * 0)
+                                              + (-(1 : ℤ)) * (-(1 : ℤ)) + 2 * (0 * 0) = 4))
+                                      as orbit;
+                                  done by Matrix.squarePlusDoubleSquareRankThreeRepresentative_oddFour(
+                                      isometric := orbit)
+                                }
+                              case b = 2: {
+                                  Matrix.IsIsometric(
+                                      Matrix.squarePlusDoubleSquareCandidate(1, 2, 5),
+                                      Matrix.squarePlusDoubleSquareDiagonalForm(2))
+                                      by Matrix.squarePlusDoubleSquareCandidate_isometric_diagonal(
+                                          x := -1, y := -1,
+                                          firstVanishes := (ring : (1 : ℤ) + (-(1 : ℤ)) = 0),
+                                          secondVanishes := (ring : (2 : ℤ) + 2 * (-(1 : ℤ)) = 0),
+                                          cornerReads :=
+                                            (ring : (5 : ℤ) + 2 * (1 * (-(1 : ℤ)) + 2 * (-(1 : ℤ)))
+                                              + (-(1 : ℤ)) * (-(1 : ℤ)) + 2 * ((-(1 : ℤ)) * (-(1 : ℤ))) = 2))
+                                      as orbit;
+                                  done by Matrix.squarePlusDoubleSquareRankThreeRepresentative_diagonalTwo(
+                                      isometric := orbit)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+          }
+        case ((a = -2 ∨ a = 2)
+            ∧ (b = -1 ∨ b = 0 ∨ b = 1)): {
+            a = -2 ∨ a = 2;
+            b = -1 ∨ b = 0 ∨ b = 1;
+            done by cases {
+              case a = -2: done by cases {
+                  case b = -1: {
+                      Matrix.IsIsometric(
+                          Matrix.squarePlusDoubleSquareCandidate(-2, -1, 5),
+                          Matrix.sumOfThreeSquaresForm)
+                          by Matrix.squarePlusDoubleSquareCandidate_isometric_sumOfThreeSquares(
+                              x := 2, y := 1,
+                              firstVanishes := (ring : (-2 : ℤ) + 2 = 0),
+                              secondIsOne := (ring : (-1 : ℤ) + 2 * 1 = 1),
+                              cornerReads :=
+                                (ring : (5 : ℤ) + 2 * ((-(2 : ℤ)) * 2 + (-(1 : ℤ)) * 1)
+                                  + 2 * 2 + 2 * (1 * 1) = 1))
+                          as orbit;
+                      done by Matrix.squarePlusDoubleSquareRankThreeRepresentative_threeSquares(
+                          isometric := orbit)
+                    }
+                  case b = 0 ∨ b = 1: done by cases {
+                      case b = 0: {
+                          Matrix.IsIsometric(
+                              Matrix.squarePlusDoubleSquareCandidate(-2, 0, 5),
+                              Matrix.squarePlusDoubleSquareDiagonalForm(1))
+                              by Matrix.squarePlusDoubleSquareCandidate_isometric_diagonal(
+                                  x := 2, y := 0,
+                                  firstVanishes := (ring : (-2 : ℤ) + 2 = 0),
+                                  secondVanishes := (ring : (0 : ℤ) + 2 * 0 = 0),
+                                  cornerReads :=
+                                    (ring : (5 : ℤ) + 2 * ((-(2 : ℤ)) * 2 + 0 * 0)
+                                      + 2 * 2 + 2 * (0 * 0) = 1))
+                          as orbit;
+                          done by Matrix.squarePlusDoubleSquareRankThreeRepresentative_diagonalOne(
+                              isometric := orbit)
+                        }
+                      case b = 1: {
+                          Matrix.IsIsometric(
+                              Matrix.squarePlusDoubleSquareCandidate(-2, 1, 5),
+                              Matrix.sumOfThreeSquaresForm)
+                              by Matrix.squarePlusDoubleSquareCandidate_isometric_sumOfThreeSquares(
+                                  x := 2, y := 0,
+                                  firstVanishes := (ring : (-2 : ℤ) + 2 = 0),
+                                  secondIsOne := (ring : (1 : ℤ) + 2 * 0 = 1),
+                                  cornerReads :=
+                                    (ring : (5 : ℤ) + 2 * ((-(2 : ℤ)) * 2 + 1 * 0)
+                                      + 2 * 2 + 2 * (0 * 0) = 1))
+                          as orbit;
+                          done by Matrix.squarePlusDoubleSquareRankThreeRepresentative_threeSquares(
+                              isometric := orbit)
+                        }
+                    }
+                }
+              case a = 2: done by cases {
+                  case b = -1: {
+                      Matrix.IsIsometric(
+                          Matrix.squarePlusDoubleSquareCandidate(2, -1, 5),
+                          Matrix.sumOfThreeSquaresForm)
+                          by Matrix.squarePlusDoubleSquareCandidate_isometric_sumOfThreeSquares(
+                              x := -2, y := 1,
+                              firstVanishes := (ring : (2 : ℤ) + (-(2 : ℤ)) = 0),
+                              secondIsOne := (ring : (-1 : ℤ) + 2 * 1 = 1),
+                              cornerReads :=
+                                (ring : (5 : ℤ) + 2 * (2 * (-(2 : ℤ)) + (-(1 : ℤ)) * 1)
+                                  + (-(2 : ℤ)) * (-(2 : ℤ)) + 2 * (1 * 1) = 1))
+                          as orbit;
+                      done by Matrix.squarePlusDoubleSquareRankThreeRepresentative_threeSquares(
+                          isometric := orbit)
+                    }
+                  case b = 0 ∨ b = 1: done by cases {
+                      case b = 0: {
+                          Matrix.IsIsometric(
+                              Matrix.squarePlusDoubleSquareCandidate(2, 0, 5),
+                              Matrix.squarePlusDoubleSquareDiagonalForm(1))
+                              by Matrix.squarePlusDoubleSquareCandidate_isometric_diagonal(
+                                  x := -2, y := 0,
+                                  firstVanishes := (ring : (2 : ℤ) + (-(2 : ℤ)) = 0),
+                                  secondVanishes := (ring : (0 : ℤ) + 2 * 0 = 0),
+                                  cornerReads :=
+                                    (ring : (5 : ℤ) + 2 * (2 * (-(2 : ℤ)) + 0 * 0)
+                                      + (-(2 : ℤ)) * (-(2 : ℤ)) + 2 * (0 * 0) = 1))
+                          as orbit;
+                          done by Matrix.squarePlusDoubleSquareRankThreeRepresentative_diagonalOne(
+                              isometric := orbit)
+                        }
+                      case b = 1: {
+                          Matrix.IsIsometric(
+                              Matrix.squarePlusDoubleSquareCandidate(2, 1, 5),
+                              Matrix.sumOfThreeSquaresForm)
+                              by Matrix.squarePlusDoubleSquareCandidate_isometric_sumOfThreeSquares(
+                                  x := -2, y := 0,
+                                  firstVanishes := (ring : (2 : ℤ) + (-(2 : ℤ)) = 0),
+                                  secondIsOne := (ring : (1 : ℤ) + 2 * 0 = 1),
+                                  cornerReads :=
+                                    (ring : (5 : ℤ) + 2 * (2 * (-(2 : ℤ)) + 1 * 0)
+                                      + (-(2 : ℤ)) * (-(2 : ℤ)) + 2 * (0 * 0) = 1))
+                          as orbit;
+                          done by Matrix.squarePlusDoubleSquareRankThreeRepresentative_threeSquares(
+                              isometric := orbit)
+                        }
+                    }
+                }
+            }
+          }
+      }
+  }
+}
+
+theorem Matrix.squarePlusDoubleSquare_escalation_eight_representatives
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2))
+        (escalation :
+            Matrix.IsEscalation(Matrix.squarePlusDoubleSquareForm, B))
+        : Matrix.IsSquarePlusDoubleSquareRankThreeRepresentative(B) := {
+  choose a such that
+      ∃ (b : ℤ).
+        Integer.IsSquarePlusDoubleSquareBorderPair(a, b)
+          ∧ B = Matrix.borderedAssembly(
+              Matrix.squarePlusDoubleSquareForm,
+              RingVector.twoCoordinates(a, b),
+              (Matrix.truant(Matrix.squarePlusDoubleSquareForm) : ℤ))
+      from Matrix.squarePlusDoubleSquare_escalation_twenty_three_candidates(
+          B := B, escalation := escalation);
+  choose b such that
+      Integer.IsSquarePlusDoubleSquareBorderPair(a, b)
+        ∧ B = Matrix.borderedAssembly(
+            Matrix.squarePlusDoubleSquareForm,
+            RingVector.twoCoordinates(a, b),
+            (Matrix.truant(Matrix.squarePlusDoubleSquareForm) : ℤ));
+  Integer.IsSquarePlusDoubleSquareBorderPair(a, b) as admissible;
+  B = Matrix.borderedAssembly(
+      Matrix.squarePlusDoubleSquareForm,
+      RingVector.twoCoordinates(a, b),
+      (Matrix.truant(Matrix.squarePlusDoubleSquareForm) : ℤ))
+  as assembled;
+  (Matrix.truant(Matrix.squarePlusDoubleSquareForm) : ℤ) = 5
+      by substituting Matrix.squarePlusDoubleSquareForm_truant
+  as cornerReads;
+  B
+     = Matrix.borderedAssembly(
+           Matrix.squarePlusDoubleSquareForm,
+           RingVector.twoCoordinates(a, b),
+           (Matrix.truant(Matrix.squarePlusDoubleSquareForm) : ℤ))
+           by assembled
+     = Matrix.borderedAssembly(
+           Matrix.squarePlusDoubleSquareForm,
+           RingVector.twoCoordinates(a, b), (5 : ℤ))
+           by substituting cornerReads
+     = Matrix.squarePlusDoubleSquareCandidate(a, b, 5)
+  as candidateReads;
+  Matrix.IsSquarePlusDoubleSquareRankThreeRepresentative(
+      Matrix.squarePlusDoubleSquareCandidate(a, b, 5))
+      by Matrix.squarePlusDoubleSquareCandidate_is_representative(
+          admissible := admissible);
+  done by substituting candidateReads
+}

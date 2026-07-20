@@ -267,6 +267,9 @@ CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
 # truant 14 and connects every one-unit-border candidate to it through one
 # parameterized top-shear isometry. All nine borders over x²+y² are thereby
 # classified, with no new residual leaks.
+# 2026-07-20: 397 → 397. rank_three_orbits manifest-added at ZERO counted
+# leaks; a generic bordered top-shear identity and its x²+2y² specialization
+# reduce all 23 remaining rank-three candidates to eight representatives.
 CLEAN_LEAK_BUDGET ?= 397
 # Second, independent axis: user-written `⟨…⟩` over a logical connective
 # (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the

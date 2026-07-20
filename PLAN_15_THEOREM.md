@@ -189,8 +189,28 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
   `sumOfTwoSquaresPlusDoubleSquareForm_isometric_oneUnitBorderCandidate`, handles every border with
   `a²+b²=1`, so all four `(±1,0),(0,±1)` candidates have truant 14. **All nine raw candidates over `x²+y²`
   are therefore classified into three proved orbits:** one zero-border form of truant 6, four two-unit-border
-  forms of truant 7, and four one-unit-border forms of truant 14. The matrix-ergonomics plan now runs before
-  the sustained attack on the 23 candidates over `x²+2y²`.
+  forms of truant 7, and four one-unit-border forms of truant 14.
+
+  **The 23 candidates over `x²+2y²` are now deduplicated to eight proved representatives**
+  (`Algebra/rank_three_orbits.math`): the five diagonal forms
+  `x²+2y²+cz²` for `c=1,…,5`, `x²+y²+z²`, and the two odd-border forms
+  `x²+2y²+2yz+cz²` for `c=4,5`. The load-bearing theorem is the generic
+  `topShear_pullback_borderedAssembly`, which sends a border `b` to `b+A·v`
+  and adjusts the corner by `2⟨b,v⟩+Q_A(v)`; its isometry wrapper is
+  `borderedAssembly_isometric_topShear`. The specialized
+  `squarePlusDoubleSquareCandidate_isometric_shear` reduces every one of the
+  23 admissible border pairs. The determinant-one odd case is identified
+  with `x²+y²+z²`, and
+  `squarePlusDoubleSquare_escalation_eight_representatives` packages the
+  complete classification for arbitrary escalations of `x²+2y²`.
+
+  Exact truants for these eight representatives remain. The known
+  `x²+y²+z²` representative has truant 7; finite enumeration predicts
+  truants 14, 7, 10, 14, 10, 7, 7, 7 in the displayed order. The reusable
+  Natural lemma `square_plus_double_square_values_below_sixteen` now
+  classifies every value `m²+2n²<16`, providing the arithmetic base for
+  the remaining nonrepresentation proofs. Turning those predictions into
+  exact `IsTruant` theorems is the next E4 substage.
 - `S3.E5` `[ ]` (XL) ★★ The rank-4 escalators: machine-generate and dedup to the **≈207** isometry classes. *(Large mechanical lemma; the count is the checkpoint.)* — owes: S3.E2, S2.R4
 - `S3.C1` `[ ]` (M) ★ The set of truants occurring anywhere in the tree is exactly **{1,2,3,5,6,7,10,14,15}**. — owes: S3.E3, S3.E4, S3.E5
 - `S3.C2` `[ ]` (L) ★★ **Master reduction:** if `Q` represents the nine critical numbers then `Q` is universal — via: a non-universal `Q` would embed an escalator missing its truant ∈ {nine}. *(Depends on rank-4 universality, Stage 5.)* — owes: S3.C1, S3.E5, S5.U2

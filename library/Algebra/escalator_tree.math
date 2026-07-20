@@ -925,6 +925,292 @@ theorem Matrix.diagonalExtension_isometric_borderedAssembly {n : ℕ}
   witness Matrix.topShear(v) with done
 }
 
+theorem Matrix.topShear_pullback_borderedAssembly
+        {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (b v : RingVector(r, n))
+        (c : CommutativeRing.carrier(r))
+        (symmetric : Matrix.IsSymmetric(A))
+        : Matrix.topShear(v)ᵀ * Matrix.borderedAssembly(A, b, c)
+            * Matrix.topShear(v)
+          = Matrix.borderedAssembly(
+              A,
+              b + A · v,
+              c + RingVector.innerProduct(b, v)
+                + RingVector.innerProduct(b, v)
+                + Matrix.quadraticForm(A, v)) := {
+  let D : Matrix(r, 1 + n, 1 + n) :=
+      Matrix.borderedAssembly(A, b, c);
+  let y : RingVector(r, 1 + n) := RingVector.extend(v);
+  let e : RingVector(r, 1 + n) :=
+      Matrix.standardBasisRow(r, 1 + n, NaturalsBelow.top(n));
+  let w : RingVector(r, 1 + n) := D · y;
+  let q : CommutativeRing.carrier(r) := Matrix.quadraticForm(A, v);
+  let s : CommutativeRing.carrier(r) := RingVector.innerProduct(b, v);
+  let R : Matrix(r, 1 + n, 1 + n) :=
+      (D + Matrix.outerProduct(e, w))
+        + (Matrix.outerProduct(w, e) + q • Matrix.outerProduct(e, e));
+
+  Dᵀ = D by Matrix.borderedAssembly_symmetric;
+  Matrix.leadingBlock(D) = A
+      by Matrix.borderedAssembly_leadingBlock as dBlock;
+  Matrix.borderColumn(D) = b
+      by Matrix.borderedAssembly_borderColumn as dBorder;
+  Matrix.corner(D) = c
+      by Matrix.borderedAssembly_corner as dCorner;
+  Matrix.topShear(v)
+      = Matrix.identity(r, 1 + n) + Matrix.outerProduct(y, e)
+  as shearReads;
+  y(NaturalsBelow.top(n)) = CommutativeRing.zero(r)
+      by RingVector.extend_top as yVanishes;
+  Matrix.quadraticForm(D, y)
+     = Matrix.quadraticForm(Matrix.leadingBlock(D), RingVector.restrict(y))
+       + y(NaturalsBelow.top(n))
+           * RingVector.innerProduct(RingVector.restrict(y), Matrix.borderColumn(D))
+       + y(NaturalsBelow.top(n))
+           * RingVector.innerProduct(Matrix.borderColumn(D), RingVector.restrict(y))
+       + (y(NaturalsBelow.top(n)) * y(NaturalsBelow.top(n)))
+           * Matrix.corner(D)
+           by Matrix.quadraticForm_bordered
+     = Matrix.quadraticForm(Matrix.leadingBlock(D), RingVector.restrict(y))
+       + CommutativeRing.zero(r)
+           * RingVector.innerProduct(RingVector.restrict(y), Matrix.borderColumn(D))
+       + CommutativeRing.zero(r)
+           * RingVector.innerProduct(Matrix.borderColumn(D), RingVector.restrict(y))
+       + (CommutativeRing.zero(r) * CommutativeRing.zero(r))
+           * Matrix.corner(D)
+           by substituting yVanishes
+     = Matrix.quadraticForm(Matrix.leadingBlock(D), RingVector.restrict(y))
+           by ring
+     = Matrix.quadraticForm(A, RingVector.restrict(y))
+           by substituting dBlock
+     = Matrix.quadraticForm(A, v)
+           by substituting RingVector.restrict_extend
+     = q
+  as quadraticReads;
+  RingVector.innerProduct(y, w) = q by quadraticReads as forwardPairing;
+  RingVector.innerProduct(w, y)
+     = RingVector.innerProduct(y, w)
+           by RingVector.innerProduct_symmetric
+     = q by forwardPairing
+  as pairingReads;
+  (Matrix.topShear(v)ᵀ * D) * Matrix.topShear(v)
+     = ((Matrix.identity(r, 1 + n) + Matrix.outerProduct(y, e))ᵀ * D)
+         * (Matrix.identity(r, 1 + n) + Matrix.outerProduct(y, e))
+           by substituting shearReads
+     = R
+           by Matrix.outerProductShear_pullback(
+               action := reflexivity(RingVector(r, 1 + n), w),
+               pairing := pairingReads)
+  as pullbackReads;
+
+  Matrix.IsSymmetric(R) by {
+    Matrix.IsSymmetric(
+        Matrix.topShear(v)ᵀ * D * Matrix.topShear(v))
+        by Matrix.pullback_symmetric;
+    done by substituting pullbackReads
+  }
+  as rSymmetric;
+  Matrix.IsSymmetric(
+      Matrix.borderedAssembly(
+          A, b + A · v,
+          c + s + s + q))
+      by Matrix.borderedAssembly_symmetric
+  as targetSymmetric;
+
+  Matrix.leadingBlock(R) = A by {
+    ∀ (i : NaturalsBelow(n)). ∀ (j : NaturalsBelow(n)).
+        Matrix.leadingBlock(R)(i, j) = A(i, j)
+        by (i : NaturalsBelow(n)) (j : NaturalsBelow(n)) ↦ {
+            ¬(NaturalsBelow.top(n) = NaturalsBelow.inclusion(n, i))
+                by NaturalsBelow.top_not_inclusion;
+            e(NaturalsBelow.inclusion(n, i)) = CommutativeRing.zero(r)
+                by Matrix.standardBasisRow_off as eVanishesI;
+            ¬(NaturalsBelow.top(n) = NaturalsBelow.inclusion(n, j))
+                by NaturalsBelow.top_not_inclusion;
+            e(NaturalsBelow.inclusion(n, j)) = CommutativeRing.zero(r)
+                by Matrix.standardBasisRow_off as eVanishesJ;
+            D(NaturalsBelow.inclusion(n, i), NaturalsBelow.inclusion(n, j))
+                = A(i, j)
+                by Matrix.borderedAssembly_block_entry
+                as dReads;
+            Matrix.leadingBlock(R)(i, j)
+               = (D(NaturalsBelow.inclusion(n, i), NaturalsBelow.inclusion(n, j))
+                    + e(NaturalsBelow.inclusion(n, i)) * w(NaturalsBelow.inclusion(n, j)))
+                 + (w(NaturalsBelow.inclusion(n, i)) * e(NaturalsBelow.inclusion(n, j))
+                    + q * (e(NaturalsBelow.inclusion(n, i)) * e(NaturalsBelow.inclusion(n, j))))
+               = (A(i, j)
+                    + e(NaturalsBelow.inclusion(n, i)) * w(NaturalsBelow.inclusion(n, j)))
+                 + (w(NaturalsBelow.inclusion(n, i)) * e(NaturalsBelow.inclusion(n, j))
+                    + q * (e(NaturalsBelow.inclusion(n, i)) * e(NaturalsBelow.inclusion(n, j))))
+                     by substituting dReads
+               = (A(i, j) + CommutativeRing.zero(r) * w(NaturalsBelow.inclusion(n, j)))
+                 + (w(NaturalsBelow.inclusion(n, i)) * e(NaturalsBelow.inclusion(n, j))
+                    + q * (CommutativeRing.zero(r) * e(NaturalsBelow.inclusion(n, j))))
+                     by substituting eVanishesI
+               = (A(i, j) + CommutativeRing.zero(r) * w(NaturalsBelow.inclusion(n, j)))
+                 + (w(NaturalsBelow.inclusion(n, i)) * CommutativeRing.zero(r)
+                    + q * (CommutativeRing.zero(r) * CommutativeRing.zero(r)))
+                     by substituting eVanishesJ
+               = A(i, j) by ring
+            as entryReads;
+            done by entryReads
+          };
+    done by Matrix.equal_of_entries
+  }
+  as blocks;
+
+  Matrix.borderColumn(R) = b + A · v by {
+    ∀ (i : NaturalsBelow(n)).
+        Matrix.borderColumn(R)(i) = (b + A · v)(i)
+        by (i : NaturalsBelow(n)) ↦ {
+            ¬(NaturalsBelow.top(n) = NaturalsBelow.inclusion(n, i))
+                by NaturalsBelow.top_not_inclusion;
+            e(NaturalsBelow.inclusion(n, i)) = CommutativeRing.zero(r)
+                by Matrix.standardBasisRow_off as eVanishes;
+            e(NaturalsBelow.top(n)) = CommutativeRing.one(r)
+                by Matrix.standardBasisRow_at as eReads;
+            D(NaturalsBelow.inclusion(n, i), NaturalsBelow.top(n))
+                = b(i)
+                by Matrix.borderedAssembly_border_entry
+                as dReads;
+            w(NaturalsBelow.inclusion(n, i))
+               = (Matrix.leadingBlock(D) · v)(i)
+                    by Matrix.applyVector_extend_inclusion
+               = (A · v)(i)
+                    by substituting dBlock
+            as wReads;
+            Matrix.borderColumn(R)(i)
+               = (D(NaturalsBelow.inclusion(n, i), NaturalsBelow.top(n))
+                    + e(NaturalsBelow.inclusion(n, i)) * w(NaturalsBelow.top(n)))
+                 + (w(NaturalsBelow.inclusion(n, i)) * e(NaturalsBelow.top(n))
+                    + q * (e(NaturalsBelow.inclusion(n, i)) * e(NaturalsBelow.top(n))))
+               = (b(i)
+                    + e(NaturalsBelow.inclusion(n, i)) * w(NaturalsBelow.top(n)))
+                 + (w(NaturalsBelow.inclusion(n, i)) * e(NaturalsBelow.top(n))
+                    + q * (e(NaturalsBelow.inclusion(n, i)) * e(NaturalsBelow.top(n))))
+                    by substituting dReads
+               = (b(i) + CommutativeRing.zero(r) * w(NaturalsBelow.top(n)))
+                 + (w(NaturalsBelow.inclusion(n, i)) * e(NaturalsBelow.top(n))
+                    + q * (CommutativeRing.zero(r) * e(NaturalsBelow.top(n))))
+                    by substituting eVanishes
+               = (b(i) + CommutativeRing.zero(r) * w(NaturalsBelow.top(n)))
+                 + (w(NaturalsBelow.inclusion(n, i)) * CommutativeRing.one(r)
+                    + q * (CommutativeRing.zero(r) * CommutativeRing.one(r)))
+                    by substituting eReads
+               = (b(i) + CommutativeRing.zero(r) * w(NaturalsBelow.top(n)))
+                 + ((A · v)(i) * CommutativeRing.one(r)
+                    + q * (CommutativeRing.zero(r) * CommutativeRing.one(r)))
+                    by substituting wReads
+               = b(i) + (A · v)(i)
+                    by ring
+               = (b + A · v)(i)
+            as entryReads;
+            done by entryReads
+          };
+    done by RingVector.equal_of_pointwise
+  }
+  as columns;
+
+  Matrix.corner(R) = c + s + s + q by {
+    e(NaturalsBelow.top(n)) = CommutativeRing.one(r)
+        by Matrix.standardBasisRow_at as eReads;
+    D(NaturalsBelow.top(n), NaturalsBelow.top(n))
+        = c by dCorner as dReads;
+    w(NaturalsBelow.top(n))
+       = RingVector.innerProduct(Matrix.borderColumn(D), v)
+            by Matrix.applyVector_extend_top
+       = RingVector.innerProduct(b, v)
+            by substituting dBorder
+       = s
+    as wReads;
+    Matrix.corner(R)
+       = (D(NaturalsBelow.top(n), NaturalsBelow.top(n))
+            + e(NaturalsBelow.top(n)) * w(NaturalsBelow.top(n)))
+         + (w(NaturalsBelow.top(n)) * e(NaturalsBelow.top(n))
+            + q * (e(NaturalsBelow.top(n)) * e(NaturalsBelow.top(n))))
+       = (c + e(NaturalsBelow.top(n)) * w(NaturalsBelow.top(n)))
+         + (w(NaturalsBelow.top(n)) * e(NaturalsBelow.top(n))
+            + q * (e(NaturalsBelow.top(n)) * e(NaturalsBelow.top(n))))
+             by substituting dReads
+       = (c + CommutativeRing.one(r) * w(NaturalsBelow.top(n)))
+         + (w(NaturalsBelow.top(n)) * CommutativeRing.one(r)
+            + q * (CommutativeRing.one(r) * CommutativeRing.one(r)))
+             by substituting eReads
+       = (c + CommutativeRing.one(r) * s)
+         + (s * CommutativeRing.one(r)
+            + q * (CommutativeRing.one(r) * CommutativeRing.one(r)))
+             by substituting wReads
+       = c + s + s + q by ring;
+    done
+  }
+  as corners;
+
+  R = Matrix.borderedAssembly(A, b + A · v, c + s + s + q)
+      by Matrix.symmetric_bordered_extensionality(
+          symmetricB := rSymmetric,
+          symmetricC := targetSymmetric,
+          blocks := {
+            Matrix.leadingBlock(R)
+               = A by blocks
+               = Matrix.leadingBlock(
+                   Matrix.borderedAssembly(A, b + A · v, c + s + s + q))
+                     by Matrix.borderedAssembly_leadingBlock
+          },
+          borderColumns := {
+            Matrix.borderColumn(R)
+               = b + A · v by columns
+               = Matrix.borderColumn(
+                   Matrix.borderedAssembly(A, b + A · v, c + s + s + q))
+                     by Matrix.borderedAssembly_borderColumn
+          },
+          corners := {
+            Matrix.corner(R)
+               = c + s + s + q by corners
+               = Matrix.corner(
+                   Matrix.borderedAssembly(A, b + A · v, c + s + s + q))
+                     by Matrix.borderedAssembly_corner
+          })
+  as resultReads;
+  Matrix.topShear(v)ᵀ * Matrix.borderedAssembly(A, b, c)
+      * Matrix.topShear(v)
+     = R by pullbackReads
+     = Matrix.borderedAssembly(
+           A, b + A · v,
+           c + RingVector.innerProduct(b, v)
+             + RingVector.innerProduct(b, v)
+             + Matrix.quadraticForm(A, v))
+           by resultReads;
+  done
+}
+
+theorem Matrix.borderedAssembly_isometric_topShear
+        {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (b v : RingVector(r, n))
+        (c : CommutativeRing.carrier(r))
+        (symmetric : Matrix.IsSymmetric(A))
+        : Matrix.IsIsometric(
+            Matrix.borderedAssembly(A, b, c),
+            Matrix.borderedAssembly(
+              A,
+              b + A · v,
+              c + RingVector.innerProduct(b, v)
+                + RingVector.innerProduct(b, v)
+                + Matrix.quadraticForm(A, v))) := {
+  Matrix.IsInvertible(Matrix.topShear(v))
+      by Matrix.topShear_invertible;
+  Matrix.borderedAssembly(
+      A,
+      b + A · v,
+      c + RingVector.innerProduct(b, v)
+        + RingVector.innerProduct(b, v)
+        + Matrix.quadraticForm(A, v))
+      = Matrix.topShear(v)ᵀ
+        * Matrix.borderedAssembly(A, b, c)
+        * Matrix.topShear(v)
+      by Matrix.topShear_pullback_borderedAssembly;
+  witness Matrix.topShear(v) with done
+}
+
 -- Positive-definiteness of the extension: the bordered splitting with a
 -- zero border leaves Q(A, y) + c·t², positive whenever A is positive-
 -- definite and the corner is positive.

@@ -73,7 +73,11 @@ recursion, or [number-theory.md](number-theory.md) for division, gcd, and primes
   `Natural.below_two`, `Natural.positive_below_five`,
   `Natural.square_below_two`/`_four`/`_six`/`_ten`,
   `Natural.two_is_not_a_square`, `Natural.three_not_sum_of_two_squares`,
-  and `Natural.five_not_square_plus_double_square`.
+  and `Natural.five_not_square_plus_double_square`. For the next ternary
+  layer, `Natural.square_plus_double_square_values_below_sixteen` classifies
+  every value of `m² + 2n²` below 16, while
+  `Natural.not_square_plus_double_square_below_sixteen` turns exclusion from
+  that finite list into a nonrepresentation theorem.
 
 ## Where to look
 
