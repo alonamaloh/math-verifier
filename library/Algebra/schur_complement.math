@@ -64,9 +64,166 @@ definition Matrix.borderColumn {r : CommutativeRing} {m : ℕ}
         (B : Matrix(r, 1 + m, 1 + m)) : RingVector(r, m) :=
   (i : NaturalsBelow(m)) ↦ B(NaturalsBelow.inclusion(m, i), NaturalsBelow.top(m))
 
+definition Matrix.borderRow {r : CommutativeRing} {m : ℕ}
+        (B : Matrix(r, 1 + m, 1 + m)) : RingVector(r, m) :=
+  (j : NaturalsBelow(m)) ↦ B(NaturalsBelow.top(m), NaturalsBelow.inclusion(m, j))
+
 definition Matrix.corner {r : CommutativeRing} {m : ℕ}
         (B : Matrix(r, 1 + m, 1 + m)) : CommutativeRing.carrier(r) :=
   B(NaturalsBelow.top(m), NaturalsBelow.top(m))
+
+-- A bordered square matrix is determined by its four regions. The
+-- inclusion/top split is quarantined here so block-structured consumers do
+-- not descend to entries.
+theorem Matrix.bordered_extensionality {r : CommutativeRing} {m : ℕ}
+        (B C : Matrix(r, 1 + m, 1 + m))
+        (blocks : Matrix.leadingBlock(B) = Matrix.leadingBlock(C))
+        (borderRows : Matrix.borderRow(B) = Matrix.borderRow(C))
+        (borderColumns : Matrix.borderColumn(B) = Matrix.borderColumn(C))
+        (corners : Matrix.corner(B) = Matrix.corner(C))
+        : B = C := {
+  ∀ (p : NaturalsBelow(1 + m)). ∀ (q : NaturalsBelow(1 + m)).
+      B(p, q) = C(p, q)
+      by (p : NaturalsBelow(1 + m))
+         (q : NaturalsBelow(1 + m)) ↦ {
+          (∃ (i : NaturalsBelow(m)).
+              p = NaturalsBelow.inclusion(m, i))
+            ∨ p = NaturalsBelow.top(m)
+            by NaturalsBelow.inclusion_or_top;
+          done by cases {
+            case ∃ (i : NaturalsBelow(m)).
+                p = NaturalsBelow.inclusion(m, i): {
+                choose i such that
+                    p = NaturalsBelow.inclusion(m, i) as pReads;
+                (∃ (j : NaturalsBelow(m)).
+                    q = NaturalsBelow.inclusion(m, j))
+                  ∨ q = NaturalsBelow.top(m)
+                  by NaturalsBelow.inclusion_or_top;
+                done by cases {
+                  case ∃ (j : NaturalsBelow(m)).
+                      q = NaturalsBelow.inclusion(m, j): {
+                      choose j such that
+                          q = NaturalsBelow.inclusion(m, j) as qReads;
+                      B(p, q)
+                         = B(NaturalsBelow.inclusion(m, i), q)
+                               by substituting pReads
+                         = B(NaturalsBelow.inclusion(m, i),
+                             NaturalsBelow.inclusion(m, j))
+                               by substituting qReads
+                         = Matrix.leadingBlock(B)(i, j)
+                         = Matrix.leadingBlock(C)(i, j)
+                               by substituting blocks
+                         = C(NaturalsBelow.inclusion(m, i),
+                             NaturalsBelow.inclusion(m, j))
+                         = C(p, NaturalsBelow.inclusion(m, j))
+                               by substituting pReads
+                         = C(p, q) by substituting qReads;
+                      done
+                    }
+                  case q = NaturalsBelow.top(m) as qReads: {
+                      B(p, q)
+                         = B(NaturalsBelow.inclusion(m, i), q)
+                               by substituting pReads
+                         = B(NaturalsBelow.inclusion(m, i),
+                             NaturalsBelow.top(m))
+                               by substituting qReads
+                         = Matrix.borderColumn(B)(i)
+                         = Matrix.borderColumn(C)(i)
+                               by substituting borderColumns
+                         = C(NaturalsBelow.inclusion(m, i),
+                             NaturalsBelow.top(m))
+                         = C(p, NaturalsBelow.top(m))
+                               by substituting pReads
+                         = C(p, q) by substituting qReads;
+                      done
+                    }
+                }
+              }
+            case p = NaturalsBelow.top(m) as pReads: {
+                (∃ (j : NaturalsBelow(m)).
+                    q = NaturalsBelow.inclusion(m, j))
+                  ∨ q = NaturalsBelow.top(m)
+                  by NaturalsBelow.inclusion_or_top;
+                done by cases {
+                  case ∃ (j : NaturalsBelow(m)).
+                      q = NaturalsBelow.inclusion(m, j): {
+                      choose j such that
+                          q = NaturalsBelow.inclusion(m, j) as qReads;
+                      B(p, q)
+                         = B(NaturalsBelow.top(m), q)
+                               by substituting pReads
+                         = B(NaturalsBelow.top(m),
+                             NaturalsBelow.inclusion(m, j))
+                               by substituting qReads
+                         = Matrix.borderRow(B)(j)
+                         = Matrix.borderRow(C)(j)
+                               by substituting borderRows
+                         = C(NaturalsBelow.top(m),
+                             NaturalsBelow.inclusion(m, j))
+                         = C(p, NaturalsBelow.inclusion(m, j))
+                               by substituting pReads
+                         = C(p, q) by substituting qReads;
+                      done
+                    }
+                  case q = NaturalsBelow.top(m) as qReads: {
+                      B(p, q)
+                         = B(NaturalsBelow.top(m), q)
+                               by substituting pReads
+                         = B(NaturalsBelow.top(m),
+                             NaturalsBelow.top(m))
+                               by substituting qReads
+                         = Matrix.corner(B)
+                         = Matrix.corner(C) by substituting corners
+                         = C(NaturalsBelow.top(m),
+                             NaturalsBelow.top(m))
+                         = C(p, NaturalsBelow.top(m))
+                               by substituting pReads
+                         = C(p, q) by substituting qReads;
+                      done
+                    }
+                }
+              }
+          }
+        };
+  done by Matrix.equal_of_entries
+}
+
+-- For symmetric matrices the border row is the transpose of the border
+-- column, so only three pieces of data are independent.
+theorem Matrix.symmetric_bordered_extensionality
+        {r : CommutativeRing} {m : ℕ}
+        (B C : Matrix(r, 1 + m, 1 + m))
+        (symmetricB : Matrix.IsSymmetric(B))
+        (symmetricC : Matrix.IsSymmetric(C))
+        (blocks : Matrix.leadingBlock(B) = Matrix.leadingBlock(C))
+        (borderColumns : Matrix.borderColumn(B) = Matrix.borderColumn(C))
+        (corners : Matrix.corner(B) = Matrix.corner(C))
+        : B = C := {
+  ∀ (j : NaturalsBelow(m)).
+      Matrix.borderRow(B)(j) = Matrix.borderRow(C)(j)
+      by (j : NaturalsBelow(m)) ↦ {
+          Matrix.borderRow(B)(j)
+             = B(NaturalsBelow.top(m), NaturalsBelow.inclusion(m, j))
+             = Bᵀ(NaturalsBelow.inclusion(m, j), NaturalsBelow.top(m))
+             = B(NaturalsBelow.inclusion(m, j), NaturalsBelow.top(m))
+                   by substituting symmetricB
+             = Matrix.borderColumn(B)(j)
+             = Matrix.borderColumn(C)(j) by substituting borderColumns
+             = C(NaturalsBelow.inclusion(m, j), NaturalsBelow.top(m))
+             = Cᵀ(NaturalsBelow.inclusion(m, j), NaturalsBelow.top(m))
+                   by substituting symmetricC
+             = C(NaturalsBelow.top(m), NaturalsBelow.inclusion(m, j))
+             = Matrix.borderRow(C)(j);
+          done
+        };
+  Matrix.borderRow(B) = Matrix.borderRow(C)
+      by Function.extensionality as borderRows;
+  done by Matrix.bordered_extensionality(
+      blocks := blocks,
+      borderRows := borderRows,
+      borderColumns := borderColumns,
+      corners := corners)
+}
 
 -- The leading block is the largest proper leading principal submatrix:
 -- the boundary inclusion and the value-preserving embedding agree.

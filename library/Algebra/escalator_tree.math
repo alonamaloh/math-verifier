@@ -360,6 +360,140 @@ theorem Matrix.topUnit_row_off {r : CommutativeRing} {m : ℕ}
   done by Matrix.inclusionMatrix_multiply_entry_off
 }
 
+theorem Matrix.topUnit_leadingBlock {r : CommutativeRing} {m : ℕ}
+        : Matrix.leadingBlock(Matrix.topUnit(r, m))
+          = Matrix.zero(r, m, m) := {
+  ∀ (i : NaturalsBelow(m)). ∀ (j : NaturalsBelow(m)).
+      Matrix.leadingBlock(Matrix.topUnit(r, m))(i, j)
+      = Matrix.zero(r, m, m)(i, j)
+      by (i : NaturalsBelow(m)) (j : NaturalsBelow(m)) ↦ {
+          done by Matrix.topUnit_row_off
+        };
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.topUnit_borderColumn {r : CommutativeRing} {m : ℕ}
+        : Matrix.borderColumn(Matrix.topUnit(r, m))
+          = RingVector.zero(r, m) := {
+  ∀ (i : NaturalsBelow(m)).
+      Matrix.borderColumn(Matrix.topUnit(r, m))(i)
+      = RingVector.zero(r, m)(i)
+      by (i : NaturalsBelow(m)) ↦ {
+          done by Matrix.topUnit_row_off
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+theorem Matrix.topUnit_borderRow {r : CommutativeRing} {m : ℕ}
+        : Matrix.borderRow(Matrix.topUnit(r, m))
+          = RingVector.zero(r, m) := {
+  ∀ (j : NaturalsBelow(m)).
+      Matrix.borderRow(Matrix.topUnit(r, m))(j)
+      = RingVector.zero(r, m)(j)
+      by (j : NaturalsBelow(m)) ↦ {
+          done by Matrix.topUnit_column_off
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+theorem Matrix.outerProduct_topBasis_leadingBlock
+        {r : CommutativeRing} {m : ℕ}
+        : Matrix.leadingBlock(Matrix.outerProduct(
+              Matrix.standardBasisRow(r, 1 + m, NaturalsBelow.top(m)),
+              Matrix.standardBasisRow(r, 1 + m, NaturalsBelow.top(m))))
+          = Matrix.zero(r, m, m) := {
+  let e : RingVector(r, 1 + m) :=
+      Matrix.standardBasisRow(r, 1 + m, NaturalsBelow.top(m));
+  ∀ (i : NaturalsBelow(m)). ∀ (j : NaturalsBelow(m)).
+      Matrix.leadingBlock(Matrix.outerProduct(e, e))(i, j)
+      = Matrix.zero(r, m, m)(i, j)
+      by (i : NaturalsBelow(m)) (j : NaturalsBelow(m)) ↦ {
+          ¬(NaturalsBelow.top(m) = NaturalsBelow.inclusion(m, i))
+              by NaturalsBelow.top_not_inclusion;
+          e(NaturalsBelow.inclusion(m, i)) = CommutativeRing.zero(r)
+              by Matrix.standardBasisRow_off as firstVanishes;
+          Matrix.leadingBlock(Matrix.outerProduct(e, e))(i, j)
+             = e(NaturalsBelow.inclusion(m, i))
+                 * e(NaturalsBelow.inclusion(m, j))
+             = CommutativeRing.zero(r)
+                 * e(NaturalsBelow.inclusion(m, j))
+                   by substituting firstVanishes
+             = Matrix.zero(r, m, m)(i, j);
+          done
+        };
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.outerProduct_topBasis_borderColumn
+        {r : CommutativeRing} {m : ℕ}
+        : Matrix.borderColumn(Matrix.outerProduct(
+              Matrix.standardBasisRow(r, 1 + m, NaturalsBelow.top(m)),
+              Matrix.standardBasisRow(r, 1 + m, NaturalsBelow.top(m))))
+          = RingVector.zero(r, m) := {
+  let e : RingVector(r, 1 + m) :=
+      Matrix.standardBasisRow(r, 1 + m, NaturalsBelow.top(m));
+  ∀ (i : NaturalsBelow(m)).
+      Matrix.borderColumn(Matrix.outerProduct(e, e))(i)
+      = RingVector.zero(r, m)(i)
+      by (i : NaturalsBelow(m)) ↦ {
+          ¬(NaturalsBelow.top(m) = NaturalsBelow.inclusion(m, i))
+              by NaturalsBelow.top_not_inclusion;
+          e(NaturalsBelow.inclusion(m, i)) = CommutativeRing.zero(r)
+              by Matrix.standardBasisRow_off as belowVanishes;
+          Matrix.borderColumn(Matrix.outerProduct(e, e))(i)
+             = e(NaturalsBelow.inclusion(m, i)) * e(NaturalsBelow.top(m))
+             = CommutativeRing.zero(r) * e(NaturalsBelow.top(m))
+                   by substituting belowVanishes
+             = RingVector.zero(r, m)(i);
+          done
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+theorem Matrix.outerProduct_topBasis_borderRow
+        {r : CommutativeRing} {m : ℕ}
+        : Matrix.borderRow(Matrix.outerProduct(
+              Matrix.standardBasisRow(r, 1 + m, NaturalsBelow.top(m)),
+              Matrix.standardBasisRow(r, 1 + m, NaturalsBelow.top(m))))
+          = RingVector.zero(r, m) := {
+  let e : RingVector(r, 1 + m) :=
+      Matrix.standardBasisRow(r, 1 + m, NaturalsBelow.top(m));
+  ∀ (j : NaturalsBelow(m)).
+      Matrix.borderRow(Matrix.outerProduct(e, e))(j)
+      = RingVector.zero(r, m)(j)
+      by (j : NaturalsBelow(m)) ↦ {
+          ¬(NaturalsBelow.top(m) = NaturalsBelow.inclusion(m, j))
+              by NaturalsBelow.top_not_inclusion;
+          e(NaturalsBelow.inclusion(m, j)) = CommutativeRing.zero(r)
+              by Matrix.standardBasisRow_off as belowVanishes;
+          Matrix.borderRow(Matrix.outerProduct(e, e))(j)
+             = e(NaturalsBelow.top(m)) * e(NaturalsBelow.inclusion(m, j))
+             = e(NaturalsBelow.top(m)) * CommutativeRing.zero(r)
+                   by substituting belowVanishes
+             = RingVector.zero(r, m)(j);
+          done
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+theorem Matrix.outerProduct_topBasis_corner
+        {r : CommutativeRing} {m : ℕ}
+        : Matrix.corner(Matrix.outerProduct(
+              Matrix.standardBasisRow(r, 1 + m, NaturalsBelow.top(m)),
+              Matrix.standardBasisRow(r, 1 + m, NaturalsBelow.top(m))))
+          = CommutativeRing.one(r) := {
+  let e : RingVector(r, 1 + m) :=
+      Matrix.standardBasisRow(r, 1 + m, NaturalsBelow.top(m));
+  Matrix.corner(Matrix.outerProduct(e, e))
+     = e(NaturalsBelow.top(m)) * e(NaturalsBelow.top(m))
+     = CommutativeRing.one(r) * e(NaturalsBelow.top(m))
+           by substituting Matrix.standardBasisRow_at
+     = CommutativeRing.one(r) * CommutativeRing.one(r)
+           by substituting Matrix.standardBasisRow_at
+     = CommutativeRing.one(r);
+  done
+}
+
 theorem Matrix.topUnit_eq_outerProduct_topBasis {r : CommutativeRing} {m : ℕ}
         : Matrix.topUnit(r, m)
           = Matrix.outerProduct(
@@ -367,102 +501,36 @@ theorem Matrix.topUnit_eq_outerProduct_topBasis {r : CommutativeRing} {m : ℕ}
               Matrix.standardBasisRow(r, 1 + m, NaturalsBelow.top(m))) := {
   let e : RingVector(r, 1 + m) :=
       Matrix.standardBasisRow(r, 1 + m, NaturalsBelow.top(m));
-  ∀ (p : NaturalsBelow(1 + m)). ∀ (q : NaturalsBelow(1 + m)).
-      Matrix.topUnit(r, m)(p, q) = Matrix.outerProduct(e, e)(p, q)
-      by (p : NaturalsBelow(1 + m)) (q : NaturalsBelow(1 + m)) ↦ {
-          (∃ (i : NaturalsBelow(m)). p = NaturalsBelow.inclusion(m, i))
-              ∨ p = NaturalsBelow.top(m) by NaturalsBelow.inclusion_or_top;
-          done by cases {
-            case ∃ (i : NaturalsBelow(m)).
-                p = NaturalsBelow.inclusion(m, i) as pBelow: {
-                choose i such that p = NaturalsBelow.inclusion(m, i)
-                    from pBelow;
-                Matrix.topUnit(r, m)(p, q)
-                   = Matrix.topUnit(r, m)(NaturalsBelow.inclusion(m, i), q)
-                         by substituting (p = NaturalsBelow.inclusion(m, i))
-                   = CommutativeRing.zero(r) by Matrix.topUnit_row_off
-                as unitVanishes;
-                ¬(NaturalsBelow.top(m) = NaturalsBelow.inclusion(m, i))
-                    by NaturalsBelow.top_not_inclusion;
-                e(p)
-                   = e(NaturalsBelow.inclusion(m, i))
-                         by substituting (p = NaturalsBelow.inclusion(m, i))
-                   = CommutativeRing.zero(r)
-                         by Matrix.standardBasisRow_off
-                as basisVanishes;
-                Matrix.outerProduct(e, e)(p, q)
-                   = e(p) * e(q)
-                   = CommutativeRing.zero(r) * e(q)
-                         by substituting basisVanishes
-                   = CommutativeRing.zero(r);
-                done by unitVanishes
-              }
-            case p = NaturalsBelow.top(m) as pTop: {
-                (∃ (j : NaturalsBelow(m)).
-                    q = NaturalsBelow.inclusion(m, j))
-                    ∨ q = NaturalsBelow.top(m)
-                    by NaturalsBelow.inclusion_or_top;
-                done by cases {
-                  case ∃ (j : NaturalsBelow(m)).
-                      q = NaturalsBelow.inclusion(m, j) as qBelow: {
-                      choose j such that q = NaturalsBelow.inclusion(m, j)
-                          from qBelow;
-                      Matrix.topUnit(r, m)(p, q)
-                         = Matrix.topUnit(
-                             r, m)(p, NaturalsBelow.inclusion(m, j))
-                               by substituting (q = NaturalsBelow.inclusion(m, j))
-                         = CommutativeRing.zero(r)
-                               by Matrix.topUnit_column_off
-                      as unitVanishes;
-                      ¬(NaturalsBelow.top(m) = NaturalsBelow.inclusion(m, j))
-                          by NaturalsBelow.top_not_inclusion;
-                      e(q)
-                         = e(NaturalsBelow.inclusion(m, j))
-                               by substituting (q = NaturalsBelow.inclusion(m, j))
-                         = CommutativeRing.zero(r)
-                               by Matrix.standardBasisRow_off
-                      as basisVanishes;
-                      Matrix.outerProduct(e, e)(p, q)
-                         = e(p) * e(q)
-                         = e(p) * CommutativeRing.zero(r)
-                               by substituting basisVanishes
-                         = CommutativeRing.zero(r);
-                      done by unitVanishes
-                    }
-                  case q = NaturalsBelow.top(m) as qTop: {
-                      Matrix.topUnit(r, m)(p, q)
-                         = Matrix.topUnit(r, m)(NaturalsBelow.top(m), q)
-                               by substituting pTop
-                         = Matrix.topUnit(
-                             r, m)(NaturalsBelow.top(m), NaturalsBelow.top(m))
-                               by substituting qTop
-                         = CommutativeRing.one(r)
-                               by Matrix.topUnit_corner
-                      as unitReads;
-                      e(p)
-                         = e(NaturalsBelow.top(m)) by substituting pTop
-                         = CommutativeRing.one(r)
-                               by Matrix.standardBasisRow_at
-                      as firstReads;
-                      e(q)
-                         = e(NaturalsBelow.top(m)) by substituting qTop
-                         = CommutativeRing.one(r)
-                               by Matrix.standardBasisRow_at
-                      as secondReads;
-                      Matrix.outerProduct(e, e)(p, q)
-                         = e(p) * e(q)
-                         = CommutativeRing.one(r) * e(q)
-                               by substituting firstReads
-                         = CommutativeRing.one(r) * CommutativeRing.one(r)
-                               by substituting secondReads
-                         = CommutativeRing.one(r);
-                      done by unitReads
-                    }
-                }
-              }
-          }
-        };
-  done by Matrix.equal_of_entries
+  let E : Matrix(r, 1 + m, 1 + m) := Matrix.outerProduct(e, e);
+  Matrix.leadingBlock(E) = Matrix.zero(r, m, m)
+      by Matrix.outerProduct_topBasis_leadingBlock as outerBlock;
+  Matrix.borderColumn(E) = RingVector.zero(r, m)
+      by Matrix.outerProduct_topBasis_borderColumn as outerColumn;
+  Matrix.borderRow(E) = RingVector.zero(r, m)
+      by Matrix.outerProduct_topBasis_borderRow as outerRow;
+  Matrix.corner(E) = CommutativeRing.one(r)
+      by Matrix.outerProduct_topBasis_corner as outerCorner;
+  Matrix.leadingBlock(Matrix.topUnit(r, m))
+     = Matrix.zero(r, m, m) by Matrix.topUnit_leadingBlock
+     = Matrix.leadingBlock(E) by outerBlock
+  as blocks;
+  Matrix.borderColumn(Matrix.topUnit(r, m))
+     = RingVector.zero(r, m) by Matrix.topUnit_borderColumn
+     = Matrix.borderColumn(E) by outerColumn
+  as columns;
+  Matrix.borderRow(Matrix.topUnit(r, m))
+     = RingVector.zero(r, m) by Matrix.topUnit_borderRow
+     = Matrix.borderRow(E) by outerRow
+  as rows;
+  Matrix.corner(Matrix.topUnit(r, m))
+     = CommutativeRing.one(r) by Matrix.topUnit_corner
+     = Matrix.corner(E) by outerCorner
+  as corners;
+  done by Matrix.bordered_extensionality(
+      blocks := blocks,
+      borderRows := rows,
+      borderColumns := columns,
+      corners := corners)
 }
 
 definition Matrix.diagonalExtension {r : CommutativeRing} {n : ℕ}
@@ -656,6 +724,42 @@ theorem Matrix.diagonalExtension_borderColumn {r : CommutativeRing} {n : ℕ}
              = CommutativeRing.zero(r) + c * CommutativeRing.zero(r) by substituting unitEntry
              = RingVector.zero(r, n)(i) by ring;
           done
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+theorem Matrix.diagonalExtension_borderRow {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (c : CommutativeRing.carrier(r))
+        : Matrix.borderRow(Matrix.diagonalExtension(A, c))
+          = RingVector.zero(r, n) := {
+  ∀ (j : NaturalsBelow(n)).
+      Matrix.borderRow(Matrix.diagonalExtension(A, c))(j)
+      = RingVector.zero(r, n)(j)
+      by (j : NaturalsBelow(n)) ↦ {
+          (Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) * A
+           * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ)(
+              NaturalsBelow.top(n), NaturalsBelow.inclusion(n, j))
+              = CommutativeRing.zero(r)
+              by Matrix.diagonalExtension_block_row_off as blockEntry;
+          Matrix.topUnit(r, n)(
+              NaturalsBelow.top(n), NaturalsBelow.inclusion(n, j))
+              = CommutativeRing.zero(r)
+              by Matrix.topUnit_column_off as unitEntry;
+          Matrix.borderRow(Matrix.diagonalExtension(A, c))(j)
+             = (Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) * A
+                * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ)(
+                   NaturalsBelow.top(n), NaturalsBelow.inclusion(n, j))
+               + c * Matrix.topUnit(r, n)(
+                   NaturalsBelow.top(n), NaturalsBelow.inclusion(n, j))
+             = CommutativeRing.zero(r)
+               + c * Matrix.topUnit(r, n)(
+                   NaturalsBelow.top(n), NaturalsBelow.inclusion(n, j))
+                   by substituting blockEntry
+             = CommutativeRing.zero(r) + c * CommutativeRing.zero(r)
+                   by substituting unitEntry
+             = RingVector.zero(r, n)(j) by ring
+          as entryReads;
+          done by entryReads
         };
   done by RingVector.equal_of_pointwise
 }

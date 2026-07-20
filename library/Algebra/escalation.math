@@ -98,6 +98,49 @@ theorem Matrix.outerProduct_entry {r : CommutativeRing} {rows columns : ℕ}
         : Matrix.outerProduct(u, v)(i, j) = u(i) * v(j) :=
   done
 
+theorem Matrix.outerProduct_leadingBlock
+        {r : CommutativeRing} {n : ℕ}
+        (u v : RingVector(r, 1 + n))
+        : Matrix.leadingBlock(Matrix.outerProduct(u, v))
+          = Matrix.outerProduct(
+              RingVector.restrict(u), RingVector.restrict(v)) := {
+  ∀ (i : NaturalsBelow(n)). ∀ (j : NaturalsBelow(n)).
+      Matrix.leadingBlock(Matrix.outerProduct(u, v))(i, j)
+      = Matrix.outerProduct(
+          RingVector.restrict(u), RingVector.restrict(v))(i, j)
+      by (i : NaturalsBelow(n)) (j : NaturalsBelow(n)) ↦ {
+          done
+        };
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.outerProduct_borderColumn
+        {r : CommutativeRing} {n : ℕ}
+        (u v : RingVector(r, 1 + n))
+        : Matrix.borderColumn(Matrix.outerProduct(u, v))
+          = ((i : NaturalsBelow(n)) ↦
+              u(NaturalsBelow.inclusion(n, i))
+                * v(NaturalsBelow.top(n))) := {
+  done by RingVector.equal_of_pointwise
+}
+
+theorem Matrix.outerProduct_borderRow
+        {r : CommutativeRing} {n : ℕ}
+        (u v : RingVector(r, 1 + n))
+        : Matrix.borderRow(Matrix.outerProduct(u, v))
+          = ((j : NaturalsBelow(n)) ↦
+              u(NaturalsBelow.top(n))
+                * v(NaturalsBelow.inclusion(n, j))) := {
+  done by RingVector.equal_of_pointwise
+}
+
+theorem Matrix.outerProduct_corner
+        {r : CommutativeRing} {n : ℕ}
+        (u v : RingVector(r, 1 + n))
+        : Matrix.corner(Matrix.outerProduct(u, v))
+          = u(NaturalsBelow.top(n)) * v(NaturalsBelow.top(n)) :=
+  done
+
 theorem Matrix.outerProduct_transpose {r : CommutativeRing} {rows columns : ℕ}
         (u : RingVector(r, rows)) (v : RingVector(r, columns))
         : Matrix.outerProduct(u, v)ᵀ = Matrix.outerProduct(v, u) := {
@@ -488,6 +531,18 @@ theorem Matrix.borderedAssembly_border_row_entry {r : CommutativeRing} {n : ℕ}
   done
 }
 
+theorem Matrix.borderedAssembly_borderRow {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (b : RingVector(r, n))
+        (c : CommutativeRing.carrier(r))
+        : Matrix.borderRow(Matrix.borderedAssembly(A, b, c)) = b := {
+  ∀ (i : NaturalsBelow(n)).
+      Matrix.borderRow(Matrix.borderedAssembly(A, b, c))(i) = b(i)
+      by (i : NaturalsBelow(n)) ↦ {
+          done by Matrix.borderedAssembly_border_row_entry
+        };
+  done by RingVector.equal_of_pointwise
+}
+
 theorem Matrix.borderedAssembly_corner {r : CommutativeRing} {n : ℕ}
         (A : Matrix(r, n, n)) (b : RingVector(r, n))
         (c : CommutativeRing.carrier(r))
@@ -534,6 +589,23 @@ theorem Matrix.borderedAssembly_corner {r : CommutativeRing} {n : ℕ}
      = c
            by ring;
   done
+}
+
+theorem Matrix.borderedAssembly_congruence
+        {r : CommutativeRing} {n : ℕ}
+        (A APrime : Matrix(r, n, n))
+        (b bPrime : RingVector(r, n))
+        (c cPrime : CommutativeRing.carrier(r))
+        (blocks : A = APrime)
+        (borders : b = bPrime)
+        (corners : c = cPrime)
+        : Matrix.borderedAssembly(A, b, c)
+          = Matrix.borderedAssembly(APrime, bPrime, cPrime) := {
+  Matrix.borderedAssembly(A, b, c)
+     = Matrix.borderedAssembly(APrime, b, c) by substituting blocks
+     = Matrix.borderedAssembly(APrime, bPrime, c) by substituting borders
+     = Matrix.borderedAssembly(APrime, bPrime, cPrime)
+           by substituting corners
 }
 
 theorem Matrix.entry_equal_of_both_top {r : CommutativeRing} {n : ℕ}

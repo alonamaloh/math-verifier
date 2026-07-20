@@ -34,6 +34,9 @@ check_shape \
 check_shape \
   Test.symmetric_bordered_equal_baseline \
   '(Matrix.borderColumn r n B) = (Matrix.borderColumn r n C) → (Matrix.corner r n B) = (Matrix.corner r n C) → B = C'
+check_shape \
+  Test.symmetric_bordered_equal_blockwise \
+  '(Matrix.borderColumn r n B) = (Matrix.borderColumn r n C) → (Matrix.corner r n B) = (Matrix.corner r n C) → B = C'
 
 # Closed 3×3 controls must retain their fixed dimension and named witnesses.
 check_shape \
