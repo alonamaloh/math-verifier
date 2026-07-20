@@ -259,6 +259,8 @@ CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
 # 2026-07-19: 397 → 397. rank_three_escalation_bounds manifest-added at
 # ZERO counted leaks; the rank-3 boxes, coupled 23-pair bound, and all 32
 # canonical bordered candidates are explicit.
+# 2026-07-19: 397 → 397. rank_three_truants manifest-added at ZERO counted
+# leaks; the zero-border form x²+y²+3z² has exact truant 6.
 CLEAN_LEAK_BUDGET ?= 397
 # Second, independent axis: user-written `⟨…⟩` over a logical connective
 # (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the

@@ -179,6 +179,35 @@ theorem Natural.positive_below_five (m : ℕ) (positive : m ≥ 1) (bound : m < 
   }
 }
 
+-- Every positive value below 6 is one of 1, 2, 3, 4, 5.
+theorem Natural.positive_below_six (m : ℕ) (positive : m ≥ 1) (bound : m < 6)
+        : m = 1 ∨ m = 2 ∨ m = 3 ∨ m = 4 ∨ m = 5 := {
+  m < 5 ∨ m = 5 ∨ 5 < m by Natural.lt_trichotomy;
+  done by cases {
+    case m < 5: {
+        m = 1 ∨ m = 2 ∨ m = 3 ∨ m = 4
+            by Natural.positive_below_five;
+        done by cases {
+          case m = 1: done
+          case m = 2 ∨ m = 3 ∨ m = 4: done by cases {
+              case m = 2: done
+              case m = 3 ∨ m = 4: done by cases {
+                  case m = 3: done
+                  case m = 4: done
+                }
+            }
+        }
+      }
+    case m = 5: done
+    case 5 < m: {
+        6 ≤ m;
+        m < 6 ≤ m;
+        False by Natural.lt_irreflexive;
+        done
+      }
+  }
+}
+
 -- A square below 2 has root 0 or 1: any root of at least 2 squares to at
 -- least 4.
 theorem Natural.square_below_two (m : ℕ) (bound : m * m < 2) : m = 0 ∨ m = 1 := {
@@ -387,6 +416,110 @@ theorem Natural.three_not_sum_of_two_squares (m n : ℕ)
               = 1 * 1 + n * n by substituting mOne
               = 1 * 1 + 1 * 1 by substituting nOne
               = 2;
+            done
+          }
+      }
+  }
+}
+
+-- 6 is not a sum of two squares. Each square is below 9, so each root
+-- is 0, 1, or 2; the resulting nine ground cases miss 6.
+theorem Natural.six_not_sum_of_two_squares (m n : ℕ)
+        : ¬(m * m + n * n = 6) := {
+  suppose m * m + n * n = 6 as sumIsSix;
+  m * m ≤ m * m + n * n = 6 < 9 < 10;
+  n * n ≤ n * n + m * m = m * m + n * n by Natural.add_commutative = 6 < 9 < 10;
+  m = 0 ∨ m = 1 ∨ m = 2 ∨ m = 3 by Natural.square_below_ten;
+  n = 0 ∨ n = 1 ∨ n = 2 ∨ n = 3 by Natural.square_below_ten;
+  m = 0 ∨ m = 1 ∨ m = 2 by cases {
+      case m = 0: done
+      case m = 1 ∨ m = 2 ∨ m = 3: done by cases {
+          case m = 1: done
+          case m = 2: done
+          case m = 3: {
+              9 = m * m by substituting (m = 3)
+                ≤ m * m + n * n
+                = 6 by sumIsSix;
+              9 ≤ 6 < 9;
+              False by Natural.lt_irreflexive;
+              done
+            }
+        }
+    };
+  n = 0 ∨ n = 1 ∨ n = 2 by cases {
+      case n = 0: done
+      case n = 1 ∨ n = 2 ∨ n = 3: done by cases {
+          case n = 1: done
+          case n = 2: done
+          case n = 3: {
+              9 = n * n by substituting (n = 3)
+                ≤ n * n + m * m
+                = m * m + n * n by Natural.add_commutative
+                = 6 by sumIsSix;
+              9 ≤ 6 < 9;
+              False by Natural.lt_irreflexive;
+              done
+            }
+        }
+    };
+  done by cases {
+    case m = 0: done by cases {
+        case n = 0: {
+            6 = m * m + n * n by sumIsSix
+              = 0 * 0 + 0 * 0 by substitution
+              = 0;
+            done
+          }
+        case n = 1: {
+            6 = m * m + n * n by sumIsSix
+              = 0 * 0 + 1 * 1 by substitution
+              = 1;
+            done
+          }
+        case n = 2: {
+            6 = m * m + n * n by sumIsSix
+              = 0 * 0 + 2 * 2 by substitution
+              = 4;
+            done
+          }
+      }
+    case m = 1: done by cases {
+        case n = 0: {
+            6 = m * m + n * n by sumIsSix
+              = 1 * 1 + 0 * 0 by substitution
+              = 1;
+            done
+          }
+        case n = 1: {
+            6 = m * m + n * n by sumIsSix
+              = 1 * 1 + 1 * 1 by substitution
+              = 2;
+            done
+          }
+        case n = 2: {
+            6 = m * m + n * n by sumIsSix
+              = 1 * 1 + 2 * 2 by substitution
+              = 5;
+            done
+          }
+      }
+    case m = 2: done by cases {
+        case n = 0: {
+            6 = m * m + n * n by sumIsSix
+              = 2 * 2 + 0 * 0 by substitution
+              = 4;
+            done
+          }
+        case n = 1: {
+            6 = m * m + n * n by sumIsSix
+              = 2 * 2 + 1 * 1 by substitution
+              = 5;
+            done
+          }
+        case n = 2: {
+            6 = m * m + n * n by sumIsSix
+              = 2 * 2 + 2 * 2 by substitution
+              = 8;
             done
           }
       }

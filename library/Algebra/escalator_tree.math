@@ -571,6 +571,70 @@ theorem Matrix.diagonalExtension_quadraticForm {n : ℕ}
   done
 }
 
+-- A zero top coordinate lifts every value of the leading block to the
+-- diagonal extension.
+theorem Matrix.diagonalExtension_represents_parent {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) (c target : ℤ)
+        (symmetric : Matrix.IsSymmetric(A))
+        (represented : Matrix.Represents(A, target))
+        : Matrix.Represents(Matrix.diagonalExtension(A, c), target) := {
+  choose y : RingVector(Integer.commutative_ring_bundle, n) such that
+      Matrix.quadraticForm(A, y) = target as valueReads from represented;
+  let x : RingVector(Integer.commutative_ring_bundle, 1 + n) := RingVector.extend(y);
+  RingVector.restrict(x) = y by RingVector.restrict_extend as restrictionReads;
+  x(NaturalsBelow.top(n)) = (0 : ℤ) by RingVector.extend_top as topVanishes;
+  Matrix.quadraticForm(Matrix.diagonalExtension(A, c), x)
+     = Matrix.quadraticForm(A, RingVector.restrict(x))
+       + x(NaturalsBelow.top(n)) * x(NaturalsBelow.top(n)) * c
+           by Matrix.diagonalExtension_quadraticForm
+     = Matrix.quadraticForm(A, y)
+       + x(NaturalsBelow.top(n)) * x(NaturalsBelow.top(n)) * c
+           by substituting restrictionReads
+     = Matrix.quadraticForm(A, y) + 0 * 0 * c
+           by substituting topVanishes
+     = Matrix.quadraticForm(A, y) by ring
+     = target by valueReads;
+  witness x with done
+}
+
+-- The top basis vector represents the new diagonal entry.
+theorem Matrix.diagonalExtension_represents_corner {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) (c : ℤ)
+        (symmetric : Matrix.IsSymmetric(A))
+        : Matrix.Represents(Matrix.diagonalExtension(A, c), c) := {
+  let e : RingVector(Integer.commutative_ring_bundle, 1 + n) :=
+      Matrix.standardBasisRow(
+          Integer.commutative_ring_bundle, 1 + n, NaturalsBelow.top(n));
+  RingVector.restrict(e) = RingVector.zero(Integer.commutative_ring_bundle, n)
+      by {
+          ∀ (i : NaturalsBelow(n)).
+              RingVector.restrict(e)(i)
+              = RingVector.zero(Integer.commutative_ring_bundle, n)(i)
+              by (i : NaturalsBelow(n)) ↦ {
+                  ¬(NaturalsBelow.top(n) = NaturalsBelow.inclusion(n, i))
+                      by NaturalsBelow.top_not_inclusion;
+                  done by Matrix.standardBasisRow_off
+                };
+          done by RingVector.equal_of_pointwise
+        }
+  as restrictionVanishes;
+  e(NaturalsBelow.top(n)) = (1 : ℤ)
+      by Matrix.standardBasisRow_at as topReads;
+  Matrix.quadraticForm(Matrix.diagonalExtension(A, c), e)
+     = Matrix.quadraticForm(A, RingVector.restrict(e))
+       + e(NaturalsBelow.top(n)) * e(NaturalsBelow.top(n)) * c
+           by Matrix.diagonalExtension_quadraticForm
+     = Matrix.quadraticForm(
+           A, RingVector.zero(Integer.commutative_ring_bundle, n))
+       + e(NaturalsBelow.top(n)) * e(NaturalsBelow.top(n)) * c
+           by substituting restrictionVanishes
+     = 0 + e(NaturalsBelow.top(n)) * e(NaturalsBelow.top(n)) * c
+           by substituting Matrix.quadraticForm_zero
+     = 0 + 1 * 1 * c by substituting topReads
+     = c;
+  witness e with done
+}
+
 theorem Matrix.diagonalExtension_positive_definite {n : ℕ}
         (A : Matrix(Integer.commutative_ring_bundle, n, n)) (c : ℤ)
         (symmetric : Matrix.IsSymmetric(A))
