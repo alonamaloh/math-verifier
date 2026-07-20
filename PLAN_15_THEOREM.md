@@ -169,8 +169,14 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
   **23**, recorded in three symmetry bands by `squarePlusDoubleSquare_escalation_border_pairs`: `a=0` gives 7 values of `b`,
   `a=±1` gives 5 each, and `a=±2` gives 3 each. The **32 raw matrices are now materialized**, not merely counted:
   `sumOfTwoSquares_escalation_nine_candidates` and `squarePlusDoubleSquare_escalation_twenty_three_candidates` reconstruct
-  every escalation as `borderedAssembly(parent, twoCoordinates(a,b), truant)`. Next: deduplicate these 32 matrices up to
-  integral isometry and compute the resulting rank-3 truants.
+  every escalation as `borderedAssembly(parent, twoCoordinates(a,b), truant)`. The first actual ternary truant is now
+  computed (`Algebra/rank_three_truants.math`, manifest-added at zero leaks): the zero-border candidate
+  **`x²+y²+3z²` has exact truant 6**. Its leading block, zero border, corner 3, and split value formula are explicit; parent
+  representations lift through the new generic `diagonalExtension_represents_parent`, the top basis vector gives
+  `diagonalExtension_represents_corner`, and the nonrepresentation proof reduces `x²+y²+3z²=6` via `z²≤2` to the binary
+  impossibilities at 3 and 6 (`Natural.six_not_sum_of_two_squares`,
+  `Matrix.sumOfTwoSquaresForm_not_represents_six`). Next: compute more representatives' truants while developing the
+  integral-isometry deduplication of all 32 raw matrices.
 - `S3.E5` `[ ]` (XL) ★★ The rank-4 escalators: machine-generate and dedup to the **≈207** isometry classes. *(Large mechanical lemma; the count is the checkpoint.)* — owes: S3.E2, S2.R4
 - `S3.C1` `[ ]` (M) ★ The set of truants occurring anywhere in the tree is exactly **{1,2,3,5,6,7,10,14,15}**. — owes: S3.E3, S3.E4, S3.E5
 - `S3.C2` `[ ]` (L) ★★ **Master reduction:** if `Q` represents the nine critical numbers then `Q` is universal — via: a non-universal `Q` would embed an escalator missing its truant ∈ {nine}. *(Depends on rank-4 universality, Stage 5.)* — owes: S3.C1, S3.E5, S5.U2

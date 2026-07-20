@@ -2,8 +2,8 @@
 
 This development formalizes the escalation route toward the Fifteen Theorem.
 The final theorem and the deduplicated rank-three/rank-four classifications
-are not yet proved; the foundations and the raw rank-three candidate family
-are.
+are not yet proved; the foundations, the raw rank-three candidate family,
+and the first exact rank-three truant are.
 
 ## Main definitions
 
@@ -67,6 +67,13 @@ are.
   `Matrix.squarePlusDoubleSquare_escalation_twenty_three_candidates` then
   turn the 9 + 23 coordinate pairs into canonical bordered matrices. Isometry
   deduplication of those 32 raw matrices remains.
+- First rank-three truant: the zero-border candidate
+  `Matrix.sumOfTwoSquaresPlusTripleSquareForm`, representing
+  \(x^2+y^2+3z^2\), represents 1 through 5 and misses 6. Thus
+  `Matrix.sumOfTwoSquaresPlusTripleSquareForm_truant` proves its exact truant
+  is 6. Generic value-lifting lemmas for diagonal extensions are
+  `Matrix.diagonalExtension_represents_parent` and
+  `Matrix.diagonalExtension_represents_corner`.
 
 ## Module path
 
@@ -74,5 +81,6 @@ Read `quadratic_form` → `integer_quadratic_form` first. Then use
 `matrix_direct_sum`, `schur_complement`/`sylvester`, and
 `representation_bound` as needed. The escalation spine is
 `square_form` → `truant` → `escalation` → `rank_two_escalators` →
-`rank_two_truants` → `rank_three_escalation_bounds` → `escalator_tree`.
+`rank_two_truants` → `rank_three_escalation_bounds` →
+`rank_three_truants` → `escalator_tree`.
 `PLAN_15_THEOREM.md` records unfinished stages.
