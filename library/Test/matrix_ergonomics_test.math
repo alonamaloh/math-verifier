@@ -302,3 +302,110 @@ theorem Test.matrix_concrete_three_by_three_pullback_baseline
   done by Matrix.topShear_pullback_diagonalExtension(
       symmetric := Matrix.sumOfTwoSquaresForm_symmetric)
 }
+
+-- ----------------------------------------------------------------------
+-- M5: frontier consumers.
+--
+-- The first equality relates two concrete bordered candidates. It is not a
+-- single instance of the shear pullback theorem: the proof composes the two
+-- independently checked changes of basis through their common diagonal
+-- representative.
+
+theorem Test.matrix_rank_three_unit_sign_orbit
+        : Matrix.IsIsometric(
+            Matrix.sumOfTwoSquaresUnitBorderCandidate((1 : ℤ), 1),
+            Matrix.sumOfTwoSquaresUnitBorderCandidate(1, -1)) := {
+  (1 : ℤ) * 1 = 1 by ring as oneSquare;
+  (-1 : ℤ) * -1 = 1 by ring as negativeOneSquare;
+  Matrix.IsIsometric(
+      Matrix.sumOfThreeSquaresForm,
+      Matrix.sumOfTwoSquaresUnitBorderCandidate((1 : ℤ), 1))
+      by Matrix.sumOfThreeSquaresForm_isometric_unitBorderCandidate(
+          aSquareOne := oneSquare,
+          bSquareOne := oneSquare)
+      as positiveCandidate;
+  Matrix.IsIsometric(
+      Matrix.sumOfThreeSquaresForm,
+      Matrix.sumOfTwoSquaresUnitBorderCandidate((1 : ℤ), -1))
+      by Matrix.sumOfThreeSquaresForm_isometric_unitBorderCandidate(
+          aSquareOne := oneSquare,
+          bSquareOne := negativeOneSquare)
+      as negativeCandidate;
+  Matrix.IsIsometric(
+      Matrix.sumOfTwoSquaresUnitBorderCandidate((1 : ℤ), 1),
+      Matrix.sumOfThreeSquaresForm)
+      by Matrix.IsIsometric.symmetric
+      as positiveCandidateReversed;
+  done by Matrix.IsIsometric.transitive(
+      leftIsometric := positiveCandidateReversed,
+      rightIsometric := negativeCandidate)
+}
+
+-- The representative from the actual 23-candidate cone above x²+2y² has
+-- border (0,2) and corner 5. Its library proof computes the named basis
+-- value and then uses only the structured isometry API.
+theorem Test.matrix_square_plus_double_candidate_isometry
+        : Matrix.IsIsometric(
+            Matrix.squarePlusDoubleSquarePlusTripleSquareForm,
+            Matrix.squarePlusDoubleSquareSecondColumnCandidate) := {
+  done by
+      Matrix.squarePlusDoubleSquareSecondColumnCandidate_isometric
+}
+
+-- A 4×4 workload-shaped control. The witness is a named top shear over a
+-- rank-three parent; the only concrete calculation is the selected diagonal
+-- value. The matrix equality itself remains at the structured API boundary.
+
+definition Test.matrixFourByFourVector
+        : RingVector(Integer.commutative_ring_bundle, 1 + 2) :=
+  Matrix.standardBasisRow(
+      Integer.commutative_ring_bundle, 1 + 2, NaturalsBelow.top(2))
+
+definition Test.matrixFourByFourCandidate
+        : Matrix(Integer.commutative_ring_bundle, 1 + (1 + 2), 1 + (1 + 2)) :=
+  Matrix.borderedAssembly(
+      Matrix.sumOfThreeSquaresForm,
+      Matrix.sumOfThreeSquaresForm · Test.matrixFourByFourVector,
+      (3 : ℤ))
+
+theorem Test.matrixFourByFourVector_value
+        : Matrix.quadraticForm(
+            Matrix.sumOfThreeSquaresForm,
+            Test.matrixFourByFourVector) = (1 : ℤ) := {
+  Matrix.quadraticForm(
+      Matrix.sumOfThreeSquaresForm,
+      Test.matrixFourByFourVector)
+     = Matrix.sumOfThreeSquaresForm(
+           NaturalsBelow.top(2), NaturalsBelow.top(2))
+           by Matrix.quadraticForm_standardBasis
+     = (1 : ℤ) by Matrix.diagonalExtension_corner(
+           A := Matrix.sumOfTwoSquaresForm, c := (1 : ℤ));
+  done
+}
+
+theorem Test.matrix_four_by_four_candidate_isometry
+        : Matrix.IsIsometric(
+            Matrix.diagonalExtension(
+                Matrix.sumOfThreeSquaresForm, (2 : ℤ)),
+            Test.matrixFourByFourCandidate) := {
+  Matrix.IsSymmetric(Matrix.sumOfThreeSquaresForm)
+      by Matrix.sumOfThreeSquaresForm_symmetric
+      as parentSymmetric;
+  Matrix.IsIsometric(
+      Matrix.diagonalExtension(
+          Matrix.sumOfThreeSquaresForm, (2 : ℤ)),
+      Matrix.borderedAssembly(
+          Matrix.sumOfThreeSquaresForm,
+          Matrix.sumOfThreeSquaresForm · Test.matrixFourByFourVector,
+          (2 : ℤ) + Matrix.quadraticForm(
+              Matrix.sumOfThreeSquaresForm,
+              Test.matrixFourByFourVector)))
+      by Matrix.diagonalExtension_isometric_borderedAssembly(
+          symmetric := parentSymmetric);
+  (2 : ℤ) + Matrix.quadraticForm(
+      Matrix.sumOfThreeSquaresForm,
+      Test.matrixFourByFourVector) = 3
+      by substituting Test.matrixFourByFourVector_value
+      as cornerReads;
+  done by substituting cornerReads
+}

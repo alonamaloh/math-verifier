@@ -903,6 +903,28 @@ theorem Matrix.topShear_pullback_diagonalExtension {n : ℕ}
   done
 }
 
+-- The pullback calculation and the square-zero inverse package directly as
+-- an isometry. Consumers can now describe the border vector mathematically
+-- and leave the matrix-ring bookkeeping behind this boundary.
+theorem Matrix.diagonalExtension_isometric_borderedAssembly {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (c : ℤ) (v : RingVector(Integer.commutative_ring_bundle, n))
+        (symmetric : Matrix.IsSymmetric(A))
+        : Matrix.IsIsometric(
+            Matrix.diagonalExtension(A, c),
+            Matrix.borderedAssembly(
+                A, A · v, c + Matrix.quadraticForm(A, v))) := {
+  Matrix.IsInvertible(Matrix.topShear(v))
+      by Matrix.topShear_invertible;
+  Matrix.borderedAssembly(
+      A, A · v, c + Matrix.quadraticForm(A, v))
+      = Matrix.topShear(v)ᵀ
+        * Matrix.diagonalExtension(A, c)
+        * Matrix.topShear(v)
+      by Matrix.topShear_pullback_diagonalExtension;
+  witness Matrix.topShear(v) with done
+}
+
 -- Positive-definiteness of the extension: the bordered splitting with a
 -- zero border leaves Q(A, y) + c·t², positive whenever A is positive-
 -- definite and the corner is positive.

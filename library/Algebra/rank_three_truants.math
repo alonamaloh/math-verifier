@@ -271,6 +271,12 @@ definition Matrix.sumOfThreeSquaresForm
         : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2) :=
   Matrix.diagonalExtension(Matrix.sumOfTwoSquaresForm, (1 : ℤ))
 
+theorem Matrix.sumOfThreeSquaresForm_symmetric
+        : Matrix.IsSymmetric(Matrix.sumOfThreeSquaresForm) := {
+  done by Matrix.diagonalExtension_symmetric(
+      symmetric := Matrix.sumOfTwoSquaresForm_symmetric)
+}
+
 theorem Matrix.sumOfThreeSquaresForm_value
         (x : RingVector(Integer.commutative_ring_bundle, 1 + 2))
         : Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, x)
@@ -1047,4 +1053,179 @@ theorem Matrix.sumOfTwoSquaresOneUnitBorderCandidate_truant
   done by Matrix.isometric_truant_equals(
       isometric := isometric,
       isTruant := Matrix.sumOfTwoSquaresPlusDoubleSquareForm_truant_fourteen)
+}
+
+-- ----------------------------------------------------------------------
+-- A first orbit in the 23-candidate cone above x²+2y².
+--
+-- Pulling diag(1,2,3) back by the second-coordinate top shear produces
+-- border (0,2) and corner 5. The only coordinate split is packaged once in
+-- the action lemma; the isometry proof itself stays entirely at matrix level.
+
+definition Matrix.squarePlusDoubleSquarePlusTripleSquareForm
+        : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2) :=
+  Matrix.diagonalExtension(Matrix.squarePlusDoubleSquareForm, (3 : ℤ))
+
+definition Matrix.squarePlusDoubleSquareSecondColumn
+        : RingVector(Integer.commutative_ring_bundle, 2) :=
+  RingVector.twoCoordinates((0 : ℤ), (2 : ℤ))
+
+definition Matrix.squarePlusDoubleSquareSecondColumnCandidate
+        : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2) :=
+  Matrix.borderedAssembly(
+      Matrix.squarePlusDoubleSquareForm,
+      Matrix.squarePlusDoubleSquareSecondColumn,
+      (5 : ℤ))
+
+theorem Matrix.squarePlusDoubleSquareForm_apply_secondBasis
+        : Matrix.squarePlusDoubleSquareForm
+            · Matrix.standardBasisRow(
+                Integer.commutative_ring_bundle,
+                2, NaturalsBelow.secondOfTwo)
+          = Matrix.squarePlusDoubleSquareSecondColumn := {
+  let e : RingVector(Integer.commutative_ring_bundle, 2) :=
+      Matrix.standardBasisRow(
+          Integer.commutative_ring_bundle,
+          2, NaturalsBelow.secondOfTwo);
+  ∀ (i : NaturalsBelow(2)).
+      (Matrix.squarePlusDoubleSquareForm · e)(i)
+        = Matrix.squarePlusDoubleSquareSecondColumn(i)
+      by (i : NaturalsBelow(2)) ↦ {
+          i = NaturalsBelow.firstOfTwo
+            ∨ i = NaturalsBelow.secondOfTwo
+            by NaturalsBelow.two_split;
+          done by cases {
+            case i = NaturalsBelow.firstOfTwo as first: {
+                ¬(NaturalsBelow.firstOfTwo
+                    = NaturalsBelow.secondOfTwo)
+                    by NaturalsBelow.firstOfTwo_not_secondOfTwo;
+                (Matrix.squarePlusDoubleSquareForm · e)(i)
+                   = (Matrix.squarePlusDoubleSquareForm · e)(
+                       NaturalsBelow.firstOfTwo)
+                         by substituting first
+                   = Matrix.squarePlusDoubleSquareForm(
+                       NaturalsBelow.firstOfTwo,
+                       NaturalsBelow.secondOfTwo)
+                         by Matrix.applyVector_standardBasisRow
+                   = (Matrix.identity(
+                         Integer.commutative_ring_bundle, 2)
+                       + Matrix.lowerRightUnit)(
+                           NaturalsBelow.firstOfTwo,
+                           NaturalsBelow.secondOfTwo)
+                         by substituting
+                             Matrix.squarePlusDoubleSquareForm_splits
+                   = Matrix.identity(
+                         Integer.commutative_ring_bundle, 2)(
+                           NaturalsBelow.firstOfTwo,
+                           NaturalsBelow.secondOfTwo)
+                     + Matrix.lowerRightUnit(
+                         NaturalsBelow.firstOfTwo,
+                         NaturalsBelow.secondOfTwo)
+                   = 0 + Matrix.lowerRightUnit(
+                         NaturalsBelow.firstOfTwo,
+                         NaturalsBelow.secondOfTwo)
+                         by substituting Matrix.identity_entry_off
+                   = (0 : ℤ)
+                         by substituting
+                             Matrix.lowerRightUnit_top_vanishes
+                   = Matrix.squarePlusDoubleSquareSecondColumn(
+                       NaturalsBelow.firstOfTwo)
+                         by RingVector.twoCoordinates_first
+                   = Matrix.squarePlusDoubleSquareSecondColumn(i)
+                         by substituting first
+                as entryReads;
+                done by entryReads
+              }
+            case i = NaturalsBelow.secondOfTwo as second: {
+                (Matrix.squarePlusDoubleSquareForm · e)(i)
+                   = (Matrix.squarePlusDoubleSquareForm · e)(
+                       NaturalsBelow.secondOfTwo)
+                         by substituting second
+                   = Matrix.squarePlusDoubleSquareForm(
+                       NaturalsBelow.secondOfTwo,
+                       NaturalsBelow.secondOfTwo)
+                         by Matrix.applyVector_standardBasisRow
+                   = (2 : ℤ)
+                         by
+                           Matrix.squarePlusDoubleSquareForm_second_diagonal
+                   = Matrix.squarePlusDoubleSquareSecondColumn(
+                       NaturalsBelow.secondOfTwo)
+                         by RingVector.twoCoordinates_second
+                   = Matrix.squarePlusDoubleSquareSecondColumn(i)
+                         by substituting second
+                as entryReads;
+                done by entryReads
+              }
+          }
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+theorem Matrix.squarePlusDoubleSquareForm_secondBasis_value
+        : Matrix.quadraticForm(
+            Matrix.squarePlusDoubleSquareForm,
+            Matrix.standardBasisRow(
+                Integer.commutative_ring_bundle,
+                2, NaturalsBelow.secondOfTwo)) = (2 : ℤ) := {
+  Matrix.quadraticForm(
+      Matrix.squarePlusDoubleSquareForm,
+      Matrix.standardBasisRow(
+          Integer.commutative_ring_bundle,
+          2, NaturalsBelow.secondOfTwo))
+     = Matrix.squarePlusDoubleSquareForm(
+           NaturalsBelow.secondOfTwo,
+           NaturalsBelow.secondOfTwo)
+           by Matrix.quadraticForm_standardBasis
+     = (2 : ℤ)
+           by Matrix.squarePlusDoubleSquareForm_second_diagonal;
+  done
+}
+
+theorem Matrix.squarePlusDoubleSquareSecondColumnCandidate_isometric
+        : Matrix.IsIsometric(
+            Matrix.squarePlusDoubleSquarePlusTripleSquareForm,
+            Matrix.squarePlusDoubleSquareSecondColumnCandidate) := {
+  let e : RingVector(Integer.commutative_ring_bundle, 2) :=
+      Matrix.standardBasisRow(
+          Integer.commutative_ring_bundle,
+          2, NaturalsBelow.secondOfTwo);
+  Matrix.IsIsometric(
+      Matrix.diagonalExtension(
+          Matrix.squarePlusDoubleSquareForm, (3 : ℤ)),
+      Matrix.borderedAssembly(
+          Matrix.squarePlusDoubleSquareForm,
+          Matrix.squarePlusDoubleSquareForm · e,
+          (3 : ℤ) + Matrix.quadraticForm(
+              Matrix.squarePlusDoubleSquareForm, e)))
+      by Matrix.diagonalExtension_isometric_borderedAssembly(
+          symmetric :=
+              Matrix.squarePlusDoubleSquareForm_symmetric);
+  Matrix.squarePlusDoubleSquareForm · e
+      = Matrix.squarePlusDoubleSquareSecondColumn
+      by Matrix.squarePlusDoubleSquareForm_apply_secondBasis
+      as borderReads;
+  (3 : ℤ) + Matrix.quadraticForm(
+      Matrix.squarePlusDoubleSquareForm, e) = (5 : ℤ)
+      by substituting
+          Matrix.squarePlusDoubleSquareForm_secondBasis_value
+      as cornerReads;
+  Matrix.borderedAssembly(
+      Matrix.squarePlusDoubleSquareForm,
+      Matrix.squarePlusDoubleSquareForm · e,
+      (3 : ℤ) + Matrix.quadraticForm(
+          Matrix.squarePlusDoubleSquareForm, e))
+     = Matrix.borderedAssembly(
+           Matrix.squarePlusDoubleSquareForm,
+           Matrix.squarePlusDoubleSquareSecondColumn,
+           (3 : ℤ) + Matrix.quadraticForm(
+               Matrix.squarePlusDoubleSquareForm, e))
+           by substituting borderReads
+     = Matrix.borderedAssembly(
+           Matrix.squarePlusDoubleSquareForm,
+           Matrix.squarePlusDoubleSquareSecondColumn,
+           (5 : ℤ))
+           by substituting cornerReads
+     = Matrix.squarePlusDoubleSquareSecondColumnCandidate
+  as candidateReads;
+  done by substituting candidateReads
 }
