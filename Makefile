@@ -261,7 +261,8 @@ CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
 # canonical bordered candidates are explicit.
 # 2026-07-19: 397 → 397. rank_three_truants manifest-added at ZERO counted
 # leaks; x²+y²+3z² has exact truant 6 and the sum-of-three-squares
-# representative has exact truant 7.
+# representative has exact truant 7; all four two-unit-border candidates
+# are connected to the latter by the generic integral top shear.
 CLEAN_LEAK_BUDGET ?= 397
 # Second, independent axis: user-written `⟨…⟩` over a logical connective
 # (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the

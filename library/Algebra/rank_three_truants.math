@@ -48,6 +48,7 @@ import Algebra.truant
 import Algebra.escalation
 import Algebra.rank_two_escalators
 import Algebra.rank_two_truants
+import Algebra.rank_three_escalation_bounds
 import Algebra.escalator_tree
 
 definition Matrix.sumOfTwoSquaresPlusTripleSquareForm
@@ -462,3 +463,221 @@ theorem Matrix.sumOfThreeSquaresForm_truant_seven
 theorem Matrix.sumOfThreeSquaresForm_truant
         : Matrix.truant(Matrix.sumOfThreeSquaresForm) = 7 :=
   by Matrix.truant_equals
+
+-- ----------------------------------------------------------------------
+-- The raw border (1,1) above x²+y² is the top-shear pullback of the
+-- sum of three squares: (x+z)²+(y+z)²+z².
+
+definition Matrix.sumOfTwoSquaresUnitBorderCandidate (a b : ℤ)
+        : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2) :=
+  Matrix.borderedAssembly(
+      Matrix.sumOfTwoSquaresForm,
+      RingVector.twoCoordinates(a, b),
+      (3 : ℤ))
+
+definition Matrix.sumOfTwoSquaresTwoUnitBorderCandidate
+        : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2) :=
+  Matrix.sumOfTwoSquaresUnitBorderCandidate((1 : ℤ), (1 : ℤ))
+
+theorem Matrix.sumOfTwoSquaresForm_twoCoordinates_value
+        (a b : ℤ)
+        : Matrix.quadraticForm(
+            Matrix.sumOfTwoSquaresForm,
+            RingVector.twoCoordinates(a, b)) = a * a + b * b := {
+  let firstBasis : RingVector(Integer.commutative_ring_bundle, 2) :=
+      Matrix.standardBasisRow(
+          Integer.commutative_ring_bundle, 2, NaturalsBelow.firstOfTwo);
+  let secondBasis : RingVector(Integer.commutative_ring_bundle, 2) :=
+      Matrix.standardBasisRow(
+          Integer.commutative_ring_bundle, 2, NaturalsBelow.secondOfTwo);
+  let v : RingVector(Integer.commutative_ring_bundle, 2) :=
+      RingVector.twoCoordinates(a, b);
+  RingVector.innerProduct(firstBasis, firstBasis)
+     = firstBasis(NaturalsBelow.firstOfTwo)
+           by RingVector.innerProduct_standardBasisRow_left
+     = (1 : ℤ) by Matrix.standardBasisRow_at
+  as firstSelf;
+  RingVector.innerProduct(firstBasis, secondBasis) = (0 : ℤ) by {
+    ¬(NaturalsBelow.firstOfTwo = NaturalsBelow.secondOfTwo)
+        by NaturalsBelow.firstOfTwo_not_secondOfTwo;
+    RingVector.innerProduct(firstBasis, secondBasis)
+       = secondBasis(NaturalsBelow.firstOfTwo)
+             by RingVector.innerProduct_standardBasisRow_left
+       = (0 : ℤ) by Matrix.standardBasisRow_off;
+    done
+  }
+  as firstSecond;
+  RingVector.innerProduct(secondBasis, firstBasis) = (0 : ℤ) by {
+    ¬(NaturalsBelow.secondOfTwo = NaturalsBelow.firstOfTwo) by {
+      suppose NaturalsBelow.secondOfTwo = NaturalsBelow.firstOfTwo;
+      NaturalsBelow.firstOfTwo = NaturalsBelow.secondOfTwo;
+      done by NaturalsBelow.firstOfTwo_not_secondOfTwo
+    };
+    RingVector.innerProduct(secondBasis, firstBasis)
+       = firstBasis(NaturalsBelow.secondOfTwo)
+             by RingVector.innerProduct_standardBasisRow_left
+       = (0 : ℤ) by Matrix.standardBasisRow_off;
+    done
+  }
+  as secondFirst;
+  RingVector.innerProduct(secondBasis, secondBasis)
+     = secondBasis(NaturalsBelow.secondOfTwo)
+           by RingVector.innerProduct_standardBasisRow_left
+     = (1 : ℤ) by Matrix.standardBasisRow_at
+  as secondSelf;
+  Matrix.sumOfTwoSquaresForm · v = v by {
+    Matrix.sumOfTwoSquaresForm · v
+       = Matrix.identity(Integer.commutative_ring_bundle, 2) · v
+             by substituting Matrix.sumOfTwoSquaresForm_is_identity
+       = v by Matrix.applyVector_identity;
+    done
+  }
+  as actionReads;
+  Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm, v)
+     = RingVector.innerProduct(v, Matrix.sumOfTwoSquaresForm · v)
+     = RingVector.innerProduct(v, v) by substituting actionReads
+     = RingVector.innerProduct(
+           a • firstBasis + b • secondBasis,
+           a • firstBasis + b • secondBasis)
+     = RingVector.innerProduct(
+           a • firstBasis, a • firstBasis + b • secondBasis)
+       + RingVector.innerProduct(
+           b • secondBasis, a • firstBasis + b • secondBasis)
+           by RingVector.innerProduct_add_left
+     = a * RingVector.innerProduct(
+           firstBasis, a • firstBasis + b • secondBasis)
+       + RingVector.innerProduct(
+           b • secondBasis, a • firstBasis + b • secondBasis)
+           by substituting RingVector.innerProduct_scale_left
+     = a * RingVector.innerProduct(
+           firstBasis, a • firstBasis + b • secondBasis)
+       + b * RingVector.innerProduct(
+           secondBasis, a • firstBasis + b • secondBasis)
+           by substituting RingVector.innerProduct_scale_left
+     = a * (RingVector.innerProduct(firstBasis, a • firstBasis)
+            + RingVector.innerProduct(firstBasis, b • secondBasis))
+       + b * RingVector.innerProduct(
+           secondBasis, a • firstBasis + b • secondBasis)
+           by substituting RingVector.innerProduct_add_right
+     = a * (RingVector.innerProduct(firstBasis, a • firstBasis)
+            + RingVector.innerProduct(firstBasis, b • secondBasis))
+       + b * (RingVector.innerProduct(secondBasis, a • firstBasis)
+              + RingVector.innerProduct(secondBasis, b • secondBasis))
+           by substituting RingVector.innerProduct_add_right
+     = a * (a * RingVector.innerProduct(firstBasis, firstBasis)
+            + RingVector.innerProduct(firstBasis, b • secondBasis))
+       + b * (RingVector.innerProduct(secondBasis, a • firstBasis)
+              + RingVector.innerProduct(secondBasis, b • secondBasis))
+           by substituting RingVector.innerProduct_scale_right
+     = a * (a * RingVector.innerProduct(firstBasis, firstBasis)
+            + b * RingVector.innerProduct(firstBasis, secondBasis))
+       + b * (RingVector.innerProduct(secondBasis, a • firstBasis)
+              + RingVector.innerProduct(secondBasis, b • secondBasis))
+           by substituting RingVector.innerProduct_scale_right
+     = a * (a * RingVector.innerProduct(firstBasis, firstBasis)
+            + b * RingVector.innerProduct(firstBasis, secondBasis))
+       + b * (a * RingVector.innerProduct(secondBasis, firstBasis)
+              + RingVector.innerProduct(secondBasis, b • secondBasis))
+           by substituting RingVector.innerProduct_scale_right
+     = a * (a * RingVector.innerProduct(firstBasis, firstBasis)
+            + b * RingVector.innerProduct(firstBasis, secondBasis))
+       + b * (a * RingVector.innerProduct(secondBasis, firstBasis)
+              + b * RingVector.innerProduct(secondBasis, secondBasis))
+           by substituting RingVector.innerProduct_scale_right
+     = a * (a * 1 + b * RingVector.innerProduct(firstBasis, secondBasis))
+       + b * (a * RingVector.innerProduct(secondBasis, firstBasis)
+              + b * RingVector.innerProduct(secondBasis, secondBasis))
+           by substituting firstSelf
+     = a * (a * 1 + b * 0)
+       + b * (a * RingVector.innerProduct(secondBasis, firstBasis)
+              + b * RingVector.innerProduct(secondBasis, secondBasis))
+           by substituting firstSecond
+     = a * (a * 1 + b * 0)
+       + b * (a * 0
+              + b * RingVector.innerProduct(secondBasis, secondBasis))
+           by substituting secondFirst
+     = a * (a * 1 + b * 0)
+       + b * (a * 0 + b * 1)
+           by substituting secondSelf
+     = a * a + b * b by ring;
+  done
+}
+
+theorem Matrix.sumOfTwoSquaresForm_twoUnits_value
+        : Matrix.quadraticForm(
+            Matrix.sumOfTwoSquaresForm,
+            RingVector.twoCoordinates((1 : ℤ), (1 : ℤ))) = 2 :=
+  by Matrix.sumOfTwoSquaresForm_twoCoordinates_value
+
+theorem Matrix.sumOfThreeSquaresForm_isometric_unitBorderCandidate
+        (a b : ℤ) (aSquareOne : a * a = 1)
+        (bSquareOne : b * b = 1)
+        : Matrix.IsIsometric(
+            Matrix.sumOfThreeSquaresForm,
+            Matrix.sumOfTwoSquaresUnitBorderCandidate(a, b)) := {
+  let v : RingVector(Integer.commutative_ring_bundle, 2) :=
+      RingVector.twoCoordinates(a, b);
+  Matrix.sumOfTwoSquaresForm · v
+     = Matrix.identity(Integer.commutative_ring_bundle, 2) · v
+           by substituting Matrix.sumOfTwoSquaresForm_is_identity
+     = v by Matrix.applyVector_identity
+  as actionReads;
+  Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm, v)
+     = a * a + b * b
+           by Matrix.sumOfTwoSquaresForm_twoCoordinates_value
+     = (1 : ℤ) + b * b by substituting aSquareOne
+     = (1 : ℤ) + 1 by substituting bSquareOne
+     = (2 : ℤ)
+  as valueReads;
+  Matrix.topShear(v)ᵀ * Matrix.sumOfThreeSquaresForm * Matrix.topShear(v)
+     = Matrix.borderedAssembly(
+           Matrix.sumOfTwoSquaresForm,
+           Matrix.sumOfTwoSquaresForm · v,
+           1 + Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm, v))
+           by Matrix.topShear_pullback_diagonalExtension
+     = Matrix.borderedAssembly(
+           Matrix.sumOfTwoSquaresForm, v,
+           1 + Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm, v))
+           by substituting actionReads
+     = Matrix.borderedAssembly(
+           Matrix.sumOfTwoSquaresForm, v, (1 : ℤ) + 2)
+           by substituting valueReads
+     = Matrix.sumOfTwoSquaresUnitBorderCandidate(a, b)
+  as pullbackReads;
+  Matrix.IsInvertible(Matrix.topShear(v))
+      by Matrix.topShear_invertible;
+  Matrix.sumOfTwoSquaresUnitBorderCandidate(a, b)
+      = Matrix.topShear(v)ᵀ
+        * Matrix.sumOfThreeSquaresForm
+        * Matrix.topShear(v)
+      by pullbackReads;
+  witness Matrix.topShear(v) with done
+}
+
+theorem Matrix.sumOfThreeSquaresForm_isometric_twoUnitBorderCandidate
+        : Matrix.IsIsometric(
+            Matrix.sumOfThreeSquaresForm,
+            Matrix.sumOfTwoSquaresTwoUnitBorderCandidate) := {
+  done by Matrix.sumOfThreeSquaresForm_isometric_unitBorderCandidate
+}
+
+theorem Matrix.sumOfTwoSquaresUnitBorderCandidate_truant
+        (a b : ℤ) (aSquareOne : a * a = 1)
+        (bSquareOne : b * b = 1)
+        : Matrix.truant(
+            Matrix.sumOfTwoSquaresUnitBorderCandidate(a, b)) = 7 := {
+  Matrix.IsIsometric(
+      Matrix.sumOfThreeSquaresForm,
+      Matrix.sumOfTwoSquaresUnitBorderCandidate(a, b))
+      by Matrix.sumOfThreeSquaresForm_isometric_unitBorderCandidate
+      as isometric;
+  done by Matrix.isometric_truant_equals(
+      isometric := isometric,
+      isTruant := Matrix.sumOfThreeSquaresForm_truant_seven)
+}
+
+theorem Matrix.sumOfTwoSquaresTwoUnitBorderCandidate_truant
+        : Matrix.truant(
+            Matrix.sumOfTwoSquaresTwoUnitBorderCandidate) = 7 := {
+  done by Matrix.sumOfTwoSquaresUnitBorderCandidate_truant
+}

@@ -101,3 +101,67 @@ theorem Ring.equal_of_linear_combination
        = goalRight + (-goalRight);
     done by Group.cancel_right
 }
+
+-- A square-zero element gives the usual unipotent inverse
+-- (1+x)⁻¹ = 1-x. No commutativity is needed.
+theorem Ring.one_add_square_zero_multiply_inverse
+        (x : carrier) (squareZero : x · x = zero)
+        : (one + x) · (one + (-x)) = one := {
+    x · (one + (-x)) = x · one + x · (-x)
+        by IsRing.distributivity_left as xDistributes;
+    one · (one + (-x)) = one + (-x)
+        by IsRing.multiply_identity_left as oneActs;
+    x · one = x by IsRing.multiply_identity_right as xTimesOne;
+    x · (-x) = -(x · x)
+        by Ring.multiply_negate_right as productNegates;
+    x + zero = x by IsRing.add_identity_right as xAddZero;
+    (-x) + x = zero by IsRing.add_inverse_left as inverseCancels;
+    (one + x) · (one + (-x))
+       = one · (one + (-x)) + x · (one + (-x))
+       = one · (one + (-x)) + (x · one + x · (-x))
+             by substituting xDistributes
+       = (one + (-x)) + (x · one + x · (-x))
+             by substituting oneActs
+       = (one + (-x)) + (x + x · (-x))
+             by substituting xTimesOne
+       = (one + (-x)) + (x + (-(x · x)))
+             by substituting productNegates
+       = (one + (-x)) + (x + (-zero)) by substituting squareZero
+       = (one + (-x)) + (x + zero) by Group.inverse_identity
+       = (one + (-x)) + x by substituting xAddZero
+       = one + ((-x) + x) by IsGroup.associativity
+       = one + zero by substituting inverseCancels
+       = one by IsRing.add_identity_right;
+    done
+}
+
+theorem Ring.one_add_square_zero_inverse_multiply
+        (x : carrier) (squareZero : x · x = zero)
+        : (one + (-x)) · (one + x) = one := {
+    (-x) · (one + x) = (-x) · one + (-x) · x
+        by IsRing.distributivity_left as negateDistributes;
+    one · (one + x) = one + x
+        by IsRing.multiply_identity_left as oneActs;
+    (-x) · one = -x by IsRing.multiply_identity_right as negateTimesOne;
+    (-x) · x = -(x · x)
+        by Ring.multiply_negate_left as productNegates;
+    (-x) + zero = -x by IsRing.add_identity_right as negateAddZero;
+    x + (-x) = zero by IsRing.add_inverse_right as inverseCancels;
+    (one + (-x)) · (one + x)
+       = one · (one + x) + (-x) · (one + x)
+       = one · (one + x) + ((-x) · one + (-x) · x)
+             by substituting negateDistributes
+       = (one + x) + ((-x) · one + (-x) · x)
+             by substituting oneActs
+       = (one + x) + ((-x) + (-x) · x)
+             by substituting negateTimesOne
+       = (one + x) + ((-x) + (-(x · x)))
+             by substituting productNegates
+       = (one + x) + ((-x) + (-zero)) by substituting squareZero
+       = (one + x) + ((-x) + zero) by Group.inverse_identity
+       = (one + x) + (-x) by substituting negateAddZero
+       = one + (x + (-x)) by IsGroup.associativity
+       = one + zero by substituting inverseCancels
+       = one by IsRing.add_identity_right;
+    done
+}

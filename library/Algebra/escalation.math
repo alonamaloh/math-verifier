@@ -107,6 +107,97 @@ theorem Matrix.outerProduct_transpose {r : CommutativeRing} {rows columns : ℕ}
   done by Matrix.equal_of_entries
 }
 
+theorem Matrix.multiply_outerProduct {r : CommutativeRing}
+        {rows middle columns : ℕ}
+        (A : Matrix(r, rows, middle))
+        (u : RingVector(r, middle)) (v : RingVector(r, columns))
+        : A * Matrix.outerProduct(u, v)
+          = Matrix.outerProduct(A · u, v) := {
+  ∀ (i : NaturalsBelow(rows)). ∀ (j : NaturalsBelow(columns)).
+      (A * Matrix.outerProduct(u, v))(i, j)
+      = Matrix.outerProduct(A · u, v)(i, j)
+      by (i : NaturalsBelow(rows)) (j : NaturalsBelow(columns)) ↦ {
+          (A * Matrix.outerProduct(u, v))(i, j)
+             = CommutativeRing.sumOver(
+                   (k : NaturalsBelow(middle)) ↦
+                       A(i, k) * (u(k) * v(j)),
+                   NaturalsBelow.enumerate(middle))
+             = CommutativeRing.sumOver(
+                   (k : NaturalsBelow(middle)) ↦
+                       (A(i, k) * u(k)) * v(j),
+                   NaturalsBelow.enumerate(middle))
+                   by ((k : NaturalsBelow(middle)) ↦ ring)
+             = CommutativeRing.sumOver(
+                   (k : NaturalsBelow(middle)) ↦ A(i, k) * u(k),
+                   NaturalsBelow.enumerate(middle)) * v(j)
+                   by CommutativeRing.sumOver_scale_right
+             = (A · u)(i) * v(j)
+             = Matrix.outerProduct(A · u, v)(i, j);
+          done
+        };
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.outerProduct_multiply {r : CommutativeRing}
+        {rows middle columns : ℕ}
+        (u : RingVector(r, rows)) (v : RingVector(r, middle))
+        (A : Matrix(r, middle, columns))
+        : Matrix.outerProduct(u, v) * A
+          = Matrix.outerProduct(u, Aᵀ · v) := {
+  ∀ (i : NaturalsBelow(rows)). ∀ (j : NaturalsBelow(columns)).
+      (Matrix.outerProduct(u, v) * A)(i, j)
+      = Matrix.outerProduct(u, Aᵀ · v)(i, j)
+      by (i : NaturalsBelow(rows)) (j : NaturalsBelow(columns)) ↦ {
+          (Matrix.outerProduct(u, v) * A)(i, j)
+             = CommutativeRing.sumOver(
+                   (k : NaturalsBelow(middle)) ↦
+                       (u(i) * v(k)) * A(k, j),
+                   NaturalsBelow.enumerate(middle))
+             = CommutativeRing.sumOver(
+                   (k : NaturalsBelow(middle)) ↦
+                       u(i) * (Aᵀ(j, k) * v(k)),
+                   NaturalsBelow.enumerate(middle))
+                   by ((k : NaturalsBelow(middle)) ↦ ring)
+             = u(i) * CommutativeRing.sumOver(
+                   (k : NaturalsBelow(middle)) ↦ Aᵀ(j, k) * v(k),
+                   NaturalsBelow.enumerate(middle))
+                   by CommutativeRing.sumOver_scale_left
+             = u(i) * (Aᵀ · v)(j)
+             = Matrix.outerProduct(u, Aᵀ · v)(i, j);
+          done
+        };
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.outerProduct_multiply_outerProduct {r : CommutativeRing}
+        {rows middle columns : ℕ}
+        (u : RingVector(r, rows)) (v w : RingVector(r, middle))
+        (z : RingVector(r, columns))
+        : Matrix.outerProduct(u, v) * Matrix.outerProduct(w, z)
+          = RingVector.innerProduct(v, w) • Matrix.outerProduct(u, z) := {
+  ∀ (i : NaturalsBelow(rows)). ∀ (j : NaturalsBelow(columns)).
+      (Matrix.outerProduct(u, v) * Matrix.outerProduct(w, z))(i, j)
+      = (RingVector.innerProduct(v, w) • Matrix.outerProduct(u, z))(i, j)
+      by (i : NaturalsBelow(rows)) (j : NaturalsBelow(columns)) ↦ {
+          (Matrix.outerProduct(u, v) * Matrix.outerProduct(w, z))(i, j)
+             = CommutativeRing.sumOver(
+                   (k : NaturalsBelow(middle)) ↦
+                       (u(i) * v(k)) * (w(k) * z(j)),
+                   NaturalsBelow.enumerate(middle))
+             = CommutativeRing.sumOver(
+                   (k : NaturalsBelow(middle)) ↦
+                       (v(k) * w(k)) * (u(i) * z(j)),
+                   NaturalsBelow.enumerate(middle))
+                   by ((k : NaturalsBelow(middle)) ↦ ring)
+             = RingVector.innerProduct(v, w) * (u(i) * z(j))
+                   by CommutativeRing.sumOver_scale_right
+             = (RingVector.innerProduct(v, w)
+                • Matrix.outerProduct(u, z))(i, j);
+          done
+        };
+  done by Matrix.equal_of_entries
+}
+
 theorem Matrix.borderedAssembly_block_entry {r : CommutativeRing} {n : ℕ}
         (A : Matrix(r, n, n)) (b : RingVector(r, n))
         (c : CommutativeRing.carrier(r))
