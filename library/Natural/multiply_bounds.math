@@ -240,6 +240,102 @@ theorem Natural.positive_below_seven (m : ℕ) (positive : m ≥ 1) (bound : m <
   }
 }
 
+-- A strict bound by a successor splits at its predecessor. This keeps the
+-- longer finite positive-range enumerations below from repeating the
+-- impossible upper branch of trichotomy at every step.
+theorem Natural.below_successor_or_equal (m k : ℕ) (bound : m < k + 1)
+        : m < k ∨ m = k := {
+  m < k ∨ m = k ∨ k < m by Natural.lt_trichotomy;
+  done by cases {
+    case m < k: done
+    case m = k: done
+    case k < m: {
+        k + 1 ≤ m;
+        m < k + 1 ≤ m;
+        False by Natural.lt_irreflexive;
+        done
+      }
+  }
+}
+
+-- Every positive value below 14 is one of 1 through 13.
+theorem Natural.positive_below_fourteen
+        (m : ℕ) (positive : m ≥ 1) (bound : m < 14)
+        : m = 1 ∨ m = 2 ∨ m = 3 ∨ m = 4 ∨ m = 5 ∨ m = 6
+          ∨ m = 7 ∨ m = 8 ∨ m = 9 ∨ m = 10 ∨ m = 11 ∨ m = 12
+          ∨ m = 13 := {
+  m < 13 ∨ m = 13 by Natural.below_successor_or_equal;
+  done by cases {
+    case m < 13: {
+        m < 12 ∨ m = 12 by Natural.below_successor_or_equal;
+        done by cases {
+          case m < 12: {
+              m < 11 ∨ m = 11 by Natural.below_successor_or_equal;
+              done by cases {
+                case m < 11: {
+                    m < 10 ∨ m = 10 by Natural.below_successor_or_equal;
+                    done by cases {
+                      case m < 10: {
+                          m < 9 ∨ m = 9 by Natural.below_successor_or_equal;
+                          done by cases {
+                            case m < 9: {
+                                m < 8 ∨ m = 8
+                                    by Natural.below_successor_or_equal;
+                                done by cases {
+                                  case m < 8: {
+                                      m < 7 ∨ m = 7
+                                          by Natural.below_successor_or_equal;
+                                      done by cases {
+                                        case m < 7: {
+                                            m = 1 ∨ m = 2 ∨ m = 3
+                                              ∨ m = 4 ∨ m = 5 ∨ m = 6
+                                                by Natural.positive_below_seven;
+                                            done by cases {
+                                              case m = 1: done
+                                              case m = 2 ∨ m = 3 ∨ m = 4
+                                                  ∨ m = 5 ∨ m = 6:
+                                                done by cases {
+                                                  case m = 2: done
+                                                  case m = 3 ∨ m = 4
+                                                      ∨ m = 5 ∨ m = 6:
+                                                    done by cases {
+                                                      case m = 3: done
+                                                      case m = 4 ∨ m = 5
+                                                          ∨ m = 6:
+                                                        done by cases {
+                                                          case m = 4: done
+                                                          case m = 5 ∨ m = 6:
+                                                            done by cases {
+                                                              case m = 5: done
+                                                              case m = 6: done
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                          }
+                                        case m = 7: done
+                                      }
+                                    }
+                                  case m = 8: done
+                                }
+                              }
+                            case m = 9: done
+                          }
+                        }
+                      case m = 10: done
+                    }
+                  }
+                case m = 11: done
+              }
+            }
+          case m = 12: done
+        }
+      }
+    case m = 13: done
+  }
+}
+
 -- A square below 2 has root 0 or 1: any root of at least 2 squares to at
 -- least 4.
 theorem Natural.square_below_two (m : ℕ) (bound : m * m < 2) : m = 0 ∨ m = 1 := {
@@ -380,6 +476,57 @@ theorem Natural.square_below_ten (m : ℕ) (bound : m * m < 10)
               ≤ m * m by Natural.multiply_monotone_left;
         m * m < 10 < 4 * 4 ≤ m * m;
         False;
+        done
+      }
+  }
+}
+
+-- A square strictly below 16 has root 0, 1, 2, or 3.
+theorem Natural.square_below_sixteen (m : ℕ) (bound : m * m < 16)
+        : m = 0 ∨ m = 1 ∨ m = 2 ∨ m = 3 := {
+  m < 4 ∨ m = 4 ∨ 4 < m by Natural.lt_trichotomy;
+  done by cases {
+    case m < 4 as belowFour: {
+        m < 3 ∨ m = 3 ∨ 3 < m by Natural.lt_trichotomy;
+        done by cases {
+          case m < 3: {
+              m < 2 ∨ m = 2 ∨ 2 < m by Natural.lt_trichotomy;
+              done by cases {
+                case m < 2: {
+                    m = 0 ∨ m = 1 by Natural.below_two;
+                    done by cases {
+                      case m = 0: done
+                      case m = 1: done
+                    }
+                  }
+                case m = 2: done
+                case 2 < m: {
+                    3 ≤ m;
+                    m < 3 ≤ m;
+                    False by Natural.lt_irreflexive;
+                    done
+                  }
+              }
+            }
+          case m = 3: done
+          case 3 < m: {
+              4 ≤ m;
+              m < 4 ≤ m;
+              False by Natural.lt_irreflexive;
+              done
+            }
+        }
+      }
+    case m = 4 ∨ 4 < m: {
+        4 ≤ m by cases {
+            case m = 4: done
+            case 4 < m: done
+          };
+        4 * 4 ≤ 4 * m by Natural.multiply_monotone_left
+              = m * 4
+              ≤ m * m by Natural.multiply_monotone_left;
+        m * m < 16 = 4 * 4 ≤ m * m;
+        False by Natural.lt_irreflexive;
         done
       }
   }
@@ -660,6 +807,252 @@ theorem Natural.seven_not_sum_of_two_squares (m n : ℕ)
           }
       }
   }
+}
+
+-- Neither 12 nor 14 is a sum of two squares. In either case both roots
+-- square below 16, so the sixteen possible pairs can be checked directly.
+theorem Natural.twelve_or_fourteen_not_sum_of_two_squares
+        (m n target : ℕ) (targetCase : target = 12 ∨ target = 14)
+        : ¬(m * m + n * n = target) := {
+  suppose m * m + n * n = target as sumReads;
+  target < 16 by cases {
+      case target = 12: done
+      case target = 14: done
+    };
+  m * m ≤ m * m + n * n = target < 16;
+  n * n ≤ n * n + m * m
+      = m * m + n * n by Natural.add_commutative
+      = target < 16;
+  m = 0 ∨ m = 1 ∨ m = 2 ∨ m = 3 by Natural.square_below_sixteen;
+  n = 0 ∨ n = 1 ∨ n = 2 ∨ n = 3 by Natural.square_below_sixteen;
+  done by cases {
+    case m = 0: done by cases {
+        case n = 0: {
+            target = 0 * 0 + 0 * 0 by substituting sumReads;
+            done by cases {
+              case target = 12: {
+                  12 = target = 0 * 0 + 0 * 0 = 0;
+                  done
+                }
+              case target = 14: {
+                  14 = target = 0 * 0 + 0 * 0 = 0;
+                  done
+                }
+            }
+          }
+        case n = 1: {
+            target = 0 * 0 + 1 * 1 by substituting sumReads;
+            done by cases {
+              case target = 12: {
+                  12 = target = 0 * 0 + 1 * 1 = 1;
+                  done
+                }
+              case target = 14: {
+                  14 = target = 0 * 0 + 1 * 1 = 1;
+                  done
+                }
+            }
+          }
+        case n = 2: {
+            target = 0 * 0 + 2 * 2 by substituting sumReads;
+            done by cases {
+              case target = 12: {
+                  12 = target = 0 * 0 + 2 * 2 = 4;
+                  done
+                }
+              case target = 14: {
+                  14 = target = 0 * 0 + 2 * 2 = 4;
+                  done
+                }
+            }
+          }
+        case n = 3: {
+            target = 0 * 0 + 3 * 3 by substituting sumReads;
+            done by cases {
+              case target = 12: {
+                  12 = target = 0 * 0 + 3 * 3 = 9;
+                  done
+                }
+              case target = 14: {
+                  14 = target = 0 * 0 + 3 * 3 = 9;
+                  done
+                }
+            }
+          }
+      }
+    case m = 1: done by cases {
+        case n = 0: {
+            target = 1 * 1 + 0 * 0 by substituting sumReads;
+            done by cases {
+              case target = 12: {
+                  12 = target = 1 * 1 + 0 * 0 = 1;
+                  done
+                }
+              case target = 14: {
+                  14 = target = 1 * 1 + 0 * 0 = 1;
+                  done
+                }
+            }
+          }
+        case n = 1: {
+            target = 1 * 1 + 1 * 1 by substituting sumReads;
+            done by cases {
+              case target = 12: {
+                  12 = target = 1 * 1 + 1 * 1 = 2;
+                  done
+                }
+              case target = 14: {
+                  14 = target = 1 * 1 + 1 * 1 = 2;
+                  done
+                }
+            }
+          }
+        case n = 2: {
+            target = 1 * 1 + 2 * 2 by substituting sumReads;
+            done by cases {
+              case target = 12: {
+                  12 = target = 1 * 1 + 2 * 2 = 5;
+                  done
+                }
+              case target = 14: {
+                  14 = target = 1 * 1 + 2 * 2 = 5;
+                  done
+                }
+            }
+          }
+        case n = 3: {
+            target = 1 * 1 + 3 * 3 by substituting sumReads;
+            done by cases {
+              case target = 12: {
+                  12 = target = 1 * 1 + 3 * 3 = 10;
+                  done
+                }
+              case target = 14: {
+                  14 = target = 1 * 1 + 3 * 3 = 10;
+                  done
+                }
+            }
+          }
+      }
+    case m = 2: done by cases {
+        case n = 0: {
+            target = 2 * 2 + 0 * 0 by substituting sumReads;
+            done by cases {
+              case target = 12: {
+                  12 = target = 2 * 2 + 0 * 0 = 4;
+                  done
+                }
+              case target = 14: {
+                  14 = target = 2 * 2 + 0 * 0 = 4;
+                  done
+                }
+            }
+          }
+        case n = 1: {
+            target = 2 * 2 + 1 * 1 by substituting sumReads;
+            done by cases {
+              case target = 12: {
+                  12 = target = 2 * 2 + 1 * 1 = 5;
+                  done
+                }
+              case target = 14: {
+                  14 = target = 2 * 2 + 1 * 1 = 5;
+                  done
+                }
+            }
+          }
+        case n = 2: {
+            target = 2 * 2 + 2 * 2 by substituting sumReads;
+            done by cases {
+              case target = 12: {
+                  12 = target = 2 * 2 + 2 * 2 = 8;
+                  done
+                }
+              case target = 14: {
+                  14 = target = 2 * 2 + 2 * 2 = 8;
+                  done
+                }
+            }
+          }
+        case n = 3: {
+            target = 2 * 2 + 3 * 3 by substituting sumReads;
+            done by cases {
+              case target = 12: {
+                  12 = target = 2 * 2 + 3 * 3 = 13;
+                  done
+                }
+              case target = 14: {
+                  14 = target = 2 * 2 + 3 * 3 = 13;
+                  done
+                }
+            }
+          }
+      }
+    case m = 3: done by cases {
+        case n = 0: {
+            target = 3 * 3 + 0 * 0 by substituting sumReads;
+            done by cases {
+              case target = 12: {
+                  12 = target = 3 * 3 + 0 * 0 = 9;
+                  done
+                }
+              case target = 14: {
+                  14 = target = 3 * 3 + 0 * 0 = 9;
+                  done
+                }
+            }
+          }
+        case n = 1: {
+            target = 3 * 3 + 1 * 1 by substituting sumReads;
+            done by cases {
+              case target = 12: {
+                  12 = target = 3 * 3 + 1 * 1 = 10;
+                  done
+                }
+              case target = 14: {
+                  14 = target = 3 * 3 + 1 * 1 = 10;
+                  done
+                }
+            }
+          }
+        case n = 2: {
+            target = 3 * 3 + 2 * 2 by substituting sumReads;
+            done by cases {
+              case target = 12: {
+                  12 = target = 3 * 3 + 2 * 2 = 13;
+                  done
+                }
+              case target = 14: {
+                  14 = target = 3 * 3 + 2 * 2 = 13;
+                  done
+                }
+            }
+          }
+        case n = 3: {
+            target = 3 * 3 + 3 * 3 by substituting sumReads;
+            done by cases {
+              case target = 12: {
+                  12 = target = 3 * 3 + 3 * 3 = 18;
+                  done
+                }
+              case target = 14: {
+                  14 = target = 3 * 3 + 3 * 3 = 18;
+                  done
+                }
+            }
+          }
+      }
+  }
+}
+
+theorem Natural.twelve_not_sum_of_two_squares (m n : ℕ)
+        : ¬(m * m + n * n = 12) := {
+  done by Natural.twelve_or_fourteen_not_sum_of_two_squares
+}
+
+theorem Natural.fourteen_not_sum_of_two_squares (m n : ℕ)
+        : ¬(m * m + n * n = 14) := {
+  done by Natural.twelve_or_fourteen_not_sum_of_two_squares
 }
 
 -- 5 is not of the form m² + 2n²: both roots are below 3, and the nine

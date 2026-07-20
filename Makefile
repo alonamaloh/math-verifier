@@ -263,6 +263,10 @@ CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
 # leaks; x²+y²+3z² has exact truant 6 and the sum-of-three-squares
 # representative has exact truant 7; all four two-unit-border candidates
 # are connected to the latter by the generic integral top shear.
+# 2026-07-20: 397 → 397. The same module now proves x²+y²+2z² has exact
+# truant 14 and connects every one-unit-border candidate to it through one
+# parameterized top-shear isometry. All nine borders over x²+y² are thereby
+# classified, with no new residual leaks.
 CLEAN_LEAK_BUDGET ?= 397
 # Second, independent axis: user-written `⟨…⟩` over a logical connective
 # (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the
