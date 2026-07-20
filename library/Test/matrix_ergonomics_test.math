@@ -1,0 +1,281 @@
+-- Baseline probes for PLAN_MATRIX_ERGONOMICS.md.
+--
+-- These declarations deliberately separate three layers:
+--   * symbolic noncommutative ring bookkeeping;
+--   * equality at the bordered-matrix boundary; and
+--   * closed 3×3 witnesses assembled from existing matrix constructors.
+--
+-- Keep their statements stable. Later stages may shorten the proof bodies,
+-- but must compare the elaborated declarations before accepting a refactor.
+
+module Test.matrix_ergonomics_test
+
+import Algebra.rank_three_truants
+
+-- ----------------------------------------------------------------------
+-- M0.1: unconditional noncommutative expansion.
+--
+-- This already closes with the abstract-ring fallback of `ring`: ordered
+-- products are retained, while addition is collected commutatively.
+
+theorem Test.matrix_ordered_word_expansion
+        {r : CommutativeRing} {n : ℕ}
+        (T D N : Matrix(r, n, n))
+        : ((Matrix.identity(r, n) + T) * D)
+            * (Matrix.identity(r, n) + N)
+          = (D + T * D) + (D * N + (T * D) * N) := {
+  ((Matrix.identity(r, n) + T) * D)
+      * (Matrix.identity(r, n) + N)
+     = (Matrix.identity(r, n) * D + T * D)
+         * (Matrix.identity(r, n) + N)
+           by substituting Matrix.distributivity_right
+     = (D + T * D) * (Matrix.identity(r, n) + N)
+           by substituting Matrix.one_multiply
+     = (D + T * D) * Matrix.identity(r, n)
+         + (D + T * D) * N
+           by Matrix.distributivity_left
+     = (D + T * D) + (D + T * D) * N
+           by substituting Matrix.multiply_one
+     = (D + T * D) + (D * N + (T * D) * N)
+           by substituting Matrix.distributivity_right
+}
+
+-- ----------------------------------------------------------------------
+-- M0.2: a supplied square-zero relation.
+--
+-- The existing generic ring lemma packages the expansion and substitution,
+-- but `ring` itself does not consume hypotheses as monomial rewrite rules.
+
+theorem Test.matrix_square_zero_inverse_right_baseline
+        {r : CommutativeRing} {n : ℕ}
+        (N : Matrix(r, n, n))
+        (squareZero : N * N = Matrix.zero(r, n, n))
+        : (Matrix.identity(r, n) + N)
+            * (Matrix.identity(r, n) + Matrix.negate(N))
+          = Matrix.identity(r, n) := {
+  IsRing(
+      Matrix(r, n, n), Matrix.add, Matrix.zero(r, n, n),
+      Matrix.negate, Matrix.multiply, Matrix.identity(r, n))
+      by Matrix.is_ring;
+  done by Ring.one_add_square_zero_multiply_inverse
+}
+
+theorem Test.matrix_square_zero_inverse_left_baseline
+        {r : CommutativeRing} {n : ℕ}
+        (N : Matrix(r, n, n))
+        (squareZero : N * N = Matrix.zero(r, n, n))
+        : (Matrix.identity(r, n) + Matrix.negate(N))
+            * (Matrix.identity(r, n) + N)
+          = Matrix.identity(r, n) := {
+  IsRing(
+      Matrix(r, n, n), Matrix.add, Matrix.zero(r, n, n),
+      Matrix.negate, Matrix.multiply, Matrix.identity(r, n))
+      by Matrix.is_ring;
+  done by Ring.one_add_square_zero_inverse_multiply
+}
+
+-- ----------------------------------------------------------------------
+-- M0.3: current block-equality proof.
+--
+-- This is the control body M1 should replace. Even with symmetry eliminating
+-- one independent border, equality currently descends to four entry regions.
+
+theorem Test.symmetric_bordered_equal_baseline
+        {r : CommutativeRing} {n : ℕ}
+        (B C : Matrix(r, 1 + n, 1 + n))
+        (symmetricB : Matrix.IsSymmetric(B))
+        (symmetricC : Matrix.IsSymmetric(C))
+        (blocks : Matrix.leadingBlock(B) = Matrix.leadingBlock(C))
+        (borders : Matrix.borderColumn(B) = Matrix.borderColumn(C))
+        (corners : Matrix.corner(B) = Matrix.corner(C))
+        : B = C := {
+  ∀ (p : NaturalsBelow(1 + n)). ∀ (q : NaturalsBelow(1 + n)).
+      B(p, q) = C(p, q)
+      by (p : NaturalsBelow(1 + n))
+         (q : NaturalsBelow(1 + n)) ↦ {
+          (∃ (i : NaturalsBelow(n)).
+              p = NaturalsBelow.inclusion(n, i))
+            ∨ p = NaturalsBelow.top(n)
+            by NaturalsBelow.inclusion_or_top;
+          done by cases {
+            case ∃ (i : NaturalsBelow(n)).
+                p = NaturalsBelow.inclusion(n, i): {
+                choose i such that
+                    p = NaturalsBelow.inclusion(n, i) as pReads;
+                (∃ (j : NaturalsBelow(n)).
+                    q = NaturalsBelow.inclusion(n, j))
+                  ∨ q = NaturalsBelow.top(n)
+                  by NaturalsBelow.inclusion_or_top;
+                done by cases {
+                  case ∃ (j : NaturalsBelow(n)).
+                      q = NaturalsBelow.inclusion(n, j): {
+                      choose j such that
+                          q = NaturalsBelow.inclusion(n, j) as qReads;
+                      B(p, q)
+                         = B(NaturalsBelow.inclusion(n, i), q)
+                               by substituting pReads
+                         = B(NaturalsBelow.inclusion(n, i),
+                             NaturalsBelow.inclusion(n, j))
+                               by substituting qReads
+                         = Matrix.leadingBlock(B)(i, j)
+                         = Matrix.leadingBlock(C)(i, j)
+                               by substituting blocks
+                         = C(NaturalsBelow.inclusion(n, i),
+                             NaturalsBelow.inclusion(n, j))
+                         = C(p, NaturalsBelow.inclusion(n, j))
+                               by substituting pReads
+                         = C(p, q) by substituting qReads;
+                      done
+                    }
+                  case q = NaturalsBelow.top(n) as qReads: {
+                      B(p, q)
+                         = B(NaturalsBelow.inclusion(n, i), q)
+                               by substituting pReads
+                         = B(NaturalsBelow.inclusion(n, i),
+                             NaturalsBelow.top(n))
+                               by substituting qReads
+                         = Matrix.borderColumn(B)(i)
+                         = Matrix.borderColumn(C)(i)
+                               by substituting borders
+                         = C(NaturalsBelow.inclusion(n, i),
+                             NaturalsBelow.top(n))
+                         = C(p, NaturalsBelow.top(n))
+                               by substituting pReads
+                         = C(p, q) by substituting qReads;
+                      done
+                    }
+                }
+              }
+            case p = NaturalsBelow.top(n) as pReads: {
+                (∃ (j : NaturalsBelow(n)).
+                    q = NaturalsBelow.inclusion(n, j))
+                  ∨ q = NaturalsBelow.top(n)
+                  by NaturalsBelow.inclusion_or_top;
+                done by cases {
+                  case ∃ (j : NaturalsBelow(n)).
+                      q = NaturalsBelow.inclusion(n, j): {
+                      choose j such that
+                          q = NaturalsBelow.inclusion(n, j) as qReads;
+                      B(p, q)
+                         = B(NaturalsBelow.top(n), q)
+                               by substituting pReads
+                         = B(NaturalsBelow.top(n),
+                             NaturalsBelow.inclusion(n, j))
+                               by substituting qReads
+                         = Bᵀ(NaturalsBelow.inclusion(n, j),
+                             NaturalsBelow.top(n))
+                         = B(NaturalsBelow.inclusion(n, j),
+                             NaturalsBelow.top(n))
+                               by substituting symmetricB
+                         = Matrix.borderColumn(B)(j)
+                         = Matrix.borderColumn(C)(j)
+                               by substituting borders
+                         = C(NaturalsBelow.inclusion(n, j),
+                             NaturalsBelow.top(n))
+                         = Cᵀ(NaturalsBelow.inclusion(n, j),
+                             NaturalsBelow.top(n))
+                               by substituting symmetricC
+                         = C(NaturalsBelow.top(n),
+                             NaturalsBelow.inclusion(n, j))
+                         = C(p, NaturalsBelow.inclusion(n, j))
+                               by substituting pReads
+                         = C(p, q) by substituting qReads;
+                      done
+                    }
+                  case q = NaturalsBelow.top(n) as qReads: {
+                      B(p, q)
+                         = B(NaturalsBelow.top(n), q)
+                               by substituting pReads
+                         = B(NaturalsBelow.top(n),
+                             NaturalsBelow.top(n))
+                               by substituting qReads
+                         = Matrix.corner(B)
+                         = Matrix.corner(C) by substituting corners
+                         = C(NaturalsBelow.top(n),
+                             NaturalsBelow.top(n))
+                         = C(p, NaturalsBelow.top(n))
+                               by substituting pReads
+                         = C(p, q) by substituting qReads;
+                      done
+                    }
+                }
+              }
+          }
+        };
+  done by Matrix.equal_of_entries
+}
+
+-- ----------------------------------------------------------------------
+-- M0.4–5: one closed 3×3 inverse and pullback.
+--
+-- The vector e₀ gives an explicit integral top shear. Today its product is
+-- proved structurally from square-zero, and its pullback uses the generic
+-- shear theorem; neither is verified by reducing the nine scalar entries.
+
+definition Test.matrixErgonomicsVector
+        : RingVector(Integer.commutative_ring_bundle, 2) :=
+  Matrix.standardBasisRow(
+      Integer.commutative_ring_bundle, 2, NaturalsBelow.firstOfTwo)
+
+definition Test.matrixErgonomicsOffset
+        : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2) :=
+  Matrix.outerProduct(
+      RingVector.extend(Test.matrixErgonomicsVector),
+      Matrix.standardBasisRow(
+          Integer.commutative_ring_bundle, 1 + 2, NaturalsBelow.top(2)))
+
+definition Test.matrixErgonomicsShear
+        : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2) :=
+  Matrix.identity(Integer.commutative_ring_bundle, 1 + 2)
+    + Test.matrixErgonomicsOffset
+
+definition Test.matrixErgonomicsShearInverse
+        : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2) :=
+  Matrix.identity(Integer.commutative_ring_bundle, 1 + 2)
+    + Matrix.negate(Test.matrixErgonomicsOffset)
+
+theorem Test.matrix_ergonomics_offset_square_zero
+        : Test.matrixErgonomicsOffset * Test.matrixErgonomicsOffset
+          = Matrix.zero(Integer.commutative_ring_bundle, 1 + 2, 1 + 2) := {
+  done by Matrix.topShear_offset_square_zero
+}
+
+theorem Test.matrix_concrete_three_by_three_product_baseline
+        : Test.matrixErgonomicsShear
+            * Test.matrixErgonomicsShearInverse
+          = Matrix.identity(Integer.commutative_ring_bundle, 1 + 2) := {
+  done by Test.matrix_square_zero_inverse_right_baseline(
+      squareZero := Test.matrix_ergonomics_offset_square_zero)
+}
+
+theorem Test.matrix_concrete_three_by_three_inverse_baseline
+        : Matrix.IsInvertible(Test.matrixErgonomicsShear) := {
+  Test.matrixErgonomicsShear
+      * Test.matrixErgonomicsShearInverse
+      = Matrix.identity(Integer.commutative_ring_bundle, 1 + 2)
+      by Test.matrix_concrete_three_by_three_product_baseline
+      as rightInverse;
+  Test.matrixErgonomicsShearInverse
+      * Test.matrixErgonomicsShear
+      = Matrix.identity(Integer.commutative_ring_bundle, 1 + 2)
+      by Test.matrix_square_zero_inverse_left_baseline(
+          squareZero := Test.matrix_ergonomics_offset_square_zero)
+      as leftInverse;
+  witness Test.matrixErgonomicsShearInverse with
+      done by And.introduction(rightInverse, leftInverse)
+}
+
+theorem Test.matrix_concrete_three_by_three_pullback_baseline
+        : Matrix.topShear(Test.matrixErgonomicsVector)ᵀ
+            * Matrix.diagonalExtension(
+                Matrix.sumOfTwoSquaresForm, (2 : ℤ))
+            * Matrix.topShear(Test.matrixErgonomicsVector)
+          = Matrix.borderedAssembly(
+              Matrix.sumOfTwoSquaresForm,
+              Matrix.sumOfTwoSquaresForm · Test.matrixErgonomicsVector,
+              (2 : ℤ) + Matrix.quadraticForm(
+                  Matrix.sumOfTwoSquaresForm,
+                  Test.matrixErgonomicsVector)) := {
+  done by Matrix.topShear_pullback_diagonalExtension(
+      symmetric := Matrix.sumOfTwoSquaresForm_symmetric)
+}

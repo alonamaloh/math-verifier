@@ -170,7 +170,7 @@ TEST_MATHV_IFACE_FILES := $(TEST_MATHV_FILES:.mathv=.mathv.iface)
 library: $(LIBRARY_MATHV_FILES) $(LIBRARY_MATHV_IFACE_FILES)
 
 tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES) checker-tests \
-	carrier-normal-form-check
+	carrier-normal-form-check matrix-ergonomics-statement-check
 
 # ----------------------------------------------------------------------
 # The clean set (see docs/CLEAN_STYLE_PLAN.md). `scripts/clean_manifest.txt`
@@ -304,7 +304,10 @@ checker-tests: library $(TEST_MATHV_FILES)
 carrier-normal-form-check: $(BUILD_DIR)/library/Test/expected_carrier_propagation_test.mathv
 	@bash scripts/check_carrier_normal_form.sh ./kernel $<
 
-.PHONY: carrier-normal-form-check
+matrix-ergonomics-statement-check: $(BUILD_DIR)/library/Test/matrix_ergonomics_test.mathv
+	@bash scripts/check_matrix_ergonomics_statements.sh ./kernel $<
+
+.PHONY: carrier-normal-form-check matrix-ergonomics-statement-check
 
 # B3.4 — morphism-packet audit: re-verify the audit surface module
 # (which imports every packet-lemma home) with the audit flag on and
