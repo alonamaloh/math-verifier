@@ -754,7 +754,8 @@ ExpressionPointer Elaborator::assembleLinearCombination(
 ExpressionPointer Elaborator::elaborateRing(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line, int column) {
+        int line, int column,
+        RingInvocation invocation) {
         Frame frame(*this, "ring at line " + std::to_string(line),
                     localBinders, expectedType, line, column);
         if (!expectedType) {
@@ -770,7 +771,7 @@ ExpressionPointer Elaborator::elaborateRing(
         // fingerprinted as an opaque atom and the goal misreported as FALSE.
         // The unfolded type is ζ-equal to the original, so the returned
         // proof still discharges the stated goal (checked up to defeq).
-        // Mirrors proveAbstractRingAC's endpoint unfolding.
+        // Mirrors proveOrderedRingEquality's endpoint unfolding.
         expectedType = zetaUnfoldLetBinders(expectedType, localBinders);
         // Pre-check the goal IS an equality, while the local binders are
         // at hand for a readable print (the generic extractor below only
@@ -828,7 +829,7 @@ ExpressionPointer Elaborator::elaborateRing(
                         leftNorm.term),
                     rightNorm.term);
                 ExpressionPointer proof = elaborateRing(
-                    localBinders, pushedGoal, line, column);
+                    localBinders, pushedGoal, line, column, invocation);
                 ExpressionPointer leftCursor = leftNorm.term;
                 if (leftNorm.proof) {
                     proof = buildEqualityTransitivity(
@@ -858,28 +859,30 @@ ExpressionPointer Elaborator::elaborateRing(
             }
         }
         std::string carrierName = headConstantName(goal.carrierType);
-        // Abstract plain-`Ring.carrier(s)` carrier (fingerprint plan Phase
-        // 2). The registered-carrier normaliser below needs multiplicative
-        // commutativity (which a general `Ring` lacks) and keys its
-        // fingerprint on `<carrier>.add/.multiply` names that don't exist
-        // for this projection — so it would wrongly declare the goal false.
-        // Route to the non-commutative AC normaliser, which proves the
-        // associativity/`+`-commutativity rearrangements that hold in EVERY
-        // ring. (Distributivity and `·`-commutativity still need a
-        // CommutativeRing carrier or an explicit proof.)
-        if (carrierName == "Ring.carrier") {
-            ExpressionPointer proof = proveAbstractRingAC(
-                localBinders, goal.leftEndpoint, goal.rightEndpoint,
-                goal.carrierType, goal.carrierUniverseLevel, line);
-            if (proof) return proof;
+        // Prefer the structure-driven ordered normaliser whenever the
+        // carrier exposes an abstract Ring view. Besides Ring.carrier(s),
+        // the explicit tactic may resolve surface carriers such as square
+        // matrices through Matrix.ring(c,n). This must run before the
+        // commutative fingerprint path: the base scalar bundle of a matrix
+        // is commutative, but matrix multiplication is not.
+        OrderedRingAttempt orderedAttempt = proveOrderedRingEquality(
+            localBinders, goal.leftEndpoint, goal.rightEndpoint,
+            goal.carrierType, goal.carrierUniverseLevel, line,
+            invocation == RingInvocation::ExplicitTactic
+                ? OrderedRingViewPolicy::RegisteredSurfaceViews
+                : OrderedRingViewPolicy::AbstractProjectionOnly);
+        if (orderedAttempt.recognizedCarrier) {
+            if (orderedAttempt.proof) return orderedAttempt.proof;
             throwElaborate(
-                "`ring` over an abstract `Ring.carrier(s)` closes only "
-                "associativity / `+`-commutativity rearrangements (a general "
-                "ring has no `·`-commutativity, and `ring` cannot see a "
-                "runtime commutativity fact). This goal is not such a "
-                "rearrangement — use a `CommutativeRing.carrier` carrier for "
-                "full commutative-ring power, or cite the ring laws "
-                "explicitly.");
+                "`ring`: the ordered ring normal forms differ. "
+                "Multiplication factors were kept in order"
+                + std::string(carrierName == "Matrix"
+                      ? " because square-matrix multiplication is "
+                        "noncommutative"
+                      : " because this ring has no available "
+                        "multiplicative-commutativity witness")
+                + ". Check the factor order, or cite the additional proved "
+                  "relation the calculation requires.");
         }
         // How operations/laws are named for this carrier, and the leading
         // structure argument they carry (`[s]` for a bundled-ring carrier
@@ -1460,15 +1463,14 @@ ExpressionPointer Elaborator::proveProductEqualsSorted(
             reassocProof, sortProof);
     }
 
-// ---- Abstract-ring AC normalisation (fingerprint plan, Phase 1) --------
+// ---- Structure-driven ordered-ring normalisation -----------------------
 //
-// proveAbstractRingAC closes a pure +/· rearrangement over an abstract
-// `Ring.carrier(s)` — the gap the registered-carrier `ring` tactic leaves.
-// `+` is associative-commutative in every ring, `·` is associative; we
-// normalise both endpoints to a sum-of-products canonical form (the sum
-// flattened and sorted as a multiset; each product flattened and
-// reassociated but NOT reordered, since a general ring's `·` is not
-// commutative) and, if the forms coincide, chain L = canon = R.
+// Every supported carrier is first presented through a uniform Ring bundle.
+// Addition is associative-commutative; multiplication is associative and
+// retains word order unless the bundle supplies a commutativity witness.
+// Carrier-specific surface operations (currently square matrices) are
+// re-expressed through that bundle by definitional equality before this
+// certificate pipeline runs.
 
 ExpressionPointer Elaborator::ringDeriveCommutativityWitness(
         ExpressionPointer structureArg) {
@@ -1543,6 +1545,164 @@ ExpressionPointer Elaborator::canonicalizeRingStructurePrefix(
         ExpressionPointer arg = canonicalizeRingStructurePrefix(
             app->argument, canonicalArg, context);
         return makeApplication(fn, arg);
+    }
+
+bool Elaborator::resolveOrderedRingView(
+        ExpressionPointer carrierOpened,
+        const Context& context,
+        OrderedRingViewPolicy policy,
+        OrderedRingView& viewOut) {
+        ExpressionPointer head;
+        std::vector<ExpressionPointer> args;
+        peelSpine(carrierOpened, head, args);
+        auto* constant = std::get_if<Constant>(&head->node);
+        if (!constant) return false;
+
+        if (constant->name == "Ring.carrier" && args.size() == 1) {
+            viewOut = OrderedRingView{};
+            viewOut.surface = OrderedRingSurface::AbstractRingProjection;
+            viewOut.structureArgument = args[0];
+            return true;
+        }
+
+        if (policy != OrderedRingViewPolicy::RegisteredSurfaceViews
+            || constant->name != "Matrix"
+            || args.size() != 3
+            || environment_.lookup("Matrix.ring") == nullptr) {
+            return false;
+        }
+
+        // Matrix(c, rows, columns) is a ring carrier only when the
+        // dimensions agree. Use defeq rather than a textual comparison so
+        // harmless arithmetic spelling differences do not hide the view.
+        if (!structurallyEqual(args[1], args[2])) {
+            try {
+                if (!isDefinitionallyEqual(
+                        environment_, context, args[1], args[2])) {
+                    return false;
+                }
+            } catch (const TypeError&) {
+                return false;
+            } catch (const ElaborateError&) {
+                return false;
+            }
+        }
+
+        viewOut = OrderedRingView{};
+        viewOut.surface = OrderedRingSurface::SquareMatrix;
+        viewOut.matrixBaseRing = args[0];
+        viewOut.matrixDimension = args[1];
+        viewOut.structureArgument = makeApplication(
+            makeApplication(makeConstant("Matrix.ring"), args[0]), args[1]);
+        return true;
+    }
+
+ExpressionPointer Elaborator::reexpressOrderedRingOperations(
+        ExpressionPointer expression,
+        const OrderedRingView& view,
+        const Context& context) {
+        if (view.surface == OrderedRingSurface::AbstractRingProjection) {
+            return canonicalizeRingStructurePrefix(
+                expression, view.structureArgument, context);
+        }
+
+        auto definitionallySame =
+            [&](ExpressionPointer actual, ExpressionPointer expected) {
+                if (structurallyEqual(actual, expected)) return true;
+                try {
+                    return isDefinitionallyEqual(
+                        environment_, context, actual, expected);
+                } catch (const TypeError&) {
+                    return false;
+                } catch (const ElaborateError&) {
+                    return false;
+                }
+            };
+        auto matrixPrefixMatches =
+            [&](const std::vector<ExpressionPointer>& args,
+                size_t dimensionCount) {
+                if (args.size() < 1 + dimensionCount
+                    || !definitionallySame(
+                        args[0], view.matrixBaseRing)) {
+                    return false;
+                }
+                for (size_t i = 0; i < dimensionCount; ++i) {
+                    if (!definitionallySame(
+                            args[1 + i], view.matrixDimension)) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+        auto buildStructureApplication =
+            [&](const std::string& name,
+                const std::vector<ExpressionPointer>& operands) {
+                ExpressionPointer result = makeApplication(
+                    makeConstant(name), view.structureArgument);
+                for (const auto& operand : operands) {
+                    result = makeApplication(result, operand);
+                }
+                return result;
+            };
+
+        ExpressionPointer head;
+        std::vector<ExpressionPointer> args;
+        peelSpine(expression, head, args);
+        auto* constant = std::get_if<Constant>(&head->node);
+        if (constant) {
+            if ((constant->name == "Matrix.add"
+                    || constant->name == "Matrix.subtract")
+                && args.size() == 5
+                && matrixPrefixMatches(args, 2)) {
+                ExpressionPointer left = reexpressOrderedRingOperations(
+                    args[3], view, context);
+                ExpressionPointer right = reexpressOrderedRingOperations(
+                    args[4], view, context);
+                return buildStructureApplication(
+                    constant->name == "Matrix.add"
+                        ? "Ring.add" : "Ring.subtract",
+                    {left, right});
+            }
+            if (constant->name == "Matrix.multiply"
+                && args.size() == 6
+                && matrixPrefixMatches(args, 3)) {
+                ExpressionPointer left = reexpressOrderedRingOperations(
+                    args[4], view, context);
+                ExpressionPointer right = reexpressOrderedRingOperations(
+                    args[5], view, context);
+                return buildStructureApplication(
+                    "Ring.multiply", {left, right});
+            }
+            if (constant->name == "Matrix.negate"
+                && args.size() == 4
+                && matrixPrefixMatches(args, 2)) {
+                ExpressionPointer inner = reexpressOrderedRingOperations(
+                    args[3], view, context);
+                return buildStructureApplication("Ring.negate", {inner});
+            }
+            if (constant->name == "Matrix.zero"
+                && args.size() == 3
+                && matrixPrefixMatches(args, 2)) {
+                return buildStructureApplication("Ring.zero", {});
+            }
+            if (constant->name == "Matrix.identity"
+                && args.size() == 2
+                && matrixPrefixMatches(args, 1)) {
+                return buildStructureApplication("Ring.one", {});
+            }
+        }
+
+        // An unrecognized application is an atom from the ring engine's
+        // perspective, but matrix-ring operations may occur inside it.
+        // Rebuild recursively so every matching subterm has one uniform
+        // spelling. This remains a definitional rewrite.
+        auto* application = std::get_if<Application>(&expression->node);
+        if (!application) return expression;
+        ExpressionPointer function = reexpressOrderedRingOperations(
+            application->function, view, context);
+        ExpressionPointer argument = reexpressOrderedRingOperations(
+            application->argument, view, context);
+        return makeApplication(function, argument);
     }
 
 ExpressionPointer Elaborator::buildBinaryOpCongruence(
@@ -2285,43 +2445,33 @@ Elaborator::ACNormResult Elaborator::ringACFullNorm(
             e, buildReflexivity(carrierLevel, carrierType, e)};
     }
 
-ExpressionPointer Elaborator::proveAbstractRingAC(
+Elaborator::OrderedRingAttempt Elaborator::proveOrderedRingEquality(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer previousKernel,
         ExpressionPointer nextKernel,
         ExpressionPointer carrierType,
         LevelPointer carrierLevel,
-        int line) {
-        // Open the goal over the local binders so the carrier index `s` and
-        // the atoms become FREE variables. This keeps the structure prefix
-        // `s` (threaded through every op/law head by ringConst) stable under
-        // the congruence lambdas the proof builders introduce — a
-        // bound-variable prefix would need shifting inside each lambda. The
-        // proof is re-closed before returning (mirrors elaborateRing's
-        // bundled-carrier path).
+        int line,
+        OrderedRingViewPolicy policy) {
+        // Open the goal over the local binders so the structure argument and
+        // atoms become FREE variables. This keeps the prefix threaded
+        // through every Ring op/law stable under congruence lambdas.
         size_t binderCount = localBinders.size();
-        // ζ-unfold let-binders first, so a carrier written `Ring.carrier(s)`
-        // with `let s := IntegralDomain.ring(d)` exposes its bundle structure
-        // (needed to source the Phase 4 commutativity witness). The unfolded
-        // forms are ζ-equal to the originals, so the proof still discharges
-        // the original goal (the calc step is checked up to defeq). Mirrors
-        // autoProveCalcStepRaw's endpoint unfolding.
+        // ζ-unfold let-binders first so a hidden bundle or registered surface
+        // carrier is visible. The unfolded forms remain definitionally equal
+        // to the stated endpoints.
         carrierType = zetaUnfoldLetBinders(carrierType, localBinders);
         previousKernel = zetaUnfoldLetBinders(previousKernel, localBinders);
         nextKernel = zetaUnfoldLetBinders(nextKernel, localBinders);
         ExpressionPointer carrierOpened =
             openOverLocalBinders(carrierType, localBinders, binderCount);
-        // The carrier must be the abstract projection `Ring.carrier(s)`.
-        // (CommutativeRing.carrier and concrete carriers already close via
-        // elaborateRing.)
-        auto* carrierApp = std::get_if<Application>(&carrierOpened->node);
-        if (!carrierApp) return nullptr;
-        auto* carrierHead =
-            std::get_if<Constant>(&carrierApp->function->node);
-        if (!carrierHead || carrierHead->name != "Ring.carrier") {
-            return nullptr;
+        Context openedContext = buildContextFromLocalBinders(localBinders);
+        OrderedRingView view;
+        if (!resolveOrderedRingView(
+                carrierOpened, openedContext, policy, view)) {
+            return OrderedRingAttempt{};
         }
-        ExpressionPointer structureArg = carrierApp->argument;
+        ExpressionPointer structureArg = view.structureArgument;
         RingAxiomNames addAxioms{
             "Ring.add", "Ring.add_associative", "Ring.add_commutative"};
         // `·` is associative-only over a general ring; no commutative axiom.
@@ -2332,7 +2482,9 @@ ExpressionPointer Elaborator::proveAbstractRingAC(
         // import Algebra/ring_bundle).
         for (const std::string& name :
                 {addAxioms.op, addAxioms.associative, addAxioms.commutative}) {
-            if (environment_.lookup(name) == nullptr) return nullptr;
+            if (environment_.lookup(name) == nullptr) {
+                return OrderedRingAttempt{true, nullptr};
+            }
         }
         // Multiplicative reassociation is OPTIONAL: when `Ring.multiply` or
         // its associativity law isn't yet in scope (e.g. a lemma proved
@@ -2356,15 +2508,13 @@ ExpressionPointer Elaborator::proveAbstractRingAC(
             openOverLocalBinders(previousKernel, localBinders, binderCount);
         ExpressionPointer rightOpened =
             openOverLocalBinders(nextKernel, localBinders, binderCount);
-        // Unify how the ring structure is spelled across both endpoints, so
-        // the strict structure-prefix matcher descends uniformly (the same
-        // `s` can arrive under several defeq projections). The results are
-        // defeq to the originals, and the calc step is checked by defeq.
-        Context openedContext = buildContextFromLocalBinders(localBinders);
-        ExpressionPointer leftCanon = canonicalizeRingStructurePrefix(
-            leftOpened, structureArg, openedContext);
-        ExpressionPointer rightCanon = canonicalizeRingStructurePrefix(
-            rightOpened, structureArg, openedContext);
+        // Unify both endpoints at the abstract Ring surface. For matrices,
+        // Matrix.* nodes become Ring.*(Matrix.ring(c,n)); for an existing
+        // Ring.carrier(s), only defeq structure-prefix spellings change.
+        ExpressionPointer leftCanon = reexpressOrderedRingOperations(
+            leftOpened, view, openedContext);
+        ExpressionPointer rightCanon = reexpressOrderedRingOperations(
+            rightOpened, view, openedContext);
         // Distributivity is OPTIONAL too: only expand products of sums when
         // both distributivity laws are in scope. Otherwise products of sums
         // stay as opaque atoms (sound; just no distributive power).
@@ -2421,10 +2571,7 @@ ExpressionPointer Elaborator::proveAbstractRingAC(
             ACNormResult nl = normalise(leftCanon);
             ACNormResult nr = normalise(rightCanon);
             if (!structurallyEqual(nl.canonical, nr.canonical)) {
-                // Sides differ as AC normal forms — not closable this way
-                // (e.g. genuinely unequal, or needs distributivity / an
-                // identity law we don't model). Decline; battery continues.
-                return nullptr;
+                return OrderedRingAttempt{true, nullptr};
             }
             // L = canon ; R = canon ⇒ L = R via canon = R (symmetry) then
             // transitivity. nl.canonical and nr.canonical are structurally
@@ -2441,12 +2588,20 @@ ExpressionPointer Elaborator::proveAbstractRingAC(
             // A calc-step proof must be closed over the local binders; a
             // stray free variable is a bug (would leak as an unbound
             // internal variable downstream). Reject defensively.
-            if (containsFreeVariable(closed)) return nullptr;
-            return closed;
+            if (containsFreeVariable(closed)) {
+                return OrderedRingAttempt{true, nullptr};
+            }
+            return OrderedRingAttempt{true, closed};
         } catch (const ElaborateError&) {
             // Internal mismatch in the normaliser (multiset assertion, an
             // op head we mis-recognised) — decline rather than abort.
-            return nullptr;
+            return OrderedRingAttempt{true, nullptr};
+        } catch (const TypeError&) {
+            // The ordered mode is a certificate-producing elaboration
+            // strategy. A failed internal candidate must decline cleanly so
+            // unsupported surface shapes never escape as kernel plumbing
+            // diagnostics.
+            return OrderedRingAttempt{true, nullptr};
         }
     }
 

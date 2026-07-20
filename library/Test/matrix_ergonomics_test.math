@@ -15,30 +15,36 @@ import Algebra.rank_three_truants
 -- ----------------------------------------------------------------------
 -- M0.1: unconditional noncommutative expansion.
 --
--- This already closes with the abstract-ring fallback of `ring`: ordered
--- products are retained, while addition is collected commutatively.
+-- The explicit ordered-ring mode retains product order while collecting
+-- addition commutatively.
 
 theorem Test.matrix_ordered_word_expansion
         {r : CommutativeRing} {n : ℕ}
         (T D N : Matrix(r, n, n))
         : ((Matrix.identity(r, n) + T) * D)
             * (Matrix.identity(r, n) + N)
-          = (D + T * D) + (D * N + (T * D) * N) := {
-  ((Matrix.identity(r, n) + T) * D)
-      * (Matrix.identity(r, n) + N)
-     = (Matrix.identity(r, n) * D + T * D)
-         * (Matrix.identity(r, n) + N)
-           by substituting Matrix.distributivity_right
-     = (D + T * D) * (Matrix.identity(r, n) + N)
-           by substituting Matrix.one_multiply
-     = (D + T * D) * Matrix.identity(r, n)
-         + (D + T * D) * N
-           by Matrix.distributivity_left
-     = (D + T * D) + (D + T * D) * N
-           by substituting Matrix.multiply_one
-     = (D + T * D) + (D * N + (T * D) * N)
-           by substituting Matrix.distributivity_right
-}
+          = (D + T * D) + (D * N + (T * D) * N) := ring
+
+-- Negation and subtraction use the same ordered-word core. This is the
+-- algebraic step needed by square-zero shear inverses; substituting N² = 0
+-- remains a separate, explicit step.
+
+theorem Test.matrix_one_add_multiply_one_subtract
+        {r : CommutativeRing} {n : ℕ}
+        (N : Matrix(r, n, n))
+        : (Matrix.identity(r, n) + N)
+            * (Matrix.identity(r, n) - N)
+          = Matrix.identity(r, n) - N * N := ring
+
+-- A rectangular product inside a square-matrix expression is an atom, not
+-- the multiplication of Matrix.ring(r,n). The surrounding square additions
+-- may still normalize.
+
+theorem Test.matrix_rectangular_product_is_ordered_ring_atom
+        {r : CommutativeRing} {m n : ℕ}
+        (A : Matrix(r, n, m)) (B : Matrix(r, m, n))
+        (Z : Matrix(r, n, n))
+        : A * B + Z = Z + A * B := ring
 
 -- ----------------------------------------------------------------------
 -- M0.2: a supplied square-zero relation.

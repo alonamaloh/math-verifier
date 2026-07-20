@@ -941,10 +941,11 @@ ExpressionPointer Elaborator::tryAcRearrangement(
         // registered-carrier `ring` below declines on this carrier, so try
         // the abstract normaliser first. It returns nullptr (no throw) when
         // the carrier isn't an abstract ring or the sides don't match.
-        ExpressionPointer abstractProof = proveAbstractRingAC(
+        OrderedRingAttempt orderedAttempt = proveOrderedRingEquality(
             localBinders, previousKernel, nextKernel,
-            carrierType, carrierLevel, line);
-        if (abstractProof) return abstractProof;
+            carrierType, carrierLevel, line,
+            OrderedRingViewPolicy::AbstractProjectionOnly);
+        if (orderedAttempt.proof) return orderedAttempt.proof;
         ExpressionPointer expectedType = makeApplication(
             makeApplication(
                 makeApplication(
@@ -983,7 +984,9 @@ ExpressionPointer Elaborator::tryAcRearrangement(
         }
         try {
             ExpressionPointer ringProof =
-                elaborateRing(localBinders, expectedType, line, 0);
+                elaborateRing(
+                    localBinders, expectedType, line, 0,
+                    RingInvocation::InternalProofSearch);
             if (ringProof) return ringProof;
         } catch (const ElaborateError&) {
         } catch (const TypeError&) {
@@ -2085,4 +2088,3 @@ bool Elaborator::matchAgainstPatternWithDeferredProjections(
         }
         return true;
     }
-

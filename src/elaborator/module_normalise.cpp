@@ -394,7 +394,9 @@ ExpressionPointer Elaborator::proveModuleEquality(
             closeOverLocalBinders(openedGoal, localBinders, binderCount);
         try {
             ExpressionPointer p =
-                elaborateRing(localBinders, closedGoal, line, 0);
+                elaborateRing(
+                    localBinders, closedGoal, line, 0,
+                    RingInvocation::InternalProofSearch);
             if (!p) return nullptr;
             return openOverLocalBinders(p, localBinders, binderCount);
         } catch (const ElaborateError&) {

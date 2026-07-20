@@ -3313,10 +3313,20 @@ private:
         ExpressionPointer expectedType,
         int line, int column);
 
+    // The explicit tactic may opt into registered noncommutative carrier
+    // views (currently square matrices). Internal proof search retains the
+    // historically narrower carrier set so adding a surface adapter does
+    // not silently broaden automation.
+    enum class RingInvocation {
+        ExplicitTactic,
+        InternalProofSearch
+    };
+
     ExpressionPointer elaborateRing(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line, int column);
+        int line, int column,
+        RingInvocation invocation);
 
     // `group` / `monoid` tactic: prove an `=` goal over an abstract group or
     // monoid by normalising both sides (flatten associativity, drop identity,
@@ -3504,30 +3514,71 @@ private:
         LevelPointer carrierUniverseLevel,
         int line);
 
-    // ---- Abstract-ring AC normalisation (fingerprint plan, Phase 1) ----
+    // ---- Structure-driven ordered-ring normalisation -----------------
     //
-    // The `ring` tactic above declines on a goal whose carrier is the
-    // *abstract* projection `Ring.carrier(s)` (it needs a registered
-    // commutative carrier; see computeRingScheme). But the worst by-less
-    // auto-prove steps in the library are pure +/· rearrangements over
-    // exactly such carriers — `+` is associative-commutative in EVERY ring
-    // (its additive group is abelian) and `·` is associative in every ring,
-    // so these close by AC-normalisation alone, with NO ·-commutativity.
-    // proveAbstractRingAC builds that proof directly (sum-of-products
-    // normal form: `+` flattened and sorted as a multiset, each `·`-product
-    // flattened and reassociated but NOT reordered), turning the multi-
-    // second context-equality-bridge search into a hash compare. Returns a
-    // closed proof of `previousKernel REL nextKernel` (REL is `=`), or
-    // nullptr if the carrier isn't an abstract `Ring.carrier`, the bundle
-    // axioms aren't in scope, or the two sides don't share a normal form.
-    // Purely additive: a null result leaves the existing battery unchanged.
-    ExpressionPointer proveAbstractRingAC(
+    // Carrier-view boundary for the ordered normaliser. Existing automatic
+    // proof search sees only an explicit `Ring.carrier(s)` projection. The
+    // explicit surface tactic may additionally resolve registered views such
+    // as square matrices. The algebra engine below depends on this capability
+    // policy, not on the syntax or search path that requested it.
+    enum class OrderedRingViewPolicy {
+        AbstractProjectionOnly,
+        RegisteredSurfaceViews
+    };
+
+    // A carrier resolved to the uniform abstract Ring interface. The
+    // normaliser itself sees only Ring.add/multiply/... under
+    // `structureArgument`; a surface adapter may first re-express carrier-
+    // specific operations (currently Matrix.*) by definitional equality.
+    enum class OrderedRingSurface {
+        AbstractRingProjection,
+        SquareMatrix
+    };
+    struct OrderedRingView {
+        OrderedRingSurface surface =
+            OrderedRingSurface::AbstractRingProjection;
+        ExpressionPointer structureArgument;
+        ExpressionPointer matrixBaseRing;
+        ExpressionPointer matrixDimension;
+    };
+
+    struct OrderedRingAttempt {
+        bool recognizedCarrier = false;
+        ExpressionPointer proof;
+    };
+
+    // Resolve `carrierOpened` to an ordered-ring view. Registered surface
+    // views are intentionally unavailable under AbstractProjectionOnly.
+    bool resolveOrderedRingView(
+        ExpressionPointer carrierOpened,
+        const Context& context,
+        OrderedRingViewPolicy policy,
+        OrderedRingView& viewOut);
+
+    // Replace surface operations belonging to a resolved carrier by the
+    // uniform Ring.* operations at `view.structureArgument`. The result is
+    // definitionally equal to the input. Rectangular Matrix.multiply
+    // subterms remain opaque atoms: only n×n multiplication is the
+    // multiplication of Matrix.ring(c,n).
+    ExpressionPointer reexpressOrderedRingOperations(
+        ExpressionPointer expression,
+        const OrderedRingView& view,
+        const Context& context);
+
+    // Certificate-producing normalization in a free associative ring:
+    // addition is AC; multiplication is associative and preserves word
+    // order unless the resolved structure supplies a commutativity witness.
+    // The canonical form is a sorted sum of signed ordered products.
+    // `recognizedCarrier` distinguishes "not this engine's carrier" from
+    // "recognized, but the ordered normal forms differ".
+    OrderedRingAttempt proveOrderedRingEquality(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer previousKernel,
         ExpressionPointer nextKernel,
         ExpressionPointer carrierType,
         LevelPointer carrierLevel,
-        int line);
+        int line,
+        OrderedRingViewPolicy policy);
 
     // Phase 4: derive a multiplicative-commutativity witness for the
     // abstract ring `structureArg` from its bundle structure — a term of
@@ -3538,12 +3589,12 @@ private:
     // `IntegralDomain.commutative(d)`; `PrincipalIdealDomain.ring(pid)` →
     // `IntegralDomain.commutative(PrincipalIdealDomain.domain(pid))`. The
     // candidate is kernel-checked as part of the final proof, so a wrong
-    // guess merely makes proveAbstractRingAC decline.
+    // guess merely makes proveOrderedRingEquality decline.
     ExpressionPointer ringDeriveCommutativityWitness(
         ExpressionPointer structureArg);
 
     // {canonical form, proof : original = canonical}, the result of
-    // normalising one expression for proveAbstractRingAC.
+    // normalising one expression for proveOrderedRingEquality.
     struct ACNormResult {
         ExpressionPointer canonical;
         ExpressionPointer proof;
@@ -3698,7 +3749,7 @@ private:
     // the proof `e = canonical`. `+` (addAxioms) is treated as AC, `·`
     // (mulAxioms) as associative-only. Mutually recursive with
     // ringACReplaceLeaves. Throws ElaborateError on an internal mismatch
-    // (caught by proveAbstractRingAC).
+    // (caught by proveOrderedRingEquality).
     ACNormResult ringACFullNorm(
         ExpressionPointer e,
         const RingAxiomNames& addAxioms,
@@ -4146,8 +4197,9 @@ private:
     // is `CommutativeRing` and the prefix is `[c]`, so e.g.
     // `add_associative` resolves to `CommutativeRing.add_associative`
     // cited as `CommutativeRing.add_associative(c, …)`. A plain
-    // `Ring.carrier(s)` is NOT a `ring` target — `ring` is a commutative-
-    // ring tactic and a bare ring has no `multiply_commutative`.
+    // This polynomial path is for commutative carriers. A plain
+    // `Ring.carrier(s)`, and registered noncommutative surface carriers such
+    // as square matrices, route through proveOrderedRingEquality instead.
     // ------------------------------------------------------------------
     struct RingLawNames {
         std::string addZeroRight;          // a + 0 = a

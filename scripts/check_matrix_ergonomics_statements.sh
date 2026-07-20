@@ -24,6 +24,12 @@ check_shape() {
 check_shape \
   Test.matrix_ordered_word_expansion \
   '(r * n n n T D)) (r + n n (r * n n n D N) (r * n n n (r * n n n T D) N))'
+check_shape \
+  Test.matrix_one_add_multiply_one_subtract \
+  '(r - n n (Matrix.identity r n) (r * n n n N N))'
+check_shape \
+  Test.matrix_rectangular_product_is_ordered_ring_atom \
+  '(r * n m n A B) Z) = (r + n n Z (r * n m n A B))'
 
 # Relation evidence remains an explicit premise of the square-zero theorem.
 check_shape \

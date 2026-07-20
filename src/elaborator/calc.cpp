@@ -1924,7 +1924,8 @@ ExpressionPointer Elaborator::autoProveCalcStepRaw(
                 nextKernel);
             try {
                 ExpressionPointer castRingProof = elaborateRing(
-                    localBinders, castRingGoal, line, column);
+                    localBinders, castRingGoal, line, column,
+                    RingInvocation::InternalProofSearch);
                 if (castRingProof) return castRingProof;
             } catch (const ElaborateError&) {
             } catch (const TypeError&) {
@@ -2045,7 +2046,8 @@ ExpressionPointer Elaborator::autoProveCalcStepRaw(
                         leafEquality, rightCursor);
                     try {
                         innerProof = elaborateRing(
-                            localBinders, leafEquality, line, column);
+                            localBinders, leafEquality, line, column,
+                            RingInvocation::InternalProofSearch);
                     } catch (const ElaborateError&) {
                         innerProof = nullptr;
                     } catch (const TypeError&) {
@@ -2167,4 +2169,3 @@ void Elaborator::checkRedundantCongruenceOfWrapper(
                 "(diff inference fills the lambda)\n";
         }
     }
-

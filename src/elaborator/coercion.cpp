@@ -885,7 +885,9 @@ std::optional<Elaborator::DiffBridgeEquality>
         ExpressionPointer proofClosed;
         try {
             proofClosed =
-                elaborateRing(localBinders, closedGoal, /*line=*/0, /*column=*/0);
+                elaborateRing(
+                    localBinders, closedGoal, /*line=*/0, /*column=*/0,
+                    RingInvocation::InternalProofSearch);
         } catch (const ElaborateError&) {
             return std::nullopt;
         } catch (const TypeError&) {

@@ -2467,7 +2467,8 @@ ExpressionPointer Elaborator::elaborateExpression(
         }
         if (std::get_if<SurfaceRing>(&expression.node)) {
             return elaborateRing(localBinders, expectedType,
-                                  expression.line, expression.column);
+                                  expression.line, expression.column,
+                                  RingInvocation::ExplicitTactic);
         }
         if (auto* groupTactic =
                 std::get_if<SurfaceGroup>(&expression.node)) {
