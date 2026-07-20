@@ -81,6 +81,11 @@ definition Test.carrier_unary_numeral (b : ℤ) : Proposition :=
 definition Test.carrier_unary_natural (b : ℤ) (m : ℕ) : Proposition :=
   b = -m
 
+-- An ascription still selects a carrier when the enclosed unary expression
+-- cannot synthesize one bottom-up.
+definition Test.carrier_unary_ascribed_literal : ℤ :=
+  (-1 : ℤ)
+
 -- Carrier evidence may arrive from the right operand after a left unary
 -- expression fails to synthesize on its own.
 definition Test.carrier_unary_from_right_operand
@@ -103,6 +108,10 @@ definition Test.carrier_unary_bundled {n : ℕ}
 definition Test.carrier_postfix_expected
         (oneNonzero : ¬(Real.one = Real.zero)) : Real :=
   1⁻¹
+
+definition Test.carrier_postfix_ascribed_literal
+        (oneNonzero : ¬(Real.one = Real.zero)) : Real :=
+  (1⁻¹ : ℝ)
 
 -- E3: relation evidence is bidirectional. A bare numeral on the left must not
 -- commit `<` to Natural when the right operand independently fixes Integer.
@@ -135,3 +144,9 @@ definition Test.carrier_equality_right_retry
 -- `Rational.to_real(a + b)`.
 axiom Test.carrier_equality_cast_normal_form
     : ∀ (a b : ℚ). ((a + b : ℝ) = a + b)
+
+-- An ascription around a negated lower-carrier term coerces the WHOLE
+-- negation. It must not push the cast into the operand and collapse this
+-- homomorphism statement to `-(↑a) = -(↑a)`.
+axiom Test.carrier_unary_cast_normal_form
+    : ∀ (a : ℤ). ((-a : ℚ) = -(a : ℚ))

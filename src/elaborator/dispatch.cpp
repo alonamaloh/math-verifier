@@ -1818,9 +1818,39 @@ ExpressionPointer Elaborator::elaborateExpression(
                     }
                 }
             }
-            ExpressionPointer inner =
-                elaborateExpression(*ascription->expression,
-                                     localBinders, ascribedType);
+            ExpressionPointer inner;
+            auto* unary = std::get_if<SurfaceUnaryOperation>(
+                &ascription->expression->node);
+            if (unary) {
+                // An ascription encloses the whole expression. Preserve that
+                // boundary when a prefix/postfix operation already has an
+                // honest carrier:
+                //
+                //   (-a : Rational), a : Integer
+                //     = Integer.to_rational(Integer.negate(a))
+                //
+                // rather than pushing Rational into the operand and silently
+                // changing it to `Rational.negate(Integer.to_rational(a))`.
+                // If the operation cannot synthesize independently
+                // (`(-1 : Integer)`, since Natural has no negation, or
+                // `(1⁻¹ : Real)`, since Natural has no reciprocal), retry
+                // with the ascribed carrier as the expected type. This keeps
+                // ascription semantics stable without losing E2's useful
+                // carrier selection for otherwise-unseeded operations.
+                try {
+                    inner = elaborateExpression(
+                        *ascription->expression, localBinders);
+                } catch (const ElaborateError&) {
+                    inner = elaborateExpression(
+                        *ascription->expression, localBinders, ascribedType);
+                } catch (const TypeError&) {
+                    inner = elaborateExpression(
+                        *ascription->expression, localBinders, ascribedType);
+                }
+            } else {
+                inner = elaborateExpression(
+                    *ascription->expression, localBinders, ascribedType);
+            }
 
             // Ascription doubles as a coercion: if `inner`'s inferred
             // type doesn't match the ascribed type but a registered

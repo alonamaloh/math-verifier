@@ -280,6 +280,17 @@ Registered postfix operators mirror the same rule: a known result carrier
 reaches the operand only when that carrier registers the postfix symbol, then
 the operand is reconciled through the coercion registry before dispatch.
 
+**Post-review ascription hardening.** Expected-carrier propagation must not
+erase the semantic boundary of an explicit ascription. The first E2
+implementation changed `(-a : ℚ)`, for `a : ℤ`, from the cast of an Integer
+negation `↑(-a)` into a Rational negation of a cast `-(↑a)`. That silently
+weakened `Integer.to_rational.negate_preserves` to reflexivity. An ascription
+around any prefix/postfix operation now tries to elaborate the enclosed
+operation bottom-up first and coerces the completed term; only an operation
+that cannot synthesize independently (`(-1 : ℤ)`, `(1⁻¹ : ℝ)`) retries with
+the ascribed carrier as an expected type. `carrier-normal-form-check` now pins
+both non-vacuous shapes, `↑(a+b) = ↑a+↑b` and `↑(-a) = -(↑a)`.
+
 Acceptance probes:
 
 ```text
@@ -531,6 +542,13 @@ because carrier normalization touches hot dispatch paths.
 For E3 specifically, additionally verify the library **from a cold cache** — a
 warm rebuild will not re-elaborate files whose sources did not change, and this
 step can silently re-dispatch expressions that still typecheck.
+
+The final semantic audit built the pre-E1 revision in isolation and compared
+the declaration types dumped from all **364** common library caches against the
+repaired tree. No unexpected statement drift remains. The only syntactic
+differences are in the intentional E6 rank-three cleanup (`Integer.zero/one`
+versus definitionally equal coerced numerals); the reviewed Rational embedding
+statement matches its pre-E1 form exactly.
 
 ## Definition of done
 
