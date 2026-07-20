@@ -647,7 +647,7 @@ promised fallback: structured, generated proofs assembled from the M1 block
 API, the M3 shear API, and ordinary isometry composition, with no handwritten
 matrix-entry case trees.
 
-### M5. Validate on the Fifteen-Theorem frontier and stop `[~]`
+### M5. Validate on the Fifteen-Theorem frontier and stop `[x]`
 
 Apply the landed machinery to a deliberately small consumer set:
 
@@ -675,6 +675,60 @@ Success criteria:
 
 At that point stop. Resume the Fifteen-Theorem mathematics and let real
 consumers justify any further matrix automation.
+
+#### M5 results — 2026-07-20
+
+The structured fallback scales to the tested frontier without a concrete
+matrix evaluator.
+
+`Matrix.diagonalExtension_isometric_borderedAssembly` now packages the M3
+pullback equation and square-zero invertibility witness into the proposition
+consumers actually need. Two missing symmetry facts for the rank-two parents
+were added at their natural library boundary rather than repeated locally.
+
+The consumer set is:
+
+| Consumer | Proof-body result | Matrix-entry cases | Direct ring-law citations |
+|---|---:|---:|---:|
+| symbolic top shear | 55 lines, down from 139 | 0 | 0 |
+| concrete rank-three sign orbit | 24 lines; composition through the common diagonal representative | 0 | 0 |
+| `(0,2)` border above `x²+2y²` | 43-line exported isometry body; 2-line downstream citation | 0 | 0 |
+| synthetic `4×4` top shear | 20 lines after the named vector and candidate | 0 | 0 |
+
+The `x²+2y²` control is live mathematics, not just a benchmark:
+`Matrix.squarePlusDoubleSquareSecondColumnCandidate_isometric` proves that
+the actual border-`(0,2)`, corner-`5` member of the 23-candidate cone is
+isometric to `diag(1,2,3)`. Its one reusable vector-action lemma contains the
+two coordinate branches needed to identify the second column. No consumer
+opens the resulting `3×3` matrix into nine entry cases.
+
+The focused ergonomics module verifies in **0.18 s** with no expensive-proof
+warnings, versus **0.14 s** for the smaller M0 control module. The structured
+`4×4` proof has the same constant-size shape as the rank-three proof. The
+existing 124-to-16-line bordered-extensionality reduction and 139-to-55-line
+pullback reduction both exceed the 50% target. All named pre-existing
+statements remain unchanged; the new interfaces are additions.
+
+Final gates pass:
+
+- focused matrix module and affected algebra targets;
+- full tests and both statement guards;
+- all 71 error tests;
+- clean check at the unchanged 397 residual leaks;
+- `git diff --check`.
+
+One separate elaborator friction remains visible. In
+`RingVector.twoCoordinates((0 : ℤ), 2)`, the second polymorphic argument is
+not carrier-seeded by the first, and calc citations can distinguish a bare
+coerced numeral from the explicitly typed Integer numeral. The library proof
+therefore uses a named carrier-typed vector boundary and retains the explicit
+casts that are genuinely required. This is the already out-of-scope
+polymorphic-argument/citation carrier-inference gap, not a reason to extend
+the matrix plan.
+
+The plan is complete. Further matrix automation should now be justified by a
+new failing Fifteen-Theorem consumer; the next work item is the remaining
+rank-three candidate mathematics.
 
 ## Commit and verification discipline
 
