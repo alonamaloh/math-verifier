@@ -137,7 +137,7 @@ deferred before rank-four enumeration begins.
 Status markers: `[ ]` TODO · `[~]` in progress · `[B]` blocked · `[x]` done ·
 `[-]` deliberately skipped.
 
-### M0. Freeze representative probes and the baseline `[ ]`
+### M0. Freeze representative probes and the baseline `[x]`
 
 Create a focused `library/Test/matrix_ergonomics_test.math` before adding
 machinery. It should contain:
@@ -171,6 +171,56 @@ Do not design a tactic from memory before this probe is recorded.
 
 Acceptance: the baseline test and negative controls are stable, the existing
 library remains green, and the measurements are written into this section.
+
+#### M0 results — 2026-07-20
+
+The controls live in `library/Test/matrix_ergonomics_test.math`; their
+elaborated declarations are guarded by
+`scripts/check_matrix_ergonomics_statements.sh`. Five `ErrorTest` fixtures
+cover the pending ordered expansion, false factor commutation, missing
+square-zero evidence, symbolic dimensions, and the provisional dimension-six
+concrete-evaluation boundary.
+
+The warm direct verification time is **0.14 s**, with no expensive-proof
+warnings. Source measurements (whole declaration, including statement) are:
+
+| Control | Current lines | Finding |
+|---|---:|---|
+| symbolic `(I+T)D(I+N)` expansion | 21 | valid, but needs five explicit matrix-law calc steps |
+| symmetric block equality | 124 | descends to the four entry regions; this is the M1 target |
+| named concrete 3×3 product | 8 | short only because the offset's generic square-zero theorem already matches |
+| named concrete 3×3 inverse | 17 | witness plus the two generic square-zero product lemmas |
+| named concrete 3×3 pullback | 14 | short only because it is exactly the existing generic top-shear theorem |
+
+The existing live consumers remain the larger measurements:
+`Matrix.topUnit_eq_outerProduct_topBasis` is roughly 120 lines and
+`Matrix.topShear_pullback_diagonalExtension` has a 139-line body.
+
+The most important probe result changes the implementation diagnosis. The
+repository **already has** an ordered sum-of-products certificate engine in
+`proveAbstractRingAC`, including distributivity, identities, negation, and
+like-word collection for `Ring.carrier(s)`. The matrix expansion nevertheless
+fails with the commutative fingerprint diagnostic. Dispatch sees
+`Matrix(r,n,n)`, follows its `CommutativeRing` parameter, and sends
+matrix-spelled `+` and `*` to the scalar commutative normalizer, which then
+atomizes the matrix-operation applications. Thus M2a is primarily a
+structure-selection and maintainability task: expose the actual
+`Matrix.ring(r,n)` structure to the existing ordered engine, make the engine's
+role and naming accurate, and avoid creating another normalizer.
+
+The other failures divide cleanly:
+
+- block equality is a **missing library API**;
+- arbitrary closed matrix evaluation is a **missing proof-language
+  calculation mechanism** (`matrix_compute` does not exist);
+- square-zero inversion itself is **not missing**:
+  `Ring.one_add_square_zero_multiply_inverse` and its left-handed companion
+  already package the proof once an `IsRing` witness and `N*N=0` are in
+  scope. Relation-aware `ring` therefore has to beat this existing one-line
+  mathematical API to justify M2b;
+- the concrete pullback control is easy only because it has the exact shape
+  of the generic top-shear theorem. A genuinely different explicit isometry
+  still has no bounded evaluator.
 
 ### M1. Add block-level extensionality and congruence `[ ]`
 
@@ -206,6 +256,13 @@ stop and redesign it.
 
 ### M2a. Extend `ring` with unconditional ordered-word mode `[ ]`
 
+M0 found that most of the ordered engine already exists under the historical
+name `proveAbstractRingAC`. Do not reimplement it. This stage must first audit
+that engine's certificate boundaries and tests, then give it an accurate
+ordered-ring name and a structure-based entry point. The new semantic work is
+to recognize square matrices as the carrier of `Matrix.ring(c,n)` and route
+their surface `Matrix.add`/`Matrix.multiply` expressions through that engine.
+
 Keep the surface spelling `ring`. Choose the normalizer from the algebraic
 structure that is actually available:
 
@@ -232,16 +289,17 @@ later algebra-aware extension is justified.
 
 The certificate builder uses the supplied `IsRing` operations and laws. The
 existing `Matrix.ring(c,n)` instance makes square matrices the primary
-consumer, but the mode should also replace the current weak
-associativity/AC-only fallback for an abstract `Ring.carrier(s)`.
+consumer. The existing behavior for an abstract `Ring.carrier(s)` must remain
+intact and share the same entry point; matrix support is not a fork.
 
 Reuse rather than fork:
 
 - the ordered-word, reassociation, identity, congruence, and proof-chain
   machinery in `group.cpp` is the closest multiplicative precedent;
-- the existing `ring` outer polynomial and additive certificate machinery
-  should be shared after parameterizing the monomial signature and product
-  operation;
+- the existing ordered implementation in `ring.cpp` is the starting point;
+  audit its overlap with `group.cpp` and the commutative outer-polynomial
+  machinery, extracting a shared certificate layer only where that reduces
+  real duplication without destabilizing the mature commutative path;
 - do not copy the current multi-thousand-line commutative normalizer and edit
   every factor sort into concatenation.
 
