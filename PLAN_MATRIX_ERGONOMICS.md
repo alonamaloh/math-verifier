@@ -38,6 +38,21 @@ The problem is not scalar arithmetic. Once a goal reaches an Integer entry,
 2. normalization for a ring whose multiplication is not commutative; and
 3. bounded verified evaluation of closed, small matrix expressions.
 
+Two existing prover components are relevant and should be reused rather than
+rediscovered:
+
+- `src/elaborator/group.cpp` already builds kernel certificates for ordered
+  noncommutative words, including reassociation, identity removal, and
+  adjacent inverse cancellation when the whole carrier is a group;
+- the `field` path in `src/elaborator/ring.cpp` already contracts commutative
+  monomials using reciprocal relations constructed from caller-supplied
+  nonzero evidence.
+
+Neither component solves this problem directly. The current polynomial
+normalizer sorts the factors inside each monomial, while a matrix monomial must
+retain their order. But they establish both certificate-building patterns the
+new mode will need.
+
 ## Execution boundary
 
 The remaining four one-unit borders over `x²+y²` should first be finished with
@@ -56,8 +71,10 @@ stopped, or explicitly deferred before rank-four enumeration begins.
 - A block-level extensionality API for `(1+n) × (1+n)` matrices.
 - Focused formulas for the existing `borderedAssembly`,
   `diagonalExtension`, outer-product, and top-shear constructions.
-- An explicit noncommutative ring-normalization tactic, if the probe confirms
-  that it substantially shortens the symbolic pullback.
+- A noncommutative ordered-word mode of the existing `ring` tactic, if the
+  probe confirms that it substantially shortens the symbolic pullback.
+- A tightly restricted layer of caller-supplied, strictly reducing monomial
+  relations, gated after the unconditional ordered-word mode works.
 - A bounded tactic for equality and inverse checks on small concrete matrices,
   if finite-index enumeration can be made reliable without a new dependent
   programming project.
@@ -75,6 +92,12 @@ stopped, or explicitly deferred before rank-four enumeration begins.
 - Symbolic equality at arbitrary matrix dimensions by unfolding finite sums.
 - Rewriting old verified matrix proofs merely for style.
 - Changing `ring` to assume commutative matrix multiplication.
+- Hardcoding a total `inverse(A)` operation or inverse-cancellation rule for
+  matrices. `Matrix.IsInvertible(A)` currently supplies an existential inverse
+  matrix and its two product equations; there is no canonical matrix inverse
+  expression for the tactic to recognize.
+- General equational rewriting, noncommutative Gröbner bases, or completion of
+  arbitrary rewrite systems.
 - Global `automatic` registrations for routine matrix rewrite lemmas.
 - The carrier-inference gaps in polymorphic function arguments and citation
   elaboration. Those are separate elaborator work.
@@ -88,9 +111,10 @@ stopped, or explicitly deferred before rank-four enumeration begins.
 2. **Build certificates.** Tactics construct applications of existing
    `IsRing`, matrix extensionality, finite-enumeration, and scalar arithmetic
    theorems. The kernel sees no oracle result.
-3. **Keep automation explicit and local.** New tactics fire only when named.
-   Library lemmas are ordinary theorems unless a separately measured
-   registration is indispensable.
+3. **Keep automation explicit and local.** The new noncommutative `ring` mode
+   initially runs only for an explicit `by ring`, not from the generic
+   equality battery. Library lemmas are ordinary theorems unless a separately
+   measured registration is indispensable.
 4. **Separate symbolic from concrete computation.** Symbolic pullbacks need
    free noncommutative-ring normalization. Closed `3×3` and `4×4` products need
    finite evaluation. Neither mechanism should pretend to solve the other.
@@ -101,6 +125,10 @@ stopped, or explicitly deferred before rank-four enumeration begins.
    against its pre-change elaborated declaration, not merely re-verified.
 7. **Measure before generalizing.** Each stage must shorten a live consumer or
    it does not earn a broader abstraction.
+8. **Relations are evidence, not axioms.** A caller-supplied monomial rule is
+   accepted only with a proof of its equality. The tactic applies that proof
+   by congruence inside words and sums; it never infers nilpotency,
+   invertibility, or commutation.
 
 ## Work plan
 
@@ -114,14 +142,18 @@ machinery. It should contain:
 
 1. a symbolic noncommutative expansion analogous to
    `(I+T) * D * (I+N)`;
-2. equality of two `(1+n) × (1+n)` symmetric matrices from equal leading
+2. the square-zero specialization
+   `(I+N) * (I-N) = I` from a supplied proof `N*N = 0`, first written as
+   an unconditional expansion followed by substitution;
+3. equality of two `(1+n) × (1+n)` symmetric matrices from equal leading
    block, border column, and corner;
-3. one explicit `3×3` integral matrix product and one inverse verification;
-4. one pullback `Uᵀ*A*U = B` using concrete matrices.
+4. one explicit `3×3` integral matrix product and one inverse verification;
+5. one pullback `Uᵀ*A*U = B` using concrete matrices.
 
 Add negative controls for:
 
 - attempting to prove `A*B = B*A` for arbitrary square matrices;
+- attempting to use `N*N = 0` without supplying its proof;
 - invoking concrete evaluation at a symbolic dimension;
 - invoking it on a dimension above its supported bound.
 
@@ -170,24 +202,46 @@ The target is at least a 50% reduction in the two control proof bodies. If the
 API merely moves the same case split into a differently named one-use lemma,
 stop and redesign it.
 
-### M2. Prototype an explicit noncommutative ring normalizer `[ ]`
+### M2a. Extend `ring` with unconditional ordered-word mode `[ ]`
 
-The preferred surface name is `noncomm_ring`; the final name is chosen only
-after checking the parser and existing tactic vocabulary.
+Keep the surface spelling `ring`. Choose the normalizer from the algebraic
+structure that is actually available:
 
-Normalize a ring expression to a finite sum of words:
+- when multiplicative commutativity is available, preserve the current
+  commutative polynomial normalizer unchanged;
+- when only `IsRing` is available, use an ordered-word polynomial normalizer;
+- when no ring structure is available, decline as today.
+
+The noncommutative normal form is a finite map from ordered words to signed
+integer multiplicities:
 
 - an atom becomes a one-letter word;
 - multiplication concatenates words without sorting their letters;
 - addition and negation combine integer multiplicities of identical words;
 - the multiplicative identity is the empty word;
 - zero terms disappear;
-- the outer sum may be ordered deterministically because ring addition is
-  commutative.
+- the outer collection of words may be ordered deterministically because ring
+  addition is commutative.
+
+For a generic ring, only integer multiples of `1` are universally central
+coefficients. A base-ring scalar acting on a matrix is not promoted to a
+coefficient in this stage; it remains an atom or structured factor unless a
+later algebra-aware extension is justified.
 
 The certificate builder uses the supplied `IsRing` operations and laws. The
-existing `Matrix.ring(c,n)` instance should make square matrices the primary
-consumer, but the tactic itself should work for any `Ring.carrier`.
+existing `Matrix.ring(c,n)` instance makes square matrices the primary
+consumer, but the mode should also replace the current weak
+associativity/AC-only fallback for an abstract `Ring.carrier(s)`.
+
+Reuse rather than fork:
+
+- the ordered-word, reassociation, identity, congruence, and proof-chain
+  machinery in `group.cpp` is the closest multiplicative precedent;
+- the existing `ring` outer polynomial and additive certificate machinery
+  should be shared after parameterizing the monomial signature and product
+  operation;
+- do not copy the current multi-thousand-line commutative normalizer and edit
+  every factor sort into concatenation.
 
 Required positive probe:
 
@@ -207,26 +261,86 @@ A * B = B * A
 must be declined, not proved.
 
 This stage does not normalize transpose, outer products, matrix-vector
-application, or finite sums. Those are rewritten to ring atoms by named
-structural facts before invoking the tactic.
+application, finite sums, or supplied hypotheses. Those expressions are
+rewritten to ring atoms by named structural facts before invoking the tactic.
 
 Acceptance:
 
-- the symbolic M0 expansion closes with one explicit tactic call;
+- the symbolic M0 expansion closes with one explicit `ring` call;
 - generated proof terms pass ordinary kernel checking;
 - the negative control remains negative;
 - off-ring and unsupported goals decline immediately;
-- the full test suite shows no new proof-search or elaboration regression.
+- the existing commutative `ring` corpus elaborates to the same statements
+  and shows no material performance change;
+- the noncommutative mode is not yet called from the automatic equality
+  battery, so unrelated matrix equalities gain no speculative search cost.
 
 Stop condition: if proof construction requires duplicating most of the
 commutative `ring` implementation without a reusable certificate layer, first
-extract that layer or mark M2 `[B]`. Do not land a second large, divergent
+extract that layer or mark M2a `[B]`. Do not land a second large, divergent
 normalizer.
+
+### M2b. Add strictly reducing caller-supplied monomial rules `[ ]`
+
+Do this only after M2a is correct and measured. The first consumer is the
+square-zero fact in the shear inverse:
+
+```text
+squareZero : N*N = 0
+(I+N) * (I-N) = I by ring(squareZero)  -- spelling is provisional
+```
+
+The surface syntax is chosen during M0/M2a after inspecting how `field` accepts
+side evidence. The semantic contract is more important than the spelling.
+
+Accept only proved, oriented monomial rules of one of these forms:
+
+```text
+word = 0
+word = k * shorterWord
+```
+
+where `k` is an integer coefficient and the right-hand word is strictly
+shorter. Normalize the unconditional polynomial first, then reduce each word
+with a deterministic strategy, carrying the supplied equality through its
+left and right word context and through the outer sum by congruence.
+
+Strict length reduction guarantees termination. Overlapping rules may make
+the chosen result incomplete but cannot make it unsound: every reduction has
+a kernel-checked equality certificate. Initially either reject overlapping
+rules, or document the deterministic order and accept that a true goal may
+decline. Do not implement critical-pair completion in this plan.
+
+`N*N = 0` is the only required relation for this stage. A future explicit
+inverse witness could supply
+
+```text
+U*V = I
+V*U = I
+```
+
+as two ordinary shortening rules. Do not hardcode `inverse(U)` syntax:
+`Matrix.IsInvertible(U)` is presently `∃ V. U*V=I ∧ V*U=I`, and the Fifteen
+Theorem proofs use the produced matrix `V`, not an abstract inverse operation.
+
+Acceptance:
+
+- the square-zero M0 probe closes with one relation-aware `ring` call;
+- omitting the relation keeps the negative control negative;
+- rules are used only in the proved direction supplied by the caller;
+- `A*B = B*A` remains negative even in the presence of unrelated rules;
+- malformed, non-monomial, non-decreasing, or carrier-mismatched rules receive
+  a focused diagnostic;
+- the unconditional M2a mode remains unchanged and independently testable.
+
+M2b is optional for the minimum plan endpoint. If its proof plumbing begins to
+grow into arbitrary equational rewriting, retain the two-line
+`by ring; by substituting squareZero` proof style and mark M2b `[-]`.
 
 ### M3. Build the structured pullback layer `[ ]`
 
-Use M1 and, if successful, M2 to package the recurring change-of-basis
-calculation.
+Use M1 and M2a, plus M2b if it passes its gate, to package the recurring
+change-of-basis calculation.
 
 Candidate lemmas, to be adjusted to the cleanest statements found by the
 probes:
@@ -248,7 +362,9 @@ Acceptance:
 - the theorem mentions the mathematical data (`A`, `v`, `A·v`, and
   `Q_A(v)`) rather than entry indices;
 - `Matrix.topShear_invertible` uses the generic square-zero inverse without
-  restating both multiplication expansions;
+  restating both multiplication expansions; if M2b landed, refactor the
+  generic `Ring.one_add_square_zero_*` lemmas themselves to use the supplied
+  monomial relation rather than bypassing the generic library theorem;
 - focused build, full tests, error tests, clean check, and elaborated-output
   comparison all pass.
 
@@ -333,11 +449,12 @@ Use small commits:
 
 1. M0 probes and measurements.
 2. M1 library API.
-3. M2 tactic and its positive/negative controls, if it passes the stop gate.
-4. M3 symbolic pullback refactor.
-5. M4 concrete evaluator, if it passes the probe gate.
-6. M5 consumer proofs.
-7. Plan/status documentation separately from mathematics or elaborator code.
+3. M2a ordered-word `ring` mode and its positive/negative controls.
+4. M2b caller-supplied monomial relations, only if it passes its stop gate.
+5. M3 symbolic pullback refactor.
+6. M4 concrete evaluator, if it passes the probe gate.
+7. M5 consumer proofs.
+8. Plan/status documentation separately from mathematics or elaborator code.
 
 For every semantic stage run:
 
