@@ -222,7 +222,7 @@ The other failures divide cleanly:
   of the generic top-shear theorem. A genuinely different explicit isometry
   still has no bounded evaluator.
 
-### M1. Add block-level extensionality and congruence `[ ]`
+### M1. Add block-level extensionality and congruence `[x]`
 
 Stay in the mathematics library for this stage.
 
@@ -253,6 +253,38 @@ Live acceptance:
 The target is at least a 50% reduction in the two control proof bodies. If the
 API merely moves the same case split into a differently named one-use lemma,
 stop and redesign it.
+
+#### M1 results — 2026-07-20
+
+The bordered vocabulary now includes `Matrix.borderRow`, general
+`Matrix.bordered_extensionality`, and
+`Matrix.symmetric_bordered_extensionality`. The only full inclusion/top split
+is inside the general theorem. The symmetric specialization derives the row
+from symmetry and the border column; consumers provide exactly the block,
+column, and corner data they know mathematically.
+
+The supporting observation API contains:
+
+- all four faces of an outer product and of the top-basis outer product;
+- leading block, both borders, and corner of `Matrix.topUnit`;
+- both borders of `Matrix.diagonalExtension` (joining its existing block and
+  corner faces);
+- both borders of `Matrix.borderedAssembly`, plus
+  `Matrix.borderedAssembly_congruence`.
+
+No second block datatype and no global automatic registrations were added.
+Addition, negation, transpose, and product projection formulas were not added:
+the M0 controls did not demand them, so M1 stopped at the measured surface.
+
+The symmetric block control falls from a 124-line baseline declaration to 16
+lines (its proof body is one block-level citation). The live
+`Matrix.topUnit_eq_outerProduct_topBasis` declaration falls from 103 lines to
+39, a **62%** reduction, and its body has no inclusion/top case tree. Its
+supporting face lemmas are independently useful observations rather than a
+one-use renamed copy of the old proof. Warm control verification remains
+**0.14 s**. Full tests, 71/71 error tests, statement-shape guards, and the
+clean check all pass; the cleanliness budget remains 397 and no search warning
+was added.
 
 ### M2a. Extend `ring` with unconditional ordered-word mode `[ ]`
 
