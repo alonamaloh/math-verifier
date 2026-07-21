@@ -81,10 +81,17 @@ in one citation.
 
 ## F1. Kernel-visible finite-range certificate
 
-Define a recursive proposition `Natural.AllFrom(P, start, count)`:
+Define an inductive proposition `Natural.AllFrom(P, start, count)`:
 
-- count 0: `True`;
-- count `1+k`: `P(start) ∧ AllFrom(P, start+1, k)`.
+- the empty constructor certifies count 0;
+- the prepend constructor stores `P(start)`, a certificate beginning at a
+  canonical `next`, and an explicit proof `next = start + 1`.
+
+The explicit successor equality is intentional. Integer addition is opaque,
+so forcing the tail to be indexed by the expression `start + 1` would turn a
+readable numeral table into an opaque addition chain. Recording the equality
+lets every leaf retain its canonical numeral spelling while keeping the
+whole step kernel-visible.
 
 Prove once that an `AllFrom` certificate entails
 `P(n)` whenever `start ≤ n < start+count`. Add the analogous Integer-facing

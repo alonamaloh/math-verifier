@@ -1,0 +1,102 @@
+-- Natural/finite_range.math
+--
+-- Kernel-visible certificates for short half-open ranges.  The elaborator's
+-- `finite_check` proof form constructs these recursively; the theorems below
+-- are the only bridge from the finite certificate to an ordinary bounded
+-- universal statement.
+
+module Natural.finite_range
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.add_order
+import Natural.strong_recursion
+
+-- `AllFrom(P, start, count)` records P(start), ..., P(start+count-1).
+-- It is deliberately a proposition rather than a computed Boolean: every
+-- leaf remains a proof checked by the kernel.
+inductive Natural.AllFrom (P : ℕ → Proposition)
+        : ℕ → ℕ → Proposition where
+  | Natural.AllFrom.empty
+      : (start : ℕ) → Natural.AllFrom(P, start, 0)
+  | Natural.AllFrom.prepend
+      : (start next count : ℕ)
+        → next = start + 1
+        → P(start)
+        → Natural.AllFrom(P, next, count)
+        → Natural.AllFrom(P, start, 1 + count)
+
+theorem Natural.add_left_lt_cancel (fixed x y : ℕ)
+        (ordered : fixed + x < fixed + y) : x < y := {
+  (fixed + x) + 1 ≤ fixed + y;
+  fixed + (x + 1) ≤ fixed + y;
+  x + 1 ≤ y by Natural.add_left_le_cancel;
+  done by Natural.lt_of_add_one_le
+}
+
+-- Read one offset from a certificate.  The successor case splits the offset
+-- into zero or one-plus-earlier; the constructor's explicit `next = start+1`
+-- then aligns the induction hypothesis without changing numeral spellings.
+theorem Natural.AllFrom_at_offset (P : ℕ → Proposition)
+        (start count : ℕ)
+        (certificate : Natural.AllFrom(P, start, count))
+        : ∀ (offset : ℕ). offset < count → P(start + offset) :=
+  by induction on certificate {
+    case Natural.AllFrom.empty(certificateStart): {
+        take offset : ℕ;
+        suppose offset < 0 as impossible;
+        False by Natural.not_less_than_zero;
+        done
+      }
+    case Natural.AllFrom.prepend(
+          certificateStart, next, predecessor,
+          nextReads, first, remaining, IH): {
+        take offset : ℕ;
+        suppose offset < 1 + predecessor as offsetBelow;
+        offset = 0 ∨ ∃ (earlier : ℕ). offset = 1 + earlier
+            by Natural.zero_or_one_plus;
+        done by cases {
+          case offset = 0 as atFirst: {
+              certificateStart + offset = certificateStart
+                  by substituting atFirst;
+              done
+            }
+          case ∃ (earlier : ℕ). offset = 1 + earlier as later: {
+              choose earlier such that offset = 1 + earlier from later;
+              1 + earlier < 1 + predecessor
+                  by substituting (offset = 1 + earlier);
+              earlier < predecessor;
+              P(next + earlier)
+                  by IH(earlier, done) as atOffset;
+              certificateStart + offset
+                 = certificateStart + (1 + earlier)
+                       by substituting (offset = 1 + earlier)
+                 = (certificateStart + 1) + earlier
+                 = next + earlier by substituting nextReads;
+              done by atOffset
+            }
+        }
+      }
+  }
+
+theorem Natural.AllFrom_between (P : ℕ → Proposition)
+        (start count upper : ℕ)
+        (upperReads : upper = start + count)
+        (certificate : Natural.AllFrom(P, start, count))
+        : ∀ (value : ℕ). start ≤ value → value < upper → P(value) := {
+  take value : ℕ;
+  suppose start ≤ value as valueAbove;
+  suppose value < upper as valueBelow;
+  choose offset such that value = start + offset
+      from Natural.subtraction_witness;
+  start + offset < upper by substituting (value = start + offset);
+  start + offset < start + count by substituting upperReads;
+  offset < count by Natural.add_left_lt_cancel;
+  P(start + offset)
+      by Natural.AllFrom_at_offset(P, start, count, certificate, offset, done);
+  done by substituting (value = start + offset)
+}

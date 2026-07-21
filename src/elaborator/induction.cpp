@@ -1644,6 +1644,7 @@ bool Elaborator::hintShapeIsProofTerm(const SurfaceExpression& byHint) {
         return std::holds_alternative<SurfaceLambda>(byHint.node)
             || std::holds_alternative<SurfaceLet>(byHint.node)
             || std::holds_alternative<SurfaceRing>(byHint.node)
+            || std::holds_alternative<SurfaceFiniteCheck>(byHint.node)
             || std::holds_alternative<SurfaceField>(byHint.node);
     }
 
@@ -2910,4 +2911,3 @@ ExpressionPointer Elaborator::elaborateGiven(
         }
         return facts[matchIndex].proofTerm;
     }
-

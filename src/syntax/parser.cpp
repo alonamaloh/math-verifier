@@ -505,6 +505,15 @@ SurfaceExpressionPointer substituteSurfaceName(
                                   decide->noBinderName, std::move(newNoBody),
                                   line, column);
     }
+    if (auto* finite = std::get_if<SurfaceFiniteCheck>(&node.node)) {
+        return makeSurfaceFiniteCheck(
+            finite->binderName,
+            substituteSurfaceName(finite->lowerBound,
+                                  targetName, replacement),
+            substituteSurfaceName(finite->upperBound,
+                                  targetName, replacement),
+            line, column);
+    }
     if (auto* blockTail = std::get_if<SurfaceBlockTail>(&node.node)) {
         // The dual-reading final expression of a block — recurse into the
         // wrapped expression so a `set`-bound name inside a block's last
@@ -3613,6 +3622,30 @@ private:
 
     SurfaceExpressionPointer parseAtom() {
         const Token& current = peek();
+        // `finite_check n from LO until HI` is contextual rather than a
+        // reserved keyword: only this full prefix claims the notation, so a
+        // declaration or local named `finite_check` remains legal.  `until`
+        // is likewise an ordinary identifier; bounds stop there naturally
+        // because the language has no juxtaposition application.
+        if (current.kind == TokenKind::Identifier
+            && current.lexeme == "finite_check"
+            && peekAt(1).kind == TokenKind::Identifier
+            && peekAt(2).kind == TokenKind::KeywordFrom) {
+            Token head = consumeAny();
+            std::string binderName = consumeAny().lexeme;
+            consumeAny();  // `from`
+            SurfaceExpressionPointer lowerBound = parseExpression();
+            if (peek().kind != TokenKind::Identifier
+                || peek().lexeme != "until") {
+                throwHere("expected 'until' between the finite_check bounds "
+                          "(finite_check n from LO until HI)");
+            }
+            consumeAny();  // `until`
+            SurfaceExpressionPointer upperBound = parseExpression();
+            return makeSurfaceFiniteCheck(
+                std::move(binderName), std::move(lowerBound),
+                std::move(upperBound), head.line, head.column);
+        }
         // The fold binder form (A8): `sum k from … to … of …`,
         // `product k from … to … of …`, `fold (op) k from … to … of …`.
         // `sum`/`product`/`fold` stay ordinary identifiers everywhere

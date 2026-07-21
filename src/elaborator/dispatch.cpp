@@ -2470,6 +2470,12 @@ ExpressionPointer Elaborator::elaborateExpression(
                                   expression.line, expression.column,
                                   RingInvocation::ExplicitTactic);
         }
+        if (auto* finite =
+                std::get_if<SurfaceFiniteCheck>(&expression.node)) {
+            return elaborateFiniteCheck(
+                *finite, localBinders, expectedType,
+                expression.line, expression.column);
+        }
         if (auto* groupTactic =
                 std::get_if<SurfaceGroup>(&expression.node)) {
             return elaborateGroup(localBinders, expectedType,

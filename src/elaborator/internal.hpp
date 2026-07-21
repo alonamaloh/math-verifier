@@ -1084,6 +1084,16 @@ private:
             if (un->operand) collectMentionsInSurface(*un->operand, record);
             return;
         }
+        if (auto* finite =
+                std::get_if<SurfaceFiniteCheck>(&expression.node)) {
+            if (finite->lowerBound) {
+                collectMentionsInSurface(*finite->lowerBound, record);
+            }
+            if (finite->upperBound) {
+                collectMentionsInSurface(*finite->upperBound, record);
+            }
+            return;
+        }
         if (auto* tup =
                 std::get_if<SurfaceAnonymousTuple>(&expression.node)) {
             for (const auto& c : tup->components) {
@@ -3327,6 +3337,17 @@ private:
         ExpressionPointer expectedType,
         int line, int column,
         RingInvocation invocation);
+
+    // `finite_check n from LO until HI`: validate the bounded-universal
+    // goal, prove each numeral instance independently with the ordinary
+    // auto-prover, and assemble an inductive range certificate consumed by
+    // Natural/Integer.AllFrom_between.  Implementation lives in its own
+    // translation unit so the certificate protocol stays auditable.
+    ExpressionPointer elaborateFiniteCheck(
+        const SurfaceFiniteCheck& tactic,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column);
 
     // `group` / `monoid` tactic: prove an `=` goal over an abstract group or
     // monoid by normalising both sides (flatten associativity, drop identity,

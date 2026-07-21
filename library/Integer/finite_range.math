@@ -1,0 +1,117 @@
+-- Integer/finite_range.math
+--
+-- Integer-facing half-open range certificates.  The length remains Natural,
+-- while the certified points advance through canonical Integer numerals.
+
+module Integer.finite_range
+
+import Logic.basics
+import Equality.basics
+import Natural.finite_range
+import Integer.basics
+import Integer.addition
+import Integer.embedding
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.order
+import Integer.ground_arithmetic
+
+inductive Integer.AllFrom (P : ℤ → Proposition)
+        : ℤ → ℕ → Proposition where
+  | Integer.AllFrom.empty
+      : (start : ℤ) → Integer.AllFrom(P, start, 0)
+  | Integer.AllFrom.prepend
+      : (start next : ℤ) → (count : ℕ)
+        → next = start + 1
+        → P(start)
+        → Integer.AllFrom(P, next, count)
+        → Integer.AllFrom(P, start, 1 + count)
+
+theorem Integer.AllFrom_at_offset (P : ℤ → Proposition)
+        (start : ℤ) (count : ℕ)
+        (certificate : Integer.AllFrom(P, start, count))
+        : ∀ (offset : ℕ). offset < count
+              → P(start + (offset : ℤ)) :=
+  by induction on certificate {
+    case Integer.AllFrom.empty(certificateStart): {
+        take offset : ℕ;
+        suppose offset < 0 as impossible;
+        False by Natural.not_less_than_zero;
+        done
+      }
+    case Integer.AllFrom.prepend(
+          certificateStart, next, predecessor,
+          nextReads, first, remaining, IH): {
+        take offset : ℕ;
+        suppose offset < 1 + predecessor as offsetBelow;
+        offset = 0 ∨ ∃ (earlier : ℕ). offset = 1 + earlier
+            by Natural.zero_or_one_plus;
+        done by cases {
+          case offset = 0 as atFirst: {
+              certificateStart + (offset : ℤ) = certificateStart
+                  by substituting atFirst;
+              done
+            }
+          case ∃ (earlier : ℕ). offset = 1 + earlier as later: {
+              choose earlier such that offset = 1 + earlier from later;
+              1 + earlier < 1 + predecessor
+                  by substituting (offset = 1 + earlier);
+              earlier < predecessor by Natural.add_left_lt_cancel;
+              P(next + (earlier : ℤ))
+                  by IH(earlier, done) as atOffset;
+              certificateStart + (offset : ℤ)
+                 = certificateStart + (1 + earlier : ℤ)
+                       by substituting (offset = 1 + earlier)
+                 = (certificateStart + 1) + (earlier : ℤ)
+                 = next + (earlier : ℤ) by substituting nextReads;
+              done by atOffset
+            }
+        }
+      }
+  }
+
+theorem Integer.add_preserves_less_than (x y z : ℤ)
+        (ordered : x < y) : x + z < y + z :=
+  unfold Integer.LessThan in {
+  x + 1 ≤ y;
+  (x + 1) + z ≤ y + z by Integer.add_preserves_less_or_equal;
+  (x + z) + 1 = (x + 1) + z as sumReads;
+  (x + z) + 1 ≤ y + z by substituting sumReads;
+  done by unfolding Integer.LessThan
+  }
+
+theorem Integer.add_left_lt_cancel (fixed x y : ℤ)
+        (ordered : fixed + x < fixed + y) : x < y := {
+  (fixed + x) + -fixed < (fixed + y) + -fixed
+      by Integer.add_preserves_less_than;
+  (fixed + x) + -fixed = x + (fixed + -fixed) = x + 0 = x
+      as leftReads;
+  (fixed + y) + -fixed = y + (fixed + -fixed) = y + 0 = y
+      as rightReads;
+  x < (fixed + y) + -fixed by substituting leftReads;
+  x < y by substituting rightReads;
+  done
+}
+
+theorem Integer.AllFrom_between (P : ℤ → Proposition)
+        (start : ℤ) (count : ℕ) (upper : ℤ)
+        (upperReads : upper = start + (count : ℤ))
+        (certificate : Integer.AllFrom(P, start, count))
+        : ∀ (value : ℤ). start ≤ value → value < upper → P(value) := {
+  take value : ℤ;
+  suppose start ≤ value as valueAbove;
+  suppose value < upper as valueBelow;
+  choose offset : ℕ such that value = start + (offset : ℤ)
+      from valueAbove;
+  start + (offset : ℤ) < upper
+      by substituting (value = start + (offset : ℤ));
+  start + (offset : ℤ) < start + (count : ℤ)
+      by substituting upperReads;
+  (offset : ℤ) < (count : ℤ) by Integer.add_left_lt_cancel;
+  offset < count by Natural.to_integer.LessThan_reflects;
+  P(start + (offset : ℤ))
+      by Integer.AllFrom_at_offset(
+          P, start, count, certificate, offset, done);
+  done by substituting (value = start + (offset : ℤ))
+}

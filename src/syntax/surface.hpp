@@ -351,6 +351,18 @@ struct SurfaceDecide {
 // associativity / commutativity / distributivity lemmas.
 struct SurfaceRing { };
 
+// `finite_check n from LO until HI` — closes a bounded universal goal by
+// independently proving its finitely many instances on the half-open range
+// [LO, HI), then assembling a kernel-visible `Natural.AllFrom` or
+// `Integer.AllFrom` certificate.  The endpoints are deliberately surface
+// expressions: the elaborator validates them as closed signed literals and
+// checks that they agree with the bounds already present in the goal.
+struct SurfaceFiniteCheck {
+    std::string binderName;
+    SurfaceExpressionPointer lowerBound;
+    SurfaceExpressionPointer upperBound;
+};
+
 // `group` / `monoid` — closes an equality goal in a (abstract) group or
 // monoid by normalising both sides: flatten associativity, drop identity,
 // and (group only) cancel adjacent inverses. `allowInverses` distinguishes
@@ -668,7 +680,8 @@ struct SurfaceExpression {
         SurfaceBinaryOperation, SurfaceUnaryOperation, SurfaceFoldBinder,
         SurfaceEllipsisFold, SurfaceSeriesFold,
         SurfaceAnonymousTuple, SurfaceCases, SurfaceSorry,
-        SurfaceRing, SurfaceGroup, SurfaceModuleNormalise, SurfaceField,
+        SurfaceRing, SurfaceFiniteCheck,
+        SurfaceGroup, SurfaceModuleNormalise, SurfaceField,
         SurfaceLinearCombination,
         SurfaceCalc, SurfaceByInductionUsing,
         SurfaceStructuredClaim, SurfaceGiven, SurfaceChoose,
@@ -853,6 +866,16 @@ inline SurfaceExpressionPointer makeSurfaceDecide(
 inline SurfaceExpressionPointer makeSurfaceRing(int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceRing{}, line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceFiniteCheck(
+    std::string binderName,
+    SurfaceExpressionPointer lowerBound,
+    SurfaceExpressionPointer upperBound,
+    int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceFiniteCheck{std::move(binderName), std::move(lowerBound),
+                           std::move(upperBound)},
+        line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceGroup(
     bool allowInverses, int line, int column) {

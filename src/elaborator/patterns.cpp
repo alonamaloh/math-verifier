@@ -2251,6 +2251,20 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
             return makeSurfaceField(
                 std::move(rewrittenHypotheses), node.line, node.column);
         }
+        if (auto* finite =
+                std::get_if<SurfaceFiniteCheck>(&node.node)) {
+            return makeSurfaceFiniteCheck(
+                finite->binderName,
+                rewriteRecursiveCalls(finite->lowerBound, thisDeclName,
+                                       recursiveArgToHypothesis,
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
+                rewriteRecursiveCalls(finite->upperBound, thisDeclName,
+                                       recursiveArgToHypothesis,
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
+                node.line, node.column);
+        }
         if (auto* linearCombination =
                 std::get_if<SurfaceLinearCombination>(&node.node)) {
             return makeSurfaceLinearCombination(
