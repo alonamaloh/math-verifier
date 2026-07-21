@@ -75,6 +75,234 @@ definition Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative
       (⟨0, 0, residue⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
       corner)
 
+theorem Matrix.diagonalExtension_determinant {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (c : CommutativeRing.carrier(r))
+        : Matrix.determinant(Matrix.diagonalExtension(A, c)) = Matrix.determinant(A) * c := {
+  let D : Matrix(r, 1 + n, 1 + n) := Matrix.diagonalExtension(A, c);
+  ∀ (j : NaturalsBelow(n)). D(NaturalsBelow.top(n), NaturalsBelow.inclusion(n, j)) = CommutativeRing.zero(r)
+      by (j : NaturalsBelow(n)) ↦ {
+        Matrix.borderRow(D) = RingVector.zero(r, n) by Matrix.diagonalExtension_borderRow as rowVanishes;
+        D(NaturalsBelow.top(n), NaturalsBelow.inclusion(n, j))
+           = Matrix.borderRow(D)(j)
+           = RingVector.zero(r, n)(j) by substituting rowVanishes
+        as entryReads;
+        done by entryReads
+      }
+  as topRowVanishes;
+  Matrix.determinant(D)
+     = Matrix.determinant(Matrix.leadingBlock(D)) * Matrix.corner(D)
+         by Matrix.determinant_bordered_top_row(vanishes := topRowVanishes)
+     = Matrix.determinant(A) * Matrix.corner(D) by substituting Matrix.diagonalExtension_leadingBlock
+     = Matrix.determinant(A) * c by substituting Matrix.diagonalExtension_corner;
+  done
+}
+
+theorem Matrix.sumOfTwoSquaresPlusScaledSquareForm_determinant
+        (d : ℤ)
+        : Matrix.determinant(Matrix.sumOfTwoSquaresPlusScaledSquareForm(d)) = d := {
+  Matrix.determinant(Matrix.sumOfTwoSquaresPlusScaledSquareForm(d))
+     = Matrix.determinant(Matrix.sumOfTwoSquaresForm) * d by Matrix.diagonalExtension_determinant
+     = Matrix.determinant(Matrix.identity(Integer.commutative_ring_bundle, 2)) * d
+         by substituting Matrix.sumOfTwoSquaresForm_is_identity
+     = 1 * d by substituting Matrix.determinant_identity
+     = d by ring;
+  done
+}
+
+-- The adjugate of diag(1,1,d) sends the normalized border (0,0,r)
+-- to itself.  We prove only this action, which is exactly what the
+-- determinant calculation consumes; no entrywise adjugate formula is needed.
+theorem Matrix.sumOfTwoSquaresPlusScaledSquareForm_adjugate_normalized_border
+        (d residue : ℤ) (dNonzero : ¬(d = 0))
+        : Matrix.adjugate(Matrix.sumOfTwoSquaresPlusScaledSquareForm(d)) ·
+            (⟨0, 0, residue⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+          = (⟨0, 0, residue⟩ : RingVector(Integer.commutative_ring_bundle, 3)) := {
+  let A : Matrix(Integer.commutative_ring_bundle, 3, 3) :=
+      Matrix.sumOfTwoSquaresPlusScaledSquareForm(d);
+  let border : RingVector(Integer.commutative_ring_bundle, 3) := ⟨0, 0, residue⟩;
+  let w : RingVector(Integer.commutative_ring_bundle, 3) := Matrix.adjugate(A) · border;
+  let pair : RingVector(Integer.commutative_ring_bundle, 2) := RingVector.restrict(w);
+  let x : ℤ := pair(NaturalsBelow.firstOfTwo);
+  let y : ℤ := pair(NaturalsBelow.secondOfTwo);
+  let z : ℤ := w(NaturalsBelow.top(2));
+  pair = RingVector.twoCoordinates(x, y) by RingVector.eq_twoCoordinates as pairReads;
+  let coordinatePair : RingVector(Integer.commutative_ring_bundle, 2) := ⟨x, y⟩;
+  coordinatePair = RingVector.twoCoordinates(x, y)
+      by RingVector.coordinatePair_eq_twoCoordinates as coordinatePairReads;
+  pair = coordinatePair by {
+    pair = RingVector.twoCoordinates(x, y) by pairReads
+       = coordinatePair by coordinatePairReads;
+    done
+  }
+  as pairIsCoordinatePair;
+  w
+     = RingVector.appendCoordinate(pair, z) by RingVector.eq_appendCoordinate(w)
+     = RingVector.appendCoordinate(coordinatePair, z) by substituting pairIsCoordinatePair
+     = (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+  as wReads;
+  A · w = Matrix.determinant(A) • border by Matrix.applyVector_adjugate as adjugateAction;
+  A · w
+     = Matrix.sumOfTwoSquaresPlusScaledSquareForm(d) ·
+         (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3)) by substituting wReads
+     = (⟨x, y, d * z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+         by Matrix.sumOfTwoSquaresPlusScaledSquareForm_apply_coordinateTuple
+  as leftActionReads;
+  Matrix.determinant(A) = d by Matrix.sumOfTwoSquaresPlusScaledSquareForm_determinant as determinantReads;
+  let first : NaturalsBelow(3) := NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo);
+  let second : NaturalsBelow(3) := NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo);
+  let third : NaturalsBelow(3) := NaturalsBelow.top(2);
+  (⟨0, 0⟩ : RingVector(Integer.commutative_ring_bundle, 2))
+      = RingVector.twoCoordinates((0 : ℤ), 0)
+      by RingVector.coordinatePair_eq_twoCoordinates as zeroPairReads;
+  border(first)
+     = (⟨0, 0⟩ : RingVector(Integer.commutative_ring_bundle, 2))(NaturalsBelow.firstOfTwo)
+         by RingVector.appendCoordinate_inclusion
+     = (RingVector.twoCoordinates((0 : ℤ), 0) : RingVector(Integer.commutative_ring_bundle, 2))(
+         NaturalsBelow.firstOfTwo)
+         by substituting zeroPairReads
+     = Integer.zero by RingVector.twoCoordinates_first((0 : ℤ), 0)
+     = (0 : ℤ)
+  as borderFirst;
+  border(second)
+     = (⟨0, 0⟩ : RingVector(Integer.commutative_ring_bundle, 2))(NaturalsBelow.secondOfTwo)
+         by RingVector.appendCoordinate_inclusion
+     = (RingVector.twoCoordinates((0 : ℤ), 0) : RingVector(Integer.commutative_ring_bundle, 2))(
+         NaturalsBelow.secondOfTwo)
+         by substituting zeroPairReads
+     = Integer.zero by RingVector.twoCoordinates_second((0 : ℤ), 0)
+     = (0 : ℤ)
+  as borderSecond;
+  (A · w)(first) = (Matrix.determinant(A) • border)(first)
+      by congruenceOf((v : RingVector(Integer.commutative_ring_bundle, 3)) ↦ v(first), adjugateAction)
+  as firstAction;
+  x
+     = (⟨x, y, d * z⟩ : RingVector(Integer.commutative_ring_bundle, 3))(first)
+         by RingVector.appendCoordinate_inclusion
+     = (A · w)(first) by leftActionReads
+     = (Matrix.determinant(A) • border)(first) by firstAction
+     = Matrix.determinant(A) * border(first)
+     = d * border(first) by substituting determinantReads
+     = d * (0 : ℤ) by substituting borderFirst
+     = 0 by ring
+  as xVanishes;
+  (A · w)(second) = (Matrix.determinant(A) • border)(second)
+      by congruenceOf((v : RingVector(Integer.commutative_ring_bundle, 3)) ↦ v(second), adjugateAction)
+  as secondAction;
+  y
+     = (⟨x, y, d * z⟩ : RingVector(Integer.commutative_ring_bundle, 3))(second)
+         by RingVector.appendCoordinate_inclusion
+     = (A · w)(second) by leftActionReads
+     = (Matrix.determinant(A) • border)(second) by secondAction
+     = Matrix.determinant(A) * border(second)
+     = d * border(second) by substituting determinantReads
+     = d * (0 : ℤ) by substituting borderSecond
+     = 0 by ring
+  as yVanishes;
+  (A · w)(third) = (Matrix.determinant(A) • border)(third)
+      by congruenceOf((v : RingVector(Integer.commutative_ring_bundle, 3)) ↦ v(third), adjugateAction)
+  as thirdAction;
+  d * z
+     = (⟨x, y, d * z⟩ : RingVector(Integer.commutative_ring_bundle, 3))(third)
+         by RingVector.appendCoordinate_top
+     = (A · w)(third) by leftActionReads
+     = (Matrix.determinant(A) • border)(third) by thirdAction
+     = Matrix.determinant(A) * border(third)
+     = d * border(third) by substituting determinantReads
+     = d * residue by RingVector.appendCoordinate_top
+  as thirdProduct;
+  z = residue by Integer.multiply_cancel_left_by_nonzero(z, residue, d, dNonzero, thirdProduct) as zReads;
+  w
+     = (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3)) by wReads
+     = (⟨0, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3)) by substituting xVanishes
+     = (⟨0, 0, z⟩ : RingVector(Integer.commutative_ring_bundle, 3)) by substituting yVanishes
+     = (⟨0, 0, residue⟩ : RingVector(Integer.commutative_ring_bundle, 3)) by substituting zReads;
+  done
+}
+
+theorem Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative_determinant
+        (d residue corner : ℤ) (dNonzero : ¬(d = 0))
+        : Matrix.determinant(
+            Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(d, residue, corner))
+          = d * corner - residue * residue := {
+  let A : Matrix(Integer.commutative_ring_bundle, 3, 3) :=
+      Matrix.sumOfTwoSquaresPlusScaledSquareForm(d);
+  let border : RingVector(Integer.commutative_ring_bundle, 3) := ⟨0, 0, residue⟩;
+  let B : Matrix(Integer.commutative_ring_bundle, 1 + 3, 1 + 3) :=
+      Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(d, residue, corner);
+  Matrix.IsSymmetric(B) by Matrix.borderedAssembly_symmetric(
+      symmetric := Matrix.sumOfTwoSquaresPlusScaledSquareForm_symmetric(d)) as symmetric;
+  Matrix.leadingBlock(B) = A by Matrix.borderedAssembly_leadingBlock as blockReads;
+  Matrix.borderColumn(B) = border by Matrix.borderedAssembly_borderColumn as borderReads;
+  Matrix.corner(B) = corner by Matrix.borderedAssembly_corner as cornerReads;
+  Matrix.determinant(Matrix.leadingBlock(B))
+     = Matrix.determinant(A) by substituting blockReads
+     = d by Matrix.sumOfTwoSquaresPlusScaledSquareForm_determinant
+  as blockDeterminant;
+  Matrix.adjugate(Matrix.leadingBlock(B)) · Matrix.borderColumn(B)
+     = Matrix.adjugate(A) · Matrix.borderColumn(B) by substituting blockReads
+     = Matrix.adjugate(A) · border by substituting borderReads
+     = border by Matrix.sumOfTwoSquaresPlusScaledSquareForm_adjugate_normalized_border(
+         d, residue, dNonzero)
+  as adjugateAction;
+  RingVector.innerProduct(Matrix.adjugate(Matrix.leadingBlock(B)) · Matrix.borderColumn(B), Matrix.borderColumn(B))
+     = RingVector.innerProduct(border, Matrix.borderColumn(B)) by substituting adjugateAction
+     = RingVector.innerProduct(border, border) by substituting borderReads
+     = 0 * 0 + 0 * 0 + residue * residue by RingVector.innerProduct_threeCoordinates
+     = residue * residue by ring
+  as pairingReads;
+  Matrix.schurComplement(B)
+     = Matrix.determinant(Matrix.leadingBlock(B)) * Matrix.corner(B)
+       - RingVector.innerProduct(
+           Matrix.adjugate(Matrix.leadingBlock(B)) · Matrix.borderColumn(B), Matrix.borderColumn(B))
+     = d * Matrix.corner(B)
+       - RingVector.innerProduct(
+           Matrix.adjugate(Matrix.leadingBlock(B)) · Matrix.borderColumn(B), Matrix.borderColumn(B))
+         by substituting blockDeterminant
+     = d * corner
+       - RingVector.innerProduct(
+           Matrix.adjugate(Matrix.leadingBlock(B)) · Matrix.borderColumn(B), Matrix.borderColumn(B))
+         by substituting cornerReads
+     = d * corner - residue * residue by substituting pairingReads
+  as schurReads;
+  Matrix.determinant(Matrix.leadingBlock(B)) * Matrix.determinant(B)
+     = Matrix.determinant(Matrix.leadingBlock(B)) * Matrix.schurComplement(B)
+         by Matrix.determinant_schurComplement(symmetric := symmetric);
+  d * Matrix.determinant(B) = d * Matrix.schurComplement(B) by substituting blockDeterminant;
+  Matrix.determinant(B) = Matrix.schurComplement(B)
+      by Integer.multiply_cancel_left_by_nonzero(
+          Matrix.determinant(B), Matrix.schurComplement(B), d, dNonzero, done);
+  done by substituting schurReads
+}
+
+theorem Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentatives_not_isometric_of_unequal_invariant
+        (d residue corner otherResidue otherCorner : ℤ)
+        (dNonzero : ¬(d = 0))
+        (unequalInvariant : ¬(d * corner - residue * residue
+          = d * otherCorner - otherResidue * otherResidue))
+        : ¬(Matrix.IsIsometric(
+            Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(d, residue, corner),
+            Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(d, otherResidue, otherCorner))) := {
+  suppose Matrix.IsIsometric(
+      Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(d, residue, corner),
+      Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(d, otherResidue, otherCorner)) as isometric;
+  Matrix.determinant(
+      Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(d, otherResidue, otherCorner))
+     = Matrix.determinant(
+         Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(d, residue, corner))
+         by Matrix.isometric_determinant(isometric := isometric)
+     = d * corner - residue * residue
+         by Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative_determinant(dNonzero := dNonzero)
+  as determinantReads;
+  Matrix.determinant(
+      Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(d, otherResidue, otherCorner))
+     = d * otherCorner - otherResidue * otherResidue
+         by Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative_determinant(dNonzero := dNonzero)
+  as otherDeterminantReads;
+  d * corner - residue * residue = d * otherCorner - otherResidue * otherResidue
+      by linear_combination(determinantReads - otherDeterminantReads);
+  done
+}
+
 theorem Matrix.sumOfTwoSquaresPlusScaledSquareRankFourCandidate_isometric_shear
         (d truant a b c x y z : ℤ)
         : Matrix.IsIsometric(
