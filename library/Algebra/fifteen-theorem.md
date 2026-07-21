@@ -1,9 +1,8 @@
 # Quadratic forms and the Fifteen Theorem
 
 This development formalizes the escalation route toward the Fifteen Theorem.
-The final theorem and the deduplicated rank-three/rank-four classifications
-are not yet proved; the foundations, the raw rank-three candidate family,
-and the first exact rank-three truant are.
+The final theorem and the rank-four classification are not yet proved; the
+foundations and the complete deduplicated rank-three classification are.
 
 ## Main definitions
 
@@ -66,7 +65,7 @@ and the first exact rank-three truant are.
   `Matrix.sumOfTwoSquares_escalation_nine_candidates` and
   `Matrix.squarePlusDoubleSquare_escalation_twenty_three_candidates` then
   turn the 9 + 23 coordinate pairs into canonical bordered matrices.
-- First rank-three truants: the zero-border candidate
+- Exact rank-three truants: the zero-border candidate
   `Matrix.sumOfTwoSquaresPlusTripleSquareForm`, representing
   \(x^2+y^2+3z^2\), represents 1 through 5 and misses 6. Thus
   `Matrix.sumOfTwoSquaresPlusTripleSquareForm_truant` proves its exact truant
@@ -98,9 +97,14 @@ and the first exact rank-three truant are.
   `Matrix.squarePlusDoubleSquareCandidate_isometric_shear` specializes it
   to these candidates. The theorem
   `Matrix.squarePlusDoubleSquare_escalation_eight_representatives` is the
-  complete reduction from any escalation of \(x^2+2y^2\). Exact truants for
-  the seven representatives other than the already-known sum of three
-  squares are the next rank-three task.
+  complete reduction from any escalation of \(x^2+2y^2\). The eight exact
+  representative truants are \(14,7,10,14,10,7,7,7\) in the displayed
+  order. `Matrix.squarePlusDoubleSquareRankThreeRepresentative_truant`
+  packages those cases, while
+  `Matrix.squarePlusDoubleSquare_escalation_rank_three_truant` concludes
+  that every such escalation has truant 7, 10, or 14. Together with
+  `Matrix.sumOfTwoSquares_escalation_rank_three_truant`, every rank-three
+  escalation over either rank-two parent is now classified.
 
 ## Module path
 
@@ -109,5 +113,6 @@ Read `quadratic_form` → `integer_quadratic_form` first. Then use
 `representation_bound` as needed. The escalation spine is
 `square_form` → `truant` → `escalation` → `rank_two_escalators` →
 `rank_two_truants` → `rank_three_escalation_bounds` →
-`rank_three_truants` → `escalator_tree` → `rank_three_orbits`.
+`rank_three_truants` → `escalator_tree` → `rank_three_orbits` →
+`rank_three_representative_truants`.
 `PLAN_15_THEOREM.md` records unfinished stages.

@@ -271,6 +271,9 @@ CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
 # 2026-07-20: 397 → 397. rank_three_orbits manifest-added at ZERO counted
 # leaks; a generic bordered top-shear identity and its x²+2y² specialization
 # reduce all 23 remaining rank-three candidates to eight representatives.
+# 2026-07-20: 397 → 397. rank_three_representative_truants manifest-added at
+# ZERO counted leaks; all eight representatives have exact truants and both
+# rank-two parent branches now have complete rank-three truant classifications.
 CLEAN_LEAK_BUDGET ?= 397
 # Second, independent axis: user-written `⟨…⟩` over a logical connective
 # (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the
