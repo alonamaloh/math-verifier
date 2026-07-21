@@ -1,0 +1,78 @@
+-- Algebra/rank_four_diagonal_branch_coverage.math
+--
+-- End-to-end coverage for the second rank-four branch.  The generated files
+-- certify the finite box; this file proves that every genuine escalation has
+-- a border in that box and reconstructs it as the corresponding candidate.
+
+module Algebra.rank_four_diagonal_branch_coverage
+
+import Algebra.rank_four_diagonal_branch_classification_generated
+
+theorem Matrix.sumOfTwoSquaresPlusTripleSquareRankFourEscalation_classified
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 3, 1 + 3))
+        (escalation : Matrix.IsEscalation(Matrix.sumOfTwoSquaresPlusTripleSquareForm, B))
+        : Matrix.IsSumOfTwoSquaresPlusTripleSquareRankFourTopShearNormalForm(B) := {
+  let border : RingVector(Integer.commutative_ring_bundle, 3) := Matrix.borderColumn(B);
+  let pair : RingVector(Integer.commutative_ring_bundle, 2) := RingVector.restrict(border);
+  let a : ℤ := pair(NaturalsBelow.firstOfTwo);
+  let b : ℤ := pair(NaturalsBelow.secondOfTwo);
+  let c : ℤ := border(NaturalsBelow.top(2));
+  pair = RingVector.twoCoordinates(a, b) by RingVector.eq_twoCoordinates as pairReads;
+  let coordinatePair : RingVector(Integer.commutative_ring_bundle, 2) := ⟨a, b⟩;
+  coordinatePair = RingVector.twoCoordinates(a, b)
+      by RingVector.coordinatePair_eq_twoCoordinates as coordinatePairReads;
+  pair
+     = RingVector.twoCoordinates(a, b) by pairReads
+     = coordinatePair by coordinatePairReads
+  as pairIsCoordinatePair;
+  border
+     = RingVector.appendCoordinate(pair, c)
+         by RingVector.eq_appendCoordinate(border)
+     = RingVector.appendCoordinate(coordinatePair, c) by substituting pairIsCoordinatePair
+     = (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+  as borderReads;
+  3 * (a * a) + 3 * (b * b) + c * c < 18
+      by Matrix.sumOfTwoSquaresPlusTripleSquareRankFourEscalation_coupled_bound(
+          escalation := escalation, borderReads := borderReads) as coupledBound;
+  a * a < 6 by Integer.first_square_bound_of_weighted_sum_below_eighteen;
+  a * a < 6 < 8;
+  a * a < 8;
+  -2 ≤ a by Integer.square_below_eight_lower_box_bound as aLower;
+  a < 3 by Integer.square_below_eight_upper_box_bound as aUpper;
+  3 * (b * b) + 3 * (a * a) + c * c
+     = 3 * (a * a) + 3 * (b * b) + c * c by ring
+     < 18 by coupledBound
+  as swappedBound;
+  b * b < 6 by Integer.first_square_bound_of_weighted_sum_below_eighteen(
+      b, a, c, swappedBound);
+  b * b < 6 < 8;
+  b * b < 8;
+  -2 ≤ b by Integer.square_below_eight_lower_box_bound as bLower;
+  b < 3 by Integer.square_below_eight_upper_box_bound as bUpper;
+  c * c < 18 by Integer.third_square_bound_of_weighted_sum_below_eighteen;
+  -4 ≤ c by Integer.square_below_eighteen_lower_box_bound as cLower;
+  c < 5 by Integer.square_below_eighteen_upper_box_bound as cUpper;
+  Matrix.IsSumOfTwoSquaresPlusTripleSquareRankFourTopShearNormalForm(
+      Matrix.sumOfTwoSquaresPlusTripleSquareRankFourCandidate(a, b, c))
+      by Matrix.rankFourDiagonalBranch_finite_box_classified(
+          a, aLower, aUpper, b, bLower, bUpper, c, cLower, cUpper, coupledBound);
+  (Matrix.truant(Matrix.sumOfTwoSquaresPlusTripleSquareForm) : ℤ) = 6
+      by substituting Matrix.sumOfTwoSquaresPlusTripleSquareForm_truant as truantReads;
+  B
+     = Matrix.borderedAssembly(
+         Matrix.sumOfTwoSquaresPlusTripleSquareForm,
+         Matrix.borderColumn(B),
+         Matrix.truant(Matrix.sumOfTwoSquaresPlusTripleSquareForm))
+         by Matrix.IsEscalation.eq_borderedAssembly(escalation := escalation)
+     = Matrix.borderedAssembly(
+         Matrix.sumOfTwoSquaresPlusTripleSquareForm,
+         (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+         Matrix.truant(Matrix.sumOfTwoSquaresPlusTripleSquareForm)) by substituting borderReads
+     = Matrix.borderedAssembly(
+         Matrix.sumOfTwoSquaresPlusTripleSquareForm,
+         (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+         6) by substituting truantReads
+     = Matrix.sumOfTwoSquaresPlusTripleSquareRankFourCandidate(a, b, c)
+  as reconstructs;
+  done by substituting reconstructs
+}

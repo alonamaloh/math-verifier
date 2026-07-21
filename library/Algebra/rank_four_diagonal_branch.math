@@ -1,0 +1,669 @@
+-- Algebra/rank_four_diagonal_branch.math
+--
+-- The second rank-four branch: children of x²+y²+3z², whose truant is 6.
+-- Unlike the identity-parent pilot, a top shear only changes the third
+-- border coordinate modulo 3.  This module supplies reusable append-coordinate
+-- algebra and the compact coordinate shear certificate used by the generator.
+
+module Algebra.rank_four_diagonal_branch
+
+import Algebra.rank_four_pilot
+import Algebra.rank_three_orbits
+
+theorem RingVector.eq_appendCoordinate {r : CommutativeRing} {n : ℕ}
+        (v : RingVector(r, 1 + n))
+        : v = RingVector.appendCoordinate(RingVector.restrict(v), v(NaturalsBelow.top(n))) := {
+  ∀ (k : NaturalsBelow(1 + n)).
+      v(k) = RingVector.appendCoordinate(RingVector.restrict(v), v(NaturalsBelow.top(n)))(k)
+      by (k : NaturalsBelow(1 + n)) ↦ {
+        (∃ (i : NaturalsBelow(n)). k = NaturalsBelow.inclusion(n, i))
+          ∨ k = NaturalsBelow.top(n) by NaturalsBelow.inclusion_or_top;
+        done by cases {
+          case ∃ (i : NaturalsBelow(n)). k = NaturalsBelow.inclusion(n, i): {
+            choose i such that k = NaturalsBelow.inclusion(n, i) as atInclusion;
+            v(k)
+               = v(NaturalsBelow.inclusion(n, i)) by substituting atInclusion
+               = RingVector.restrict(v)(i)
+               = RingVector.appendCoordinate(RingVector.restrict(v), v(NaturalsBelow.top(n)))(
+                   NaturalsBelow.inclusion(n, i)) by RingVector.appendCoordinate_inclusion
+               = RingVector.appendCoordinate(RingVector.restrict(v), v(NaturalsBelow.top(n)))(k)
+                   by substituting atInclusion;
+            done
+          }
+          case k = NaturalsBelow.top(n): done by RingVector.appendCoordinate_top
+        }
+      };
+  done by RingVector.equal_of_pointwise
+}
+
+theorem RingVector.appendCoordinate_add {r : CommutativeRing} {n : ℕ}
+        (u v : RingVector(r, n)) (a b : CommutativeRing.carrier(r))
+        : RingVector.appendCoordinate(u, a) + RingVector.appendCoordinate(v, b)
+          = RingVector.appendCoordinate(u + v, a + b) := {
+  ∀ (k : NaturalsBelow(1 + n)).
+      (RingVector.appendCoordinate(u, a) + RingVector.appendCoordinate(v, b))(k)
+        = RingVector.appendCoordinate(u + v, a + b)(k)
+      by (k : NaturalsBelow(1 + n)) ↦ {
+          (∃ (i : NaturalsBelow(n)). k = NaturalsBelow.inclusion(n, i))
+            ∨ k = NaturalsBelow.top(n) by NaturalsBelow.inclusion_or_top;
+          done by cases {
+            case ∃ (i : NaturalsBelow(n)). k = NaturalsBelow.inclusion(n, i): {
+              choose i such that k = NaturalsBelow.inclusion(n, i) as atInclusion;
+              (RingVector.appendCoordinate(u, a) + RingVector.appendCoordinate(v, b))(k)
+                 = RingVector.appendCoordinate(u, a)(NaturalsBelow.inclusion(n, i))
+                   + RingVector.appendCoordinate(v, b)(NaturalsBelow.inclusion(n, i)) by substituting atInclusion
+                 = u(i) + RingVector.appendCoordinate(v, b)(NaturalsBelow.inclusion(n, i))
+                     by RingVector.appendCoordinate_inclusion
+                 = u(i) + v(i) by RingVector.appendCoordinate_inclusion
+                 = (u + v)(i)
+                 = RingVector.appendCoordinate(u + v, a + b)(NaturalsBelow.inclusion(n, i))
+                     by RingVector.appendCoordinate_inclusion
+                 = RingVector.appendCoordinate(u + v, a + b)(k) by substituting atInclusion;
+              done
+            }
+            case k = NaturalsBelow.top(n) as atTop: {
+              (RingVector.appendCoordinate(u, a) + RingVector.appendCoordinate(v, b))(k)
+                 = RingVector.appendCoordinate(u, a)(NaturalsBelow.top(n))
+                   + RingVector.appendCoordinate(v, b)(NaturalsBelow.top(n)) by substituting atTop
+                 = a + RingVector.appendCoordinate(v, b)(NaturalsBelow.top(n)) by RingVector.appendCoordinate_top
+                 = a + b by RingVector.appendCoordinate_top
+                 = RingVector.appendCoordinate(u + v, a + b)(NaturalsBelow.top(n))
+                     by RingVector.appendCoordinate_top
+                 = RingVector.appendCoordinate(u + v, a + b)(k) by substituting atTop;
+              done
+            }
+          }
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+theorem RingVector.innerProduct_appendCoordinate {r : CommutativeRing} {n : ℕ}
+        (u v : RingVector(r, n)) (a b : CommutativeRing.carrier(r))
+        : RingVector.innerProduct(RingVector.appendCoordinate(u, a), RingVector.appendCoordinate(v, b))
+          = RingVector.innerProduct(u, v) + a * b := {
+  let left : RingVector(r, 1 + n) := RingVector.appendCoordinate(u, a);
+  let right : RingVector(r, 1 + n) := RingVector.appendCoordinate(v, b);
+  let topBasis : RingVector(r, 1 + n) := Matrix.standardBasisRow(r, 1 + n, NaturalsBelow.top(n));
+  RingVector.restrict(left) = u by RingVector.restrict_appendCoordinate as leftRestricts;
+  left(NaturalsBelow.top(n)) = a by RingVector.appendCoordinate_top as leftTop;
+  RingVector.restrict(right) = v by RingVector.restrict_appendCoordinate as rightRestricts;
+  right(NaturalsBelow.top(n)) = b by RingVector.appendCoordinate_top as rightTop;
+  left = RingVector.extend(RingVector.restrict(left)) + left(NaturalsBelow.top(n)) • topBasis
+      by RingVector.bordered_decomposition
+     = RingVector.extend(u) + left(NaturalsBelow.top(n)) • topBasis by substituting leftRestricts
+     = RingVector.extend(u) + a • topBasis by substituting leftTop
+  as leftSplits;
+  RingVector.innerProduct(left, right)
+     = RingVector.innerProduct(RingVector.extend(u) + a • topBasis, right) by substituting leftSplits
+     = RingVector.innerProduct(RingVector.extend(u), right)
+       + RingVector.innerProduct(a • topBasis, right) by RingVector.innerProduct_add_left
+     = RingVector.innerProduct(u, RingVector.restrict(right))
+       + RingVector.innerProduct(a • topBasis, right) by RingVector.innerProduct_extend_left
+     = RingVector.innerProduct(u, v) + RingVector.innerProduct(a • topBasis, right)
+         by substituting rightRestricts
+     = RingVector.innerProduct(u, v) + a * RingVector.innerProduct(topBasis, right)
+         by RingVector.innerProduct_scale_left
+     = RingVector.innerProduct(u, v) + a * right(NaturalsBelow.top(n))
+         by RingVector.innerProduct_standardBasisRow_left
+     = RingVector.innerProduct(u, v) + a * b by substituting rightTop;
+  done
+}
+
+theorem Matrix.diagonalExtension_apply_appendCoordinate {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (c : CommutativeRing.carrier(r))
+        (symmetric : Matrix.IsSymmetric(A))
+        (v : RingVector(r, n)) (t : CommutativeRing.carrier(r))
+        : Matrix.diagonalExtension(A, c) · RingVector.appendCoordinate(v, t)
+          = RingVector.appendCoordinate(A · v, c * t) := {
+  let D : Matrix(r, 1 + n, 1 + n) := Matrix.diagonalExtension(A, c);
+  let input : RingVector(r, 1 + n) := RingVector.appendCoordinate(v, t);
+  let topBasis : RingVector(r, 1 + n) := Matrix.standardBasisRow(r, 1 + n, NaturalsBelow.top(n));
+  RingVector.restrict(input) = v by RingVector.restrict_appendCoordinate as inputRestricts;
+  input(NaturalsBelow.top(n)) = t by RingVector.appendCoordinate_top as inputTop;
+  input = RingVector.extend(RingVector.restrict(input)) + input(NaturalsBelow.top(n)) • topBasis
+      by RingVector.bordered_decomposition
+     = RingVector.extend(v) + input(NaturalsBelow.top(n)) • topBasis by substituting inputRestricts
+     = RingVector.extend(v) + t • topBasis by substituting inputTop
+  as inputSplits;
+  D · topBasis = RingVector.appendCoordinate(RingVector.zero(r, n), c) by {
+    ∀ (k : NaturalsBelow(1 + n)).
+        (D · topBasis)(k) = RingVector.appendCoordinate(RingVector.zero(r, n), c)(k)
+        by (k : NaturalsBelow(1 + n)) ↦ {
+            (∃ (i : NaturalsBelow(n)). k = NaturalsBelow.inclusion(n, i))
+              ∨ k = NaturalsBelow.top(n) by NaturalsBelow.inclusion_or_top;
+            done by cases {
+              case ∃ (i : NaturalsBelow(n)). k = NaturalsBelow.inclusion(n, i): {
+                choose i such that k = NaturalsBelow.inclusion(n, i) as atInclusion;
+                (D · topBasis)(k)
+                   = (D · topBasis)(NaturalsBelow.inclusion(n, i)) by substituting atInclusion
+                   = D(NaturalsBelow.inclusion(n, i), NaturalsBelow.top(n))
+                       by Matrix.applyVector_standardBasisRow
+                   = Matrix.borderColumn(D)(i)
+                   = RingVector.zero(r, n)(i) by Matrix.diagonalExtension_borderColumn
+                   = RingVector.appendCoordinate(RingVector.zero(r, n), c)(NaturalsBelow.inclusion(n, i))
+                       by RingVector.appendCoordinate_inclusion
+                   = RingVector.appendCoordinate(RingVector.zero(r, n), c)(k) by substituting atInclusion;
+                done
+              }
+              case k = NaturalsBelow.top(n) as atTop: {
+                (D · topBasis)(k)
+                   = (D · topBasis)(NaturalsBelow.top(n)) by substituting atTop
+                   = D(NaturalsBelow.top(n), NaturalsBelow.top(n)) by Matrix.applyVector_standardBasisRow
+                   = Matrix.corner(D)
+                   = c by Matrix.diagonalExtension_corner
+                   = RingVector.appendCoordinate(RingVector.zero(r, n), c)(NaturalsBelow.top(n))
+                       by RingVector.appendCoordinate_top
+                   = RingVector.appendCoordinate(RingVector.zero(r, n), c)(k) by substituting atTop;
+                done
+              }
+            }
+          };
+    done by RingVector.equal_of_pointwise
+  }
+  as topAction;
+  D · input
+     = D · (RingVector.extend(v) + t • topBasis) by substituting inputSplits
+     = D · RingVector.extend(v) + D · (t • topBasis) by Matrix.applyVector_add
+     = RingVector.extend(A · v) + D · (t • topBasis)
+         by Matrix.diagonalExtension_apply_extend(A := A, c := c, symmetric := symmetric, v := v)
+     = RingVector.extend(A · v) + t • (D · topBasis) by Matrix.applyVector_scale
+     = RingVector.extend(A · v) + t • RingVector.appendCoordinate(RingVector.zero(r, n), c)
+         by substituting topAction
+  as actionSplits;
+  ∀ (k : NaturalsBelow(1 + n)).
+      (RingVector.extend(A · v) + t • RingVector.appendCoordinate(RingVector.zero(r, n), c))(k)
+        = RingVector.appendCoordinate(A · v, c * t)(k)
+      by (k : NaturalsBelow(1 + n)) ↦ {
+          (∃ (i : NaturalsBelow(n)). k = NaturalsBelow.inclusion(n, i))
+            ∨ k = NaturalsBelow.top(n) by NaturalsBelow.inclusion_or_top;
+          done by cases {
+            case ∃ (i : NaturalsBelow(n)). k = NaturalsBelow.inclusion(n, i): {
+              choose i such that k = NaturalsBelow.inclusion(n, i) as atInclusion;
+              (RingVector.extend(A · v) + t • RingVector.appendCoordinate(RingVector.zero(r, n), c))(k)
+                 = RingVector.extend(A · v)(NaturalsBelow.inclusion(n, i))
+                   + t * RingVector.appendCoordinate(RingVector.zero(r, n), c)(NaturalsBelow.inclusion(n, i))
+                     by substituting atInclusion
+                 = (A · v)(i)
+                   + t * RingVector.appendCoordinate(RingVector.zero(r, n), c)(NaturalsBelow.inclusion(n, i))
+                     by RingVector.extend_inclusion
+                 = (A · v)(i) + t * RingVector.zero(r, n)(i)
+                     by RingVector.appendCoordinate_inclusion
+                 = (A · v)(i) by ring
+                 = RingVector.appendCoordinate(A · v, c * t)(NaturalsBelow.inclusion(n, i))
+                     by RingVector.appendCoordinate_inclusion
+                 = RingVector.appendCoordinate(A · v, c * t)(k) by substituting atInclusion;
+              done
+            }
+            case k = NaturalsBelow.top(n) as atTop: {
+              (RingVector.extend(A · v) + t • RingVector.appendCoordinate(RingVector.zero(r, n), c))(k)
+                 = RingVector.extend(A · v)(NaturalsBelow.top(n))
+                   + t * RingVector.appendCoordinate(RingVector.zero(r, n), c)(NaturalsBelow.top(n))
+                     by substituting atTop
+                 = CommutativeRing.zero(r)
+                   + t * RingVector.appendCoordinate(RingVector.zero(r, n), c)(NaturalsBelow.top(n))
+                     by RingVector.extend_top
+                 = CommutativeRing.zero(r) + t * c by RingVector.appendCoordinate_top
+                 = c * t by ring
+                 = RingVector.appendCoordinate(A · v, c * t)(NaturalsBelow.top(n))
+                     by RingVector.appendCoordinate_top
+                 = RingVector.appendCoordinate(A · v, c * t)(k) by substituting atTop;
+              done
+            }
+          }
+        };
+  RingVector.extend(A · v) + t • RingVector.appendCoordinate(RingVector.zero(r, n), c)
+      = RingVector.appendCoordinate(A · v, c * t) by RingVector.equal_of_pointwise as outputReads;
+  D · input
+     = RingVector.extend(A · v) + t • RingVector.appendCoordinate(RingVector.zero(r, n), c) by actionSplits
+     = RingVector.appendCoordinate(A · v, c * t) by outputReads;
+  done
+}
+
+theorem RingVector.innerProduct_threeCoordinates
+        (a b c x y z : ℤ)
+        : RingVector.innerProduct(
+            (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+            (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+          = a * x + b * y + c * z := {
+  let leftPair : RingVector(Integer.commutative_ring_bundle, 2) := ⟨a, b⟩;
+  let rightPair : RingVector(Integer.commutative_ring_bundle, 2) := ⟨x, y⟩;
+  leftPair = RingVector.twoCoordinates(a, b) by RingVector.coordinatePair_eq_twoCoordinates as leftPairReads;
+  rightPair = RingVector.twoCoordinates(x, y) by RingVector.coordinatePair_eq_twoCoordinates as rightPairReads;
+  RingVector.innerProduct((⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+      (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+     = RingVector.innerProduct(leftPair, rightPair) + c * z by RingVector.innerProduct_appendCoordinate
+     = RingVector.innerProduct(
+         (RingVector.twoCoordinates(a, b) : RingVector(Integer.commutative_ring_bundle, 2)), rightPair) + c * z
+         by substituting leftPairReads
+     = RingVector.innerProduct(
+         (RingVector.twoCoordinates(a, b) : RingVector(Integer.commutative_ring_bundle, 2)),
+         (RingVector.twoCoordinates(x, y) : RingVector(Integer.commutative_ring_bundle, 2))) + c * z
+         by substituting rightPairReads
+     = (a * x + b * y) + c * z by RingVector.innerProduct_twoCoordinates
+     = a * x + b * y + c * z;
+  done
+}
+
+theorem RingVector.threeCoordinates_add
+        (a b c x y z : ℤ)
+        : (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)) + ⟨x, y, z⟩
+          = (⟨a + x, b + y, c + z⟩ : RingVector(Integer.commutative_ring_bundle, 3)) := {
+  let leftPair : RingVector(Integer.commutative_ring_bundle, 2) := ⟨a, b⟩;
+  let rightPair : RingVector(Integer.commutative_ring_bundle, 2) := ⟨x, y⟩;
+  let resultPair : RingVector(Integer.commutative_ring_bundle, 2) := ⟨a + x, b + y⟩;
+  leftPair = RingVector.twoCoordinates(a, b) by RingVector.coordinatePair_eq_twoCoordinates as leftPairReads;
+  rightPair = RingVector.twoCoordinates(x, y) by RingVector.coordinatePair_eq_twoCoordinates as rightPairReads;
+  resultPair = RingVector.twoCoordinates(a + x, b + y) by RingVector.coordinatePair_eq_twoCoordinates as resultPairReads;
+  leftPair + rightPair
+     = (RingVector.twoCoordinates(a, b) : RingVector(Integer.commutative_ring_bundle, 2)) + rightPair
+         by substituting leftPairReads
+     = (RingVector.twoCoordinates(a, b) : RingVector(Integer.commutative_ring_bundle, 2))
+       + (RingVector.twoCoordinates(x, y) : RingVector(Integer.commutative_ring_bundle, 2))
+         by substituting rightPairReads
+     = (RingVector.twoCoordinates(a + x, b + y) : RingVector(Integer.commutative_ring_bundle, 2))
+         by RingVector.twoCoordinates_add
+     = resultPair by resultPairReads
+  as pairsAdd;
+  (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)) + ⟨x, y, z⟩
+     = RingVector.appendCoordinate(leftPair + rightPair, c + z) by RingVector.appendCoordinate_add
+     = RingVector.appendCoordinate(resultPair, c + z) by substituting pairsAdd
+     = (⟨a + x, b + y, c + z⟩ : RingVector(Integer.commutative_ring_bundle, 3));
+  done
+}
+
+theorem Matrix.sumOfTwoSquaresPlusTripleSquareForm_apply_coordinateTuple
+        (x y z : ℤ)
+        : Matrix.sumOfTwoSquaresPlusTripleSquareForm ·
+            (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+          = (⟨x, y, 3 * z⟩ : RingVector(Integer.commutative_ring_bundle, 3)) := {
+  let pair : RingVector(Integer.commutative_ring_bundle, 2) := ⟨x, y⟩;
+  Matrix.sumOfTwoSquaresForm · pair
+     = Matrix.identity(Integer.commutative_ring_bundle, 2) · pair
+         by substituting Matrix.sumOfTwoSquaresForm_is_identity
+     = pair by Matrix.applyVector_identity
+  as parentAction;
+  Matrix.sumOfTwoSquaresPlusTripleSquareForm ·
+      (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+     = RingVector.appendCoordinate(Matrix.sumOfTwoSquaresForm · pair, 3 * z)
+         by Matrix.diagonalExtension_apply_appendCoordinate(
+             symmetric := Matrix.sumOfTwoSquaresForm_symmetric)
+     = RingVector.appendCoordinate(pair, 3 * z) by substituting parentAction
+     = (⟨x, y, 3 * z⟩ : RingVector(Integer.commutative_ring_bundle, 3));
+  done
+}
+
+definition Matrix.sumOfTwoSquaresPlusTripleSquareRankFourCandidate
+        (a b c : ℤ) : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+  Matrix.borderedAssembly(
+      Matrix.sumOfTwoSquaresPlusTripleSquareForm,
+      (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+      6)
+
+definition Matrix.sumOfTwoSquaresPlusTripleSquareRankFourRepresentative
+        (residue corner : ℤ) : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+  Matrix.borderedAssembly(
+      Matrix.sumOfTwoSquaresPlusTripleSquareForm,
+      (⟨0, 0, residue⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+      corner)
+
+definition Matrix.IsSumOfTwoSquaresPlusTripleSquareRankFourTopShearNormalForm
+        (B : Matrix(Integer.commutative_ring_bundle, 4, 4)) : Proposition :=
+  Matrix.IsIsometric(B, Matrix.sumOfTwoSquaresPlusTripleSquareRankFourRepresentative(-1, 1))
+    ∨ Matrix.IsIsometric(B, Matrix.sumOfTwoSquaresPlusTripleSquareRankFourRepresentative(-1, 2))
+    ∨ Matrix.IsIsometric(B, Matrix.sumOfTwoSquaresPlusTripleSquareRankFourRepresentative(-1, 3))
+    ∨ Matrix.IsIsometric(B, Matrix.sumOfTwoSquaresPlusTripleSquareRankFourRepresentative(-1, 4))
+    ∨ Matrix.IsIsometric(B, Matrix.sumOfTwoSquaresPlusTripleSquareRankFourRepresentative(-1, 5))
+    ∨ Matrix.IsIsometric(B, Matrix.sumOfTwoSquaresPlusTripleSquareRankFourRepresentative(-1, 6))
+    ∨ Matrix.IsIsometric(B, Matrix.sumOfTwoSquaresPlusTripleSquareRankFourRepresentative(0, 1))
+    ∨ Matrix.IsIsometric(B, Matrix.sumOfTwoSquaresPlusTripleSquareRankFourRepresentative(0, 2))
+    ∨ Matrix.IsIsometric(B, Matrix.sumOfTwoSquaresPlusTripleSquareRankFourRepresentative(0, 3))
+    ∨ Matrix.IsIsometric(B, Matrix.sumOfTwoSquaresPlusTripleSquareRankFourRepresentative(0, 4))
+    ∨ Matrix.IsIsometric(B, Matrix.sumOfTwoSquaresPlusTripleSquareRankFourRepresentative(0, 5))
+    ∨ Matrix.IsIsometric(B, Matrix.sumOfTwoSquaresPlusTripleSquareRankFourRepresentative(0, 6))
+    ∨ Matrix.IsIsometric(B, Matrix.sumOfTwoSquaresPlusTripleSquareRankFourRepresentative(1, 1))
+    ∨ Matrix.IsIsometric(B, Matrix.sumOfTwoSquaresPlusTripleSquareRankFourRepresentative(1, 2))
+    ∨ Matrix.IsIsometric(B, Matrix.sumOfTwoSquaresPlusTripleSquareRankFourRepresentative(1, 3))
+    ∨ Matrix.IsIsometric(B, Matrix.sumOfTwoSquaresPlusTripleSquareRankFourRepresentative(1, 4))
+    ∨ Matrix.IsIsometric(B, Matrix.sumOfTwoSquaresPlusTripleSquareRankFourRepresentative(1, 5))
+    ∨ Matrix.IsIsometric(B, Matrix.sumOfTwoSquaresPlusTripleSquareRankFourRepresentative(1, 6))
+
+-- The integral Schur-complement test uses (-3a,-3b,-c,3).  Its value is
+-- three times 18-(3a²+3b²+c²), so positive-definiteness gives exactly the
+-- coupled finite-search bound used by the generated classifier.
+theorem Matrix.sumOfTwoSquaresPlusTripleSquareRankFourEscalation_coupled_bound
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 3, 1 + 3))
+        (escalation : Matrix.IsEscalation(Matrix.sumOfTwoSquaresPlusTripleSquareForm, B))
+        (a b c : ℤ)
+        (borderReads : Matrix.borderColumn(B)
+          = (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+        : 3 * (a * a) + 3 * (b * b) + c * c < 18 := {
+  let eliminatingBase : RingVector(Integer.commutative_ring_bundle, 3) := ⟨-3 * a, -3 * b, -c⟩;
+  let eliminatingVector : RingVector(Integer.commutative_ring_bundle, 1 + 3) :=
+      RingVector.appendCoordinate(eliminatingBase, 3);
+  RingVector.restrict(eliminatingVector) = eliminatingBase
+      by RingVector.restrict_appendCoordinate as restrictionReads;
+  eliminatingVector(NaturalsBelow.top(3)) = 3 by RingVector.appendCoordinate_top as topReads;
+  ¬(eliminatingVector = RingVector.zero(Integer.commutative_ring_bundle, 1 + 3)) by {
+    suppose eliminatingVector = RingVector.zero(Integer.commutative_ring_bundle, 1 + 3) as vectorZero;
+    (3 : ℤ)
+       = eliminatingVector(NaturalsBelow.top(3)) by topReads
+       = RingVector.zero(Integer.commutative_ring_bundle, 1 + 3)(NaturalsBelow.top(3)) by substituting vectorZero
+       = 0;
+    ¬((3 : ℤ) = 0);
+    done
+  };
+  Matrix.leadingBlock(B) = Matrix.sumOfTwoSquaresPlusTripleSquareForm
+      by Matrix.IsEscalation.block as blockReads;
+  (Matrix.truant(Matrix.sumOfTwoSquaresPlusTripleSquareForm) : ℤ) = 6
+      by substituting Matrix.sumOfTwoSquaresPlusTripleSquareForm_truant as truantReads;
+  Matrix.corner(B) = (6 : ℤ) by {
+    Matrix.corner(B)
+       = (Matrix.truant(Matrix.sumOfTwoSquaresPlusTripleSquareForm) : ℤ)
+           by Matrix.IsEscalation.corner_is_truant;
+    done by substituting truantReads
+  }
+  as cornerReads;
+  Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusTripleSquareForm, eliminatingBase)
+     = (-3 * a) * (-3 * a) + (-3 * b) * (-3 * b) + 3 * ((-c) * (-c))
+         by Matrix.sumOfTwoSquaresPlusTripleSquareForm_coordinateTuple_value
+     = 9 * (a * a) + 9 * (b * b) + 3 * (c * c) by ring
+  as baseValueReads;
+  RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B))
+     = RingVector.innerProduct(eliminatingBase,
+         (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3))) by substituting borderReads
+     = (-3 * a) * a + (-3 * b) * b + (-c) * c by RingVector.innerProduct_threeCoordinates
+     = -3 * (a * a) + -3 * (b * b) + -(c * c) by ring
+  as leftPairingReads;
+  RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
+     = RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B)) by RingVector.innerProduct_symmetric
+     = -3 * (a * a) + -3 * (b * b) + -(c * c) by leftPairingReads
+  as rightPairingReads;
+  Matrix.quadraticForm(B, eliminatingVector)
+     = Matrix.quadraticForm(Matrix.leadingBlock(B), RingVector.restrict(eliminatingVector))
+       + eliminatingVector(NaturalsBelow.top(3))
+         * RingVector.innerProduct(RingVector.restrict(eliminatingVector), Matrix.borderColumn(B))
+       + eliminatingVector(NaturalsBelow.top(3))
+         * RingVector.innerProduct(Matrix.borderColumn(B), RingVector.restrict(eliminatingVector))
+       + (eliminatingVector(NaturalsBelow.top(3)) * eliminatingVector(NaturalsBelow.top(3))) * Matrix.corner(B)
+         by Matrix.quadraticForm_bordered(symmetric := Matrix.IsEscalation.symmetric(escalation := escalation))
+     = Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusTripleSquareForm, RingVector.restrict(eliminatingVector))
+       + eliminatingVector(NaturalsBelow.top(3))
+         * RingVector.innerProduct(RingVector.restrict(eliminatingVector), Matrix.borderColumn(B))
+       + eliminatingVector(NaturalsBelow.top(3))
+         * RingVector.innerProduct(Matrix.borderColumn(B), RingVector.restrict(eliminatingVector))
+       + (eliminatingVector(NaturalsBelow.top(3)) * eliminatingVector(NaturalsBelow.top(3))) * Matrix.corner(B)
+         by congruenceOf(
+             (block : Matrix(Integer.commutative_ring_bundle, 3, 3)) ↦
+               Matrix.quadraticForm(block, RingVector.restrict(eliminatingVector))
+               + eliminatingVector(NaturalsBelow.top(3))
+                 * RingVector.innerProduct(RingVector.restrict(eliminatingVector), Matrix.borderColumn(B))
+               + eliminatingVector(NaturalsBelow.top(3))
+                 * RingVector.innerProduct(Matrix.borderColumn(B), RingVector.restrict(eliminatingVector))
+               + (eliminatingVector(NaturalsBelow.top(3)) * eliminatingVector(NaturalsBelow.top(3))) * Matrix.corner(B),
+             blockReads)
+     = Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusTripleSquareForm, eliminatingBase)
+       + eliminatingVector(NaturalsBelow.top(3))
+         * RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B))
+       + eliminatingVector(NaturalsBelow.top(3))
+         * RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
+       + (eliminatingVector(NaturalsBelow.top(3)) * eliminatingVector(NaturalsBelow.top(3))) * Matrix.corner(B)
+         by substituting restrictionReads
+     = Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusTripleSquareForm, eliminatingBase)
+       + 3 * RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B))
+       + 3 * RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
+       + (3 * 3) * Matrix.corner(B) by substituting topReads
+     = Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusTripleSquareForm, eliminatingBase)
+       + 3 * RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B))
+       + 3 * RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
+       + (3 * 3) * 6 by substituting cornerReads
+     = (9 * (a * a) + 9 * (b * b) + 3 * (c * c))
+       + 3 * RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B))
+       + 3 * RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
+       + (3 * 3) * 6 by substituting baseValueReads
+     = (9 * (a * a) + 9 * (b * b) + 3 * (c * c))
+       + 3 * (-3 * (a * a) + -3 * (b * b) + -(c * c))
+       + 3 * RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
+       + (3 * 3) * 6 by substituting leftPairingReads
+     = (9 * (a * a) + 9 * (b * b) + 3 * (c * c))
+       + 3 * (-3 * (a * a) + -3 * (b * b) + -(c * c))
+       + 3 * (-3 * (a * a) + -3 * (b * b) + -(c * c))
+       + (3 * 3) * 6 by substituting rightPairingReads
+     = 3 * (18 - (3 * (a * a) + 3 * (b * b) + c * c)) by ring
+  as eliminatingValueReads;
+  Matrix.IsPositiveDefinite(B) by Matrix.IsEscalation.positive_definite as positiveDefinite;
+  Matrix.quadraticForm(B, eliminatingVector) > 0
+      by positiveDefinite;
+  3 * (18 - (3 * (a * a) + 3 * (b * b) + c * c)) > 0 by substituting eliminatingValueReads;
+  3 > (0 : ℤ);
+  18 - (3 * (a * a) + 3 * (b * b) + c * c) > 0
+      by Integer.positive_of_multiply_positive;
+  done by Integer.lt_of_positive_difference
+}
+
+theorem Integer.first_square_bound_of_weighted_sum_below_eighteen
+        (a b c : ℤ)
+        (bound : 3 * (a * a) + 3 * (b * b) + c * c < 18)
+        : a * a < 6 := {
+  (0 : ℤ) ≤ b * b by Integer.zero_less_or_equal_of_nonneg as bSquareNonnegative;
+  (0 : ℤ)
+     = 3 * 0
+     ≤ 3 * (b * b) by Integer.multiply_le_by_natural(3, 0, b * b, bSquareNonnegative)
+  as weightedBSquareNonnegative;
+  (0 : ℤ) ≤ c * c by Integer.zero_less_or_equal_of_nonneg;
+  c * c
+     = 0 + c * c
+     ≤ 3 * (b * b) + c * c by Integer.add_preserves_less_or_equal(
+         0, 3 * (b * b), c * c, weightedBSquareNonnegative);
+  (0 : ℤ) ≤ 3 * (b * b) + c * c by Integer.LessOrEqual.transitive as remainderNonnegative;
+  3 * (a * a)
+     = 0 + 3 * (a * a)
+     ≤ (3 * (b * b) + c * c) + 3 * (a * a)
+         by Integer.add_preserves_less_or_equal(0, 3 * (b * b) + c * c, 3 * (a * a), remainderNonnegative)
+     = 3 * (a * a) + 3 * (b * b) + c * c by ring
+     < 18 by bound
+     = 3 * 6 by ring;
+  3 > (0 : ℤ);
+  done by Integer.cancel_lt_by_positive
+}
+
+theorem Integer.third_square_bound_of_weighted_sum_below_eighteen
+        (a b c : ℤ)
+        (bound : 3 * (a * a) + 3 * (b * b) + c * c < 18)
+        : c * c < 18 := {
+  (0 : ℤ) ≤ a * a by Integer.zero_less_or_equal_of_nonneg as aSquareNonnegative;
+  (0 : ℤ) = 3 * 0 ≤ 3 * (a * a)
+      by Integer.multiply_le_by_natural(3, 0, a * a, aSquareNonnegative) as weightedANonnegative;
+  (0 : ℤ) ≤ b * b by Integer.zero_less_or_equal_of_nonneg as bSquareNonnegative;
+  (0 : ℤ) = 3 * 0 ≤ 3 * (b * b)
+      by Integer.multiply_le_by_natural(3, 0, b * b, bSquareNonnegative);
+  3 * (b * b)
+     = 0 + 3 * (b * b)
+     ≤ 3 * (a * a) + 3 * (b * b)
+         by Integer.add_preserves_less_or_equal(0, 3 * (a * a), 3 * (b * b), weightedANonnegative);
+  (0 : ℤ) ≤ 3 * (a * a) + 3 * (b * b) by Integer.LessOrEqual.transitive as weightedSumNonnegative;
+  c * c
+     = 0 + c * c
+     ≤ (3 * (a * a) + 3 * (b * b)) + c * c
+         by Integer.add_preserves_less_or_equal(0, 3 * (a * a) + 3 * (b * b), c * c, weightedSumNonnegative)
+     = 3 * (a * a) + 3 * (b * b) + c * c by ring
+     < 18 by bound;
+  done
+}
+
+theorem Integer.square_below_eight_lower_box_bound (x : ℤ) (bound : x * x < 8)
+        : -2 ≤ x := {
+  x = -2 ∨ x = -1 ∨ x = 0 ∨ x = 1 ∨ x = 2 by Integer.square_below_eight;
+  done by cases {
+    case x = -2: done
+    case x = -1 ∨ x = 0 ∨ x = 1 ∨ x = 2: done by cases {
+      case x = -1: done
+      case x = 0 ∨ x = 1 ∨ x = 2: done by cases {
+        case x = 0: done
+        case x = 1 ∨ x = 2: done by cases { case x = 1: done case x = 2: done }
+      }
+    }
+  }
+}
+
+theorem Integer.square_below_eight_upper_box_bound (x : ℤ) (bound : x * x < 8)
+        : x < 3 := {
+  x = -2 ∨ x = -1 ∨ x = 0 ∨ x = 1 ∨ x = 2 by Integer.square_below_eight;
+  done by cases {
+    case x = -2: done
+    case x = -1 ∨ x = 0 ∨ x = 1 ∨ x = 2: done by cases {
+      case x = -1: done
+      case x = 0 ∨ x = 1 ∨ x = 2: done by cases {
+        case x = 0: done
+        case x = 1 ∨ x = 2: done by cases { case x = 1: done case x = 2: done }
+      }
+    }
+  }
+}
+
+theorem Integer.square_below_eighteen_lower_box_bound (x : ℤ) (bound : x * x < 18)
+        : -4 ≤ x := {
+  x = -4 ∨ x = -3 ∨ x = -2 ∨ x = -1 ∨ x = 0 ∨ x = 1 ∨ x = 2 ∨ x = 3 ∨ x = 4
+      by Integer.square_below_eighteen;
+  done by cases {
+    case x = -4: done
+    case x = -3 ∨ x = -2 ∨ x = -1 ∨ x = 0 ∨ x = 1 ∨ x = 2 ∨ x = 3 ∨ x = 4: done by cases {
+      case x = -3: done
+      case x = -2 ∨ x = -1 ∨ x = 0 ∨ x = 1 ∨ x = 2 ∨ x = 3 ∨ x = 4: done by cases {
+        case x = -2: done
+        case x = -1 ∨ x = 0 ∨ x = 1 ∨ x = 2 ∨ x = 3 ∨ x = 4: done by cases {
+          case x = -1: done
+          case x = 0 ∨ x = 1 ∨ x = 2 ∨ x = 3 ∨ x = 4: done by cases {
+            case x = 0: done
+            case x = 1 ∨ x = 2 ∨ x = 3 ∨ x = 4: done by cases {
+              case x = 1: done
+              case x = 2 ∨ x = 3 ∨ x = 4: done by cases {
+                case x = 2: done
+                case x = 3 ∨ x = 4: done by cases { case x = 3: done case x = 4: done }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+theorem Integer.square_below_eighteen_upper_box_bound (x : ℤ) (bound : x * x < 18)
+        : x < 5 := {
+  x = -4 ∨ x = -3 ∨ x = -2 ∨ x = -1 ∨ x = 0 ∨ x = 1 ∨ x = 2 ∨ x = 3 ∨ x = 4
+      by Integer.square_below_eighteen;
+  done by cases {
+    case x = -4: done
+    case x = -3 ∨ x = -2 ∨ x = -1 ∨ x = 0 ∨ x = 1 ∨ x = 2 ∨ x = 3 ∨ x = 4: done by cases {
+      case x = -3: done
+      case x = -2 ∨ x = -1 ∨ x = 0 ∨ x = 1 ∨ x = 2 ∨ x = 3 ∨ x = 4: done by cases {
+        case x = -2: done
+        case x = -1 ∨ x = 0 ∨ x = 1 ∨ x = 2 ∨ x = 3 ∨ x = 4: done by cases {
+          case x = -1: done
+          case x = 0 ∨ x = 1 ∨ x = 2 ∨ x = 3 ∨ x = 4: done by cases {
+            case x = 0: done
+            case x = 1 ∨ x = 2 ∨ x = 3 ∨ x = 4: done by cases {
+              case x = 1: done
+              case x = 2 ∨ x = 3 ∨ x = 4: done by cases {
+                case x = 2: done
+                case x = 3 ∨ x = 4: done by cases { case x = 3: done case x = 4: done }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+theorem Matrix.sumOfTwoSquaresPlusTripleSquareRankFourCandidate_isometric_shear
+        (a b c x y z : ℤ)
+        : Matrix.IsIsometric(
+            Matrix.sumOfTwoSquaresPlusTripleSquareRankFourCandidate(a, b, c),
+            Matrix.borderedAssembly(
+              Matrix.sumOfTwoSquaresPlusTripleSquareForm,
+              (⟨a + x, b + y, c + 3 * z⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+              6 + 2 * (a * x + b * y + c * z) + x * x + y * y + 3 * (z * z))) := {
+  let border : RingVector(Integer.commutative_ring_bundle, 3) := ⟨a, b, c⟩;
+  let shift : RingVector(Integer.commutative_ring_bundle, 3) := ⟨x, y, z⟩;
+  Matrix.IsIsometric(
+      Matrix.borderedAssembly(Matrix.sumOfTwoSquaresPlusTripleSquareForm, border, 6),
+      Matrix.borderedAssembly(
+          Matrix.sumOfTwoSquaresPlusTripleSquareForm,
+          border + Matrix.sumOfTwoSquaresPlusTripleSquareForm · shift,
+          6 + RingVector.innerProduct(border, shift) + RingVector.innerProduct(border, shift)
+            + Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusTripleSquareForm, shift)))
+      by Matrix.borderedAssembly_isometric_topShear(
+          symmetric := Matrix.sumOfTwoSquaresPlusTripleSquareForm_symmetric);
+  Matrix.sumOfTwoSquaresPlusTripleSquareForm · shift = ⟨x, y, 3 * z⟩
+      by Matrix.sumOfTwoSquaresPlusTripleSquareForm_apply_coordinateTuple as actionReads;
+  border + Matrix.sumOfTwoSquaresPlusTripleSquareForm · shift
+     = border + (⟨x, y, 3 * z⟩ : RingVector(Integer.commutative_ring_bundle, 3)) by substituting actionReads
+     = (⟨a + x, b + y, c + 3 * z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+         by RingVector.threeCoordinates_add
+  as borderReads;
+  RingVector.innerProduct(border, shift) = a * x + b * y + c * z
+      by RingVector.innerProduct_threeCoordinates as pairingReads;
+  Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusTripleSquareForm, shift)
+     = x * x + y * y + 3 * (z * z)
+         by Matrix.sumOfTwoSquaresPlusTripleSquareForm_coordinateTuple_value as shiftValue;
+  6 + RingVector.innerProduct(border, shift) + RingVector.innerProduct(border, shift)
+      + Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusTripleSquareForm, shift)
+     = 6 + (a * x + b * y + c * z) + RingVector.innerProduct(border, shift)
+       + Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusTripleSquareForm, shift) by substituting pairingReads
+     = 6 + (a * x + b * y + c * z) + (a * x + b * y + c * z)
+       + Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusTripleSquareForm, shift) by substituting pairingReads
+     = 6 + (a * x + b * y + c * z) + (a * x + b * y + c * z)
+       + (x * x + y * y + 3 * (z * z)) by substituting shiftValue
+     = 6 + 2 * (a * x + b * y + c * z) + x * x + y * y + 3 * (z * z) by ring
+  as cornerReads;
+  Matrix.IsIsometric(
+      Matrix.borderedAssembly(Matrix.sumOfTwoSquaresPlusTripleSquareForm, border, 6),
+      Matrix.borderedAssembly(
+          Matrix.sumOfTwoSquaresPlusTripleSquareForm,
+          (⟨a + x, b + y, c + 3 * z⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+          6 + RingVector.innerProduct(border, shift) + RingVector.innerProduct(border, shift)
+            + Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusTripleSquareForm, shift)))
+      by substituting borderReads;
+  done by substituting cornerReads
+}
+
+theorem Matrix.sumOfTwoSquaresPlusTripleSquareRankFourCandidate_isometric_reduced
+        (a b c x y z residue corner : ℤ)
+        (firstVanishes : a + x = 0)
+        (secondVanishes : b + y = 0)
+        (thirdReduces : c + 3 * z = residue)
+        (cornerReduces : 6 + 2 * (a * x + b * y + c * z) + x * x + y * y + 3 * (z * z) = corner)
+        : Matrix.IsIsometric(
+            Matrix.sumOfTwoSquaresPlusTripleSquareRankFourCandidate(a, b, c),
+            Matrix.sumOfTwoSquaresPlusTripleSquareRankFourRepresentative(residue, corner)) := {
+  Matrix.IsIsometric(
+      Matrix.sumOfTwoSquaresPlusTripleSquareRankFourCandidate(a, b, c),
+      Matrix.borderedAssembly(
+          Matrix.sumOfTwoSquaresPlusTripleSquareForm,
+          (⟨a + x, b + y, c + 3 * z⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+          6 + 2 * (a * x + b * y + c * z) + x * x + y * y + 3 * (z * z)))
+      by Matrix.sumOfTwoSquaresPlusTripleSquareRankFourCandidate_isometric_shear;
+  Matrix.IsIsometric(
+      Matrix.sumOfTwoSquaresPlusTripleSquareRankFourCandidate(a, b, c),
+      Matrix.borderedAssembly(
+          Matrix.sumOfTwoSquaresPlusTripleSquareForm,
+          (⟨0, b + y, c + 3 * z⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+          6 + 2 * (a * x + b * y + c * z) + x * x + y * y + 3 * (z * z)))
+      by substituting firstVanishes;
+  Matrix.IsIsometric(
+      Matrix.sumOfTwoSquaresPlusTripleSquareRankFourCandidate(a, b, c),
+      Matrix.borderedAssembly(
+          Matrix.sumOfTwoSquaresPlusTripleSquareForm,
+          (⟨0, 0, c + 3 * z⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+          6 + 2 * (a * x + b * y + c * z) + x * x + y * y + 3 * (z * z)))
+      by substituting secondVanishes;
+  Matrix.IsIsometric(
+      Matrix.sumOfTwoSquaresPlusTripleSquareRankFourCandidate(a, b, c),
+      Matrix.borderedAssembly(
+          Matrix.sumOfTwoSquaresPlusTripleSquareForm,
+          (⟨0, 0, residue⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+          6 + 2 * (a * x + b * y + c * z) + x * x + y * y + 3 * (z * z)))
+      by substituting thirdReduces;
+  done by substituting cornerReduces
+}
