@@ -9,6 +9,230 @@ module Algebra.rank_four_diagonal_family
 
 import Algebra.rank_four_diagonal_branch
 
+-- Matrices are determined by their actions.  This is the convenient
+-- extensionality principle for block calculations whose vector action is
+-- simpler than their entrywise product.
+theorem Matrix.equal_of_applyVector {r : CommutativeRing} {n : ℕ}
+        (A B : Matrix(r, n, n))
+        (actions : ∀ (x : RingVector(r, n)). A · x = B · x)
+        : A = B := {
+  ∀ (i : NaturalsBelow(n)). ∀ (j : NaturalsBelow(n)). A(i, j) = B(i, j)
+      by (i : NaturalsBelow(n)) (j : NaturalsBelow(n)) ↦ {
+        let e : RingVector(r, n) := Matrix.standardBasisRow(r, n, j);
+        A · e = B · e by actions as actionReads;
+        A(i, j)
+           = (A · e)(i) by Equality.symmetry(Matrix.applyVector_standardBasisRow(A, j, i))
+           = (B · e)(i) by congruenceOf((v : RingVector(r, n)) ↦ v(i), actionReads)
+           = B(i, j) by Matrix.applyVector_standardBasisRow;
+        done
+      };
+  done by Matrix.equal_of_entries
+}
+
+-- Read the action of a symmetric bordered matrix in block coordinates.
+theorem Matrix.borderedAssembly_apply_appendCoordinate {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (b : RingVector(r, n))
+        (c : CommutativeRing.carrier(r)) (symmetric : Matrix.IsSymmetric(A))
+        (v : RingVector(r, n)) (t : CommutativeRing.carrier(r))
+        : Matrix.borderedAssembly(A, b, c) · RingVector.appendCoordinate(v, t)
+          = RingVector.appendCoordinate(
+              A · v + t • b,
+              RingVector.innerProduct(b, v) + c * t) := {
+  let B : Matrix(r, 1 + n, 1 + n) := Matrix.borderedAssembly(A, b, c);
+  let input : RingVector(r, 1 + n) := RingVector.appendCoordinate(v, t);
+  let topBasis : RingVector(r, 1 + n) :=
+      Matrix.standardBasisRow(r, 1 + n, NaturalsBelow.top(n));
+  input
+     = RingVector.extend(RingVector.restrict(input)) + input(NaturalsBelow.top(n)) • topBasis
+         by RingVector.bordered_decomposition
+     = RingVector.extend(v) + input(NaturalsBelow.top(n)) • topBasis
+         by substituting RingVector.restrict_appendCoordinate
+     = RingVector.extend(v) + t • topBasis by substituting RingVector.appendCoordinate_top
+  as inputSplits;
+  Matrix.IsSymmetric(B) by Matrix.borderedAssembly_symmetric(
+      A := A, b := b, c := c, symmetric := symmetric) as bSymmetric;
+  Matrix.leadingBlock(B) = A by Matrix.borderedAssembly_leadingBlock as blockReads;
+  Matrix.borderColumn(B) = b by Matrix.borderedAssembly_borderColumn as borderReads;
+  Matrix.corner(B) = c by Matrix.borderedAssembly_corner as cornerReads;
+  B · input
+     = B · (RingVector.extend(v) + t • topBasis) by substituting inputSplits
+     = B · RingVector.extend(v) + B · (t • topBasis) by Matrix.applyVector_add
+     = B · RingVector.extend(v) + t • (B · topBasis) by Matrix.applyVector_scale
+  as actionSplits;
+  ∀ (k : NaturalsBelow(1 + n)).
+      (B · input)(k)
+        = RingVector.appendCoordinate(A · v + t • b, RingVector.innerProduct(b, v) + c * t)(k)
+      by (k : NaturalsBelow(1 + n)) ↦ {
+        (∃ (i : NaturalsBelow(n)). k = NaturalsBelow.inclusion(n, i))
+          ∨ k = NaturalsBelow.top(n) by NaturalsBelow.inclusion_or_top;
+        done by cases {
+          case ∃ (i : NaturalsBelow(n)). k = NaturalsBelow.inclusion(n, i): {
+            choose i such that k = NaturalsBelow.inclusion(n, i) as atInclusion;
+            (B · input)(k)
+               = (B · RingVector.extend(v) + t • (B · topBasis))(k) by substituting actionSplits
+               = (B · RingVector.extend(v) + t • (B · topBasis))(NaturalsBelow.inclusion(n, i))
+                   by substituting atInclusion
+               = (B · RingVector.extend(v))(NaturalsBelow.inclusion(n, i))
+                 + t * (B · topBasis)(NaturalsBelow.inclusion(n, i))
+               = (Matrix.leadingBlock(B) · v)(i)
+                 + t * (B · topBasis)(NaturalsBelow.inclusion(n, i))
+                   by Matrix.applyVector_extend_inclusion
+               = (A · v)(i) + t * (B · topBasis)(NaturalsBelow.inclusion(n, i))
+                   by substituting blockReads
+               = (A · v)(i) + t * B(NaturalsBelow.inclusion(n, i), NaturalsBelow.top(n))
+                   by Matrix.applyVector_standardBasisRow
+               = (A · v)(i) + t * Matrix.borderColumn(B)(i)
+               = (A · v)(i) + t * b(i) by substituting borderReads
+               = (A · v + t • b)(i)
+               = RingVector.appendCoordinate(
+                   A · v + t • b, RingVector.innerProduct(b, v) + c * t)(NaturalsBelow.inclusion(n, i))
+                   by RingVector.appendCoordinate_inclusion
+               = RingVector.appendCoordinate(
+                   A · v + t • b, RingVector.innerProduct(b, v) + c * t)(k) by substituting atInclusion;
+            done
+          }
+          case k = NaturalsBelow.top(n) as atTop: {
+            (B · input)(k)
+               = (B · RingVector.extend(v) + t • (B · topBasis))(k) by substituting actionSplits
+               = (B · RingVector.extend(v) + t • (B · topBasis))(NaturalsBelow.top(n))
+                   by substituting atTop
+               = (B · RingVector.extend(v))(NaturalsBelow.top(n))
+                 + t * (B · topBasis)(NaturalsBelow.top(n))
+               = RingVector.innerProduct(Matrix.borderColumn(B), v)
+                 + t * (B · topBasis)(NaturalsBelow.top(n))
+                   by Matrix.applyVector_extend_top(B := B, z := v, symmetric := bSymmetric)
+               = RingVector.innerProduct(b, v) + t * (B · topBasis)(NaturalsBelow.top(n))
+                   by substituting borderReads
+               = RingVector.innerProduct(b, v) + t * B(NaturalsBelow.top(n), NaturalsBelow.top(n))
+                   by Matrix.applyVector_standardBasisRow
+               = RingVector.innerProduct(b, v) + t * Matrix.corner(B)
+               = RingVector.innerProduct(b, v) + t * c by substituting cornerReads
+               = RingVector.innerProduct(b, v) + c * t by ring
+               = RingVector.appendCoordinate(
+                   A · v + t • b, RingVector.innerProduct(b, v) + c * t)(NaturalsBelow.top(n))
+                   by RingVector.appendCoordinate_top
+               = RingVector.appendCoordinate(
+                   A · v + t • b, RingVector.innerProduct(b, v) + c * t)(k) by substituting atTop;
+            done
+          }
+        }
+      };
+  done by RingVector.equal_of_pointwise
+}
+
+theorem RingVector.negatedScalar_scale {r : CommutativeRing} {n : ℕ}
+        (t : CommutativeRing.carrier(r)) (b : RingVector(r, n))
+        : CommutativeRing.negate(t) • b = t • RingVector.negate(b) := {
+  ∀ (i : NaturalsBelow(n)).
+      (CommutativeRing.negate(t) • b)(i) = (t • RingVector.negate(b))(i)
+      by (i : NaturalsBelow(n)) ↦ { done by ring };
+  done by RingVector.equal_of_pointwise
+}
+
+theorem RingVector.innerProduct_negate_left {r : CommutativeRing} {n : ℕ}
+        (b v : RingVector(r, n))
+        : RingVector.innerProduct(RingVector.negate(b), v)
+          = CommutativeRing.negate(RingVector.innerProduct(b, v)) := {
+  RingVector.innerProduct(RingVector.negate(b), v)
+     = RingVector.innerProduct(
+         CommutativeRing.negate(CommutativeRing.one(r)) • b, v)
+         by substituting RingVector.negate_scale_one
+     = CommutativeRing.negate(CommutativeRing.one(r)) * RingVector.innerProduct(b, v)
+         by RingVector.innerProduct_scale_left
+     = CommutativeRing.negate(RingVector.innerProduct(b, v)) by ring;
+  done
+}
+
+theorem RingVector.negate_oneCoordinate {r : CommutativeRing}
+        (a : CommutativeRing.carrier(r))
+        : RingVector.negate(RingVector.oneCoordinate(a))
+          = RingVector.oneCoordinate(CommutativeRing.negate(a)) := {
+  ∀ (i : NaturalsBelow(1)).
+      RingVector.negate(RingVector.oneCoordinate(a))(i)
+        = RingVector.oneCoordinate(CommutativeRing.negate(a))(i)
+      by (i : NaturalsBelow(1)) ↦ {
+        RingVector.negate(RingVector.oneCoordinate(a))(i)
+           = CommutativeRing.negate(a) by substituting RingVector.oneCoordinate_at(a, i)
+           = RingVector.oneCoordinate(CommutativeRing.negate(a))(i)
+               by RingVector.oneCoordinate_at;
+        done
+      };
+  done by RingVector.equal_of_pointwise
+}
+
+theorem RingVector.negate_appendCoordinate {r : CommutativeRing} {n : ℕ}
+        (v : RingVector(r, n)) (t : CommutativeRing.carrier(r))
+        : RingVector.negate(RingVector.appendCoordinate(v, t))
+          = RingVector.appendCoordinate(RingVector.negate(v), CommutativeRing.negate(t)) := {
+  ∀ (k : NaturalsBelow(1 + n)).
+      RingVector.negate(RingVector.appendCoordinate(v, t))(k)
+        = RingVector.appendCoordinate(RingVector.negate(v), CommutativeRing.negate(t))(k)
+      by (k : NaturalsBelow(1 + n)) ↦ {
+        (∃ (i : NaturalsBelow(n)). k = NaturalsBelow.inclusion(n, i))
+          ∨ k = NaturalsBelow.top(n) by NaturalsBelow.inclusion_or_top;
+        done by cases {
+          case ∃ (i : NaturalsBelow(n)). k = NaturalsBelow.inclusion(n, i): {
+            choose i such that k = NaturalsBelow.inclusion(n, i) as atInclusion;
+            RingVector.negate(RingVector.appendCoordinate(v, t))(k)
+               = CommutativeRing.negate(
+                   RingVector.appendCoordinate(v, t)(NaturalsBelow.inclusion(n, i))) by substituting atInclusion
+               = CommutativeRing.negate(v(i)) by RingVector.appendCoordinate_inclusion
+               = RingVector.negate(v)(i)
+               = RingVector.appendCoordinate(RingVector.negate(v), CommutativeRing.negate(t))(
+                   NaturalsBelow.inclusion(n, i)) by RingVector.appendCoordinate_inclusion
+               = RingVector.appendCoordinate(RingVector.negate(v), CommutativeRing.negate(t))(k)
+                   by substituting atInclusion;
+            done
+          }
+          case k = NaturalsBelow.top(n) as atTop: {
+            RingVector.negate(RingVector.appendCoordinate(v, t))(k)
+               = CommutativeRing.negate(RingVector.appendCoordinate(v, t)(NaturalsBelow.top(n)))
+                   by substituting atTop
+               = CommutativeRing.negate(t) by RingVector.appendCoordinate_top
+               = RingVector.appendCoordinate(RingVector.negate(v), CommutativeRing.negate(t))(
+                   NaturalsBelow.top(n)) by RingVector.appendCoordinate_top
+               = RingVector.appendCoordinate(RingVector.negate(v), CommutativeRing.negate(t))(k)
+                   by substituting atTop;
+            done
+          }
+        }
+      };
+  done by RingVector.equal_of_pointwise
+}
+
+theorem RingVector.negate_threeCoordinates
+        (a b c : ℤ)
+        : RingVector.negate(
+            (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+          = (⟨-a, -b, -c⟩ : RingVector(Integer.commutative_ring_bundle, 3)) := {
+  RingVector.negate((⟨a, b⟩ : RingVector(Integer.commutative_ring_bundle, 2)))
+     = RingVector.appendCoordinate(
+         RingVector.negate(
+           (RingVector.oneCoordinate(a) : RingVector(Integer.commutative_ring_bundle, 1))), -b)
+         by RingVector.negate_appendCoordinate
+  as pairNegates;
+  RingVector.negate(
+      (RingVector.oneCoordinate(a) : RingVector(Integer.commutative_ring_bundle, 1)))
+     = (RingVector.oneCoordinate(-a) : RingVector(Integer.commutative_ring_bundle, 1))
+         by RingVector.negate_oneCoordinate
+  as firstNegates;
+  RingVector.negate((⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+     = RingVector.appendCoordinate(
+         RingVector.negate((⟨a, b⟩ : RingVector(Integer.commutative_ring_bundle, 2))), -c)
+         by RingVector.negate_appendCoordinate
+     = RingVector.appendCoordinate(
+         RingVector.appendCoordinate(
+           RingVector.negate(
+             (RingVector.oneCoordinate(a) : RingVector(Integer.commutative_ring_bundle, 1))), -b), -c)
+         by substituting pairNegates
+     = RingVector.appendCoordinate(
+         RingVector.appendCoordinate(
+           (RingVector.oneCoordinate(-a) : RingVector(Integer.commutative_ring_bundle, 1)), -b), -c)
+         by substituting firstNegates
+     = (⟨-a, -b, -c⟩ : RingVector(Integer.commutative_ring_bundle, 3));
+  done
+}
+
 definition Matrix.sumOfTwoSquaresPlusScaledSquareForm
         (d : ℤ) : Matrix(Integer.commutative_ring_bundle, 3, 3) :=
   Matrix.diagonalExtension(Matrix.sumOfTwoSquaresForm, d)
@@ -95,6 +319,161 @@ theorem Matrix.diagonalExtension_determinant {r : CommutativeRing} {n : ℕ}
      = Matrix.determinant(A) * Matrix.corner(D) by substituting Matrix.diagonalExtension_leadingBlock
      = Matrix.determinant(A) * c by substituting Matrix.diagonalExtension_corner;
   done
+}
+
+-- Negating the new coordinate is an involutive change of basis.  On a
+-- bordered matrix it fixes the leading block and corner and negates the
+-- whole border.
+theorem Matrix.borderedAssembly_isometric_negate_border {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (b : RingVector(r, n))
+        (c : CommutativeRing.carrier(r)) (symmetric : Matrix.IsSymmetric(A))
+        : Matrix.IsIsometric(
+            Matrix.borderedAssembly(A, b, c),
+            Matrix.borderedAssembly(A, RingVector.negate(b), c)) := {
+  let identity : Matrix(r, n, n) := Matrix.identity(r, n);
+  let minusOne : CommutativeRing.carrier(r) := CommutativeRing.negate(CommutativeRing.one(r));
+  let U : Matrix(r, 1 + n, 1 + n) := Matrix.diagonalExtension(identity, minusOne);
+  let source : Matrix(r, 1 + n, 1 + n) := Matrix.borderedAssembly(A, b, c);
+  let target : Matrix(r, 1 + n, 1 + n) := Matrix.borderedAssembly(A, RingVector.negate(b), c);
+  minusOne = CommutativeRing.negate(CommutativeRing.one(r)) as minusOneReads;
+  Matrix.IsSymmetric(identity) by Matrix.transpose_identity as identitySymmetric;
+  Matrix.IsSymmetric(U) by Matrix.diagonalExtension_symmetric(
+      A := identity, c := minusOne, symmetric := identitySymmetric) as uSymmetric;
+  Matrix.determinant(U)
+     = Matrix.determinant(identity) * minusOne by Matrix.diagonalExtension_determinant
+     = CommutativeRing.one(r) * minusOne by substituting Matrix.determinant_identity
+     = minusOne by ring
+  as determinantReads;
+  Matrix.determinant(U) * minusOne
+     = minusOne * minusOne by substituting determinantReads
+     = CommutativeRing.one(r) by ring;
+  Matrix.IsInvertible(U) by Matrix.invertible_of_unit_determinant as uInvertible;
+  Uᵀ * source * U = target by Matrix.equal_of_applyVector(
+      actions := (x : RingVector(r, 1 + n)) ↦ {
+        let v : RingVector(r, n) := RingVector.restrict(x);
+        let t : CommutativeRing.carrier(r) := x(NaturalsBelow.top(n));
+        x = RingVector.appendCoordinate(v, t) by RingVector.eq_appendCoordinate(x) as xReads;
+        U · x
+           = U · RingVector.appendCoordinate(v, t) by substituting xReads
+           = RingVector.appendCoordinate(identity · v, minusOne * t)
+               by Matrix.diagonalExtension_apply_appendCoordinate(symmetric := identitySymmetric)
+           = RingVector.appendCoordinate(v, minusOne * t) by substituting Matrix.applyVector_identity
+           = RingVector.appendCoordinate(
+               v, CommutativeRing.negate(CommutativeRing.one(r)) * t) by substituting minusOneReads
+           = RingVector.appendCoordinate(
+               v, CommutativeRing.negate(CommutativeRing.one(r) * t))
+               by substituting CommutativeRing.multiply_negate_left
+           = RingVector.appendCoordinate(v, CommutativeRing.negate(t))
+               by substituting CommutativeRing.one_multiply
+        as uAction;
+        source · (U · x)
+           = source · RingVector.appendCoordinate(v, CommutativeRing.negate(t)) by substituting uAction
+           = RingVector.appendCoordinate(
+               A · v + CommutativeRing.negate(t) • b,
+               RingVector.innerProduct(b, v) + c * CommutativeRing.negate(t))
+               by Matrix.borderedAssembly_apply_appendCoordinate(symmetric := symmetric)
+        as sourceAction;
+        CommutativeRing.negate(
+            RingVector.innerProduct(b, v) + c * CommutativeRing.negate(t))
+           = CommutativeRing.negate(RingVector.innerProduct(b, v)) + c * t by {
+          c * CommutativeRing.negate(t) = CommutativeRing.negate(c * t)
+              by CommutativeRing.multiply_negate_right as productNegates;
+          CommutativeRing.negate(
+              RingVector.innerProduct(b, v) + c * CommutativeRing.negate(t))
+             = CommutativeRing.negate(RingVector.innerProduct(b, v))
+               + CommutativeRing.negate(c * CommutativeRing.negate(t))
+                 by CommutativeRing.negate_add
+             = CommutativeRing.negate(RingVector.innerProduct(b, v))
+               + CommutativeRing.negate(CommutativeRing.negate(c * t))
+                 by substituting productNegates
+             = CommutativeRing.negate(RingVector.innerProduct(b, v)) + c * t
+                 by substituting CommutativeRing.negate_negate;
+          done
+        }
+        as topNegates;
+        U · (source · (U · x))
+           = U · RingVector.appendCoordinate(
+               A · v + CommutativeRing.negate(t) • b,
+               RingVector.innerProduct(b, v) + c * CommutativeRing.negate(t))
+               by substituting sourceAction
+           = RingVector.appendCoordinate(
+               identity · (A · v + CommutativeRing.negate(t) • b),
+               minusOne * (RingVector.innerProduct(b, v) + c * CommutativeRing.negate(t)))
+               by Matrix.diagonalExtension_apply_appendCoordinate(symmetric := identitySymmetric)
+           = RingVector.appendCoordinate(
+               A · v + CommutativeRing.negate(t) • b,
+               minusOne * (RingVector.innerProduct(b, v) + c * CommutativeRing.negate(t)))
+               by substituting Matrix.applyVector_identity
+           = RingVector.appendCoordinate(
+               A · v + t • RingVector.negate(b),
+               minusOne * (RingVector.innerProduct(b, v) + c * CommutativeRing.negate(t)))
+               by substituting RingVector.negatedScalar_scale
+           = RingVector.appendCoordinate(
+               A · v + t • RingVector.negate(b),
+               CommutativeRing.negate(CommutativeRing.one(r))
+                 * (RingVector.innerProduct(b, v) + c * CommutativeRing.negate(t)))
+               by substituting minusOneReads
+           = RingVector.appendCoordinate(
+               A · v + t • RingVector.negate(b),
+               CommutativeRing.negate(
+                 CommutativeRing.one(r)
+                   * (RingVector.innerProduct(b, v) + c * CommutativeRing.negate(t))))
+               by substituting CommutativeRing.multiply_negate_left
+           = RingVector.appendCoordinate(
+               A · v + t • RingVector.negate(b),
+               CommutativeRing.negate(
+                 RingVector.innerProduct(b, v) + c * CommutativeRing.negate(t)))
+               by substituting CommutativeRing.one_multiply
+           = RingVector.appendCoordinate(
+               A · v + t • RingVector.negate(b),
+               CommutativeRing.negate(RingVector.innerProduct(b, v)) + c * t)
+               by substituting topNegates
+           = RingVector.appendCoordinate(
+               A · v + t • RingVector.negate(b),
+               RingVector.innerProduct(RingVector.negate(b), v) + c * t)
+               by substituting RingVector.innerProduct_negate_left
+           = target · RingVector.appendCoordinate(v, t)
+               by Equality.symmetry(Matrix.borderedAssembly_apply_appendCoordinate(
+                 A, RingVector.negate(b), c, symmetric, v, t))
+           = target · x by substituting xReads
+        as pulledAction;
+        (Uᵀ * source * U) · x
+           = (Uᵀ * source) · (U · x) by Matrix.applyVector_multiply
+           = Uᵀ · (source · (U · x)) by Matrix.applyVector_multiply
+           = U · (source · (U · x)) by substituting uSymmetric
+           = target · x by pulledAction;
+        done
+      });
+  witness U with done by And.introduction(uInvertible, done)
+}
+
+theorem Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative_isometric_negate_residue
+        (d residue corner : ℤ)
+        : Matrix.IsIsometric(
+            Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(d, residue, corner),
+            Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(d, -residue, corner)) := {
+  let A : Matrix(Integer.commutative_ring_bundle, 3, 3) :=
+      Matrix.sumOfTwoSquaresPlusScaledSquareForm(d);
+  let border : RingVector(Integer.commutative_ring_bundle, 3) := ⟨0, 0, residue⟩;
+  Integer.zero = (0 : ℤ) by Equality.symmetry(Natural.to_integer.zero_preserves) as zeroReads;
+  -Integer.zero = Integer.zero by ring as integerZeroNegates;
+  -(0 : ℤ)
+     = -Integer.zero by substituting zeroReads
+     = Integer.zero by integerZeroNegates
+     = (0 : ℤ) by zeroReads
+  as zeroNegates;
+  RingVector.negate(border)
+     = (⟨-(0 : ℤ), -0, -residue⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+         by RingVector.negate_threeCoordinates
+     = (⟨0, -0, -residue⟩ : RingVector(Integer.commutative_ring_bundle, 3)) by substituting zeroNegates
+     = (⟨0, 0, -residue⟩ : RingVector(Integer.commutative_ring_bundle, 3)) by substituting zeroNegates
+  as borderNegates;
+  Matrix.IsIsometric(
+      Matrix.borderedAssembly(A, border, corner),
+      Matrix.borderedAssembly(A, RingVector.negate(border), corner))
+      by Matrix.borderedAssembly_isometric_negate_border(
+        symmetric := Matrix.sumOfTwoSquaresPlusScaledSquareForm_symmetric(d));
+  done by substituting borderNegates
 }
 
 theorem Matrix.sumOfTwoSquaresPlusScaledSquareForm_determinant
