@@ -171,7 +171,7 @@ TEST_MATHV_IFACE_FILES := $(TEST_MATHV_FILES:.mathv=.mathv.iface)
 library: $(LIBRARY_MATHV_FILES) $(LIBRARY_MATHV_IFACE_FILES)
 
 tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES) checker-tests \
-	carrier-normal-form-check matrix-ergonomics-statement-check
+	carrier-normal-form-check matrix-ergonomics-statement-check rank-four-generated-check
 
 # ----------------------------------------------------------------------
 # The clean set (see docs/CLEAN_STYLE_PLAN.md). `scripts/clean_manifest.txt`
@@ -314,7 +314,17 @@ carrier-normal-form-check: $(BUILD_DIR)/library/Test/expected_carrier_propagatio
 matrix-ergonomics-statement-check: $(BUILD_DIR)/library/Test/matrix_ergonomics_test.mathv
 	@bash scripts/check_matrix_ergonomics_statements.sh ./kernel $<
 
-.PHONY: carrier-normal-form-check matrix-ergonomics-statement-check
+# Generated rank-four certificates are ordinary checked source, but a stale
+# checked-in output could otherwise remain green indefinitely.  Regenerate in
+# a deliberate authoring step; CI only compares the deterministic renderings.
+rank-four-generated-check:
+	@python3 scripts/generate_rank_four_pilot.py --check
+	@python3 scripts/generate_rank_four_diagonal_branch.py --check
+	@python3 scripts/generate_rank_four_weighted_diagonal_branches.py --check
+	@python3 scripts/generate_rank_four_odd_diagonal_branches.py --check
+	@echo "rank-four-generated-check: PASS"
+
+.PHONY: carrier-normal-form-check matrix-ergonomics-statement-check rank-four-generated-check
 
 # B3.4 — morphism-packet audit: re-verify the audit surface module
 # (which imports every packet-lemma home) with the audit flag on and

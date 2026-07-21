@@ -215,7 +215,7 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
   that every escalation over `x²+2y²` has truant 7, 10, or 14. Together with
   `sumOfTwoSquares_escalation_rank_three_truant` (truants 6, 7, or 14), this
   completes the explicit rank-three escalation classification.
-- `S3.E5` `[ ]` (XL) ★★ The rank-4 escalators: machine-generate and dedup to the **≈207** isometry classes. *(Large mechanical lemma; the count is the checkpoint.)* — owes: S3.E2, S2.R4
+- `S3.E5` `[~]` (XL) ★★ The rank-4 escalators: machine-generate and dedup to the **≈207** isometry classes. *(Finite coverage of every ternary-parent branch is complete; the exact global deduplication and count remain. Large mechanical lemma; the count is the checkpoint.)* — owes: S3.E2, S2.R4
   **PILOT COMPLETE 2026-07-21:** `Algebra/rank_four_pilot.math` and the deterministic
   `scripts/generate_rank_four_pilot.py` carry one ternary branch end to end. Above
   `x²+y²+z²` (truant 7), positive-definiteness gives the exact coupled bound
@@ -247,14 +247,10 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
   eliminated expensive-proof warnings. A cold whole-library build and the full
   test suite pass.
 
-  The number 18 is a **top-shear normal-form bound**, not yet a proved isometry
-  count: changing the sign of the third parent coordinate should pair residues
-  `1` and `-1`, leaving at most 12 classes, but the library lacks a reusable
-  diagonal sign-change matrix certificate. That small infrastructure item is a
-  useful later deduplication pass, not a coverage blocker. The next mechanical
-  step should run the parameterized diagonal layer first on `x²+y²+2z²`;
-  after the remaining diagonal representatives, handle the two odd-border
-  ternary parents separately.
+  The initial number 18 was a **top-shear normal-form bound**, not an isometry
+  count. The later reusable diagonal sign-change certificate pairs the two
+  nonzero residue bands, so the public coverage theorem now exposes at most
+  12 alternatives. Larger parent automorphisms may still identify more.
 
   **DIAGONAL FAMILY FACTORED 2026-07-21:**
   `Algebra/rank_four_diagonal_family.math` now proves the symbolic coordinate
@@ -262,13 +258,37 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
   and the fraction-free coupled bound
   **`d a² + d b² + c² < d t`** from the single integral test vector
   `(-da,-db,-c,d)`. Thus later diagonal branches no longer copy the large
-  Schur calculation. The next parent `x²+y²+2z²` (truant 14) has been measured
-  externally: the bound `2a²+2b²+c² < 28` leaves **319** raw borders, and
-  top-shear reduction leaves **25** `(residue, corner)` forms (14 with residue
-  0 and 11 with residue 1). Their expected determinants `2·corner-residue²`
-  are all distinct, so unlike the `d=3` branch this should produce an exact
-  25-class theorem with no sign-change cleanup. These counts and determinant
-  claims remain search predictions until the next generated certificates land.
+  Schur calculation. Its `x²+y²+2z²` specialization is now the certified
+  319-border, 25-form branch described below; the invariant
+  `2·corner-residue²` separates its displayed forms.
+
+  **ALL PARENT BRANCHES COVERED 2026-07-21:** the search prediction above is
+  now certified, and the same architecture has been carried through every
+  remaining ternary parent. `x²+y²+2z²` has 319 admissible borders and exactly
+  25 determinant-separated top-shear forms. The generic
+  `Algebra/rank_four_weighted_diagonal_family.math` covers the five
+  `diag(1,2,d)` parents (`d=1,…,5`): its shared fraction-free bound is
+  `2d a²+d b²+2c² < 2dt`, and the five generated branches certify 1,877 raw
+  borders and 287 current normal forms. The two odd parents
+  `x²+2y²+2yz+Cz²`, `C=4,5`, use the adjugate bound
+  `(2C-1)a²+(C-1)b²+(b-c)²+c² < 7(2C-1)`; centered lattice reduction and
+  border-sign isometry certify 444 borders and leave 26+32 alternatives.
+  The earlier `d=3` diagonal branch has also been reduced from 18 to at most
+  12 alternatives by a reusable signed-coordinate isometry.
+
+  Every generated reduction, excluded box leaf, and finite collector is
+  kernel-checked. The deterministic renderings are now a permanent
+  `make rank-four-generated-check` gate. Summed over the ten distinct ternary
+  parents, the branchwise coverage lists contain **389 alternatives**.
+
+  This finishes the **coverage** substage of E5, but not E5 itself. The 389
+  alternatives are not claimed pairwise non-isometric: obvious parent
+  automorphisms beyond the top-shear/sign subgroup still identify many of
+  them, and the advertised ≈207 checkpoint is an exact isometry count. The
+  next E5 work is therefore a measured automorphism-orbit pass, with
+  determinant used first as a cheap partition and explicit kernel-checked
+  isometries only inside equal-invariant buckets. Cross-parent identifications
+  must be included before changing `[~]` to `[x]`.
 - `S3.C1` `[ ]` (M) ★ The set of truants occurring anywhere in the tree is exactly **{1,2,3,5,6,7,10,14,15}**. — owes: S3.E3, S3.E4, S3.E5
 - `S3.C2` `[ ]` (L) ★★ **Master reduction:** if `Q` represents the nine critical numbers then `Q` is universal — via: a non-universal `Q` would embed an escalator missing its truant ∈ {nine}. *(Depends on rank-4 universality, Stage 5.)* — owes: S3.C1, S3.E5, S5.U2
 
