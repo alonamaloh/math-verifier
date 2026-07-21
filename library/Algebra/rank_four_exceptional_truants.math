@@ -1,0 +1,1029 @@
+-- Algebra/rank_four_exceptional_truants.math
+--
+-- Exact finite arithmetic for the six selected rank-four normal forms that
+-- fail to represent a positive integer at or below 15.  The positive halves
+-- are compact witness tables.  The negative halves are proved below by
+-- completing squares and reducing to the small exceptional values of
+-- x²+2y².
+
+module Algebra.rank_four_exceptional_truants
+
+import Algebra.rank_four_global_classification
+
+-- ----------------------------------------------------------------------
+-- The binary obstruction shared by all six negative proofs.
+
+theorem Natural.lt_six_of_square_below_thirty_six
+        (m : ℕ) (bound : m * m < 36) : m < 6 := {
+  m = 0 ∨ m = 1 ∨ m = 2 ∨ m = 3 ∨ m = 4 ∨ m = 5 by Natural.square_below_thirty_six;
+  done by cases {
+    case m = 0: done
+    case m = 1 ∨ m = 2 ∨ m = 3 ∨ m = 4 ∨ m = 5: done by cases {
+      case m = 1: done
+      case m = 2 ∨ m = 3 ∨ m = 4 ∨ m = 5: done by cases {
+        case m = 2: done
+        case m = 3 ∨ m = 4 ∨ m = 5: done by cases {
+          case m = 3: done
+          case m = 4 ∨ m = 5: done by cases { case m = 4: done case m = 5: done }
+        }
+      }
+    }
+  }
+}
+
+theorem Natural.square_plus_double_square_not_of_six_box_exclusion
+        (m n target : ℕ) (targetBelowThirtyOne : target < 31)
+        (boxExclusion : ∀ (p q : ℕ). p < 6 → q < 6 → ¬(p * p + 2 * (q * q) = target))
+        : ¬(m * m + 2 * (n * n) = target) := {
+  suppose m * m + 2 * (n * n) = target as valueReads;
+  m * m ≤ m * m + 2 * (n * n) = target < 31 < 36;
+  n * n ≤ 2 * (n * n) by Natural.le_multiply_when_factor_at_least_one
+        ≤ m * m + 2 * (n * n) by Natural.less_or_equal_add_left
+        = target by valueReads
+        < 31 by targetBelowThirtyOne
+        < 36;
+  m < 6 by Natural.lt_six_of_square_below_thirty_six;
+  n < 6 by Natural.lt_six_of_square_below_thirty_six;
+  done by boxExclusion(m, n)
+}
+
+theorem Natural.fifteen_not_square_plus_double_square (m n : ℕ)
+        : ¬(m * m + 2 * (n * n) = 15) := {
+  ∀ (q : ℕ). 0 ≤ q → q < 6 → ¬(0 * 0 + 2 * (q * q) = 15) by finite_check q from 0 until 6 as row0;
+  ∀ (q : ℕ). 0 ≤ q → q < 6 → ¬(1 * 1 + 2 * (q * q) = 15) by finite_check q from 0 until 6 as row1;
+  ∀ (q : ℕ). 0 ≤ q → q < 6 → ¬(2 * 2 + 2 * (q * q) = 15) by finite_check q from 0 until 6 as row2;
+  ∀ (q : ℕ). 0 ≤ q → q < 6 → ¬(3 * 3 + 2 * (q * q) = 15) by finite_check q from 0 until 6 as row3;
+  ∀ (q : ℕ). 0 ≤ q → q < 6 → ¬(4 * 4 + 2 * (q * q) = 15) by finite_check q from 0 until 6 as row4;
+  ∀ (q : ℕ). 0 ≤ q → q < 6 → ¬(5 * 5 + 2 * (q * q) = 15) by finite_check q from 0 until 6 as row5;
+  ∀ (p q : ℕ). p < 6 → q < 6 → ¬(p * p + 2 * (q * q) = 15)
+      by (p q : ℕ) (pBelow : p < 6) (qBelow : q < 6) ↦ {
+    ¬(0 * 0 + 2 * (q * q) = 15) by row0(q, done, qBelow);
+    ¬(1 * 1 + 2 * (q * q) = 15) by row1(q, done, qBelow);
+    ¬(2 * 2 + 2 * (q * q) = 15) by row2(q, done, qBelow);
+    ¬(3 * 3 + 2 * (q * q) = 15) by row3(q, done, qBelow);
+    ¬(4 * 4 + 2 * (q * q) = 15) by row4(q, done, qBelow);
+    ¬(5 * 5 + 2 * (q * q) = 15) by row5(q, done, qBelow);
+    ∀ (k : ℕ). 0 ≤ k → k < 6 → ¬(k * k + 2 * (q * q) = 15)
+        by finite_check k from 0 until 6 as rows;
+    done by rows(p, done, pBelow)
+  } as excluded;
+  done by Natural.square_plus_double_square_not_of_six_box_exclusion(
+      targetBelowThirtyOne := done, boxExclusion := excluded)
+}
+
+theorem Natural.twenty_not_square_plus_double_square (m n : ℕ)
+        : ¬(m * m + 2 * (n * n) = 20) := {
+  ∀ (q : ℕ). 0 ≤ q → q < 6 → ¬(0 * 0 + 2 * (q * q) = 20) by finite_check q from 0 until 6 as row0;
+  ∀ (q : ℕ). 0 ≤ q → q < 6 → ¬(1 * 1 + 2 * (q * q) = 20) by finite_check q from 0 until 6 as row1;
+  ∀ (q : ℕ). 0 ≤ q → q < 6 → ¬(2 * 2 + 2 * (q * q) = 20) by finite_check q from 0 until 6 as row2;
+  ∀ (q : ℕ). 0 ≤ q → q < 6 → ¬(3 * 3 + 2 * (q * q) = 20) by finite_check q from 0 until 6 as row3;
+  ∀ (q : ℕ). 0 ≤ q → q < 6 → ¬(4 * 4 + 2 * (q * q) = 20) by finite_check q from 0 until 6 as row4;
+  ∀ (q : ℕ). 0 ≤ q → q < 6 → ¬(5 * 5 + 2 * (q * q) = 20) by finite_check q from 0 until 6 as row5;
+  ∀ (p q : ℕ). p < 6 → q < 6 → ¬(p * p + 2 * (q * q) = 20)
+      by (p q : ℕ) (pBelow : p < 6) (qBelow : q < 6) ↦ {
+    ¬(0 * 0 + 2 * (q * q) = 20) by row0(q, done, qBelow);
+    ¬(1 * 1 + 2 * (q * q) = 20) by row1(q, done, qBelow);
+    ¬(2 * 2 + 2 * (q * q) = 20) by row2(q, done, qBelow);
+    ¬(3 * 3 + 2 * (q * q) = 20) by row3(q, done, qBelow);
+    ¬(4 * 4 + 2 * (q * q) = 20) by row4(q, done, qBelow);
+    ¬(5 * 5 + 2 * (q * q) = 20) by row5(q, done, qBelow);
+    ∀ (k : ℕ). 0 ≤ k → k < 6 → ¬(k * k + 2 * (q * q) = 20)
+        by finite_check k from 0 until 6 as rows;
+    done by rows(p, done, pBelow)
+  } as excluded;
+  done by Natural.square_plus_double_square_not_of_six_box_exclusion(
+      targetBelowThirtyOne := done, boxExclusion := excluded)
+}
+
+theorem Natural.twenty_one_not_square_plus_double_square (m n : ℕ)
+        : ¬(m * m + 2 * (n * n) = 21) := {
+  ∀ (q : ℕ). 0 ≤ q → q < 6 → ¬(0 * 0 + 2 * (q * q) = 21) by finite_check q from 0 until 6 as row0;
+  ∀ (q : ℕ). 0 ≤ q → q < 6 → ¬(1 * 1 + 2 * (q * q) = 21) by finite_check q from 0 until 6 as row1;
+  ∀ (q : ℕ). 0 ≤ q → q < 6 → ¬(2 * 2 + 2 * (q * q) = 21) by finite_check q from 0 until 6 as row2;
+  ∀ (q : ℕ). 0 ≤ q → q < 6 → ¬(3 * 3 + 2 * (q * q) = 21) by finite_check q from 0 until 6 as row3;
+  ∀ (q : ℕ). 0 ≤ q → q < 6 → ¬(4 * 4 + 2 * (q * q) = 21) by finite_check q from 0 until 6 as row4;
+  ∀ (q : ℕ). 0 ≤ q → q < 6 → ¬(5 * 5 + 2 * (q * q) = 21) by finite_check q from 0 until 6 as row5;
+  ∀ (p q : ℕ). p < 6 → q < 6 → ¬(p * p + 2 * (q * q) = 21)
+      by (p q : ℕ) (pBelow : p < 6) (qBelow : q < 6) ↦ {
+    ¬(0 * 0 + 2 * (q * q) = 21) by row0(q, done, qBelow);
+    ¬(1 * 1 + 2 * (q * q) = 21) by row1(q, done, qBelow);
+    ¬(2 * 2 + 2 * (q * q) = 21) by row2(q, done, qBelow);
+    ¬(3 * 3 + 2 * (q * q) = 21) by row3(q, done, qBelow);
+    ¬(4 * 4 + 2 * (q * q) = 21) by row4(q, done, qBelow);
+    ¬(5 * 5 + 2 * (q * q) = 21) by row5(q, done, qBelow);
+    ∀ (k : ℕ). 0 ≤ k → k < 6 → ¬(k * k + 2 * (q * q) = 21)
+        by finite_check k from 0 until 6 as rows;
+    done by rows(p, done, pBelow)
+  } as excluded;
+  done by Natural.square_plus_double_square_not_of_six_box_exclusion(
+      targetBelowThirtyOne := done, boxExclusion := excluded)
+}
+
+theorem Natural.thirty_not_square_plus_double_square (m n : ℕ)
+        : ¬(m * m + 2 * (n * n) = 30) := {
+  ∀ (q : ℕ). 0 ≤ q → q < 6 → ¬(0 * 0 + 2 * (q * q) = 30) by finite_check q from 0 until 6 as row0;
+  ∀ (q : ℕ). 0 ≤ q → q < 6 → ¬(1 * 1 + 2 * (q * q) = 30) by finite_check q from 0 until 6 as row1;
+  ∀ (q : ℕ). 0 ≤ q → q < 6 → ¬(2 * 2 + 2 * (q * q) = 30) by finite_check q from 0 until 6 as row2;
+  ∀ (q : ℕ). 0 ≤ q → q < 6 → ¬(3 * 3 + 2 * (q * q) = 30) by finite_check q from 0 until 6 as row3;
+  ∀ (q : ℕ). 0 ≤ q → q < 6 → ¬(4 * 4 + 2 * (q * q) = 30) by finite_check q from 0 until 6 as row4;
+  ∀ (q : ℕ). 0 ≤ q → q < 6 → ¬(5 * 5 + 2 * (q * q) = 30) by finite_check q from 0 until 6 as row5;
+  ∀ (p q : ℕ). p < 6 → q < 6 → ¬(p * p + 2 * (q * q) = 30)
+      by (p q : ℕ) (pBelow : p < 6) (qBelow : q < 6) ↦ {
+    ¬(0 * 0 + 2 * (q * q) = 30) by row0(q, done, qBelow);
+    ¬(1 * 1 + 2 * (q * q) = 30) by row1(q, done, qBelow);
+    ¬(2 * 2 + 2 * (q * q) = 30) by row2(q, done, qBelow);
+    ¬(3 * 3 + 2 * (q * q) = 30) by row3(q, done, qBelow);
+    ¬(4 * 4 + 2 * (q * q) = 30) by row4(q, done, qBelow);
+    ¬(5 * 5 + 2 * (q * q) = 30) by row5(q, done, qBelow);
+    ∀ (k : ℕ). 0 ≤ k → k < 6 → ¬(k * k + 2 * (q * q) = 30)
+        by finite_check k from 0 until 6 as rows;
+    done by rows(p, done, pBelow)
+  } as excluded;
+  done by Natural.square_plus_double_square_not_of_six_box_exclusion(
+      targetBelowThirtyOne := done, boxExclusion := excluded)
+}
+
+theorem Matrix.squarePlusDoubleSquareForm_not_represents_exceptional_residual
+        (target : ℕ)
+        (exceptional : target = 7 ∨ target = 10 ∨ target = 13 ∨ target = 14 ∨ target = 15
+          ∨ target = 20 ∨ target = 21 ∨ target = 30)
+        : ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareForm, (target : ℤ))) := {
+  done by cases {
+    case target = 7 as targetReads: {
+      ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareForm, (7 : ℤ)))
+          by Matrix.squarePlusDoubleSquareForm_not_represents_seven;
+      done by substituting targetReads
+    }
+    case target = 10 ∨ target = 13 ∨ target = 14 ∨ target = 15 ∨ target = 20 ∨ target = 21 ∨ target = 30: done by cases {
+      case target = 10 as targetReads: {
+        ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareForm, (10 : ℤ)))
+            by Matrix.squarePlusDoubleSquareForm_not_represents_ten;
+        done by substituting targetReads
+      }
+      case target = 13 ∨ target = 14 ∨ target = 15 ∨ target = 20 ∨ target = 21 ∨ target = 30: done by cases {
+        case target = 13 as targetReads: {
+          ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareForm, (13 : ℤ)))
+              by Matrix.squarePlusDoubleSquareForm_not_represents_thirteen;
+          done by substituting targetReads
+        }
+        case target = 14 ∨ target = 15 ∨ target = 20 ∨ target = 21 ∨ target = 30: done by cases {
+          case target = 14 as targetReads: {
+            ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareForm, (14 : ℤ)))
+                by Matrix.squarePlusDoubleSquareForm_not_represents_fourteen;
+            done by substituting targetReads
+          }
+          case target = 15 ∨ target = 20 ∨ target = 21 ∨ target = 30: {
+          suppose Matrix.Represents(Matrix.squarePlusDoubleSquareForm, (target : ℤ));
+          ∃ (a b : ℤ). (target : ℤ) = a * a + 2 * (b * b)
+              by Matrix.squarePlusDoubleSquareForm_represents_only_squares;
+          choose a such that ∃ (b : ℤ). (target : ℤ) = a * a + 2 * (b * b);
+          choose b such that (target : ℤ) = a * a + 2 * (b * b) as valueReads;
+          ∃ (m : ℕ). a * a = m * m by Integer.square_as_natural_square;
+          choose m such that a * a = m * m as aSquare;
+          ∃ (n : ℕ). b * b = n * n by Integer.square_as_natural_square;
+          choose n such that b * b = n * n as bSquare;
+          (target : ℤ) = (m * m + 2 * (n * n) : ℕ) by {
+            (target : ℤ)
+               = a * a + 2 * (b * b) by valueReads
+               = m * m + 2 * (b * b) by substituting aSquare
+               = m * m + 2 * (n * n) by substituting bSquare
+               = (m * m + 2 * (n * n) : ℕ);
+            done
+          };
+          target = m * m + 2 * (n * n) by Natural.to_integer.injective as naturalValue;
+          done by cases {
+            case target = 15: {
+              m * m + 2 * (n * n) = target by Equality.symmetry(naturalValue) = 15;
+              done by Natural.fifteen_not_square_plus_double_square
+            }
+            case target = 20 ∨ target = 21 ∨ target = 30: done by cases {
+              case target = 20: {
+                m * m + 2 * (n * n) = target by Equality.symmetry(naturalValue) = 20;
+                done by Natural.twenty_not_square_plus_double_square
+              }
+              case target = 21 ∨ target = 30: done by cases {
+                case target = 21: {
+                  m * m + 2 * (n * n) = target by Equality.symmetry(naturalValue) = 21;
+                  done by Natural.twenty_one_not_square_plus_double_square
+                }
+                case target = 30: {
+                  m * m + 2 * (n * n) = target by Equality.symmetry(naturalValue) = 30;
+                  done by Natural.thirty_not_square_plus_double_square
+                }
+              }
+            }
+          }
+          }
+        }
+      }
+    }
+  }
+}
+
+theorem Integer.square_plus_double_square_not_exceptional_residual
+        (u x : ℤ) (target : ℕ)
+        (exceptional : target = 7 ∨ target = 10 ∨ target = 13 ∨ target = 14 ∨ target = 15
+          ∨ target = 20 ∨ target = 21 ∨ target = 30)
+        : ¬(u * u + 2 * (x * x) = (target : ℤ)) := {
+  suppose u * u + 2 * (x * x) = (target : ℤ) as valueReads;
+  Matrix.Represents(Matrix.squarePlusDoubleSquareForm, (target : ℤ)) by {
+    Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm,
+        (⟨u, x⟩ : RingVector(Integer.commutative_ring_bundle, 2)))
+       = u * u + 2 * (x * x) by Matrix.squarePlusDoubleSquareForm_twoCoordinates_value
+       = (target : ℤ) by valueReads;
+    done by Matrix.represents_by_witness(vector := ⟨u, x⟩)
+  };
+  done by Matrix.squarePlusDoubleSquareForm_not_represents_exceptional_residual(
+      exceptional := exceptional)
+}
+
+theorem Matrix.squarePlusDoublePlusScaledRankFourRepresentative_coordinateTuple_value
+        (d secondResidue thirdResidue corner x y z w : ℤ)
+        : Matrix.quadraticForm(
+            Matrix.squarePlusDoublePlusScaledRankFourRepresentative(d, secondResidue, thirdResidue, corner),
+            (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4)))
+          = x * x + 2 * (y * y) + d * (z * z)
+            + 2 * secondResidue * y * w + 2 * thirdResidue * z * w + corner * (w * w) := {
+  Matrix.quadraticForm(
+      Matrix.squarePlusDoublePlusScaledRankFourRepresentative(d, secondResidue, thirdResidue, corner),
+      (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4)))
+     = RingVector.innerProduct(
+         (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4)),
+         (⟨x, 2 * y + secondResidue * w, d * z + thirdResidue * w,
+             secondResidue * y + thirdResidue * z + corner * w⟩
+           : RingVector(Integer.commutative_ring_bundle, 4)))
+         by substituting Matrix.squarePlusDoublePlusScaledRankFourRepresentative_apply_coordinateTuple
+     = x * x + y * (2 * y + secondResidue * w) + z * (d * z + thirdResidue * w)
+       + w * (secondResidue * y + thirdResidue * z + corner * w)
+         by RingVector.innerProduct_fourCoordinates
+     = x * x + 2 * (y * y) + d * (z * z)
+       + 2 * secondResidue * y * w + 2 * thirdResidue * z * w + corner * (w * w) by ring;
+  done
+}
+
+automatic theorem Matrix.squarePlusDoublePlusScaledRankFourRepresentative_coordinateTuple_computes
+        (d secondResidue thirdResidue corner x y z w target : ℤ)
+        (scalarComputation : x * x + 2 * (y * y) + d * (z * z)
+          + 2 * secondResidue * y * w + 2 * thirdResidue * z * w + corner * (w * w) = target)
+        : Matrix.quadraticForm(
+            Matrix.squarePlusDoublePlusScaledRankFourRepresentative(d, secondResidue, thirdResidue, corner),
+            (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4))) = target := {
+  Matrix.quadraticForm(
+      Matrix.squarePlusDoublePlusScaledRankFourRepresentative(d, secondResidue, thirdResidue, corner),
+      (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4)))
+     = x * x + 2 * (y * y) + d * (z * z)
+       + 2 * secondResidue * y * w + 2 * thirdResidue * z * w + corner * (w * w)
+         by Matrix.squarePlusDoublePlusScaledRankFourRepresentative_coordinateTuple_value
+     = target by scalarComputation;
+  done
+}
+
+theorem Matrix.squarePlusDoubleSquareOddRankFourRepresentative_coordinateTuple_value
+        (formCorner residue corner x y z w : ℤ)
+        : Matrix.quadraticForm(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(formCorner, residue, corner),
+            (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4)))
+          = x * x + 2 * (y * y) + 2 * y * z + formCorner * (z * z)
+            + 2 * residue * y * w + corner * (w * w) := {
+  Matrix.quadraticForm(
+      Matrix.squarePlusDoubleSquareOddRankFourRepresentative(formCorner, residue, corner),
+      (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4)))
+     = RingVector.innerProduct(
+         (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4)),
+         (⟨x, 2 * y + z + residue * w, y + formCorner * z, residue * y + corner * w⟩
+           : RingVector(Integer.commutative_ring_bundle, 4)))
+         by substituting Matrix.squarePlusDoubleSquareOddRankFourRepresentative_apply_coordinateTuple
+     = x * x + y * (2 * y + z + residue * w) + z * (y + formCorner * z)
+       + w * (residue * y + corner * w) by RingVector.innerProduct_fourCoordinates
+     = x * x + 2 * (y * y) + 2 * y * z + formCorner * (z * z)
+       + 2 * residue * y * w + corner * (w * w) by ring;
+  done
+}
+
+automatic theorem Matrix.squarePlusDoubleSquareOddRankFourRepresentative_coordinateTuple_computes
+        (formCorner residue corner x y z w target : ℤ)
+        (scalarComputation : x * x + 2 * (y * y) + 2 * y * z + formCorner * (z * z)
+          + 2 * residue * y * w + corner * (w * w) = target)
+        : Matrix.quadraticForm(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(formCorner, residue, corner),
+            (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4))) = target := {
+  Matrix.quadraticForm(
+      Matrix.squarePlusDoubleSquareOddRankFourRepresentative(formCorner, residue, corner),
+      (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4)))
+     = x * x + 2 * (y * y) + 2 * y * z + formCorner * (z * z)
+       + 2 * residue * y * w + corner * (w * w)
+         by Matrix.squarePlusDoubleSquareOddRankFourRepresentative_coordinateTuple_value
+     = target by scalarComputation;
+  done
+}
+
+-- Completing squares makes the two truant-10 exclusions a 3×3 table in
+-- the final two coordinates.  Every nonnegative residual is one of the
+-- exceptional x²+2y² values proved above.
+
+theorem Integer.oddC4R0C3_completed_residual
+        (x u z w zValue wValue residual : ℤ)
+        (completed : 2 * (x * x) + u * u + 7 * (z * z) + 6 * (w * w) = 20)
+        (zReads : z = zValue) (wReads : w = wValue)
+        (residualReads : residual + 7 * (zValue * zValue) + 6 * (wValue * wValue) = 20)
+        : u * u + 2 * (x * x) = residual := {
+  2 * (x * x) + u * u + 7 * (zValue * zValue) + 6 * (wValue * wValue)
+     = 2 * (x * x) + u * u + 7 * (z * z) + 6 * (wValue * wValue) by substituting zReads
+     = 2 * (x * x) + u * u + 7 * (z * z) + 6 * (w * w) by substituting wReads
+     = 20 by completed
+  as specialized;
+  done by linear_combination(specialized - residualReads)
+}
+
+theorem Integer.oddC4R2C7_completed_residual
+        (x u z w zValue wValue residual : ℤ)
+        (completed : 2 * (x * x) + u * u + (z - 2 * w) * (z - 2 * w)
+          + 6 * (z * z) + 6 * (w * w) = 20)
+        (zReads : z = zValue) (wReads : w = wValue)
+        (residualReads : residual + (zValue - 2 * wValue) * (zValue - 2 * wValue)
+          + 6 * (zValue * zValue) + 6 * (wValue * wValue) = 20)
+        : u * u + 2 * (x * x) = residual := {
+  2 * (x * x) + u * u + (zValue - 2 * wValue) * (zValue - 2 * wValue)
+      + 6 * (zValue * zValue) + 6 * (wValue * wValue)
+     = 2 * (x * x) + u * u + (z - 2 * wValue) * (z - 2 * wValue)
+       + 6 * (z * z) + 6 * (wValue * wValue) by substituting zReads
+     = 2 * (x * x) + u * u + (z - 2 * w) * (z - 2 * w)
+       + 6 * (z * z) + 6 * (w * w) by substituting wReads
+     = 20 by completed
+  as specialized;
+  done by linear_combination(specialized - residualReads)
+}
+
+theorem Matrix.oddC4R0C3_not_represents_ten
+        : ¬(Matrix.Represents(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 0, 3), (10 : ℤ))) := {
+  suppose Matrix.Represents(
+      Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 0, 3), (10 : ℤ)) as represented;
+  choose v : RingVector(Integer.commutative_ring_bundle, 4) such that
+      Matrix.quadraticForm(Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 0, 3), v) = 10
+      from represented;
+  let x : ℤ := v(NaturalsBelow.firstOfFour);
+  let y : ℤ := v(NaturalsBelow.secondOfFour);
+  let z : ℤ := v(NaturalsBelow.thirdOfFour);
+  let w : ℤ := v(NaturalsBelow.fourthOfFour);
+  let u : ℤ := 2 * y + z;
+  v = (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4)) by RingVector.eq_fourCoordinates as vReads;
+  x * x + 2 * (y * y) + 2 * y * z + 4 * (z * z) + 2 * 0 * y * w + 3 * (w * w) = 10 by {
+    Matrix.quadraticForm(Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 0, 3),
+        (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4))) = 10 by substituting vReads;
+    done by substituting Matrix.squarePlusDoubleSquareOddRankFourRepresentative_coordinateTuple_value
+  } as valueReads;
+  2 * (x * x) + u * u + 7 * (z * z) + 6 * (w * w) = 20 by {
+    2 * (x * x) + u * u + 7 * (z * z) + 6 * (w * w)
+       = 2 * (x * x + 2 * (y * y) + 2 * y * z + 4 * (z * z) + 2 * 0 * y * w + 3 * (w * w)) by ring
+       = 2 * 10 by substituting valueReads
+       = 20 by ring;
+    done
+  } as completed;
+  0 ≤ 2 * (x * x) by Integer.zero_less_or_equal_of_nonneg;
+  0 ≤ u * u by Integer.zero_less_or_equal_of_nonneg;
+  0 ≤ 7 * (z * z) by Integer.zero_less_or_equal_of_nonneg;
+  0 ≤ 6 * (w * w) by Integer.zero_less_or_equal_of_nonneg;
+  0 ≤ 2 * (x * x) + u * u + 7 * (z * z) by Integer.zero_less_or_equal_of_nonneg;
+  6 * (w * w)
+     = 0 + 6 * (w * w)
+     ≤ (2 * (x * x) + u * u + 7 * (z * z)) + 6 * (w * w) by Integer.add_preserves_less_or_equal
+     = 20 by completed
+     < 24
+     = 6 * 4 by ring;
+  w * w < 4 by Integer.cancel_lt_by_positive;
+  w = -1 ∨ w = 0 ∨ w = 1 by Integer.square_below_four;
+  7 * (z * z)
+     = 0 + 7 * (z * z)
+     ≤ (2 * (x * x) + u * u) + 7 * (z * z) by Integer.add_preserves_less_or_equal
+     = 0 + (2 * (x * x) + u * u + 7 * (z * z)) by ring
+     ≤ 6 * (w * w) + (2 * (x * x) + u * u + 7 * (z * z)) by Integer.add_preserves_less_or_equal
+     = (2 * (x * x) + u * u + 7 * (z * z)) + 6 * (w * w) by ring
+     = 20 by completed
+     < 28
+     = 7 * 4 by ring;
+  z * z < 4 by Integer.cancel_lt_by_positive;
+  z = -1 ∨ z = 0 ∨ z = 1 by Integer.square_below_four;
+  done by cases {
+    case w = -1 as wReads: done by cases {
+      case z = -1 as zReads: {
+        u * u + 2 * (x * x) = 7 by Integer.oddC4R0C3_completed_residual(
+            completed := completed, zReads := zReads, wReads := wReads);
+        done by Integer.square_plus_double_square_not_exceptional_residual(u := u, x := x, target := 7)
+      }
+      case z = 0 ∨ z = 1: done by cases {
+        case z = 0 as zReads: {
+          u * u + 2 * (x * x) = 14 by Integer.oddC4R0C3_completed_residual(
+              completed := completed, zReads := zReads, wReads := wReads);
+          done by Integer.square_plus_double_square_not_exceptional_residual(u := u, x := x, target := 14)
+        }
+        case z = 1 as zReads: {
+          u * u + 2 * (x * x) = 7 by Integer.oddC4R0C3_completed_residual(
+              completed := completed, zReads := zReads, wReads := wReads);
+          done by Integer.square_plus_double_square_not_exceptional_residual(u := u, x := x, target := 7)
+        }
+      }
+    }
+    case w = 0 ∨ w = 1: done by cases {
+      case w = 0 as wReads: done by cases {
+        case z = -1 as zReads: {
+          u * u + 2 * (x * x) = 13 by Integer.oddC4R0C3_completed_residual(
+              completed := completed, zReads := zReads, wReads := wReads);
+          done by Integer.square_plus_double_square_not_exceptional_residual(u := u, x := x, target := 13)
+        }
+        case z = 0 ∨ z = 1: done by cases {
+          case z = 0 as zReads: {
+            u * u + 2 * (x * x) = 20 by Integer.oddC4R0C3_completed_residual(
+                completed := completed, zReads := zReads, wReads := wReads);
+            done by Integer.square_plus_double_square_not_exceptional_residual(u := u, x := x, target := 20)
+          }
+          case z = 1 as zReads: {
+            u * u + 2 * (x * x) = 13 by Integer.oddC4R0C3_completed_residual(
+                completed := completed, zReads := zReads, wReads := wReads);
+            done by Integer.square_plus_double_square_not_exceptional_residual(u := u, x := x, target := 13)
+          }
+        }
+      }
+      case w = 1 as wReads: done by cases {
+        case z = -1 as zReads: {
+          u * u + 2 * (x * x) = 7 by Integer.oddC4R0C3_completed_residual(
+              completed := completed, zReads := zReads, wReads := wReads);
+          done by Integer.square_plus_double_square_not_exceptional_residual(u := u, x := x, target := 7)
+        }
+        case z = 0 ∨ z = 1: done by cases {
+          case z = 0 as zReads: {
+            u * u + 2 * (x * x) = 14 by Integer.oddC4R0C3_completed_residual(
+                completed := completed, zReads := zReads, wReads := wReads);
+            done by Integer.square_plus_double_square_not_exceptional_residual(u := u, x := x, target := 14)
+          }
+          case z = 1 as zReads: {
+            u * u + 2 * (x * x) = 7 by Integer.oddC4R0C3_completed_residual(
+                completed := completed, zReads := zReads, wReads := wReads);
+            done by Integer.square_plus_double_square_not_exceptional_residual(u := u, x := x, target := 7)
+          }
+        }
+      }
+    }
+  }
+}
+
+theorem Matrix.oddC4R2C7_not_represents_ten
+        : ¬(Matrix.Represents(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 2, 7), (10 : ℤ))) := {
+  suppose Matrix.Represents(
+      Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 2, 7), (10 : ℤ)) as represented;
+  choose v : RingVector(Integer.commutative_ring_bundle, 4) such that
+      Matrix.quadraticForm(Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 2, 7), v) = 10
+      from represented;
+  let x : ℤ := v(NaturalsBelow.firstOfFour);
+  let y : ℤ := v(NaturalsBelow.secondOfFour);
+  let z : ℤ := v(NaturalsBelow.thirdOfFour);
+  let w : ℤ := v(NaturalsBelow.fourthOfFour);
+  let u : ℤ := 2 * y + z + 2 * w;
+  v = (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4)) by RingVector.eq_fourCoordinates as vReads;
+  x * x + 2 * (y * y) + 2 * y * z + 4 * (z * z) + 2 * 2 * y * w + 7 * (w * w) = 10 by {
+    Matrix.quadraticForm(Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 2, 7),
+        (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4))) = 10 by substituting vReads;
+    done by substituting Matrix.squarePlusDoubleSquareOddRankFourRepresentative_coordinateTuple_value
+  } as valueReads;
+  2 * (x * x) + u * u + (z - 2 * w) * (z - 2 * w) + 6 * (z * z) + 6 * (w * w) = 20 by {
+    2 * (x * x) + u * u + (z - 2 * w) * (z - 2 * w) + 6 * (z * z) + 6 * (w * w)
+       = 2 * (x * x + 2 * (y * y) + 2 * y * z + 4 * (z * z) + 2 * 2 * y * w + 7 * (w * w)) by ring
+       = 2 * 10 by substituting valueReads
+       = 20 by ring;
+    done
+  } as completed;
+  0 ≤ 2 * (x * x) by Integer.zero_less_or_equal_of_nonneg;
+  0 ≤ u * u by Integer.zero_less_or_equal_of_nonneg;
+  0 ≤ (z - 2 * w) * (z - 2 * w) by Integer.zero_less_or_equal_of_nonneg;
+  0 ≤ 6 * (z * z) by Integer.zero_less_or_equal_of_nonneg;
+  0 ≤ 6 * (w * w) by Integer.zero_less_or_equal_of_nonneg;
+  0 ≤ 2 * (x * x) + u * u + (z - 2 * w) * (z - 2 * w) + 6 * (z * z)
+      by Integer.zero_less_or_equal_of_nonneg;
+  6 * (w * w)
+     = 0 + 6 * (w * w)
+     ≤ (2 * (x * x) + u * u + (z - 2 * w) * (z - 2 * w) + 6 * (z * z)) + 6 * (w * w)
+         by Integer.add_preserves_less_or_equal
+     = 20 by completed
+     < 24
+     = 6 * 4 by ring;
+  w * w < 4 by Integer.cancel_lt_by_positive;
+  w = -1 ∨ w = 0 ∨ w = 1 by Integer.square_below_four;
+  0 ≤ 2 * (x * x) + u * u + (z - 2 * w) * (z - 2 * w)
+      by Integer.zero_less_or_equal_of_nonneg;
+  6 * (z * z)
+     = 0 + 6 * (z * z)
+     ≤ (2 * (x * x) + u * u + (z - 2 * w) * (z - 2 * w)) + 6 * (z * z)
+         by Integer.add_preserves_less_or_equal
+     = 0 + (2 * (x * x) + u * u + (z - 2 * w) * (z - 2 * w) + 6 * (z * z)) by ring
+     ≤ 6 * (w * w) + (2 * (x * x) + u * u + (z - 2 * w) * (z - 2 * w) + 6 * (z * z))
+         by Integer.add_preserves_less_or_equal
+     = (2 * (x * x) + u * u + (z - 2 * w) * (z - 2 * w) + 6 * (z * z)) + 6 * (w * w) by ring
+     = 20 by completed
+     < 24
+     = 6 * 4 by ring;
+  z * z < 4 by Integer.cancel_lt_by_positive;
+  z = -1 ∨ z = 0 ∨ z = 1 by Integer.square_below_four;
+  done by cases {
+    case w = -1 as wReads: done by cases {
+      case z = -1 as zReads: {
+        u * u + 2 * (x * x) = 7 by Integer.oddC4R2C7_completed_residual(
+            completed := completed, zReads := zReads, wReads := wReads);
+        done by Integer.square_plus_double_square_not_exceptional_residual(u := u, x := x, target := 7)
+      }
+      case z = 0 ∨ z = 1: done by cases {
+        case z = 0 as zReads: {
+          u * u + 2 * (x * x) = 10 by Integer.oddC4R2C7_completed_residual(
+              completed := completed, zReads := zReads, wReads := wReads);
+          done by Integer.square_plus_double_square_not_exceptional_residual(u := u, x := x, target := 10)
+        }
+        case z = 1 as zReads: {
+          u * u + 2 * (x * x) = -1 by Integer.oddC4R2C7_completed_residual(
+              completed := completed, zReads := zReads, wReads := wReads) as impossibleValue;
+          0 ≤ u * u + 2 * (x * x) by Integer.zero_less_or_equal_of_nonneg;
+          done by substituting impossibleValue
+        }
+      }
+    }
+    case w = 0 ∨ w = 1: done by cases {
+      case w = 0 as wReads: done by cases {
+        case z = -1 as zReads: {
+          u * u + 2 * (x * x) = 13 by Integer.oddC4R2C7_completed_residual(
+              completed := completed, zReads := zReads, wReads := wReads);
+          done by Integer.square_plus_double_square_not_exceptional_residual(u := u, x := x, target := 13)
+        }
+        case z = 0 ∨ z = 1: done by cases {
+          case z = 0 as zReads: {
+            u * u + 2 * (x * x) = 20 by Integer.oddC4R2C7_completed_residual(
+                completed := completed, zReads := zReads, wReads := wReads);
+            done by Integer.square_plus_double_square_not_exceptional_residual(u := u, x := x, target := 20)
+          }
+          case z = 1 as zReads: {
+            u * u + 2 * (x * x) = 13 by Integer.oddC4R2C7_completed_residual(
+                completed := completed, zReads := zReads, wReads := wReads);
+            done by Integer.square_plus_double_square_not_exceptional_residual(u := u, x := x, target := 13)
+          }
+        }
+      }
+      case w = 1 as wReads: done by cases {
+        case z = -1 as zReads: {
+          u * u + 2 * (x * x) = -1 by Integer.oddC4R2C7_completed_residual(
+              completed := completed, zReads := zReads, wReads := wReads) as impossibleValue;
+          0 ≤ u * u + 2 * (x * x) by Integer.zero_less_or_equal_of_nonneg;
+          done by substituting impossibleValue
+        }
+        case z = 0 ∨ z = 1: done by cases {
+          case z = 0 as zReads: {
+            u * u + 2 * (x * x) = 10 by Integer.oddC4R2C7_completed_residual(
+                completed := completed, zReads := zReads, wReads := wReads);
+            done by Integer.square_plus_double_square_not_exceptional_residual(u := u, x := x, target := 10)
+          }
+          case z = 1 as zReads: {
+            u * u + 2 * (x * x) = 7 by Integer.oddC4R2C7_completed_residual(
+                completed := completed, zReads := zReads, wReads := wReads);
+            done by Integer.square_plus_double_square_not_exceptional_residual(u := u, x := x, target := 7)
+          }
+        }
+      }
+    }
+  }
+}
+
+-- The weighted forms share one structural proof.  A 10-fold completion
+-- bounds the fourth coordinate uniformly; a smaller 2-fold completion is
+-- then handed to a kernel-checked finite table for the final coordinate.
+
+theorem Matrix.weightedD5_not_represents_fifteen_by_completion
+        (secondResidue thirdResidue corner completionCoefficient secondCoefficient zLow zHigh : ℤ)
+        (completionCoefficientReads : 10 * corner - 5 * (secondResidue * secondResidue)
+          - 2 * (thirdResidue * thirdResidue) = completionCoefficient)
+        (completionCoefficientAtLeastForty : 40 ≤ completionCoefficient)
+        (secondCoefficientReads : 2 * corner - secondResidue * secondResidue = secondCoefficient)
+        (coordinateBound : ∀ (x u z w : ℤ).
+          2 * (x * x) + u * u + 10 * (z * z) + 4 * thirdResidue * z * w
+            + secondCoefficient * (w * w) = 30 → zLow ≤ z ∧ z < zHigh)
+        (finiteExclusion : ∀ (x u w z : ℤ). -1 ≤ w → w < 2 → zLow ≤ z → z < zHigh →
+          ¬(2 * (x * x) + u * u + 10 * (z * z) + 4 * thirdResidue * z * w
+            + secondCoefficient * (w * w) = 30))
+        : ¬(Matrix.Represents(
+            Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+              5, secondResidue, thirdResidue, corner), (15 : ℤ))) := {
+  suppose Matrix.Represents(
+      Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+        5, secondResidue, thirdResidue, corner), (15 : ℤ)) as represented;
+  choose vector : RingVector(Integer.commutative_ring_bundle, 4) such that
+      Matrix.quadraticForm(
+        Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+          5, secondResidue, thirdResidue, corner), vector) = 15 from represented;
+  let x : ℤ := vector(NaturalsBelow.firstOfFour);
+  let y : ℤ := vector(NaturalsBelow.secondOfFour);
+  let z : ℤ := vector(NaturalsBelow.thirdOfFour);
+  let w : ℤ := vector(NaturalsBelow.fourthOfFour);
+  let u : ℤ := 2 * y + secondResidue * w;
+  let v : ℤ := 5 * z + thirdResidue * w;
+  vector = (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4))
+      by RingVector.eq_fourCoordinates as vectorReads;
+  x * x + 2 * (y * y) + 5 * (z * z) + 2 * secondResidue * y * w
+      + 2 * thirdResidue * z * w + corner * (w * w) = 15 by {
+    Matrix.quadraticForm(
+        Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+          5, secondResidue, thirdResidue, corner),
+        (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4))) = 15
+        by substituting vectorReads;
+    done by substituting Matrix.squarePlusDoublePlusScaledRankFourRepresentative_coordinateTuple_value
+  } as valueReads;
+  10 * (x * x) + 5 * (u * u) + 2 * (v * v) + completionCoefficient * (w * w) = 150 by {
+    10 * (x * x) + 5 * (u * u) + 2 * (v * v) + completionCoefficient * (w * w)
+       = 10 * (x * x) + 5 * (u * u) + 2 * (v * v)
+         + (10 * corner - 5 * (secondResidue * secondResidue)
+           - 2 * (thirdResidue * thirdResidue)) * (w * w)
+           by substituting completionCoefficientReads
+       = 10 * (x * x + 2 * (y * y) + 5 * (z * z) + 2 * secondResidue * y * w
+           + 2 * thirdResidue * z * w + corner * (w * w)) by ring
+       = 10 * 15 by substituting valueReads
+       = 150 by ring;
+    done
+  } as tenfoldCompletion;
+  2 * (x * x) + u * u + 10 * (z * z) + 4 * thirdResidue * z * w
+      + secondCoefficient * (w * w) = 30 by {
+    2 * (x * x) + u * u + 10 * (z * z) + 4 * thirdResidue * z * w
+        + secondCoefficient * (w * w)
+       = 2 * (x * x) + u * u + 10 * (z * z) + 4 * thirdResidue * z * w
+         + (2 * corner - secondResidue * secondResidue) * (w * w)
+           by substituting secondCoefficientReads
+       = 2 * (x * x + 2 * (y * y) + 5 * (z * z) + 2 * secondResidue * y * w
+           + 2 * thirdResidue * z * w + corner * (w * w)) by ring
+       = 2 * 15 by substituting valueReads
+       = 30 by ring;
+    done
+  } as twofoldCompletion;
+  0 ≤ 10 * (x * x) by Integer.zero_less_or_equal_of_nonneg;
+  0 ≤ 5 * (u * u) by Integer.zero_less_or_equal_of_nonneg;
+  0 ≤ 2 * (v * v) by Integer.zero_less_or_equal_of_nonneg;
+  0 ≤ 10 * (x * x) + 5 * (u * u) + 2 * (v * v) by Integer.zero_less_or_equal_of_nonneg;
+  completionCoefficient * (w * w)
+     = 0 + completionCoefficient * (w * w)
+     ≤ (10 * (x * x) + 5 * (u * u) + 2 * (v * v)) + completionCoefficient * (w * w)
+         by Integer.add_preserves_less_or_equal
+     = 150 by tenfoldCompletion;
+  Integer.IsNonneg(completionCoefficient - 40)
+      by Integer.nonneg_difference_of_le;
+  Integer.IsNonneg(w * w);
+  Integer.IsNonneg((completionCoefficient - 40) * (w * w));
+  (completionCoefficient - 40) * (w * w)
+      = completionCoefficient * (w * w) - 40 * (w * w) by ring as differenceReads;
+  Integer.IsNonneg(completionCoefficient * (w * w) - 40 * (w * w))
+      by substituting differenceReads;
+  40 * (w * w) ≤ completionCoefficient * (w * w) by Integer.le_of_nonneg_difference;
+  40 * (w * w)
+     ≤ completionCoefficient * (w * w)
+     ≤ 150
+     < 160
+     = 40 * 4 by ring;
+  w * w < 4 by Integer.cancel_lt_by_positive;
+  w = -1 ∨ w = 0 ∨ w = 1 by Integer.square_below_four;
+  -1 ≤ w ∧ w < 2 by cases {
+    case w = -1: done
+    case w = 0 ∨ w = 1: done by cases { case w = 0: done case w = 1: done }
+  };
+  zLow ≤ z ∧ z < zHigh by coordinateBound(x, u, z, w, twofoldCompletion);
+  done by finiteExclusion(x, u, w, z)
+}
+
+theorem Integer.weightedD5_completed_residual
+        (x u z w thirdResidue secondCoefficient zValue wValue residual : ℤ)
+        (completed : 2 * (x * x) + u * u + 10 * (z * z) + 4 * thirdResidue * z * w
+          + secondCoefficient * (w * w) = 30)
+        (zReads : z = zValue) (wReads : w = wValue)
+        (residualReads : residual + 10 * (zValue * zValue) + 4 * thirdResidue * zValue * wValue
+          + secondCoefficient * (wValue * wValue) = 30)
+        : u * u + 2 * (x * x) = residual := {
+  2 * (x * x) + u * u + 10 * (zValue * zValue) + 4 * thirdResidue * zValue * wValue
+      + secondCoefficient * (wValue * wValue)
+     = 2 * (x * x) + u * u + 10 * (z * z) + 4 * thirdResidue * z * wValue
+       + secondCoefficient * (wValue * wValue) by substituting zReads
+     = 2 * (x * x) + u * u + 10 * (z * z) + 4 * thirdResidue * z * w
+       + secondCoefficient * (w * w) by substituting wReads
+     = 30 by completed
+  as specialized;
+  done by linear_combination(specialized - residualReads)
+}
+
+theorem Integer.weightedD5_completed_not_of_exceptional_residual
+        (x u z w thirdResidue secondCoefficient : ℤ) (target : ℕ)
+        (completed : 2 * (x * x) + u * u + 10 * (z * z) + 4 * thirdResidue * z * w
+          + secondCoefficient * (w * w) = 30)
+        (residualReads : (target : ℤ) + 10 * (z * z) + 4 * thirdResidue * z * w
+          + secondCoefficient * (w * w) = 30)
+        (exceptional : target = 7 ∨ target = 10 ∨ target = 13 ∨ target = 14 ∨ target = 15
+          ∨ target = 20 ∨ target = 21 ∨ target = 30)
+        : False := {
+  u * u + 2 * (x * x) = (target : ℤ) by Integer.weightedD5_completed_residual(
+      completed := completed, zReads := reflexivity(ℤ, z), wReads := reflexivity(ℤ, w),
+      residualReads := residualReads);
+  done by Integer.square_plus_double_square_not_exceptional_residual(u := u, x := x, exceptional := exceptional)
+}
+
+theorem Integer.weightedD5_completed_not_of_negative_residual
+        (x u z w thirdResidue secondCoefficient residual : ℤ)
+        (completed : 2 * (x * x) + u * u + 10 * (z * z) + 4 * thirdResidue * z * w
+          + secondCoefficient * (w * w) = 30)
+        (residualReads : residual + 10 * (z * z) + 4 * thirdResidue * z * w
+          + secondCoefficient * (w * w) = 30)
+        (residualNegative : residual < 0)
+        : False := {
+  u * u + 2 * (x * x) = residual by Integer.weightedD5_completed_residual(
+      completed := completed, zReads := reflexivity(ℤ, z), wReads := reflexivity(ℤ, w),
+      residualReads := residualReads) as residualValue;
+  0 ≤ u * u + 2 * (x * x) by Integer.zero_less_or_equal_of_nonneg;
+  0 ≤ residual by substituting residualValue;
+  residual < 0 ≤ residual;
+  False by Integer.LessThan.irreflexive;
+  done
+}
+
+theorem Integer.weightedD5_completed_excludes_exceptional_residual
+        (x u z w thirdResidue secondCoefficient : ℤ) (target : ℕ)
+        (residualReads : (target : ℤ) + 10 * (z * z) + 4 * thirdResidue * z * w
+          + secondCoefficient * (w * w) = 30)
+        (exceptional : target = 7 ∨ target = 10 ∨ target = 13 ∨ target = 14 ∨ target = 15
+          ∨ target = 20 ∨ target = 21 ∨ target = 30)
+        : ¬(2 * (x * x) + u * u + 10 * (z * z) + 4 * thirdResidue * z * w
+          + secondCoefficient * (w * w) = 30) := {
+  suppose 2 * (x * x) + u * u + 10 * (z * z) + 4 * thirdResidue * z * w
+      + secondCoefficient * (w * w) = 30 as completed;
+  done by Integer.weightedD5_completed_not_of_exceptional_residual(
+      completed := completed, residualReads := residualReads, exceptional := exceptional)
+}
+
+theorem Integer.weightedD5_completed_excludes_negative_residual
+        (x u z w thirdResidue secondCoefficient residual : ℤ)
+        (residualReads : residual + 10 * (z * z) + 4 * thirdResidue * z * w
+          + secondCoefficient * (w * w) = 30)
+        (residualNegative : residual < 0)
+        : ¬(2 * (x * x) + u * u + 10 * (z * z) + 4 * thirdResidue * z * w
+          + secondCoefficient * (w * w) = 30) := {
+  suppose 2 * (x * x) + u * u + 10 * (z * z) + 4 * thirdResidue * z * w
+      + secondCoefficient * (w * w) = 30 as completed;
+  done by Integer.weightedD5_completed_not_of_negative_residual(
+      completed := completed, residualReads := residualReads, residualNegative := residualNegative)
+}
+
+theorem Integer.in_minus_one_until_two_of_square_below_four
+        (z : ℤ) (bound : z * z < 4) : -1 ≤ z ∧ z < 2 := {
+  z = -1 ∨ z = 0 ∨ z = 1 by Integer.square_below_four;
+  done by cases {
+    case z = -1: done
+    case z = 0 ∨ z = 1: done by cases { case z = 0: done case z = 1: done }
+  }
+}
+
+theorem Integer.in_minus_two_until_three_of_square_below_eight
+        (z : ℤ) (bound : z * z < 8) : -2 ≤ z ∧ z < 3 := {
+  z = -2 ∨ z = -1 ∨ z = 0 ∨ z = 1 ∨ z = 2 by Integer.square_below_eight;
+  done by cases {
+    case z = -2: done
+    case z = -1 ∨ z = 0 ∨ z = 1 ∨ z = 2: done by cases {
+      case z = -1: done
+      case z = 0 ∨ z = 1 ∨ z = 2: done by cases {
+        case z = 0: done
+        case z = 1 ∨ z = 2: done by cases { case z = 1: done case z = 2: done }
+      }
+    }
+  }
+}
+
+theorem Integer.in_minus_three_until_four_of_square_below_sixteen
+        (z : ℤ) (bound : z * z < 16) : -3 ≤ z ∧ z < 4 := {
+  z = -3 ∨ z = -2 ∨ z = -1 ∨ z = 0 ∨ z = 1 ∨ z = 2 ∨ z = 3
+      by Integer.square_below_sixteen;
+  done by cases {
+    case z = -3: done
+    case z = -2 ∨ z = -1 ∨ z = 0 ∨ z = 1 ∨ z = 2 ∨ z = 3: done by cases {
+      case z = -2: done
+      case z = -1 ∨ z = 0 ∨ z = 1 ∨ z = 2 ∨ z = 3: done by cases {
+        case z = -1: done
+        case z = 0 ∨ z = 1 ∨ z = 2 ∨ z = 3: done by cases {
+          case z = 0: done
+          case z = 1 ∨ z = 2 ∨ z = 3: done by cases {
+            case z = 1: done
+            case z = 2 ∨ z = 3: done by cases { case z = 2: done case z = 3: done }
+          }
+        }
+      }
+    }
+  }
+}
+
+theorem Integer.weightedD5R0C10_coordinate_bound
+        (x u z w : ℤ)
+        (completed : 2 * (x * x) + u * u + 10 * (z * z) + 10 * (w * w) = 30)
+        : -1 ≤ z ∧ z < 2 := {
+  0 ≤ 2 * (x * x) + u * u + 10 * (w * w) by Integer.zero_less_or_equal_of_nonneg;
+  10 * (z * z)
+     = 0 + 10 * (z * z)
+     ≤ (2 * (x * x) + u * u + 10 * (w * w)) + 10 * (z * z)
+         by Integer.add_preserves_less_or_equal
+     = 30 by linear_combination(completed)
+     < 40
+     = 10 * 4 by ring;
+  z * z < 4 by Integer.cancel_lt_by_positive;
+  done by Integer.in_minus_one_until_two_of_square_below_four
+}
+
+theorem Integer.weightedD5R1_coordinate_bound
+        (x u z w secondCoefficient : ℤ) (coefficientAtLeastOne : 1 ≤ secondCoefficient)
+        (completed : 2 * (x * x) + u * u + 10 * (z * z) + 4 * z * w
+          + secondCoefficient * (w * w) = 30)
+        : -2 ≤ z ∧ z < 3 := {
+  Integer.IsNonneg(secondCoefficient - 1) by Integer.nonneg_difference_of_le;
+  0 ≤ 2 * (x * x) + u * u + (2 * z + w) * (2 * z + w)
+      + (secondCoefficient - 1) * (w * w) by Integer.zero_less_or_equal_of_nonneg;
+  2 * (x * x) + u * u + (2 * z + w) * (2 * z + w) + 6 * (z * z)
+      + (secondCoefficient - 1) * (w * w) = 30 by {
+    2 * (x * x) + u * u + (2 * z + w) * (2 * z + w) + 6 * (z * z)
+        + (secondCoefficient - 1) * (w * w)
+       = 2 * (x * x) + u * u + 10 * (z * z) + 4 * z * w
+         + secondCoefficient * (w * w) by ring
+       = 30 by completed;
+    done
+  } as squares;
+  6 * (z * z)
+     = 0 + 6 * (z * z)
+     ≤ (2 * (x * x) + u * u + (2 * z + w) * (2 * z + w)
+       + (secondCoefficient - 1) * (w * w)) + 6 * (z * z)
+         by Integer.add_preserves_less_or_equal
+     = 30 by linear_combination(squares)
+     < 36
+     = 6 * 6 by ring;
+  z * z < 6 by Integer.cancel_lt_by_positive;
+  z * z < 8;
+  done by Integer.in_minus_two_until_three_of_square_below_eight
+}
+
+theorem Integer.weightedD5R2C15_coordinate_bound
+        (x u z w : ℤ)
+        (completed : 2 * (x * x) + u * u + 10 * (z * z) + 8 * z * w + 15 * (w * w) = 30)
+        : -3 ≤ z ∧ z < 4 := {
+  0 ≤ 2 * (x * x) + u * u + 2 * ((2 * z + w) * (2 * z + w)) + 13 * (w * w)
+      by Integer.zero_less_or_equal_of_nonneg;
+  2 * (x * x) + u * u + 2 * ((2 * z + w) * (2 * z + w)) + 2 * (z * z)
+      + 13 * (w * w) = 30 by {
+    2 * (x * x) + u * u + 2 * ((2 * z + w) * (2 * z + w)) + 2 * (z * z)
+        + 13 * (w * w)
+       = 2 * (x * x) + u * u + 10 * (z * z) + 8 * z * w + 15 * (w * w) by ring
+       = 30 by completed;
+    done
+  } as squares;
+  2 * (z * z)
+     = 0 + 2 * (z * z)
+     ≤ (2 * (x * x) + u * u + 2 * ((2 * z + w) * (2 * z + w)) + 13 * (w * w))
+       + 2 * (z * z) by Integer.add_preserves_less_or_equal
+     = 30 by linear_combination(squares)
+     < 32
+     = 2 * 16 by ring;
+  z * z < 16 by Integer.cancel_lt_by_positive;
+  done by Integer.in_minus_three_until_four_of_square_below_sixteen
+}
+
+-- The finite positive side of the four truant-15 forms.
+
+theorem Matrix.weightedD5S0R0C5_represents_below_fifteen
+        : ∀ (s : ℕ). s ≥ 1 → s < 15 → Matrix.Represents(
+            Matrix.squarePlusDoublePlusScaledRankFourRepresentative(5, 0, 0, 5), (s : ℤ)) := {
+  let A : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+      Matrix.squarePlusDoublePlusScaledRankFourRepresentative(5, 0, 0, 5);
+  Matrix.represents_by_witness(A, target := 1, vector := ⟨1, 0, 0, 0⟩);
+  Matrix.represents_by_witness(A, target := 2, vector := ⟨0, 1, 0, 0⟩);
+  Matrix.represents_by_witness(A, target := 3, vector := ⟨1, 1, 0, 0⟩);
+  Matrix.represents_by_witness(A, target := 4, vector := ⟨2, 0, 0, 0⟩);
+  Matrix.represents_by_witness(A, target := 5, vector := ⟨0, 0, 0, 1⟩);
+  Matrix.represents_by_witness(A, target := 6, vector := ⟨1, 0, 0, 1⟩);
+  Matrix.represents_by_witness(A, target := 7, vector := ⟨0, 1, 0, 1⟩);
+  Matrix.represents_by_witness(A, target := 8, vector := ⟨0, 2, 0, 0⟩);
+  Matrix.represents_by_witness(A, target := 9, vector := ⟨1, 2, 0, 0⟩);
+  Matrix.represents_by_witness(A, target := 10, vector := ⟨0, 0, 1, 1⟩);
+  Matrix.represents_by_witness(A, target := 11, vector := ⟨1, 0, 1, 1⟩);
+  Matrix.represents_by_witness(A, target := 12, vector := ⟨0, 1, 1, 1⟩);
+  Matrix.represents_by_witness(A, target := 13, vector := ⟨0, 2, 0, 1⟩);
+  Matrix.represents_by_witness(A, target := 14, vector := ⟨1, 2, 0, 1⟩);
+  done by finite_check s from 1 until 15
+}
+
+theorem Matrix.weightedD5S1R1C5_represents_below_fifteen
+        : ∀ (s : ℕ). s ≥ 1 → s < 15 → Matrix.Represents(
+            Matrix.squarePlusDoublePlusScaledRankFourRepresentative(5, 1, 1, 5), (s : ℤ)) := {
+  let A : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+      Matrix.squarePlusDoublePlusScaledRankFourRepresentative(5, 1, 1, 5);
+  Matrix.represents_by_witness(A, target := 1, vector := ⟨1, 0, 0, 0⟩);
+  Matrix.represents_by_witness(A, target := 2, vector := ⟨0, 1, 0, 0⟩);
+  Matrix.represents_by_witness(A, target := 3, vector := ⟨1, 1, 0, 0⟩);
+  Matrix.represents_by_witness(A, target := 4, vector := ⟨2, 0, 0, 0⟩);
+  Matrix.represents_by_witness(A, target := 5, vector := ⟨0, 0, 0, 1⟩);
+  Matrix.represents_by_witness(A, target := 6, vector := ⟨1, 0, 0, 1⟩);
+  Matrix.represents_by_witness(A, target := 7, vector := ⟨0, 1, 1, 0⟩);
+  Matrix.represents_by_witness(A, target := 8, vector := ⟨0, 0, -1, 1⟩);
+  Matrix.represents_by_witness(A, target := 9, vector := ⟨0, 1, 0, 1⟩);
+  Matrix.represents_by_witness(A, target := 10, vector := ⟨1, 1, 0, 1⟩);
+  Matrix.represents_by_witness(A, target := 11, vector := ⟨2, 1, 1, 0⟩);
+  Matrix.represents_by_witness(A, target := 12, vector := ⟨0, 0, 1, 1⟩);
+  Matrix.represents_by_witness(A, target := 13, vector := ⟨1, 0, 1, 1⟩);
+  Matrix.represents_by_witness(A, target := 14, vector := ⟨1, 2, 1, 0⟩);
+  done by finite_check s from 1 until 15
+}
+
+theorem Matrix.weightedD5S1R1C9_represents_below_fifteen
+        : ∀ (s : ℕ). s ≥ 1 → s < 15 → Matrix.Represents(
+            Matrix.squarePlusDoublePlusScaledRankFourRepresentative(5, 1, 1, 9), (s : ℤ)) := {
+  let A : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+      Matrix.squarePlusDoublePlusScaledRankFourRepresentative(5, 1, 1, 9);
+  Matrix.represents_by_witness(A, target := 1, vector := ⟨1, 0, 0, 0⟩);
+  Matrix.represents_by_witness(A, target := 2, vector := ⟨0, 1, 0, 0⟩);
+  Matrix.represents_by_witness(A, target := 3, vector := ⟨1, 1, 0, 0⟩);
+  Matrix.represents_by_witness(A, target := 4, vector := ⟨2, 0, 0, 0⟩);
+  Matrix.represents_by_witness(A, target := 5, vector := ⟨0, 0, 1, 0⟩);
+  Matrix.represents_by_witness(A, target := 6, vector := ⟨1, 0, 1, 0⟩);
+  Matrix.represents_by_witness(A, target := 7, vector := ⟨0, 1, 1, 0⟩);
+  Matrix.represents_by_witness(A, target := 8, vector := ⟨0, 2, 0, 0⟩);
+  Matrix.represents_by_witness(A, target := 9, vector := ⟨0, 0, 0, 1⟩);
+  Matrix.represents_by_witness(A, target := 10, vector := ⟨1, 0, 0, 1⟩);
+  Matrix.represents_by_witness(A, target := 11, vector := ⟨2, 1, 1, 0⟩);
+  Matrix.represents_by_witness(A, target := 12, vector := ⟨0, 0, -1, 1⟩);
+  Matrix.represents_by_witness(A, target := 13, vector := ⟨0, 1, 0, 1⟩);
+  Matrix.represents_by_witness(A, target := 14, vector := ⟨1, 1, 0, 1⟩);
+  done by finite_check s from 1 until 15
+}
+
+theorem Matrix.weightedD5S1R2C8_represents_below_fifteen
+        : ∀ (s : ℕ). s ≥ 1 → s < 15 → Matrix.Represents(
+            Matrix.squarePlusDoublePlusScaledRankFourRepresentative(5, 1, 2, 8), (s : ℤ)) := {
+  let A : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+      Matrix.squarePlusDoublePlusScaledRankFourRepresentative(5, 1, 2, 8);
+  Matrix.represents_by_witness(A, target := 1, vector := ⟨1, 0, 0, 0⟩);
+  Matrix.represents_by_witness(A, target := 2, vector := ⟨0, 1, 0, 0⟩);
+  Matrix.represents_by_witness(A, target := 3, vector := ⟨1, 1, 0, 0⟩);
+  Matrix.represents_by_witness(A, target := 4, vector := ⟨2, 0, 0, 0⟩);
+  Matrix.represents_by_witness(A, target := 5, vector := ⟨0, 0, 1, 0⟩);
+  Matrix.represents_by_witness(A, target := 6, vector := ⟨1, 0, 1, 0⟩);
+  Matrix.represents_by_witness(A, target := 7, vector := ⟨0, 1, 1, 0⟩);
+  Matrix.represents_by_witness(A, target := 8, vector := ⟨0, 0, 0, 1⟩);
+  Matrix.represents_by_witness(A, target := 9, vector := ⟨1, 0, 0, 1⟩);
+  Matrix.represents_by_witness(A, target := 10, vector := ⟨1, 0, -1, 1⟩);
+  Matrix.represents_by_witness(A, target := 11, vector := ⟨2, 1, 1, 0⟩);
+  Matrix.represents_by_witness(A, target := 12, vector := ⟨0, 1, 0, 1⟩);
+  Matrix.represents_by_witness(A, target := 13, vector := ⟨1, 1, 0, 1⟩);
+  Matrix.represents_by_witness(A, target := 14, vector := ⟨1, 1, -1, 1⟩);
+  done by finite_check s from 1 until 15
+}
+
+-- The two truant-10 forms.
+
+theorem Matrix.oddC4R0C3_represents_below_ten
+        : ∀ (s : ℕ). s ≥ 1 → s < 10 → Matrix.Represents(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 0, 3), (s : ℤ)) := {
+  let A : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+      Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 0, 3);
+  Matrix.represents_by_witness(A, target := 1, vector := ⟨1, 0, 0, 0⟩);
+  Matrix.represents_by_witness(A, target := 2, vector := ⟨0, 1, 0, 0⟩);
+  Matrix.represents_by_witness(A, target := 3, vector := ⟨0, 0, 0, 1⟩);
+  Matrix.represents_by_witness(A, target := 4, vector := ⟨0, 0, 1, 0⟩);
+  Matrix.represents_by_witness(A, target := 5, vector := ⟨0, 1, 0, 1⟩);
+  Matrix.represents_by_witness(A, target := 6, vector := ⟨1, 1, 0, 1⟩);
+  Matrix.represents_by_witness(A, target := 7, vector := ⟨0, 0, 1, 1⟩);
+  Matrix.represents_by_witness(A, target := 8, vector := ⟨0, 1, 1, 0⟩);
+  Matrix.represents_by_witness(A, target := 9, vector := ⟨1, 1, 1, 0⟩);
+  done by finite_check s from 1 until 10
+}
+
+theorem Matrix.oddC4R2C7_represents_below_ten
+        : ∀ (s : ℕ). s ≥ 1 → s < 10 → Matrix.Represents(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 2, 7), (s : ℤ)) := {
+  let A : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+      Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 2, 7);
+  Matrix.represents_by_witness(A, target := 1, vector := ⟨1, 0, 0, 0⟩);
+  Matrix.represents_by_witness(A, target := 2, vector := ⟨0, 1, 0, 0⟩);
+  Matrix.represents_by_witness(A, target := 3, vector := ⟨1, 1, 0, 0⟩);
+  Matrix.represents_by_witness(A, target := 4, vector := ⟨0, 0, 1, 0⟩);
+  Matrix.represents_by_witness(A, target := 5, vector := ⟨1, 0, 1, 0⟩);
+  Matrix.represents_by_witness(A, target := 6, vector := ⟨1, -1, 0, 1⟩);
+  Matrix.represents_by_witness(A, target := 7, vector := ⟨0, 0, 0, 1⟩);
+  Matrix.represents_by_witness(A, target := 8, vector := ⟨0, 1, 1, 0⟩);
+  Matrix.represents_by_witness(A, target := 9, vector := ⟨1, 1, 1, 0⟩);
+  done by finite_check s from 1 until 10
+}
+
+theorem Matrix.oddC4R0C3_truant_ten
+        : Matrix.IsTruant(Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 0, 3), 10) := {
+  (10 : ℕ) ≥ 1;
+  ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 0, 3), (10 : ℤ)))
+      by Matrix.oddC4R0C3_not_represents_ten;
+  done by Matrix.oddC4R0C3_represents_below_ten
+}
+
+theorem Matrix.oddC4R2C7_truant_ten
+        : Matrix.IsTruant(Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 2, 7), 10) := {
+  (10 : ℕ) ≥ 1;
+  ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 2, 7), (10 : ℤ)))
+      by Matrix.oddC4R2C7_not_represents_ten;
+  done by Matrix.oddC4R2C7_represents_below_ten
+}

@@ -324,19 +324,26 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
   arguments and is recorded as an optional audit rather than an E5 blocker.
 - `S3.C1` `[~]` (M) ★ The set of truants occurring anywhere in the tree is exactly **{1,2,3,5,6,7,10,14,15}**. — owes: S3.E3, S3.E4, S3.E5, S5.U2, S5.U3
 
-  **LOW-RANK HALF COMPLETE 2026-07-21:**
+  **LOW-RANK AND EXCEPTIONAL FINITE CASES COMPLETE 2026-07-21:**
   `Algebra/critical_truants.math` proves in the kernel that rank-zero through
   rank-three escalators have truants in `{1}`, `{2}`, `{3,5}`, and
   `{6,7,10,14}` respectively.  The theorem transports the exact truant of
   each canonical representative across the isometries supplied by the rank
   classifiers; it does not merely classify the underlying matrices.
 
-  The remaining value `15` is not a consequence of the 207-way rank-four
-  classification alone.  One must show that every non-universal selected
-  rank-four form has truant 15, and that its rank-five escalations are
-  universal.  Those are precisely the mathematical contents of `S5.U2` and
-  `S5.U3`, so they are now listed as dependencies here.  The old dependency
-  line understated this logical obligation.
+  A complete value sweep through 15 over the 207 selected rank-four forms
+  isolates exactly six finite exceptions.  `Algebra/rank_four_exceptional_truants.math`
+  and its deterministic generated companion prove that two have exact
+  truant 10 and four have exact truant 15.  The positive halves are explicit
+  witness tables; the negative halves complete squares, bound two coordinates,
+  and reduce to a small checked table of values missed by `x²+2y²`.
+
+  The remaining obligation is therefore precise: prove the other 201 forms
+  universal, and prove the rank-five escalations of the six exceptional forms
+  universal.  Those are the contents of `S5.U2` and `S5.U3`, so they remain
+  dependencies here.  In particular, rank four can repeat the old truant 10;
+  the earlier claim that every non-universal rank-four form must have truant
+  15 was too strong and is corrected here.
 - `S3.C2` `[ ]` (L) ★★ **Master reduction:** if `Q` represents the nine critical numbers then `Q` is universal — via: a non-universal `Q` would embed an escalator missing its truant ∈ {nine}. *(Depends on rank-4 universality, Stage 5.)* — owes: S3.C1, S3.E5, S5.U2
 
 ---

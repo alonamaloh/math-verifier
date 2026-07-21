@@ -153,6 +153,13 @@ rank-four escalator by 207 selected normal forms are.
   isometric to one of the 207 selected normal forms. Pairwise minimality of the
   number 207 remains an exhaustive-search audit; the 207-way cover needed by
   downstream proofs is fully kernel-checked.
+- A direct value sweep through 15 isolates six exceptional selected
+  rank-four forms. `Algebra/rank_four_exceptional_truants` supplies reusable
+  coordinate formulas, compact witness tables, and completed-square bounds;
+  its deterministic generated companion checks the final finite tables.
+  Two exceptional forms have exact truant 10 and four have exact truant 15.
+  The other 201 selected forms represent every value through 15; proving
+  their universality is the remaining rank-four representation-theory stage.
 
 ## Module path
 
@@ -167,5 +174,6 @@ Read `quadratic_form` → `integer_quadratic_form` first. Then use
 → `rank_four_weighted_diagonal_branches_coverage` →
 `rank_four_odd_diagonal_branches_coverage` →
 `rank_three_global_classification` → `critical_truants` and
-`rank_four_global_classification`.
+`rank_four_global_classification` → `rank_four_exceptional_truants` →
+`rank_four_exceptional_truants_generated`.
 `PLAN_15_THEOREM.md` records unfinished stages.
