@@ -773,14 +773,11 @@ theorem Matrix.diagonalExtension_symmetric {r : CommutativeRing} {n : ℕ}
   done
 }
 
-theorem Matrix.diagonalExtension_apply_extend {r : CommutativeRing} {n : ℕ}
+theorem Matrix.diagonalExtension_apply_extend_general {r : CommutativeRing} {n : ℕ}
         (A : Matrix(r, n, n)) (c : CommutativeRing.carrier(r))
-        (symmetric : Matrix.IsSymmetric(A))
         (v : RingVector(r, n))
         : Matrix.diagonalExtension(A, c) · RingVector.extend(v)
           = RingVector.extend(A · v) := {
-  Matrix.IsSymmetric(Matrix.diagonalExtension(A, c))
-      by Matrix.diagonalExtension_symmetric as extensionSymmetric;
   ∀ (p : NaturalsBelow(1 + n)).
       (Matrix.diagonalExtension(A, c) · RingVector.extend(v))(p)
       = RingVector.extend(A · v)(p)
@@ -815,12 +812,11 @@ theorem Matrix.diagonalExtension_apply_extend {r : CommutativeRing} {n : ℕ}
                       · RingVector.extend(v))(NaturalsBelow.top(n))
                          by substituting top
                    = RingVector.innerProduct(
-                         Matrix.borderColumn(
+                         Matrix.borderRow(
                            Matrix.diagonalExtension(A, c)), v)
-                         by Matrix.applyVector_extend_top(
-                             symmetric := extensionSymmetric)
+                         by Matrix.applyVector_extend_top_row
                    = RingVector.innerProduct(RingVector.zero(r, n), v)
-                         by substituting Matrix.diagonalExtension_borderColumn
+                         by substituting Matrix.diagonalExtension_borderRow
                    = RingVector.innerProduct(v, RingVector.zero(r, n))
                          by RingVector.innerProduct_symmetric
                    = CommutativeRing.zero(r)
@@ -834,6 +830,15 @@ theorem Matrix.diagonalExtension_apply_extend {r : CommutativeRing} {n : ℕ}
           }
         };
   done by RingVector.equal_of_pointwise
+}
+
+theorem Matrix.diagonalExtension_apply_extend {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (c : CommutativeRing.carrier(r))
+        (symmetric : Matrix.IsSymmetric(A))
+        (v : RingVector(r, n))
+        : Matrix.diagonalExtension(A, c) · RingVector.extend(v)
+          = RingVector.extend(A · v) := {
+  done by Matrix.diagonalExtension_apply_extend_general
 }
 
 -- Completing the square as an integral change of basis. The top shear

@@ -1,0 +1,33 @@
+-- Algebra/rank_four_selected_transport.math
+
+module Algebra.rank_four_selected_transport
+
+import Algebra.rank_four_selected_normal_forms_generated
+
+theorem Matrix.isometric_exists_representative_transport
+        (Selected : Matrix(Integer.commutative_ring_bundle, 4, 4) → Proposition)
+        (source target : Matrix(Integer.commutative_ring_bundle, 4, 4))
+        (sourceIsometric : Matrix.IsIsometric(source, target))
+        (targetRepresentative : ∃ (representative : Matrix(Integer.commutative_ring_bundle, 4, 4)).
+            Selected(representative) ∧ Matrix.IsIsometric(target, representative))
+        : ∃ (representative : Matrix(Integer.commutative_ring_bundle, 4, 4)).
+            Selected(representative) ∧ Matrix.IsIsometric(source, representative) := {
+  choose representative such that Selected(representative)
+      ∧ Matrix.IsIsometric(target, representative) from targetRepresentative;
+  Selected(representative) as selected;
+  Matrix.IsIsometric(target, representative) as targetIsometric;
+  Matrix.IsIsometric(source, representative)
+      by Matrix.IsIsometric.transitive(
+        leftIsometric := sourceIsometric, rightIsometric := targetIsometric) as sourceToRepresentative;
+  witness representative with done by And.introduction(selected, sourceToRepresentative)
+}
+
+theorem Matrix.rankFourEscalatorRepresentative_transport
+        (source target : Matrix(Integer.commutative_ring_bundle, 4, 4))
+        (sourceIsometric : Matrix.IsIsometric(source, target))
+        (targetRepresentative : Matrix.IsRankFourEscalatorRepresentative(target))
+        : Matrix.IsRankFourEscalatorRepresentative(source) := {
+  done by Matrix.isometric_exists_representative_transport(
+    Selected := Matrix.IsSelectedRankFourNormalForm,
+    sourceIsometric := sourceIsometric, targetRepresentative := targetRepresentative)
+}

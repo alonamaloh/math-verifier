@@ -1,9 +1,9 @@
 # Quadratic forms and the Fifteen Theorem
 
 This development formalizes the escalation route toward the Fifteen Theorem.
-The final theorem and the exact rank-four isometry count are not yet proved.
-The foundations, the complete deduplicated rank-three classification, and
-finite kernel-checked coverage of every resulting rank-four branch are.
+The final theorem is not yet proved. The foundations, the complete
+deduplicated rank-three classification, and a kernel-checked cover of every
+rank-four escalator by 207 selected normal forms are.
 
 ## Main definitions
 
@@ -135,16 +135,17 @@ finite kernel-checked coverage of every resulting rank-four branch are.
   `(2C-1)a²+(C-1)b²+(b-c)²+c² < 7(2C-1)`. Centered lattice residues followed
   by a sign isometry reduce 203 and 241 admissible borders to 26 and 32
   alternatives respectively.
-- The four deterministic generators are guarded by
-  `make rank-four-generated-check`. Across the ten distinct ternary parents the
-  current global result names 276 distinct representatives across its coverage
-  theorem family.
-  The exhaustive discovery tool `scripts/classify_rank_four_normal_forms.py`
-  now identifies exactly 207 integral-isometry classes and emits 69 explicit
-  unimodular changes of basis, including the cross-parent coincidences. The
-  count is guarded alongside the generators, but it remains an untrusted
-  search result until all 69 congruences are replayed in the kernel and the
-  coverage predicates are collapsed to the resulting 207 alternatives.
+- The deterministic rank-four generators are guarded by
+  `make rank-four-generated-check`. Their ten historical parent branches name
+  276 alternatives. The exhaustive discovery tool
+  `scripts/classify_rank_four_normal_forms.py` finds 207 integral-isometry
+  classes and 69 cross-branch or within-branch identifications. All 69 are
+  replayed in the kernel with explicit unimodular matrices and inverse/action
+  certificates. `Matrix.escalator_rank_three` unifies the ternary parents,
+  and `Matrix.escalator_rank_four` proves that every rank-four escalator is
+  isometric to one of the 207 selected normal forms. Pairwise minimality of the
+  number 207 remains an exhaustive-search audit; the 207-way cover needed by
+  downstream proofs is fully kernel-checked.
 
 ## Module path
 
@@ -157,5 +158,6 @@ Read `quadratic_form` → `integer_quadratic_form` first. Then use
 `rank_three_representative_truants` → `rank_four_pilot` →
 `rank_four_diagonal_branch_coverage` → `rank_four_double_diagonal_branch_coverage`
 → `rank_four_weighted_diagonal_branches_coverage` →
-`rank_four_odd_diagonal_branches_coverage`.
+`rank_four_odd_diagonal_branches_coverage` →
+`rank_three_global_classification` → `rank_four_global_classification`.
 `PLAN_15_THEOREM.md` records unfinished stages.

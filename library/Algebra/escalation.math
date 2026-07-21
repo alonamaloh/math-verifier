@@ -992,6 +992,42 @@ theorem Matrix.IsEscalation.corner_is_truant {n : ℕ}
   done
 }
 
+-- A genuine escalation cannot have a universal parent: the total truant
+-- function is zero on a universal form, while positive-definiteness makes
+-- the new diagonal entry strictly positive.
+theorem Matrix.IsEscalation.parent_not_universal {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n))
+        (escalation : Matrix.IsEscalation(A, B))
+        : ¬(Matrix.IsUniversal(A)) := {
+  suppose Matrix.IsUniversal(A) as universal;
+  Matrix.IsPositiveDefinite(B) by Matrix.IsEscalation.positive_definite;
+  B(NaturalsBelow.top(n), NaturalsBelow.top(n)) > 0
+      by Matrix.positive_definite_diagonal;
+  Matrix.corner(B) = (Matrix.truant(A) : ℤ)
+      by Matrix.IsEscalation.corner_is_truant as cornerReads;
+  Natural.to_integer(0) < Natural.to_integer(Matrix.truant(A)) by {
+    B(NaturalsBelow.top(n), NaturalsBelow.top(n))
+       = Matrix.corner(B)
+       = Natural.to_integer(Matrix.truant(A)) by cornerReads
+    as diagonalReads;
+    done by substituting diagonalReads
+  };
+  0 < Matrix.truant(A) by Natural.to_integer.LessThan_reflects;
+  Matrix.truantPredicate(A, Matrix.truant(A)) by Matrix.truant_satisfies;
+  done by cases {
+    case ¬(Matrix.IsUniversal(A)) ∧ Matrix.IsTruant(A, Matrix.truant(A)): {
+      ¬(Matrix.IsUniversal(A));
+      done
+    }
+    case Matrix.IsUniversal(A) ∧ Matrix.truant(A) = 0: {
+      Matrix.truant(A) = 0 as truantZero;
+      0 < 0 by substituting truantZero;
+      done by Natural.not_less_than_zero
+    }
+  }
+}
+
 theorem Matrix.IsEscalation.eq_borderedAssembly {n : ℕ}
         (A : Matrix(Integer.commutative_ring_bundle, n, n))
         (B : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n))

@@ -1,0 +1,34 @@
+-- Algebra/rank_four_classification_transport.math
+--
+-- Small compositional API between parent transport, a branch classifier, and
+-- the selected global rank-four cover.
+
+module Algebra.rank_four_classification_transport
+
+import Algebra.rank_four_parent_automorphisms
+import Algebra.rank_four_selected_transport
+
+theorem Matrix.rankFourRepresentative_of_parent_isometry
+        (sourceParent targetParent : Matrix(Integer.commutative_ring_bundle, 3, 3))
+        (B : Matrix(Integer.commutative_ring_bundle, 4, 4))
+        (Branch : Matrix(Integer.commutative_ring_bundle, 4, 4) → Proposition)
+        (escalation : Matrix.IsEscalation(sourceParent, B))
+        (parentIsometric : Matrix.IsIsometric(sourceParent, targetParent))
+        (classify : ∀ (C : Matrix(Integer.commutative_ring_bundle, 4, 4)).
+            Matrix.IsEscalation(targetParent, C) → Branch(C))
+        (include : ∀ (C : Matrix(Integer.commutative_ring_bundle, 4, 4)).
+            Branch(C) → Matrix.IsRankFourEscalatorRepresentative(C))
+        : Matrix.IsRankFourEscalatorRepresentative(B) := {
+  choose C such that Matrix.IsEscalation(targetParent, C) ∧ Matrix.IsIsometric(B, C)
+      from Matrix.escalation_transport_parent_isometry(
+        escalation := escalation, parentIsometric := parentIsometric);
+  Matrix.IsEscalation(targetParent, C)
+      by And.left(Matrix.IsEscalation(targetParent, C), Matrix.IsIsometric(B, C))
+  as childEscalation;
+  Matrix.IsIsometric(B, C)
+      by And.right(Matrix.IsEscalation(targetParent, C), Matrix.IsIsometric(B, C))
+  as childIsometric;
+  Branch(C) by classify(C, childEscalation) as classified;
+  Matrix.IsRankFourEscalatorRepresentative(C) by include(C, classified);
+  done by Matrix.rankFourEscalatorRepresentative_transport(sourceIsometric := childIsometric)
+}

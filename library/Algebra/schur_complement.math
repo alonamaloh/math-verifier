@@ -649,6 +649,35 @@ theorem Matrix.applyVector_extend_top {r : CommutativeRing} {m : ℕ}
   done
 }
 
+-- The corresponding statement for an arbitrary square matrix reads the
+-- actual bottom row.  Keeping this separate from the symmetric convenience
+-- lemma is useful for block-diagonal changes of basis, which need not
+-- themselves be symmetric.
+theorem Matrix.applyVector_extend_top_row {r : CommutativeRing} {m : ℕ}
+        (B : Matrix(r, 1 + m, 1 + m)) (z : RingVector(r, m))
+        : (B · RingVector.extend(z))(NaturalsBelow.top(m))
+          = RingVector.innerProduct(Matrix.borderRow(B), z) := {
+  (B * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m))) · z = B · RingVector.extend(z)
+      as actionFactors;
+  (B · RingVector.extend(z))(NaturalsBelow.top(m))
+     = ((B * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m))) · z)(NaturalsBelow.top(m))
+           by substituting actionFactors
+     = CommutativeRing.sumOver(
+           (j : NaturalsBelow(m)) ↦
+               (B * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m)))(NaturalsBelow.top(m), j) * z(j),
+           NaturalsBelow.enumerate(m))
+     = CommutativeRing.sumOver(
+           (j : NaturalsBelow(m)) ↦ Matrix.borderRow(B)(j) * z(j), NaturalsBelow.enumerate(m))
+           by ((j : NaturalsBelow(m)) ↦ {
+               (B * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(m)))(NaturalsBelow.top(m), j)
+                  = B(NaturalsBelow.top(m), NaturalsBelow.inclusion(m, j))
+                  = Matrix.borderRow(B)(j);
+               done
+             })
+     = RingVector.innerProduct(Matrix.borderRow(B), z);
+  done
+}
+
 -- ----------------------------------------------------------------------
 -- The border elimination matrix G = [[I, −adj(A')·b], [0, det A']]: the
 -- identity with its top column replaced by the eliminating column

@@ -8,6 +8,199 @@ module Algebra.rank_four_parent_automorphisms
 
 import Algebra.rank_four_diagonal_family
 
+-- A block-diagonal change of basis is generally not symmetric.  Its
+-- transpose simply transposes the leading block and leaves the final scalar
+-- coordinate alone.
+theorem Matrix.diagonalExtension_transpose_general {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (c : CommutativeRing.carrier(r))
+        : Matrix.diagonalExtension(A, c)ᵀ = Matrix.diagonalExtension(Aᵀ, c) := {
+  let J : Matrix(r, 1 + n, n) := Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n));
+  let T : Matrix(r, 1 + n, 1) := Matrix.inclusionMatrix(r, NaturalsBelow.topSelector(n));
+  Matrix.diagonalExtension(A, c)ᵀ
+     = (J * A * Jᵀ)ᵀ + (c • (T * Tᵀ))ᵀ by Matrix.transpose_add
+     = (J * A * Jᵀ)ᵀ + c • (T * Tᵀ)ᵀ by substituting Matrix.transpose_scale
+     = (Jᵀ)ᵀ * (J * A)ᵀ + c • (T * Tᵀ)ᵀ by substituting Matrix.transpose_multiply
+     = (Jᵀ)ᵀ * (Aᵀ * Jᵀ) + c • (T * Tᵀ)ᵀ by substituting Matrix.transpose_multiply
+     = J * (Aᵀ * Jᵀ) + c • (T * Tᵀ)ᵀ by substituting Matrix.transpose_transpose
+     = J * (Aᵀ * Jᵀ) + c • ((Tᵀ)ᵀ * Tᵀ) by substituting Matrix.transpose_multiply
+     = J * (Aᵀ * Jᵀ) + c • (T * Tᵀ) by substituting Matrix.transpose_transpose
+     = J * Aᵀ * Jᵀ + c • (T * Tᵀ) by substituting Matrix.multiply_associative
+     = Matrix.diagonalExtension(Aᵀ, c);
+  done
+}
+
+-- An arbitrary integral parent isometry lifts block-diagonally.  The border
+-- transforms contragrediently by Uᵀ; the older symmetric-parent helper below
+-- is the common Uᵀ = U specialization.
+theorem Matrix.borderedAssembly_isometric_parent_change {n : ℕ}
+        (A targetParent U : Matrix(Integer.commutative_ring_bundle, n, n))
+        (b : RingVector(Integer.commutative_ring_bundle, n)) (c : ℤ)
+        (aSymmetric : Matrix.IsSymmetric(A))
+        (targetSymmetric : Matrix.IsSymmetric(targetParent))
+        (uInvertible : Matrix.IsInvertible(U))
+        (changesParent : Uᵀ * A * U = targetParent)
+        : Matrix.IsIsometric(
+            Matrix.borderedAssembly(A, b, c),
+            Matrix.borderedAssembly(targetParent, Uᵀ · b, c)) := {
+  let W : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n) :=
+      Matrix.diagonalExtension(U, 1);
+  let source : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n) :=
+      Matrix.borderedAssembly(A, b, c);
+  let target : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n) :=
+      Matrix.borderedAssembly(targetParent, Uᵀ · b, c);
+  Wᵀ = Matrix.diagonalExtension(Uᵀ, 1)
+      by Matrix.diagonalExtension_transpose_general as wTranspose;
+  Matrix.determinant(U) = Integer.one ∨ Matrix.determinant(U) = Integer.negate(Integer.one)
+      by Matrix.determinant_unimodular_of_invertible(invertible := uInvertible);
+  Matrix.determinant(W)
+     = Matrix.determinant(U) * 1 by Matrix.diagonalExtension_determinant
+     = Matrix.determinant(U) by ring
+  as determinantWReads;
+  Matrix.determinant(W) = Integer.one ∨ Matrix.determinant(W) = Integer.negate(Integer.one) by {
+    done by cases {
+      case Matrix.determinant(U) = Integer.one: done by substituting determinantWReads
+      case Matrix.determinant(U) = Integer.negate(Integer.one): done by substituting determinantWReads
+    }
+  }
+  as determinantWIsUnit;
+  Matrix.IsInvertible(W)
+      by Matrix.invertible_of_determinant_unimodular(determinantUnimodular := determinantWIsUnit)
+  as wInvertible;
+  Wᵀ * source * W = target by Matrix.equal_of_applyVector(
+      actions := (x : RingVector(Integer.commutative_ring_bundle, 1 + n)) ↦ {
+        let v : RingVector(Integer.commutative_ring_bundle, n) := RingVector.restrict(x);
+        let t : ℤ := x(NaturalsBelow.top(n));
+        x = RingVector.appendCoordinate(v, t) by RingVector.eq_appendCoordinate(x) as xReads;
+        (1 : ℤ) * t = t by ring as oneTimesT;
+        W · x
+           = W · RingVector.appendCoordinate(v, t) by substituting xReads
+           = RingVector.appendCoordinate(U · v, 1 * t)
+               by Matrix.diagonalExtension_apply_appendCoordinate_general
+           = RingVector.appendCoordinate(U · v, t) by substituting oneTimesT
+        as wAction;
+        source · (W · x)
+           = source · RingVector.appendCoordinate(U · v, t) by substituting wAction
+           = RingVector.appendCoordinate(
+               A · (U · v) + t • b,
+               RingVector.innerProduct(b, U · v) + c * t)
+               by Matrix.borderedAssembly_apply_appendCoordinate(
+                 A := A, b := b, c := c, symmetric := aSymmetric,
+                 v := U · v, t := t)
+        as sourceAction;
+        Uᵀ · (A · (U · v))
+           = Uᵀ · ((A * U) · v) by substituting Matrix.applyVector_multiply
+           = (Uᵀ * (A * U)) · v by Matrix.applyVector_multiply
+           = ((Uᵀ * A) * U) · v by Matrix.multiply_associative
+           = (Uᵀ * A * U) · v
+           = targetParent · v by substituting changesParent
+        as baseAction;
+        Uᵀ · (A · (U · v) + t • b)
+           = Uᵀ · (A · (U · v)) + Uᵀ · (t • b) by Matrix.applyVector_add
+           = targetParent · v + Uᵀ · (t • b) by substituting baseAction
+           = targetParent · v + t • (Uᵀ · b) by Matrix.applyVector_scale
+        as lowerAction;
+        RingVector.innerProduct(b, U · v)
+           = RingVector.innerProduct(Uᵀ · b, v)
+               by Equality.symmetry(Matrix.transpose_adjoint(U, b, v))
+        as pairingMoves;
+        (1 : ℤ) * (RingVector.innerProduct(b, U · v) + c * t)
+            = RingVector.innerProduct(b, U · v) + c * t by ring as oneTimesTop;
+        Wᵀ · (source · (W · x))
+           = Wᵀ · RingVector.appendCoordinate(
+               A · (U · v) + t • b,
+               RingVector.innerProduct(b, U · v) + c * t)
+               by substituting sourceAction
+           = Matrix.diagonalExtension(Uᵀ, 1) · RingVector.appendCoordinate(
+               A · (U · v) + t • b,
+               RingVector.innerProduct(b, U · v) + c * t)
+               by substituting wTranspose
+           = RingVector.appendCoordinate(
+               Uᵀ · (A · (U · v) + t • b),
+               1 * (RingVector.innerProduct(b, U · v) + c * t))
+               by Matrix.diagonalExtension_apply_appendCoordinate_general
+           = RingVector.appendCoordinate(
+               targetParent · v + t • (Uᵀ · b),
+               1 * (RingVector.innerProduct(b, U · v) + c * t))
+               by substituting lowerAction
+           = RingVector.appendCoordinate(
+               targetParent · v + t • (Uᵀ · b),
+               RingVector.innerProduct(b, U · v) + c * t)
+               by substituting oneTimesTop
+           = RingVector.appendCoordinate(
+               targetParent · v + t • (Uᵀ · b),
+               RingVector.innerProduct(Uᵀ · b, v) + c * t)
+               by substituting pairingMoves
+           = target · RingVector.appendCoordinate(v, t)
+               by Equality.symmetry(Matrix.borderedAssembly_apply_appendCoordinate(
+                 targetParent, Uᵀ · b, c, targetSymmetric, v, t))
+           = target · x by substituting xReads
+        as pulledAction;
+        (Wᵀ * source * W) · x
+           = (Wᵀ * source) · (W · x) by Matrix.applyVector_multiply
+           = Wᵀ · (source · (W · x)) by Matrix.applyVector_multiply
+           = target · x by pulledAction;
+        done
+      });
+  target = Wᵀ * source * W by Equality.symmetry;
+  witness W with done by And.introduction(wInvertible, done)
+}
+
+-- Escalation is invariant under changing the basis of its parent.  The
+-- transported child is existential because its new border depends on the
+-- particular change-of-basis witness.
+theorem Matrix.escalation_transport_parent_isometry {n : ℕ}
+        (A targetParent : Matrix(Integer.commutative_ring_bundle, n, n))
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n))
+        (escalation : Matrix.IsEscalation(A, B))
+        (parentIsometric : Matrix.IsIsometric(A, targetParent))
+        : ∃ (targetChild : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n)).
+            Matrix.IsEscalation(targetParent, targetChild)
+              ∧ Matrix.IsIsometric(B, targetChild) := {
+  choose U such that Matrix.IsInvertible(U) ∧ targetParent = Uᵀ * A * U
+      from parentIsometric;
+  Matrix.IsInvertible(U) as uInvertible;
+  targetParent = Uᵀ * A * U as parentReads;
+  let b : RingVector(Integer.commutative_ring_bundle, n) := Matrix.borderColumn(B);
+  let targetChild : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n) :=
+      Matrix.borderedAssembly(targetParent, Uᵀ · b, (Matrix.truant(A) : ℤ));
+  Matrix.IsSymmetric(A) by Matrix.escalation_block_symmetric as aSymmetric;
+  Matrix.IsSymmetric(Uᵀ * A * U)
+      by Matrix.pullback_symmetric(symmetric := aSymmetric);
+  Matrix.IsSymmetric(targetParent) by substituting parentReads as targetSymmetric;
+  B = Matrix.borderedAssembly(A, b, (Matrix.truant(A) : ℤ))
+      by Matrix.IsEscalation.eq_borderedAssembly as childReads;
+  Matrix.IsIsometric(
+      Matrix.borderedAssembly(A, b, (Matrix.truant(A) : ℤ)), targetChild)
+      by Matrix.borderedAssembly_isometric_parent_change(
+        aSymmetric := aSymmetric, targetSymmetric := targetSymmetric,
+        uInvertible := uInvertible, changesParent := Equality.symmetry(parentReads));
+  Matrix.IsIsometric(B, targetChild) by substituting childReads as childIsometric;
+  Matrix.IsPositiveDefinite(B) by Matrix.IsEscalation.positive_definite as childPositive;
+  Matrix.IsPositiveDefinite(targetChild)
+      by Matrix.isometric_positive_definite(
+        isometric := childIsometric, positiveDefinite := childPositive)
+  as targetPositive;
+  ¬(Matrix.IsUniversal(A)) by Matrix.IsEscalation.parent_not_universal as parentNonUniversal;
+  Matrix.IsTruant(A, Matrix.truant(A))
+      by Matrix.truant_is_truant(nonUniversal := parentNonUniversal) as parentTruant;
+  Matrix.truant(targetParent) = Matrix.truant(A)
+      by Matrix.isometric_truant_equals(
+        isometric := parentIsometric, isTruant := parentTruant)
+  as truantsAgree;
+  Matrix.IsSymmetric(targetChild)
+      by Matrix.borderedAssembly_symmetric(
+        A := targetParent, b := Uᵀ · b, c := (Matrix.truant(A) : ℤ),
+        symmetric := targetSymmetric);
+  Matrix.IsPositiveDefinite(targetChild) by targetPositive;
+  Matrix.leadingBlock(targetChild) = targetParent
+      by Matrix.borderedAssembly_leadingBlock;
+  Matrix.corner(targetChild)
+     = (Matrix.truant(A) : ℤ) by Matrix.borderedAssembly_corner
+     = (Matrix.truant(targetParent) : ℤ) by substituting truantsAgree;
+  Matrix.IsEscalation(targetParent, targetChild);
+  witness targetChild with done
+}
+
 theorem Matrix.borderedAssembly_isometric_symmetric_parent_change {n : ℕ}
         (A targetParent U : Matrix(Integer.commutative_ring_bundle, n, n))
         (b : RingVector(Integer.commutative_ring_bundle, n)) (c : ℤ)

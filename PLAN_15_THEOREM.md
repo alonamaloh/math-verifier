@@ -215,7 +215,7 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
   that every escalation over `x²+2y²` has truant 7, 10, or 14. Together with
   `sumOfTwoSquares_escalation_rank_three_truant` (truants 6, 7, or 14), this
   completes the explicit rank-three escalation classification.
-- `S3.E5` `[~]` (XL) ★★ The rank-4 escalators: machine-generate and dedup to the **≈207** isometry classes. *(Finite coverage of every ternary-parent branch is complete; the exact global deduplication and count remain. Large mechanical lemma; the count is the checkpoint.)* — owes: S3.E2, S2.R4
+- `S3.E5` `[x]` (XL) ★★ The rank-4 escalators: machine-generate and dedup to the **207** selected isometry classes. — owes: S3.E2, S2.R4 · **DONE 2026-07-21:** every rank-four escalator is now kernel-proved isometric to one of the 207 selected normal forms; see the completion note below. The exhaustive classifier establishes that the selected list has 207 classes, while the kernel-critical downstream fact is the proved 207-way cover.
   **PILOT COMPLETE 2026-07-21:** `Algebra/rank_four_pilot.math` and the deterministic
   `scripts/generate_rank_four_pilot.py` carry one ternary branch end to end. Above
   `x²+y²+z²` (truant 7), positive-definiteness gives the exact coupled bound
@@ -292,8 +292,8 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
   parents, the global coverage predicates now name **276 distinct
   representatives**.
 
-  This finishes the **coverage** substage of E5, but not E5 itself. The 276
-  alternatives are not pairwise non-isometric. The deterministic discovery
+  This finished the first **coverage** substage of E5. The 276 alternatives
+  are not pairwise non-isometric. The deterministic discovery
   tool `scripts/classify_rank_four_normal_forms.py` now reconstructs their
   concrete Gram matrices and proves the search exhaustive: for each potential
   isometry it enumerates every vector of the required norms inside exact
@@ -301,10 +301,27 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
   basis. Determinant and the theta-series prefix through 15 are only safe
   prefilters. The result is exactly **207 integral-isometry classes**, with
   **69 explicit unimodular identifications**, including all cross-parent
-  coincidences. This count is guarded by `make rank-four-generated-check` but
-  remains untrusted until those 69 matrices are replayed as kernel-checked
-  congruence certificates. That replay and the resulting 207-alternative
-  coverage predicate are the final E5 substage before changing `[~]` to `[x]`.
+  coincidences.
+
+  **GLOBAL DEDUPLICATION COMPLETE 2026-07-21:**
+  `Algebra/rank_four_isometry_certificates_generated.math` replays all 69
+  discovered congruences in the kernel. Each proof checks an explicit
+  unimodular 4×4 matrix, its explicit two-sided inverse, and the full pullback
+  action. `Algebra/rank_three_global_classification.math` first joins the two
+  binary-parent branches into nine canonical ternary parents, using the new
+  general theorem `escalation_transport_parent_isometry` rather than assuming
+  a parent is literally canonical. The generated selected-normal-form and
+  branch-coverage modules then merge all 276 historical alternatives into 207
+  names. Finally **`Matrix.escalator_rank_four`** proves that every actual
+  rank-four escalator satisfies `Matrix.IsRankFourEscalatorRepresentative`.
+
+  The deterministic renderings, the counts 276/207/69, and all certificates
+  are guarded by `make rank-four-generated-check`. The kernel proves the
+  207-way cover and every positive identification. The claim that 207 is
+  minimal still uses the exhaustive external non-isometry search (exact finite
+  coordinate bounds plus determinant/theta prefilters); formalizing all
+  pairwise negative certificates is not needed by downstream Fifteen-Theorem
+  arguments and is recorded as an optional audit rather than an E5 blocker.
 - `S3.C1` `[ ]` (M) ★ The set of truants occurring anywhere in the tree is exactly **{1,2,3,5,6,7,10,14,15}**. — owes: S3.E3, S3.E4, S3.E5
 - `S3.C2` `[ ]` (L) ★★ **Master reduction:** if `Q` represents the nine critical numbers then `Q` is universal — via: a non-universal `Q` would embed an escalator missing its truant ∈ {nine}. *(Depends on rank-4 universality, Stage 5.)* — owes: S3.C1, S3.E5, S5.U2
 
