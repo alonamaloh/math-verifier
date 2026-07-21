@@ -116,30 +116,28 @@ def render_table(form: NamedForm) -> str:
 """
 
 
-def exceptional_proof(form: NamedForm, equality_name: str) -> str:
-    index = EXCEPTIONAL_NAMES.index(form.name)
+def concrete_branch(form: NamedForm) -> tuple[str, str]:
     expression = form_expression(form)
-    proof = or_intro(
-        index,
-        len(EXCEPTIONAL_NAMES),
-        f"reflexivity(Matrix(Integer.commutative_ring_bundle, 4, 4), {expression})",
+    if form.name in EXCEPTIONAL_NAMES:
+        proof = or_intro(
+            EXCEPTIONAL_NAMES.index(form.name),
+            len(EXCEPTIONAL_NAMES),
+            f"reflexivity(Matrix(Integer.commutative_ring_bundle, 4, 4), {expression})",
+        )
+        return (
+            f"Matrix.IsExceptionalRankFourNormalForm({expression}) by {proof} as concreteExceptional",
+            "concreteExceptional",
+        )
+    return (
+        f"Matrix.RepresentsThroughFifteen({expression}) by {theorem_name(form)} as concreteRepresents",
+        "concreteRepresents",
     )
-    return f"""Matrix.IsExceptionalRankFourNormalForm({expression}) by {proof} as concreteExceptional;
-      {expression} = R by {equality_name} as reverseReads;
-      Matrix.IsExceptionalRankFourNormalForm(R) by Equality.transport_proposition(
-        (candidate : Matrix(Integer.commutative_ring_bundle, 4, 4)) ↦ Matrix.IsExceptionalRankFourNormalForm(candidate),
-        {expression}, R, reverseReads, concreteExceptional) as outcome;
-      done by disjunct(outcome)"""
 
 
-def regular_proof(form: NamedForm, equality_name: str) -> str:
-    expression = form_expression(form)
-    return f"""Matrix.RepresentsThroughFifteen({expression}) by {theorem_name(form)} as concreteRepresents;
-      {expression} = R by {equality_name} as reverseReads;
-      Matrix.RepresentsThroughFifteen(R) by Equality.transport_proposition(
-        (candidate : Matrix(Integer.commutative_ring_bundle, 4, 4)) ↦ Matrix.RepresentsThroughFifteen(candidate),
-        {expression}, R, reverseReads, concreteRepresents) as outcome;
-      done by disjunct(outcome)"""
+def branch_proof(form: NamedForm) -> str:
+    claim, proof_name = concrete_branch(form)
+    return f"""{claim};
+      done by disjunct({proof_name})"""
 
 
 def chunk_name(family: str, index: int) -> str:
@@ -170,19 +168,25 @@ import Algebra.rank_four_short_values
 def render_chunk(family: str, index: int, chunk: list[NamedForm]) -> str:
     if len(chunk) == 1:
         form = chunk[0]
-        body = exceptional_proof(form, "formReads") if form.name in EXCEPTIONAL_NAMES else regular_proof(form, "formReads")
-        indented_body = "\n".join(f"  {line}" for line in body.splitlines())
+        expression = form_expression(form)
+        claim, proof_name = concrete_branch(form)
         return f"""theorem {chunk_name(family, index)}
         (R : Matrix(Integer.commutative_ring_bundle, 4, 4))
         (selected : {FAMILY_DEFINITIONS[family]}Chunk{index}(R))
         : Matrix.IsExceptionalRankFourNormalForm(R) ∨ Matrix.RepresentsThroughFifteen(R) := {{
-  R = {form_expression(form)} by selected as formReads;
-{indented_body}
+  R = {expression} by selected as formReads;
+  {claim};
+  Matrix.IsExceptionalRankFourNormalForm({expression}) ∨ Matrix.RepresentsThroughFifteen({expression})
+      by disjunct({proof_name}) as concreteOutcome;
+  done by Equality.transport_proposition(
+      (candidate : Matrix(Integer.commutative_ring_bundle, 4, 4)) ↦
+        Matrix.IsExceptionalRankFourNormalForm(candidate) ∨ Matrix.RepresentsThroughFifteen(candidate),
+      {expression}, R, Equality.symmetry(formReads), concreteOutcome)
 }}
 """
     cases = []
     for form in chunk:
-        body = exceptional_proof(form, "formReads") if form.name in EXCEPTIONAL_NAMES else regular_proof(form, "formReads")
+        body = branch_proof(form)
         cases.append(f"""    case R = {form_expression(form)} as formReads: {{
       {body}
     }}""")
