@@ -1,0 +1,189 @@
+-- Algebra/three_squares_residual_cover_five.math
+
+module Algebra.three_squares_residual_cover_five
+
+import Algebra.three_squares_residual_cover_common
+
+theorem Natural.five_residual_at_exponent_zero (b : ℕ)
+        : ∃ (residual w : ℕ).
+            ¬(Natural.IsThreeSquareObstruction(residual))
+            ∧ residual + w * w * 5 = 4 ^ 0 * (8 * b + 7) := {
+  let residual : ℕ := 4 * (2 * b) + 2;
+  ¬(Natural.IsThreeSquareObstruction(residual))
+      by Natural.four_times_plus_two_not_obstruction(2 * b) as admissible;
+  residual + 1 * 1 * 5
+     = 4 * (2 * b) + 2 + 5
+     = 8 * b + 7
+     = 4 ^ 0 * (8 * b + 7) by substituting Equality.symmetry(Natural.power_zero(4))
+  as coverReads;
+  witness residual with witness 1 with And.introduction(admissible, coverReads)
+}
+
+theorem Natural.five_residual_at_exponent_one (b : ℕ)
+        : ∃ (residual w : ℕ).
+            ¬(Natural.IsThreeSquareObstruction(residual))
+            ∧ residual + w * w * 5 = 4 ^ 1 * (8 * b + 7) := {
+  let core : ℕ := 4 * (2 * b) + 2;
+  let residual : ℕ := 4 * core;
+  ¬(Natural.IsThreeSquareObstruction(core))
+      by Natural.four_times_plus_two_not_obstruction(2 * b) as coreAdmissible;
+  ¬(Natural.IsThreeSquareObstruction(residual))
+      by Natural.not_obstruction_four_times(core, coreAdmissible) as admissible;
+  residual + 2 * 2 * 5
+     = 4 * (4 * (2 * b) + 2) + 20
+     = 4 * (8 * b + 7)
+     = 4 ^ 1 * (8 * b + 7) by substituting Equality.symmetry(Natural.power_one(4))
+  as coverReads;
+  witness residual with witness 2 with And.introduction(admissible, coverReads)
+}
+
+theorem Natural.five_residual_at_exponent_two_plus (earlier b : ℕ)
+        : ∃ (residual w : ℕ).
+            ¬(Natural.IsThreeSquareObstruction(residual))
+            ∧ residual + w * w * 5 = 4 ^ (earlier + 2) * (8 * b + 7) := {
+  let core : ℕ := 8 * (16 * b + 13) + 3;
+  let residual : ℕ := 4 ^ earlier * core;
+  let w : ℕ := 2 ^ earlier;
+  ¬(Natural.IsThreeSquareObstruction(core))
+      by Natural.eight_times_plus_three_not_obstruction as coreAdmissible;
+  ¬(Natural.IsThreeSquareObstruction(residual))
+      by Natural.not_obstruction_four_power_times(earlier, core, coreAdmissible) as admissible;
+  residual + w * w * 5
+     = 4 ^ earlier * (8 * (16 * b + 13) + 3) + (2 ^ earlier * 2 ^ earlier) * 5
+     = 4 ^ earlier * (8 * (16 * b + 13) + 3) + 4 ^ earlier * 5
+         by Equality.congruence(
+             (candidate : ℕ) ↦ 4 ^ earlier * (8 * (16 * b + 13) + 3) + candidate * 5,
+             2 ^ earlier * 2 ^ earlier, 4 ^ earlier,
+             Natural.two_power_square_is_four_power(earlier))
+     = 4 ^ earlier * (16 * (8 * b + 7))
+     = (4 ^ earlier * (4 * 4)) * (8 * b + 7)
+     = 4 ^ (earlier + 2) * (8 * b + 7) by {
+          4 ^ (earlier + 2)
+             = 4 ^ (1 + (1 + earlier))
+             = 4 * 4 ^ (1 + earlier) by Natural.power_one_plus(4, 1 + earlier)
+             = 4 * (4 * 4 ^ earlier) by substituting Natural.power_one_plus(4, earlier)
+             = 4 ^ earlier * (4 * 4);
+          done
+        }
+  as coverReads;
+  witness residual with witness w with And.introduction(admissible, coverReads)
+}
+
+theorem Natural.five_residual_for_obstruction_shape (exponent b : ℕ)
+        : ∃ (residual w : ℕ).
+            ¬(Natural.IsThreeSquareObstruction(residual))
+            ∧ residual + w * w * 5 = 4 ^ exponent * (8 * b + 7) := {
+  exponent = 0 ∨ ∃ (predecessor : ℕ). exponent = 1 + predecessor by Natural.zero_or_one_plus;
+  done by cases {
+    case exponent = 0 as exponentReads: {
+      choose residual : ℕ such that ∃ (w : ℕ).
+          ¬(Natural.IsThreeSquareObstruction(residual))
+          ∧ residual + w * w * 5 = 4 ^ 0 * (8 * b + 7)
+          from Natural.five_residual_at_exponent_zero(b);
+      choose w : ℕ such that
+          ¬(Natural.IsThreeSquareObstruction(residual))
+          ∧ residual + w * w * 5 = 4 ^ 0 * (8 * b + 7);
+      ¬(Natural.IsThreeSquareObstruction(residual)) as admissible;
+      residual + w * w * 5
+         = 4 ^ 0 * (8 * b + 7)
+         = 4 ^ exponent * (8 * b + 7) by Equality.congruence(
+             (candidate : ℕ) ↦ 4 ^ candidate * (8 * b + 7),
+             0, exponent, Equality.symmetry(exponentReads))
+      as coverReads;
+      witness residual with witness w with And.introduction(admissible, coverReads)
+    }
+    case ∃ (predecessor : ℕ). exponent = 1 + predecessor: {
+      choose predecessor : ℕ such that exponent = 1 + predecessor as exponentReads;
+      predecessor = 0 ∨ ∃ (earlier : ℕ). predecessor = 1 + earlier by Natural.zero_or_one_plus;
+      done by cases {
+        case predecessor = 0 as predecessorReads: {
+          1
+             = 1 + predecessor by substituting Equality.symmetry(predecessorReads)
+             = exponent by Equality.symmetry(exponentReads)
+          as sourceReads;
+          choose residual : ℕ such that ∃ (w : ℕ).
+              ¬(Natural.IsThreeSquareObstruction(residual))
+              ∧ residual + w * w * 5 = 4 ^ 1 * (8 * b + 7)
+              from Natural.five_residual_at_exponent_one(b);
+          choose w : ℕ such that
+              ¬(Natural.IsThreeSquareObstruction(residual))
+              ∧ residual + w * w * 5 = 4 ^ 1 * (8 * b + 7);
+          ¬(Natural.IsThreeSquareObstruction(residual)) as admissible;
+          residual + w * w * 5
+             = 4 ^ 1 * (8 * b + 7)
+             = 4 ^ exponent * (8 * b + 7) by Equality.congruence(
+                 (candidate : ℕ) ↦ 4 ^ candidate * (8 * b + 7),
+                 1, exponent, sourceReads)
+          as coverReads;
+          witness residual with witness w with And.introduction(admissible, coverReads)
+        }
+        case ∃ (earlier : ℕ). predecessor = 1 + earlier: {
+          choose earlier : ℕ such that predecessor = 1 + earlier as predecessorReads;
+          earlier + 2
+             = 1 + (1 + earlier)
+             = 1 + predecessor by Equality.congruence(
+                 (candidate : ℕ) ↦ 1 + candidate,
+                 1 + earlier, predecessor, Equality.symmetry(predecessorReads))
+             = exponent by Equality.symmetry(exponentReads)
+          as sourceReads;
+          choose residual : ℕ such that ∃ (w : ℕ).
+              ¬(Natural.IsThreeSquareObstruction(residual))
+              ∧ residual + w * w * 5 = 4 ^ (earlier + 2) * (8 * b + 7)
+              from Natural.five_residual_at_exponent_two_plus(earlier, b);
+          choose w : ℕ such that
+              ¬(Natural.IsThreeSquareObstruction(residual))
+              ∧ residual + w * w * 5 = 4 ^ (earlier + 2) * (8 * b + 7);
+          ¬(Natural.IsThreeSquareObstruction(residual)) as admissible;
+          residual + w * w * 5
+             = 4 ^ (earlier + 2) * (8 * b + 7)
+             = 4 ^ exponent * (8 * b + 7) by Equality.congruence(
+                 (candidate : ℕ) ↦ 4 ^ candidate * (8 * b + 7),
+                 earlier + 2, exponent, sourceReads)
+          as coverReads;
+          witness residual with witness w with And.introduction(admissible, coverReads)
+        }
+      }
+    }
+  }
+}
+
+theorem Matrix.threeSquareResidualCover_five_of_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.ThreeSquareResidualCover(5) := {
+  take m : ℕ;
+  suppose m ≥ 1;
+  Natural.IsThreeSquareObstruction(m) ∨ ¬(Natural.IsThreeSquareObstruction(m));
+  ¬(Natural.IsThreeSquareObstruction(m)) ∨ Natural.IsThreeSquareObstruction(m) by Or.swap;
+  done by cases {
+    case ¬(Natural.IsThreeSquareObstruction(m)) as admissible:
+      done by Matrix.threeSquareResidualCover_witness_of_converse(
+          converse, 5, m, m, 0, admissible, done)
+    case Natural.IsThreeSquareObstruction(m) as obstruction: {
+      choose exponent : ℕ such that ∃ (b : ℕ). m = 4 ^ exponent * (8 * b + 7)
+          from obstruction;
+      choose b : ℕ such that m = 4 ^ exponent * (8 * b + 7) as mReads;
+      choose residual : ℕ such that ∃ (w : ℕ).
+          ¬(Natural.IsThreeSquareObstruction(residual))
+          ∧ residual + w * w * 5 = 4 ^ exponent * (8 * b + 7)
+          from Natural.five_residual_for_obstruction_shape(exponent, b);
+      choose w : ℕ such that
+          ¬(Natural.IsThreeSquareObstruction(residual))
+          ∧ residual + w * w * 5 = 4 ^ exponent * (8 * b + 7);
+      ¬(Natural.IsThreeSquareObstruction(residual)) as admissible;
+      residual + w * w * 5
+         = 4 ^ exponent * (8 * b + 7)
+         = m by Equality.symmetry(mReads)
+      as coverReads;
+      done by Matrix.threeSquareResidualCover_witness_of_converse(
+          converse, 5, m, residual, w, admissible, coverReads)
+    }
+  }
+}
+
+theorem Matrix.selectedRankFourPilot_five_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.sumOfThreeSquaresRankFourCandidate(0, 1, 1)) := {
+  done by Matrix.sumOfThreeSquaresRankFourCandidate_universal(
+      d := 5, diagonalReads := ring,
+      cover := Matrix.threeSquareResidualCover_five_of_converse(converse))
+}

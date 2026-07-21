@@ -1,0 +1,57 @@
+-- Algebra/three_squares_theorem.math
+--
+-- Stable public statement for Legendre's three-squares theorem.  The
+-- obstruction direction is proved; the converse remains an explicit
+-- representation-theory obligation.
+
+module Algebra.three_squares_theorem
+
+import Algebra.three_squares_full_obstruction
+
+definition Natural.IsThreeSquareObstruction (n : ℕ) : Proposition :=
+  ∃ (exponent b : ℕ). n = 4 ^ exponent * (8 * b + 7)
+
+theorem Matrix.sumOfThreeSquaresForm_not_represents_obstruction
+        (n : ℕ) (obstruction : Natural.IsThreeSquareObstruction(n))
+        : ¬(Matrix.Represents(Matrix.sumOfThreeSquaresForm, (n : ℤ))) := {
+  choose exponent : ℕ such that
+      ∃ (b : ℕ). n = 4 ^ exponent * (8 * b + 7) from obstruction;
+  choose b : ℕ such that n = 4 ^ exponent * (8 * b + 7) as nReads;
+  (n : ℤ)
+     = ((4 ^ exponent * (8 * b + 7) : ℕ) : ℤ) by substituting nReads
+     = ((4 ^ exponent : ℕ) : ℤ) * ((8 * b + 7 : ℕ) : ℤ)
+         by Natural.to_integer.multiply_preserves
+     = ((4 ^ exponent : ℕ) : ℤ) * (((8 * b : ℕ) : ℤ) + 7)
+         by substituting Natural.to_integer.add_preserves(8 * b, 7)
+     = ((4 ^ exponent : ℕ) : ℤ) * ((8 : ℤ) * (b : ℤ) + 7)
+         by substituting Natural.to_integer.multiply_preserves(8, b)
+  as targetReads;
+  suppose Matrix.Represents(Matrix.sumOfThreeSquaresForm, (n : ℤ)) as represented;
+  Matrix.Represents(Matrix.sumOfThreeSquaresForm,
+      ((4 ^ exponent : ℕ) : ℤ) * (8 * (b : ℤ) + 7))
+      by substituting targetReads;
+  done by Matrix.sumOfThreeSquaresForm_not_represents_four_power_times_eight_plus_seven
+}
+
+theorem Matrix.sumOfThreeSquaresForm_represents_only_admissible
+        (n : ℕ) (represented : Matrix.Represents(Matrix.sumOfThreeSquaresForm, (n : ℤ)))
+        : ¬(Natural.IsThreeSquareObstruction(n)) := {
+  suppose Natural.IsThreeSquareObstruction(n) as obstruction;
+  done by Matrix.sumOfThreeSquaresForm_not_represents_obstruction(n, obstruction, represented)
+}
+
+definition Matrix.ThreeSquaresConverse : Proposition :=
+  ∀ (n : ℕ). ¬(Natural.IsThreeSquareObstruction(n)) →
+    Matrix.Represents(Matrix.sumOfThreeSquaresForm, (n : ℤ))
+
+theorem Matrix.sumOfThreeSquaresForm_characterization
+        (converse : Matrix.ThreeSquaresConverse) (n : ℕ)
+        : (Matrix.Represents(Matrix.sumOfThreeSquaresForm, (n : ℤ))
+            → ¬(Natural.IsThreeSquareObstruction(n)))
+          ∧ (¬(Natural.IsThreeSquareObstruction(n))
+            → Matrix.Represents(Matrix.sumOfThreeSquaresForm, (n : ℤ))) := {
+  done by And.introduction(
+      (represented : Matrix.Represents(Matrix.sumOfThreeSquaresForm, (n : ℤ))) ↦
+        Matrix.sumOfThreeSquaresForm_represents_only_admissible(n, represented),
+      converse(n))
+}

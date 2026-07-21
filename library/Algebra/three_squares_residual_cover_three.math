@@ -1,0 +1,145 @@
+-- Algebra/three_squares_residual_cover_three.math
+
+module Algebra.three_squares_residual_cover_three
+
+import Algebra.three_squares_residual_cover_common
+
+theorem Matrix.threeSquareResidualCover_three_of_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.ThreeSquareResidualCover(3) := {
+  take m : ℕ;
+  suppose m ≥ 1;
+  Natural.IsThreeSquareObstruction(m) ∨ ¬(Natural.IsThreeSquareObstruction(m));
+  ¬(Natural.IsThreeSquareObstruction(m)) ∨ Natural.IsThreeSquareObstruction(m) by Or.swap;
+  done by cases {
+    case ¬(Natural.IsThreeSquareObstruction(m)) as admissible:
+      done by Matrix.threeSquareResidualCover_witness_of_converse(
+          converse, 3, m, m, 0, admissible, done)
+    case Natural.IsThreeSquareObstruction(m) as obstruction: {
+      choose exponent : ℕ such that ∃ (b : ℕ). m = 4 ^ exponent * (8 * b + 7)
+          from obstruction;
+      choose b : ℕ such that m = 4 ^ exponent * (8 * b + 7) as mReads;
+      exponent = 0 ∨ ∃ (predecessor : ℕ). exponent = 1 + predecessor by Natural.zero_or_one_plus;
+      done by cases {
+        case exponent = 0: {
+          let quotient : ℕ := Natural.floor_divide(b, 4);
+          let remainder : ℕ := Natural.modulo(b, 4);
+          4 * quotient + remainder = b by Natural.floor_divide_modulo_decompose as bReads;
+          remainder < 4 by Natural.modulo_lt;
+          remainder = 0 ∨ remainder = 1 ∨ remainder = 2 ∨ remainder = 3
+              by Natural.below_four_values;
+          done by cases {
+            case remainder = 0 as remainderReads: {
+              let residual : ℕ := 4 * (8 * quotient + 1);
+              ¬(Natural.IsThreeSquareObstruction(8 * quotient + 1))
+                  by Natural.eight_times_plus_one_not_obstruction as coreAdmissible;
+              ¬(Natural.IsThreeSquareObstruction(residual))
+                  by Natural.not_obstruction_four_times(8 * quotient + 1, coreAdmissible)
+              as admissible;
+              residual + 1 * 1 * 3
+                 = 4 * (8 * quotient + 1) + 3
+                 = 8 * (4 * quotient + 0) + 7
+                 = 8 * (4 * quotient + remainder) + 7 by substituting Equality.symmetry(remainderReads)
+                 = 8 * b + 7 by substituting bReads
+                 = 4 ^ 0 * (8 * b + 7) by substituting Equality.symmetry(Natural.power_zero(4))
+                 = m by Equality.symmetry(mReads)
+              as coverReads;
+              done by Matrix.threeSquareResidualCover_witness_of_converse(
+                  converse, 3, m, residual, 1, admissible, coverReads)
+            }
+            case remainder = 1 ∨ remainder = 2 ∨ remainder = 3: done by cases {
+              case remainder = 1 as remainderReads: {
+                let residual : ℕ := 4 * (8 * quotient + 3);
+                ¬(Natural.IsThreeSquareObstruction(8 * quotient + 3))
+                    by Natural.eight_times_plus_three_not_obstruction as coreAdmissible;
+                ¬(Natural.IsThreeSquareObstruction(residual))
+                    by Natural.not_obstruction_four_times(8 * quotient + 3, coreAdmissible)
+                as admissible;
+                residual + 1 * 1 * 3
+                   = 4 * (8 * quotient + 3) + 3
+                   = 8 * (4 * quotient + 1) + 7
+                   = 8 * (4 * quotient + remainder) + 7 by substituting Equality.symmetry(remainderReads)
+                   = 8 * b + 7 by substituting bReads
+                   = 4 ^ 0 * (8 * b + 7) by substituting Equality.symmetry(Natural.power_zero(4))
+                   = m by Equality.symmetry(mReads)
+                as coverReads;
+                done by Matrix.threeSquareResidualCover_witness_of_converse(
+                    converse, 3, m, residual, 1, admissible, coverReads)
+              }
+              case remainder = 2 ∨ remainder = 3: done by cases {
+                case remainder = 2 as remainderReads: {
+                  let residual : ℕ := 4 * (8 * quotient + 5);
+                  ¬(Natural.IsThreeSquareObstruction(8 * quotient + 5))
+                      by Natural.eight_times_plus_five_not_obstruction as coreAdmissible;
+                  ¬(Natural.IsThreeSquareObstruction(residual))
+                      by Natural.not_obstruction_four_times(8 * quotient + 5, coreAdmissible)
+                  as admissible;
+                  residual + 1 * 1 * 3
+                     = 4 * (8 * quotient + 5) + 3
+                     = 8 * (4 * quotient + 2) + 7
+                     = 8 * (4 * quotient + remainder) + 7 by substituting Equality.symmetry(remainderReads)
+                     = 8 * b + 7 by substituting bReads
+                     = 4 ^ 0 * (8 * b + 7) by substituting Equality.symmetry(Natural.power_zero(4))
+                     = m by Equality.symmetry(mReads)
+                  as coverReads;
+                  done by Matrix.threeSquareResidualCover_witness_of_converse(
+                      converse, 3, m, residual, 1, admissible, coverReads)
+                }
+                case remainder = 3 as remainderReads: {
+                  let residual : ℕ := 8 * (4 * quotient + 2) + 3;
+                  ¬(Natural.IsThreeSquareObstruction(residual))
+                      by Natural.eight_times_plus_three_not_obstruction as admissible;
+                  residual + 2 * 2 * 3
+                     = 8 * (4 * quotient + 2) + 3 + 12
+                     = 8 * (4 * quotient + 3) + 7
+                     = 8 * (4 * quotient + remainder) + 7 by substituting Equality.symmetry(remainderReads)
+                     = 8 * b + 7 by substituting bReads
+                     = 4 ^ 0 * (8 * b + 7) by substituting Equality.symmetry(Natural.power_zero(4))
+                     = m by Equality.symmetry(mReads)
+                  as coverReads;
+                  done by Matrix.threeSquareResidualCover_witness_of_converse(
+                      converse, 3, m, residual, 2, admissible, coverReads)
+                }
+              }
+            }
+          }
+        }
+        case ∃ (predecessor : ℕ). exponent = 1 + predecessor: {
+          choose predecessor : ℕ such that exponent = 1 + predecessor as exponentReads;
+          let factor : ℕ := 4 ^ predecessor * (8 * b + 7);
+          1 ≤ 8 * b + 7
+             ≤ 4 ^ predecessor * (8 * b + 7)
+                 by Natural.le_multiply_when_factor_at_least_one(
+                     8 * b + 7, 4 ^ predecessor, Natural.power_positive(4, predecessor, done))
+          as factorPositive;
+          choose offset : ℕ such that factor = 1 + offset as factorReads
+              from Natural.subtraction_witness(1, factor, factorPositive);
+          let residual : ℕ := 4 * offset + 1;
+          ¬(Natural.IsThreeSquareObstruction(residual))
+              by Natural.four_times_plus_one_not_obstruction as admissible;
+          residual + 1 * 1 * 3
+             = 4 * offset + 1 + 3
+             = 4 * (1 + offset)
+             = 4 * factor by substituting Equality.symmetry(factorReads)
+             = (4 * 4 ^ predecessor) * (8 * b + 7)
+             = 4 ^ (1 + predecessor) * (8 * b + 7)
+                 by substituting Equality.symmetry(Natural.power_one_plus(4, predecessor))
+             = 4 ^ exponent * (8 * b + 7) by substituting Equality.symmetry(exponentReads)
+             = m by Equality.symmetry(mReads)
+          as coverReads;
+          done by Matrix.threeSquareResidualCover_witness_of_converse(
+              converse, 3, m, residual, 1, admissible, coverReads)
+        }
+      }
+    }
+  }
+}
+
+theorem Matrix.selectedRankFourPilot_three_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.sumOfThreeSquaresRankFourCandidate(0, 0, 2)) := {
+  done by Matrix.sumOfThreeSquaresRankFourCandidate_universal(
+      d := 3, diagonalReads := ring,
+      cover := Matrix.threeSquareResidualCover_three_of_converse(converse))
+}
+

@@ -1,0 +1,51 @@
+-- Algebra/three_squares_residual_cover_one.math
+
+module Algebra.three_squares_residual_cover_one
+
+import Algebra.three_squares_residual_cover_common
+
+theorem Matrix.threeSquareResidualCover_one_of_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.ThreeSquareResidualCover(1) := {
+  take m : ℕ;
+  suppose m ≥ 1;
+  Natural.IsThreeSquareObstruction(m) ∨ ¬(Natural.IsThreeSquareObstruction(m));
+  ¬(Natural.IsThreeSquareObstruction(m)) ∨ Natural.IsThreeSquareObstruction(m) by Or.swap;
+  done by cases {
+    case ¬(Natural.IsThreeSquareObstruction(m)) as admissible: {
+      done by Matrix.threeSquareResidualCover_witness_of_converse(
+          converse, 1, m, m, 0, admissible, done)
+    }
+    case Natural.IsThreeSquareObstruction(m) as obstruction: {
+      choose exponent : ℕ such that ∃ (b : ℕ). m = 4 ^ exponent * (8 * b + 7)
+          from obstruction;
+      choose b : ℕ such that m = 4 ^ exponent * (8 * b + 7) as mReads;
+      let residual : ℕ := 4 ^ exponent * (8 * b + 6);
+      let w : ℕ := 2 ^ exponent;
+      ¬(Natural.IsThreeSquareObstruction(residual))
+          by Natural.four_power_times_eight_plus_six_not_obstruction as admissible;
+      residual + w * w * 1
+         = 4 ^ exponent * (8 * b + 6) + (2 ^ exponent * 2 ^ exponent) * 1
+         = 4 ^ exponent * (8 * b + 6) + (2 ^ exponent * 2 ^ exponent)
+         = 4 ^ exponent * (8 * b + 6) + 4 ^ exponent
+             by Equality.congruence(
+                 (candidate : ℕ) ↦ 4 ^ exponent * (8 * b + 6) + candidate,
+                 2 ^ exponent * 2 ^ exponent, 4 ^ exponent,
+                 Natural.two_power_square_is_four_power(exponent))
+         = 4 ^ exponent * (8 * b + 7)
+         = m by Equality.symmetry(mReads)
+      as coverReads;
+      done by Matrix.threeSquareResidualCover_witness_of_converse(
+          converse, 1, m, residual, w, admissible, coverReads)
+    }
+  }
+}
+
+theorem Matrix.selectedRankFourPilot_one_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.sumOfThreeSquaresRankFourCandidate(1, 1, 2)) := {
+  done by Matrix.sumOfThreeSquaresRankFourCandidate_universal(
+      d := 1, diagonalReads := ring,
+      cover := Matrix.threeSquareResidualCover_one_of_converse(converse))
+}
+

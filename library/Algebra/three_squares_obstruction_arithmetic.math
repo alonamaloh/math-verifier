@@ -1,0 +1,554 @@
+-- Algebra/three_squares_obstruction_arithmetic.math
+--
+-- Elementary arithmetic of the forbidden shape 4^a(8b+7).
+
+module Algebra.three_squares_obstruction_arithmetic
+
+import Algebra.three_squares_theorem
+
+theorem Natural.below_four_values (r : ℕ) (rBelow : r < 4)
+        : r = 0 ∨ r = 1 ∨ r = 2 ∨ r = 3 := {
+  r = 0 ∨ ∃ (predecessor : ℕ). r = 1 + predecessor by Natural.zero_or_one_plus;
+  done by cases {
+    case r = 0: done by Or.introduceLeft(done)
+    case ∃ (predecessor : ℕ). r = 1 + predecessor: {
+      choose predecessor : ℕ such that r = 1 + predecessor;
+      1 ≤ r by substituting (r = 1 + predecessor);
+      r < 4 < 5;
+      r = 1 ∨ r = 2 ∨ r = 3 ∨ r = 4 by Natural.positive_below_five;
+      done by cases {
+        case r = 1: done by Or.introduceRight(Or.introduceLeft(done))
+        case r = 2 ∨ r = 3 ∨ r = 4: done by cases {
+          case r = 2: done by Or.introduceRight(Or.introduceRight(Or.introduceLeft(done)))
+          case r = 3 ∨ r = 4: done by cases {
+            case r = 3: done by Or.introduceRight(Or.introduceRight(Or.introduceRight(done)))
+            case r = 4: {
+              4 < 4 by substituting (r = 4) as impossibleOrder;
+              False by Natural.lt_irreflexive(4, impossibleOrder);
+              done
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+theorem Integer.distinct_affine_residues_not_equal
+        (modulus leftRemainder rightRemainder : ℕ) (leftQuotient rightQuotient : ℤ)
+        (leftBelow : leftRemainder < modulus) (rightBelow : rightRemainder < modulus)
+        (remaindersDistinct : leftRemainder ≠ rightRemainder)
+        : ¬((modulus : ℤ) * leftQuotient + (leftRemainder : ℤ)
+          = (modulus : ℤ) * rightQuotient + (rightRemainder : ℤ)) := {
+  suppose (modulus : ℤ) * leftQuotient + (leftRemainder : ℤ)
+      = (modulus : ℤ) * rightQuotient + (rightRemainder : ℤ) as equalValues;
+  IntegerMod.make(modulus, (modulus : ℤ) * leftQuotient + (leftRemainder : ℤ))
+      = IntegerMod.residue(modulus, leftRemainder)
+          by IntegerMod.make_equal_of_difference_multiple(multiple := leftQuotient) as leftResidue;
+  IntegerMod.make(modulus, (modulus : ℤ) * rightQuotient + (rightRemainder : ℤ))
+      = IntegerMod.residue(modulus, rightRemainder)
+          by IntegerMod.make_equal_of_difference_multiple(multiple := rightQuotient) as rightResidue;
+  IntegerMod.residue(modulus, leftRemainder)
+     = IntegerMod.make(modulus, (modulus : ℤ) * leftQuotient + (leftRemainder : ℤ))
+         by Equality.symmetry(leftResidue)
+     = IntegerMod.make(modulus, (modulus : ℤ) * rightQuotient + (rightRemainder : ℤ))
+         by substituting equalValues
+     = IntegerMod.residue(modulus, rightRemainder) by rightResidue;
+  done by IntegerMod.residue_distinct_below_modulus(
+      modulus, leftRemainder, rightRemainder, leftBelow, rightBelow, remaindersDistinct)
+}
+
+theorem Natural.distinct_affine_residues_not_equal
+        (modulus leftRemainder rightRemainder leftQuotient rightQuotient : ℕ)
+        (leftBelow : leftRemainder < modulus) (rightBelow : rightRemainder < modulus)
+        (remaindersDistinct : leftRemainder ≠ rightRemainder)
+        : ¬(modulus * leftQuotient + leftRemainder
+          = modulus * rightQuotient + rightRemainder) := {
+  suppose modulus * leftQuotient + leftRemainder
+      = modulus * rightQuotient + rightRemainder as equalValues;
+  (modulus : ℤ) * (leftQuotient : ℤ) + (leftRemainder : ℤ)
+     = ((modulus * leftQuotient : ℕ) : ℤ) + (leftRemainder : ℤ)
+         by substituting Natural.to_integer.multiply_preserves(modulus, leftQuotient)
+     = ((modulus * leftQuotient + leftRemainder : ℕ) : ℤ)
+         by Equality.symmetry(Natural.to_integer.add_preserves(modulus * leftQuotient, leftRemainder))
+     = ((modulus * rightQuotient + rightRemainder : ℕ) : ℤ) by substituting equalValues
+     = ((modulus * rightQuotient : ℕ) : ℤ) + (rightRemainder : ℤ)
+         by Natural.to_integer.add_preserves
+     = (modulus : ℤ) * (rightQuotient : ℤ) + (rightRemainder : ℤ)
+         by substituting Natural.to_integer.multiply_preserves(modulus, rightQuotient);
+  done by Integer.distinct_affine_residues_not_equal(
+      modulus, leftRemainder, rightRemainder, leftQuotient, rightQuotient,
+      leftBelow, rightBelow, remaindersDistinct)
+}
+
+theorem Integer.four_multiple_not_eight_times_plus_six (p q : ℤ)
+        : ¬(4 * p = 8 * q + 6) := {
+  suppose 4 * p = 8 * q + 6 as equalValues;
+  IntegerMod.make(4, 4 * p) = IntegerMod.residue(4, 0)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := p) as leftResidue;
+  IntegerMod.make(4, 8 * q + 6) = IntegerMod.residue(4, 2)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := 2 * q + 1) as rightResidue;
+  IntegerMod.residue(4, 0)
+     = IntegerMod.make(4, 4 * p) by Equality.symmetry(leftResidue)
+     = IntegerMod.make(4, 8 * q + 6) by substituting equalValues
+     = IntegerMod.residue(4, 2) by rightResidue;
+  IntegerMod.residue(4, 0) ≠ IntegerMod.residue(4, 2)
+      by IntegerMod.residue_distinct_below_modulus;
+  done
+}
+
+theorem Integer.four_multiple_not_eight_times_plus_seven (p q : ℤ)
+        : ¬(4 * p = 8 * q + 7) := {
+  suppose 4 * p = 8 * q + 7 as equalValues;
+  IntegerMod.make(4, 4 * p) = IntegerMod.residue(4, 0)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := p) as leftResidue;
+  IntegerMod.make(4, 8 * q + 7) = IntegerMod.residue(4, 3)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := 2 * q + 1) as rightResidue;
+  IntegerMod.residue(4, 0)
+     = IntegerMod.make(4, 4 * p) by Equality.symmetry(leftResidue)
+     = IntegerMod.make(4, 8 * q + 7) by substituting equalValues
+     = IntegerMod.residue(4, 3) by rightResidue;
+  IntegerMod.residue(4, 0) ≠ IntegerMod.residue(4, 3)
+      by IntegerMod.residue_distinct_below_modulus;
+  done
+}
+
+theorem Integer.eight_times_plus_six_not_eight_times_plus_seven (p q : ℤ)
+        : ¬(8 * p + 6 = 8 * q + 7) := {
+  suppose 8 * p + 6 = 8 * q + 7 as equalValues;
+  IntegerMod.make(8, 8 * p + 6) = IntegerMod.residue(8, 6)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := p) as leftResidue;
+  IntegerMod.make(8, 8 * q + 7) = IntegerMod.residue(8, 7)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := q) as rightResidue;
+  IntegerMod.residue(8, 6)
+     = IntegerMod.make(8, 8 * p + 6) by Equality.symmetry(leftResidue)
+     = IntegerMod.make(8, 8 * q + 7) by substituting equalValues
+     = IntegerMod.residue(8, 7) by rightResidue;
+  IntegerMod.residue(8, 6) ≠ IntegerMod.residue(8, 7)
+      by IntegerMod.residue_distinct_below_modulus;
+  done
+}
+
+theorem Natural.four_multiple_not_eight_times_plus_six (p q : ℕ)
+        : ¬(4 * p = 8 * q + 6) := {
+  suppose 4 * p = 8 * q + 6 as equalValues;
+  (4 : ℤ) * (p : ℤ)
+     = ((4 * p : ℕ) : ℤ) by Equality.symmetry(Natural.to_integer.multiply_preserves(4, p))
+     = ((8 * q + 6 : ℕ) : ℤ) by substituting equalValues
+     = ((8 * q : ℕ) : ℤ) + 6 by Natural.to_integer.add_preserves
+     = (8 : ℤ) * (q : ℤ) + 6 by substituting Natural.to_integer.multiply_preserves(8, q);
+  done by Integer.four_multiple_not_eight_times_plus_six
+}
+
+theorem Natural.four_multiple_not_eight_times_plus_seven (p q : ℕ)
+        : ¬(4 * p = 8 * q + 7) := {
+  suppose 4 * p = 8 * q + 7 as equalValues;
+  (4 : ℤ) * (p : ℤ)
+     = ((4 * p : ℕ) : ℤ) by Equality.symmetry(Natural.to_integer.multiply_preserves(4, p))
+     = ((8 * q + 7 : ℕ) : ℤ) by substituting equalValues
+     = ((8 * q : ℕ) : ℤ) + 7 by Natural.to_integer.add_preserves
+     = (8 : ℤ) * (q : ℤ) + 7 by substituting Natural.to_integer.multiply_preserves(8, q);
+  done by Integer.four_multiple_not_eight_times_plus_seven
+}
+
+theorem Natural.eight_times_plus_six_not_eight_times_plus_seven (p q : ℕ)
+        : ¬(8 * p + 6 = 8 * q + 7) := {
+  suppose 8 * p + 6 = 8 * q + 7 as equalValues;
+  (8 : ℤ) * (p : ℤ) + 6
+     = ((8 * p : ℕ) : ℤ) + 6 by substituting Natural.to_integer.multiply_preserves(8, p)
+     = ((8 * p + 6 : ℕ) : ℤ) by Equality.symmetry(Natural.to_integer.add_preserves(8 * p, 6))
+     = ((8 * q + 7 : ℕ) : ℤ) by substituting equalValues
+     = ((8 * q : ℕ) : ℤ) + 7 by Natural.to_integer.add_preserves
+     = (8 : ℤ) * (q : ℤ) + 7 by substituting Natural.to_integer.multiply_preserves(8, q);
+  done by Integer.eight_times_plus_six_not_eight_times_plus_seven
+}
+
+theorem Natural.four_power_times_eight_plus_six_not_obstruction
+        (exponent b : ℕ)
+        : ¬(Natural.IsThreeSquareObstruction(4 ^ exponent * (8 * b + 6))) := {
+  suppose Natural.IsThreeSquareObstruction(4 ^ exponent * (8 * b + 6)) as obstruction;
+  choose otherExponent : ℕ such that ∃ (otherB : ℕ).
+      4 ^ exponent * (8 * b + 6) = 4 ^ otherExponent * (8 * otherB + 7)
+      from obstruction;
+  choose otherB : ℕ such that
+      4 ^ exponent * (8 * b + 6) = 4 ^ otherExponent * (8 * otherB + 7)
+      as equalShapes;
+  exponent < otherExponent ∨ exponent = otherExponent ∨ otherExponent < exponent
+      by Natural.lt_trichotomy;
+  done by cases {
+    case exponent < otherExponent as exponentBelow: {
+      choose gap : ℕ such that exponent + (1 + gap) = otherExponent
+          as exponentSplit from Natural.lt_elim;
+      4 ^ exponent * (8 * b + 6)
+         = 4 ^ otherExponent * (8 * otherB + 7) by equalShapes
+         = 4 ^ (exponent + (1 + gap)) * (8 * otherB + 7) by substituting Equality.symmetry(exponentSplit)
+         = (4 ^ exponent * 4 ^ (1 + gap)) * (8 * otherB + 7)
+             by substituting Natural.power_add(4, exponent, 1 + gap)
+         = 4 ^ exponent * (4 ^ (1 + gap) * (8 * otherB + 7))
+      as cancellable;
+      8 * b + 6 = 4 ^ (1 + gap) * (8 * otherB + 7)
+          by Natural.multiply_cancel_left(
+              4 ^ exponent, 8 * b + 6, 4 ^ (1 + gap) * (8 * otherB + 7),
+              Natural.power_positive(4, exponent, done), cancellable)
+      as reduced;
+      4 * (4 ^ gap * (8 * otherB + 7))
+         = (4 * 4 ^ gap) * (8 * otherB + 7)
+         = 4 ^ (1 + gap) * (8 * otherB + 7)
+             by substituting Equality.symmetry(Natural.power_one_plus(4, gap))
+         = 8 * b + 6 by Equality.symmetry(reduced)
+      as impossible;
+      done by Natural.four_multiple_not_eight_times_plus_six(
+          4 ^ gap * (8 * otherB + 7), b, impossible)
+    }
+    case exponent = otherExponent ∨ otherExponent < exponent: done by cases {
+      case exponent = otherExponent as exponentsEqual: {
+        4 ^ exponent * (8 * b + 6)
+           = 4 ^ otherExponent * (8 * otherB + 7) by equalShapes
+           = 4 ^ exponent * (8 * otherB + 7)
+               by substituting Equality.symmetry(exponentsEqual)
+        as cancellable;
+        8 * b + 6 = 8 * otherB + 7
+            by Natural.multiply_cancel_left(
+                4 ^ exponent, 8 * b + 6, 8 * otherB + 7,
+                Natural.power_positive(4, exponent, done), cancellable)
+        as impossible;
+        done by Natural.eight_times_plus_six_not_eight_times_plus_seven(b, otherB, impossible)
+      }
+      case otherExponent < exponent as otherBelow: {
+        choose gap : ℕ such that otherExponent + (1 + gap) = exponent
+            as exponentSplit from Natural.lt_elim;
+        4 ^ otherExponent * (4 ^ (1 + gap) * (8 * b + 6))
+           = (4 ^ otherExponent * 4 ^ (1 + gap)) * (8 * b + 6)
+           = 4 ^ (otherExponent + (1 + gap)) * (8 * b + 6)
+               by substituting Equality.symmetry(Natural.power_add(4, otherExponent, 1 + gap))
+           = 4 ^ exponent * (8 * b + 6) by substituting exponentSplit
+           = 4 ^ otherExponent * (8 * otherB + 7) by equalShapes
+        as cancellable;
+        4 ^ (1 + gap) * (8 * b + 6) = 8 * otherB + 7
+            by Natural.multiply_cancel_left(
+                4 ^ otherExponent, 4 ^ (1 + gap) * (8 * b + 6), 8 * otherB + 7,
+                Natural.power_positive(4, otherExponent, done), cancellable)
+        as reduced;
+        4 * (4 ^ gap * (8 * b + 6))
+           = (4 * 4 ^ gap) * (8 * b + 6)
+           = 4 ^ (1 + gap) * (8 * b + 6)
+               by substituting Equality.symmetry(Natural.power_one_plus(4, gap))
+           = 8 * otherB + 7 by reduced
+        as impossible;
+        done by Natural.four_multiple_not_eight_times_plus_seven(
+            4 ^ gap * (8 * b + 6), otherB, impossible)
+      }
+    }
+  }
+}
+
+theorem Natural.four_times_plus_two_not_obstruction (p : ℕ)
+        : ¬(Natural.IsThreeSquareObstruction(4 * p + 2)) := {
+  suppose Natural.IsThreeSquareObstruction(4 * p + 2) as obstruction;
+  choose exponent : ℕ such that ∃ (b : ℕ). 4 * p + 2 = 4 ^ exponent * (8 * b + 7)
+      from obstruction;
+  choose b : ℕ such that 4 * p + 2 = 4 ^ exponent * (8 * b + 7) as equalShapes;
+  exponent = 0 ∨ ∃ (predecessor : ℕ). exponent = 1 + predecessor by Natural.zero_or_one_plus;
+  done by cases {
+    case exponent = 0: {
+      4 * p + 2
+         = 4 ^ 0 * (8 * b + 7) by equalShapes
+         = 8 * b + 7 by substituting Natural.power_zero(4)
+         = 4 * (2 * b + 1) + 3
+      as impossible;
+      done by Natural.distinct_affine_residues_not_equal(
+          4, 2, 3, p, 2 * b + 1, done, done, done, impossible)
+    }
+    case ∃ (predecessor : ℕ). exponent = 1 + predecessor: {
+      choose predecessor : ℕ such that exponent = 1 + predecessor;
+      4 * p + 2
+         = 4 ^ exponent * (8 * b + 7) by equalShapes
+         = 4 ^ (1 + predecessor) * (8 * b + 7) by substituting (exponent = 1 + predecessor)
+         = (4 * 4 ^ predecessor) * (8 * b + 7)
+             by substituting Natural.power_one_plus(4, predecessor)
+         = 4 * (4 ^ predecessor * (8 * b + 7))
+         = 4 * (4 ^ predecessor * (8 * b + 7)) + 0
+      as impossible;
+      done by Natural.distinct_affine_residues_not_equal(
+          4, 2, 0, p, 4 ^ predecessor * (8 * b + 7), done, done, done, impossible)
+    }
+  }
+}
+
+theorem Natural.four_times_plus_one_not_obstruction (p : ℕ)
+        : ¬(Natural.IsThreeSquareObstruction(4 * p + 1)) := {
+  suppose Natural.IsThreeSquareObstruction(4 * p + 1) as obstruction;
+  choose exponent : ℕ such that ∃ (b : ℕ). 4 * p + 1 = 4 ^ exponent * (8 * b + 7)
+      from obstruction;
+  choose b : ℕ such that 4 * p + 1 = 4 ^ exponent * (8 * b + 7) as equalShapes;
+  exponent = 0 ∨ ∃ (predecessor : ℕ). exponent = 1 + predecessor by Natural.zero_or_one_plus;
+  done by cases {
+    case exponent = 0: {
+      4 * p + 1
+         = 4 ^ 0 * (8 * b + 7) by equalShapes
+         = 8 * b + 7 by substituting Natural.power_zero(4)
+         = 4 * (2 * b + 1) + 3
+      as impossible;
+      done by Natural.distinct_affine_residues_not_equal(
+          4, 1, 3, p, 2 * b + 1, done, done, done, impossible)
+    }
+    case ∃ (predecessor : ℕ). exponent = 1 + predecessor: {
+      choose predecessor : ℕ such that exponent = 1 + predecessor;
+      4 * p + 1
+         = 4 ^ exponent * (8 * b + 7) by equalShapes
+         = 4 ^ (1 + predecessor) * (8 * b + 7) by substituting (exponent = 1 + predecessor)
+         = (4 * 4 ^ predecessor) * (8 * b + 7)
+             by substituting Natural.power_one_plus(4, predecessor)
+         = 4 * (4 ^ predecessor * (8 * b + 7)) + 0
+      as impossible;
+      done by Natural.distinct_affine_residues_not_equal(
+          4, 1, 0, p, 4 ^ predecessor * (8 * b + 7), done, done, done, impossible)
+    }
+  }
+}
+
+theorem Natural.obstruction_of_four_times_obstruction
+        (n : ℕ) (scaledObstruction : Natural.IsThreeSquareObstruction(4 * n))
+        : Natural.IsThreeSquareObstruction(n) := {
+  choose exponent : ℕ such that ∃ (b : ℕ). 4 * n = 4 ^ exponent * (8 * b + 7)
+      from scaledObstruction;
+  choose b : ℕ such that 4 * n = 4 ^ exponent * (8 * b + 7) as equalShapes;
+  exponent = 0 ∨ ∃ (predecessor : ℕ). exponent = 1 + predecessor by Natural.zero_or_one_plus;
+  done by cases {
+    case exponent = 0: {
+      4 * n
+         = 4 ^ 0 * (8 * b + 7) by equalShapes
+         = 8 * b + 7 by substituting Natural.power_zero(4)
+      as impossible;
+      False by Natural.four_multiple_not_eight_times_plus_seven(n, b, impossible);
+      done
+    }
+    case ∃ (predecessor : ℕ). exponent = 1 + predecessor: {
+      choose predecessor : ℕ such that exponent = 1 + predecessor;
+      4 * n
+         = 4 ^ exponent * (8 * b + 7) by equalShapes
+         = 4 ^ (1 + predecessor) * (8 * b + 7) by substituting (exponent = 1 + predecessor)
+         = (4 * 4 ^ predecessor) * (8 * b + 7)
+             by substituting Natural.power_one_plus(4, predecessor)
+         = 4 * (4 ^ predecessor * (8 * b + 7))
+      as cancellable;
+      n = 4 ^ predecessor * (8 * b + 7)
+          by Natural.multiply_cancel_left(4, n, 4 ^ predecessor * (8 * b + 7), done, cancellable)
+      as reduced;
+      witness predecessor with witness b with reduced
+    }
+  }
+}
+
+theorem Natural.not_obstruction_four_times
+        (n : ℕ) (admissible : ¬(Natural.IsThreeSquareObstruction(n)))
+        : ¬(Natural.IsThreeSquareObstruction(4 * n)) := {
+  suppose Natural.IsThreeSquareObstruction(4 * n) as scaledObstruction;
+  done by admissible(Natural.obstruction_of_four_times_obstruction(n, scaledObstruction))
+}
+
+theorem Natural.not_obstruction_four_power_times
+        (exponent n : ℕ) (admissible : ¬(Natural.IsThreeSquareObstruction(n)))
+        : ¬(Natural.IsThreeSquareObstruction(4 ^ exponent * n)) :=
+  by induction on exponent with IH {
+    case base: {
+      4 ^ 0 * n = n by substituting Natural.power_zero(4) as valueReads;
+      suppose Natural.IsThreeSquareObstruction(4 ^ 0 * n) as obstruction;
+      Natural.IsThreeSquareObstruction(n) by substituting valueReads;
+      done by admissible
+    }
+    case step(predecessor): {
+      suppose Natural.IsThreeSquareObstruction(4 ^ (1 + predecessor) * n) as obstruction;
+      4 ^ (1 + predecessor) * n
+         = (4 * 4 ^ predecessor) * n by substituting Natural.power_one_plus(4, predecessor)
+         = 4 * (4 ^ predecessor * n)
+      as valueReads;
+      Natural.IsThreeSquareObstruction(4 * (4 ^ predecessor * n)) by substituting valueReads;
+      Natural.IsThreeSquareObstruction(4 ^ predecessor * n)
+          by Natural.obstruction_of_four_times_obstruction;
+      done by IH
+    }
+  }
+
+theorem Natural.eight_times_plus_one_not_obstruction (p : ℕ)
+        : ¬(Natural.IsThreeSquareObstruction(8 * p + 1)) := {
+  suppose Natural.IsThreeSquareObstruction(8 * p + 1) as obstruction;
+  choose exponent : ℕ such that ∃ (b : ℕ). 8 * p + 1 = 4 ^ exponent * (8 * b + 7)
+      from obstruction;
+  choose b : ℕ such that 8 * p + 1 = 4 ^ exponent * (8 * b + 7) as equalShapes;
+  exponent = 0 ∨ ∃ (predecessor : ℕ). exponent = 1 + predecessor by Natural.zero_or_one_plus;
+  done by cases {
+    case exponent = 0: {
+      8 * p + 1
+         = 4 ^ 0 * (8 * b + 7) by equalShapes
+         = 8 * b + 7 by substituting Natural.power_zero(4)
+      as impossible;
+      done by Natural.distinct_affine_residues_not_equal(
+          8, 1, 7, p, b, done, done, done, impossible)
+    }
+    case ∃ (predecessor : ℕ). exponent = 1 + predecessor: {
+      choose predecessor : ℕ such that exponent = 1 + predecessor;
+      4 * (2 * p) + 1
+         = 8 * p + 1
+         = 4 ^ exponent * (8 * b + 7) by equalShapes
+         = 4 ^ (1 + predecessor) * (8 * b + 7) by substituting (exponent = 1 + predecessor)
+         = (4 * 4 ^ predecessor) * (8 * b + 7)
+             by substituting Natural.power_one_plus(4, predecessor)
+         = 4 * (4 ^ predecessor * (8 * b + 7)) + 0
+      as impossible;
+      done by Natural.distinct_affine_residues_not_equal(
+          4, 1, 0, 2 * p, 4 ^ predecessor * (8 * b + 7), done, done, done, impossible)
+    }
+  }
+}
+
+theorem Natural.eight_times_plus_three_not_obstruction (p : ℕ)
+        : ¬(Natural.IsThreeSquareObstruction(8 * p + 3)) := {
+  suppose Natural.IsThreeSquareObstruction(8 * p + 3) as obstruction;
+  choose exponent : ℕ such that ∃ (b : ℕ). 8 * p + 3 = 4 ^ exponent * (8 * b + 7)
+      from obstruction;
+  choose b : ℕ such that 8 * p + 3 = 4 ^ exponent * (8 * b + 7) as equalShapes;
+  exponent = 0 ∨ ∃ (predecessor : ℕ). exponent = 1 + predecessor by Natural.zero_or_one_plus;
+  done by cases {
+    case exponent = 0: {
+      8 * p + 3
+         = 4 ^ 0 * (8 * b + 7) by equalShapes
+         = 8 * b + 7 by substituting Natural.power_zero(4)
+      as impossible;
+      done by Natural.distinct_affine_residues_not_equal(
+          8, 3, 7, p, b, done, done, done, impossible)
+    }
+    case ∃ (predecessor : ℕ). exponent = 1 + predecessor: {
+      choose predecessor : ℕ such that exponent = 1 + predecessor;
+      4 * (2 * p) + 3
+         = 8 * p + 3
+         = 4 ^ exponent * (8 * b + 7) by equalShapes
+         = 4 ^ (1 + predecessor) * (8 * b + 7) by substituting (exponent = 1 + predecessor)
+         = (4 * 4 ^ predecessor) * (8 * b + 7)
+             by substituting Natural.power_one_plus(4, predecessor)
+         = 4 * (4 ^ predecessor * (8 * b + 7)) + 0
+      as impossible;
+      done by Natural.distinct_affine_residues_not_equal(
+          4, 3, 0, 2 * p, 4 ^ predecessor * (8 * b + 7), done, done, done, impossible)
+    }
+  }
+}
+
+theorem Natural.eight_times_plus_five_not_obstruction (p : ℕ)
+        : ¬(Natural.IsThreeSquareObstruction(8 * p + 5)) := {
+  suppose Natural.IsThreeSquareObstruction(8 * p + 5) as obstruction;
+  choose exponent : ℕ such that ∃ (b : ℕ). 8 * p + 5 = 4 ^ exponent * (8 * b + 7)
+      from obstruction;
+  choose b : ℕ such that 8 * p + 5 = 4 ^ exponent * (8 * b + 7) as equalShapes;
+  exponent = 0 ∨ ∃ (predecessor : ℕ). exponent = 1 + predecessor by Natural.zero_or_one_plus;
+  done by cases {
+    case exponent = 0: {
+      8 * p + 5
+         = 4 ^ 0 * (8 * b + 7) by equalShapes
+         = 8 * b + 7 by substituting Natural.power_zero(4)
+      as impossible;
+      done by Natural.distinct_affine_residues_not_equal(
+          8, 5, 7, p, b, done, done, done, impossible)
+    }
+    case ∃ (predecessor : ℕ). exponent = 1 + predecessor: {
+      choose predecessor : ℕ such that exponent = 1 + predecessor;
+      4 * (2 * p + 1) + 1
+         = 8 * p + 5
+         = 4 ^ exponent * (8 * b + 7) by equalShapes
+         = 4 ^ (1 + predecessor) * (8 * b + 7) by substituting (exponent = 1 + predecessor)
+         = (4 * 4 ^ predecessor) * (8 * b + 7)
+             by substituting Natural.power_one_plus(4, predecessor)
+         = 4 * (4 ^ predecessor * (8 * b + 7)) + 0
+      as impossible;
+      done by Natural.distinct_affine_residues_not_equal(
+          4, 1, 0, 2 * p + 1, 4 ^ predecessor * (8 * b + 7), done, done, done, impossible)
+    }
+  }
+}
+
+theorem Natural.eight_times_obstruction_exponent_zero_impossible (b q : ℕ)
+        : ¬(8 * b = 4 ^ 0 * (8 * q + 7)) := {
+  suppose 8 * b = 4 ^ 0 * (8 * q + 7) as equalShapes;
+  8 * b + 0
+     = 8 * b
+     = 4 ^ 0 * (8 * q + 7) by equalShapes
+     = 8 * q + 7 by substituting Natural.power_zero(4)
+  as impossible;
+  done by Natural.distinct_affine_residues_not_equal(
+      8, 0, 7, b, q, done, done, done, impossible)
+}
+
+theorem Natural.eight_times_obstruction_exponent_one_impossible (b q : ℕ)
+        : ¬(8 * b = 4 ^ 1 * (8 * q + 7)) := {
+  suppose 8 * b = 4 ^ 1 * (8 * q + 7) as equalShapes;
+  8 * b + 0
+     = 8 * b
+     = 4 ^ 1 * (8 * q + 7) by equalShapes
+     = 4 * (8 * q + 7) by substituting Natural.power_one(4)
+     = 8 * (4 * q + 3) + 4
+  as impossible;
+  done by Natural.distinct_affine_residues_not_equal(
+      8, 0, 4, b, 4 * q + 3, done, done, done, impossible)
+}
+
+theorem Natural.eight_times_obstruction_exponent_two_plus_shape
+        (earlier b q : ℕ)
+        (equalShapes : 8 * b = 4 ^ (earlier + 2) * (8 * q + 7))
+        : b = 2 * 4 ^ earlier * (8 * q + 7) := {
+  8 * b
+     = 4 ^ (earlier + 2) * (8 * q + 7) by equalShapes
+     = 4 ^ (1 + (1 + earlier)) * (8 * q + 7)
+     = (4 * 4 ^ (1 + earlier)) * (8 * q + 7) by substituting Natural.power_one_plus(4, 1 + earlier)
+     = (4 * (4 * 4 ^ earlier)) * (8 * q + 7) by substituting Natural.power_one_plus(4, earlier)
+     = 8 * (2 * 4 ^ earlier * (8 * q + 7))
+  as cancellable;
+  done by Natural.multiply_cancel_left(8, b, 2 * 4 ^ earlier * (8 * q + 7), done, cancellable)
+}
+
+theorem Natural.obstruction_eight_times_shape
+        (b : ℕ) (obstruction : Natural.IsThreeSquareObstruction(8 * b))
+        : ∃ (exponent q : ℕ). b = 2 * 4 ^ exponent * (8 * q + 7) := {
+  choose obstructionExponent : ℕ such that ∃ (q : ℕ).
+      8 * b = 4 ^ obstructionExponent * (8 * q + 7)
+      from obstruction;
+  choose q : ℕ such that 8 * b = 4 ^ obstructionExponent * (8 * q + 7) as equalShapes;
+  obstructionExponent = 0 ∨ ∃ (predecessor : ℕ). obstructionExponent = 1 + predecessor
+      by Natural.zero_or_one_plus;
+  done by cases {
+    case obstructionExponent = 0: {
+      8 * b
+         = 4 ^ obstructionExponent * (8 * q + 7) by equalShapes
+         = 4 ^ 0 * (8 * q + 7) by substituting (obstructionExponent = 0)
+      as zeroShape;
+      False by Natural.eight_times_obstruction_exponent_zero_impossible(b, q, zeroShape);
+      done
+    }
+    case ∃ (predecessor : ℕ). obstructionExponent = 1 + predecessor: {
+      choose predecessor : ℕ such that obstructionExponent = 1 + predecessor as exponentReads;
+      predecessor = 0 ∨ ∃ (earlier : ℕ). predecessor = 1 + earlier by Natural.zero_or_one_plus;
+      done by cases {
+        case predecessor = 0: {
+          8 * b
+             = 4 ^ obstructionExponent * (8 * q + 7) by equalShapes
+             = 4 ^ (1 + predecessor) * (8 * q + 7) by substituting exponentReads
+             = 4 ^ 1 * (8 * q + 7) by substituting (predecessor = 0)
+          as oneShape;
+          False by Natural.eight_times_obstruction_exponent_one_impossible(b, q, oneShape);
+          done
+        }
+        case ∃ (earlier : ℕ). predecessor = 1 + earlier: {
+          choose earlier : ℕ such that predecessor = 1 + earlier as predecessorReads;
+          8 * b
+             = 4 ^ obstructionExponent * (8 * q + 7) by equalShapes
+             = 4 ^ (1 + predecessor) * (8 * q + 7) by substituting exponentReads
+             = 4 ^ (1 + (1 + earlier)) * (8 * q + 7) by substituting predecessorReads
+             = 4 ^ (earlier + 2) * (8 * q + 7)
+          as twoPlusShape;
+          b = 2 * 4 ^ earlier * (8 * q + 7)
+              by Natural.eight_times_obstruction_exponent_two_plus_shape(earlier, b, q, twoPlusShape);
+          witness earlier with witness q with done
+        }
+      }
+    }
+  }
+}

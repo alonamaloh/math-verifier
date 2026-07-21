@@ -1,0 +1,50 @@
+-- Algebra/three_squares_residual_covers.math
+--
+-- Arithmetic reductions from Legendre's converse to the residual-cover
+-- interfaces used by the rank-four universality templates.
+
+module Algebra.three_squares_residual_cover_common
+
+import Algebra.three_squares_obstruction_arithmetic
+import Algebra.rank_four_pilot_universality
+import Natural.floor_divide
+
+theorem Natural.two_power_square_is_four_power (exponent : ℕ)
+        : 2 ^ exponent * 2 ^ exponent = 4 ^ exponent :=
+  by induction on exponent with IH {
+    case base:
+      2 ^ 0 * 2 ^ 0
+         = 1 * 1 by substituting Natural.power_zero(2)
+         = 1
+         = 4 ^ 0 by Equality.symmetry(Natural.power_zero(4))
+    case step(predecessor):
+      2 ^ (1 + predecessor) * 2 ^ (1 + predecessor)
+         = (2 * 2 ^ predecessor) * (2 * 2 ^ predecessor)
+             by substituting Natural.power_one_plus(2, predecessor)
+         = 4 * (2 ^ predecessor * 2 ^ predecessor)
+         = 4 * 4 ^ predecessor by substituting IH
+         = 4 ^ (1 + predecessor) by Equality.symmetry(Natural.power_one_plus(4, predecessor))
+  }
+
+theorem Matrix.threeSquareResidualCover_witness_of_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        (d m residual w : ℕ)
+        (admissible : ¬(Natural.IsThreeSquareObstruction(residual)))
+        (valueReads : residual + w * w * d = m)
+        : ∃ (integerResidual integerW : ℤ).
+            Matrix.Represents(Matrix.sumOfThreeSquaresForm, integerResidual)
+            ∧ integerResidual + integerW * integerW * (d : ℤ) = (m : ℤ) := {
+  Matrix.Represents(Matrix.sumOfThreeSquaresForm, (residual : ℤ))
+      by converse(residual, admissible) as represented;
+  (residual : ℤ) + (w : ℤ) * (w : ℤ) * (d : ℤ)
+     = (residual : ℤ) + ((w * w : ℕ) : ℤ) * (d : ℤ)
+         by substituting Natural.to_integer.multiply_preserves(w, w)
+     = (residual : ℤ) + ((w * w * d : ℕ) : ℤ)
+         by substituting Natural.to_integer.multiply_preserves(w * w, d)
+     = ((residual + w * w * d : ℕ) : ℤ)
+         by Equality.symmetry(Natural.to_integer.add_preserves(residual, w * w * d))
+     = (m : ℤ) by substituting valueReads
+  as integerValueReads;
+  witness (residual : ℤ) with witness (w : ℤ) with
+    And.introduction(represented, integerValueReads)
+}

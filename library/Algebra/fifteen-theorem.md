@@ -189,7 +189,13 @@ rank-four escalator by 207 selected normal forms are.
   matrix-level companion exclude every value of the form
   `4^a(8b+7)` from `Matrix.sumOfThreeSquaresForm`. The converse direction of
   the three-squares theorem remains the substantial representation-theory
-  obligation.
+  obligation. `Algebra/three_squares_theorem` packages that converse as
+  `Matrix.ThreeSquaresConverse`. Elementary forbidden-shape arithmetic in
+  `Algebra/three_squares_obstruction_arithmetic` and seven independently
+  cached `Algebra/three_squares_residual_cover_*` modules prove every residual
+  cover for `d=1,...,7` from that single converse. Thus
+  `Matrix.selectedRankFourPilot_universal_of_three_squares_converse` makes the
+  whole seven-form pilot family universal as soon as the converse is supplied.
 
 ## Module path
 
@@ -212,5 +218,8 @@ families. The elementary three-squares obstruction is layered as
 `three_squares_obstruction` → `three_squares_mod_eight` →
 `three_squares_mod_eight_generated` → `three_squares_base_obstruction` →
 `three_squares_mod_four` → `three_squares_descent` →
-`three_squares_power_descent` → `three_squares_full_obstruction`.
+`three_squares_power_descent` → `three_squares_full_obstruction` →
+`three_squares_theorem` → `three_squares_obstruction_arithmetic` →
+`three_squares_residual_cover_common` and the seven
+`three_squares_residual_cover_*` cases → `three_squares_residual_covers`.
 `PLAN_15_THEOREM.md` records unfinished stages.
