@@ -1,0 +1,554 @@
+-- Algebra/three_squares_rational_descent.math
+--
+-- The Aubry--Davenport--Cassels descent specialized to x²+y²+z².
+-- A rational representation with denominator m is moved along the integral
+-- line through a nearest lattice point; the other intersection with the
+-- sphere has a strictly smaller denominator.
+
+module Algebra.three_squares_rational_descent
+
+import Algebra.three_squares_theorem
+import Integer.balanced_division
+import Integer.absolute_value_multiplicative
+import Integer.integral_domain
+import Natural.strong_recursion
+import Rational.archimedean
+
+definition Integer.ThreeSquareScaledRepresentation (n : ℤ) (denominator : ℕ)
+        : Proposition :=
+  ∃ (a b c : ℤ).
+    a * a + b * b + c * c = n * (denominator : ℤ) * (denominator : ℤ)
+
+definition Integer.ThreeSquareRepresentation (n : ℤ) : Proposition :=
+  ∃ (a b c : ℤ). a * a + b * b + c * c = n
+
+definition Integer.ThreeSquareFractionalRepresentation (n : ℤ) : Proposition :=
+  ∃ (denominator : ℕ).
+    1 ≤ denominator ∧ Integer.ThreeSquareScaledRepresentation(n, denominator)
+
+definition Rational.ThreeSquareRepresentation (n : ℤ) : Proposition :=
+  ∃ (x y z : ℚ). x * x + y * y + z * z = (n : ℚ)
+
+-- This is the genuinely arithmetic half that remains after descent: produce
+-- a rational point on the three-square quadric for every admissible target.
+definition Rational.ThreeSquaresConverse : Proposition :=
+  ∀ (n : ℕ). ¬(Natural.IsThreeSquareObstruction(n)) →
+    Rational.ThreeSquareRepresentation((n : ℤ))
+
+theorem Integer.add_preserves_less_or_equal_left
+        (fixed x y : ℤ) (xLeY : x ≤ y)
+        : fixed + x ≤ fixed + y := {
+  fixed + x
+     = x + fixed
+     ≤ y + fixed by Integer.add_preserves_less_or_equal(x, y, fixed, xLeY)
+     = fixed + y;
+  done
+}
+
+theorem Integer.three_balanced_remainders_below
+        (modulus rx ry rz : ℤ)
+        (modulusPositive : modulus > 0)
+        (xBound : 4 * (rx * rx) ≤ modulus * modulus)
+        (yBound : 4 * (ry * ry) ≤ modulus * modulus)
+        (zBound : 4 * (rz * rz) ≤ modulus * modulus)
+        : rx * rx + ry * ry + rz * rz < modulus * modulus := {
+  4 * (rx * rx) + 4 * (ry * ry)
+     ≤ modulus * modulus + 4 * (ry * ry)
+         by Integer.add_preserves_less_or_equal(
+             4 * (rx * rx), modulus * modulus, 4 * (ry * ry), xBound)
+     ≤ modulus * modulus + modulus * modulus
+         by Integer.add_preserves_less_or_equal_left(
+             modulus * modulus, 4 * (ry * ry), modulus * modulus, yBound)
+  as firstTwoBound;
+  4 * (rx * rx + ry * ry + rz * rz)
+     = (4 * (rx * rx) + 4 * (ry * ry)) + 4 * (rz * rz)
+     ≤ (modulus * modulus + modulus * modulus) + 4 * (rz * rz)
+         by Integer.add_preserves_less_or_equal(
+             4 * (rx * rx) + 4 * (ry * ry),
+             modulus * modulus + modulus * modulus,
+             4 * (rz * rz), firstTwoBound)
+     ≤ (modulus * modulus + modulus * modulus) + modulus * modulus
+         by Integer.add_preserves_less_or_equal_left(
+             modulus * modulus + modulus * modulus,
+             4 * (rz * rz), modulus * modulus, zBound)
+     = 3 * (modulus * modulus)
+  ;
+  modulus * modulus > 0 by Integer.multiply_positive as squarePositive;
+  3 * (modulus * modulus) < 4 * (modulus * modulus) by {
+    4 * (modulus * modulus) - 3 * (modulus * modulus)
+       = modulus * modulus
+       > 0 by squarePositive;
+    done by Integer.lt_of_positive_difference
+  };
+  4 * (rx * rx + ry * ry + rz * rz) < 4 * (modulus * modulus)
+      by Integer.LessThan.transitive_left;
+  done by Integer.cancel_lt_by_positive(4, rx * rx + ry * ry + rz * rz, modulus * modulus, done)
+}
+
+theorem Integer.three_square_line_other_root_identity
+        (n denominator smaller coefficient dotProduct remainderNorm qx qy qz rx ry rz : ℤ)
+        (coefficientReads : qx * qx + qy * qy + qz * qz = n + coefficient)
+        (dotProductReads : qx * rx + qy * ry + qz * rz = dotProduct)
+        (remainderNormReads : rx * rx + ry * ry + rz * rz = remainderNorm)
+        (remainderFactorization : remainderNorm = denominator * smaller)
+        (otherRootReads
+            : smaller + 2 * dotProduct + denominator * coefficient = 0)
+        : (smaller * qx + coefficient * rx) * (smaller * qx + coefficient * rx)
+          + (smaller * qy + coefficient * ry) * (smaller * qy + coefficient * ry)
+          + (smaller * qz + coefficient * rz) * (smaller * qz + coefficient * rz)
+          = n * smaller * smaller := {
+  (smaller * qx + coefficient * rx) * (smaller * qx + coefficient * rx)
+      + (smaller * qy + coefficient * ry) * (smaller * qy + coefficient * ry)
+      + (smaller * qz + coefficient * rz) * (smaller * qz + coefficient * rz)
+     = smaller * smaller * (qx * qx + qy * qy + qz * qz)
+         + 2 * smaller * coefficient * (qx * rx + qy * ry + qz * rz)
+         + coefficient * coefficient * (rx * rx + ry * ry + rz * rz) by ring
+     = smaller * smaller * (n + coefficient)
+         + 2 * smaller * coefficient * (qx * rx + qy * ry + qz * rz)
+         + coefficient * coefficient * (rx * rx + ry * ry + rz * rz)
+         by Equality.congruence(
+             (candidate : ℤ) ↦ smaller * smaller * candidate
+                 + 2 * smaller * coefficient * (qx * rx + qy * ry + qz * rz)
+                 + coefficient * coefficient * (rx * rx + ry * ry + rz * rz),
+             qx * qx + qy * qy + qz * qz, n + coefficient, coefficientReads)
+     = smaller * smaller * (n + coefficient)
+         + 2 * smaller * coefficient * dotProduct
+         + coefficient * coefficient * (rx * rx + ry * ry + rz * rz)
+         by Equality.congruence(
+             (candidate : ℤ) ↦ smaller * smaller * (n + coefficient)
+                 + 2 * smaller * coefficient * candidate
+                 + coefficient * coefficient * (rx * rx + ry * ry + rz * rz),
+             qx * rx + qy * ry + qz * rz, dotProduct, dotProductReads)
+     = smaller * smaller * (n + coefficient)
+         + 2 * smaller * coefficient * dotProduct
+         + coefficient * coefficient * remainderNorm
+         by Equality.congruence(
+             (candidate : ℤ) ↦ smaller * smaller * (n + coefficient)
+                 + 2 * smaller * coefficient * dotProduct + coefficient * coefficient * candidate,
+             rx * rx + ry * ry + rz * rz, remainderNorm, remainderNormReads)
+     = smaller * smaller * (n + coefficient)
+         + 2 * smaller * coefficient * dotProduct
+         + coefficient * coefficient * (denominator * smaller)
+         by Equality.congruence(
+             (candidate : ℤ) ↦ smaller * smaller * (n + coefficient)
+                 + 2 * smaller * coefficient * dotProduct + coefficient * coefficient * candidate,
+             remainderNorm, denominator * smaller, remainderFactorization)
+     = n * smaller * smaller
+         + smaller * coefficient * (smaller + 2 * dotProduct + denominator * coefficient) by ring
+     = n * smaller * smaller + smaller * coefficient * 0
+         by Equality.congruence(
+             (candidate : ℤ) ↦ n * smaller * smaller + smaller * coefficient * candidate,
+             smaller + 2 * dotProduct + denominator * coefficient, 0, otherRootReads)
+     = n * smaller * smaller;
+  done
+}
+
+theorem Integer.three_square_remainder_factorization
+        (n denominator a b c qx qy qz rx ry rz : ℤ)
+        (xReads : a = denominator * qx + rx)
+        (yReads : b = denominator * qy + ry)
+        (zReads : c = denominator * qz + rz)
+        (scaledRepresentation
+            : a * a + b * b + c * c = n * denominator * denominator)
+        : rx * rx + ry * ry + rz * rz
+          = denominator
+              * (-(2 * (qx * rx + qy * ry + qz * rz))
+                  - denominator * (qx * qx + qy * qy + qz * qz - n)) := {
+  (denominator * qx + rx) * (denominator * qx + rx)
+      + (denominator * qy + ry) * (denominator * qy + ry)
+      + (denominator * qz + rz) * (denominator * qz + rz)
+     = a * a + b * b + c * c by {
+          denominator * qx + rx = a by Equality.symmetry(xReads) as xReverse;
+          denominator * qy + ry = b by Equality.symmetry(yReads) as yReverse;
+          denominator * qz + rz = c by Equality.symmetry(zReads) as zReverse;
+          (denominator * qx + rx) * (denominator * qx + rx)
+              + (denominator * qy + ry) * (denominator * qy + ry)
+              + (denominator * qz + rz) * (denominator * qz + rz)
+             = a * a
+                 + (denominator * qy + ry) * (denominator * qy + ry)
+                 + (denominator * qz + rz) * (denominator * qz + rz)
+                 by substituting xReverse
+             = a * a + b * b + (denominator * qz + rz) * (denominator * qz + rz)
+                 by substituting yReverse
+             = a * a + b * b + c * c by substituting zReverse;
+          done
+        }
+     = n * denominator * denominator by scaledRepresentation
+  as expandedRepresentation;
+  done by linear_combination(expandedRepresentation)
+}
+
+theorem Integer.square_zero_implies_zero (x : ℤ) (squareZero : x * x = 0)
+        : x = 0 := {
+  x = 0 ∨ x = 0 by Integer.multiply_eq_zero_implies(x, x, squareZero);
+  done by cases {
+    case x = 0 as xZero: xZero
+    case x = 0 as xZero: xZero
+  }
+}
+
+theorem Integer.three_square_sum_zero
+        (x y z : ℤ) (sumZero : x * x + y * y + z * z = 0)
+        : x = 0 ∧ y = 0 ∧ z = 0 := {
+  choose xSquare : ℕ such that x * x = (xSquare : ℤ) from Integer.square_is_nonneg(x);
+  choose ySquare : ℕ such that y * y = (ySquare : ℤ) from Integer.square_is_nonneg(y);
+  choose zSquare : ℕ such that z * z = (zSquare : ℤ) from Integer.square_is_nonneg(z);
+  ((xSquare + ySquare + zSquare : ℕ) : ℤ)
+     = (xSquare : ℤ) + (ySquare : ℤ) + (zSquare : ℤ)
+     = x * x + y * y + z * z
+     = 0 by sumZero;
+  xSquare + ySquare + zSquare = 0 by Natural.to_integer.eq_zero_implies;
+  xSquare + (ySquare + zSquare)
+     = xSquare + ySquare + zSquare
+     = 0;
+  xSquare = 0 by Natural.add_equals_zero_left;
+  ySquare + zSquare = 0 by Natural.add_equals_zero_right;
+  ySquare = 0 by Natural.add_equals_zero_left;
+  zSquare = 0 by Natural.add_equals_zero_right;
+  x * x = (xSquare : ℤ) = 0 by substituting (xSquare = 0);
+  y * y = (ySquare : ℤ) = 0 by substituting (ySquare = 0);
+  z * z = (zSquare : ℤ) = 0 by substituting (zSquare = 0);
+  x = 0 by Integer.square_zero_implies_zero;
+  y = 0 by Integer.square_zero_implies_zero;
+  z = 0 by Integer.square_zero_implies_zero;
+  done
+}
+
+theorem Integer.three_square_sum_is_nonneg (x y z : ℤ)
+        : Integer.IsNonneg(x * x + y * y + z * z) := {
+  choose xSquare : ℕ such that x * x = (xSquare : ℤ) from Integer.square_is_nonneg(x);
+  choose ySquare : ℕ such that y * y = (ySquare : ℤ) from Integer.square_is_nonneg(y);
+  choose zSquare : ℕ such that z * z = (zSquare : ℤ) from Integer.square_is_nonneg(z);
+  witness xSquare + ySquare + zSquare with
+    x * x + y * y + z * z
+       = (xSquare : ℤ) + (ySquare : ℤ) + (zSquare : ℤ)
+       = ((xSquare + ySquare + zSquare : ℕ) : ℤ)
+}
+
+theorem Integer.three_square_scaled_representation_descends
+        (n : ℤ) (denominator : ℕ)
+        : 1 ≤ denominator
+          → Integer.ThreeSquareScaledRepresentation(n, denominator)
+          → Integer.ThreeSquareRepresentation(n) :=
+  by strong induction on denominator with subject, inductionHypothesis {
+    suppose 1 ≤ subject as denominatorPositive;
+    suppose Integer.ThreeSquareScaledRepresentation(n, subject) as scaled;
+    choose a : ℤ such that ∃ (b c : ℤ).
+        a * a + b * b + c * c = n * (subject : ℤ) * (subject : ℤ)
+        from scaled;
+    choose b : ℤ such that ∃ (c : ℤ).
+        a * a + b * b + c * c = n * (subject : ℤ) * (subject : ℤ);
+    choose c : ℤ such that
+        a * a + b * b + c * c = n * (subject : ℤ) * (subject : ℤ)
+        as scaledReads;
+    let modulus : ℤ := (subject : ℤ);
+    modulus > 0 by Natural.to_integer.positive_preserves as modulusPositive;
+    choose qx : ℤ, rx : ℤ such that
+        a = modulus * qx + rx ∧ 4 * rx² ≤ modulus²
+        from Integer.divide_balanced(a, modulus, modulusPositive);
+    choose qy : ℤ, ry : ℤ such that
+        b = modulus * qy + ry ∧ 4 * ry² ≤ modulus²
+        from Integer.divide_balanced(b, modulus, modulusPositive);
+    choose qz : ℤ, rz : ℤ such that
+        c = modulus * qz + rz ∧ 4 * rz² ≤ modulus²
+        from Integer.divide_balanced(c, modulus, modulusPositive);
+    a = modulus * qx + rx as xReads;
+    b = modulus * qy + ry as yReads;
+    c = modulus * qz + rz as zReads;
+    4 * rx² ≤ modulus² as xBound;
+    4 * ry² ≤ modulus² as yBound;
+    4 * rz² ≤ modulus² as zBound;
+    let remainderNorm : ℤ := rx * rx + ry * ry + rz * rz;
+    remainderNorm < modulus * modulus
+        by Integer.three_balanced_remainders_below(
+            modulus, rx, ry, rz, modulusPositive, xBound, yBound, zBound)
+        as remainderBelow;
+    let coefficient : ℤ := qx * qx + qy * qy + qz * qz - n;
+    let dotProduct : ℤ := qx * rx + qy * ry + qz * rz;
+    let smaller : ℤ := -(2 * dotProduct) - modulus * coefficient;
+    remainderNorm = modulus * smaller
+        by Integer.three_square_remainder_factorization(
+            n, modulus, a, b, c, qx, qy, qz, rx, ry, rz,
+            xReads, yReads, zReads, scaledReads)
+        as remainderFactorization;
+    smaller + 2 * dotProduct + modulus * coefficient = 0 by ring as otherRootReads;
+    Integer.IsNonneg(remainderNorm)
+        by Integer.three_square_sum_is_nonneg(rx, ry, rz);
+    remainderNorm = 0 ∨ ¬(remainderNorm = 0);
+    done by cases {
+      case remainderNorm = 0 as remainderZero: {
+        rx = 0 ∧ ry = 0 ∧ rz = 0
+            by Integer.three_square_sum_zero(rx, ry, rz, remainderZero);
+        rx = 0 as rxZero;
+        ry = 0 as ryZero;
+        rz = 0 as rzZero;
+        modulus * modulus * (qx * qx + qy * qy + qz * qz)
+           = a * a + b * b + c * c by {
+                a
+                   = modulus * qx + rx by xReads
+                   = modulus * qx + 0 by substituting rxZero
+                   = modulus * qx
+                as aReads;
+                b
+                   = modulus * qy + ry by yReads
+                   = modulus * qy + 0 by substituting ryZero
+                   = modulus * qy
+                as bReads;
+                c
+                   = modulus * qz + rz by zReads
+                   = modulus * qz + 0 by substituting rzZero
+                   = modulus * qz
+                as cReads;
+                modulus * modulus * (qx * qx + qy * qy + qz * qz)
+                   = (modulus * qx) * (modulus * qx)
+                       + (modulus * qy) * (modulus * qy)
+                       + (modulus * qz) * (modulus * qz) by ring
+                   = a * a + (modulus * qy) * (modulus * qy)
+                       + (modulus * qz) * (modulus * qz) by substituting Equality.symmetry(aReads)
+                   = a * a + b * b + (modulus * qz) * (modulus * qz)
+                       by substituting Equality.symmetry(bReads)
+                   = a * a + b * b + c * c by substituting Equality.symmetry(cReads);
+                done
+              }
+           = n * modulus * modulus by scaledReads
+           = modulus * modulus * n
+        as cancellable;
+        modulus ≠ 0 by Integer.LessThan.distinct;
+        modulus * modulus ≠ 0 by Integer.multiply_nonzero;
+        qx * qx + qy * qy + qz * qz = n
+            by Integer.multiply_cancel_left_by_nonzero(
+                qx * qx + qy * qy + qz * qz, n,
+                modulus * modulus, done, cancellable)
+        as represented;
+        witness qx with witness qy with witness qz with represented
+      }
+      case ¬(remainderNorm = 0) as remainderNonzero: {
+        remainderNorm > 0 by Integer.positive_of_nonneg_nonzero as remainderPositive;
+        modulus * smaller
+           = remainderNorm by Equality.symmetry(remainderFactorization)
+           > 0 by remainderPositive
+        as productPositive;
+        smaller > 0 by Integer.positive_of_multiply_positive(
+            modulus, smaller, modulusPositive, productPositive);
+        Integer.IsNonneg(smaller) by Integer.nonneg_of_zero_less_or_equal;
+        choose nextDenominator : ℕ such that smaller = (nextDenominator : ℤ) as smallerReads;
+        0 < nextDenominator by Natural.to_integer.LessThan_reflects;
+        1 ≤ nextDenominator as nextPositive;
+        modulus * (nextDenominator : ℤ)
+           = modulus * smaller by substituting Equality.symmetry(smallerReads)
+           = remainderNorm by Equality.symmetry(remainderFactorization)
+           < modulus * modulus by remainderBelow;
+        (nextDenominator : ℤ) < modulus
+            by Integer.cancel_lt_by_positive(modulus, nextDenominator, modulus, modulusPositive);
+        nextDenominator < subject by Natural.to_integer.LessThan_reflects as nextBelow;
+        qx * qx + qy * qy + qz * qz = n + coefficient by ring as coefficientReads;
+        qx * rx + qy * ry + qz * rz = dotProduct as dotProductReads;
+        rx * rx + ry * ry + rz * rz = remainderNorm as remainderNormReads;
+        (smaller * qx + coefficient * rx) * (smaller * qx + coefficient * rx)
+            + (smaller * qy + coefficient * ry) * (smaller * qy + coefficient * ry)
+            + (smaller * qz + coefficient * rz) * (smaller * qz + coefficient * rz)
+           = n * smaller * smaller
+               by Integer.three_square_line_other_root_identity(
+                   n, modulus, smaller, coefficient, dotProduct, remainderNorm,
+                   qx, qy, qz, rx, ry, rz,
+                   coefficientReads, dotProductReads, remainderNormReads,
+                   remainderFactorization, otherRootReads)
+           = n * (nextDenominator : ℤ) * (nextDenominator : ℤ)
+               by substituting smallerReads
+        as nextScaledReads;
+        Integer.ThreeSquareScaledRepresentation(n, nextDenominator) by {
+          witness (smaller * qx + coefficient * rx) with
+          witness (smaller * qy + coefficient * ry) with
+          witness (smaller * qz + coefficient * rz) with nextScaledReads
+        };
+        done by inductionHypothesis(nextDenominator, nextBelow, nextPositive, done)
+      }
+    }
+  }
+
+theorem Integer.three_square_fractional_representation_descends
+        (n : ℤ) (fractional : Integer.ThreeSquareFractionalRepresentation(n))
+        : Integer.ThreeSquareRepresentation(n) := {
+  choose denominator : ℕ such that
+      1 ≤ denominator ∧ Integer.ThreeSquareScaledRepresentation(n, denominator)
+      from fractional;
+  1 ≤ denominator as denominatorPositive;
+  Integer.ThreeSquareScaledRepresentation(n, denominator) as scaled;
+  done by Integer.three_square_scaled_representation_descends(
+      n, denominator, denominatorPositive, scaled)
+}
+
+theorem Rational.multiply_fraction_by_denominator
+        (numerator denominator extra : ℤ) (denominatorNonzero : denominator ≠ 0)
+        : ((denominator * extra : ℤ) : ℚ)
+            * Rational.fraction(numerator, denominator, denominatorNonzero)
+          = ((numerator * extra : ℤ) : ℚ) := {
+  done by Rational.fraction_equal(
+      (denominator * extra) * numerator, 1 * denominator,
+      Integer.multiply_nonzero(1, denominator, Integer.one_is_nonzero, denominatorNonzero),
+      numerator * extra, 1, Integer.one_is_nonzero,
+      ring)
+}
+
+theorem Rational.explicit_three_square_representation_clears_denominators
+        (n : ℤ) (x y z : ℚ)
+        (represented : x * x + y * y + z * z = (n : ℚ))
+        : Integer.ThreeSquareFractionalRepresentation(n) :=
+  by_representatives x as ⟨nx, dx, dxNonzero⟩,
+                     y as ⟨ny, dy, dyNonzero⟩,
+                     z as ⟨nz, dz, dzNonzero⟩ => {
+    let commonDenominator : ℤ := dx * dy * dz;
+    commonDenominator ≠ 0 by Integer.multiply_nonzero as commonNonzero;
+    let denominator : ℕ := Integer.absolute_value_natural(commonDenominator);
+    1 ≤ denominator
+        by Integer.absolute_value_natural_positive_of_nonzero(commonDenominator, commonNonzero)
+        as denominatorPositive;
+    let ax : ℤ := nx * dy * dz;
+    let ay : ℤ := ny * dx * dz;
+    let az : ℤ := nz * dx * dy;
+    commonDenominator = dx * (dy * dz) by ring as commonX;
+    commonDenominator = dy * (dx * dz) by ring as commonY;
+    commonDenominator = dz * (dx * dy) by ring as commonZ;
+    ax = nx * (dy * dz) by ring as axReads;
+    ay = ny * (dx * dz) by ring as ayReads;
+    az = nz * (dx * dy) by ring as azReads;
+    (commonDenominator : ℚ) * x
+       = ((dx * (dy * dz) : ℤ) : ℚ) * x
+           by Equality.congruence(
+               (candidate : ℤ) ↦ (candidate : ℚ) * x,
+               commonDenominator, dx * (dy * dz), commonX)
+       = ((nx * (dy * dz) : ℤ) : ℚ)
+           by Rational.multiply_fraction_by_denominator(nx, dx, dy * dz, dxNonzero)
+       = (ax : ℚ) by Equality.congruence(
+           (candidate : ℤ) ↦ (candidate : ℚ),
+           nx * (dy * dz), ax, Equality.symmetry(axReads))
+    as xScale;
+    (commonDenominator : ℚ) * y
+       = ((dy * (dx * dz) : ℤ) : ℚ) * y
+           by Equality.congruence(
+               (candidate : ℤ) ↦ (candidate : ℚ) * y,
+               commonDenominator, dy * (dx * dz), commonY)
+       = ((ny * (dx * dz) : ℤ) : ℚ)
+           by Rational.multiply_fraction_by_denominator(ny, dy, dx * dz, dyNonzero)
+       = (ay : ℚ) by Equality.congruence(
+           (candidate : ℤ) ↦ (candidate : ℚ),
+           ny * (dx * dz), ay, Equality.symmetry(ayReads))
+    as yScale;
+    (commonDenominator : ℚ) * z
+       = ((dz * (dx * dy) : ℤ) : ℚ) * z
+           by Equality.congruence(
+               (candidate : ℤ) ↦ (candidate : ℚ) * z,
+               commonDenominator, dz * (dx * dy), commonZ)
+       = ((nz * (dx * dy) : ℤ) : ℚ)
+           by Rational.multiply_fraction_by_denominator(nz, dz, dx * dy, dzNonzero)
+       = (az : ℚ) by Equality.congruence(
+           (candidate : ℤ) ↦ (candidate : ℚ),
+           nz * (dx * dy), az, Equality.symmetry(azReads))
+    as zScale;
+    ((ax * ax + ay * ay + az * az : ℤ) : ℚ)
+       = (ax : ℚ) * (ax : ℚ) + (ay : ℚ) * (ay : ℚ) + (az : ℚ) * (az : ℚ)
+       = ((commonDenominator : ℚ) * x) * ((commonDenominator : ℚ) * x) + (ay : ℚ) * (ay : ℚ) + (az : ℚ) * (az : ℚ)
+           by substituting Equality.symmetry(xScale)
+       = ((commonDenominator : ℚ) * x) * ((commonDenominator : ℚ) * x)
+           + ((commonDenominator : ℚ) * y) * ((commonDenominator : ℚ) * y) + (az : ℚ) * (az : ℚ)
+           by substituting Equality.symmetry(yScale)
+       = ((commonDenominator : ℚ) * x) * ((commonDenominator : ℚ) * x)
+           + ((commonDenominator : ℚ) * y) * ((commonDenominator : ℚ) * y)
+           + ((commonDenominator : ℚ) * z) * ((commonDenominator : ℚ) * z)
+           by substituting Equality.symmetry(zScale)
+       = (commonDenominator : ℚ) * (commonDenominator : ℚ) * (x * x + y * y + z * z) by ring
+       = (commonDenominator : ℚ) * (commonDenominator : ℚ) * (n : ℚ) by substituting represented
+       = ((n * commonDenominator * commonDenominator : ℤ) : ℚ)
+    as castScaled;
+    ax * ax + ay * ay + az * az = n * commonDenominator * commonDenominator
+        by Integer.to_rational.injective(
+            ax * ax + ay * ay + az * az,
+            n * commonDenominator * commonDenominator,
+            castScaled)
+        as scaledCommon;
+    choose commonSquare : ℕ such that
+        commonDenominator * commonDenominator = (commonSquare : ℤ)
+        as commonSquareReads from Integer.square_is_nonneg(commonDenominator);
+    (denominator : ℤ) * (denominator : ℤ)
+       = abs(commonDenominator) * abs(commonDenominator)
+           by substituting Equality.symmetry(Integer.absolute_value_natural_is_image(commonDenominator))
+       = abs(commonDenominator * commonDenominator)
+           by Equality.symmetry(Integer.absolute_value_multiplicative(commonDenominator, commonDenominator))
+       = abs((commonSquare : ℤ)) by substituting commonSquareReads
+       = (commonSquare : ℤ) by Integer.absolute_value_of_natural
+       = commonDenominator * commonDenominator
+           by Equality.symmetry(commonSquareReads)
+    as denominatorSquareReads;
+    ax * ax + ay * ay + az * az
+       = n * commonDenominator * commonDenominator by scaledCommon
+       = n * (commonDenominator * commonDenominator) by ring
+       = n * ((denominator : ℤ) * (denominator : ℤ))
+           by Equality.congruence(
+               (candidate : ℤ) ↦ n * candidate,
+               commonDenominator * commonDenominator,
+               (denominator : ℤ) * (denominator : ℤ),
+               Equality.symmetry(denominatorSquareReads))
+       = n * (denominator : ℤ) * (denominator : ℤ) by ring
+    as scaledReads;
+    witness denominator with And.introduction(
+        denominatorPositive,
+        witness ax with witness ay with witness az with scaledReads)
+  }
+
+theorem Rational.three_square_representation_clears_denominators
+        (n : ℤ) (represented : Rational.ThreeSquareRepresentation(n))
+        : Integer.ThreeSquareFractionalRepresentation(n) := {
+  choose x : ℚ such that ∃ (y z : ℚ). x * x + y * y + z * z = (n : ℚ)
+      from represented;
+  choose y : ℚ such that ∃ (z : ℚ). x * x + y * y + z * z = (n : ℚ);
+  choose z : ℚ such that x * x + y * y + z * z = (n : ℚ) as representedByCoordinates;
+  done by Rational.explicit_three_square_representation_clears_denominators(
+      n, x, y, z, representedByCoordinates)
+}
+
+theorem Rational.three_square_representation_is_integral
+        (n : ℤ) (represented : Rational.ThreeSquareRepresentation(n))
+        : Integer.ThreeSquareRepresentation(n) := {
+  Integer.ThreeSquareFractionalRepresentation(n)
+      by Rational.three_square_representation_clears_denominators as fractional;
+  done by Integer.three_square_fractional_representation_descends(n, fractional)
+}
+
+theorem Matrix.sumOfThreeSquaresForm_represents_of_integer_three_square
+        (n : ℤ) (represented : Integer.ThreeSquareRepresentation(n))
+        : Matrix.Represents(Matrix.sumOfThreeSquaresForm, n) := {
+  choose x : ℤ such that ∃ (y z : ℤ). x * x + y * y + z * z = n
+      from represented;
+  choose y : ℤ such that ∃ (z : ℤ). x * x + y * y + z * z = n;
+  choose z : ℤ such that x * x + y * y + z * z = n;
+  done by Matrix.represents_by_witness(
+      Matrix.sumOfThreeSquaresForm, n, ⟨x, y, z⟩,
+      Matrix.sumOfThreeSquaresForm_coordinateTuple_computes(x, y, z, n, done))
+}
+
+theorem Matrix.sumOfThreeSquaresForm_represents_of_fractional_three_square
+        (n : ℤ) (fractional : Integer.ThreeSquareFractionalRepresentation(n))
+        : Matrix.Represents(Matrix.sumOfThreeSquaresForm, n) := {
+  Integer.ThreeSquareRepresentation(n)
+      by Integer.three_square_fractional_representation_descends as represented;
+  done by Matrix.sumOfThreeSquaresForm_represents_of_integer_three_square(n, represented)
+}
+
+theorem Matrix.sumOfThreeSquaresForm_represents_of_rational_three_square
+        (n : ℤ) (represented : Rational.ThreeSquareRepresentation(n))
+        : Matrix.Represents(Matrix.sumOfThreeSquaresForm, n) := {
+  Integer.ThreeSquareRepresentation(n)
+      by Rational.three_square_representation_is_integral as integral;
+  done by Matrix.sumOfThreeSquaresForm_represents_of_integer_three_square(n, integral)
+}
+
+theorem Matrix.three_squares_converse_of_rational
+        (converse : Rational.ThreeSquaresConverse)
+        : Matrix.ThreeSquaresConverse := {
+  take n : ℕ;
+  suppose ¬(Natural.IsThreeSquareObstruction(n)) as admissible;
+  Rational.ThreeSquareRepresentation((n : ℤ))
+      by converse(n, admissible) as rationalRepresentation;
+  done by Matrix.sumOfThreeSquaresForm_represents_of_rational_three_square(
+      (n : ℤ), rationalRepresentation)
+}
