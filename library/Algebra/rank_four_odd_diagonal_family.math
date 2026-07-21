@@ -304,14 +304,25 @@ theorem Matrix.squarePlusDoubleSquareOdd_bordered_coupled_bound
     (0 : ℤ) = q by Equality.symmetry(qZero);
     done by Integer.LessThan.distinct
   };
+  2 * (-formCorner * b + c) + (b - 2 * c)
+     = -(2 * formCorner - 1) * b by ring
+     = -q * b by substituting qReads
+  as secondAction;
+  (-formCorner * b + c) + formCorner * (b - 2 * c)
+     = -(2 * formCorner - 1) * c by ring
+     = -q * c by substituting qReads
+  as thirdAction;
   Matrix.squarePlusDoubleSquareOddForm(formCorner) · eliminatingBase
      = (⟨-q * a,
           2 * (-formCorner * b + c) + (b - 2 * c),
           (-formCorner * b + c) + formCorner * (b - 2 * c)⟩
           : RingVector(Integer.commutative_ring_bundle, 3))
          by Matrix.squarePlusDoubleSquareOddForm_apply_coordinateTuple
+     = (⟨-q * a, -q * b,
+          (-formCorner * b + c) + formCorner * (b - 2 * c)⟩
+          : RingVector(Integer.commutative_ring_bundle, 3)) by substituting secondAction
      = (⟨-q * a, -q * b, -q * c⟩ : RingVector(Integer.commutative_ring_bundle, 3))
-         by substituting qReads; ring
+         by substituting thirdAction
   as baseAction;
   Matrix.quadraticForm(Matrix.squarePlusDoubleSquareOddForm(formCorner), eliminatingBase)
      = RingVector.innerProduct(
@@ -344,12 +355,34 @@ theorem Matrix.squarePlusDoubleSquareOdd_bordered_coupled_bound
          * RingVector.innerProduct(Matrix.borderColumn(B), RingVector.restrict(eliminatingVector))
        + (eliminatingVector(NaturalsBelow.top(3)) * eliminatingVector(NaturalsBelow.top(3))) * Matrix.corner(B)
          by Matrix.quadraticForm_bordered(symmetric := symmetric)
+     = Matrix.quadraticForm(Matrix.leadingBlock(B), eliminatingBase)
+       + eliminatingVector(NaturalsBelow.top(3))
+         * RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B))
+       + eliminatingVector(NaturalsBelow.top(3))
+         * RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
+       + (eliminatingVector(NaturalsBelow.top(3)) * eliminatingVector(NaturalsBelow.top(3))) * Matrix.corner(B)
+         by substituting restrictionReads
+     = Matrix.quadraticForm(Matrix.leadingBlock(B), eliminatingBase)
+       + q * RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B))
+       + q * RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
+       + (q * q) * Matrix.corner(B) by substituting topReads
      = Matrix.quadraticForm(Matrix.squarePlusDoubleSquareOddForm(formCorner), eliminatingBase)
        + q * RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B))
        + q * RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
-       + (q * q) * truant by substitution
+       + (q * q) * Matrix.corner(B) by substituting blockReads
+     = Matrix.quadraticForm(Matrix.squarePlusDoubleSquareOddForm(formCorner), eliminatingBase)
+       + q * RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B))
+       + q * RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
+       + (q * q) * truant by substituting cornerReads
+     = q * adjugateValue
+       + q * RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B))
+       + q * RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
+       + (q * q) * truant by substituting baseValueReads
+     = q * adjugateValue + q * (-adjugateValue)
+       + q * RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
+       + (q * q) * truant by substituting leftPairingReads
      = q * adjugateValue + q * (-adjugateValue) + q * (-adjugateValue) + (q * q) * truant
-         by substitution
+         by substituting rightPairingReads
      = q * (q * truant - adjugateValue) by ring
   as eliminatingValueReads;
   Matrix.quadraticForm(B, eliminatingVector) > 0 by positiveDefinite;
@@ -358,13 +391,18 @@ theorem Matrix.squarePlusDoubleSquareOdd_bordered_coupled_bound
   adjugateValue < q * truant by Integer.lt_of_positive_difference as adjugateBound;
   q * (a * a) + (formCorner - 1) * (b * b) + (b - c) * (b - c) + c * c
      = q * (a * a) + formCorner * (b * b) - 2 * b * c + 2 * (c * c) by ring
-     = adjugateValue;
-  done by substituting adjugateBound
+     = adjugateValue
+     < q * truant by adjugateBound;
+  done
 }
 
 theorem Integer.lt_of_add_nonnegative_right
         (x y limit : ℤ) (yNonnegative : y ≥ 0) (bound : x + y < limit)
         : x < limit := {
-  x = x + 0 ≤ x + y by Integer.add_preserves_less_or_equal(x, x, 0, y, yNonnegative) < limit by bound;
+  x
+     = 0 + x
+     ≤ y + x by Integer.add_preserves_less_or_equal(0, y, x, yNonnegative)
+     = x + y by ring
+     < limit by bound;
   done
 }

@@ -242,7 +242,8 @@ theorem Matrix.squarePlusDoublePlusScaled_bordered_coupled_bound
        = RingVector.zero(Integer.commutative_ring_bundle, 1 + 3)(NaturalsBelow.top(3))
            by substituting vectorZero
        = 0;
-    ¬((2 * d : ℤ) = 0) by Integer.LessThan.distinct(scalePositive);
+    ¬((0 : ℤ) = 2 * d) by Integer.LessThan.distinct(0, 2 * d, scalePositive);
+    ¬((2 * d : ℤ) = 0) by Equality.not_equal_symmetric;
     done
   };
   Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(d), eliminatingBase)
@@ -272,16 +273,43 @@ theorem Matrix.squarePlusDoublePlusScaled_bordered_coupled_bound
          * RingVector.innerProduct(Matrix.borderColumn(B), RingVector.restrict(eliminatingVector))
        + (eliminatingVector(NaturalsBelow.top(3)) * eliminatingVector(NaturalsBelow.top(3))) * Matrix.corner(B)
          by Matrix.quadraticForm_bordered(symmetric := symmetric)
+     = Matrix.quadraticForm(Matrix.leadingBlock(B), eliminatingBase)
+       + eliminatingVector(NaturalsBelow.top(3))
+         * RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B))
+       + eliminatingVector(NaturalsBelow.top(3))
+         * RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
+       + (eliminatingVector(NaturalsBelow.top(3)) * eliminatingVector(NaturalsBelow.top(3))) * Matrix.corner(B)
+         by substituting restrictionReads
+     = Matrix.quadraticForm(Matrix.leadingBlock(B), eliminatingBase)
+       + (2 * d) * RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B))
+       + (2 * d) * RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
+       + ((2 * d) * (2 * d)) * Matrix.corner(B)
+         by substituting topReads
+     = Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(d), eliminatingBase)
+       + (2 * d) * RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B))
+       + (2 * d) * RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
+       + ((2 * d) * (2 * d)) * Matrix.corner(B)
+         by substituting blockReads
      = Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(d), eliminatingBase)
        + (2 * d) * RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B))
        + (2 * d) * RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
        + ((2 * d) * (2 * d)) * truant
-         by substitution
+         by substituting cornerReads
+     = (4 * (d * d) * (a * a) + 2 * (d * d) * (b * b) + 4 * d * (c * c))
+       + (2 * d) * RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B))
+       + (2 * d) * RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
+       + ((2 * d) * (2 * d)) * truant
+         by substituting baseValueReads
+     = (4 * (d * d) * (a * a) + 2 * (d * d) * (b * b) + 4 * d * (c * c))
+       + (2 * d) * (-2 * d * (a * a) + -d * (b * b) + -2 * (c * c))
+       + (2 * d) * RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
+       + ((2 * d) * (2 * d)) * truant
+         by substituting leftPairingReads
      = (4 * (d * d) * (a * a) + 2 * (d * d) * (b * b) + 4 * d * (c * c))
        + (2 * d) * (-2 * d * (a * a) + -d * (b * b) + -2 * (c * c))
        + (2 * d) * (-2 * d * (a * a) + -d * (b * b) + -2 * (c * c))
        + ((2 * d) * (2 * d)) * truant
-         by substitution
+         by substituting rightPairingReads
      = (2 * d) * ((2 * d) * truant
        - (2 * d * (a * a) + d * (b * b) + 2 * (c * c))) by ring
   as eliminatingValueReads;
@@ -294,12 +322,39 @@ theorem Matrix.squarePlusDoublePlusScaled_bordered_coupled_bound
   done by Integer.lt_of_positive_difference
 }
 
+theorem Integer.positive_times_square_nonnegative
+        (factor x : ℤ) (factorPositive : factor > 0)
+        : (0 : ℤ) ≤ factor * (x * x) := {
+  (0 : ℤ) ≤ factor
+      by Integer.LessThan.weaken(0, factor, factorPositive) as factorNonnegative;
+  Integer.IsNonneg(factor)
+      by Integer.nonneg_of_zero_less_or_equal(factor, factorNonnegative) as factorIsNonnegative;
+  Integer.IsNonneg(x * x) by Integer.square_IsNonneg(x) as squareIsNonnegative;
+  Integer.IsNonneg(factor * (x * x))
+      by Integer.multiply_nonneg(factor, x * x, factorIsNonnegative, squareIsNonnegative)
+  as productIsNonnegative;
+  done by Integer.zero_less_or_equal_of_nonneg(factor * (x * x), productIsNonnegative)
+}
+
+theorem Integer.add_nonnegative
+        (x y : ℤ) (xNonnegative : (0 : ℤ) ≤ x) (yNonnegative : (0 : ℤ) ≤ y)
+        : (0 : ℤ) ≤ x + y := {
+  x
+     = 0 + x
+     ≤ y + x by Integer.add_preserves_less_or_equal(0, y, x, yNonnegative)
+     = x + y by ring
+  as xBelowSum;
+  done by Integer.LessOrEqual.transitive(0, x, x + y, xNonnegative, xBelowSum)
+}
+
 theorem Integer.first_square_bound_of_weighted_diagonal_sum
         (d truant a b c : ℤ) (dPositive : d > 0)
         (bound : 2 * d * (a * a) + d * (b * b) + 2 * (c * c) < 2 * d * truant)
         : a * a < truant := {
-  (0 : ℤ) ≤ d * (b * b) by Integer.zero_less_or_equal_of_nonneg as middleNonnegative;
-  (0 : ℤ) ≤ 2 * (c * c) by Integer.zero_less_or_equal_of_nonneg;
+  (0 : ℤ) ≤ d * (b * b)
+      by Integer.positive_times_square_nonnegative(d, b, dPositive) as middleNonnegative;
+  (0 : ℤ) ≤ 2 * (c * c)
+      by Integer.positive_times_square_nonnegative(2, c, done);
   2 * (c * c)
      = 0 + 2 * (c * c)
      ≤ d * (b * b) + 2 * (c * c)
@@ -321,8 +376,11 @@ theorem Integer.second_square_bound_of_weighted_diagonal_sum
         (d truant a b c : ℤ) (dPositive : d > 0)
         (bound : 2 * d * (a * a) + d * (b * b) + 2 * (c * c) < 2 * d * truant)
         : b * b < 2 * truant := {
-  (0 : ℤ) ≤ 2 * d * (a * a) by Integer.zero_less_or_equal_of_nonneg as firstNonnegative;
-  (0 : ℤ) ≤ 2 * (c * c) by Integer.zero_less_or_equal_of_nonneg;
+  2 * d > 0 by Integer.multiply_positive(2, d, done, dPositive) as twoDPositive;
+  (0 : ℤ) ≤ 2 * d * (a * a)
+      by Integer.positive_times_square_nonnegative(2 * d, a, twoDPositive) as firstNonnegative;
+  (0 : ℤ) ≤ 2 * (c * c)
+      by Integer.positive_times_square_nonnegative(2, c, done);
   2 * (c * c)
      = 0 + 2 * (c * c)
      ≤ 2 * d * (a * a) + 2 * (c * c)
@@ -344,8 +402,11 @@ theorem Integer.third_square_bound_of_weighted_diagonal_sum
         (d truant a b c : ℤ) (dPositive : d > 0)
         (bound : 2 * d * (a * a) + d * (b * b) + 2 * (c * c) < 2 * d * truant)
         : c * c < d * truant := {
-  (0 : ℤ) ≤ 2 * d * (a * a) by Integer.zero_less_or_equal_of_nonneg as firstNonnegative;
-  (0 : ℤ) ≤ d * (b * b) by Integer.zero_less_or_equal_of_nonneg;
+  2 * d > 0 by Integer.multiply_positive(2, d, done, dPositive) as twoDPositive;
+  (0 : ℤ) ≤ 2 * d * (a * a)
+      by Integer.positive_times_square_nonnegative(2 * d, a, twoDPositive) as firstNonnegative;
+  (0 : ℤ) ≤ d * (b * b)
+      by Integer.positive_times_square_nonnegative(d, b, dPositive);
   d * (b * b)
      = 0 + d * (b * b)
      ≤ 2 * d * (a * a) + d * (b * b)

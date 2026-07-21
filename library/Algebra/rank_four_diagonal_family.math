@@ -609,10 +609,14 @@ theorem Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative_determinant
   let B : Matrix(Integer.commutative_ring_bundle, 1 + 3, 1 + 3) :=
       Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(d, residue, corner);
   Matrix.IsSymmetric(B) by Matrix.borderedAssembly_symmetric(
+      A := A, b := border, c := corner,
       symmetric := Matrix.sumOfTwoSquaresPlusScaledSquareForm_symmetric(d)) as symmetric;
-  Matrix.leadingBlock(B) = A by Matrix.borderedAssembly_leadingBlock as blockReads;
-  Matrix.borderColumn(B) = border by Matrix.borderedAssembly_borderColumn as borderReads;
-  Matrix.corner(B) = corner by Matrix.borderedAssembly_corner as cornerReads;
+  Matrix.leadingBlock(B) = A
+      by Matrix.borderedAssembly_leadingBlock(A, border, corner) as blockReads;
+  Matrix.borderColumn(B) = border
+      by Matrix.borderedAssembly_borderColumn(A, border, corner) as borderReads;
+  Matrix.corner(B) = corner
+      by Matrix.borderedAssembly_corner(A, border, corner) as cornerReads;
   Matrix.determinant(Matrix.leadingBlock(B))
      = Matrix.determinant(A) by substituting blockReads
      = d by Matrix.sumOfTwoSquaresPlusScaledSquareForm_determinant
@@ -645,12 +649,23 @@ theorem Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative_determinant
   as schurReads;
   Matrix.determinant(Matrix.leadingBlock(B)) * Matrix.determinant(B)
      = Matrix.determinant(Matrix.leadingBlock(B)) * Matrix.schurComplement(B)
-         by Matrix.determinant_schurComplement(symmetric := symmetric);
-  d * Matrix.determinant(B) = d * Matrix.schurComplement(B) by substituting blockDeterminant;
+         by Matrix.determinant_schurComplement(symmetric := symmetric)
+  as schurProductReads;
+  d * Matrix.determinant(B)
+     = Matrix.determinant(Matrix.leadingBlock(B)) * Matrix.determinant(B)
+         by congruenceOf(
+           (x : ℤ) ↦ x * Matrix.determinant(B), Equality.symmetry(blockDeterminant))
+     = Matrix.determinant(Matrix.leadingBlock(B)) * Matrix.schurComplement(B)
+         by schurProductReads
+     = d * Matrix.schurComplement(B)
+         by congruenceOf((x : ℤ) ↦ x * Matrix.schurComplement(B), blockDeterminant);
   Matrix.determinant(B) = Matrix.schurComplement(B)
       by Integer.multiply_cancel_left_by_nonzero(
-          Matrix.determinant(B), Matrix.schurComplement(B), d, dNonzero, done);
-  done by substituting schurReads
+          Matrix.determinant(B), Matrix.schurComplement(B), d, dNonzero, done)
+  as determinantEqualsSchur;
+  done by Equality.transitivity(
+    Matrix.determinant(B), Matrix.schurComplement(B), d * corner - residue * residue,
+    determinantEqualsSchur, schurReads)
 }
 
 theorem Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentatives_not_isometric_of_unequal_invariant
@@ -678,7 +693,14 @@ theorem Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentatives_not_isomet
          by Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative_determinant(dNonzero := dNonzero)
   as otherDeterminantReads;
   d * corner - residue * residue = d * otherCorner - otherResidue * otherResidue
-      by linear_combination(determinantReads - otherDeterminantReads);
+      by {
+        d * corner - residue * residue
+           = Matrix.determinant(
+               Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(
+                 d, otherResidue, otherCorner)) by Equality.symmetry(determinantReads)
+           = d * otherCorner - otherResidue * otherResidue by otherDeterminantReads;
+        done
+      };
   done
 }
 

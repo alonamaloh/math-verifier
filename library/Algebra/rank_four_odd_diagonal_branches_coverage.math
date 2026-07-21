@@ -79,14 +79,26 @@ theorem Matrix.squarePlusDoubleSquareOddRankFourEscalation_classified
 
 theorem Matrix.rankFourOddDiagonalC4_admissible_classified
         (a b c : ℤ)
-        (bound : 7 * (a * a) + 3 * (b * b) + (b - c) * (b - c) + c * c < 49)
+        (bound : 7 * (a * a) + (4 - 1) * (b * b) + (b - c) * (b - c) + c * c < 7 * 7)
         : Matrix.IsRankFourOddDiagonalC4NormalForm(
             Matrix.squarePlusDoubleSquareOddRankFourCandidate(4, 7, a, b, c)) := {
+  7 * (a * a) + 3 * (b * b) + (b - c) * (b - c) + c * c
+     = 7 * (a * a) + (4 - 1) * (b * b) + (b - c) * (b - c) + c * c by ring
+     < 7 * 7 by bound
+     = 49 by ring
+  as boxBound;
   (0 : ℤ) ≤ 3 * (b * b) + (b - c) * (b - c) + c * c
-      by Integer.zero_less_or_equal_of_nonneg as firstRemainderNonnegative;
+      by Integer.add_nonnegative(
+        3 * (b * b) + (b - c) * (b - c), c * c,
+        Integer.add_nonnegative(
+          3 * (b * b), (b - c) * (b - c),
+          Integer.positive_times_square_nonnegative(3, b, done),
+          Integer.positive_times_square_nonnegative(1, b - c, done)),
+        Integer.positive_times_square_nonnegative(1, c, done))
+  as firstRemainderNonnegative;
   7 * (a * a) + (3 * (b * b) + (b - c) * (b - c) + c * c)
      = 7 * (a * a) + 3 * (b * b) + (b - c) * (b - c) + c * c by ring
-     < 49 by bound
+     < 49 by boxBound
   as firstTermBound;
   7 * (a * a) < 49
       by Integer.lt_of_add_nonnegative_right(
@@ -97,10 +109,17 @@ theorem Matrix.rankFourOddDiagonalC4_admissible_classified
   -2 ≤ a by Integer.square_below_eight_lower_box_bound as aLower;
   a < 3 by Integer.square_below_eight_upper_box_bound as aUpper;
   (0 : ℤ) ≤ 7 * (a * a) + (b - c) * (b - c) + c * c
-      by Integer.zero_less_or_equal_of_nonneg as secondRemainderNonnegative;
+      by Integer.add_nonnegative(
+        7 * (a * a) + (b - c) * (b - c), c * c,
+        Integer.add_nonnegative(
+          7 * (a * a), (b - c) * (b - c),
+          Integer.positive_times_square_nonnegative(7, a, done),
+          Integer.positive_times_square_nonnegative(1, b - c, done)),
+        Integer.positive_times_square_nonnegative(1, c, done))
+  as secondRemainderNonnegative;
   3 * (b * b) + (7 * (a * a) + (b - c) * (b - c) + c * c)
      = 7 * (a * a) + 3 * (b * b) + (b - c) * (b - c) + c * c by ring
-     < 49 by bound
+     < 49 by boxBound
   as secondTermBound;
   3 * (b * b) < 49
       by Integer.lt_of_add_nonnegative_right(
@@ -112,10 +131,17 @@ theorem Matrix.rankFourOddDiagonalC4_admissible_classified
   -4 ≤ b by Integer.square_below_eighteen_lower_box_bound as bLower;
   b < 5 by Integer.square_below_eighteen_upper_box_bound as bUpper;
   (0 : ℤ) ≤ 7 * (a * a) + 3 * (b * b) + (b - c) * (b - c)
-      by Integer.zero_less_or_equal_of_nonneg as thirdRemainderNonnegative;
+      by Integer.add_nonnegative(
+        7 * (a * a) + 3 * (b * b), (b - c) * (b - c),
+        Integer.add_nonnegative(
+          7 * (a * a), 3 * (b * b),
+          Integer.positive_times_square_nonnegative(7, a, done),
+          Integer.positive_times_square_nonnegative(3, b, done)),
+        Integer.positive_times_square_nonnegative(1, b - c, done))
+  as thirdRemainderNonnegative;
   c * c + (7 * (a * a) + 3 * (b * b) + (b - c) * (b - c))
      = 7 * (a * a) + 3 * (b * b) + (b - c) * (b - c) + c * c by ring
-     < 49 by bound
+     < 49 by boxBound
   as thirdTermBound;
   c * c < 49
       by Integer.lt_of_add_nonnegative_right(
@@ -123,10 +149,10 @@ theorem Matrix.rankFourOddDiagonalC4_admissible_classified
         thirdRemainderNonnegative, thirdTermBound)
      < 64;
   -7 ≤ c ∧ c < 8 by Integer.square_below_sixty_four_box as cBox;
-  -7 ≤ c by cBox as cLower;
-  c < 8 by cBox as cUpper;
+  -7 ≤ c by And.left((-(7 : ℤ) ≤ c), (c < 8), cBox) as cLower;
+  c < 8 by And.right((-(7 : ℤ) ≤ c), (c < 8), cBox) as cUpper;
   done by Matrix.rankFourOddDiagonalC4_finite_box_classified(
-      a, aLower, aUpper, b, bLower, bUpper, c, cLower, cUpper, bound)
+      a, aLower, aUpper, b, bLower, bUpper, c, cLower, cUpper, boxBound)
 }
 
 theorem Matrix.squarePlusDoubleSquareOddForm_four_rankFourEscalation_classified
@@ -141,14 +167,26 @@ theorem Matrix.squarePlusDoubleSquareOddForm_four_rankFourEscalation_classified
 
 theorem Matrix.rankFourOddDiagonalC5_admissible_classified
         (a b c : ℤ)
-        (bound : 9 * (a * a) + 4 * (b * b) + (b - c) * (b - c) + c * c < 63)
+        (bound : 9 * (a * a) + (5 - 1) * (b * b) + (b - c) * (b - c) + c * c < 9 * 7)
         : Matrix.IsRankFourOddDiagonalC5NormalForm(
             Matrix.squarePlusDoubleSquareOddRankFourCandidate(5, 7, a, b, c)) := {
+  9 * (a * a) + 4 * (b * b) + (b - c) * (b - c) + c * c
+     = 9 * (a * a) + (5 - 1) * (b * b) + (b - c) * (b - c) + c * c by ring
+     < 9 * 7 by bound
+     = 63 by ring
+  as boxBound;
   (0 : ℤ) ≤ 4 * (b * b) + (b - c) * (b - c) + c * c
-      by Integer.zero_less_or_equal_of_nonneg as firstRemainderNonnegative;
+      by Integer.add_nonnegative(
+        4 * (b * b) + (b - c) * (b - c), c * c,
+        Integer.add_nonnegative(
+          4 * (b * b), (b - c) * (b - c),
+          Integer.positive_times_square_nonnegative(4, b, done),
+          Integer.positive_times_square_nonnegative(1, b - c, done)),
+        Integer.positive_times_square_nonnegative(1, c, done))
+  as firstRemainderNonnegative;
   9 * (a * a) + (4 * (b * b) + (b - c) * (b - c) + c * c)
      = 9 * (a * a) + 4 * (b * b) + (b - c) * (b - c) + c * c by ring
-     < 63 by bound
+     < 63 by boxBound
   as firstTermBound;
   9 * (a * a) < 63
       by Integer.lt_of_add_nonnegative_right(
@@ -159,10 +197,17 @@ theorem Matrix.rankFourOddDiagonalC5_admissible_classified
   -2 ≤ a by Integer.square_below_eight_lower_box_bound as aLower;
   a < 3 by Integer.square_below_eight_upper_box_bound as aUpper;
   (0 : ℤ) ≤ 9 * (a * a) + (b - c) * (b - c) + c * c
-      by Integer.zero_less_or_equal_of_nonneg as secondRemainderNonnegative;
+      by Integer.add_nonnegative(
+        9 * (a * a) + (b - c) * (b - c), c * c,
+        Integer.add_nonnegative(
+          9 * (a * a), (b - c) * (b - c),
+          Integer.positive_times_square_nonnegative(9, a, done),
+          Integer.positive_times_square_nonnegative(1, b - c, done)),
+        Integer.positive_times_square_nonnegative(1, c, done))
+  as secondRemainderNonnegative;
   4 * (b * b) + (9 * (a * a) + (b - c) * (b - c) + c * c)
      = 9 * (a * a) + 4 * (b * b) + (b - c) * (b - c) + c * c by ring
-     < 63 by bound
+     < 63 by boxBound
   as secondTermBound;
   4 * (b * b) < 63
       by Integer.lt_of_add_nonnegative_right(
@@ -174,10 +219,17 @@ theorem Matrix.rankFourOddDiagonalC5_admissible_classified
   -4 ≤ b by Integer.square_below_eighteen_lower_box_bound as bLower;
   b < 5 by Integer.square_below_eighteen_upper_box_bound as bUpper;
   (0 : ℤ) ≤ 9 * (a * a) + 4 * (b * b) + (b - c) * (b - c)
-      by Integer.zero_less_or_equal_of_nonneg as thirdRemainderNonnegative;
+      by Integer.add_nonnegative(
+        9 * (a * a) + 4 * (b * b), (b - c) * (b - c),
+        Integer.add_nonnegative(
+          9 * (a * a), 4 * (b * b),
+          Integer.positive_times_square_nonnegative(9, a, done),
+          Integer.positive_times_square_nonnegative(4, b, done)),
+        Integer.positive_times_square_nonnegative(1, b - c, done))
+  as thirdRemainderNonnegative;
   c * c + (9 * (a * a) + 4 * (b * b) + (b - c) * (b - c))
      = 9 * (a * a) + 4 * (b * b) + (b - c) * (b - c) + c * c by ring
-     < 63 by bound
+     < 63 by boxBound
   as thirdTermBound;
   c * c < 63
       by Integer.lt_of_add_nonnegative_right(
@@ -185,10 +237,10 @@ theorem Matrix.rankFourOddDiagonalC5_admissible_classified
         thirdRemainderNonnegative, thirdTermBound)
      < 64;
   -7 ≤ c ∧ c < 8 by Integer.square_below_sixty_four_box as cBox;
-  -7 ≤ c by cBox as cLower;
-  c < 8 by cBox as cUpper;
+  -7 ≤ c by And.left((-(7 : ℤ) ≤ c), (c < 8), cBox) as cLower;
+  c < 8 by And.right((-(7 : ℤ) ≤ c), (c < 8), cBox) as cUpper;
   done by Matrix.rankFourOddDiagonalC5_finite_box_classified(
-      a, aLower, aUpper, b, bLower, bUpper, c, cLower, cUpper, bound)
+      a, aLower, aUpper, b, bLower, bUpper, c, cLower, cUpper, boxBound)
 }
 
 theorem Matrix.squarePlusDoubleSquareOddForm_five_rankFourEscalation_classified

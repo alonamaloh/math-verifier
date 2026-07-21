@@ -1,0 +1,64 @@
+-- Algebra/rank_four_weighted_diagonal_orbits.math
+--
+-- Parent-automorphism orbit reductions for the diag(1,2,d) rank-four
+-- families.  Kept separate from the base family so the foundational bound
+-- proofs do not inherit the larger automorphism search environment.
+
+module Algebra.rank_four_weighted_diagonal_orbits
+
+import Algebra.rank_four_weighted_diagonal_family
+import Algebra.rank_four_parent_automorphisms
+
+-- Reflect the final coordinate of diag(1,2,d), then use a top shear to return
+-- its border entry to the chosen residue interval.  The two arithmetic
+-- hypotheses are deliberately explicit: generated classifiers may compute the
+-- orbit representative, but the kernel still checks every resulting move.
+theorem Matrix.squarePlusDoublePlusScaledRankFourRepresentative_isometric_reflected
+        (d secondResidue thirdResidue corner z reflectedThird reflectedCorner : ℤ)
+        (thirdMoves : -thirdResidue + d * z = reflectedThird)
+        (cornerMoves : corner + 2 * ((-thirdResidue) * z) + d * (z * z) = reflectedCorner)
+        : Matrix.IsIsometric(
+            Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+              d, secondResidue, thirdResidue, corner),
+            Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+              d, secondResidue, reflectedThird, reflectedCorner)) := {
+  let binary : Matrix(Integer.commutative_ring_bundle, 2, 2) :=
+      Matrix.diagonalExtension(Matrix.squareForm, 2);
+  let prefix : RingVector(Integer.commutative_ring_bundle, 2) := ⟨0, secondResidue⟩;
+  Matrix.IsSymmetric(Matrix.squareForm) by Matrix.transpose_identity as squareSymmetric;
+  Matrix.IsSymmetric(binary)
+      by Matrix.diagonalExtension_symmetric(
+        A := Matrix.squareForm, c := (2 : ℤ), symmetric := squareSymmetric)
+  as binarySymmetric;
+  Matrix.IsIsometric(
+      Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+        d, secondResidue, thirdResidue, corner),
+      Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+        d, secondResidue, -thirdResidue, corner))
+      by Matrix.borderedDiagonalExtension_isometric_negate_last_border_coordinate(
+        A := binary, d := d, v := prefix, t := thirdResidue, corner := corner,
+        aSymmetric := binarySymmetric)
+  as reflects;
+  (0 : ℤ) + 0 = 0 by ring as firstVanishes;
+  secondResidue + 2 * 0 = secondResidue by ring as secondStays;
+  -thirdResidue + d * z = reflectedThird by thirdMoves as thirdReduces;
+  corner + 2 * ((0 : ℤ) * 0 + secondResidue * 0 + (-thirdResidue) * z)
+      + 0 * 0 + 2 * (0 * 0) + d * (z * z)
+     = corner + 2 * ((-thirdResidue) * z) + d * (z * z) by ring
+     = reflectedCorner by cornerMoves
+  as cornerReduces;
+  Matrix.IsIsometric(
+      Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+        d, secondResidue, -thirdResidue, corner),
+      Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+        d, secondResidue, reflectedThird, reflectedCorner))
+      by Matrix.squarePlusDoublePlusScaledRankFourCandidate_isometric_reduced(
+        d := d, truant := corner, a := 0, b := secondResidue, c := -thirdResidue,
+        x := 0, y := 0, z := z, secondResidue := secondResidue,
+        thirdResidue := reflectedThird, corner := reflectedCorner,
+        firstVanishes := firstVanishes, secondReduces := secondStays,
+        thirdReduces := thirdReduces, cornerReduces := cornerReduces)
+  as returnsToResidueInterval;
+  done by Matrix.IsIsometric.transitive(
+    leftIsometric := reflects, rightIsometric := returnsToResidueInterval)
+}

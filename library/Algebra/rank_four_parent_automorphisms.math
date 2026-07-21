@@ -1,0 +1,226 @@
+-- Algebra/rank_four_parent_automorphisms.math
+--
+-- A symmetric integral automorphism of a ternary parent lifts block-diagonally
+-- to every bordered child.  This is the reusable certificate behind the
+-- automorphism-orbit reduction of the rank-four candidate lists.
+
+module Algebra.rank_four_parent_automorphisms
+
+import Algebra.rank_four_diagonal_family
+
+theorem Matrix.borderedAssembly_isometric_symmetric_parent_automorphism {n : ℕ}
+        (A U : Matrix(Integer.commutative_ring_bundle, n, n))
+        (b : RingVector(Integer.commutative_ring_bundle, n)) (c : ℤ)
+        (aSymmetric : Matrix.IsSymmetric(A))
+        (uSymmetric : Matrix.IsSymmetric(U))
+        (uInvertible : Matrix.IsInvertible(U))
+        (preservesParent : Uᵀ * A * U = A)
+        : Matrix.IsIsometric(
+            Matrix.borderedAssembly(A, b, c),
+            Matrix.borderedAssembly(A, U · b, c)) := {
+  let W : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n) :=
+      Matrix.diagonalExtension(U, 1);
+  let source : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n) :=
+      Matrix.borderedAssembly(A, b, c);
+  let target : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n) :=
+      Matrix.borderedAssembly(A, U · b, c);
+  Matrix.IsSymmetric(W) by Matrix.diagonalExtension_symmetric(
+      A := U, c := (1 : ℤ), symmetric := uSymmetric) as wSymmetric;
+  Matrix.determinant(U) = Integer.one ∨ Matrix.determinant(U) = Integer.negate(Integer.one)
+      by Matrix.determinant_unimodular_of_invertible(invertible := uInvertible);
+  Matrix.determinant(W)
+     = Matrix.determinant(U) * 1 by Matrix.diagonalExtension_determinant
+     = Matrix.determinant(U) by ring
+  as determinantWReads;
+  Matrix.determinant(W) = Integer.one ∨ Matrix.determinant(W) = Integer.negate(Integer.one) by {
+    done by cases {
+      case Matrix.determinant(U) = Integer.one: done by substituting determinantWReads
+      case Matrix.determinant(U) = Integer.negate(Integer.one): done by substituting determinantWReads
+    }
+  }
+  as determinantWIsUnit;
+  Matrix.IsInvertible(W)
+      by Matrix.invertible_of_determinant_unimodular(determinantUnimodular := determinantWIsUnit)
+  as wInvertible;
+  U * A * U
+     = Uᵀ * A * U by substituting uSymmetric
+     = A by preservesParent
+  as symmetricPreservesParent;
+  Wᵀ * source * W = target by Matrix.equal_of_applyVector(
+      actions := (x : RingVector(Integer.commutative_ring_bundle, 1 + n)) ↦ {
+        let v : RingVector(Integer.commutative_ring_bundle, n) := RingVector.restrict(x);
+        let t : ℤ := x(NaturalsBelow.top(n));
+        x = RingVector.appendCoordinate(v, t) by RingVector.eq_appendCoordinate(x) as xReads;
+        (1 : ℤ) * t = t by ring as oneTimesT;
+        W · x
+           = W · RingVector.appendCoordinate(v, t) by substituting xReads
+           = RingVector.appendCoordinate(U · v, 1 * t)
+               by Matrix.diagonalExtension_apply_appendCoordinate(
+                 A := U, c := (1 : ℤ), symmetric := uSymmetric, v := v, t := t)
+           = RingVector.appendCoordinate(U · v, t) by substituting oneTimesT
+        as wAction;
+        source · (W · x)
+           = source · RingVector.appendCoordinate(U · v, t) by substituting wAction
+           = RingVector.appendCoordinate(
+               A · (U · v) + t • b,
+               RingVector.innerProduct(b, U · v) + c * t)
+               by Matrix.borderedAssembly_apply_appendCoordinate(
+                 A := A, b := b, c := c, symmetric := aSymmetric,
+                 v := U · v, t := t)
+        as sourceAction;
+        U · (A · (U · v))
+           = U · ((A * U) · v) by substituting Matrix.applyVector_multiply
+           = (U * (A * U)) · v by Matrix.applyVector_multiply
+           = ((U * A) * U) · v by Matrix.multiply_associative
+           = (U * A * U) · v
+           = A · v by substituting symmetricPreservesParent
+        as baseAction;
+        U · (A · (U · v) + t • b)
+           = U · (A · (U · v)) + U · (t • b) by Matrix.applyVector_add
+           = A · v + U · (t • b) by substituting baseAction
+           = A · v + t • (U · b) by Matrix.applyVector_scale
+        as lowerAction;
+        RingVector.innerProduct(b, U · v)
+           = RingVector.innerProduct(Uᵀ · b, v)
+               by Equality.symmetry(Matrix.transpose_adjoint(U, b, v))
+           = RingVector.innerProduct(U · b, v) by substituting uSymmetric
+        as pairingMoves;
+        (1 : ℤ) * (RingVector.innerProduct(b, U · v) + c * t)
+            = RingVector.innerProduct(b, U · v) + c * t by ring as oneTimesTop;
+        W · (source · (W · x))
+           = W · RingVector.appendCoordinate(
+               A · (U · v) + t • b,
+               RingVector.innerProduct(b, U · v) + c * t)
+               by substituting sourceAction
+           = RingVector.appendCoordinate(
+               U · (A · (U · v) + t • b),
+               1 * (RingVector.innerProduct(b, U · v) + c * t))
+               by Matrix.diagonalExtension_apply_appendCoordinate(
+                 A := U, c := (1 : ℤ), symmetric := uSymmetric,
+                 v := A · (U · v) + t • b,
+                 t := RingVector.innerProduct(b, U · v) + c * t)
+           = RingVector.appendCoordinate(
+               A · v + t • (U · b),
+               1 * (RingVector.innerProduct(b, U · v) + c * t))
+               by substituting lowerAction
+           = RingVector.appendCoordinate(
+               A · v + t • (U · b),
+               RingVector.innerProduct(b, U · v) + c * t)
+               by substituting oneTimesTop
+           = RingVector.appendCoordinate(
+               A · v + t • (U · b),
+               RingVector.innerProduct(U · b, v) + c * t)
+               by substituting pairingMoves
+           = target · RingVector.appendCoordinate(v, t)
+               by Equality.symmetry(Matrix.borderedAssembly_apply_appendCoordinate(
+                 A, U · b, c, aSymmetric, v, t))
+           = target · x by substituting xReads
+        as pulledAction;
+        (Wᵀ * source * W) · x
+           = (Wᵀ * source) · (W · x) by Matrix.applyVector_multiply
+           = Wᵀ · (source · (W · x)) by Matrix.applyVector_multiply
+           = W · (source · (W · x)) by substituting wSymmetric
+           = target · x by pulledAction;
+        done
+      });
+  target = Wᵀ * source * W by Equality.symmetry;
+  witness W with done by And.introduction(wInvertible, done)
+}
+
+-- A particularly common parent automorphism negates only the final coordinate
+-- of a diagonal extension.  Unlike negating the border of the rank-four child,
+-- this leaves every earlier border coordinate unchanged.
+theorem Matrix.borderedDiagonalExtension_isometric_negate_last_border_coordinate {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (d : ℤ) (v : RingVector(Integer.commutative_ring_bundle, n)) (t corner : ℤ)
+        (aSymmetric : Matrix.IsSymmetric(A))
+        : Matrix.IsIsometric(
+            Matrix.borderedAssembly(
+              Matrix.diagonalExtension(A, d), RingVector.appendCoordinate(v, t), corner),
+            Matrix.borderedAssembly(
+              Matrix.diagonalExtension(A, d), RingVector.appendCoordinate(v, -t), corner)) := {
+  let identity : Matrix(Integer.commutative_ring_bundle, n, n) :=
+      Matrix.identity(Integer.commutative_ring_bundle, n);
+  let U : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n) :=
+      Matrix.diagonalExtension(identity, -1);
+  let D : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n) :=
+      Matrix.diagonalExtension(A, d);
+  Matrix.IsSymmetric(identity) by Matrix.transpose_identity as identitySymmetric;
+  Matrix.IsSymmetric(U)
+      by Matrix.diagonalExtension_symmetric(
+        A := identity, c := (-1 : ℤ), symmetric := identitySymmetric)
+  as uSymmetric;
+  Matrix.IsSymmetric(D)
+      by Matrix.diagonalExtension_symmetric(A := A, c := d, symmetric := aSymmetric)
+  as dSymmetric;
+  Matrix.determinant(U)
+     = Matrix.determinant(identity) * -1 by Matrix.diagonalExtension_determinant
+     = (1 : ℤ) * -1 by substituting Matrix.determinant_identity
+     = -1 by ring
+  as determinantReads;
+  Matrix.determinant(U) * -1
+     = (-1 : ℤ) * -1 by substituting determinantReads
+     = 1 by ring;
+  Matrix.IsInvertible(U) by Matrix.invertible_of_unit_determinant as uInvertible;
+  Uᵀ * D * U = D by Matrix.equal_of_applyVector(
+      actions := (x : RingVector(Integer.commutative_ring_bundle, 1 + n)) ↦ {
+        let w : RingVector(Integer.commutative_ring_bundle, n) := RingVector.restrict(x);
+        let s : ℤ := x(NaturalsBelow.top(n));
+        x = RingVector.appendCoordinate(w, s) by RingVector.eq_appendCoordinate(x) as xReads;
+        identity · w = w by Matrix.applyVector_identity as identityAction;
+        (-1 : ℤ) * s = -s by ring as minusOneTimesS;
+        U · x
+           = U · RingVector.appendCoordinate(w, s) by substituting xReads
+           = RingVector.appendCoordinate(identity · w, -1 * s)
+               by Matrix.diagonalExtension_apply_appendCoordinate(
+                 A := identity, c := (-1 : ℤ), symmetric := identitySymmetric, v := w, t := s)
+           = RingVector.appendCoordinate(w, -1 * s) by substituting identityAction
+           = RingVector.appendCoordinate(w, -s) by substituting minusOneTimesS
+        as uAction;
+        D · (U · x)
+           = D · RingVector.appendCoordinate(w, -s) by substituting uAction
+           = RingVector.appendCoordinate(A · w, d * (-s))
+               by Matrix.diagonalExtension_apply_appendCoordinate(
+                 A := A, c := d, symmetric := aSymmetric, v := w, t := -s)
+        as dAction;
+        identity · (A · w) = A · w by Matrix.applyVector_identity as identityBaseAction;
+        (-1 : ℤ) * (d * (-s)) = d * s by ring as signsCancel;
+        U · (D · (U · x))
+           = U · RingVector.appendCoordinate(A · w, d * (-s)) by substituting dAction
+           = RingVector.appendCoordinate(identity · (A · w), -1 * (d * (-s)))
+               by Matrix.diagonalExtension_apply_appendCoordinate(
+                 A := identity, c := (-1 : ℤ), symmetric := identitySymmetric,
+                 v := A · w, t := d * (-s))
+           = RingVector.appendCoordinate(A · w, -1 * (d * (-s))) by substituting identityBaseAction
+           = RingVector.appendCoordinate(A · w, d * s) by substituting signsCancel
+           = D · RingVector.appendCoordinate(w, s)
+               by Equality.symmetry(Matrix.diagonalExtension_apply_appendCoordinate(
+                 A, d, aSymmetric, w, s))
+           = D · x by substituting xReads
+        as conjugatedAction;
+        (Uᵀ * D * U) · x
+           = (Uᵀ * D) · (U · x) by Matrix.applyVector_multiply
+           = Uᵀ · (D · (U · x)) by Matrix.applyVector_multiply
+           = U · (D · (U · x)) by substituting uSymmetric
+           = D · x by conjugatedAction;
+        done
+      })
+  as preservesParent;
+  identity · v = v by Matrix.applyVector_identity as identityBorderAction;
+  (-1 : ℤ) * t = -t by ring as minusOneTimesT;
+  U · RingVector.appendCoordinate(v, t)
+     = RingVector.appendCoordinate(identity · v, -1 * t)
+         by Matrix.diagonalExtension_apply_appendCoordinate(
+           A := identity, c := (-1 : ℤ), symmetric := identitySymmetric, v := v, t := t)
+     = RingVector.appendCoordinate(v, -1 * t) by substituting identityBorderAction
+     = RingVector.appendCoordinate(v, -t) by substituting minusOneTimesT
+  as borderAction;
+  Matrix.IsIsometric(
+      Matrix.borderedAssembly(D, RingVector.appendCoordinate(v, t), corner),
+      Matrix.borderedAssembly(D, U · RingVector.appendCoordinate(v, t), corner))
+      by Matrix.borderedAssembly_isometric_symmetric_parent_automorphism(
+        A := D, U := U, b := RingVector.appendCoordinate(v, t), c := corner,
+        aSymmetric := dSymmetric, uSymmetric := uSymmetric,
+        uInvertible := uInvertible, preservesParent := preservesParent);
+  done by substituting borderAction
+}

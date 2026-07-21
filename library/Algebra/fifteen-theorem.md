@@ -122,7 +122,11 @@ finite kernel-checked coverage of every resulting rank-four branch are.
 - `Algebra/rank_four_weighted_diagonal_family` handles all five remaining
   diagonal parents `diag(1,2,d)`, `d=1,…,5`. A single structural coverage
   theorem feeds five generated finite classifiers. Together they certify
-  1,877 admissible borders and currently expose 287 top-shear forms.
+  1,877 admissible borders. `Algebra/rank_four_parent_automorphisms` lifts a
+  symmetric integral parent automorphism to its bordered child, and
+  `Algebra/rank_four_weighted_diagonal_orbits` specializes it to reflection of
+  the `d`-weighted coordinate followed by residue reduction. The five lists
+  now expose 25+25+36+68+52 = 206 certified orbit representatives.
 - `Algebra/rank_four_odd_diagonal_family` handles the two non-diagonal parents
   `x²+2y²+2yz+Cz²`, `C=4,5`. Its fraction-free adjugate bound is
   `(2C-1)a²+(C-1)b²+(b-c)²+c² < 7(2C-1)`. Centered lattice residues followed
@@ -130,7 +134,7 @@ finite kernel-checked coverage of every resulting rank-four branch are.
   alternatives respectively.
 - The four deterministic generators are guarded by
   `make rank-four-generated-check`. Across the ten distinct ternary parents the
-  current branchwise result is a 389-alternative coverage theorem family.
+  current branchwise result is a 308-alternative coverage theorem family.
   This is intentionally not called the expected ≈207-class classification:
   completing that count requires quotienting the remaining lists by larger
   parent automorphism groups and proving cross-list identifications.

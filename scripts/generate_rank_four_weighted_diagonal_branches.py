@@ -72,9 +72,9 @@ BRANCHES = {
     for branch in (
         Branch(1, 14, range(-3, 4), range(-5, 6), range(-3, 4), 319, 25),
         Branch(2, 7, range(-2, 3), range(-3, 4), range(-3, 4), 161, 25),
-        Branch(3, 10, range(-3, 4), range(-5, 6), range(-5, 6), 341, 54),
-        Branch(4, 14, range(-3, 4), range(-5, 6), range(-7, 8), 631, 96),
-        Branch(5, 10, range(-3, 4), range(-5, 6), range(-7, 8), 425, 87),
+        Branch(3, 10, range(-3, 4), range(-5, 6), range(-5, 6), 341, 36),
+        Branch(4, 14, range(-3, 4), range(-5, 6), range(-7, 8), 631, 68),
+        Branch(5, 10, range(-3, 4), range(-5, 6), range(-7, 8), 425, 52),
     )
 }
 
@@ -135,8 +135,29 @@ def reduce_border(
     return shift, (second, third, corner)
 
 
+def reflect_form(
+    branch: Branch, form: tuple[int, int, int]
+) -> tuple[tuple[int, int, int], int]:
+    """Reflect the d-weighted coordinate and return it to [0,d)."""
+    second, third, corner = form
+    reflected_third = (-third) % branch.d
+    shift = (reflected_third + third) // branch.d
+    reflected_corner = corner + 2 * (-third) * shift + branch.d * shift * shift
+    return (second, reflected_third, reflected_corner), shift
+
+
+def canonical_form(branch: Branch, form: tuple[int, int, int]) -> tuple[int, int, int]:
+    reflected, _ = reflect_form(branch, form)
+    return min(form, reflected)
+
+
 def normal_forms(branch: Branch) -> list[tuple[int, int, int]]:
-    forms = sorted({reduce_border(branch, border)[1] for border in raw_borders(branch)})
+    forms = sorted(
+        {
+            canonical_form(branch, reduce_border(branch, border)[1])
+            for border in raw_borders(branch)
+        }
+    )
     assert len(forms) == branch.expected_normal_forms
     return forms
 
@@ -147,10 +168,10 @@ def border_theorem(branch: Branch, border: tuple[int, int, int]) -> str:
     )
 
 
-def disjunction_introduction(index: int, count: int) -> str:
+def disjunction_introduction(index: int, count: int, proof: str = "reduced") -> str:
     if index == count - 1:
-        return "Or.introduceRight(" * index + "reduced" + ")" * index
-    return "Or.introduceRight(" * index + "Or.introduceLeft(reduced)" + ")" * index
+        return "Or.introduceRight(" * index + proof + ")" * index
+    return "Or.introduceRight(" * index + f"Or.introduceLeft({proof})" + ")" * index
 
 
 def render_normal_forms(branch: Branch) -> str:
@@ -164,7 +185,7 @@ def render_normal_forms(branch: Branch) -> str:
 
 module Algebra.{branch.stem}_normal_forms_generated
 
-import Algebra.rank_four_weighted_diagonal_family
+import Algebra.rank_four_weighted_diagonal_orbits
 
 definition {branch.predicate}
         (B : Matrix(Integer.commutative_ring_bundle, 4, 4)) : Proposition :=
@@ -173,14 +194,38 @@ definition {branch.predicate}
 
 
 def render_certificate(branch: Branch, border: tuple[int, int, int]) -> str:
-    shift, form = reduce_border(branch, border)
-    second, third, corner = form
+    shift, reduced_form = reduce_border(branch, border)
+    second, third, corner = reduced_form
+    form = canonical_form(branch, reduced_form)
+    canonical_second, canonical_third, canonical_corner = form
     a, b, c = map(integer, border)
     x, y, z = map(integer, shift)
     az, bz, cz = (f"({value} : ℤ)" for value in (a, b, c))
     xz, yz, zz = (f"({value} : ℤ)" for value in (x, y, z))
     index = normal_forms(branch).index(form)
-    introduction = disjunction_introduction(index, branch.expected_normal_forms)
+    proof_name = "reduced" if form == reduced_form else "canonicalized"
+    introduction = disjunction_introduction(index, branch.expected_normal_forms, proof_name)
+    canonical_proof = ""
+    if form != reduced_form:
+        reflected, reflection_shift = reflect_form(branch, reduced_form)
+        assert reflected == form
+        canonical_proof = f"""  -({third} : ℤ) + {branch.d} * ({reflection_shift} : ℤ) = ({canonical_third} : ℤ) by ring as thirdReflects;
+  ({corner} : ℤ) + 2 * (-({third} : ℤ) * ({reflection_shift} : ℤ))
+      + {branch.d} * (({reflection_shift} : ℤ) * ({reflection_shift} : ℤ)) = {canonical_corner}
+      by ring as cornerReflects;
+  Matrix.IsIsometric(
+      {representative(branch, second, third, corner)},
+      {representative(branch, canonical_second, canonical_third, canonical_corner)})
+      by Matrix.squarePlusDoublePlusScaledRankFourRepresentative_isometric_reflected(
+        z := {reflection_shift}, reflectedThird := {canonical_third}, reflectedCorner := {canonical_corner},
+        thirdMoves := thirdReflects, cornerMoves := cornerReflects)
+  as orbitReduction;
+  Matrix.IsIsometric(
+      {candidate(branch, a, b, c)},
+      {representative(branch, canonical_second, canonical_third, canonical_corner)})
+      by Matrix.IsIsometric.transitive(leftIsometric := reduced, rightIsometric := orbitReduction)
+  as canonicalized;
+"""
     return f"""automatic theorem {border_theorem(branch, border)}
         : {branch.predicate}({candidate(branch, a, b, c)}) := {{
   {az} + {xz} = 0 by ring as firstVanishes;
@@ -196,7 +241,7 @@ def render_certificate(branch: Branch, border: tuple[int, int, int]) -> str:
         firstVanishes := firstVanishes, secondReduces := secondReduces,
         thirdReduces := thirdReduces, cornerReduces := cornerReduces)
   as reduced;
-  done by {introduction}
+{canonical_proof}  done by {introduction}
 }}
 """
 
@@ -205,7 +250,7 @@ def render_certificates(branch: Branch) -> str:
     certificates = "\n".join(render_certificate(branch, border) for border in raw_borders(branch))
     return f"""-- Algebra/{branch.stem}_generated.math
 -- Generated by scripts/generate_rank_four_weighted_diagonal_branches.py --branch {branch.key}.  Do not edit.
--- {branch.expected_borders} admissible borders reduce to {branch.expected_normal_forms} top-shear forms.
+-- {branch.expected_borders} admissible borders reduce to {branch.expected_normal_forms} parent-automorphism forms.
 
 module Algebra.{branch.stem}_generated
 
