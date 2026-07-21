@@ -240,6 +240,38 @@ theorem Natural.positive_below_seven (m : ℕ) (positive : m ≥ 1) (bound : m <
   }
 }
 
+-- Every positive value below 8 is one of 1 through 7.
+theorem Natural.positive_below_eight (m : ℕ) (positive : m ≥ 1) (bound : m < 8)
+        : m = 1 ∨ m = 2 ∨ m = 3 ∨ m = 4 ∨ m = 5 ∨ m = 6 ∨ m = 7 := {
+  m < 7 ∨ m = 7 ∨ 7 < m by Natural.lt_trichotomy;
+  done by cases {
+    case m < 7: {
+      m = 1 ∨ m = 2 ∨ m = 3 ∨ m = 4 ∨ m = 5 ∨ m = 6
+          by Natural.positive_below_seven;
+      done by cases {
+        case m = 1: done
+        case m = 2 ∨ m = 3 ∨ m = 4 ∨ m = 5 ∨ m = 6: done by cases {
+          case m = 2: done
+          case m = 3 ∨ m = 4 ∨ m = 5 ∨ m = 6: done by cases {
+            case m = 3: done
+            case m = 4 ∨ m = 5 ∨ m = 6: done by cases {
+              case m = 4: done
+              case m = 5 ∨ m = 6: done by cases { case m = 5: done case m = 6: done }
+            }
+          }
+        }
+      }
+    }
+    case m = 7: done
+    case 7 < m: {
+      8 ≤ m;
+      m < 8 ≤ m;
+      False by Natural.lt_irreflexive;
+      done
+    }
+  }
+}
+
 -- A strict bound by a successor splits at its predecessor. This keeps the
 -- longer finite positive-range enumerations below from repeating the
 -- impossible upper branch of trichotomy at every step.
@@ -608,6 +640,52 @@ theorem Natural.square_below_thirty_six (m : ℕ) (bound : m * m < 36)
             = m * 6
             ≤ m * m by Natural.multiply_monotone_left;
       m * m < 36 = 6 * 6 ≤ m * m;
+      False by Natural.lt_irreflexive;
+      done
+    }
+  }
+}
+
+-- A square strictly below 64 has root at most 7.
+theorem Natural.square_below_sixty_four (m : ℕ) (bound : m * m < 64)
+        : m = 0 ∨ m = 1 ∨ m = 2 ∨ m = 3 ∨ m = 4 ∨ m = 5 ∨ m = 6 ∨ m = 7 := {
+  m < 8 ∨ m = 8 ∨ 8 < m by Natural.lt_trichotomy;
+  done by cases {
+    case m < 8 as belowEight: {
+      m = 0 ∨ ∃ (predecessor : ℕ). m = 1 + predecessor by Natural.zero_or_one_plus;
+      done by cases {
+        case m = 0: done
+        case ∃ (predecessor : ℕ). m = 1 + predecessor as positiveShape: {
+          choose predecessor such that m = 1 + predecessor from positiveShape;
+          1 ≤ 1 + predecessor;
+          1 ≤ m by substituting (m = 1 + predecessor);
+          m = 1 ∨ m = 2 ∨ m = 3 ∨ m = 4 ∨ m = 5 ∨ m = 6 ∨ m = 7
+              by Natural.positive_below_eight;
+          done by cases {
+            case m = 1: done
+            case m = 2 ∨ m = 3 ∨ m = 4 ∨ m = 5 ∨ m = 6 ∨ m = 7: done by cases {
+              case m = 2: done
+              case m = 3 ∨ m = 4 ∨ m = 5 ∨ m = 6 ∨ m = 7: done by cases {
+                case m = 3: done
+                case m = 4 ∨ m = 5 ∨ m = 6 ∨ m = 7: done by cases {
+                  case m = 4: done
+                  case m = 5 ∨ m = 6 ∨ m = 7: done by cases {
+                    case m = 5: done
+                    case m = 6 ∨ m = 7: done by cases { case m = 6: done case m = 7: done }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    case m = 8 ∨ 8 < m: {
+      8 ≤ m by cases { case m = 8: done case 8 < m: done };
+      8 * 8 ≤ 8 * m by Natural.multiply_monotone_left
+            = m * 8
+            ≤ m * m by Natural.multiply_monotone_left;
+      m * m < 64 = 8 * 8 ≤ m * m;
       False by Natural.lt_irreflexive;
       done
     }

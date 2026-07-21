@@ -1,0 +1,247 @@
+-- Algebra/rank_four_weighted_diagonal_branches_coverage.math
+--
+-- End-to-end finite coverage for all five diagonal representatives above
+-- x²+2y².  The shared theorem below isolates the structural matrix work;
+-- each branch proof then consists only of its scalar box bounds and its
+-- generated finite classifier.
+
+module Algebra.rank_four_weighted_diagonal_branches_coverage
+
+import Algebra.rank_four_weighted_diagonal_d1_classification_generated
+import Algebra.rank_four_weighted_diagonal_d2_classification_generated
+import Algebra.rank_four_weighted_diagonal_d3_classification_generated
+import Algebra.rank_four_weighted_diagonal_d4_classification_generated
+import Algebra.rank_four_weighted_diagonal_d5_classification_generated
+import Algebra.rank_four_double_diagonal_branch
+import Algebra.rank_three_representative_truants
+
+theorem Matrix.squarePlusDoubleSquareDiagonalRankFourEscalation_classified
+        (d : ℤ) (truant : ℕ)
+        (P : Matrix(Integer.commutative_ring_bundle, 4, 4) → Proposition)
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 3, 1 + 3))
+        (escalation : Matrix.IsEscalation(Matrix.squarePlusDoubleSquareDiagonalForm(d), B))
+        (dPositive : d > 0)
+        (truantReads : Matrix.truant(Matrix.squarePlusDoubleSquareDiagonalForm(d)) = truant)
+        (classifier : ∀ (a b c : ℤ).
+          2 * d * (a * a) + d * (b * b) + 2 * (c * c) < 2 * d * truant
+          → P(Matrix.squarePlusDoublePlusScaledRankFourCandidate(d, truant, a, b, c)))
+        : P(B) := {
+  let border : RingVector(Integer.commutative_ring_bundle, 3) := Matrix.borderColumn(B);
+  let pair : RingVector(Integer.commutative_ring_bundle, 2) := RingVector.restrict(border);
+  let a : ℤ := pair(NaturalsBelow.firstOfTwo);
+  let b : ℤ := pair(NaturalsBelow.secondOfTwo);
+  let c : ℤ := border(NaturalsBelow.top(2));
+  pair = RingVector.twoCoordinates(a, b) by RingVector.eq_twoCoordinates as pairReads;
+  let coordinatePair : RingVector(Integer.commutative_ring_bundle, 2) := ⟨a, b⟩;
+  coordinatePair = RingVector.twoCoordinates(a, b)
+      by RingVector.coordinatePair_eq_twoCoordinates as coordinatePairReads;
+  pair
+     = RingVector.twoCoordinates(a, b) by pairReads
+     = coordinatePair by coordinatePairReads
+  as pairIsCoordinatePair;
+  border
+     = RingVector.appendCoordinate(pair, c) by RingVector.eq_appendCoordinate(border)
+     = RingVector.appendCoordinate(coordinatePair, c) by substituting pairIsCoordinatePair
+     = (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+  as borderReads;
+  Matrix.leadingBlock(B)
+     = Matrix.squarePlusDoubleSquareDiagonalForm(d) by Matrix.IsEscalation.block(escalation := escalation)
+     = Matrix.squarePlusDoublePlusScaledSquareForm(d)
+         by Matrix.squarePlusDoubleSquareDiagonalForm_is_scaled_family
+  as blockReads;
+  (Matrix.truant(Matrix.squarePlusDoubleSquareDiagonalForm(d)) : ℤ) = (truant : ℤ)
+      by congruenceOf((n : ℕ) ↦ (n : ℤ), truantReads) as truantIntegerReads;
+  Matrix.corner(B)
+     = (Matrix.truant(Matrix.squarePlusDoubleSquareDiagonalForm(d)) : ℤ)
+         by Matrix.IsEscalation.corner_is_truant(escalation := escalation)
+     = (truant : ℤ) by truantIntegerReads
+  as cornerReads;
+  2 * d * (a * a) + d * (b * b) + 2 * (c * c) < 2 * d * truant
+      by Matrix.squarePlusDoublePlusScaled_bordered_coupled_bound(
+        B := B, d := d, truant := (truant : ℤ), a := a, b := b, c := c,
+        symmetric := Matrix.IsEscalation.symmetric(escalation := escalation),
+        positiveDefinite := Matrix.IsEscalation.positive_definite(escalation := escalation),
+        dPositive := dPositive, blockReads := blockReads, borderReads := borderReads,
+        cornerReads := cornerReads)
+  as coupledBound;
+  P(Matrix.squarePlusDoublePlusScaledRankFourCandidate(d, truant, a, b, c))
+      by classifier(a, b, c, coupledBound);
+  B
+     = Matrix.borderedAssembly(
+         Matrix.squarePlusDoubleSquareDiagonalForm(d), Matrix.borderColumn(B),
+         Matrix.truant(Matrix.squarePlusDoubleSquareDiagonalForm(d)))
+         by Matrix.IsEscalation.eq_borderedAssembly(escalation := escalation)
+     = Matrix.borderedAssembly(
+         Matrix.squarePlusDoubleSquareDiagonalForm(d),
+         (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+         Matrix.truant(Matrix.squarePlusDoubleSquareDiagonalForm(d)))
+         by substituting borderReads
+     = Matrix.borderedAssembly(
+         Matrix.squarePlusDoubleSquareDiagonalForm(d),
+         (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)), (truant : ℤ))
+         by substituting truantIntegerReads
+     = Matrix.borderedAssembly(
+         Matrix.squarePlusDoublePlusScaledSquareForm(d),
+         (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)), (truant : ℤ))
+         by substituting Matrix.squarePlusDoubleSquareDiagonalForm_is_scaled_family(d)
+     = Matrix.squarePlusDoublePlusScaledRankFourCandidate(d, truant, a, b, c)
+  as reconstructs;
+  done by substituting reconstructs
+}
+
+theorem Matrix.rankFourWeightedDiagonalD1_admissible_classified
+        (a b c : ℤ) (bound : 2 * (a * a) + b * b + 2 * (c * c) < 28)
+        : Matrix.IsRankFourWeightedDiagonalD1NormalForm(
+            Matrix.squarePlusDoublePlusScaledRankFourCandidate(1, 14, a, b, c)) := {
+  2 * 1 * (a * a) + 1 * (b * b) + 2 * (c * c) < 2 * 1 * 14 by {
+    2 * 1 * (a * a) + 1 * (b * b) + 2 * (c * c) = 2 * (a * a) + b * b + 2 * (c * c) by ring < 28 by bound = 2 * 1 * 14 by ring;
+    done
+  } as familyBound;
+  a * a < 14 by Integer.first_square_bound_of_weighted_diagonal_sum(1, 14, a, b, c, done, familyBound) < 16;
+  -3 ≤ a by Integer.square_below_sixteen_lower_box_bound as aLower;
+  a < 4 by Integer.square_below_sixteen_upper_box_bound as aUpper;
+  b * b < 2 * 14 by Integer.second_square_bound_of_weighted_diagonal_sum(1, 14, a, b, c, done, familyBound) = 28 < 36;
+  -5 ≤ b by Integer.square_below_thirty_six_lower_box_bound as bLower;
+  b < 6 by Integer.square_below_thirty_six_upper_box_bound as bUpper;
+  c * c < 1 * 14 by Integer.third_square_bound_of_weighted_diagonal_sum(1, 14, a, b, c, done, familyBound) = 14 < 16;
+  -3 ≤ c by Integer.square_below_sixteen_lower_box_bound as cLower;
+  c < 4 by Integer.square_below_sixteen_upper_box_bound as cUpper;
+  done by Matrix.rankFourWeightedDiagonalD1_finite_box_classified(
+      a, aLower, aUpper, b, bLower, bUpper, c, cLower, cUpper, bound)
+}
+
+theorem Matrix.squarePlusDoubleSquareDiagonalForm_one_rankFourEscalation_classified
+        (B : Matrix(Integer.commutative_ring_bundle, 4, 4))
+        (escalation : Matrix.IsEscalation(Matrix.squarePlusDoubleSquareDiagonalForm(1), B))
+        : Matrix.IsRankFourWeightedDiagonalD1NormalForm(B) :=
+  by Matrix.squarePlusDoubleSquareDiagonalRankFourEscalation_classified(
+    d := 1, truant := 14, P := Matrix.IsRankFourWeightedDiagonalD1NormalForm,
+    escalation := escalation, dPositive := done,
+    truantReads := Matrix.squarePlusDoubleSquareDiagonalForm_one_truant,
+    classifier := Matrix.rankFourWeightedDiagonalD1_admissible_classified)
+
+theorem Matrix.rankFourWeightedDiagonalD2_admissible_classified
+        (a b c : ℤ) (bound : 4 * (a * a) + 2 * (b * b) + 2 * (c * c) < 28)
+        : Matrix.IsRankFourWeightedDiagonalD2NormalForm(
+            Matrix.squarePlusDoublePlusScaledRankFourCandidate(2, 7, a, b, c)) := {
+  2 * 2 * (a * a) + 2 * (b * b) + 2 * (c * c) < 2 * 2 * 7 by {
+    2 * 2 * (a * a) + 2 * (b * b) + 2 * (c * c) = 4 * (a * a) + 2 * (b * b) + 2 * (c * c) by ring < 28 by bound = 2 * 2 * 7 by ring;
+    done
+  } as familyBound;
+  a * a < 7 by Integer.first_square_bound_of_weighted_diagonal_sum(2, 7, a, b, c, done, familyBound) < 8;
+  -2 ≤ a by Integer.square_below_eight_lower_box_bound as aLower;
+  a < 3 by Integer.square_below_eight_upper_box_bound as aUpper;
+  b * b < 2 * 7 by Integer.second_square_bound_of_weighted_diagonal_sum(2, 7, a, b, c, done, familyBound) = 14 < 16;
+  -3 ≤ b by Integer.square_below_sixteen_lower_box_bound as bLower;
+  b < 4 by Integer.square_below_sixteen_upper_box_bound as bUpper;
+  c * c < 2 * 7 by Integer.third_square_bound_of_weighted_diagonal_sum(2, 7, a, b, c, done, familyBound) = 14 < 16;
+  -3 ≤ c by Integer.square_below_sixteen_lower_box_bound as cLower;
+  c < 4 by Integer.square_below_sixteen_upper_box_bound as cUpper;
+  done by Matrix.rankFourWeightedDiagonalD2_finite_box_classified(
+      a, aLower, aUpper, b, bLower, bUpper, c, cLower, cUpper, bound)
+}
+
+theorem Matrix.squarePlusDoubleSquareDiagonalForm_two_rankFourEscalation_classified
+        (B : Matrix(Integer.commutative_ring_bundle, 4, 4))
+        (escalation : Matrix.IsEscalation(Matrix.squarePlusDoubleSquareDiagonalForm(2), B))
+        : Matrix.IsRankFourWeightedDiagonalD2NormalForm(B) :=
+  by Matrix.squarePlusDoubleSquareDiagonalRankFourEscalation_classified(
+    d := 2, truant := 7, P := Matrix.IsRankFourWeightedDiagonalD2NormalForm,
+    escalation := escalation, dPositive := done,
+    truantReads := Matrix.squarePlusDoubleSquareDiagonalForm_two_truant,
+    classifier := Matrix.rankFourWeightedDiagonalD2_admissible_classified)
+
+theorem Matrix.rankFourWeightedDiagonalD3_admissible_classified
+        (a b c : ℤ) (bound : 6 * (a * a) + 3 * (b * b) + 2 * (c * c) < 60)
+        : Matrix.IsRankFourWeightedDiagonalD3NormalForm(
+            Matrix.squarePlusDoublePlusScaledRankFourCandidate(3, 10, a, b, c)) := {
+  2 * 3 * (a * a) + 3 * (b * b) + 2 * (c * c) < 2 * 3 * 10 by {
+    2 * 3 * (a * a) + 3 * (b * b) + 2 * (c * c) = 6 * (a * a) + 3 * (b * b) + 2 * (c * c) by ring < 60 by bound = 2 * 3 * 10 by ring;
+    done
+  } as familyBound;
+  a * a < 10 by Integer.first_square_bound_of_weighted_diagonal_sum(3, 10, a, b, c, done, familyBound) < 16;
+  -3 ≤ a by Integer.square_below_sixteen_lower_box_bound as aLower;
+  a < 4 by Integer.square_below_sixteen_upper_box_bound as aUpper;
+  b * b < 2 * 10 by Integer.second_square_bound_of_weighted_diagonal_sum(3, 10, a, b, c, done, familyBound) = 20 < 36;
+  -5 ≤ b by Integer.square_below_thirty_six_lower_box_bound as bLower;
+  b < 6 by Integer.square_below_thirty_six_upper_box_bound as bUpper;
+  c * c < 3 * 10 by Integer.third_square_bound_of_weighted_diagonal_sum(3, 10, a, b, c, done, familyBound) = 30 < 36;
+  -5 ≤ c by Integer.square_below_thirty_six_lower_box_bound as cLower;
+  c < 6 by Integer.square_below_thirty_six_upper_box_bound as cUpper;
+  done by Matrix.rankFourWeightedDiagonalD3_finite_box_classified(
+      a, aLower, aUpper, b, bLower, bUpper, c, cLower, cUpper, bound)
+}
+
+theorem Matrix.squarePlusDoubleSquareDiagonalForm_three_rankFourEscalation_classified
+        (B : Matrix(Integer.commutative_ring_bundle, 4, 4))
+        (escalation : Matrix.IsEscalation(Matrix.squarePlusDoubleSquareDiagonalForm(3), B))
+        : Matrix.IsRankFourWeightedDiagonalD3NormalForm(B) :=
+  by Matrix.squarePlusDoubleSquareDiagonalRankFourEscalation_classified(
+    d := 3, truant := 10, P := Matrix.IsRankFourWeightedDiagonalD3NormalForm,
+    escalation := escalation, dPositive := done,
+    truantReads := Matrix.truant_equals(isTruant := Matrix.squarePlusDoubleSquareDiagonalForm_three_truant_ten),
+    classifier := Matrix.rankFourWeightedDiagonalD3_admissible_classified)
+
+theorem Matrix.rankFourWeightedDiagonalD4_admissible_classified
+        (a b c : ℤ) (bound : 8 * (a * a) + 4 * (b * b) + 2 * (c * c) < 112)
+        : Matrix.IsRankFourWeightedDiagonalD4NormalForm(
+            Matrix.squarePlusDoublePlusScaledRankFourCandidate(4, 14, a, b, c)) := {
+  2 * 4 * (a * a) + 4 * (b * b) + 2 * (c * c) < 2 * 4 * 14 by {
+    2 * 4 * (a * a) + 4 * (b * b) + 2 * (c * c) = 8 * (a * a) + 4 * (b * b) + 2 * (c * c) by ring < 112 by bound = 2 * 4 * 14 by ring;
+    done
+  } as familyBound;
+  a * a < 14 by Integer.first_square_bound_of_weighted_diagonal_sum(4, 14, a, b, c, done, familyBound) < 16;
+  -3 ≤ a by Integer.square_below_sixteen_lower_box_bound as aLower;
+  a < 4 by Integer.square_below_sixteen_upper_box_bound as aUpper;
+  b * b < 2 * 14 by Integer.second_square_bound_of_weighted_diagonal_sum(4, 14, a, b, c, done, familyBound) = 28 < 36;
+  -5 ≤ b by Integer.square_below_thirty_six_lower_box_bound as bLower;
+  b < 6 by Integer.square_below_thirty_six_upper_box_bound as bUpper;
+  c * c < 4 * 14 by Integer.third_square_bound_of_weighted_diagonal_sum(4, 14, a, b, c, done, familyBound) = 56 < 64;
+  -7 ≤ c ∧ c < 8 by Integer.square_below_sixty_four_box as cBox;
+  -7 ≤ c by cBox as cLower;
+  c < 8 by cBox as cUpper;
+  done by Matrix.rankFourWeightedDiagonalD4_finite_box_classified(
+      a, aLower, aUpper, b, bLower, bUpper, c, cLower, cUpper, bound)
+}
+
+theorem Matrix.squarePlusDoubleSquareDiagonalForm_four_rankFourEscalation_classified
+        (B : Matrix(Integer.commutative_ring_bundle, 4, 4))
+        (escalation : Matrix.IsEscalation(Matrix.squarePlusDoubleSquareDiagonalForm(4), B))
+        : Matrix.IsRankFourWeightedDiagonalD4NormalForm(B) :=
+  by Matrix.squarePlusDoubleSquareDiagonalRankFourEscalation_classified(
+    d := 4, truant := 14, P := Matrix.IsRankFourWeightedDiagonalD4NormalForm,
+    escalation := escalation, dPositive := done,
+    truantReads := Matrix.squarePlusDoubleSquareDiagonalForm_four_truant,
+    classifier := Matrix.rankFourWeightedDiagonalD4_admissible_classified)
+
+theorem Matrix.rankFourWeightedDiagonalD5_admissible_classified
+        (a b c : ℤ) (bound : 10 * (a * a) + 5 * (b * b) + 2 * (c * c) < 100)
+        : Matrix.IsRankFourWeightedDiagonalD5NormalForm(
+            Matrix.squarePlusDoublePlusScaledRankFourCandidate(5, 10, a, b, c)) := {
+  2 * 5 * (a * a) + 5 * (b * b) + 2 * (c * c) < 2 * 5 * 10 by {
+    2 * 5 * (a * a) + 5 * (b * b) + 2 * (c * c) = 10 * (a * a) + 5 * (b * b) + 2 * (c * c) by ring < 100 by bound = 2 * 5 * 10 by ring;
+    done
+  } as familyBound;
+  a * a < 10 by Integer.first_square_bound_of_weighted_diagonal_sum(5, 10, a, b, c, done, familyBound) < 16;
+  -3 ≤ a by Integer.square_below_sixteen_lower_box_bound as aLower;
+  a < 4 by Integer.square_below_sixteen_upper_box_bound as aUpper;
+  b * b < 2 * 10 by Integer.second_square_bound_of_weighted_diagonal_sum(5, 10, a, b, c, done, familyBound) = 20 < 36;
+  -5 ≤ b by Integer.square_below_thirty_six_lower_box_bound as bLower;
+  b < 6 by Integer.square_below_thirty_six_upper_box_bound as bUpper;
+  c * c < 5 * 10 by Integer.third_square_bound_of_weighted_diagonal_sum(5, 10, a, b, c, done, familyBound) = 50 < 64;
+  -7 ≤ c ∧ c < 8 by Integer.square_below_sixty_four_box as cBox;
+  -7 ≤ c by cBox as cLower;
+  c < 8 by cBox as cUpper;
+  done by Matrix.rankFourWeightedDiagonalD5_finite_box_classified(
+      a, aLower, aUpper, b, bLower, bUpper, c, cLower, cUpper, bound)
+}
+
+theorem Matrix.squarePlusDoubleSquareDiagonalForm_five_rankFourEscalation_classified
+        (B : Matrix(Integer.commutative_ring_bundle, 4, 4))
+        (escalation : Matrix.IsEscalation(Matrix.squarePlusDoubleSquareDiagonalForm(5), B))
+        : Matrix.IsRankFourWeightedDiagonalD5NormalForm(B) :=
+  by Matrix.squarePlusDoubleSquareDiagonalRankFourEscalation_classified(
+    d := 5, truant := 10, P := Matrix.IsRankFourWeightedDiagonalD5NormalForm,
+    escalation := escalation, dPositive := done,
+    truantReads := Matrix.squarePlusDoubleSquareDiagonalForm_five_truant,
+    classifier := Matrix.rankFourWeightedDiagonalD5_admissible_classified)
