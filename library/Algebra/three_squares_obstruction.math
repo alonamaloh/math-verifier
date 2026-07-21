@@ -1,0 +1,85 @@
+-- Algebra/three_squares_obstruction.math
+--
+-- The elementary obstruction half of Legendre's three-squares theorem.
+
+module Algebra.three_squares_obstruction
+
+import Algebra.rank_three_truants
+import IntegerMod.residues
+import IntegerMod.ring
+
+theorem IntegerMod.make_equal_of_difference_multiple
+        (modulus : ℕ) (a b multiple : ℤ)
+        (differenceReads : a - b = (modulus : ℤ) * multiple)
+        : IntegerMod.make(modulus, a) = IntegerMod.make(modulus, b) := {
+  Integer.CongruentModulo(modulus, a, b)
+      by ⟨multiple, differenceReads⟩ as congruent;
+  done by Quotient.equivalent_implies_equal(a, b, congruent)
+}
+
+theorem IntegerMod.square_mod_eight (x : IntegerMod(8))
+        : x * x = IntegerMod.zero(8)
+          ∨ x * x = IntegerMod.one(8)
+          ∨ x * x = IntegerMod.residue(8, 4) := {
+  choose r such that r < 8 ∧ x = IntegerMod.make(8, (r : ℤ))
+      from IntegerMod.exists_natural_representative(8, done, x);
+  r < 8 by And.left(r < 8, x = IntegerMod.make(8, (r : ℤ))) as rBelow;
+  x = IntegerMod.make(8, (r : ℤ))
+      by And.right(r < 8, x = IntegerMod.make(8, (r : ℤ))) as xReads;
+  IntegerMod.make(8, (0 : ℤ)) * IntegerMod.make(8, (0 : ℤ)) = IntegerMod.zero(8)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := 0) as squareZero;
+  IntegerMod.make(8, (1 : ℤ)) * IntegerMod.make(8, (1 : ℤ)) = IntegerMod.one(8)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := 0) as squareOne;
+  IntegerMod.make(8, (2 : ℤ)) * IntegerMod.make(8, (2 : ℤ)) = IntegerMod.residue(8, 4)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := 0) as squareTwo;
+  IntegerMod.make(8, (3 : ℤ)) * IntegerMod.make(8, (3 : ℤ)) = IntegerMod.one(8)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := 1) as squareThree;
+  IntegerMod.make(8, (4 : ℤ)) * IntegerMod.make(8, (4 : ℤ)) = IntegerMod.zero(8)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := 2) as squareFour;
+  IntegerMod.make(8, (5 : ℤ)) * IntegerMod.make(8, (5 : ℤ)) = IntegerMod.one(8)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := 3) as squareFive;
+  IntegerMod.make(8, (6 : ℤ)) * IntegerMod.make(8, (6 : ℤ)) = IntegerMod.residue(8, 4)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := 4) as squareSix;
+  IntegerMod.make(8, (7 : ℤ)) * IntegerMod.make(8, (7 : ℤ)) = IntegerMod.one(8)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := 6) as squareSeven;
+  IntegerMod.make(8, (r : ℤ)) * IntegerMod.make(8, (r : ℤ)) = IntegerMod.zero(8)
+      ∨ IntegerMod.make(8, (r : ℤ)) * IntegerMod.make(8, (r : ℤ)) = IntegerMod.one(8)
+      ∨ IntegerMod.make(8, (r : ℤ)) * IntegerMod.make(8, (r : ℤ)) = IntegerMod.residue(8, 4) by {
+    r = 0 ∨ ∃ (predecessor : ℕ). r = 1 + predecessor by Natural.zero_or_one_plus;
+    done by cases {
+      case r = 0: done by Or.introduceLeft(squareZero)
+      case ∃ (predecessor : ℕ). r = 1 + predecessor: {
+        choose predecessor such that r = 1 + predecessor;
+        1 ≤ r by substituting (r = 1 + predecessor) as rPositive;
+        r = 1 ∨ r = 2 ∨ r = 3 ∨ r = 4 ∨ r = 5 ∨ r = 6 ∨ r = 7
+            by Natural.positive_below_eight(positive := rPositive, bound := rBelow);
+        done by cases {
+          case r = 1: done by Or.introduceRight(Or.introduceLeft(squareOne))
+          case r = 2 ∨ r = 3 ∨ r = 4 ∨ r = 5 ∨ r = 6 ∨ r = 7: done by cases {
+            case r = 2: done by Or.introduceRight(Or.introduceRight(squareTwo))
+            case r = 3 ∨ r = 4 ∨ r = 5 ∨ r = 6 ∨ r = 7: done by cases {
+              case r = 3: done by Or.introduceRight(Or.introduceLeft(squareThree))
+              case r = 4 ∨ r = 5 ∨ r = 6 ∨ r = 7: done by cases {
+                case r = 4: done by Or.introduceLeft(squareFour)
+                case r = 5 ∨ r = 6 ∨ r = 7: done by cases {
+                  case r = 5: done by Or.introduceRight(Or.introduceLeft(squareFive))
+                  case r = 6 ∨ r = 7: done by cases {
+                    case r = 6: done by Or.introduceRight(Or.introduceRight(squareSix))
+                    case r = 7: done by Or.introduceRight(Or.introduceLeft(squareSeven))
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  } as squareClass;
+  IntegerMod.make(8, (r : ℤ)) = x by Equality.symmetry(xReads) as reverseReads;
+  done by Equality.transport_proposition(
+      (candidate : IntegerMod(8)) ↦
+        candidate * candidate = IntegerMod.zero(8)
+        ∨ candidate * candidate = IntegerMod.one(8)
+        ∨ candidate * candidate = IntegerMod.residue(8, 4),
+      IntegerMod.make(8, (r : ℤ)), x, reverseReads, squareClass)
+}

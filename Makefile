@@ -171,7 +171,8 @@ TEST_MATHV_IFACE_FILES := $(TEST_MATHV_FILES:.mathv=.mathv.iface)
 library: $(LIBRARY_MATHV_FILES) $(LIBRARY_MATHV_IFACE_FILES)
 
 tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES) checker-tests \
-	carrier-normal-form-check matrix-ergonomics-statement-check rank-four-generated-check
+	carrier-normal-form-check matrix-ergonomics-statement-check rank-four-generated-check \
+	three-squares-generated-check
 
 # ----------------------------------------------------------------------
 # The clean set (see docs/CLEAN_STYLE_PLAN.md). `scripts/clean_manifest.txt`
@@ -329,7 +330,11 @@ rank-four-generated-check:
 	@python3 scripts/generate_rank_four_short_values.py --check
 	@echo "rank-four-generated-check: PASS"
 
-.PHONY: carrier-normal-form-check matrix-ergonomics-statement-check rank-four-generated-check
+three-squares-generated-check:
+	@python3 scripts/generate_three_squares_mod_eight.py --check
+
+.PHONY: carrier-normal-form-check matrix-ergonomics-statement-check rank-four-generated-check \
+	three-squares-generated-check
 
 # B3.4 — morphism-packet audit: re-verify the audit surface module
 # (which imports every packet-lemma home) with the audit flag on and

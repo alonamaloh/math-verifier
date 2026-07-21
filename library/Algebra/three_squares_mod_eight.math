@@ -1,0 +1,62 @@
+-- Algebra/three_squares_mod_eight.math
+--
+-- The modulo-eight base case for the three-squares obstruction.
+
+module Algebra.three_squares_mod_eight
+
+import Algebra.three_squares_obstruction
+
+theorem IntegerMod.residue_three_sum_normalizes
+        {modulus : ℕ} (a b c remainder multiple : ℕ)
+        (sumReads : a + b + c = remainder + modulus * multiple)
+        : IntegerMod.residue(modulus, a) + IntegerMod.residue(modulus, b) + IntegerMod.residue(modulus, c)
+          = IntegerMod.residue(modulus, remainder) := {
+  ((a + b + c : ℕ) : ℤ) = ((remainder + modulus * multiple : ℕ) : ℤ)
+      by substituting sumReads as integerSum;
+  (a : ℤ) + (b : ℤ) + (c : ℤ) - (remainder : ℤ)
+     = ((a + b : ℕ) : ℤ) + (c : ℤ) - (remainder : ℤ)
+         by substituting Equality.symmetry(Natural.to_integer.add_preserves(a, b))
+     = ((a + b + c : ℕ) : ℤ) - (remainder : ℤ)
+         by substituting Equality.symmetry(Natural.to_integer.add_preserves(a + b, c))
+     = ((remainder + modulus * multiple : ℕ) : ℤ) - (remainder : ℤ)
+         by substituting integerSum
+     = (remainder : ℤ) + ((modulus * multiple : ℕ) : ℤ) - (remainder : ℤ)
+         by substituting Natural.to_integer.add_preserves(remainder, modulus * multiple)
+     = (remainder : ℤ) + (modulus : ℤ) * (multiple : ℤ) - (remainder : ℤ)
+         by substituting Natural.to_integer.multiply_preserves(modulus, multiple)
+     = (modulus : ℤ) * (multiple : ℤ) by ring
+  as differenceReads;
+  done by IntegerMod.make_equal_of_difference_multiple(
+      multiple := (multiple : ℤ), differenceReads := differenceReads)
+}
+
+theorem IntegerMod.residue_distinct_below_modulus
+        (modulus a b : ℕ) (aBelow : a < modulus) (bBelow : b < modulus) (distinct : a ≠ b)
+        : IntegerMod.residue(modulus, a) ≠ IntegerMod.residue(modulus, b) :=
+  (equalResidues : IntegerMod.residue(modulus, a) = IntegerMod.residue(modulus, b)) ↦ {
+    a = b by IntegerMod.make_injective_below_modulus;
+    done by distinct
+  }
+
+theorem IntegerMod.ground_three_square_residues_not_seven
+        (a b c remainder multiple : ℕ)
+        (sumReads : a + b + c = remainder + 8 * multiple)
+        (remainderBelow : remainder < 8) (remainderNotSeven : remainder ≠ 7)
+        : ¬(IntegerMod.residue(8, a) + IntegerMod.residue(8, b) + IntegerMod.residue(8, c)
+          = IntegerMod.residue(8, 7)) := {
+  IntegerMod.residue(8, a) + IntegerMod.residue(8, b) + IntegerMod.residue(8, c)
+      = IntegerMod.residue(8, remainder)
+          by IntegerMod.residue_three_sum_normalizes(sumReads := sumReads) as normalizes;
+  suppose IntegerMod.residue(8, a) + IntegerMod.residue(8, b) + IntegerMod.residue(8, c)
+      = IntegerMod.residue(8, 7) as equalsSeven;
+  IntegerMod.residue(8, remainder) = IntegerMod.residue(8, 7) by {
+    IntegerMod.residue(8, remainder)
+       = IntegerMod.residue(8, a) + IntegerMod.residue(8, b) + IntegerMod.residue(8, c)
+           by Equality.symmetry(normalizes)
+       = IntegerMod.residue(8, 7) by equalsSeven;
+    done
+  };
+  IntegerMod.residue(8, remainder) ≠ IntegerMod.residue(8, 7)
+      by IntegerMod.residue_distinct_below_modulus;
+  done
+}

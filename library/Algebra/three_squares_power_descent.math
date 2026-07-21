@@ -1,0 +1,164 @@
+-- Algebra/three_squares_power_descent.math
+--
+-- Pull a factor of four out of a represented sum of three squares.
+
+module Algebra.three_squares_power_descent
+
+import Algebra.three_squares_descent
+import Natural.prime_divides_product
+import Natural.prime_two
+
+theorem Integer.absolute_value_natural_negate (x : ℤ)
+        : Integer.absolute_value_natural(-x) = Integer.absolute_value_natural(x) := {
+  (Integer.absolute_value_natural(-x) : ℤ)
+     = abs(-x) by Equality.symmetry(Integer.absolute_value_natural_is_image(-x))
+     = abs(x) by Integer.absolute_value_negate
+     = (Integer.absolute_value_natural(x) : ℤ) by Integer.absolute_value_natural_is_image;
+  done by Natural.to_integer.injective
+}
+
+theorem Integer.two_divides_of_two_divides_square
+        (x : ℤ) (squareEven : Integer.divides(2, x * x))
+        : Integer.divides(2, x) := {
+  choose quotient : ℤ such that x * x = 2 * quotient from squareEven;
+  let magnitude : ℕ := Integer.absolute_value_natural(x);
+  magnitude * magnitude
+     = Integer.absolute_value_natural(x) * Integer.absolute_value_natural(x)
+     = Integer.absolute_value_natural(x * x)
+         by Equality.symmetry(Integer.absolute_value_natural_multiplicative(x, x))
+     = Integer.absolute_value_natural(2 * quotient) by substituting (x * x = 2 * quotient)
+     = Integer.absolute_value_natural(2) * Integer.absolute_value_natural(quotient)
+         by Integer.absolute_value_natural_multiplicative
+     = 2 * Integer.absolute_value_natural(quotient)
+         by substituting Integer.absolute_value_natural_of_natural(2)
+  as magnitudeSquareEven;
+  Natural.divides(2, magnitude * magnitude)
+      by { witness Integer.absolute_value_natural(quotient) with magnitudeSquareEven };
+  Natural.divides(2, magnitude) ∨ Natural.divides(2, magnitude)
+      by Natural.prime_divides_product(primality := Natural.is_prime_two);
+  Natural.divides(2, magnitude) by Or.self as magnitudeEven;
+  choose half : ℕ such that magnitude = 2 * half from magnitudeEven;
+  Integer.IsNonneg(x) ∨ ∃ (n : ℕ). x = -(n : ℤ) by Integer.sign_split;
+  done by cases {
+    case Integer.IsNonneg(x): {
+      choose n : ℕ such that x = n;
+      magnitude
+         = Integer.absolute_value_natural(x)
+         = Integer.absolute_value_natural((n : ℤ)) by substituting (x = n)
+         = n by Integer.absolute_value_natural_of_natural
+      as magnitudeReads;
+      witness (half : ℤ) with
+        x
+           = (n : ℤ)
+           = (magnitude : ℤ) by substituting Equality.symmetry(magnitudeReads)
+           = ((2 * half : ℕ) : ℤ) by substituting (magnitude = 2 * half)
+           = (2 : ℤ) * (half : ℤ) by Natural.to_integer.multiply_preserves
+    }
+    case ∃ (n : ℕ). x = -(n : ℤ): {
+      choose n : ℕ such that x = -(n : ℤ);
+      magnitude
+         = Integer.absolute_value_natural(x)
+         = Integer.absolute_value_natural(-(n : ℤ)) by substituting (x = -(n : ℤ))
+         = Integer.absolute_value_natural((n : ℤ)) by Integer.absolute_value_natural_negate
+         = n by Integer.absolute_value_natural_of_natural
+      as magnitudeReads;
+      witness -(half : ℤ) with
+        x
+           = -(n : ℤ)
+           = -(magnitude : ℤ) by substituting Equality.symmetry(magnitudeReads)
+           = -((2 * half : ℕ) : ℤ) by substituting (magnitude = 2 * half)
+           = -((2 : ℤ) * (half : ℤ)) by substituting Natural.to_integer.multiply_preserves(2, half)
+           = (2 : ℤ) * -(half : ℤ) by ring
+    }
+  }
+}
+
+theorem Integer.divides_of_congruent_zero
+        (modulus : ℕ) (x : ℤ)
+        (congruent : Integer.CongruentModulo(modulus, x, 0))
+        : Integer.divides((modulus : ℤ), x) := {
+  choose quotient : ℤ such that x - 0 = (modulus : ℤ) * quotient from congruent;
+  witness quotient with
+    x = x - 0 = (modulus : ℤ) * quotient
+}
+
+theorem Integer.two_divides_of_square_zero_mod_four
+        (x : ℤ)
+        (squareZero : IntegerMod.make(4, x) * IntegerMod.make(4, x) = IntegerMod.zero(4))
+        : Integer.divides(2, x) := {
+  IntegerMod.make(4, x * x) = IntegerMod.make(4, 0) by squareZero as makeEquality;
+  Integer.CongruentModulo(4, x * x, 0)
+      by Quotient.equal_implies_equivalent(x * x, 0, makeEquality);
+  Integer.divides(4, x * x) by Integer.divides_of_congruent_zero as fourDividesSquare;
+  Integer.divides(2, 4) by { witness 2 with done } as twoDividesFour;
+  Integer.divides(2, x * x)
+      by Integer.divides_transitive(2, 4, x * x, twoDividesFour, fourDividesSquare);
+  done by Integer.two_divides_of_two_divides_square
+}
+
+theorem Integer.three_squares_multiple_of_four_forces_even
+        (x y z quotient : ℤ)
+        (valueReads : x * x + y * y + z * z = 4 * quotient)
+        : Integer.divides(2, x) ∧ Integer.divides(2, y) ∧ Integer.divides(2, z) := {
+  let xMod : IntegerMod(4) := IntegerMod.make(4, x);
+  let yMod : IntegerMod(4) := IntegerMod.make(4, y);
+  let zMod : IntegerMod(4) := IntegerMod.make(4, z);
+  xMod * xMod + yMod * yMod + zMod * zMod
+      = IntegerMod.make(4, x * x + y * y + z * z)
+      = IntegerMod.make(4, 4 * quotient) by substituting valueReads
+      = IntegerMod.zero(4)
+          by IntegerMod.make_equal_of_difference_multiple(multiple := quotient)
+  as sumZero;
+  xMod * xMod = IntegerMod.zero(4) ∧ yMod * yMod = IntegerMod.zero(4)
+      ∧ zMod * zMod = IntegerMod.zero(4)
+      by IntegerMod.three_squares_zero_mod_four_forces_each_zero(xMod, yMod, zMod, sumZero) as squareZeros;
+  xMod * xMod = IntegerMod.zero(4)
+      by And.left(
+          xMod * xMod = IntegerMod.zero(4),
+          yMod * yMod = IntegerMod.zero(4) ∧ zMod * zMod = IntegerMod.zero(4), squareZeros)
+      as xSquare;
+  yMod * yMod = IntegerMod.zero(4) ∧ zMod * zMod = IntegerMod.zero(4)
+      by And.right(
+          xMod * xMod = IntegerMod.zero(4),
+          yMod * yMod = IntegerMod.zero(4) ∧ zMod * zMod = IntegerMod.zero(4), squareZeros)
+      as yzSquares;
+  yMod * yMod = IntegerMod.zero(4) by And.left(
+      yMod * yMod = IntegerMod.zero(4), zMod * zMod = IntegerMod.zero(4), yzSquares) as ySquare;
+  zMod * zMod = IntegerMod.zero(4) by And.right(
+      yMod * yMod = IntegerMod.zero(4), zMod * zMod = IntegerMod.zero(4), yzSquares) as zSquare;
+  Integer.divides(2, x) by Integer.two_divides_of_square_zero_mod_four(x, xSquare) as xEven;
+  Integer.divides(2, y) by Integer.two_divides_of_square_zero_mod_four(y, ySquare) as yEven;
+  Integer.divides(2, z) by Integer.two_divides_of_square_zero_mod_four(z, zSquare) as zEven;
+  done by And.introduction(xEven, And.introduction(yEven, zEven))
+}
+
+theorem Integer.three_squares_cancel_four
+        (x y z target : ℤ)
+        (valueReads : x * x + y * y + z * z = 4 * target)
+        : ∃ (halfX halfY halfZ : ℤ). halfX * halfX + halfY * halfY + halfZ * halfZ = target := {
+  Integer.divides(2, x) ∧ Integer.divides(2, y) ∧ Integer.divides(2, z)
+      by Integer.three_squares_multiple_of_four_forces_even as allEven;
+  Integer.divides(2, x) by And.left(
+      Integer.divides(2, x), Integer.divides(2, y) ∧ Integer.divides(2, z), allEven) as xEven;
+  Integer.divides(2, y) ∧ Integer.divides(2, z) by And.right(
+      Integer.divides(2, x), Integer.divides(2, y) ∧ Integer.divides(2, z), allEven) as yzEven;
+  choose halfX : ℤ such that x = 2 * halfX as xReads from xEven;
+  choose halfY : ℤ such that y = 2 * halfY as yReads from And.left(
+      Integer.divides(2, y), Integer.divides(2, z), yzEven);
+  choose halfZ : ℤ such that z = 2 * halfZ as zReads from And.right(
+      Integer.divides(2, y), Integer.divides(2, z), yzEven);
+  4 * (halfX * halfX + halfY * halfY + halfZ * halfZ)
+     = (2 * halfX) * (2 * halfX) + (2 * halfY) * (2 * halfY) + (2 * halfZ) * (2 * halfZ) by ring
+     = x * x + (2 * halfY) * (2 * halfY) + (2 * halfZ) * (2 * halfZ)
+         by substituting Equality.symmetry(xReads)
+     = x * x + y * y + (2 * halfZ) * (2 * halfZ)
+         by substituting Equality.symmetry(yReads)
+     = x * x + y * y + z * z by substituting Equality.symmetry(zReads)
+     = 4 * target by valueReads
+  as scaledReads;
+  halfX * halfX + halfY * halfY + halfZ * halfZ = target
+      by Integer.multiply_cancel_left_by_nonzero(
+          halfX * halfX + halfY * halfY + halfZ * halfZ, target, 4, done, scaledReads)
+      as reducedReads;
+  witness halfX with witness halfY with witness halfZ with reducedReads
+}

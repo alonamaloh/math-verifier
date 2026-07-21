@@ -179,6 +179,17 @@ rank-four escalator by 207 selected normal forms are.
   28 selected forms. The identities and matrix witnesses are proved once;
   future per-form work consists only of explicit arithmetic/congruence cover
   facts.
+- The obstruction half of Legendre's three-squares theorem is now complete.
+  `Algebra/three_squares_obstruction` classifies square residues modulo eight,
+  and a deterministic 27-case certificate proves that three squares cannot
+  sum to seven modulo eight. `Algebra/three_squares_descent` proves the
+  modulo-four parity step, while `Algebra/three_squares_power_descent` extracts
+  even coordinates and cancels a common factor of four. Consequently
+  `Integer.four_power_times_eight_plus_seven_not_three_squares` and its
+  matrix-level companion exclude every value of the form
+  `4^a(8b+7)` from `Matrix.sumOfThreeSquaresForm`. The converse direction of
+  the three-squares theorem remains the substantial representation-theory
+  obligation.
 
 ## Module path
 
@@ -197,5 +208,9 @@ Read `quadratic_form` → `integer_quadratic_form` first. Then use
 `rank_four_exceptional_truants_generated` → `rank_four_short_values` →
 `rank_four_short_values_generated` → `rank_four_pilot_universality`.
 Then use `rank_four_completed_cover_universality` for the other rank-four
-families.
+families. The elementary three-squares obstruction is layered as
+`three_squares_obstruction` → `three_squares_mod_eight` →
+`three_squares_mod_eight_generated` → `three_squares_base_obstruction` →
+`three_squares_mod_four` → `three_squares_descent` →
+`three_squares_power_descent` → `three_squares_full_obstruction`.
 `PLAN_15_THEOREM.md` records unfinished stages.

@@ -1,0 +1,46 @@
+-- Algebra/three_squares_base_obstruction.math
+--
+-- Lift the finite modulo-eight certificate back to ordinary integers.
+
+module Algebra.three_squares_base_obstruction
+
+import Algebra.three_squares_mod_eight_generated
+
+theorem Integer.eight_times_plus_seven_not_three_squares
+        (x y z b : ℤ)
+        : ¬(x * x + y * y + z * z = 8 * b + 7) := {
+  suppose x * x + y * y + z * z = 8 * b + 7 as valueReads;
+  let xMod : IntegerMod(8) := IntegerMod.make(8, x);
+  let yMod : IntegerMod(8) := IntegerMod.make(8, y);
+  let zMod : IntegerMod(8) := IntegerMod.make(8, z);
+  xMod * xMod + yMod * yMod + zMod * zMod
+      = IntegerMod.make(8, x * x + y * y + z * z)
+      = IntegerMod.make(8, 8 * b + 7) by substituting valueReads
+      = IntegerMod.residue(8, 7)
+          by IntegerMod.make_equal_of_difference_multiple(multiple := b)
+  as equalsSeven;
+  done by IntegerMod.three_squares_not_seven(xMod, yMod, zMod, equalsSeven)
+}
+
+theorem Matrix.sumOfThreeSquaresForm_not_represents_eight_times_plus_seven
+        (b : ℤ)
+        : ¬(Matrix.Represents(Matrix.sumOfThreeSquaresForm, 8 * b + 7)) := {
+  suppose Matrix.Represents(Matrix.sumOfThreeSquaresForm, 8 * b + 7) as represented;
+  choose v : RingVector(Integer.commutative_ring_bundle, 3) such that
+      Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, v) = 8 * b + 7
+      from represented;
+  let pair : RingVector(Integer.commutative_ring_bundle, 2) := RingVector.restrict(v);
+  let x : ℤ := pair(NaturalsBelow.firstOfTwo);
+  let y : ℤ := pair(NaturalsBelow.secondOfTwo);
+  let z : ℤ := v(NaturalsBelow.top(2));
+  Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm, pair) = x * x + y * y
+      by Matrix.sumOfTwoSquaresForm_value as pairValue;
+  x * x + y * y + z * z
+      = Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm, pair) + z * z
+          by substituting Equality.symmetry(pairValue)
+      = Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, v)
+          by Equality.symmetry(Matrix.sumOfThreeSquaresForm_value(v))
+      = 8 * b + 7
+  as valueReads;
+  done by Integer.eight_times_plus_seven_not_three_squares(x, y, z, b, valueReads)
+}

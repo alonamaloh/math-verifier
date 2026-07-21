@@ -1,0 +1,148 @@
+-- Algebra/three_squares_descent.math
+--
+-- The elementary descent behind the obstruction half of Legendre's
+-- three-squares theorem: a sum of three squares divisible by four has
+-- three even roots.
+
+module Algebra.three_squares_descent
+
+import Algebra.three_squares_mod_four
+
+theorem IntegerMod.replace_three_square_residues_mod_four
+        (x y z a b c : IntegerMod(4))
+        (xSquare : x * x = a) (ySquare : y * y = b) (zSquare : z * z = c)
+        (sumZero : x * x + y * y + z * z = IntegerMod.zero(4))
+        : a + b + c = IntegerMod.zero(4) := {
+  a + y * y + z * z = IntegerMod.zero(4)
+      by Equality.transport_proposition(
+          (candidate : IntegerMod(4)) ↦ candidate + y * y + z * z = IntegerMod.zero(4),
+          x * x, a, xSquare, sumZero)
+  as afterX;
+  a + b + z * z = IntegerMod.zero(4)
+      by Equality.transport_proposition(
+          (candidate : IntegerMod(4)) ↦ a + candidate + z * z = IntegerMod.zero(4),
+          y * y, b, ySquare, afterX)
+  as afterY;
+  done by Equality.transport_proposition(
+      (candidate : IntegerMod(4)) ↦ a + b + candidate = IntegerMod.zero(4),
+      z * z, c, zSquare, afterY)
+}
+
+theorem IntegerMod.three_square_residue_case_impossible
+        (x y z a b c : IntegerMod(4))
+        (xSquare : x * x = a) (ySquare : y * y = b) (zSquare : z * z = c)
+        (sumZero : x * x + y * y + z * z = IntegerMod.zero(4))
+        (groundImpossible : ¬(a + b + c = IntegerMod.zero(4)))
+        : False := {
+  a + b + c = IntegerMod.zero(4)
+      by IntegerMod.replace_three_square_residues_mod_four as contradiction;
+  done by groundImpossible(contradiction)
+}
+
+theorem IntegerMod.three_squares_zero_mod_four_forces_each_zero
+        (x y z : IntegerMod(4))
+        (sumZero : x * x + y * y + z * z = IntegerMod.zero(4))
+        : x * x = IntegerMod.zero(4) ∧ y * y = IntegerMod.zero(4) ∧ z * z = IntegerMod.zero(4) := {
+  x * x = IntegerMod.zero(4) by {
+    x * x = IntegerMod.zero(4) ∨ x * x = IntegerMod.one(4) by IntegerMod.square_mod_four;
+    done by cases {
+      case x * x = IntegerMod.zero(4): done
+      case x * x = IntegerMod.one(4) as xSquare: {
+        y * y = IntegerMod.zero(4) ∨ y * y = IntegerMod.one(4) by IntegerMod.square_mod_four;
+        done by cases {
+          case y * y = IntegerMod.zero(4) as ySquare: {
+            z * z = IntegerMod.zero(4) ∨ z * z = IntegerMod.one(4) by IntegerMod.square_mod_four;
+            done by cases {
+              case z * z = IntegerMod.zero(4) as zSquare: {
+                ¬(IntegerMod.one(4) + IntegerMod.zero(4) + IntegerMod.zero(4) = IntegerMod.zero(4))
+                    by IntegerMod.nonzero_binary_three_sum_mod_four(
+                        a := 1, b := 0, c := 0, remainder := 1) as impossible;
+                False by IntegerMod.three_square_residue_case_impossible(
+                    x, y, z, IntegerMod.one(4), IntegerMod.zero(4), IntegerMod.zero(4),
+                    xSquare, ySquare, zSquare, sumZero, impossible);
+                done
+              }
+              case z * z = IntegerMod.one(4) as zSquare: {
+                ¬(IntegerMod.one(4) + IntegerMod.zero(4) + IntegerMod.one(4) = IntegerMod.zero(4))
+                    by IntegerMod.nonzero_binary_three_sum_mod_four(
+                        a := 1, b := 0, c := 1, remainder := 2) as impossible;
+                False by IntegerMod.three_square_residue_case_impossible(
+                    x, y, z, IntegerMod.one(4), IntegerMod.zero(4), IntegerMod.one(4),
+                    xSquare, ySquare, zSquare, sumZero, impossible);
+                done
+              }
+            }
+          }
+          case y * y = IntegerMod.one(4) as ySquare: {
+            z * z = IntegerMod.zero(4) ∨ z * z = IntegerMod.one(4) by IntegerMod.square_mod_four;
+            done by cases {
+              case z * z = IntegerMod.zero(4) as zSquare: {
+                ¬(IntegerMod.one(4) + IntegerMod.one(4) + IntegerMod.zero(4) = IntegerMod.zero(4))
+                    by IntegerMod.nonzero_binary_three_sum_mod_four(
+                        a := 1, b := 1, c := 0, remainder := 2) as impossible;
+                False by IntegerMod.three_square_residue_case_impossible(
+                    x, y, z, IntegerMod.one(4), IntegerMod.one(4), IntegerMod.zero(4),
+                    xSquare, ySquare, zSquare, sumZero, impossible);
+                done
+              }
+              case z * z = IntegerMod.one(4) as zSquare: {
+                ¬(IntegerMod.one(4) + IntegerMod.one(4) + IntegerMod.one(4) = IntegerMod.zero(4))
+                    by IntegerMod.nonzero_binary_three_sum_mod_four(
+                        a := 1, b := 1, c := 1, remainder := 3) as impossible;
+                False by IntegerMod.three_square_residue_case_impossible(
+                    x, y, z, IntegerMod.one(4), IntegerMod.one(4), IntegerMod.one(4),
+                    xSquare, ySquare, zSquare, sumZero, impossible);
+                done
+              }
+            }
+          }
+        }
+      }
+    }
+  } as xSquareZero;
+  y * y = IntegerMod.zero(4) by {
+    y * y = IntegerMod.zero(4) ∨ y * y = IntegerMod.one(4) by IntegerMod.square_mod_four;
+    done by cases {
+      case y * y = IntegerMod.zero(4): done
+      case y * y = IntegerMod.one(4) as ySquare: {
+        z * z = IntegerMod.zero(4) ∨ z * z = IntegerMod.one(4) by IntegerMod.square_mod_four;
+        done by cases {
+          case z * z = IntegerMod.zero(4) as zSquare: {
+            ¬(IntegerMod.zero(4) + IntegerMod.one(4) + IntegerMod.zero(4) = IntegerMod.zero(4))
+                by IntegerMod.nonzero_binary_three_sum_mod_four(
+                    a := 0, b := 1, c := 0, remainder := 1) as impossible;
+            False by IntegerMod.three_square_residue_case_impossible(
+                x, y, z, IntegerMod.zero(4), IntegerMod.one(4), IntegerMod.zero(4),
+                xSquareZero, ySquare, zSquare, sumZero, impossible);
+            done
+          }
+          case z * z = IntegerMod.one(4) as zSquare: {
+            ¬(IntegerMod.zero(4) + IntegerMod.one(4) + IntegerMod.one(4) = IntegerMod.zero(4))
+                by IntegerMod.nonzero_binary_three_sum_mod_four(
+                    a := 0, b := 1, c := 1, remainder := 2) as impossible;
+            False by IntegerMod.three_square_residue_case_impossible(
+                x, y, z, IntegerMod.zero(4), IntegerMod.one(4), IntegerMod.one(4),
+                xSquareZero, ySquare, zSquare, sumZero, impossible);
+            done
+          }
+        }
+      }
+    }
+  } as ySquareZero;
+  z * z = IntegerMod.zero(4) by {
+    z * z = IntegerMod.zero(4) ∨ z * z = IntegerMod.one(4) by IntegerMod.square_mod_four;
+    done by cases {
+      case z * z = IntegerMod.zero(4): done
+      case z * z = IntegerMod.one(4) as zSquare: {
+        ¬(IntegerMod.zero(4) + IntegerMod.zero(4) + IntegerMod.one(4) = IntegerMod.zero(4))
+            by IntegerMod.nonzero_binary_three_sum_mod_four(
+                a := 0, b := 0, c := 1, remainder := 1) as impossible;
+        False by IntegerMod.three_square_residue_case_impossible(
+            x, y, z, IntegerMod.zero(4), IntegerMod.zero(4), IntegerMod.one(4),
+            xSquareZero, ySquareZero, zSquare, sumZero, impossible);
+        done
+      }
+    }
+  } as zSquareZero;
+  done by And.introduction(xSquareZero, And.introduction(ySquareZero, zSquareZero))
+}

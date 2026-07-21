@@ -1,0 +1,99 @@
+-- Algebra/three_squares_full_obstruction.math
+--
+-- The complete elementary obstruction direction of Legendre's
+-- three-squares theorem.
+
+module Algebra.three_squares_full_obstruction
+
+import Algebra.three_squares_power_descent
+import Natural.power
+
+theorem Integer.four_power_step (exponent : ℕ)
+        : ((4 ^ (1 + exponent) : ℕ) : ℤ) = 4 * ((4 ^ exponent : ℕ) : ℤ) := {
+  ((4 ^ (1 + exponent) : ℕ) : ℤ)
+     = ((4 * 4 ^ exponent : ℕ) : ℤ) by substituting Natural.power_one_plus(4, exponent)
+     = (4 : ℤ) * ((4 ^ exponent : ℕ) : ℤ)
+         by Natural.to_integer.multiply_preserves;
+  done
+}
+
+theorem Integer.four_power_times_eight_plus_seven_not_three_squares
+        (exponent : ℕ) (x y z b : ℤ)
+        : ¬(x * x + y * y + z * z
+          = ((4 ^ exponent : ℕ) : ℤ) * (8 * b + 7)) := {
+  ∀ (exponent : ℕ). ∀ (x y z b : ℤ).
+      ¬(x * x + y * y + z * z
+        = ((4 ^ exponent : ℕ) : ℤ) * (8 * b + 7)) by {
+    take exponent : ℕ;
+    by induction on exponent with IH {
+      case base: {
+        take x : ℤ;
+        take y : ℤ;
+        take z : ℤ;
+        take b : ℤ;
+        suppose x * x + y * y + z * z
+            = ((4 ^ 0 : ℕ) : ℤ) * (8 * b + 7) as valueReads;
+        x * x + y * y + z * z
+           = ((4 ^ 0 : ℕ) : ℤ) * (8 * b + 7) by valueReads
+           = (1 : ℤ) * (8 * b + 7) by substituting Natural.power_zero(4)
+           = 8 * b + 7 by ring
+        as baseReads;
+        done by Integer.eight_times_plus_seven_not_three_squares(x, y, z, b, baseReads)
+      }
+      case step(predecessor): {
+        take x : ℤ;
+        take y : ℤ;
+        take z : ℤ;
+        take b : ℤ;
+        suppose x * x + y * y + z * z
+            = ((4 ^ (1 + predecessor) : ℕ) : ℤ) * (8 * b + 7) as valueReads;
+        x * x + y * y + z * z
+           = ((4 ^ (1 + predecessor) : ℕ) : ℤ) * (8 * b + 7) by valueReads
+           = (4 * ((4 ^ predecessor : ℕ) : ℤ)) * (8 * b + 7)
+               by substituting Integer.four_power_step(predecessor)
+           = 4 * (((4 ^ predecessor : ℕ) : ℤ) * (8 * b + 7)) by ring
+        as divisibleByFour;
+        choose halfX : ℤ such that ∃ (halfY halfZ : ℤ).
+            halfX * halfX + halfY * halfY + halfZ * halfZ
+              = ((4 ^ predecessor : ℕ) : ℤ) * (8 * b + 7)
+            from Integer.three_squares_cancel_four(x, y, z,
+              ((4 ^ predecessor : ℕ) : ℤ) * (8 * b + 7), divisibleByFour);
+        choose halfY : ℤ such that ∃ (halfZ : ℤ).
+            halfX * halfX + halfY * halfY + halfZ * halfZ
+              = ((4 ^ predecessor : ℕ) : ℤ) * (8 * b + 7);
+        choose halfZ : ℤ such that
+            halfX * halfX + halfY * halfY + halfZ * halfZ
+              = ((4 ^ predecessor : ℕ) : ℤ) * (8 * b + 7);
+        done by IH(halfX, halfY, halfZ, b)
+      }
+    }
+  };
+  done
+}
+
+theorem Matrix.sumOfThreeSquaresForm_not_represents_four_power_times_eight_plus_seven
+        (exponent : ℕ) (b : ℤ)
+        : ¬(Matrix.Represents(Matrix.sumOfThreeSquaresForm,
+          ((4 ^ exponent : ℕ) : ℤ) * (8 * b + 7))) := {
+  suppose Matrix.Represents(Matrix.sumOfThreeSquaresForm,
+      ((4 ^ exponent : ℕ) : ℤ) * (8 * b + 7)) as represented;
+  choose v : RingVector(Integer.commutative_ring_bundle, 3) such that
+      Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, v)
+        = ((4 ^ exponent : ℕ) : ℤ) * (8 * b + 7)
+      from represented;
+  let pair : RingVector(Integer.commutative_ring_bundle, 2) := RingVector.restrict(v);
+  let x : ℤ := pair(NaturalsBelow.firstOfTwo);
+  let y : ℤ := pair(NaturalsBelow.secondOfTwo);
+  let z : ℤ := v(NaturalsBelow.top(2));
+  Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm, pair) = x * x + y * y
+      by Matrix.sumOfTwoSquaresForm_value as pairValue;
+  x * x + y * y + z * z
+      = Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm, pair) + z * z
+          by substituting Equality.symmetry(pairValue)
+      = Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, v)
+          by Equality.symmetry(Matrix.sumOfThreeSquaresForm_value(v))
+      = ((4 ^ exponent : ℕ) : ℤ) * (8 * b + 7)
+  as valueReads;
+  done by Integer.four_power_times_eight_plus_seven_not_three_squares(
+      exponent, x, y, z, b, valueReads)
+}

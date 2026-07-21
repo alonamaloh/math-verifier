@@ -1,0 +1,88 @@
+-- Algebra/three_squares_mod_four.math
+--
+-- Squares and short sums of square residues modulo four.
+
+module Algebra.three_squares_mod_four
+
+import Algebra.three_squares_base_obstruction
+
+theorem IntegerMod.square_mod_four (x : IntegerMod(4))
+        : x * x = IntegerMod.zero(4) ∨ x * x = IntegerMod.one(4) := {
+  choose r such that r < 4 ∧ x = IntegerMod.make(4, (r : ℤ))
+      from IntegerMod.exists_natural_representative(4, done, x);
+  r < 4 by And.left(r < 4, x = IntegerMod.make(4, (r : ℤ)));
+  x = IntegerMod.make(4, (r : ℤ))
+      by And.right(r < 4, x = IntegerMod.make(4, (r : ℤ))) as xReads;
+  IntegerMod.make(4, (0 : ℤ)) * IntegerMod.make(4, (0 : ℤ)) = IntegerMod.zero(4)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := 0) as squareZero;
+  IntegerMod.make(4, (1 : ℤ)) * IntegerMod.make(4, (1 : ℤ)) = IntegerMod.one(4)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := 0) as squareOne;
+  IntegerMod.make(4, (2 : ℤ)) * IntegerMod.make(4, (2 : ℤ)) = IntegerMod.zero(4)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := 1) as squareTwo;
+  IntegerMod.make(4, (3 : ℤ)) * IntegerMod.make(4, (3 : ℤ)) = IntegerMod.one(4)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := 2) as squareThree;
+  r = 0 ∨ ∃ (predecessor : ℕ). r = 1 + predecessor by Natural.zero_or_one_plus;
+  r = 0 ∨ r = 1 ∨ r = 2 ∨ r = 3 by cases {
+    case r = 0: done by Or.introduceLeft(done)
+    case ∃ (predecessor : ℕ). r = 1 + predecessor: {
+      choose predecessor such that r = 1 + predecessor;
+      1 ≤ r by substituting (r = 1 + predecessor);
+      r < 4 < 5;
+      r = 1 ∨ r = 2 ∨ r = 3 ∨ r = 4 by Natural.positive_below_five;
+      done by cases {
+        case r = 1: done by Or.introduceRight(Or.introduceLeft(done))
+        case r = 2 ∨ r = 3 ∨ r = 4: done by cases {
+          case r = 2: done by Or.introduceRight(Or.introduceRight(Or.introduceLeft(done)))
+          case r = 3 ∨ r = 4: done by cases {
+            case r = 3: done by Or.introduceRight(Or.introduceRight(Or.introduceRight(done)))
+            case r = 4: {
+              4 < 4 by substituting (r = 4) as impossibleOrder;
+              False by Natural.lt_irreflexive(4, impossibleOrder);
+              done
+            }
+          }
+        }
+      }
+    }
+  };
+  IntegerMod.make(4, (r : ℤ)) * IntegerMod.make(4, (r : ℤ)) = IntegerMod.zero(4)
+      ∨ IntegerMod.make(4, (r : ℤ)) * IntegerMod.make(4, (r : ℤ)) = IntegerMod.one(4) by cases {
+    case r = 0: done by Or.introduceLeft(squareZero)
+    case r = 1 ∨ r = 2 ∨ r = 3: done by cases {
+      case r = 1: done by Or.introduceRight(squareOne)
+      case r = 2 ∨ r = 3: done by cases {
+        case r = 2: done by Or.introduceLeft(squareTwo)
+        case r = 3: done by Or.introduceRight(squareThree)
+      }
+    }
+  } as squareClass;
+  IntegerMod.make(4, (r : ℤ)) = x by Equality.symmetry(xReads) as reverseReads;
+  done by Equality.transport_proposition(
+      (candidate : IntegerMod(4)) ↦
+        candidate * candidate = IntegerMod.zero(4)
+        ∨ candidate * candidate = IntegerMod.one(4),
+      IntegerMod.make(4, (r : ℤ)), x, reverseReads, squareClass)
+}
+
+theorem IntegerMod.nonzero_binary_three_sum_mod_four
+        (a b c remainder : ℕ)
+        (sumReads : a + b + c = remainder)
+        (remainderBelow : remainder < 4) (remainderNonzero : remainder ≠ 0)
+        : ¬(IntegerMod.residue(4, a) + IntegerMod.residue(4, b) + IntegerMod.residue(4, c)
+          = IntegerMod.zero(4)) := {
+  IntegerMod.residue(4, a) + IntegerMod.residue(4, b) + IntegerMod.residue(4, c)
+      = IntegerMod.residue(4, remainder)
+          by IntegerMod.residue_three_sum_normalizes(multiple := 0) as normalizes;
+  suppose IntegerMod.residue(4, a) + IntegerMod.residue(4, b) + IntegerMod.residue(4, c)
+      = IntegerMod.zero(4) as equalsZero;
+  IntegerMod.residue(4, remainder) = IntegerMod.residue(4, 0) by {
+    IntegerMod.residue(4, remainder)
+       = IntegerMod.residue(4, a) + IntegerMod.residue(4, b) + IntegerMod.residue(4, c)
+           by Equality.symmetry(normalizes)
+       = IntegerMod.zero(4) by equalsZero;
+    done
+  };
+  IntegerMod.residue(4, remainder) ≠ IntegerMod.residue(4, 0)
+      by IntegerMod.residue_distinct_below_modulus;
+  done
+}
