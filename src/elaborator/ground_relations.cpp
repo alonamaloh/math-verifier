@@ -2,10 +2,12 @@
 //
 // Decides ground `=` / `≠` / `≤` / `<` at ℕ/ℤ/ℚ (plus `Integer.IsNonneg`)
 // by computing the answer with GMP and emitting a fixed spine of
-// `ground_arithmetic` library lemmas. The kernel then checks the leaf
-// premises by literal computation (the Stage-1 accelerated-op table), so
-// no search happens: the tier either recognizes a ground goal and proves
-// it in O(term size) lemma applications, or declines with nullptr.
+// `ground_arithmetic` library lemmas. It also refutes finite disjunctions
+// whose leaves are false ground relations: recursively certify each leaf,
+// then assemble the negation with `Or.eliminate`. The kernel checks every
+// leaf and connective certificate, so no trust is placed in the elaborator.
+// The tier either recognizes a ground goal and proves it in O(term size)
+// lemma applications, or declines with nullptr.
 //
 // Shape of the certificates:
 //   ℕ  — a term WHNFs to a NaturalLiteral (`zero` / successor chains
@@ -747,6 +749,81 @@ ExpressionPointer Elaborator::tryGroundRelationTier(
     int binderCount = static_cast<int>(localBinders.size());
     ExpressionPointer goal =
         openOverLocalBinders(goalClosed, localBinders, binderCount);
+
+    // A closed negated disjunction is just a finite collection of false
+    // ground leaves. Refute both sides recursively, then let Or.eliminate
+    // assemble the certificate. WHNF on the domain deliberately sees
+    // through a named classification predicate, so clients can write
+    // `¬ClosedEnumeration(7)` instead of restating its binary Or tree.
+    //
+    // Keep this polarity-specific: proving a positive disjunction would
+    // require choosing a branch, while refuting one requires *all* leaves
+    // and therefore exactly matches the exhaustive-check meaning.
+    ExpressionPointer goalWhnf = weakHeadNormalForm(environment_, goal);
+    if (auto* negation = std::get_if<Pi>(&goalWhnf->node)) {
+        bool codomainIndependent =
+            !referencesBoundVariable(negation->codomain, 0);
+        ExpressionPointer codomain = codomainIndependent
+            ? weakHeadNormalForm(environment_, shift(negation->codomain, -1))
+            : nullptr;
+        auto* codomainConstant = codomain
+            ? std::get_if<Constant>(&codomain->node)
+            : nullptr;
+        int groundBudget = kGroundScanBudget;
+        if (codomainConstant && codomainConstant->name == "False"
+            && quickGroundScan(negation->domain, groundBudget)
+            && environment_.lookup("Or.eliminate")) {
+            ExpressionPointer domainWhnf =
+                weakHeadNormalForm(environment_, negation->domain);
+            SpineView domain = decomposeSpine(domainWhnf);
+            if (domain.headName == "Or" && domain.args.size() == 2) {
+                auto refuteSide = [&](ExpressionPointer sideOpened) {
+                    ExpressionPointer notSideOpened = makePi(
+                        "_ground_refuted", sideOpened,
+                        makeConstant("False", {}));
+                    ExpressionPointer notSideClosed = closeOverLocalBinders(
+                        notSideOpened, localBinders, binderCount);
+                    ExpressionPointer proofClosed = tryGroundRelationTier(
+                        notSideClosed, localBinders);
+                    return proofClosed
+                        ? openOverLocalBinders(
+                              proofClosed, localBinders, binderCount)
+                        : nullptr;
+                };
+                ExpressionPointer notLeft = refuteSide(domain.args[0]);
+                ExpressionPointer notRight = refuteSide(domain.args[1]);
+                if (notLeft && notRight) {
+                    // Under the lambda binding the disjunction proof, lift
+                    // every pre-existing bound reference by one. Ground
+                    // propositions ordinarily have none, but doing this
+                    // structurally keeps the certificate builder correct.
+                    ExpressionPointer call =
+                        makeConstant("Or.eliminate", {});
+                    call = makeApplication(
+                        std::move(call),
+                        liftBoundVariables(domain.args[0], 1, 0));
+                    call = makeApplication(
+                        std::move(call),
+                        liftBoundVariables(domain.args[1], 1, 0));
+                    call = makeApplication(
+                        std::move(call), makeConstant("False", {}));
+                    call = makeApplication(
+                        std::move(call),
+                        liftBoundVariables(notLeft, 1, 0));
+                    call = makeApplication(
+                        std::move(call),
+                        liftBoundVariables(notRight, 1, 0));
+                    call = makeApplication(
+                        std::move(call), makeBoundVariable(0));
+                    ExpressionPointer proof = makeLambda(
+                        "_ground_disjunction", negation->domain,
+                        std::move(call));
+                    return closeOverLocalBinders(
+                        proof, localBinders, binderCount);
+                }
+            }
+        }
+    }
 
     // Recognize the relation shape first (cheap name checks), then insist
     // the operands are variable-free before any WHNF work happens.
