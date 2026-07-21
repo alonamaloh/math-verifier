@@ -216,6 +216,19 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
   `sumOfTwoSquares_escalation_rank_three_truant` (truants 6, 7, or 14), this
   completes the explicit rank-three escalation classification.
 - `S3.E5` `[ ]` (XL) ★★ The rank-4 escalators: machine-generate and dedup to the **≈207** isometry classes. *(Large mechanical lemma; the count is the checkpoint.)* — owes: S3.E2, S2.R4
+  **PILOT COMPLETE 2026-07-21:** `Algebra/rank_four_pilot.math` and the deterministic
+  `scripts/generate_rank_four_pilot.py` carry one ternary branch end to end. Above
+  `x²+y²+z²` (truant 7), positive-definiteness gives the exact coupled bound
+  `Q(b) < 7`; the untrusted search finds 81 integer borders and seven squared-norm
+  classes. The generated module kernel-checks all 81 top-shear reductions and all
+  21 pairwise determinant separations. More importantly, the hand-written theorem
+  `sumOfThreeSquaresRankFourEscalation_classified` classifies an arbitrary actual
+  escalation into those seven classes, so coverage does not trust the enumerator.
+  Normal verification measured about 9.1 s for the reusable foundation and 0.2 s
+  for the 102 generated certificates with warm imports (31.4 KiB + 40.5 KiB source).
+  This validates the search/certificate split. It does **not** check off E5: the
+  remaining ternary parents require canonical reduction modulo `b ↦ b + A·v`, not
+  the identity-parent shortcut that makes squared norm a complete invariant here.
 - `S3.C1` `[ ]` (M) ★ The set of truants occurring anywhere in the tree is exactly **{1,2,3,5,6,7,10,14,15}**. — owes: S3.E3, S3.E4, S3.E5
 - `S3.C2` `[ ]` (L) ★★ **Master reduction:** if `Q` represents the nine critical numbers then `Q` is universal — via: a non-universal `Q` would embed an escalator missing its truant ∈ {nine}. *(Depends on rank-4 universality, Stage 5.)* — owes: S3.C1, S3.E5, S5.U2
 
