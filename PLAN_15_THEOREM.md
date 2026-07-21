@@ -252,10 +252,23 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
   `1` and `-1`, leaving at most 12 classes, but the library lacks a reusable
   diagonal sign-change matrix certificate. That small infrastructure item is a
   useful later deduplication pass, not a coverage blocker. The next mechanical
-  step should factor the two successful diagonal branches into a parameterized
-  diagonal-parent generator/certificate layer, then run it first on
-  `x²+y²+2z²`; after the remaining diagonal representatives, handle the two
-  odd-border ternary parents separately.
+  step should run the parameterized diagonal layer first on `x²+y²+2z²`;
+  after the remaining diagonal representatives, handle the two odd-border
+  ternary parents separately.
+
+  **DIAGONAL FAMILY FACTORED 2026-07-21:**
+  `Algebra/rank_four_diagonal_family.math` now proves the symbolic coordinate
+  action and value formula for `diag(1,1,d)`, the generic top-shear reduction,
+  and the fraction-free coupled bound
+  **`d a² + d b² + c² < d t`** from the single integral test vector
+  `(-da,-db,-c,d)`. Thus later diagonal branches no longer copy the large
+  Schur calculation. The next parent `x²+y²+2z²` (truant 14) has been measured
+  externally: the bound `2a²+2b²+c² < 28` leaves **319** raw borders, and
+  top-shear reduction leaves **25** `(residue, corner)` forms (14 with residue
+  0 and 11 with residue 1). Their expected determinants `2·corner-residue²`
+  are all distinct, so unlike the `d=3` branch this should produce an exact
+  25-class theorem with no sign-change cleanup. These counts and determinant
+  claims remain search predictions until the next generated certificates land.
 - `S3.C1` `[ ]` (M) ★ The set of truants occurring anywhere in the tree is exactly **{1,2,3,5,6,7,10,14,15}**. — owes: S3.E3, S3.E4, S3.E5
 - `S3.C2` `[ ]` (L) ★★ **Master reduction:** if `Q` represents the nine critical numbers then `Q` is universal — via: a non-universal `Q` would embed an escalator missing its truant ∈ {nine}. *(Depends on rank-4 universality, Stage 5.)* — owes: S3.C1, S3.E5, S5.U2
 

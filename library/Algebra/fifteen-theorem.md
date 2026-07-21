@@ -116,6 +116,10 @@ foundations and the complete deduplicated rank-three classification are.
   borders and all excluded box cases are checked inside the kernel. The 18-form
   result is coverage, not yet an exact isometry count: a diagonal sign-change
   certificate should pair the two nonzero residue bands.
+- `Algebra/rank_four_diagonal_family` factors the reusable part of the latter
+  argument for every parent `diag(1,1,d)`: coordinate action, quadratic value,
+  top-shear reduction, and the fraction-free positive-definiteness bound
+  `d a²+d b²+c² < d t` for a child whose corner is `t`.
 
 ## Module path
 
