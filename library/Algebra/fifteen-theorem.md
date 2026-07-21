@@ -139,9 +139,12 @@ finite kernel-checked coverage of every resulting rank-four branch are.
   `make rank-four-generated-check`. Across the ten distinct ternary parents the
   current global result names 276 distinct representatives across its coverage
   theorem family.
-  This is intentionally not called the expected ≈207-class classification:
-  completing that count requires quotienting the remaining lists by larger
-  parent automorphism groups and proving cross-list identifications.
+  The exhaustive discovery tool `scripts/classify_rank_four_normal_forms.py`
+  now identifies exactly 207 integral-isometry classes and emits 69 explicit
+  unimodular changes of basis, including the cross-parent coincidences. The
+  count is guarded alongside the generators, but it remains an untrusted
+  search result until all 69 congruences are replayed in the kernel and the
+  coverage predicates are collapsed to the resulting 207 alternatives.
 
 ## Module path
 

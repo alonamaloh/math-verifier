@@ -293,13 +293,18 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
   representatives**.
 
   This finishes the **coverage** substage of E5, but not E5 itself. The 276
-  alternatives are not claimed pairwise non-isometric: obvious parent
-  automorphisms beyond the top-shear/reflection subgroup still identify some
-  of them, and the advertised ≈207 checkpoint is an exact isometry count. The
-  next E5 work is the remaining measured automorphism-orbit pass, with
-  determinant used first as a cheap partition and explicit kernel-checked
-  isometries only inside equal-invariant buckets. Cross-parent identifications
-  must be included before changing `[~]` to `[x]`.
+  alternatives are not pairwise non-isometric. The deterministic discovery
+  tool `scripts/classify_rank_four_normal_forms.py` now reconstructs their
+  concrete Gram matrices and proves the search exhaustive: for each potential
+  isometry it enumerates every vector of the required norms inside exact
+  adjugate/determinant coordinate bounds, then every compatible unimodular
+  basis. Determinant and the theta-series prefix through 15 are only safe
+  prefilters. The result is exactly **207 integral-isometry classes**, with
+  **69 explicit unimodular identifications**, including all cross-parent
+  coincidences. This count is guarded by `make rank-four-generated-check` but
+  remains untrusted until those 69 matrices are replayed as kernel-checked
+  congruence certificates. That replay and the resulting 207-alternative
+  coverage predicate are the final E5 substage before changing `[~]` to `[x]`.
 - `S3.C1` `[ ]` (M) ★ The set of truants occurring anywhere in the tree is exactly **{1,2,3,5,6,7,10,14,15}**. — owes: S3.E3, S3.E4, S3.E5
 - `S3.C2` `[ ]` (L) ★★ **Master reduction:** if `Q` represents the nine critical numbers then `Q` is universal — via: a non-universal `Q` would embed an escalator missing its truant ∈ {nine}. *(Depends on rank-4 universality, Stage 5.)* — owes: S3.C1, S3.E5, S5.U2
 
