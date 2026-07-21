@@ -363,6 +363,14 @@ struct SurfaceFiniteCheck {
     SurfaceExpressionPointer upperBound;
 };
 
+// `disjunct(proof)` — injects `proof` into the matching leaf of a
+// right-associated disjunction. The elaborator follows the goal's `Or` spine
+// and emits the corresponding introduceLeft/introduceRight certificate, so
+// callers never need to spell a linear tower of constructors.
+struct SurfaceDisjunct {
+    SurfaceExpressionPointer proof;
+};
+
 // `group` / `monoid` — closes an equality goal in a (abstract) group or
 // monoid by normalising both sides: flatten associativity, drop identity,
 // and (group only) cancel adjacent inverses. `allowInverses` distinguishes
@@ -680,7 +688,7 @@ struct SurfaceExpression {
         SurfaceBinaryOperation, SurfaceUnaryOperation, SurfaceFoldBinder,
         SurfaceEllipsisFold, SurfaceSeriesFold,
         SurfaceAnonymousTuple, SurfaceCases, SurfaceSorry,
-        SurfaceRing, SurfaceFiniteCheck,
+        SurfaceRing, SurfaceFiniteCheck, SurfaceDisjunct,
         SurfaceGroup, SurfaceModuleNormalise, SurfaceField,
         SurfaceLinearCombination,
         SurfaceCalc, SurfaceByInductionUsing,
@@ -876,6 +884,11 @@ inline SurfaceExpressionPointer makeSurfaceFiniteCheck(
         SurfaceFiniteCheck{std::move(binderName), std::move(lowerBound),
                            std::move(upperBound)},
         line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceDisjunct(
+    SurfaceExpressionPointer proof, int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceDisjunct{std::move(proof)}, line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceGroup(
     bool allowInverses, int line, int column) {

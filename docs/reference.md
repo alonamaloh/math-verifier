@@ -352,10 +352,16 @@ linear_combination(expression)
 group
 monoid
 module
+disjunct(proof)
 ```
 
 The applicable carrier structures and limitations are described in
 `conventions/algebra-tactics.md`.
+
+`disjunct(proof)` injects a proof into the matching branch of a
+right-associated disjunction. It is especially useful for generated finite
+classifications: the elaborator emits the exact `Or` constructor path without
+requiring a nested `Or.introduceRight(...)` term or invoking proof search.
 
 ## Citation and inference
 

@@ -514,6 +514,11 @@ SurfaceExpressionPointer substituteSurfaceName(
                                   targetName, replacement),
             line, column);
     }
+    if (auto* disjunct = std::get_if<SurfaceDisjunct>(&node.node)) {
+        return makeSurfaceDisjunct(
+            substituteSurfaceName(disjunct->proof, targetName, replacement),
+            line, column);
+    }
     if (auto* blockTail = std::get_if<SurfaceBlockTail>(&node.node)) {
         // The dual-reading final expression of a block — recurse into the
         // wrapped expression so a `set`-bound name inside a block's last
@@ -3622,6 +3627,19 @@ private:
 
     SurfaceExpressionPointer parseAtom() {
         const Token& current = peek();
+        // `disjunct(proof)` is contextual, leaving an ordinary declaration
+        // or local named `disjunct` legal when it is not followed by `(`.
+        if (current.kind == TokenKind::Identifier
+            && current.lexeme == "disjunct"
+            && peekAt(1).kind == TokenKind::LeftParen) {
+            Token head = consumeAny();
+            consumeAny();  // `(`
+            SurfaceExpressionPointer proof = parseExpression();
+            expect(TokenKind::RightParen,
+                   "ending `disjunct` proof argument");
+            return makeSurfaceDisjunct(
+                std::move(proof), head.line, head.column);
+        }
         // `finite_check n from LO until HI` is contextual rather than a
         // reserved keyword: only this full prefix claims the notation, so a
         // declaration or local named `finite_check` remains legal.  `until`

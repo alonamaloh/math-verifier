@@ -146,12 +146,6 @@ def theorem_name(branch: Branch, border: tuple[int, int, int]) -> str:
     )
 
 
-def disjunction_introduction(index: int, count: int) -> str:
-    if index == count - 1:
-        return "Or.introduceRight(" * index + "reduced" + ")" * index
-    return "Or.introduceRight(" * index + "Or.introduceLeft(reduced)" + ")" * index
-
-
 def render_certificate(branch: Branch, border: tuple[int, int, int]) -> str:
     shift, residue_value, corner = reduce_border(branch, border)
     a, b, c = map(integer, border)
@@ -159,9 +153,9 @@ def render_certificate(branch: Branch, border: tuple[int, int, int]) -> str:
     az, bz, cz = (f"({value} : ℤ)" for value in (a, b, c))
     xz, yz, zz = (f"({value} : ℤ)" for value in (x, y, z))
     residue = integer(residue_value)
-    index = normal_forms(branch).index((residue_value, corner))
-    introduction = disjunction_introduction(index, branch.expected_normal_forms)
-    return f"""automatic theorem {theorem_name(branch, border)}
+    assert (residue_value, corner) in normal_forms(branch)
+    introduction = "disjunct(reduced)"
+    return f"""theorem {theorem_name(branch, border)}
         : {branch.normal_form_predicate}(
             {branch.candidate}({a}, {b}, {c})) := {{
   {az} + {xz} = 0 by ring as firstVanishes;
@@ -235,7 +229,7 @@ def render_box_case(branch: Branch, a: int, b: int, c: int) -> str:
     name = f"Matrix.{branch.theorem_prefix}_box_case_{fixed_name(a)}_{fixed_name(b)}_{fixed_name(c)}"
     value = branch.weight * a * a + branch.weight * b * b + c * c
     expression = weighted_expression(branch, f"({a} : ℤ)", f"({b} : ℤ)", f"({c} : ℤ)")
-    statement = f"""automatic theorem {name}
+    statement = f"""theorem {name}
         (bound : {expression} < {branch.bound})
         : {branch.normal_form_predicate}(
             {branch.candidate}({a}, {b}, {c})) := {{
@@ -264,7 +258,7 @@ def render_c_sweep(branch: Branch, a: int, b: int) -> str:
         for c in branch.c_range
     ]
     certificate = render_integer_all_from("P", predicate, "c", branch.c_range, facts)
-    return f"""automatic theorem Matrix.{branch.theorem_prefix}_box_{fixed_name(a)}_{fixed_name(b)}_all_c
+    return f"""theorem Matrix.{branch.theorem_prefix}_box_{fixed_name(a)}_{fixed_name(b)}_all_c
         : ∀ (c : ℤ). {branch.c_range.start} ≤ c → c < {branch.c_range.stop}
           → {expression} < {branch.bound}
           → {branch.normal_form_predicate}(
@@ -285,7 +279,7 @@ def render_b_sweep(branch: Branch, a: int) -> str:
         for b in branch.b_range
     ]
     certificate = render_integer_all_from("P", predicate, "b", branch.b_range, facts)
-    return f"""automatic theorem Matrix.{branch.theorem_prefix}_box_{fixed_name(a)}_all_b_c
+    return f"""theorem Matrix.{branch.theorem_prefix}_box_{fixed_name(a)}_all_b_c
         : ∀ (b : ℤ). {branch.b_range.start} ≤ b → b < {branch.b_range.stop}
           → ∀ (c : ℤ). {branch.c_range.start} ≤ c → c < {branch.c_range.stop}
           → {expression} < {branch.bound}

@@ -106,10 +106,7 @@ def or_expression(expressions: list[str], indent: str = "  ") -> str:
 
 def or_intro(index: int, count: int, value: str) -> str:
     assert 0 <= index < count
-    result = value if index == count - 1 else f"Or.introduceLeft({value})"
-    for _ in range(index):
-        result = f"Or.introduceRight({result})"
-    return result
+    return value if count == 1 else f"disjunct({value})"
 
 
 def promotion_name(form: NamedForm) -> str:

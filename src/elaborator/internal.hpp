@@ -1094,6 +1094,13 @@ private:
             }
             return;
         }
+        if (auto* disjunct =
+                std::get_if<SurfaceDisjunct>(&expression.node)) {
+            if (disjunct->proof) {
+                collectMentionsInSurface(*disjunct->proof, record);
+            }
+            return;
+        }
         if (auto* tup =
                 std::get_if<SurfaceAnonymousTuple>(&expression.node)) {
             for (const auto& c : tup->components) {
@@ -3345,6 +3352,14 @@ private:
     // translation unit so the certificate protocol stays auditable.
     ExpressionPointer elaborateFiniteCheck(
         const SurfaceFiniteCheck& tactic,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column);
+
+    // `disjunct(proof)`: find proof's proposition among the leaves of the
+    // expected right-associated `Or` and build the exact constructor path.
+    ExpressionPointer elaborateDisjunct(
+        const SurfaceDisjunct& tactic,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
         int line, int column);

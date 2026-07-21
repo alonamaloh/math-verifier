@@ -208,7 +208,7 @@ def theorem_name(identification: Identification) -> str:
 def render_certificate(identification: Identification) -> str:
     change = identification.change_of_basis
     inverse = inverse_unimodular(change)
-    return f"""automatic theorem {theorem_name(identification)}
+    return f"""theorem {theorem_name(identification)}
         : Matrix.IsIsometric({form_expression(identification.source)},
             {form_expression(identification.representative)}) := {{
   let source : Matrix(Integer.commutative_ring_bundle, 4, 4) := {form_expression(identification.source)};

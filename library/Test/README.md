@@ -18,6 +18,7 @@ Filenames are the index. Useful families include:
   `diff_*` for theorem search and inference
 - `ring_*`, `field_*`, `lincomb_test`, and `module_tactic_test` for algebra
   tactics
+- `disjunct_test` for compact, explicit injection into disjunction chains
 - `coercion_*`, `cast_*`, `numeral_*`, and `operator_*` for elaboration
 - `quotient_*`, `interface_*`, and `implementation_module_test` for module and
   abstraction boundaries

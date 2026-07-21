@@ -131,6 +131,121 @@ ExpressionPointer Elaborator::elaborateSorry(
         return call;
     }
 
+ExpressionPointer Elaborator::elaborateDisjunct(
+        const SurfaceDisjunct& tactic,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int /*column*/) {
+        Frame frame(*this, "disjunct at line " + std::to_string(line));
+        if (!expectedType) {
+            throwElaborate(
+                "`disjunct(proof)` needs an expected disjunction from "
+                "context");
+        }
+        if (!tactic.proof) {
+            throwElaborate("`disjunct` is missing its proof argument");
+        }
+
+        struct OrLayer {
+            ExpressionPointer left;
+            ExpressionPointer right;
+        };
+        std::vector<OrLayer> layers;
+        ExpressionPointer cursor = weakHeadNormalForm(
+            environment_, expectedType);
+        while (true) {
+            auto* outer = std::get_if<Application>(&cursor->node);
+            if (!outer) break;
+            auto* inner = std::get_if<Application>(
+                &outer->function->node);
+            if (!inner) break;
+            auto* head = std::get_if<Constant>(&inner->function->node);
+            if (!head || head->name != "Or") break;
+            layers.push_back({inner->argument, outer->argument});
+            cursor = weakHeadNormalForm(environment_, outer->argument);
+        }
+        if (layers.empty()) {
+            throwElaborate(
+                "`disjunct(proof)` expects a disjunction goal, but the goal "
+                "does not reduce to `A ∨ B`");
+        }
+        if (!environment_.lookup("Or.introduceLeft")
+            || !environment_.lookup("Or.introduceRight")) {
+            throwElaborate(
+                "`disjunct(proof)` requires `Or.introduceLeft` and "
+                "`Or.introduceRight`; import Logic.basics");
+        }
+
+        ExpressionPointer proof = elaborateExpression(
+            *tactic.proof, localBinders);
+        ExpressionPointer proofTypeOpened = inferTypeInLocalContext(
+            localBinders, proof);
+        Context context = buildContextFromLocalBinders(localBinders);
+        auto matchesProof = [&](ExpressionPointer propositionClosed) {
+            ExpressionPointer propositionOpened = openOverLocalBinders(
+                propositionClosed, localBinders, localBinders.size());
+            return isDefinitionallyEqual(
+                environment_, context, proofTypeOpened, propositionOpened);
+        };
+        auto introduceLeft = [&](const OrLayer& layer,
+                                 ExpressionPointer selectedProof) {
+            ExpressionPointer call = makeConstant("Or.introduceLeft");
+            call = makeApplication(std::move(call), layer.left);
+            call = makeApplication(std::move(call), layer.right);
+            return makeApplication(
+                std::move(call), std::move(selectedProof));
+        };
+        auto introduceRight = [&](const OrLayer& layer,
+                                  ExpressionPointer selectedProof) {
+            ExpressionPointer call = makeConstant("Or.introduceRight");
+            call = makeApplication(std::move(call), layer.left);
+            call = makeApplication(std::move(call), layer.right);
+            return makeApplication(
+                std::move(call), std::move(selectedProof));
+        };
+
+        for (size_t index = 0; index < layers.size(); ++index) {
+            if (matchesProof(layers[index].left)) {
+                ExpressionPointer result = introduceLeft(
+                    layers[index], proof);
+                for (size_t outer = index; outer > 0; --outer) {
+                    result = introduceRight(
+                        layers[outer - 1], std::move(result));
+                }
+                return result;
+            }
+            // A named right-hand branch may itself unfold to another `Or`
+            // (the generated classification chunks do this). Prefer the
+            // caller's proof of that named branch directly before descending
+            // into its definition; this preserves abstraction and avoids
+            // rejecting a proof whose printed type is exactly the goal.
+            if (matchesProof(layers[index].right)) {
+                ExpressionPointer result = introduceRight(
+                    layers[index], proof);
+                for (size_t outer = index; outer > 0; --outer) {
+                    result = introduceRight(
+                        layers[outer - 1], std::move(result));
+                }
+                return result;
+            }
+        }
+
+        ExpressionPointer proofTypeClosed = closeOverLocalBinders(
+            proofTypeOpened, localBinders, localBinders.size());
+        std::string proofTypePrinted = "<unprintable>";
+        std::string goalPrinted = "<unprintable>";
+        try {
+            proofTypePrinted = prettyPrintInLocalScope(
+                proofTypeClosed, localBinders);
+            goalPrinted = prettyPrintInLocalScope(
+                expectedType, localBinders);
+        } catch (...) { }
+        throwElaborate(
+            "`disjunct(proof)` could not find a disjunct matching the "
+            "supplied proof\n  proof has type: " + proofTypePrinted
+            + "\n  goal: " + goalPrinted);
+    }
+
 ExpressionPointer Elaborator::elaborateAnonymousTuple(
         const SurfaceAnonymousTuple& tuple,
         const std::vector<LocalBinder>& localBinders,

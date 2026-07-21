@@ -129,7 +129,7 @@ def exceptional_proof(form: NamedForm, equality_name: str) -> str:
       Matrix.IsExceptionalRankFourNormalForm(R) by Equality.transport_proposition(
         (candidate : Matrix(Integer.commutative_ring_bundle, 4, 4)) ↦ Matrix.IsExceptionalRankFourNormalForm(candidate),
         {expression}, R, reverseReads, concreteExceptional) as outcome;
-      done by Or.introduceLeft(outcome)"""
+      done by disjunct(outcome)"""
 
 
 def regular_proof(form: NamedForm, equality_name: str) -> str:
@@ -139,7 +139,7 @@ def regular_proof(form: NamedForm, equality_name: str) -> str:
       Matrix.RepresentsThroughFifteen(R) by Equality.transport_proposition(
         (candidate : Matrix(Integer.commutative_ring_bundle, 4, 4)) ↦ Matrix.RepresentsThroughFifteen(candidate),
         {expression}, R, reverseReads, concreteRepresents) as outcome;
-      done by Or.introduceRight(outcome)"""
+      done by disjunct(outcome)"""
 
 
 def chunk_name(family: str, index: int) -> str:
@@ -253,12 +253,12 @@ theorem Matrix.rankFourEscalatorRepresentative_short_value_classification
     case Matrix.IsExceptionalRankFourNormalForm(R) as exceptional: {{
       Matrix.truant(B) = 10 ∨ Matrix.truant(B) = 15
           by Matrix.isometric_exceptional_rankFour_truant(isometric := isometric, exceptional := exceptional) as truantReads;
-      done by Or.introduceLeft(truantReads)
+      done by disjunct(truantReads)
     }}
     case Matrix.RepresentsThroughFifteen(R) as represents: {{
       Matrix.RepresentsThroughFifteen(B)
           by Matrix.isometric_representsThroughFifteen(isometric := isometric, targetRepresents := represents) as outcome;
-      done by Or.introduceRight(outcome)
+      done by disjunct(outcome)
     }}
   }}
 }}

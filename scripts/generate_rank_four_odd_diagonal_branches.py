@@ -154,12 +154,6 @@ def border_theorem(branch: Branch, border: tuple[int, int, int]) -> str:
     )
 
 
-def disjunction_introduction(index: int, count: int) -> str:
-    if index == count - 1:
-        return "Or.introduceRight(" * index + "canonical" + ")" * index
-    return "Or.introduceRight(" * index + "Or.introduceLeft(canonical)" + ")" * index
-
-
 def render_normal_forms(branch: Branch) -> str:
     clauses = [
         f"Matrix.IsIsometric(B, {representative(branch, residue, corner)})"
@@ -185,7 +179,7 @@ def render_certificate(branch: Branch, border: tuple[int, int, int]) -> str:
     x, y, z = map(integer, shift)
     az, bz, cz = (f"({value} : ℤ)" for value in (a, b, c))
     xz, yz, zz = (f"({value} : ℤ)" for value in (x, y, z))
-    index = normal_forms(branch).index((canonical_residue, corner))
+    assert (canonical_residue, corner) in normal_forms(branch)
     if signed_residue < 0:
         canonical_proof = f"""  Matrix.IsIsometric(
       {representative(branch, signed_residue, corner)},
@@ -200,7 +194,7 @@ def render_certificate(branch: Branch, border: tuple[int, int, int]) -> str:
 """
     else:
         canonical_proof = "  Matrix.IsIsometric(\n" + f"      {candidate(branch, a, b, c)},\n      {representative(branch, canonical_residue, corner)}) by reduced as canonical;\n"
-    return f"""automatic theorem {border_theorem(branch, border)}
+    return f"""theorem {border_theorem(branch, border)}
         : {branch.predicate}({candidate(branch, a, b, c)}) := {{
   {az} + {xz} = 0 by ring as firstVanishes;
   {bz} + 2 * {yz} + {zz} = ({signed_residue} : ℤ) by ring as secondReduces;
@@ -216,7 +210,7 @@ def render_certificate(branch: Branch, border: tuple[int, int, int]) -> str:
         firstVanishes := firstVanishes, secondReduces := secondReduces,
         thirdVanishes := thirdVanishes, cornerReduces := cornerReduces)
   as reduced;
-{canonical_proof}  done by {disjunction_introduction(index, branch.expected_normal_forms)}
+{canonical_proof}  done by disjunct(canonical)
 }}
 """
 
@@ -249,7 +243,7 @@ def render_box_case(branch: Branch, a: int, b: int, c: int) -> str:
   False by Natural.lt_irreflexive;
   done
 """
-    return f"""automatic theorem {name}
+    return f"""theorem {name}
         (bound : {expression} < {branch.bound})
         : {branch.predicate}({candidate(branch, str(a), str(b), str(c))}) := {{
 {proof}}}
@@ -282,7 +276,7 @@ def render_c_sweep(branch: Branch, a: int, b: int) -> str:
         for c in branch.c_range
     ]
     certificate = render_integer_all_from("P", predicate, "c", branch.c_range, facts)
-    return f"""automatic theorem Matrix.{branch.theorem_prefix}_box_{name_coordinate(a)}_{name_coordinate(b)}_all_c
+    return f"""theorem Matrix.{branch.theorem_prefix}_box_{name_coordinate(a)}_{name_coordinate(b)}_all_c
         : ∀ (c : ℤ). {branch.c_range.start} ≤ c → c < {branch.c_range.stop}
           → {expression} < {branch.bound}
           → {branch.predicate}({candidate(branch, str(a), str(b), 'c')}) := {{
@@ -301,7 +295,7 @@ def render_b_sweep(branch: Branch, a: int) -> str:
         for b in branch.b_range
     ]
     certificate = render_integer_all_from("P", predicate, "b", branch.b_range, facts)
-    return f"""automatic theorem Matrix.{branch.theorem_prefix}_box_{name_coordinate(a)}_all_b_c
+    return f"""theorem Matrix.{branch.theorem_prefix}_box_{name_coordinate(a)}_all_b_c
         : ∀ (b : ℤ). {branch.b_range.start} ≤ b → b < {branch.b_range.stop}
           → ∀ (c : ℤ). {branch.c_range.start} ≤ c → c < {branch.c_range.stop}
           → {expression} < {branch.bound}

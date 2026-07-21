@@ -1645,6 +1645,7 @@ bool Elaborator::hintShapeIsProofTerm(const SurfaceExpression& byHint) {
             || std::holds_alternative<SurfaceLet>(byHint.node)
             || std::holds_alternative<SurfaceRing>(byHint.node)
             || std::holds_alternative<SurfaceFiniteCheck>(byHint.node)
+            || std::holds_alternative<SurfaceDisjunct>(byHint.node)
             || std::holds_alternative<SurfaceField>(byHint.node);
     }
 

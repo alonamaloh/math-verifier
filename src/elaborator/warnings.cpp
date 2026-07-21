@@ -185,6 +185,11 @@ bool Elaborator::surfaceContainsAutoProverInvocation(
             return decide->noBody
                 && surfaceContainsAutoProverInvocation(*decide->noBody);
         }
+        if (auto* disjunct =
+                std::get_if<SurfaceDisjunct>(&expression.node)) {
+            return disjunct->proof
+                && surfaceContainsAutoProverInvocation(*disjunct->proof);
+        }
         if (auto* blockTail =
                 std::get_if<SurfaceBlockTail>(&expression.node)) {
             // Under a Proposition goal a block tail reads as a statement +
@@ -401,6 +406,11 @@ bool Elaborator::surfaceMentionsName(
                     return true;
             }
             return false;
+        }
+        if (auto* disjunct =
+                std::get_if<SurfaceDisjunct>(&expression.node)) {
+            return disjunct->proof
+                && surfaceMentionsName(*disjunct->proof, name);
         }
         if (auto* linearCombination =
                 std::get_if<SurfaceLinearCombination>(&expression.node)) {
@@ -768,4 +778,3 @@ void Elaborator::emitHintClassification(
         << "\thint=" << hintName
         << "\tgoal=" << goalText << "\n";
 }
-

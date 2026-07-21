@@ -2265,6 +2265,15 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                                        implicitOuterBinderCount),
                 node.line, node.column);
         }
+        if (auto* disjunct =
+                std::get_if<SurfaceDisjunct>(&node.node)) {
+            return makeSurfaceDisjunct(
+                rewriteRecursiveCalls(disjunct->proof, thisDeclName,
+                                       recursiveArgToHypothesis,
+                                       recursiveCallScrutineeIndex,
+                                       implicitOuterBinderCount),
+                node.line, node.column);
+        }
         if (auto* linearCombination =
                 std::get_if<SurfaceLinearCombination>(&node.node)) {
             return makeSurfaceLinearCombination(

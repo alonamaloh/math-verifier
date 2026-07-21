@@ -2476,6 +2476,12 @@ ExpressionPointer Elaborator::elaborateExpression(
                 *finite, localBinders, expectedType,
                 expression.line, expression.column);
         }
+        if (auto* disjunct =
+                std::get_if<SurfaceDisjunct>(&expression.node)) {
+            return elaborateDisjunct(
+                *disjunct, localBinders, expectedType,
+                expression.line, expression.column);
+        }
         if (auto* groupTactic =
                 std::get_if<SurfaceGroup>(&expression.node)) {
             return elaborateGroup(localBinders, expectedType,
