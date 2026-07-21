@@ -8,6 +8,7 @@ module Algebra.rank_four_weighted_diagonal_orbits
 
 import Algebra.rank_four_weighted_diagonal_family
 import Algebra.rank_four_parent_automorphisms
+import Algebra.rank_four_double_diagonal_branch
 
 theorem RingVector.eq_threeCoordinates
         (v : RingVector(Integer.commutative_ring_bundle, 3))
@@ -288,6 +289,101 @@ theorem Matrix.swapLastTwoCoordinates3_preserves_squarePlusDoublePlusScaledSquar
         done
       });
   done
+}
+
+theorem Matrix.swapLastTwoCoordinates3_changes_weighted_one_to_double_diagonal
+        : Matrix.swapLastTwoCoordinates3ᵀ
+            * Matrix.squarePlusDoublePlusScaledSquareForm(1)
+            * Matrix.swapLastTwoCoordinates3
+          = Matrix.sumOfTwoSquaresPlusScaledSquareForm(2) := {
+  let U : Matrix(Integer.commutative_ring_bundle, 3, 3) :=
+      Matrix.swapLastTwoCoordinates3;
+  let source : Matrix(Integer.commutative_ring_bundle, 3, 3) :=
+      Matrix.squarePlusDoublePlusScaledSquareForm(1);
+  let target : Matrix(Integer.commutative_ring_bundle, 3, 3) :=
+      Matrix.sumOfTwoSquaresPlusScaledSquareForm(2);
+  Matrix.IsSymmetric(U) by Matrix.swapLastTwoCoordinates3_symmetric as uSymmetric;
+  Uᵀ * source * U = target by Matrix.equal_of_applyVector(
+      actions := (v : RingVector(Integer.commutative_ring_bundle, 3)) ↦ {
+        let x : ℤ := v(NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo));
+        let y : ℤ := v(NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo));
+        let z : ℤ := v(NaturalsBelow.top(2));
+        v = (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+            by RingVector.eq_threeCoordinates(v) as vReads;
+        U · v
+           = U · (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+               by substituting vReads
+           = (⟨x, z, y⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+               by Matrix.swapLastTwoCoordinates3_apply_coordinateTuple
+        as firstSwap;
+        source · (U · v)
+           = source · (⟨x, z, y⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+               by substituting firstSwap
+           = (⟨x, 2 * z, 1 * y⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+               by Matrix.squarePlusDoublePlusScaledSquareForm_apply_coordinateTuple
+        as sourceAction;
+        1 * y = y by ring as oneTimesY;
+        U · (source · (U · v))
+           = U · (⟨x, 2 * z, 1 * y⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+               by substituting sourceAction
+           = U · (⟨x, 2 * z, y⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+               by substituting oneTimesY
+           = (⟨x, y, 2 * z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+               by Matrix.swapLastTwoCoordinates3_apply_coordinateTuple
+        as conjugatedAction;
+        target · v
+           = target · (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+               by substituting vReads
+           = (⟨x, y, 2 * z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+               by Matrix.sumOfTwoSquaresPlusScaledSquareForm_apply_coordinateTuple
+        as targetAction;
+        (Uᵀ * source * U) · v
+           = (Uᵀ * source) · (U · v) by Matrix.applyVector_multiply
+           = Uᵀ · (source · (U · v)) by Matrix.applyVector_multiply
+           = U · (source · (U · v)) by substituting uSymmetric
+           = (⟨x, y, 2 * z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+               by conjugatedAction
+           = target · v by Equality.symmetry(targetAction);
+        done
+      });
+  done
+}
+
+theorem Matrix.squarePlusDoublePlusScaledRankFourRepresentative_one_isometric_double_diagonal
+        (residue corner : ℤ)
+        : Matrix.IsIsometric(
+            Matrix.squarePlusDoublePlusScaledRankFourRepresentative(1, residue, 0, corner),
+            Matrix.sumOfTwoSquaresPlusDoubleSquareRankFourRepresentative(residue, corner)) := {
+  let U : Matrix(Integer.commutative_ring_bundle, 3, 3) :=
+      Matrix.swapLastTwoCoordinates3;
+  let source : Matrix(Integer.commutative_ring_bundle, 3, 3) :=
+      Matrix.squarePlusDoublePlusScaledSquareForm(1);
+  let target : Matrix(Integer.commutative_ring_bundle, 3, 3) :=
+      Matrix.sumOfTwoSquaresPlusScaledSquareForm(2);
+  let border : RingVector(Integer.commutative_ring_bundle, 3) := ⟨0, residue, 0⟩;
+  Matrix.IsSymmetric(source)
+      by Matrix.squarePlusDoublePlusScaledSquareForm_symmetric(1) as sourceSymmetric;
+  Matrix.IsSymmetric(target)
+      by Matrix.sumOfTwoSquaresPlusScaledSquareForm_symmetric(2) as targetSymmetric;
+  Matrix.IsSymmetric(U) by Matrix.swapLastTwoCoordinates3_symmetric as uSymmetric;
+  Matrix.IsInvertible(U) by Matrix.swapLastTwoCoordinates3_invertible as uInvertible;
+  Uᵀ * source * U = target
+      by Matrix.swapLastTwoCoordinates3_changes_weighted_one_to_double_diagonal
+  as changesParent;
+  U · border
+     = U · (⟨0, residue, 0⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+     = (⟨0, 0, residue⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+         by Matrix.swapLastTwoCoordinates3_apply_coordinateTuple
+  as borderMoves;
+  Matrix.IsIsometric(
+      Matrix.borderedAssembly(source, border, corner),
+      Matrix.borderedAssembly(target, U · border, corner))
+      by Matrix.borderedAssembly_isometric_symmetric_parent_change(
+        A := source, targetParent := target, U := U, b := border, c := corner,
+        aSymmetric := sourceSymmetric, targetSymmetric := targetSymmetric,
+        uSymmetric := uSymmetric, uInvertible := uInvertible,
+        changesParent := changesParent);
+  done by substituting borderMoves
 }
 
 theorem Matrix.squarePlusDoublePlusScaledRankFourRepresentative_two_isometric_swap_residues

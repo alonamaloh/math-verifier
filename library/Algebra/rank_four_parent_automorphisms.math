@@ -1,29 +1,30 @@
 -- Algebra/rank_four_parent_automorphisms.math
 --
--- A symmetric integral automorphism of a ternary parent lifts block-diagonally
--- to every bordered child.  This is the reusable certificate behind the
--- automorphism-orbit reduction of the rank-four candidate lists.
+-- A symmetric integral change of basis between ternary parents lifts
+-- block-diagonally to their bordered children.  Parent automorphisms are the
+-- same-parent specialization used by the rank-four orbit reducers.
 
 module Algebra.rank_four_parent_automorphisms
 
 import Algebra.rank_four_diagonal_family
 
-theorem Matrix.borderedAssembly_isometric_symmetric_parent_automorphism {n : ℕ}
-        (A U : Matrix(Integer.commutative_ring_bundle, n, n))
+theorem Matrix.borderedAssembly_isometric_symmetric_parent_change {n : ℕ}
+        (A targetParent U : Matrix(Integer.commutative_ring_bundle, n, n))
         (b : RingVector(Integer.commutative_ring_bundle, n)) (c : ℤ)
         (aSymmetric : Matrix.IsSymmetric(A))
+        (targetSymmetric : Matrix.IsSymmetric(targetParent))
         (uSymmetric : Matrix.IsSymmetric(U))
         (uInvertible : Matrix.IsInvertible(U))
-        (preservesParent : Uᵀ * A * U = A)
+        (changesParent : Uᵀ * A * U = targetParent)
         : Matrix.IsIsometric(
             Matrix.borderedAssembly(A, b, c),
-            Matrix.borderedAssembly(A, U · b, c)) := {
+            Matrix.borderedAssembly(targetParent, U · b, c)) := {
   let W : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n) :=
       Matrix.diagonalExtension(U, 1);
   let source : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n) :=
       Matrix.borderedAssembly(A, b, c);
   let target : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n) :=
-      Matrix.borderedAssembly(A, U · b, c);
+      Matrix.borderedAssembly(targetParent, U · b, c);
   Matrix.IsSymmetric(W) by Matrix.diagonalExtension_symmetric(
       A := U, c := (1 : ℤ), symmetric := uSymmetric) as wSymmetric;
   Matrix.determinant(U) = Integer.one ∨ Matrix.determinant(U) = Integer.negate(Integer.one)
@@ -44,8 +45,8 @@ theorem Matrix.borderedAssembly_isometric_symmetric_parent_automorphism {n : ℕ
   as wInvertible;
   U * A * U
      = Uᵀ * A * U by substituting uSymmetric
-     = A by preservesParent
-  as symmetricPreservesParent;
+     = targetParent by changesParent
+  as symmetricChangesParent;
   Wᵀ * source * W = target by Matrix.equal_of_applyVector(
       actions := (x : RingVector(Integer.commutative_ring_bundle, 1 + n)) ↦ {
         let v : RingVector(Integer.commutative_ring_bundle, n) := RingVector.restrict(x);
@@ -73,12 +74,12 @@ theorem Matrix.borderedAssembly_isometric_symmetric_parent_automorphism {n : ℕ
            = (U * (A * U)) · v by Matrix.applyVector_multiply
            = ((U * A) * U) · v by Matrix.multiply_associative
            = (U * A * U) · v
-           = A · v by substituting symmetricPreservesParent
+           = targetParent · v by substituting symmetricChangesParent
         as baseAction;
         U · (A · (U · v) + t • b)
            = U · (A · (U · v)) + U · (t • b) by Matrix.applyVector_add
-           = A · v + U · (t • b) by substituting baseAction
-           = A · v + t • (U · b) by Matrix.applyVector_scale
+           = targetParent · v + U · (t • b) by substituting baseAction
+           = targetParent · v + t • (U · b) by Matrix.applyVector_scale
         as lowerAction;
         RingVector.innerProduct(b, U · v)
            = RingVector.innerProduct(Uᵀ · b, v)
@@ -100,20 +101,20 @@ theorem Matrix.borderedAssembly_isometric_symmetric_parent_automorphism {n : ℕ
                  v := A · (U · v) + t • b,
                  t := RingVector.innerProduct(b, U · v) + c * t)
            = RingVector.appendCoordinate(
-               A · v + t • (U · b),
+               targetParent · v + t • (U · b),
                1 * (RingVector.innerProduct(b, U · v) + c * t))
                by substituting lowerAction
            = RingVector.appendCoordinate(
-               A · v + t • (U · b),
+               targetParent · v + t • (U · b),
                RingVector.innerProduct(b, U · v) + c * t)
                by substituting oneTimesTop
            = RingVector.appendCoordinate(
-               A · v + t • (U · b),
+               targetParent · v + t • (U · b),
                RingVector.innerProduct(U · b, v) + c * t)
                by substituting pairingMoves
            = target · RingVector.appendCoordinate(v, t)
                by Equality.symmetry(Matrix.borderedAssembly_apply_appendCoordinate(
-                 A, U · b, c, aSymmetric, v, t))
+                 targetParent, U · b, c, targetSymmetric, v, t))
            = target · x by substituting xReads
         as pulledAction;
         (Wᵀ * source * W) · x
@@ -126,6 +127,22 @@ theorem Matrix.borderedAssembly_isometric_symmetric_parent_automorphism {n : ℕ
   target = Wᵀ * source * W by Equality.symmetry;
   witness W with done by And.introduction(wInvertible, done)
 }
+
+theorem Matrix.borderedAssembly_isometric_symmetric_parent_automorphism {n : ℕ}
+        (A U : Matrix(Integer.commutative_ring_bundle, n, n))
+        (b : RingVector(Integer.commutative_ring_bundle, n)) (c : ℤ)
+        (aSymmetric : Matrix.IsSymmetric(A))
+        (uSymmetric : Matrix.IsSymmetric(U))
+        (uInvertible : Matrix.IsInvertible(U))
+        (preservesParent : Uᵀ * A * U = A)
+        : Matrix.IsIsometric(
+            Matrix.borderedAssembly(A, b, c),
+            Matrix.borderedAssembly(A, U · b, c)) :=
+  Matrix.borderedAssembly_isometric_symmetric_parent_change(
+    A := A, targetParent := A, U := U, b := b, c := c,
+    aSymmetric := aSymmetric, targetSymmetric := aSymmetric,
+    uSymmetric := uSymmetric, uInvertible := uInvertible,
+    changesParent := preservesParent)
 
 -- A particularly common parent automorphism negates only the final coordinate
 -- of a diagonal extension.  Unlike negating the border of the rank-four child,

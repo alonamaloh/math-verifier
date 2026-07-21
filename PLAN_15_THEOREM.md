@@ -276,7 +276,10 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
   reflecting the `d`-weighted coordinate followed by a top shear reduces the
   five lists from 287 to 206 forms. The equal-weight coordinate swap for
   `diag(1,2,2)` then cuts its branch from 25 to 18, leaving **199** weighted
-  forms altogether (25+18+36+68+52). The two odd parents
+  branch alternatives altogether (25+18+36+68+52). The same swap identifies
+  all 25 `diag(1,2,1)` representatives with the already-classified
+  `diag(1,1,2)` representatives, so this branch contributes no new global
+  classes. The two odd parents
   `x²+2y²+2yz+Cz²`, `C=4,5`, use the adjugate bound
   `(2C-1)a²+(C-1)b²+(b-c)²+c² < 7(2C-1)`; centered lattice reduction and
   border-sign isometry certify 444 borders and leave 26+32 alternatives.
@@ -286,9 +289,10 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
   Every generated reduction, excluded box leaf, and finite collector is
   kernel-checked. The deterministic renderings are now a permanent
   `make rank-four-generated-check` gate. Summed over the ten distinct ternary
-  parents, the branchwise coverage lists now contain **301 alternatives**.
+  parents, the global coverage predicates now name **276 distinct
+  representatives**.
 
-  This finishes the **coverage** substage of E5, but not E5 itself. The 301
+  This finishes the **coverage** substage of E5, but not E5 itself. The 276
   alternatives are not claimed pairwise non-isometric: obvious parent
   automorphisms beyond the top-shear/reflection subgroup still identify some
   of them, and the advertised ≈207 checkpoint is an exact isometry count. The
