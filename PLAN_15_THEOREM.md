@@ -338,12 +338,25 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
   witness tables; the negative halves complete squares, bound two coordinates,
   and reduce to a small checked table of values missed by `x²+2y²`.
 
-  The remaining obligation is therefore precise: prove the other 201 forms
-  universal, and prove the rank-five escalations of the six exceptional forms
-  universal.  Those are the contents of `S5.U2` and `S5.U3`, so they remain
-  dependencies here.  In particular, rank four can repeat the old truant 10;
-  the earlier claim that every non-universal rank-four form must have truant
-  15 was too strong and is corrected here.
+  `Algebra/rank_four_short_values.math` and its deterministic generated
+  certificate chunks now close the complementary side in the kernel as well:
+  each of the other 201 selected normal forms has an explicit witness for
+  every value from 1 through 15 (3,015 witnesses in total).  The packaged
+  theorem `Matrix.escalator_rank_four_short_value_classification` says that
+  every rank-four escalator either has exact truant 10 or 15, or represents
+  all fifteen test values.  Generation is untrusted; every scalar computation,
+  existential witness, finite-range collection, selected-form case, and
+  isometry transport is replayed by the kernel.  The certificate tables are
+  split into small modules so the standard parallel build and incremental
+  cache can check them independently.
+
+  The remaining obligation is therefore precise: upgrade the through-15
+  certificates for those 201 forms to universality, and prove the rank-five
+  escalations of the six exceptional forms universal.  Those are the contents
+  of `S5.U2` and `S5.U3`, so they remain dependencies here.  In particular,
+  rank four can repeat the old truant 10; the earlier claim that every
+  non-universal rank-four form must have truant 15 was too strong and is
+  corrected here.
 - `S3.C2` `[ ]` (L) ★★ **Master reduction:** if `Q` represents the nine critical numbers then `Q` is universal — via: a non-universal `Q` would embed an escalator missing its truant ∈ {nine}. *(Depends on rank-4 universality, Stage 5.)* — owes: S3.C1, S3.E5, S5.U2
 
 ---

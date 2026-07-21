@@ -13,6 +13,21 @@ import Algebra.rank_four_global_classification
 -- ----------------------------------------------------------------------
 -- The binary obstruction shared by all six negative proofs.
 
+theorem Integer.not_zero_less_or_equal_minus_one
+        : ¬((0 : ℤ) ≤ -(1 : ℤ)) := {
+  suppose (0 : ℤ) ≤ -(1 : ℤ) as impossible;
+  choose n such that -(1 : ℤ) = (0 : ℤ) + (n : ℤ) from impossible;
+  Integer.from_difference(0, 1)
+     = -(1 : ℤ) by Integer.negate_evaluates
+     = (0 : ℤ) + (n : ℤ)
+     = (n : ℤ)
+     = Integer.from_difference(n, 0);
+  0 + 0 = 1 + n by Integer.difference_equal_implies;
+  0 = 1 + n;
+  ¬(0 = 1 + n) by Natural.zero_not_one_plus;
+  done
+}
+
 theorem Natural.lt_six_of_square_below_thirty_six
         (m : ℕ) (bound : m * m < 36) : m < 6 := {
   m = 0 ∨ m = 1 ∨ m = 2 ∨ m = 3 ∨ m = 4 ∨ m = 5 by Natural.square_below_thirty_six;
@@ -541,7 +556,8 @@ theorem Matrix.oddC4R2C7_not_represents_ten
           u * u + 2 * (x * x) = -1 by Integer.oddC4R2C7_completed_residual(
               completed := completed, zReads := zReads, wReads := wReads) as impossibleValue;
           0 ≤ u * u + 2 * (x * x) by Integer.zero_less_or_equal_of_nonneg;
-          done by substituting impossibleValue
+          0 ≤ -(1 : ℤ) by substituting impossibleValue as impossibleOrder;
+          done by Integer.not_zero_less_or_equal_minus_one(impossibleOrder)
         }
       }
     }
@@ -570,7 +586,8 @@ theorem Matrix.oddC4R2C7_not_represents_ten
           u * u + 2 * (x * x) = -1 by Integer.oddC4R2C7_completed_residual(
               completed := completed, zReads := zReads, wReads := wReads) as impossibleValue;
           0 ≤ u * u + 2 * (x * x) by Integer.zero_less_or_equal_of_nonneg;
-          done by substituting impossibleValue
+          0 ≤ -(1 : ℤ) by substituting impossibleValue as impossibleOrder;
+          done by Integer.not_zero_less_or_equal_minus_one(impossibleOrder)
         }
         case z = 0 ∨ z = 1: done by cases {
           case z = 0 as zReads: {
@@ -738,7 +755,7 @@ theorem Integer.weightedD5_completed_not_of_negative_residual
   0 ≤ u * u + 2 * (x * x) by Integer.zero_less_or_equal_of_nonneg;
   0 ≤ residual by substituting residualValue;
   residual < 0 ≤ residual;
-  False by Integer.LessThan.irreflexive;
+  residual ≠ residual by Integer.LessThan.distinct;
   done
 }
 
@@ -856,8 +873,8 @@ theorem Integer.weightedD5R1_coordinate_bound
      = 30 by linear_combination(squares)
      < 36
      = 6 * 6 by ring;
-  z * z < 6 by Integer.cancel_lt_by_positive;
-  z * z < 8;
+  z * z < 6 by Integer.cancel_lt_by_positive
+        < 8;
   done by Integer.in_minus_two_until_three_of_square_below_eight
 }
 
@@ -1017,7 +1034,10 @@ theorem Matrix.oddC4R0C3_truant_ten
   (10 : ℕ) ≥ 1;
   ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 0, 3), (10 : ℤ)))
       by Matrix.oddC4R0C3_not_represents_ten;
-  done by Matrix.oddC4R0C3_represents_below_ten
+  ∀ (s : ℕ). s ≥ 1 → s < 10 → Matrix.Represents(
+      Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 0, 3), (s : ℤ))
+      by Matrix.oddC4R0C3_represents_below_ten;
+  done
 }
 
 theorem Matrix.oddC4R2C7_truant_ten
@@ -1025,5 +1045,8 @@ theorem Matrix.oddC4R2C7_truant_ten
   (10 : ℕ) ≥ 1;
   ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 2, 7), (10 : ℤ)))
       by Matrix.oddC4R2C7_not_represents_ten;
-  done by Matrix.oddC4R2C7_represents_below_ten
+  ∀ (s : ℕ). s ≥ 1 → s < 10 → Matrix.Represents(
+      Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 2, 7), (s : ℤ))
+      by Matrix.oddC4R2C7_represents_below_ten;
+  done
 }

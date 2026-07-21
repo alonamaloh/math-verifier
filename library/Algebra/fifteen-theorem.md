@@ -158,8 +158,14 @@ rank-four escalator by 207 selected normal forms are.
   coordinate formulas, compact witness tables, and completed-square bounds;
   its deterministic generated companion checks the final finite tables.
   Two exceptional forms have exact truant 10 and four have exact truant 15.
-  The other 201 selected forms represent every value through 15; proving
-  their universality is the remaining rank-four representation-theory stage.
+  `Algebra/rank_four_short_values` and its generated certificate chunks prove
+  in the kernel that each of the other 201 selected forms represents every
+  value from 1 through 15, using 3,015 explicit witnesses. The resulting
+  `Matrix.escalator_rank_four_short_value_classification` transports the
+  selected-form result back to every rank-four escalator: it either has exact
+  truant 10 or 15, or represents all fifteen test values. Proving those 201
+  through-15 forms universal is the remaining rank-four representation-theory
+  stage.
 
 ## Module path
 
@@ -175,5 +181,6 @@ Read `quadratic_form` → `integer_quadratic_form` first. Then use
 `rank_four_odd_diagonal_branches_coverage` →
 `rank_three_global_classification` → `critical_truants` and
 `rank_four_global_classification` → `rank_four_exceptional_truants` →
-`rank_four_exceptional_truants_generated`.
+`rank_four_exceptional_truants_generated` → `rank_four_short_values` →
+`rank_four_short_values_generated`.
 `PLAN_15_THEOREM.md` records unfinished stages.

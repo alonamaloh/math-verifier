@@ -326,6 +326,7 @@ rank-four-generated-check:
 	@python3 scripts/generate_rank_four_isometry_certificates.py --check
 	@python3 scripts/generate_rank_four_global_classification.py --check
 	@python3 scripts/generate_rank_four_exceptional_truants.py --check
+	@python3 scripts/generate_rank_four_short_values.py --check
 	@echo "rank-four-generated-check: PASS"
 
 .PHONY: carrier-normal-form-check matrix-ergonomics-statement-check rank-four-generated-check
