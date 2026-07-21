@@ -15,6 +15,7 @@ import Natural.basics
 import Natural.arithmetic
 import Natural.order
 import Natural.multiply_bounds
+import Natural.finite_range
 import Integer.basics
 import Integer.addition
 import Integer.multiplication
@@ -44,6 +45,63 @@ import Algebra.rank_two_escalators
 -- ----------------------------------------------------------------------
 -- Values of the two direct sums are respectively a²+b² and a²+2b².
 
+definition RingVector.twoCoordinates {r : CommutativeRing}
+        (a b : CommutativeRing.carrier(r)) : RingVector(r, 2) :=
+  a • Matrix.standardBasisRow(r, 2, NaturalsBelow.firstOfTwo)
+    + b • Matrix.standardBasisRow(r, 2, NaturalsBelow.secondOfTwo)
+
+theorem RingVector.twoCoordinates_first {r : CommutativeRing}
+        (a b : CommutativeRing.carrier(r))
+        : RingVector.twoCoordinates(a, b)(NaturalsBelow.firstOfTwo) = a := {
+  let firstBasis : RingVector(r, 2) := Matrix.standardBasisRow(r, 2, NaturalsBelow.firstOfTwo);
+  let secondBasis : RingVector(r, 2) := Matrix.standardBasisRow(r, 2, NaturalsBelow.secondOfTwo);
+  firstBasis(NaturalsBelow.firstOfTwo) = CommutativeRing.one(r) by Matrix.standardBasisRow_at as firstReads;
+  ¬(NaturalsBelow.firstOfTwo = NaturalsBelow.secondOfTwo) by NaturalsBelow.firstOfTwo_not_secondOfTwo;
+  secondBasis(NaturalsBelow.firstOfTwo) = CommutativeRing.zero(r) by Matrix.standardBasisRow_off as secondVanishes;
+  RingVector.twoCoordinates(a, b)(NaturalsBelow.firstOfTwo)
+     = a * firstBasis(NaturalsBelow.firstOfTwo) + b * secondBasis(NaturalsBelow.firstOfTwo)
+     = a * CommutativeRing.one(r) + b * secondBasis(NaturalsBelow.firstOfTwo) by substituting firstReads
+     = a * CommutativeRing.one(r) + b * CommutativeRing.zero(r) by substituting secondVanishes
+     = a by ring
+  as valueReads;
+  done by valueReads
+}
+
+theorem RingVector.twoCoordinates_second {r : CommutativeRing}
+        (a b : CommutativeRing.carrier(r))
+        : RingVector.twoCoordinates(a, b)(NaturalsBelow.secondOfTwo) = b := {
+  let firstBasis : RingVector(r, 2) := Matrix.standardBasisRow(r, 2, NaturalsBelow.firstOfTwo);
+  let secondBasis : RingVector(r, 2) := Matrix.standardBasisRow(r, 2, NaturalsBelow.secondOfTwo);
+  ¬(NaturalsBelow.secondOfTwo = NaturalsBelow.firstOfTwo) by {
+    suppose NaturalsBelow.secondOfTwo = NaturalsBelow.firstOfTwo;
+    done by NaturalsBelow.firstOfTwo_not_secondOfTwo
+  };
+  firstBasis(NaturalsBelow.secondOfTwo) = CommutativeRing.zero(r) by Matrix.standardBasisRow_off as firstVanishes;
+  secondBasis(NaturalsBelow.secondOfTwo) = CommutativeRing.one(r) by Matrix.standardBasisRow_at as secondReads;
+  RingVector.twoCoordinates(a, b)(NaturalsBelow.secondOfTwo)
+     = a * firstBasis(NaturalsBelow.secondOfTwo) + b * secondBasis(NaturalsBelow.secondOfTwo)
+     = a * CommutativeRing.zero(r) + b * secondBasis(NaturalsBelow.secondOfTwo) by substituting firstVanishes
+     = a * CommutativeRing.zero(r) + b * CommutativeRing.one(r) by substituting secondReads
+     = b by ring
+  as valueReads;
+  done by valueReads
+}
+
+theorem RingVector.eq_twoCoordinates {r : CommutativeRing}
+        (z : RingVector(r, 2))
+        : z = RingVector.twoCoordinates(z(NaturalsBelow.firstOfTwo), z(NaturalsBelow.secondOfTwo)) := {
+  ∀ (i : NaturalsBelow(2)).
+      z(i) = RingVector.twoCoordinates(z(NaturalsBelow.firstOfTwo), z(NaturalsBelow.secondOfTwo))(i)
+      by (i : NaturalsBelow(2)) ↦ {
+          i = NaturalsBelow.firstOfTwo ∨ i = NaturalsBelow.secondOfTwo by NaturalsBelow.two_split;
+          done by cases {
+            case i = NaturalsBelow.firstOfTwo: done by RingVector.twoCoordinates_first
+            case i = NaturalsBelow.secondOfTwo: done by RingVector.twoCoordinates_second
+          }
+        };
+  done by RingVector.equal_of_pointwise
+}
+
 theorem Matrix.quadraticForm_scale_matrix {r : CommutativeRing} {n : ℕ}
         (A : Matrix(r, n, n)) (c : CommutativeRing.carrier(r)) (x : RingVector(r, n))
         : Matrix.quadraticForm(c • A, x) = c * Matrix.quadraticForm(A, x) :=
@@ -53,34 +111,225 @@ theorem Matrix.quadraticForm_scale_matrix {r : CommutativeRing} {n : ℕ}
      = c * RingVector.innerProduct(x, A · x) by RingVector.innerProduct_scale_right
      = c * Matrix.quadraticForm(A, x)
 
-theorem Matrix.doubleSquareForm_represents_two
-        : Matrix.Represents((2 : ℤ) • Matrix.squareForm, (2 : ℤ)) := {
-  let e : RingVector(Integer.commutative_ring_bundle, 1) :=
-      Matrix.standardBasisRow(Integer.commutative_ring_bundle, 1, NaturalsBelow.top(0));
-  Matrix.quadraticForm(Matrix.squareForm, e)
-     = Matrix.squareForm(NaturalsBelow.top(0), NaturalsBelow.top(0))
-          by Matrix.quadraticForm_standardBasis
-     = (1 : ℤ)
-          by Matrix.identity_entry_diagonal
-  as squareValue;
-  Matrix.quadraticForm((2 : ℤ) • Matrix.squareForm, e)
-     = (2 : ℤ) * Matrix.quadraticForm(Matrix.squareForm, e)
-          by Matrix.quadraticForm_scale_matrix
-     = (2 : ℤ) * (1 : ℤ) by substituting squareValue
-     = (2 : ℤ);
-  witness e with done
+theorem Matrix.sumOfTwoSquaresForm_value
+        (z : RingVector(Integer.commutative_ring_bundle, 2))
+        : Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm, z)
+          = z(NaturalsBelow.firstOfTwo) * z(NaturalsBelow.firstOfTwo)
+            + z(NaturalsBelow.secondOfTwo) * z(NaturalsBelow.secondOfTwo) := {
+  let u : RingVector(Integer.commutative_ring_bundle, 1) :=
+      (RingVector.restrictLeft :
+          RingVector(Integer.commutative_ring_bundle, 1 + 1)
+          → RingVector(Integer.commutative_ring_bundle, 1))(z);
+  let v : RingVector(Integer.commutative_ring_bundle, 1) :=
+      (RingVector.restrictRight :
+          RingVector(Integer.commutative_ring_bundle, 1 + 1)
+          → RingVector(Integer.commutative_ring_bundle, 1))(z);
+  z = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1) · u
+      + Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1) · v
+      by RingVector.directSum_decomposition as decomposition;
+  RingVector.coordinate(u)
+     = z(NaturalsBelow.sumLeft(1, 1, NaturalsBelow.top(0)))
+     = z(NaturalsBelow.firstOfTwo)
+  as firstCoordinate;
+  RingVector.coordinate(v)
+     = z(NaturalsBelow.shift(1, NaturalsBelow.top(0)))
+     = z(NaturalsBelow.secondOfTwo)
+  as secondCoordinate;
+  Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm, z)
+     = Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm,
+           Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1) · u
+           + Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1) · v)
+           by substituting decomposition
+     = Matrix.quadraticForm(Matrix.squareForm, u) + Matrix.quadraticForm(Matrix.squareForm, v)
+           by Matrix.directSum_quadraticForm
+     = RingVector.coordinate(u) * RingVector.coordinate(u) + Matrix.quadraticForm(Matrix.squareForm, v)
+           by substituting Matrix.squareForm_value
+     = RingVector.coordinate(u) * RingVector.coordinate(u) + RingVector.coordinate(v) * RingVector.coordinate(v)
+           by substituting Matrix.squareForm_value
+     = z(NaturalsBelow.firstOfTwo) * z(NaturalsBelow.firstOfTwo)
+       + RingVector.coordinate(v) * RingVector.coordinate(v) by substituting firstCoordinate
+     = z(NaturalsBelow.firstOfTwo) * z(NaturalsBelow.firstOfTwo)
+       + z(NaturalsBelow.secondOfTwo) * z(NaturalsBelow.secondOfTwo) by substituting secondCoordinate;
+  done
 }
 
-theorem Matrix.sumOfTwoSquaresForm_represents (a b target : ℤ)
-        (valueComputes : a * a + b * b = target)
-        : Matrix.Represents(Matrix.sumOfTwoSquaresForm, target) := {
-  Matrix.Represents(Matrix.squareForm, a * a)
-      by Matrix.squareForm_represents_square;
-  Matrix.Represents(Matrix.squareForm, b * b)
-      by Matrix.squareForm_represents_square;
-  Matrix.Represents(Matrix.sumOfTwoSquaresForm, a * a + b * b)
-      by Matrix.directSum_represents_sum;
-  done by substituting valueComputes
+theorem Matrix.sumOfTwoSquaresForm_twoCoordinates_value
+        (a b : ℤ)
+        : Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm,
+            (RingVector.twoCoordinates(a, b) : RingVector(Integer.commutative_ring_bundle, 2)))
+          = a * a + b * b := {
+  let v : RingVector(Integer.commutative_ring_bundle, 2) := RingVector.twoCoordinates(a, b);
+  Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm, v)
+     = v(NaturalsBelow.firstOfTwo) * v(NaturalsBelow.firstOfTwo)
+       + v(NaturalsBelow.secondOfTwo) * v(NaturalsBelow.secondOfTwo) by Matrix.sumOfTwoSquaresForm_value
+     = a * a + v(NaturalsBelow.secondOfTwo) * v(NaturalsBelow.secondOfTwo)
+         by substituting RingVector.twoCoordinates_first
+     = a * a + b * b by substituting RingVector.twoCoordinates_second;
+  done
+}
+
+automatic theorem Matrix.sumOfTwoSquaresForm_twoCoordinates_computes
+        (a b target : ℤ)
+        (scalarComputation : a * a + b * b = target)
+        : Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm,
+            (RingVector.twoCoordinates(a, b) : RingVector(Integer.commutative_ring_bundle, 2))) = target := {
+  Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm,
+      (RingVector.twoCoordinates(a, b) : RingVector(Integer.commutative_ring_bundle, 2)))
+     = a * a + b * b by Matrix.sumOfTwoSquaresForm_twoCoordinates_value
+     = target by scalarComputation;
+  done
+}
+
+theorem Matrix.squarePlusDoubleSquareForm_value
+        (z : RingVector(Integer.commutative_ring_bundle, 2))
+        : Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm, z)
+          = z(NaturalsBelow.firstOfTwo) * z(NaturalsBelow.firstOfTwo)
+            + 2 * (z(NaturalsBelow.secondOfTwo) * z(NaturalsBelow.secondOfTwo)) := {
+  let u : RingVector(Integer.commutative_ring_bundle, 1) :=
+      (RingVector.restrictLeft :
+          RingVector(Integer.commutative_ring_bundle, 1 + 1)
+          → RingVector(Integer.commutative_ring_bundle, 1))(z);
+  let v : RingVector(Integer.commutative_ring_bundle, 1) :=
+      (RingVector.restrictRight :
+          RingVector(Integer.commutative_ring_bundle, 1 + 1)
+          → RingVector(Integer.commutative_ring_bundle, 1))(z);
+  z = Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1) · u
+      + Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1) · v
+      by RingVector.directSum_decomposition as decomposition;
+  RingVector.coordinate(u)
+     = z(NaturalsBelow.sumLeft(1, 1, NaturalsBelow.top(0)))
+     = z(NaturalsBelow.firstOfTwo)
+  as firstCoordinate;
+  RingVector.coordinate(v)
+     = z(NaturalsBelow.shift(1, NaturalsBelow.top(0)))
+     = z(NaturalsBelow.secondOfTwo)
+  as secondCoordinate;
+  Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm, z)
+     = Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm,
+           Matrix.leftBlockInclusion(Integer.commutative_ring_bundle, 1, 1) · u
+           + Matrix.rightBlockInclusion(Integer.commutative_ring_bundle, 1, 1) · v)
+           by substituting decomposition
+     = Matrix.quadraticForm(Matrix.squareForm, u) + Matrix.quadraticForm((2 : ℤ) • Matrix.squareForm, v)
+           by Matrix.directSum_quadraticForm
+     = RingVector.coordinate(u) * RingVector.coordinate(u) + Matrix.quadraticForm((2 : ℤ) • Matrix.squareForm, v)
+           by substituting Matrix.squareForm_value
+     = RingVector.coordinate(u) * RingVector.coordinate(u) + 2 * Matrix.quadraticForm(Matrix.squareForm, v)
+           by substituting Matrix.quadraticForm_scale_matrix
+     = RingVector.coordinate(u) * RingVector.coordinate(u) + 2 * (RingVector.coordinate(v) * RingVector.coordinate(v))
+           by substituting Matrix.squareForm_value
+     = z(NaturalsBelow.firstOfTwo) * z(NaturalsBelow.firstOfTwo)
+       + 2 * (RingVector.coordinate(v) * RingVector.coordinate(v)) by substituting firstCoordinate
+     = z(NaturalsBelow.firstOfTwo) * z(NaturalsBelow.firstOfTwo)
+       + 2 * (z(NaturalsBelow.secondOfTwo) * z(NaturalsBelow.secondOfTwo)) by substituting secondCoordinate;
+  done
+}
+
+theorem Matrix.squarePlusDoubleSquareForm_twoCoordinates_value
+        (a b : ℤ)
+        : Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm,
+            (RingVector.twoCoordinates(a, b) : RingVector(Integer.commutative_ring_bundle, 2)))
+          = a * a + 2 * (b * b) := {
+  let v : RingVector(Integer.commutative_ring_bundle, 2) := RingVector.twoCoordinates(a, b);
+  Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm, v)
+     = v(NaturalsBelow.firstOfTwo) * v(NaturalsBelow.firstOfTwo)
+       + 2 * (v(NaturalsBelow.secondOfTwo) * v(NaturalsBelow.secondOfTwo)) by Matrix.squarePlusDoubleSquareForm_value
+     = a * a + 2 * (v(NaturalsBelow.secondOfTwo) * v(NaturalsBelow.secondOfTwo))
+         by substituting RingVector.twoCoordinates_first
+     = a * a + 2 * (b * b) by substituting RingVector.twoCoordinates_second;
+  done
+}
+
+automatic theorem Matrix.squarePlusDoubleSquareForm_twoCoordinates_computes
+        (a b target : ℤ)
+        (scalarComputation : a * a + 2 * (b * b) = target)
+        : Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm,
+            (RingVector.twoCoordinates(a, b) : RingVector(Integer.commutative_ring_bundle, 2))) = target := {
+  Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm,
+      (RingVector.twoCoordinates(a, b) : RingVector(Integer.commutative_ring_bundle, 2)))
+     = a * a + 2 * (b * b) by Matrix.squarePlusDoubleSquareForm_twoCoordinates_value
+     = target by scalarComputation;
+  done
+}
+
+theorem RingVector.coordinatePair_eq_twoCoordinates (a b : ℤ)
+        : RingVector.appendCoordinate(
+            (RingVector.oneCoordinate(a) : RingVector(Integer.commutative_ring_bundle, 1)), b)
+          = (RingVector.twoCoordinates(a, b) : RingVector(Integer.commutative_ring_bundle, 2)) := {
+  ∀ (i : NaturalsBelow(2)).
+      RingVector.appendCoordinate(
+        (RingVector.oneCoordinate(a) : RingVector(Integer.commutative_ring_bundle, 1)), b)(i)
+        = (RingVector.twoCoordinates(a, b) : RingVector(Integer.commutative_ring_bundle, 2))(i)
+      by (i : NaturalsBelow(2)) ↦ {
+          i = NaturalsBelow.firstOfTwo ∨ i = NaturalsBelow.secondOfTwo by NaturalsBelow.two_split;
+          done by cases {
+            case i = NaturalsBelow.firstOfTwo as first: {
+                RingVector.appendCoordinate(
+                    (RingVector.oneCoordinate(a) : RingVector(Integer.commutative_ring_bundle, 1)), b)(i)
+                   = RingVector.appendCoordinate(
+                       (RingVector.oneCoordinate(a) : RingVector(Integer.commutative_ring_bundle, 1)), b)(
+                         NaturalsBelow.firstOfTwo) by substituting first
+                   = RingVector.appendCoordinate(
+                       (RingVector.oneCoordinate(a) : RingVector(Integer.commutative_ring_bundle, 1)), b)(
+                         NaturalsBelow.inclusion(1, NaturalsBelow.top(0)))
+                         by substituting NaturalsBelow.firstOfTwo_is_inclusion
+                   = (RingVector.oneCoordinate(a) : RingVector(Integer.commutative_ring_bundle, 1))(
+                       NaturalsBelow.top(0)) by RingVector.appendCoordinate_inclusion
+                   = a by RingVector.oneCoordinate_at
+                   = (RingVector.twoCoordinates(a, b) : RingVector(Integer.commutative_ring_bundle, 2))(
+                       NaturalsBelow.firstOfTwo) by RingVector.twoCoordinates_first
+                   = (RingVector.twoCoordinates(a, b) : RingVector(Integer.commutative_ring_bundle, 2))(i)
+                         by substituting first;
+                done
+              }
+            case i = NaturalsBelow.secondOfTwo as second: {
+                RingVector.appendCoordinate(
+                    (RingVector.oneCoordinate(a) : RingVector(Integer.commutative_ring_bundle, 1)), b)(i)
+                   = RingVector.appendCoordinate(
+                       (RingVector.oneCoordinate(a) : RingVector(Integer.commutative_ring_bundle, 1)), b)(
+                         NaturalsBelow.secondOfTwo) by substituting second
+                   = RingVector.appendCoordinate(
+                       (RingVector.oneCoordinate(a) : RingVector(Integer.commutative_ring_bundle, 1)), b)(
+                         NaturalsBelow.top(1)) by substituting NaturalsBelow.secondOfTwo_is_top
+                   = b by RingVector.appendCoordinate_top
+                   = (RingVector.twoCoordinates(a, b) : RingVector(Integer.commutative_ring_bundle, 2))(
+                       NaturalsBelow.secondOfTwo) by RingVector.twoCoordinates_second
+                   = (RingVector.twoCoordinates(a, b) : RingVector(Integer.commutative_ring_bundle, 2))(i)
+                         by substituting second;
+                done
+              }
+          }
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+automatic theorem Matrix.sumOfTwoSquaresForm_coordinateTuple_computes
+        (a b target : ℤ)
+        (scalarComputation : a * a + b * b = target)
+        : Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm,
+            (⟨a, b⟩ : RingVector(Integer.commutative_ring_bundle, 2))) = target := {
+  Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm,
+      (⟨a, b⟩ : RingVector(Integer.commutative_ring_bundle, 2)))
+     = Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm,
+         (RingVector.twoCoordinates(a, b) : RingVector(Integer.commutative_ring_bundle, 2)))
+         by substituting RingVector.coordinatePair_eq_twoCoordinates
+     = a * a + b * b by Matrix.sumOfTwoSquaresForm_twoCoordinates_value
+     = target by scalarComputation;
+  done
+}
+
+automatic theorem Matrix.squarePlusDoubleSquareForm_coordinateTuple_computes
+        (a b target : ℤ)
+        (scalarComputation : a * a + 2 * (b * b) = target)
+        : Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm,
+            (⟨a, b⟩ : RingVector(Integer.commutative_ring_bundle, 2))) = target := {
+  Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm,
+      (⟨a, b⟩ : RingVector(Integer.commutative_ring_bundle, 2)))
+     = Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm,
+         (RingVector.twoCoordinates(a, b) : RingVector(Integer.commutative_ring_bundle, 2)))
+         by substituting RingVector.coordinatePair_eq_twoCoordinates
+     = a * a + 2 * (b * b) by Matrix.squarePlusDoubleSquareForm_twoCoordinates_value
+     = target by scalarComputation;
+  done
 }
 
 theorem Matrix.sumOfTwoSquaresForm_represents_only_squares (target : ℤ)
@@ -189,16 +438,15 @@ theorem Matrix.sumOfTwoSquaresForm_not_represents_of_natural
       by Matrix.sumOfTwoSquaresForm_represents_only_squares;
   choose a such that ∃ (b : ℤ). (target : ℤ) = a * a + b * b;
   choose b such that (target : ℤ) = a * a + b * b;
-  ∃ (m : ℕ). a * a = ((m * m : ℕ) : ℤ)
+  ∃ (m : ℕ). a * a = m * m
       by Integer.square_as_natural_square;
-  choose m such that a * a = ((m * m : ℕ) : ℤ);
-  ∃ (n : ℕ). b * b = ((n * n : ℕ) : ℤ)
+  choose m such that a * a = m * m;
+  ∃ (n : ℕ). b * b = n * n
       by Integer.square_as_natural_square;
-  choose n such that b * b = ((n * n : ℕ) : ℤ);
+  choose n such that b * b = n * n;
   (target : ℤ)
      = a * a + b * b
-     = ((m * m : ℕ) : ℤ) + ((n * n : ℕ) : ℤ)
-     = ((m * m + n * n : ℕ) : ℤ);
+     = m * m + n * n;
   target = m * m + n * n by Natural.to_integer.injective;
   m * m + n * n = target;
   done by notSum(m, n)
@@ -241,15 +489,13 @@ theorem Matrix.squarePlusDoubleSquareForm_not_represents_five
       by Matrix.squarePlusDoubleSquareForm_represents_only_squares;
   choose a such that ∃ (b : ℤ). (5 : ℤ) = a * a + 2 * (b * b);
   choose b such that (5 : ℤ) = a * a + 2 * (b * b);
-  ∃ (m : ℕ). a * a = ((m * m : ℕ) : ℤ) by Integer.square_as_natural_square;
-  choose m such that a * a = ((m * m : ℕ) : ℤ);
-  ∃ (n : ℕ). b * b = ((n * n : ℕ) : ℤ) by Integer.square_as_natural_square;
-  choose n such that b * b = ((n * n : ℕ) : ℤ);
-  ((5 : ℕ) : ℤ)
-     = 5
+  ∃ (m : ℕ). a * a = m * m by Integer.square_as_natural_square;
+  choose m such that a * a = m * m;
+  ∃ (n : ℕ). b * b = n * n by Integer.square_as_natural_square;
+  choose n such that b * b = n * n;
+  (5 : ℤ)
      = a * a + 2 * (b * b)
-     = ((m * m : ℕ) : ℤ) + 2 * ((n * n : ℕ) : ℤ)
-     = ((m * m + 2 * (n * n) : ℕ) : ℤ);
+     = m * m + 2 * (n * n);
   5 = m * m + 2 * (n * n) by Natural.to_integer.injective;
   m * m + 2 * (n * n) = 5;
   done by Natural.five_not_square_plus_double_square
@@ -257,81 +503,27 @@ theorem Matrix.squarePlusDoubleSquareForm_not_represents_five
 
 theorem Matrix.sumOfTwoSquaresForm_truant_three
         : Matrix.IsTruant(Matrix.sumOfTwoSquaresForm, 3) := {
-  3 ≥ 1;
-  ¬(Matrix.Represents(Matrix.sumOfTwoSquaresForm, ((3 : ℕ) : ℤ))) by {
-      ((3 : ℕ) : ℤ) = 3;
-      done by Matrix.sumOfTwoSquaresForm_not_represents_three
-    };
+  let A : Matrix(Integer.commutative_ring_bundle, 2, 2) := Matrix.sumOfTwoSquaresForm;
+  Matrix.represents_by_witness(A, target := 1, vector := ⟨1, 0⟩);
+  Matrix.represents_by_witness(A, target := 2, vector := ⟨1, 1⟩);
+  ¬(Matrix.Represents(Matrix.sumOfTwoSquaresForm, (3 : ℤ)))
+      by Matrix.sumOfTwoSquaresForm_not_represents_three;
   ∀ (s : ℕ). s ≥ 1 → s < 3 → Matrix.Represents(Matrix.sumOfTwoSquaresForm, (s : ℤ))
-      by (s : ℕ) (positive : s ≥ 1) (belowThree : s < 3) ↦ {
-          s = 1 ∨ s = 2 by {
-              s < 2 ∨ s = 2 ∨ 2 < s by Natural.lt_trichotomy;
-              done by cases {
-                case s < 2: {
-                    s ≤ 1 by Natural.le_of_lt_one_plus;
-                    s = 1 by Natural.le_antisymmetric;
-                    done
-                  }
-                case s = 2: done
-                case 2 < s: {
-                    3 ≤ s;
-                    s < 3 ≤ s;
-                    False by Natural.lt_irreflexive;
-                    done
-                  }
-              }
-            };
-          done by cases {
-            case s = 1: {
-                Matrix.Represents(Matrix.sumOfTwoSquaresForm, (1 : ℤ))
-                    by Matrix.directSum_represents_left;
-                done
-              }
-            case s = 2: {
-                Matrix.Represents(Matrix.sumOfTwoSquaresForm, (1 : ℤ) + (1 : ℤ))
-                    by Matrix.directSum_represents_sum;
-                done
-              }
-          }
-        };
+      by finite_check s from 1 until 3;
   done
 }
 
 theorem Matrix.squarePlusDoubleSquareForm_truant_five
         : Matrix.IsTruant(Matrix.squarePlusDoubleSquareForm, 5) := {
-  5 ≥ 1;
-  ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareForm, ((5 : ℕ) : ℤ))) by {
-      ((5 : ℕ) : ℤ) = 5;
-      done by Matrix.squarePlusDoubleSquareForm_not_represents_five
-    };
+  let A : Matrix(Integer.commutative_ring_bundle, 2, 2) := Matrix.squarePlusDoubleSquareForm;
+  Matrix.represents_by_witness(A, target := 1, vector := ⟨1, 0⟩);
+  Matrix.represents_by_witness(A, target := 2, vector := ⟨0, 1⟩);
+  Matrix.represents_by_witness(A, target := 3, vector := ⟨1, 1⟩);
+  Matrix.represents_by_witness(A, target := 4, vector := ⟨2, 0⟩);
+  ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareForm, (5 : ℤ)))
+      by Matrix.squarePlusDoubleSquareForm_not_represents_five;
   ∀ (s : ℕ). s ≥ 1 → s < 5 → Matrix.Represents(Matrix.squarePlusDoubleSquareForm, (s : ℤ))
-      by (s : ℕ) (positive : s ≥ 1) (belowFive : s < 5) ↦ {
-          s = 1 ∨ s = 2 ∨ s = 3 ∨ s = 4 by Natural.positive_below_five;
-          done by cases {
-            case s = 1: {
-                Matrix.Represents(Matrix.squarePlusDoubleSquareForm, (1 : ℤ))
-                    by Matrix.directSum_represents_left;
-                done
-              }
-            case s = 2 ∨ s = 3 ∨ s = 4: done by cases {
-                case s = 2: {
-                    Matrix.Represents((2 : ℤ) • Matrix.squareForm, (2 : ℤ))
-                        by Matrix.doubleSquareForm_represents_two;
-                    done by Matrix.directSum_represents_right
-                  }
-                case s = 3: {
-                    Matrix.Represents(Matrix.squarePlusDoubleSquareForm, (1 : ℤ) + 2)
-                        by Matrix.directSum_represents_sum;
-                    done
-                  }
-                case s = 4: {
-                    Matrix.Represents(Matrix.squareForm, (2 : ℤ) * 2)
-                        by Matrix.squareForm_represents_square;
-                    done by Matrix.directSum_represents_left
-                  }
-              }
-          }
-        };
+      by finite_check s from 1 until 5;
   done
 }
 

@@ -48,7 +48,7 @@ theorem Integer.square_is_nonneg (a : ℤ) : Integer.IsNonneg(a * a) := {
         witness n * n with
             a * a
                = (n : ℤ) * (n : ℤ)
-               = ((n * n : ℕ) : ℤ)
+               = Natural.to_integer(n * n) by Natural.to_integer.multiply_preserves
       }
     case ∃ (k : ℕ). a = -(k : ℤ) as negative: {
         choose k such that a = -(k : ℤ) from negative;
@@ -56,7 +56,7 @@ theorem Integer.square_is_nonneg (a : ℤ) : Integer.IsNonneg(a * a) := {
             a * a
                = (-(k : ℤ)) * (-(k : ℤ))
                = (k : ℤ) * (k : ℤ)
-               = ((k * k : ℕ) : ℤ)
+               = Natural.to_integer(k * k) by Natural.to_integer.multiply_preserves
       }
   }
 }
@@ -98,11 +98,11 @@ theorem Integer.sum_of_squares_zero (a b : ℤ)
   done
 }
 
--- Every integer square is the cast of a natural square: the sign split
--- names |a| as a natural, and both signs square to the same value. The
--- bridge that moves a square identity from ℤ down to ℕ.
+-- Every integer square is a natural square in an Integer context: the sign
+-- split names |a| as a natural, and both signs square to the same value.
+-- Carrier reconciliation inserts the embedding on the bare right-hand side.
 theorem Integer.square_as_natural_square (a : ℤ)
-        : ∃ (m : ℕ). a * a = ((m * m : ℕ) : ℤ) := {
+        : ∃ (m : ℕ). a * a = m * m := {
   Integer.IsNonneg(a) ∨ ∃ (m : ℕ). a = -(m : ℤ) by Integer.sign_split;
   done by cases {
     case Integer.IsNonneg(a): {
@@ -110,7 +110,6 @@ theorem Integer.square_as_natural_square (a : ℤ)
         witness m with
             a * a
                = (m : ℤ) * (m : ℤ)
-               = ((m * m : ℕ) : ℤ)
       }
     case ∃ (m : ℕ). a = -(m : ℤ): {
         choose m such that a = -(m : ℤ);
@@ -118,9 +117,30 @@ theorem Integer.square_as_natural_square (a : ℤ)
             a * a
                = (-(m : ℤ)) * (-(m : ℤ))
                = (m : ℤ) * (m : ℤ)
-               = ((m * m : ℕ) : ℤ)
       }
   }
+}
+
+-- Reflect an Integer equality between an embedded natural square and an
+-- embedded natural target.  This packages the multiplication-homomorphism
+-- bridge needed before injectivity, keeping it out of arithmetic callers.
+theorem Natural.to_integer.square_equality_reflects (m target : ℕ)
+        (squareEquality : (m : ℤ) * (m : ℤ) = (target : ℤ))
+        : m * m = target := {
+  Natural.to_integer(m * m)
+     = (m : ℤ) * (m : ℤ) by Natural.to_integer.multiply_preserves
+     = (target : ℤ) by squareEquality
+     = Natural.to_integer(target);
+  done by Natural.to_integer.injective
+}
+
+theorem Natural.to_integer.square_less_reflects (m bound : ℕ)
+        (squareLess : (m : ℤ) * (m : ℤ) < (bound : ℤ))
+        : m * m < bound := {
+  Natural.to_integer(m * m)
+     = (m : ℤ) * (m : ℤ) by Natural.to_integer.multiply_preserves
+     < (bound : ℤ) by squareLess;
+  done by Natural.to_integer.LessThan_reflects
 }
 
 -- Small integer squares are classified by splitting the sign and reflecting
@@ -131,13 +151,12 @@ theorem Integer.square_below_three (b : ℤ) (bound : b * b < 3)
   done by cases {
     case Integer.IsNonneg(b): {
         choose m such that b = m;
-        ((m * m : ℕ) : ℤ)
-           = m * m
+        (m : ℤ) * (m : ℤ)
            = b * b by substituting (b = m)
            < 3 by bound
            < 4
            = 4;
-        m * m < 4 by Natural.to_integer.LessThan_reflects;
+        m * m < 4 by Natural.to_integer.square_less_reflects;
         m = 0 ∨ m = 1 by Natural.square_below_four;
         done by cases {
           case m = 0:
@@ -148,14 +167,13 @@ theorem Integer.square_below_three (b : ℤ) (bound : b * b < 3)
       }
     case ∃ (m : ℕ). b = -(m : ℤ): {
         choose m such that b = -(m : ℤ);
-        ((m * m : ℕ) : ℤ)
-           = m * m
+        (m : ℤ) * (m : ℤ)
            = (-(m : ℤ)) * (-(m : ℤ))
            = b * b by substituting (b = -(m : ℤ))
            < 3 by bound
            < 4
            = 4;
-        m * m < 4 by Natural.to_integer.LessThan_reflects;
+        m * m < 4 by Natural.to_integer.square_less_reflects;
         m = 0 ∨ m = 1 by Natural.square_below_four;
         done by cases {
           case m = 0:
@@ -173,11 +191,10 @@ theorem Integer.square_below_four (b : ℤ) (bound : b * b < 4)
   done by cases {
     case Integer.IsNonneg(b): {
         choose m such that b = m;
-        ((m * m : ℕ) : ℤ)
-           = m * m
+        (m : ℤ) * (m : ℤ)
            = b * b by substituting (b = m)
            < 4 by bound;
-        m * m < 4 by Natural.to_integer.LessThan_reflects;
+        m * m < 4 by Natural.to_integer.square_less_reflects;
         m = 0 ∨ m = 1 by Natural.square_below_four;
         done by cases {
           case m = 0:
@@ -188,12 +205,11 @@ theorem Integer.square_below_four (b : ℤ) (bound : b * b < 4)
       }
     case ∃ (m : ℕ). b = -(m : ℤ): {
         choose m such that b = -(m : ℤ);
-        ((m * m : ℕ) : ℤ)
-           = m * m
+        (m : ℤ) * (m : ℤ)
            = (-(m : ℤ)) * (-(m : ℤ))
            = b * b by substituting (b = -(m : ℤ))
            < 4 by bound;
-        m * m < 4 by Natural.to_integer.LessThan_reflects;
+        m * m < 4 by Natural.to_integer.square_less_reflects;
         m = 0 ∨ m = 1 by Natural.square_below_four;
         done by cases {
           case m = 0:
@@ -211,13 +227,12 @@ theorem Integer.square_below_five (b : ℤ) (bound : b * b < 5)
   done by cases {
     case Integer.IsNonneg(b): {
         choose m such that b = m;
-        ((m * m : ℕ) : ℤ)
-           = m * m
+        (m : ℤ) * (m : ℤ)
            = b * b by substituting (b = m)
            < 5 by bound
            < 6
            = 6;
-        m * m < 6 by Natural.to_integer.LessThan_reflects;
+        m * m < 6 by Natural.to_integer.square_less_reflects;
         m = 0 ∨ m = 1 ∨ m = 2 by Natural.square_below_six;
         done by cases {
           case m = 0:
@@ -232,14 +247,13 @@ theorem Integer.square_below_five (b : ℤ) (bound : b * b < 5)
       }
     case ∃ (m : ℕ). b = -(m : ℤ): {
         choose m such that b = -(m : ℤ);
-        ((m * m : ℕ) : ℤ)
-           = m * m
+        (m : ℤ) * (m : ℤ)
            = (-(m : ℤ)) * (-(m : ℤ))
            = b * b by substituting (b = -(m : ℤ))
            < 5 by bound
            < 6
            = 6;
-        m * m < 6 by Natural.to_integer.LessThan_reflects;
+        m * m < 6 by Natural.to_integer.square_less_reflects;
         m = 0 ∨ m = 1 ∨ m = 2 by Natural.square_below_six;
         done by cases {
           case m = 0:
@@ -262,12 +276,11 @@ theorem Integer.square_below_ten (b : ℤ) (bound : b * b < 10)
   done by cases {
     case Integer.IsNonneg(b): {
         choose m such that b = m;
-        ((m * m : ℕ) : ℤ)
-           = m * m
+        (m : ℤ) * (m : ℤ)
            = b * b by substituting (b = m)
            < 10 by bound
            = 10;
-        m * m < 10 by Natural.to_integer.LessThan_reflects;
+        m * m < 10 by Natural.to_integer.square_less_reflects;
         m = 0 ∨ m = 1 ∨ m = 2 ∨ m = 3 by Natural.square_below_ten;
         done by cases {
           case m = 0:
@@ -286,13 +299,12 @@ theorem Integer.square_below_ten (b : ℤ) (bound : b * b < 10)
       }
     case ∃ (m : ℕ). b = -(m : ℤ): {
         choose m such that b = -(m : ℤ);
-        ((m * m : ℕ) : ℤ)
-           = m * m
+        (m : ℤ) * (m : ℤ)
            = (-(m : ℤ)) * (-(m : ℤ))
            = b * b by substituting (b = -(m : ℤ))
            < 10 by bound
            = 10;
-        m * m < 10 by Natural.to_integer.LessThan_reflects;
+        m * m < 10 by Natural.to_integer.square_less_reflects;
         m = 0 ∨ m = 1 ∨ m = 2 ∨ m = 3 by Natural.square_below_ten;
         done by cases {
           case m = 0:
