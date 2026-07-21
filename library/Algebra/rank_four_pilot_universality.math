@@ -1,0 +1,157 @@
+-- Algebra/rank_four_pilot_universality.math
+--
+-- The algebraic half of universality for the seven rank-four escalators above
+-- x²+y²+z².  Completing the border identifies them with
+-- x²+y²+z²+d·w², for d = 1,...,7.  The remaining input is isolated as the
+-- arithmetic statement that a three-square value can always be chosen after
+-- subtracting d times a square.
+
+module Algebra.rank_four_pilot_universality
+
+import Algebra.rank_four_short_values_generated
+
+definition Matrix.sumOfThreeSquaresDiagonalRankFourForm (d : ℤ)
+        : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+  Matrix.diagonalExtension(Matrix.sumOfThreeSquaresForm, d)
+
+definition Matrix.ThreeSquareResidualCover (d : ℤ) : Proposition :=
+  ∀ (m : ℕ). m ≥ 1 →
+    ∃ (residual w : ℤ).
+      Matrix.Represents(Matrix.sumOfThreeSquaresForm, residual)
+      ∧ residual + w * w * d = (m : ℤ)
+
+theorem Matrix.sumOfThreeSquaresDiagonalRankFourForm_represents
+        (d residual target w : ℤ)
+        (residualRepresented : Matrix.Represents(Matrix.sumOfThreeSquaresForm, residual))
+        (valueReads : residual + w * w * d = target)
+        : Matrix.Represents(Matrix.sumOfThreeSquaresDiagonalRankFourForm(d), target) := {
+  Matrix.Represents(
+      Matrix.diagonalExtension(Matrix.sumOfThreeSquaresForm, d),
+      residual + w * w * d)
+      by Matrix.diagonalExtension_represents_parent_plus_square(
+          symmetric := Matrix.sumOfThreeSquaresForm_symmetric,
+          represented := residualRepresented);
+  done by substituting valueReads
+}
+
+theorem Matrix.sumOfThreeSquaresDiagonalRankFourForm_universal
+        (d : ℤ) (cover : Matrix.ThreeSquareResidualCover(d))
+        : Matrix.IsUniversal(Matrix.sumOfThreeSquaresDiagonalRankFourForm(d)) := {
+  take m : ℕ;
+  suppose m ≥ 1 as positive;
+  choose residual such that
+      ∃ (w : ℤ).
+        Matrix.Represents(Matrix.sumOfThreeSquaresForm, residual)
+        ∧ residual + w * w * d = (m : ℤ) from cover(m, positive);
+  choose w such that
+      Matrix.Represents(Matrix.sumOfThreeSquaresForm, residual)
+      ∧ residual + w * w * d = (m : ℤ);
+  Matrix.Represents(Matrix.sumOfThreeSquaresForm, residual)
+      by And.left(
+          Matrix.Represents(Matrix.sumOfThreeSquaresForm, residual),
+          residual + w * w * d = (m : ℤ)) as residualRepresented;
+  residual + w * w * d = (m : ℤ)
+      by And.right(
+          Matrix.Represents(Matrix.sumOfThreeSquaresForm, residual),
+          residual + w * w * d = (m : ℤ)) as valueReads;
+  done by Matrix.sumOfThreeSquaresDiagonalRankFourForm_represents(
+      residualRepresented := residualRepresented, valueReads := valueReads)
+}
+
+theorem Matrix.sumOfThreeSquaresRankFourCandidate_isometric_diagonal
+        (a b c d : ℤ) (diagonalReads : d + a * a + b * b + c * c = 7)
+        : Matrix.IsIsometric(
+            Matrix.sumOfThreeSquaresDiagonalRankFourForm(d),
+            Matrix.sumOfThreeSquaresRankFourCandidate(a, b, c)) := {
+  let v : RingVector(Integer.commutative_ring_bundle, 3) := ⟨a, b, c⟩;
+  Matrix.sumOfThreeSquaresForm · v = v by {
+    Matrix.sumOfThreeSquaresForm · v
+       = Matrix.identity(Integer.commutative_ring_bundle, 3) · v
+           by substituting Matrix.sumOfThreeSquaresForm_is_identity
+       = v by Matrix.applyVector_identity;
+    done
+  } as actionReads;
+  Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, v)
+     = a * a + b * b + c * c
+         by Matrix.sumOfThreeSquaresForm_coordinateTuple_value as valueReads;
+  Matrix.IsIsometric(
+      Matrix.diagonalExtension(Matrix.sumOfThreeSquaresForm, d),
+      Matrix.borderedAssembly(
+          Matrix.sumOfThreeSquaresForm,
+          Matrix.sumOfThreeSquaresForm · v,
+          d + Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, v)))
+      by Matrix.diagonalExtension_isometric_borderedAssembly(
+          symmetric := Matrix.sumOfThreeSquaresForm_symmetric);
+  Matrix.IsIsometric(
+      Matrix.diagonalExtension(Matrix.sumOfThreeSquaresForm, d),
+      Matrix.borderedAssembly(
+          Matrix.sumOfThreeSquaresForm, v,
+          d + Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, v)))
+      by substituting actionReads;
+  Matrix.IsIsometric(
+      Matrix.diagonalExtension(Matrix.sumOfThreeSquaresForm, d),
+      Matrix.borderedAssembly(
+          Matrix.sumOfThreeSquaresForm, v,
+          d + (a * a + b * b + c * c)))
+      by substituting valueReads;
+  d + (a * a + b * b + c * c) = 7 by linear_combination(diagonalReads) as cornerReads;
+  Matrix.IsIsometric(
+      Matrix.diagonalExtension(Matrix.sumOfThreeSquaresForm, d),
+      Matrix.borderedAssembly(Matrix.sumOfThreeSquaresForm, v, 7))
+      by substituting cornerReads;
+  done
+}
+
+theorem Matrix.sumOfThreeSquaresRankFourCandidate_universal
+        (a b c d : ℤ) (diagonalReads : d + a * a + b * b + c * c = 7)
+        (cover : Matrix.ThreeSquareResidualCover(d))
+        : Matrix.IsUniversal(Matrix.sumOfThreeSquaresRankFourCandidate(a, b, c)) := {
+  Matrix.IsIsometric(
+      Matrix.sumOfThreeSquaresDiagonalRankFourForm(d),
+      Matrix.sumOfThreeSquaresRankFourCandidate(a, b, c))
+      by Matrix.sumOfThreeSquaresRankFourCandidate_isometric_diagonal(
+          diagonalReads := diagonalReads) as forward;
+  Matrix.IsIsometric(
+      Matrix.sumOfThreeSquaresRankFourCandidate(a, b, c),
+      Matrix.sumOfThreeSquaresDiagonalRankFourForm(d))
+      by Matrix.IsIsometric.symmetric(isometric := forward) as reverse;
+  Matrix.IsUniversal(Matrix.sumOfThreeSquaresDiagonalRankFourForm(d))
+      by Matrix.sumOfThreeSquaresDiagonalRankFourForm_universal(cover := cover);
+  done by Matrix.isometric_universal(isometric := reverse)
+}
+
+theorem Matrix.selectedRankFourPilot_universal
+        (R : Matrix(Integer.commutative_ring_bundle, 4, 4))
+        (selected : Matrix.IsSelectedRankFourPilotNormalForm(R))
+        (coverOne : Matrix.ThreeSquareResidualCover(1))
+        (coverTwo : Matrix.ThreeSquareResidualCover(2))
+        (coverThree : Matrix.ThreeSquareResidualCover(3))
+        (coverFour : Matrix.ThreeSquareResidualCover(4))
+        (coverFive : Matrix.ThreeSquareResidualCover(5))
+        (coverSix : Matrix.ThreeSquareResidualCover(6))
+        (coverSeven : Matrix.ThreeSquareResidualCover(7))
+        : Matrix.IsUniversal(R) := {
+  done by cases {
+    case R = Matrix.sumOfThreeSquaresRankFourCandidate(0, 0, 0):
+      done by Matrix.sumOfThreeSquaresRankFourCandidate_universal(
+          d := 7, diagonalReads := ring, cover := coverSeven)
+    case R = Matrix.sumOfThreeSquaresRankFourCandidate(0, 0, 1):
+      done by Matrix.sumOfThreeSquaresRankFourCandidate_universal(
+          d := 6, diagonalReads := ring, cover := coverSix)
+    case R = Matrix.sumOfThreeSquaresRankFourCandidate(0, 1, 1):
+      done by Matrix.sumOfThreeSquaresRankFourCandidate_universal(
+          d := 5, diagonalReads := ring, cover := coverFive)
+    case R = Matrix.sumOfThreeSquaresRankFourCandidate(1, 1, 1):
+      done by Matrix.sumOfThreeSquaresRankFourCandidate_universal(
+          d := 4, diagonalReads := ring, cover := coverFour)
+    case R = Matrix.sumOfThreeSquaresRankFourCandidate(0, 0, 2):
+      done by Matrix.sumOfThreeSquaresRankFourCandidate_universal(
+          d := 3, diagonalReads := ring, cover := coverThree)
+    case R = Matrix.sumOfThreeSquaresRankFourCandidate(0, 1, 2):
+      done by Matrix.sumOfThreeSquaresRankFourCandidate_universal(
+          d := 2, diagonalReads := ring, cover := coverTwo)
+    case R = Matrix.sumOfThreeSquaresRankFourCandidate(1, 1, 2):
+      done by Matrix.sumOfThreeSquaresRankFourCandidate_universal(
+          d := 1, diagonalReads := ring, cover := coverOne)
+  }
+}

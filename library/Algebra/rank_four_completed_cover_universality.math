@@ -1,0 +1,276 @@
+-- Algebra/rank_four_completed_cover_universality.math
+--
+-- Fraction-free universality interfaces for the remaining rank-four normal
+-- form families.  Each predicate is an arithmetic/congruence statement in
+-- scalar integers.  The theorems below perform the completed-square identity,
+-- cancel its nonzero scale, and build the matrix representation witness.
+
+module Algebra.rank_four_completed_cover_universality
+
+import Algebra.rank_four_pilot_universality
+
+-- For x²+y²+d z²+2rzw+cw², put u=dz+rw and multiply by d:
+--   dQ = d x²+d y²+u²+(dc-r²)w².
+definition Matrix.TwoSquaresScaledCompletedCover (d residue corner : ℤ) : Proposition :=
+  ∀ (m : ℕ). m ≥ 1 →
+    ∃ (x y z w u : ℤ).
+      u = d * z + residue * w
+      ∧ d * (m : ℤ) = d * (x * x) + d * (y * y) + u * u
+        + (d * corner - residue * residue) * (w * w)
+
+theorem Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative_universal
+        (d residue corner : ℤ) (dNonzero : d ≠ 0)
+        (cover : Matrix.TwoSquaresScaledCompletedCover(d, residue, corner))
+        : Matrix.IsUniversal(
+            Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(d, residue, corner)) := {
+  take m : ℕ;
+  suppose m ≥ 1 as positive;
+  choose x such that
+      ∃ (y z w u : ℤ).
+        u = d * z + residue * w
+        ∧ d * (m : ℤ) = d * (x * x) + d * (y * y) + u * u
+          + (d * corner - residue * residue) * (w * w)
+      from cover(m, positive);
+  choose y such that
+      ∃ (z w u : ℤ).
+        u = d * z + residue * w
+        ∧ d * (m : ℤ) = d * (x * x) + d * (y * y) + u * u
+          + (d * corner - residue * residue) * (w * w);
+  choose z such that
+      ∃ (w u : ℤ).
+        u = d * z + residue * w
+        ∧ d * (m : ℤ) = d * (x * x) + d * (y * y) + u * u
+          + (d * corner - residue * residue) * (w * w);
+  choose w such that
+      ∃ (u : ℤ).
+        u = d * z + residue * w
+        ∧ d * (m : ℤ) = d * (x * x) + d * (y * y) + u * u
+          + (d * corner - residue * residue) * (w * w);
+  choose u such that
+      u = d * z + residue * w
+      ∧ d * (m : ℤ) = d * (x * x) + d * (y * y) + u * u
+        + (d * corner - residue * residue) * (w * w);
+  u = d * z + residue * w by And.left(
+      u = d * z + residue * w,
+      d * (m : ℤ) = d * (x * x) + d * (y * y) + u * u
+        + (d * corner - residue * residue) * (w * w)) as uReads;
+  d * (m : ℤ) = d * (x * x) + d * (y * y) + u * u
+      + (d * corner - residue * residue) * (w * w) by And.right(
+          u = d * z + residue * w,
+          d * (m : ℤ) = d * (x * x) + d * (y * y) + u * u
+            + (d * corner - residue * residue) * (w * w)) as completed;
+  d * (x * x + y * y + d * (z * z) + 2 * residue * z * w + corner * (w * w))
+     = d * (x * x) + d * (y * y) + (d * z + residue * w) * (d * z + residue * w)
+       + (d * corner - residue * residue) * (w * w)
+         by ring
+     = d * (x * x) + d * (y * y) + u * u
+       + (d * corner - residue * residue) * (w * w)
+         by substituting uReads
+     = d * (m : ℤ) by completed;
+  x * x + y * y + d * (z * z) + 2 * residue * z * w + corner * (w * w) = (m : ℤ)
+      by Integer.multiply_cancel_left_by_nonzero as scalarComputation;
+  done by Matrix.represents_by_witness(
+      Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(d, residue, corner),
+      target := m, vector := ⟨x, y, z, w⟩,
+      computes := Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative_coordinateTuple_computes(
+          scalarComputation := scalarComputation))
+}
+
+-- For x²+2y²+d z²+2syw+2rzw+cw², put u=2y+sw and v=dz+rw:
+--   2dQ = 2d x²+d u²+2v²+(2dc-ds²-2r²)w².
+definition Matrix.WeightedCompletedCover
+        (d secondResidue thirdResidue corner : ℤ) : Proposition :=
+  ∀ (m : ℕ). m ≥ 1 →
+    ∃ (x y z w u v : ℤ).
+      u = 2 * y + secondResidue * w
+      ∧ v = d * z + thirdResidue * w
+      ∧ (2 * d) * (m : ℤ) = (2 * d) * (x * x) + d * (u * u) + 2 * (v * v)
+        + (2 * d * corner - d * (secondResidue * secondResidue)
+          - 2 * (thirdResidue * thirdResidue)) * (w * w)
+
+theorem Matrix.squarePlusDoublePlusScaledRankFourRepresentative_universal
+        (d secondResidue thirdResidue corner : ℤ)
+        (scaleNonzero : 2 * d ≠ 0)
+        (cover : Matrix.WeightedCompletedCover(d, secondResidue, thirdResidue, corner))
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+            d, secondResidue, thirdResidue, corner)) := {
+  take m : ℕ;
+  suppose m ≥ 1 as positive;
+  choose x such that
+      ∃ (y z w u v : ℤ).
+        u = 2 * y + secondResidue * w
+        ∧ v = d * z + thirdResidue * w
+        ∧ (2 * d) * (m : ℤ) = (2 * d) * (x * x) + d * (u * u) + 2 * (v * v)
+          + (2 * d * corner - d * (secondResidue * secondResidue)
+            - 2 * (thirdResidue * thirdResidue)) * (w * w)
+      from cover(m, positive);
+  choose y such that
+      ∃ (z w u v : ℤ).
+        u = 2 * y + secondResidue * w
+        ∧ v = d * z + thirdResidue * w
+        ∧ (2 * d) * (m : ℤ) = (2 * d) * (x * x) + d * (u * u) + 2 * (v * v)
+          + (2 * d * corner - d * (secondResidue * secondResidue)
+            - 2 * (thirdResidue * thirdResidue)) * (w * w);
+  choose z such that
+      ∃ (w u v : ℤ).
+        u = 2 * y + secondResidue * w
+        ∧ v = d * z + thirdResidue * w
+        ∧ (2 * d) * (m : ℤ) = (2 * d) * (x * x) + d * (u * u) + 2 * (v * v)
+          + (2 * d * corner - d * (secondResidue * secondResidue)
+            - 2 * (thirdResidue * thirdResidue)) * (w * w);
+  choose w such that
+      ∃ (u v : ℤ).
+        u = 2 * y + secondResidue * w
+        ∧ v = d * z + thirdResidue * w
+        ∧ (2 * d) * (m : ℤ) = (2 * d) * (x * x) + d * (u * u) + 2 * (v * v)
+          + (2 * d * corner - d * (secondResidue * secondResidue)
+            - 2 * (thirdResidue * thirdResidue)) * (w * w);
+  choose u such that
+      ∃ (v : ℤ).
+        u = 2 * y + secondResidue * w
+        ∧ v = d * z + thirdResidue * w
+        ∧ (2 * d) * (m : ℤ) = (2 * d) * (x * x) + d * (u * u) + 2 * (v * v)
+          + (2 * d * corner - d * (secondResidue * secondResidue)
+            - 2 * (thirdResidue * thirdResidue)) * (w * w);
+  choose v such that
+      u = 2 * y + secondResidue * w
+      ∧ v = d * z + thirdResidue * w
+      ∧ (2 * d) * (m : ℤ) = (2 * d) * (x * x) + d * (u * u) + 2 * (v * v)
+        + (2 * d * corner - d * (secondResidue * secondResidue)
+          - 2 * (thirdResidue * thirdResidue)) * (w * w);
+  u = 2 * y + secondResidue * w as uReads;
+  v = d * z + thirdResidue * w as vReads;
+  (2 * d) * (m : ℤ) = (2 * d) * (x * x) + d * (u * u) + 2 * (v * v)
+      + (2 * d * corner - d * (secondResidue * secondResidue)
+        - 2 * (thirdResidue * thirdResidue)) * (w * w) as completed;
+  (2 * d) * (x * x + 2 * (y * y) + d * (z * z) + 2 * secondResidue * y * w
+      + 2 * thirdResidue * z * w + corner * (w * w))
+     = (2 * d) * (x * x) + d * ((2 * y + secondResidue * w) * (2 * y + secondResidue * w))
+       + 2 * ((d * z + thirdResidue * w) * (d * z + thirdResidue * w))
+       + (2 * d * corner - d * (secondResidue * secondResidue)
+         - 2 * (thirdResidue * thirdResidue)) * (w * w)
+           by ring
+     = (2 * d) * (x * x) + d * (u * u)
+       + 2 * ((d * z + thirdResidue * w) * (d * z + thirdResidue * w))
+       + (2 * d * corner - d * (secondResidue * secondResidue)
+         - 2 * (thirdResidue * thirdResidue)) * (w * w)
+           by substituting uReads
+     = (2 * d) * (x * x) + d * (u * u) + 2 * (v * v)
+       + (2 * d * corner - d * (secondResidue * secondResidue)
+         - 2 * (thirdResidue * thirdResidue)) * (w * w)
+           by substituting vReads
+     = (2 * d) * (m : ℤ) by completed;
+  x * x + 2 * (y * y) + d * (z * z) + 2 * secondResidue * y * w
+      + 2 * thirdResidue * z * w + corner * (w * w) = (m : ℤ)
+      by Integer.multiply_cancel_left_by_nonzero as scalarComputation;
+  done by Matrix.represents_by_witness(
+      Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+          d, secondResidue, thirdResidue, corner),
+      target := m, vector := ⟨x, y, z, w⟩,
+      computes := Matrix.squarePlusDoublePlusScaledRankFourRepresentative_coordinateTuple_computes(
+          scalarComputation := scalarComputation))
+}
+
+-- For x²+2y²+2yz+kz²+2ryw+cw², let delta=2k-1 and
+-- (u,v)=((2y+z+rw),(y+kz)).  This is B(y,z)+b·w for the binary block B:
+--   delta Q = delta x²+k u²-2uv+2v²+(delta c-k r²)w².
+definition Matrix.OddCompletedCover (formCorner residue corner : ℤ) : Proposition :=
+  ∀ (m : ℕ). m ≥ 1 →
+    ∃ (x y z w u v : ℤ).
+      u = 2 * y + z + residue * w
+      ∧ v = y + formCorner * z
+      ∧ (2 * formCorner - 1) * (m : ℤ)
+        = (2 * formCorner - 1) * (x * x) + formCorner * (u * u)
+          - 2 * u * v + 2 * (v * v)
+          + ((2 * formCorner - 1) * corner - formCorner * (residue * residue)) * (w * w)
+
+theorem Matrix.squarePlusDoubleSquareOddRankFourRepresentative_universal
+        (formCorner residue corner : ℤ)
+        (scaleNonzero : 2 * formCorner - 1 ≠ 0)
+        (cover : Matrix.OddCompletedCover(formCorner, residue, corner))
+        : Matrix.IsUniversal(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(formCorner, residue, corner)) := {
+  take m : ℕ;
+  suppose m ≥ 1 as positive;
+  choose x such that
+      ∃ (y z w u v : ℤ).
+        u = 2 * y + z + residue * w
+        ∧ v = y + formCorner * z
+        ∧ (2 * formCorner - 1) * (m : ℤ)
+          = (2 * formCorner - 1) * (x * x) + formCorner * (u * u)
+            - 2 * u * v + 2 * (v * v)
+            + ((2 * formCorner - 1) * corner - formCorner * (residue * residue)) * (w * w)
+      from cover(m, positive);
+  choose y such that
+      ∃ (z w u v : ℤ).
+        u = 2 * y + z + residue * w
+        ∧ v = y + formCorner * z
+        ∧ (2 * formCorner - 1) * (m : ℤ)
+          = (2 * formCorner - 1) * (x * x) + formCorner * (u * u)
+            - 2 * u * v + 2 * (v * v)
+            + ((2 * formCorner - 1) * corner - formCorner * (residue * residue)) * (w * w);
+  choose z such that
+      ∃ (w u v : ℤ).
+        u = 2 * y + z + residue * w
+        ∧ v = y + formCorner * z
+        ∧ (2 * formCorner - 1) * (m : ℤ)
+          = (2 * formCorner - 1) * (x * x) + formCorner * (u * u)
+            - 2 * u * v + 2 * (v * v)
+            + ((2 * formCorner - 1) * corner - formCorner * (residue * residue)) * (w * w);
+  choose w such that
+      ∃ (u v : ℤ).
+        u = 2 * y + z + residue * w
+        ∧ v = y + formCorner * z
+        ∧ (2 * formCorner - 1) * (m : ℤ)
+          = (2 * formCorner - 1) * (x * x) + formCorner * (u * u)
+            - 2 * u * v + 2 * (v * v)
+            + ((2 * formCorner - 1) * corner - formCorner * (residue * residue)) * (w * w);
+  choose u such that
+      ∃ (v : ℤ).
+        u = 2 * y + z + residue * w
+        ∧ v = y + formCorner * z
+        ∧ (2 * formCorner - 1) * (m : ℤ)
+          = (2 * formCorner - 1) * (x * x) + formCorner * (u * u)
+            - 2 * u * v + 2 * (v * v)
+            + ((2 * formCorner - 1) * corner - formCorner * (residue * residue)) * (w * w);
+  choose v such that
+      u = 2 * y + z + residue * w
+      ∧ v = y + formCorner * z
+      ∧ (2 * formCorner - 1) * (m : ℤ)
+        = (2 * formCorner - 1) * (x * x) + formCorner * (u * u)
+          - 2 * u * v + 2 * (v * v)
+          + ((2 * formCorner - 1) * corner - formCorner * (residue * residue)) * (w * w);
+  u = 2 * y + z + residue * w as uReads;
+  v = y + formCorner * z as vReads;
+  (2 * formCorner - 1) * (m : ℤ)
+      = (2 * formCorner - 1) * (x * x) + formCorner * (u * u)
+        - 2 * u * v + 2 * (v * v)
+        + ((2 * formCorner - 1) * corner - formCorner * (residue * residue)) * (w * w)
+      as completed;
+  (2 * formCorner - 1) * (x * x + 2 * (y * y) + 2 * y * z + formCorner * (z * z)
+      + 2 * residue * y * w + corner * (w * w))
+     = (2 * formCorner - 1) * (x * x)
+       + formCorner * ((2 * y + z + residue * w) * (2 * y + z + residue * w))
+       - 2 * (2 * y + z + residue * w) * (y + formCorner * z)
+       + 2 * ((y + formCorner * z) * (y + formCorner * z))
+       + ((2 * formCorner - 1) * corner - formCorner * (residue * residue)) * (w * w)
+           by ring
+     = (2 * formCorner - 1) * (x * x) + formCorner * (u * u)
+       - 2 * u * (y + formCorner * z)
+       + 2 * ((y + formCorner * z) * (y + formCorner * z))
+       + ((2 * formCorner - 1) * corner - formCorner * (residue * residue)) * (w * w)
+           by substituting uReads
+     = (2 * formCorner - 1) * (x * x) + formCorner * (u * u)
+       - 2 * u * v + 2 * (v * v)
+       + ((2 * formCorner - 1) * corner - formCorner * (residue * residue)) * (w * w)
+           by substituting vReads
+     = (2 * formCorner - 1) * (m : ℤ) by completed;
+  x * x + 2 * (y * y) + 2 * y * z + formCorner * (z * z)
+      + 2 * residue * y * w + corner * (w * w) = (m : ℤ)
+      by Integer.multiply_cancel_left_by_nonzero as scalarComputation;
+  done by Matrix.represents_by_witness(
+      Matrix.squarePlusDoubleSquareOddRankFourRepresentative(formCorner, residue, corner),
+      target := m, vector := ⟨x, y, z, w⟩,
+      computes := Matrix.squarePlusDoubleSquareOddRankFourRepresentative_coordinateTuple_computes(
+          scalarComputation := scalarComputation))
+}

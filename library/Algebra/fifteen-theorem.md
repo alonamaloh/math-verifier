@@ -166,6 +166,19 @@ rank-four escalator by 207 selected normal forms are.
   truant 10 or 15, or represents all fifteen test values. Proving those 201
   through-15 forms universal is the remaining rank-four representation-theory
   stage.
+- The rank-four universality templates are now algebraically complete.
+  `Algebra/rank_four_pilot_universality` identifies the seven selected forms
+  above (x^2+y^2+z^2) with the diagonal forms
+  (x^2+y^2+z^2+d w^2), (1\le d\le7). The proposition
+  `Matrix.ThreeSquareResidualCover(d)` isolates their remaining arithmetic
+  input, and `Matrix.selectedRankFourPilot_universal` turns the seven such
+  residual-cover facts into universality of the whole selected pilot family.
+  `Algebra/rank_four_completed_cover_universality` gives fraction-free
+  completed-square interfaces for all other constructors. Its scaled-square,
+  weighted, and odd cover predicates account for the remaining 32, 140, and
+  28 selected forms. The identities and matrix witnesses are proved once;
+  future per-form work consists only of explicit arithmetic/congruence cover
+  facts.
 
 ## Module path
 
@@ -182,5 +195,7 @@ Read `quadratic_form` → `integer_quadratic_form` first. Then use
 `rank_three_global_classification` → `critical_truants` and
 `rank_four_global_classification` → `rank_four_exceptional_truants` →
 `rank_four_exceptional_truants_generated` → `rank_four_short_values` →
-`rank_four_short_values_generated`.
+`rank_four_short_values_generated` → `rank_four_pilot_universality`.
+Then use `rank_four_completed_cover_universality` for the other rank-four
+families.
 `PLAN_15_THEOREM.md` records unfinished stages.
