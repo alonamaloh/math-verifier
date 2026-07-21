@@ -235,7 +235,8 @@ struct SurfaceFoldBinder {
 // Anonymous tuple expression `⟨a, b, ...⟩`. The elaborator picks the
 // constructor based on the expected type — `And.introduction(a, b)` when
 // the goal is `And(_, _)`, `Exists.introduce(a, b)` for `Exists(_, _)`,
-// and the unique constructor for any other single-constructor inductive.
+// the unique constructor for any other single-constructor inductive, and a
+// coordinate vector when the expected type is `RingVector(r, n)`.
 // N-ary tuples right-associate: `⟨a, b, c⟩` ≡ `⟨a, ⟨b, c⟩⟩`.
 struct SurfaceAnonymousTuple {
     std::vector<SurfaceExpressionPointer> components;
@@ -1332,4 +1333,3 @@ struct SurfaceModule {
     std::vector<std::string> exportDefinitionsNames;
     std::vector<SurfaceTopStatement> statements;
 };
-

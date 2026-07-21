@@ -2559,4 +2559,3 @@ void Elaborator::synthesizeCoverageLemma(
         } catch (const TypeError&) {
         }
     }
-

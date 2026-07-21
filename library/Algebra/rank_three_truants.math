@@ -609,6 +609,154 @@ theorem Matrix.sumOfTwoSquaresForm_twoCoordinates_value
   done
 }
 
+-- The function-encoded pair constructed by `⟨a, b⟩` agrees with the
+-- standard-basis spelling used by the older rank-two API.
+theorem RingVector.coordinatePair_eq_twoCoordinates (a b : ℤ)
+        : RingVector.appendCoordinate(
+            (RingVector.oneCoordinate(a)
+              : RingVector(Integer.commutative_ring_bundle, 1)), b)
+          = (RingVector.twoCoordinates(a, b)
+              : RingVector(Integer.commutative_ring_bundle, 2)) := {
+  ∀ (i : NaturalsBelow(2)).
+      RingVector.appendCoordinate(
+        (RingVector.oneCoordinate(a)
+          : RingVector(Integer.commutative_ring_bundle, 1)), b)(i)
+        = (RingVector.twoCoordinates(a, b)
+            : RingVector(Integer.commutative_ring_bundle, 2))(i)
+      by (i : NaturalsBelow(2)) ↦ {
+          i = NaturalsBelow.firstOfTwo
+            ∨ i = NaturalsBelow.secondOfTwo by NaturalsBelow.two_split;
+          done by cases {
+            case i = NaturalsBelow.firstOfTwo as first: {
+                RingVector.appendCoordinate(
+                    (RingVector.oneCoordinate(a)
+                      : RingVector(Integer.commutative_ring_bundle, 1)), b)(i)
+                   = RingVector.appendCoordinate(
+                       (RingVector.oneCoordinate(a)
+                         : RingVector(Integer.commutative_ring_bundle, 1)), b)(
+                         NaturalsBelow.firstOfTwo) by substituting first
+                   = RingVector.appendCoordinate(
+                       (RingVector.oneCoordinate(a)
+                         : RingVector(Integer.commutative_ring_bundle, 1)), b)(
+                         NaturalsBelow.inclusion(
+                           1, NaturalsBelow.top(0)))
+                         by substituting NaturalsBelow.firstOfTwo_is_inclusion
+                   = (RingVector.oneCoordinate(a)
+                        : RingVector(Integer.commutative_ring_bundle, 1))(
+                          NaturalsBelow.top(0))
+                         by RingVector.appendCoordinate_inclusion
+                   = a by RingVector.oneCoordinate_at
+                   = (RingVector.twoCoordinates(a, b)
+                       : RingVector(Integer.commutative_ring_bundle, 2))(
+                       NaturalsBelow.firstOfTwo)
+                         by RingVector.twoCoordinates_first
+                   = (RingVector.twoCoordinates(a, b)
+                       : RingVector(Integer.commutative_ring_bundle, 2))(i)
+                         by substituting first;
+                done
+              }
+            case i = NaturalsBelow.secondOfTwo as second: {
+                RingVector.appendCoordinate(
+                    (RingVector.oneCoordinate(a)
+                      : RingVector(Integer.commutative_ring_bundle, 1)), b)(i)
+                   = RingVector.appendCoordinate(
+                       (RingVector.oneCoordinate(a)
+                         : RingVector(Integer.commutative_ring_bundle, 1)), b)(
+                         NaturalsBelow.secondOfTwo) by substituting second
+                   = RingVector.appendCoordinate(
+                       (RingVector.oneCoordinate(a)
+                         : RingVector(Integer.commutative_ring_bundle, 1)), b)(
+                           NaturalsBelow.top(1))
+                         by substituting NaturalsBelow.secondOfTwo_is_top
+                   = b by RingVector.appendCoordinate_top
+                   = (RingVector.twoCoordinates(a, b)
+                       : RingVector(Integer.commutative_ring_bundle, 2))(
+                       NaturalsBelow.secondOfTwo)
+                         by RingVector.twoCoordinates_second
+                   = (RingVector.twoCoordinates(a, b)
+                       : RingVector(Integer.commutative_ring_bundle, 2))(i)
+                         by substituting second;
+                done
+              }
+          }
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+-- A narrow automatic evaluator for the coordinate-tuple spelling.  It keeps
+-- matrix structure out of `ring`: the structural lemmas reduce the form to a
+-- polynomial, then `ring` handles only that polynomial.
+theorem Matrix.sumOfThreeSquaresForm_coordinateTuple_value
+        (a b c : ℤ)
+        : Matrix.quadraticForm(
+            Matrix.sumOfThreeSquaresForm,
+            RingVector.appendCoordinate(
+              (RingVector.appendCoordinate(
+                 (RingVector.oneCoordinate(a)
+                   : RingVector(Integer.commutative_ring_bundle, 1)), b)
+                : RingVector(Integer.commutative_ring_bundle, 2)), c))
+          = a * a + b * b + c * c := {
+  let pair : RingVector(Integer.commutative_ring_bundle, 2) :=
+      RingVector.appendCoordinate(
+        (RingVector.oneCoordinate(a)
+          : RingVector(Integer.commutative_ring_bundle, 1)), b);
+  let triple : RingVector(Integer.commutative_ring_bundle, 3) :=
+      RingVector.appendCoordinate(pair, c);
+  (RingVector.restrict(triple)
+      : RingVector(Integer.commutative_ring_bundle, 2)) = pair
+      by RingVector.restrict_appendCoordinate as restrictReads;
+  pair = (RingVector.twoCoordinates(a, b)
+            : RingVector(Integer.commutative_ring_bundle, 2))
+      by RingVector.coordinatePair_eq_twoCoordinates as pairReads;
+  triple(NaturalsBelow.top(2)) = c
+      by RingVector.appendCoordinate_top as topReads;
+  Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, triple)
+     = Matrix.quadraticForm(
+           Matrix.sumOfTwoSquaresForm, RingVector.restrict(triple))
+       + triple(NaturalsBelow.top(2)) * triple(NaturalsBelow.top(2))
+           by Matrix.sumOfThreeSquaresForm_value
+     = Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm, pair)
+       + triple(NaturalsBelow.top(2)) * triple(NaturalsBelow.top(2))
+           by substituting restrictReads
+     = Matrix.quadraticForm(
+           Matrix.sumOfTwoSquaresForm, RingVector.twoCoordinates(a, b))
+       + triple(NaturalsBelow.top(2)) * triple(NaturalsBelow.top(2))
+           by substituting pairReads
+     = (a * a + b * b)
+       + triple(NaturalsBelow.top(2)) * triple(NaturalsBelow.top(2))
+           by substituting Matrix.sumOfTwoSquaresForm_twoCoordinates_value
+     = (a * a + b * b) + c * c by substituting topReads
+     = a * a + b * b + c * c;
+  done
+}
+
+-- Let the local prover finish the final scalar calculation while keeping the
+-- structural matrix evaluation in the theorem above.  This is the bridge
+-- used when `represents_by_witness` asks for its `computes` premise.
+automatic theorem Matrix.sumOfThreeSquaresForm_coordinateTuple_computes
+        (a b c target : ℤ)
+        (scalarComputation : a * a + b * b + c * c = target)
+        : Matrix.quadraticForm(
+            Matrix.sumOfThreeSquaresForm,
+            RingVector.appendCoordinate(
+              (RingVector.appendCoordinate(
+                 (RingVector.oneCoordinate(a)
+                   : RingVector(Integer.commutative_ring_bundle, 1)), b)
+                : RingVector(Integer.commutative_ring_bundle, 2)), c))
+          = target := {
+  Matrix.quadraticForm(
+      Matrix.sumOfThreeSquaresForm,
+      RingVector.appendCoordinate(
+        (RingVector.appendCoordinate(
+           (RingVector.oneCoordinate(a)
+             : RingVector(Integer.commutative_ring_bundle, 1)), b)
+          : RingVector(Integer.commutative_ring_bundle, 2)), c))
+     = a * a + b * b + c * c
+         by Matrix.sumOfThreeSquaresForm_coordinateTuple_value
+     = target by scalarComputation;
+  done
+}
+
 theorem Matrix.sumOfTwoSquaresForm_twoUnits_value
         : Matrix.quadraticForm(
             Matrix.sumOfTwoSquaresForm,

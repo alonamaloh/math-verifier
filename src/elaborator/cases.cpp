@@ -142,6 +142,73 @@ ExpressionPointer Elaborator::elaborateAnonymousTuple(
                 "anonymous tuple '⟨...⟩' needs an expected type from "
                 "context (line " + std::to_string(line) + ")");
         }
+        // RingVector is function-encoded rather than inductive, but at the
+        // surface it is exactly a finite tuple of coordinates.  Recognize its
+        // still-opaque expected type before the general constructor-tuple
+        // path forces definitions open.
+        std::vector<ExpressionPointer> expectedArguments;
+        ExpressionPointer expectedHead = expectedType;
+        while (auto* application =
+                   std::get_if<Application>(&expectedHead->node)) {
+            expectedArguments.push_back(application->argument);
+            expectedHead = application->function;
+        }
+        std::reverse(expectedArguments.begin(), expectedArguments.end());
+        auto* expectedConstant = std::get_if<Constant>(&expectedHead->node);
+        if (expectedConstant && expectedConstant->name == "RingVector"
+            && expectedArguments.size() == 2) {
+            if (tuple.components.empty()) {
+                throw ElaborateError(
+                    "a RingVector tuple needs at least one coordinate (line "
+                    + std::to_string(line) + ")");
+            }
+            ExpressionPointer dimension = weakHeadNormalForm(
+                environment_, expectedArguments[1]);
+            RingCoefficient dimensionValue;
+            if (!tryParseNaturalLiteral(dimension, dimensionValue)) {
+                throw ElaborateError(
+                    "a RingVector tuple currently needs a concrete numeral "
+                    "dimension in its expected type (line "
+                    + std::to_string(line) + ")");
+            }
+            if (dimensionValue != RingCoefficient(tuple.components.size())) {
+                throw ElaborateError(
+                    "RingVector tuple has "
+                    + std::to_string(tuple.components.size())
+                    + " coordinates but the expected RingVector has dimension "
+                    + dimensionValue.get_str() + " (line "
+                    + std::to_string(line) + ")");
+            }
+
+            ExpressionPointer ring = expectedArguments[0];
+            ExpressionPointer carrier = makeApplication(
+                makeConstant("CommutativeRing.carrier"), ring);
+            std::vector<ExpressionPointer> coordinates;
+            coordinates.reserve(tuple.components.size());
+            for (const auto& component : tuple.components) {
+                ExpressionPointer coordinate = elaborateExpression(
+                    *component, localBinders, carrier);
+                coordinate = coerceToExpectedTypeViaRegistry(
+                    localBinders, std::move(coordinate), carrier);
+                coordinates.push_back(std::move(coordinate));
+            }
+
+            ExpressionPointer result = makeApplication(
+                makeApplication(
+                    makeConstant("RingVector.oneCoordinate"), ring),
+                coordinates.front());
+            for (size_t i = 1; i < coordinates.size(); ++i) {
+                ExpressionPointer append = makeConstant(
+                    "RingVector.appendCoordinate");
+                append = makeApplication(append, ring);
+                append = makeApplication(
+                    append,
+                    buildNaturalLiteralKernel(RingCoefficient(i)));
+                append = makeApplication(append, result);
+                result = makeApplication(append, coordinates[i]);
+            }
+            return result;
+        }
         // Force opaque heads transparent so an `IsNonneg(x)`-typed expected
         // type exposes its underlying `Exists` inductive — the construct-site
         // counterpart of the kernel's opacity-tolerant retries (replaces the
@@ -2273,4 +2340,3 @@ ExpressionPointer Elaborator::elaborateCasesExpressionInner(
         applied = makeApplication(applied, scrutinee);
         return applied;
     }
-

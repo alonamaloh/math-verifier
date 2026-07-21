@@ -734,6 +734,14 @@ Elaborator::CallInferenceResult Elaborator::inferLeadingArguments(
                         weakHeadNormalForm(environment_, expectedForArgument));
                 }
                 kernelTrailingArgument = coerced;
+                // The implicit-leading path must mirror ordinary function
+                // application completely, including carrier coercions.  Its
+                // old diff-only handling left a bare `6 : Natural` in an
+                // `Integer` argument slot whenever the callee had an inferred
+                // leading parameter (for example `Matrix.Represents`).
+                kernelTrailingArgument = coerceToExpectedTypeViaRegistry(
+                    localBinders, std::move(kernelTrailingArgument),
+                    expectedForArgument);
             }
             // Infer the trailing arg's type WITHOUT normalising first, so a
             // Definition head (e.g. `Rational.LessOrEqual` for an `a ≤ b`
@@ -812,6 +820,11 @@ Elaborator::CallInferenceResult Elaborator::inferLeadingArguments(
             ExpressionPointer kernelTrailingArgument = elaborateExpression(
                 *trailingArgumentsSurface[deferred.index], localBinders,
                 expectedForArgument);
+            if (expectedForArgument) {
+                kernelTrailingArgument = coerceToExpectedTypeViaRegistry(
+                    localBinders, std::move(kernelTrailingArgument),
+                    expectedForArgument);
+            }
             ExpressionPointer inferredArgumentType =
                 closeOverLocalBinders(
                     inferTypeInLocalContext(
@@ -2243,7 +2256,35 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                 if (iterator == assignment.end()) {
                     unresolved.push_back(i);
                 } else {
-                    elaboratedArgs[i] = iterator->second;
+                    ExpressionPointer inferred = iterator->second;
+                    // Backward unification can recover a carrier-valued
+                    // argument from the goal before that value has passed
+                    // through ordinary argument elaboration.  In particular,
+                    // a bare numeral in `Represents(A, 6)` was assigned
+                    // directly to an Integer-valued `target` hole as the
+                    // Natural literal `6`.  The conclusion happened to retain
+                    // the goal's spelling, but a dependent proof slot then
+                    // became the ill-typed equality `Q(A,v) = (6 : Natural)`.
+                    // Give inferred holes the same registry-coercion step as
+                    // written arguments before substituting them into later
+                    // domains.
+                    ExpressionPointer expectedDomain =
+                        substituteFreeVariables(piDomains[i], assignment);
+                    if (!containsNamedFreeVariable(
+                            expectedDomain, metavariableNames)) {
+                        try {
+                            inferred = coerceToExpectedTypeViaRegistry(
+                                localBinders, std::move(inferred),
+                                expectedDomain);
+                        } catch (const ElaborateError&) {
+                            // Preserve the original inferred value; the
+                            // ordinary final type check will report a genuine
+                            // mismatch with its established diagnostic.
+                        } catch (const TypeError&) {
+                        }
+                    }
+                    elaboratedArgs[i] = inferred;
+                    assignment[argFreshNames[i]] = std::move(inferred);
                 }
             }
         }
@@ -2478,17 +2519,16 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                 }
                 // Fallback 2: not a stated hypothesis and no forgetful
                 // instance — but the bare prover may close it
-                // near-instantly from `automatic` lemmas / the tier stack
+                // from `automatic` lemmas / the tier stack
                 // (`start ≤ start + c` via less_or_equal_add_right; the
-                // A7 known-gap fix). Budget-capped like the redundancy
-                // re-proof; skipped inside the speculative context scan,
-                // where it would multiply per-candidate cost (and whose
-                // flag also breaks any prover→scan→discharge recursion),
-                // and for slots still mentioning unresolved holes.
+                // A7 known-gap fix). This is an explicitly cited lemma's
+                // proof premise, not a speculative redundancy check, so use
+                // the ordinary bounded prover budget.  The old 1000-step
+                // redundancy cap made valid ground computations fail here
+                // even though the identical proposition closed with `done`.
                 if (!found && !inSpeculativeContextScan_
                     && !containsNamedFreeVariable(slotType,
-                                                  dischargeMetavars)) {
-                    RedundancyBudgetGuard budgetGuard(*this);
+                                                  stillUnresolvedNames)) {
                     ExpressionPointer proved;
                     try {
                         proved = autoProveClaim(
@@ -3211,4 +3251,3 @@ ExpressionPointer Elaborator::elaborateLambda(
         }
         return result;
     }
-

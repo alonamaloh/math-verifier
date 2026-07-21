@@ -22,6 +22,7 @@ import Algebra.commutative_ring_bundle
 import Algebra.commutative_ring_algebra
 import Algebra.commutative_ring_aggregation
 import Algebra.permutation_enumeration
+import Algebra.function_enumeration
 import Algebra.matrix
 import Algebra.matrix_ring
 import Algebra.matrix_transpose
@@ -40,6 +41,41 @@ definition RingVector.scale {r : CommutativeRing} {n : ℕ}
 
 definition RingVector.zero (r : CommutativeRing) (n : ℕ) : RingVector(r, n) :=
   (k : NaturalsBelow(n)) ↦ CommutativeRing.zero(r)
+
+-- The construction behind a RingVector-valued `⟨a, b, …⟩`. Starting from one
+-- coordinate and
+-- appending at the top makes nonempty finite vector literals arbitrary in
+-- length while leaving carrier and dimension inference to ordinary function
+-- application. The impossible `value(i) > n` part of the final branch is
+-- harmless: an index of `NaturalsBelow(1+n)` has value at most n.
+definition RingVector.oneCoordinate {r : CommutativeRing}
+        (entry : CommutativeRing.carrier(r)) : RingVector(r, 1) :=
+  (_ : NaturalsBelow(1)) ↦ entry
+
+definition RingVector.appendCoordinate {r : CommutativeRing} {n : ℕ}
+        (initial : RingVector(r, n))
+        (last : CommutativeRing.carrier(r))
+        : RingVector(r, 1 + n) :=
+  Function.extendByValue(initial, last)
+
+theorem RingVector.oneCoordinate_at {r : CommutativeRing}
+        (entry : CommutativeRing.carrier(r)) (i : NaturalsBelow(1))
+        : RingVector.oneCoordinate(entry)(i) = entry :=
+  done
+
+theorem RingVector.appendCoordinate_inclusion {r : CommutativeRing} {n : ℕ}
+        (initial : RingVector(r, n))
+        (last : CommutativeRing.carrier(r)) (i : NaturalsBelow(n))
+        : RingVector.appendCoordinate(initial, last)(NaturalsBelow.inclusion(n, i))
+          = initial(i) :=
+  by Function.apply_extendByValue_inclusion
+
+theorem RingVector.appendCoordinate_top {r : CommutativeRing} {n : ℕ}
+        (initial : RingVector(r, n))
+        (last : CommutativeRing.carrier(r))
+        : RingVector.appendCoordinate(initial, last)(NaturalsBelow.top(n))
+          = last :=
+  by Function.apply_extendByValue_top
 
 definition RingVector.negate {r : CommutativeRing} {n : ℕ}
         (u : RingVector(r, n)) : RingVector(r, n) :=
