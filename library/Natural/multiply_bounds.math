@@ -574,6 +574,46 @@ theorem Natural.square_below_eighteen (m : ℕ) (bound : m * m < 18)
   }
 }
 
+-- A square strictly below 36 has root at most 5.  This larger cutoff is
+-- useful for finite boxes arising from rank-four Schur bounds.
+theorem Natural.square_below_thirty_six (m : ℕ) (bound : m * m < 36)
+        : m = 0 ∨ m = 1 ∨ m = 2 ∨ m = 3 ∨ m = 4 ∨ m = 5 := {
+  m < 6 ∨ m = 6 ∨ 6 < m by Natural.lt_trichotomy;
+  done by cases {
+    case m < 6 as belowSix: {
+      m = 0 ∨ ∃ (predecessor : ℕ). m = 1 + predecessor by Natural.zero_or_one_plus;
+      done by cases {
+        case m = 0: done
+        case ∃ (predecessor : ℕ). m = 1 + predecessor as positiveShape: {
+          choose predecessor such that m = 1 + predecessor from positiveShape;
+          1 ≤ 1 + predecessor;
+          1 ≤ m by substituting (m = 1 + predecessor);
+          m = 1 ∨ m = 2 ∨ m = 3 ∨ m = 4 ∨ m = 5 by Natural.positive_below_six;
+          done by cases {
+            case m = 1: done
+            case m = 2 ∨ m = 3 ∨ m = 4 ∨ m = 5: done by cases {
+              case m = 2: done
+              case m = 3 ∨ m = 4 ∨ m = 5: done by cases {
+                case m = 3: done
+                case m = 4 ∨ m = 5: done by cases { case m = 4: done case m = 5: done }
+              }
+            }
+          }
+        }
+      }
+    }
+    case m = 6 ∨ 6 < m: {
+      6 ≤ m by cases { case m = 6: done case 6 < m: done };
+      6 * 6 ≤ 6 * m by Natural.multiply_monotone_left
+            = m * 6
+            ≤ m * m by Natural.multiply_monotone_left;
+      m * m < 36 = 6 * 6 ≤ m * m;
+      False by Natural.lt_irreflexive;
+      done
+    }
+  }
+}
+
 -- 2 lies strictly between the consecutive squares 1 and 4, so it is not a
 -- square: a root would be at most 1 (square too small) or at least 2
 -- (square too large).
