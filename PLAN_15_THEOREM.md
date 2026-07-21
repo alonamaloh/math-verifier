@@ -322,7 +322,21 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
   coordinate bounds plus determinant/theta prefilters); formalizing all
   pairwise negative certificates is not needed by downstream Fifteen-Theorem
   arguments and is recorded as an optional audit rather than an E5 blocker.
-- `S3.C1` `[ ]` (M) ★ The set of truants occurring anywhere in the tree is exactly **{1,2,3,5,6,7,10,14,15}**. — owes: S3.E3, S3.E4, S3.E5
+- `S3.C1` `[~]` (M) ★ The set of truants occurring anywhere in the tree is exactly **{1,2,3,5,6,7,10,14,15}**. — owes: S3.E3, S3.E4, S3.E5, S5.U2, S5.U3
+
+  **LOW-RANK HALF COMPLETE 2026-07-21:**
+  `Algebra/critical_truants.math` proves in the kernel that rank-zero through
+  rank-three escalators have truants in `{1}`, `{2}`, `{3,5}`, and
+  `{6,7,10,14}` respectively.  The theorem transports the exact truant of
+  each canonical representative across the isometries supplied by the rank
+  classifiers; it does not merely classify the underlying matrices.
+
+  The remaining value `15` is not a consequence of the 207-way rank-four
+  classification alone.  One must show that every non-universal selected
+  rank-four form has truant 15, and that its rank-five escalations are
+  universal.  Those are precisely the mathematical contents of `S5.U2` and
+  `S5.U3`, so they are now listed as dependencies here.  The old dependency
+  line understated this logical obligation.
 - `S3.C2` `[ ]` (L) ★★ **Master reduction:** if `Q` represents the nine critical numbers then `Q` is universal — via: a non-universal `Q` would embed an escalator missing its truant ∈ {nine}. *(Depends on rank-4 universality, Stage 5.)* — owes: S3.C1, S3.E5, S5.U2
 
 ---

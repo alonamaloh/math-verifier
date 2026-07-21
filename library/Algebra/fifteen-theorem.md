@@ -53,6 +53,13 @@ rank-four escalator by 207 selected normal forms are.
   two up to isometry as \(x^2+y^2\) or \(x^2+2y^2\). Their truants are
   respectively 3 and 5 (`Matrix.sumOfTwoSquaresForm_truant` and
   `Matrix.squarePlusDoubleSquareForm_truant`).
+- Low-rank critical truants: `Matrix.escalator_rank_zero_truant`,
+  `Matrix.escalator_rank_one_truant`, `Matrix.escalator_rank_two_truant`, and
+  `Matrix.escalator_rank_three_truant` prove that escalators of ranks zero
+  through three have truants in `{1}`, `{2}`, `{3,5}`, and
+  `{6,7,10,14}` respectively.  These theorems transport exact truants across
+  the classified isometries; the remaining critical value 15 belongs to the
+  rank-four universality stage.
 - Rank-three search boxes:
   `Matrix.sumOfTwoSquares_escalation_border_values` confines each border
   coordinate to \(\{-1,0,1\}\);
@@ -159,5 +166,6 @@ Read `quadratic_form` → `integer_quadratic_form` first. Then use
 `rank_four_diagonal_branch_coverage` → `rank_four_double_diagonal_branch_coverage`
 → `rank_four_weighted_diagonal_branches_coverage` →
 `rank_four_odd_diagonal_branches_coverage` →
-`rank_three_global_classification` → `rank_four_global_classification`.
+`rank_three_global_classification` → `critical_truants` and
+`rank_four_global_classification`.
 `PLAN_15_THEOREM.md` records unfinished stages.
