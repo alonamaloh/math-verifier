@@ -71,7 +71,7 @@ BRANCHES = {
     branch.key: branch
     for branch in (
         Branch(1, 14, range(-3, 4), range(-5, 6), range(-3, 4), 319, 25),
-        Branch(2, 7, range(-2, 3), range(-3, 4), range(-3, 4), 161, 25),
+        Branch(2, 7, range(-2, 3), range(-3, 4), range(-3, 4), 161, 18),
         Branch(3, 10, range(-3, 4), range(-5, 6), range(-5, 6), 341, 36),
         Branch(4, 14, range(-3, 4), range(-5, 6), range(-7, 8), 631, 68),
         Branch(5, 10, range(-3, 4), range(-5, 6), range(-7, 8), 425, 52),
@@ -148,7 +148,10 @@ def reflect_form(
 
 def canonical_form(branch: Branch, form: tuple[int, int, int]) -> tuple[int, int, int]:
     reflected, _ = reflect_form(branch, form)
-    return min(form, reflected)
+    orbit = {form, reflected}
+    if branch.d == 2:
+        orbit.update((third, second, corner) for second, third, corner in tuple(orbit))
+    return min(orbit)
 
 
 def normal_forms(branch: Branch) -> list[tuple[int, int, int]]:
@@ -207,9 +210,23 @@ def render_certificate(branch: Branch, border: tuple[int, int, int]) -> str:
     introduction = disjunction_introduction(index, branch.expected_normal_forms, proof_name)
     canonical_proof = ""
     if form != reduced_form:
-        reflected, reflection_shift = reflect_form(branch, reduced_form)
-        assert reflected == form
-        canonical_proof = f"""  -({third} : ℤ) + {branch.d} * ({reflection_shift} : ℤ) = ({canonical_third} : ℤ) by ring as thirdReflects;
+        swapped = (third, second, corner)
+        if branch.d == 2 and swapped == form:
+            canonical_proof = f"""  Matrix.IsIsometric(
+      {representative(branch, second, third, corner)},
+      {representative(branch, canonical_second, canonical_third, canonical_corner)})
+      by Matrix.squarePlusDoublePlusScaledRankFourRepresentative_two_isometric_swap_residues
+  as orbitReduction;
+  Matrix.IsIsometric(
+      {candidate(branch, a, b, c)},
+      {representative(branch, canonical_second, canonical_third, canonical_corner)})
+      by Matrix.IsIsometric.transitive(leftIsometric := reduced, rightIsometric := orbitReduction)
+  as canonicalized;
+"""
+        else:
+            reflected, reflection_shift = reflect_form(branch, reduced_form)
+            assert reflected == form
+            canonical_proof = f"""  -({third} : ℤ) + {branch.d} * ({reflection_shift} : ℤ) = ({canonical_third} : ℤ) by ring as thirdReflects;
   ({corner} : ℤ) + 2 * (-({third} : ℤ) * ({reflection_shift} : ℤ))
       + {branch.d} * (({reflection_shift} : ℤ) * ({reflection_shift} : ℤ)) = {canonical_corner}
       by ring as cornerReflects;
