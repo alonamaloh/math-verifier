@@ -1,0 +1,370 @@
+-- Algebra/rank_four_odd_diagonal_family.math
+--
+-- Reusable rank-four reduction above the ternary forms
+--   x² + 2y² + 2yz + C z².
+-- Their determinant is q = 2C-1.  A top shear kills the unit coordinate
+-- and reduces the other two border coordinates to (r,0), with r taken
+-- modulo q.  The adjugate calculation is kept fraction-free.
+
+module Algebra.rank_four_odd_diagonal_family
+
+import Algebra.rank_four_weighted_diagonal_family
+import Algebra.rank_three_representative_truants
+
+definition Matrix.squarePlusDoubleSquareOddRankFourCandidate
+        (corner truant a b c : ℤ) : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+  Matrix.borderedAssembly(
+      Matrix.squarePlusDoubleSquareOddForm(corner),
+      (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+      truant)
+
+definition Matrix.squarePlusDoubleSquareOddRankFourRepresentative
+        (corner residue newCorner : ℤ) : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+  Matrix.borderedAssembly(
+      Matrix.squarePlusDoubleSquareOddForm(corner),
+      (⟨0, residue, 0⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+      newCorner)
+
+theorem Matrix.squarePlusDoubleSquareOddForm_apply_coordinateTuple
+        (corner x y z : ℤ)
+        : Matrix.squarePlusDoubleSquareOddForm(corner) ·
+            (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+          = (⟨x, 2 * y + z, y + corner * z⟩ : RingVector(Integer.commutative_ring_bundle, 3)) := {
+  let pair : RingVector(Integer.commutative_ring_bundle, 2) := ⟨x, y⟩;
+  let unitBorder : RingVector(Integer.commutative_ring_bundle, 2) := ⟨0, 1⟩;
+  let binaryResult : RingVector(Integer.commutative_ring_bundle, 2) := ⟨x, 2 * y⟩;
+  let scaledBorderResult : RingVector(Integer.commutative_ring_bundle, 2) := ⟨0, z⟩;
+  let resultPair : RingVector(Integer.commutative_ring_bundle, 2) := ⟨x, 2 * y + z⟩;
+  pair = (RingVector.twoCoordinates(x, y) : RingVector(Integer.commutative_ring_bundle, 2))
+      by RingVector.coordinatePair_eq_twoCoordinates as pairReads;
+  unitBorder = (RingVector.twoCoordinates((0 : ℤ), (1 : ℤ))
+      : RingVector(Integer.commutative_ring_bundle, 2))
+      by RingVector.coordinatePair_eq_twoCoordinates as unitBorderReads;
+  binaryResult = (RingVector.twoCoordinates(x, 2 * y)
+      : RingVector(Integer.commutative_ring_bundle, 2))
+      by RingVector.coordinatePair_eq_twoCoordinates as binaryResultReads;
+  scaledBorderResult = (RingVector.twoCoordinates((0 : ℤ), z)
+      : RingVector(Integer.commutative_ring_bundle, 2))
+      by RingVector.coordinatePair_eq_twoCoordinates as scaledBorderResultReads;
+  resultPair = (RingVector.twoCoordinates(x, 2 * y + z)
+      : RingVector(Integer.commutative_ring_bundle, 2))
+      by RingVector.coordinatePair_eq_twoCoordinates as resultPairReads;
+  Matrix.squarePlusDoubleSquareForm · pair
+     = Matrix.squarePlusDoubleSquareForm ·
+         (RingVector.twoCoordinates(x, y) : RingVector(Integer.commutative_ring_bundle, 2))
+         by substituting pairReads
+     = (RingVector.twoCoordinates(x, 2 * y) : RingVector(Integer.commutative_ring_bundle, 2))
+         by Matrix.squarePlusDoubleSquareForm_apply_twoCoordinates
+     = binaryResult by binaryResultReads
+  as binaryAction;
+  z • unitBorder = scaledBorderResult by {
+    ∀ (i : NaturalsBelow(2)).
+        (z • unitBorder)(i) = scaledBorderResult(i)
+      by (i : NaturalsBelow(2)) ↦ {
+        i = NaturalsBelow.firstOfTwo ∨ i = NaturalsBelow.secondOfTwo by NaturalsBelow.two_split;
+        done by cases {
+          case i = NaturalsBelow.firstOfTwo as first: {
+            (z • unitBorder)(i)
+               = z * unitBorder(NaturalsBelow.firstOfTwo) by substituting first
+               = z * (RingVector.twoCoordinates((0 : ℤ), (1 : ℤ))
+                   : RingVector(Integer.commutative_ring_bundle, 2))(NaturalsBelow.firstOfTwo)
+                   by substituting unitBorderReads
+               = z * 0 by substituting RingVector.twoCoordinates_first
+               = (0 : ℤ) by ring
+               = (RingVector.twoCoordinates((0 : ℤ), z)
+                   : RingVector(Integer.commutative_ring_bundle, 2))(NaturalsBelow.firstOfTwo)
+                   by substituting RingVector.twoCoordinates_first
+               = scaledBorderResult(NaturalsBelow.firstOfTwo) by scaledBorderResultReads
+               = scaledBorderResult(i) by substituting first;
+            done
+          }
+          case i = NaturalsBelow.secondOfTwo as second: {
+            (z • unitBorder)(i)
+               = z * unitBorder(NaturalsBelow.secondOfTwo) by substituting second
+               = z * (RingVector.twoCoordinates((0 : ℤ), (1 : ℤ))
+                   : RingVector(Integer.commutative_ring_bundle, 2))(NaturalsBelow.secondOfTwo)
+                   by substituting unitBorderReads
+               = z * 1 by substituting RingVector.twoCoordinates_second
+               = z by ring
+               = (RingVector.twoCoordinates((0 : ℤ), z)
+                   : RingVector(Integer.commutative_ring_bundle, 2))(NaturalsBelow.secondOfTwo)
+                   by substituting RingVector.twoCoordinates_second
+               = scaledBorderResult(NaturalsBelow.secondOfTwo) by scaledBorderResultReads
+               = scaledBorderResult(i) by substituting second;
+            done
+          }
+        }
+      };
+    done by RingVector.equal_of_pointwise
+  }
+  as scaledBorder;
+  RingVector.innerProduct(unitBorder, pair) = y by {
+    RingVector.innerProduct(unitBorder, pair)
+       = RingVector.innerProduct(
+           (RingVector.twoCoordinates((0 : ℤ), (1 : ℤ))
+             : RingVector(Integer.commutative_ring_bundle, 2)), pair)
+           by substituting unitBorderReads
+       = RingVector.innerProduct(
+           (RingVector.twoCoordinates((0 : ℤ), (1 : ℤ))
+             : RingVector(Integer.commutative_ring_bundle, 2)),
+           (RingVector.twoCoordinates(x, y) : RingVector(Integer.commutative_ring_bundle, 2)))
+           by substituting pairReads
+       = 0 * x + 1 * y by RingVector.innerProduct_twoCoordinates
+       = y by ring;
+    done
+  }
+  as pairingReads;
+  x + (0 : ℤ) = x by ring as firstAddsZero;
+  binaryResult + scaledBorderResult = resultPair by {
+    binaryResult + scaledBorderResult
+       = (RingVector.twoCoordinates(x, 2 * y) : RingVector(Integer.commutative_ring_bundle, 2))
+         + scaledBorderResult by substituting binaryResultReads
+       = (RingVector.twoCoordinates(x, 2 * y) : RingVector(Integer.commutative_ring_bundle, 2))
+         + (RingVector.twoCoordinates((0 : ℤ), z) : RingVector(Integer.commutative_ring_bundle, 2))
+           by substituting scaledBorderResultReads
+       = (RingVector.twoCoordinates(x + 0, 2 * y + z)
+           : RingVector(Integer.commutative_ring_bundle, 2)) by RingVector.twoCoordinates_add
+       = (RingVector.twoCoordinates(x, 2 * y + z)
+           : RingVector(Integer.commutative_ring_bundle, 2)) by substituting firstAddsZero
+       = resultPair by resultPairReads;
+    done
+  }
+  as pairAdds;
+  Matrix.squarePlusDoubleSquareOddForm(corner)
+     = Matrix.borderedAssembly(
+         Matrix.squarePlusDoubleSquareForm,
+         (RingVector.twoCoordinates((0 : ℤ), (1 : ℤ))
+           : RingVector(Integer.commutative_ring_bundle, 2)), corner)
+     = Matrix.borderedAssembly(Matrix.squarePlusDoubleSquareForm, unitBorder, corner)
+         by substituting unitBorderReads
+  as formReads;
+  (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+      = RingVector.appendCoordinate(pair, z) as inputReads;
+  Matrix.squarePlusDoubleSquareOddForm(corner) ·
+      (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+     = Matrix.borderedAssembly(Matrix.squarePlusDoubleSquareForm, unitBorder, corner) ·
+         (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3)) by substituting formReads
+     = Matrix.borderedAssembly(Matrix.squarePlusDoubleSquareForm, unitBorder, corner) ·
+         RingVector.appendCoordinate(pair, z) by substituting inputReads
+     = RingVector.appendCoordinate(
+         Matrix.squarePlusDoubleSquareForm · pair + z • unitBorder,
+         RingVector.innerProduct(unitBorder, pair) + corner * z)
+         by Matrix.borderedAssembly_apply_appendCoordinate(
+           symmetric := Matrix.squarePlusDoubleSquareForm_symmetric)
+     = RingVector.appendCoordinate(
+         binaryResult + z • unitBorder,
+         RingVector.innerProduct(unitBorder, pair) + corner * z)
+         by substituting binaryAction
+     = RingVector.appendCoordinate(
+         binaryResult + scaledBorderResult,
+         RingVector.innerProduct(unitBorder, pair) + corner * z)
+         by substituting scaledBorder
+     = RingVector.appendCoordinate(
+         binaryResult + scaledBorderResult,
+         y + corner * z) by substituting pairingReads
+     = RingVector.appendCoordinate(resultPair, y + corner * z) by substituting pairAdds
+     = (⟨x, 2 * y + z, y + corner * z⟩ : RingVector(Integer.commutative_ring_bundle, 3));
+  done
+}
+
+theorem Matrix.squarePlusDoubleSquareOddRankFourCandidate_isometric_reduced
+        (formCorner truant a b c x y z residue newCorner : ℤ)
+        (firstVanishes : a + x = 0)
+        (secondReduces : b + 2 * y + z = residue)
+        (thirdVanishes : c + y + formCorner * z = 0)
+        (cornerReduces : truant + 2 * (a * x + b * y + c * z)
+          + x * x + 2 * (y * y) + 2 * y * z + formCorner * (z * z) = newCorner)
+        : Matrix.IsIsometric(
+            Matrix.squarePlusDoubleSquareOddRankFourCandidate(formCorner, truant, a, b, c),
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(formCorner, residue, newCorner)) := {
+  let A : Matrix(Integer.commutative_ring_bundle, 3, 3) := Matrix.squarePlusDoubleSquareOddForm(formCorner);
+  let border : RingVector(Integer.commutative_ring_bundle, 3) := ⟨a, b, c⟩;
+  let shift : RingVector(Integer.commutative_ring_bundle, 3) := ⟨x, y, z⟩;
+  Matrix.IsIsometric(
+      Matrix.borderedAssembly(A, border, truant),
+      Matrix.borderedAssembly(
+        A, border + A · shift,
+        truant + RingVector.innerProduct(border, shift) + RingVector.innerProduct(border, shift)
+          + Matrix.quadraticForm(A, shift)))
+      by Matrix.borderedAssembly_isometric_topShear(
+        symmetric := Matrix.squarePlusDoubleSquareOddForm_symmetric(formCorner));
+  A · shift = (⟨x, 2 * y + z, y + formCorner * z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+      by Matrix.squarePlusDoubleSquareOddForm_apply_coordinateTuple as actionReads;
+  b + (2 * y + z) = residue by {
+    b + (2 * y + z) = b + 2 * y + z by ring = residue by secondReduces;
+    done
+  }
+  as secondTarget;
+  c + (y + formCorner * z) = 0 by {
+    c + (y + formCorner * z) = c + y + formCorner * z by ring = 0 by thirdVanishes;
+    done
+  }
+  as thirdTarget;
+  border + A · shift
+     = border + (⟨x, 2 * y + z, y + formCorner * z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+         by substituting actionReads
+     = (⟨a + x, b + (2 * y + z), c + (y + formCorner * z)⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+         by RingVector.threeCoordinates_add
+     = (⟨0, b + (2 * y + z), c + (y + formCorner * z)⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+         by substituting firstVanishes
+     = (⟨0, residue, c + (y + formCorner * z)⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+         by substituting secondTarget
+     = (⟨0, residue, 0⟩ : RingVector(Integer.commutative_ring_bundle, 3)) by substituting thirdTarget
+  as borderTarget;
+  RingVector.innerProduct(border, shift) = a * x + b * y + c * z
+      by RingVector.innerProduct_threeCoordinates as pairingReads;
+  Matrix.quadraticForm(A, shift)
+      = x * x + 2 * (y * y) + 2 * y * z + formCorner * (z * z)
+      by Matrix.squarePlusDoubleSquareOddForm_coordinateTuple_value as shiftValue;
+  truant + RingVector.innerProduct(border, shift) + RingVector.innerProduct(border, shift)
+      + Matrix.quadraticForm(A, shift)
+     = truant + (a * x + b * y + c * z) + (a * x + b * y + c * z)
+       + Matrix.quadraticForm(A, shift) by substituting pairingReads
+     = truant + (a * x + b * y + c * z) + (a * x + b * y + c * z)
+       + (x * x + 2 * (y * y) + 2 * y * z + formCorner * (z * z)) by substituting shiftValue
+     = truant + 2 * (a * x + b * y + c * z)
+       + x * x + 2 * (y * y) + 2 * y * z + formCorner * (z * z)
+         by ring
+     = newCorner by cornerReduces
+  as cornerTarget;
+  Matrix.IsIsometric(
+      Matrix.borderedAssembly(A, border, truant),
+      Matrix.borderedAssembly(
+        A, (⟨0, residue, 0⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+        truant + RingVector.innerProduct(border, shift) + RingVector.innerProduct(border, shift)
+          + Matrix.quadraticForm(A, shift)))
+      by substituting borderTarget;
+  done by substituting cornerTarget
+}
+
+theorem Matrix.squarePlusDoubleSquareOddRankFourRepresentative_isometric_negate_residue
+        (formCorner residue newCorner : ℤ)
+        : Matrix.IsIsometric(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(formCorner, residue, newCorner),
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(formCorner, -residue, newCorner)) := {
+  let border : RingVector(Integer.commutative_ring_bundle, 3) := ⟨0, residue, 0⟩;
+  RingVector.negate(border) = (⟨0, -residue, 0⟩ : RingVector(Integer.commutative_ring_bundle, 3)) by {
+    done by RingVector.negate_threeCoordinates
+  }
+  as borderNegates;
+  Matrix.squarePlusDoubleSquareOddRankFourRepresentative(formCorner, residue, newCorner)
+      = Matrix.borderedAssembly(Matrix.squarePlusDoubleSquareOddForm(formCorner), border, newCorner)
+      as sourceReads;
+  Matrix.squarePlusDoubleSquareOddRankFourRepresentative(formCorner, -residue, newCorner)
+     = Matrix.borderedAssembly(
+         Matrix.squarePlusDoubleSquareOddForm(formCorner),
+         (⟨0, -residue, 0⟩ : RingVector(Integer.commutative_ring_bundle, 3)), newCorner)
+     = Matrix.borderedAssembly(
+         Matrix.squarePlusDoubleSquareOddForm(formCorner), RingVector.negate(border), newCorner)
+         by substituting borderNegates
+  as targetReads;
+  Matrix.IsIsometric(
+      Matrix.borderedAssembly(Matrix.squarePlusDoubleSquareOddForm(formCorner), border, newCorner),
+      Matrix.borderedAssembly(Matrix.squarePlusDoubleSquareOddForm(formCorner), RingVector.negate(border), newCorner))
+      by Matrix.borderedAssembly_isometric_negate_border(
+        symmetric := Matrix.squarePlusDoubleSquareOddForm_symmetric(formCorner));
+  Matrix.IsIsometric(
+      Matrix.squarePlusDoubleSquareOddRankFourRepresentative(formCorner, residue, newCorner),
+      Matrix.borderedAssembly(Matrix.squarePlusDoubleSquareOddForm(formCorner), RingVector.negate(border), newCorner))
+      by substituting sourceReads;
+  done by substituting targetReads
+}
+
+-- Fraction-free Schur bound.  Written as a sum of manifestly nonnegative
+-- terms, the adjugate quadratic form is
+--   q a² + (C-1)b² + (b-c)² + c²,
+-- where q=2C-1.
+theorem Matrix.squarePlusDoubleSquareOdd_bordered_coupled_bound
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 3, 1 + 3))
+        (symmetric : Matrix.IsSymmetric(B))
+        (positiveDefinite : Matrix.IsPositiveDefinite(B))
+        (formCorner truant a b c q : ℤ)
+        (qReads : q = 2 * formCorner - 1) (qPositive : q > 0)
+        (blockReads : Matrix.leadingBlock(B) = Matrix.squarePlusDoubleSquareOddForm(formCorner))
+        (borderReads : Matrix.borderColumn(B)
+          = (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+        (cornerReads : Matrix.corner(B) = truant)
+        : q * (a * a) + (formCorner - 1) * (b * b) + (b - c) * (b - c) + c * c
+          < q * truant := {
+  let adjugateValue : ℤ := q * (a * a) + formCorner * (b * b) - 2 * b * c + 2 * (c * c);
+  let eliminatingBase : RingVector(Integer.commutative_ring_bundle, 3) :=
+      ⟨-q * a, -formCorner * b + c, b - 2 * c⟩;
+  let eliminatingVector : RingVector(Integer.commutative_ring_bundle, 1 + 3) :=
+      RingVector.appendCoordinate(eliminatingBase, q);
+  RingVector.restrict(eliminatingVector) = eliminatingBase
+      by RingVector.restrict_appendCoordinate as restrictionReads;
+  eliminatingVector(NaturalsBelow.top(3)) = q by RingVector.appendCoordinate_top as topReads;
+  ¬(eliminatingVector = RingVector.zero(Integer.commutative_ring_bundle, 1 + 3)) by {
+    suppose eliminatingVector = RingVector.zero(Integer.commutative_ring_bundle, 1 + 3) as vectorZero;
+    q
+       = eliminatingVector(NaturalsBelow.top(3)) by topReads
+       = RingVector.zero(Integer.commutative_ring_bundle, 1 + 3)(NaturalsBelow.top(3)) by substituting vectorZero
+       = 0
+    as qZero;
+    (0 : ℤ) = q by Equality.symmetry(qZero);
+    done by Integer.LessThan.distinct
+  };
+  Matrix.squarePlusDoubleSquareOddForm(formCorner) · eliminatingBase
+     = (⟨-q * a,
+          2 * (-formCorner * b + c) + (b - 2 * c),
+          (-formCorner * b + c) + formCorner * (b - 2 * c)⟩
+          : RingVector(Integer.commutative_ring_bundle, 3))
+         by Matrix.squarePlusDoubleSquareOddForm_apply_coordinateTuple
+     = (⟨-q * a, -q * b, -q * c⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+         by substituting qReads; ring
+  as baseAction;
+  Matrix.quadraticForm(Matrix.squarePlusDoubleSquareOddForm(formCorner), eliminatingBase)
+     = RingVector.innerProduct(
+         eliminatingBase, Matrix.squarePlusDoubleSquareOddForm(formCorner) · eliminatingBase)
+     = RingVector.innerProduct(
+         eliminatingBase, (⟨-q * a, -q * b, -q * c⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+         by substituting baseAction
+     = (-q * a) * (-q * a) + (-formCorner * b + c) * (-q * b) + (b - 2 * c) * (-q * c)
+         by RingVector.innerProduct_threeCoordinates
+     = q * adjugateValue by ring
+  as baseValueReads;
+  RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B))
+     = RingVector.innerProduct(
+         eliminatingBase, (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+         by substituting borderReads
+     = (-q * a) * a + (-formCorner * b + c) * b + (b - 2 * c) * c
+         by RingVector.innerProduct_threeCoordinates
+     = -adjugateValue by ring
+  as leftPairingReads;
+  RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
+     = RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B))
+         by RingVector.innerProduct_symmetric
+     = -adjugateValue by leftPairingReads
+  as rightPairingReads;
+  Matrix.quadraticForm(B, eliminatingVector)
+     = Matrix.quadraticForm(Matrix.leadingBlock(B), RingVector.restrict(eliminatingVector))
+       + eliminatingVector(NaturalsBelow.top(3))
+         * RingVector.innerProduct(RingVector.restrict(eliminatingVector), Matrix.borderColumn(B))
+       + eliminatingVector(NaturalsBelow.top(3))
+         * RingVector.innerProduct(Matrix.borderColumn(B), RingVector.restrict(eliminatingVector))
+       + (eliminatingVector(NaturalsBelow.top(3)) * eliminatingVector(NaturalsBelow.top(3))) * Matrix.corner(B)
+         by Matrix.quadraticForm_bordered(symmetric := symmetric)
+     = Matrix.quadraticForm(Matrix.squarePlusDoubleSquareOddForm(formCorner), eliminatingBase)
+       + q * RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B))
+       + q * RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
+       + (q * q) * truant by substitution
+     = q * adjugateValue + q * (-adjugateValue) + q * (-adjugateValue) + (q * q) * truant
+         by substitution
+     = q * (q * truant - adjugateValue) by ring
+  as eliminatingValueReads;
+  Matrix.quadraticForm(B, eliminatingVector) > 0 by positiveDefinite;
+  q * (q * truant - adjugateValue) > 0 by substituting eliminatingValueReads;
+  q * truant - adjugateValue > 0 by Integer.positive_of_multiply_positive;
+  adjugateValue < q * truant by Integer.lt_of_positive_difference as adjugateBound;
+  q * (a * a) + (formCorner - 1) * (b * b) + (b - c) * (b - c) + c * c
+     = q * (a * a) + formCorner * (b * b) - 2 * b * c + 2 * (c * c) by ring
+     = adjugateValue;
+  done by substituting adjugateBound
+}
+
+theorem Integer.lt_of_add_nonnegative_right
+        (x y limit : ℤ) (yNonnegative : y ≥ 0) (bound : x + y < limit)
+        : x < limit := {
+  x = x + 0 ≤ x + y by Integer.add_preserves_less_or_equal(x, x, 0, y, yNonnegative) < limit by bound;
+  done
+}

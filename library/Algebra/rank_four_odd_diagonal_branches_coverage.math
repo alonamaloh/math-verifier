@@ -1,0 +1,202 @@
+-- Algebra/rank_four_odd_diagonal_branches_coverage.math
+--
+-- End-to-end coverage for the two non-diagonal ternary representatives
+-- above x²+2y².  Their common reconstruction is separated from the two
+-- small scalar box arguments.
+
+module Algebra.rank_four_odd_diagonal_branches_coverage
+
+import Algebra.rank_four_odd_diagonal_c4_classification_generated
+import Algebra.rank_four_odd_diagonal_c5_classification_generated
+
+theorem Matrix.squarePlusDoubleSquareOddRankFourEscalation_classified
+        (formCorner q : ℤ) (truant : ℕ)
+        (P : Matrix(Integer.commutative_ring_bundle, 4, 4) → Proposition)
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 3, 1 + 3))
+        (escalation : Matrix.IsEscalation(Matrix.squarePlusDoubleSquareOddForm(formCorner), B))
+        (qReads : q = 2 * formCorner - 1) (qPositive : q > 0)
+        (truantReads : Matrix.truant(Matrix.squarePlusDoubleSquareOddForm(formCorner)) = truant)
+        (classifier : ∀ (a b c : ℤ).
+          q * (a * a) + (formCorner - 1) * (b * b) + (b - c) * (b - c) + c * c < q * truant
+          → P(Matrix.squarePlusDoubleSquareOddRankFourCandidate(formCorner, truant, a, b, c)))
+        : P(B) := {
+  let border : RingVector(Integer.commutative_ring_bundle, 3) := Matrix.borderColumn(B);
+  let pair : RingVector(Integer.commutative_ring_bundle, 2) := RingVector.restrict(border);
+  let a : ℤ := pair(NaturalsBelow.firstOfTwo);
+  let b : ℤ := pair(NaturalsBelow.secondOfTwo);
+  let c : ℤ := border(NaturalsBelow.top(2));
+  pair = RingVector.twoCoordinates(a, b) by RingVector.eq_twoCoordinates as pairReads;
+  let coordinatePair : RingVector(Integer.commutative_ring_bundle, 2) := ⟨a, b⟩;
+  coordinatePair = RingVector.twoCoordinates(a, b)
+      by RingVector.coordinatePair_eq_twoCoordinates as coordinatePairReads;
+  pair = coordinatePair by {
+    pair = RingVector.twoCoordinates(a, b) by pairReads = coordinatePair by coordinatePairReads;
+    done
+  }
+  as pairIsCoordinatePair;
+  border
+     = RingVector.appendCoordinate(pair, c) by RingVector.eq_appendCoordinate(border)
+     = RingVector.appendCoordinate(coordinatePair, c) by substituting pairIsCoordinatePair
+     = (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+  as borderReads;
+  Matrix.leadingBlock(B) = Matrix.squarePlusDoubleSquareOddForm(formCorner)
+      by Matrix.IsEscalation.block(escalation := escalation) as blockReads;
+  (Matrix.truant(Matrix.squarePlusDoubleSquareOddForm(formCorner)) : ℤ) = (truant : ℤ)
+      by congruenceOf((n : ℕ) ↦ (n : ℤ), truantReads) as truantIntegerReads;
+  Matrix.corner(B)
+     = (Matrix.truant(Matrix.squarePlusDoubleSquareOddForm(formCorner)) : ℤ)
+         by Matrix.IsEscalation.corner_is_truant(escalation := escalation)
+     = (truant : ℤ) by truantIntegerReads
+  as cornerReads;
+  q * (a * a) + (formCorner - 1) * (b * b) + (b - c) * (b - c) + c * c < q * truant
+      by Matrix.squarePlusDoubleSquareOdd_bordered_coupled_bound(
+        B := B, formCorner := formCorner, truant := (truant : ℤ), a := a, b := b, c := c, q := q,
+        symmetric := Matrix.IsEscalation.symmetric(escalation := escalation),
+        positiveDefinite := Matrix.IsEscalation.positive_definite(escalation := escalation),
+        qReads := qReads, qPositive := qPositive, blockReads := blockReads,
+        borderReads := borderReads, cornerReads := cornerReads)
+  as coupledBound;
+  P(Matrix.squarePlusDoubleSquareOddRankFourCandidate(formCorner, truant, a, b, c))
+      by classifier(a, b, c, coupledBound);
+  B
+     = Matrix.borderedAssembly(
+         Matrix.squarePlusDoubleSquareOddForm(formCorner), Matrix.borderColumn(B),
+         Matrix.truant(Matrix.squarePlusDoubleSquareOddForm(formCorner)))
+         by Matrix.IsEscalation.eq_borderedAssembly(escalation := escalation)
+     = Matrix.borderedAssembly(
+         Matrix.squarePlusDoubleSquareOddForm(formCorner),
+         (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+         Matrix.truant(Matrix.squarePlusDoubleSquareOddForm(formCorner)))
+         by substituting borderReads
+     = Matrix.borderedAssembly(
+         Matrix.squarePlusDoubleSquareOddForm(formCorner),
+         (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)), (truant : ℤ))
+         by substituting truantIntegerReads
+     = Matrix.squarePlusDoubleSquareOddRankFourCandidate(formCorner, truant, a, b, c)
+  as reconstructs;
+  done by substituting reconstructs
+}
+
+theorem Matrix.rankFourOddDiagonalC4_admissible_classified
+        (a b c : ℤ)
+        (bound : 7 * (a * a) + 3 * (b * b) + (b - c) * (b - c) + c * c < 49)
+        : Matrix.IsRankFourOddDiagonalC4NormalForm(
+            Matrix.squarePlusDoubleSquareOddRankFourCandidate(4, 7, a, b, c)) := {
+  (0 : ℤ) ≤ 3 * (b * b) + (b - c) * (b - c) + c * c
+      by Integer.zero_less_or_equal_of_nonneg as firstRemainderNonnegative;
+  7 * (a * a) + (3 * (b * b) + (b - c) * (b - c) + c * c)
+     = 7 * (a * a) + 3 * (b * b) + (b - c) * (b - c) + c * c by ring
+     < 49 by bound
+  as firstTermBound;
+  7 * (a * a) < 49
+      by Integer.lt_of_add_nonnegative_right(
+        7 * (a * a), 3 * (b * b) + (b - c) * (b - c) + c * c, 49,
+        firstRemainderNonnegative, firstTermBound)
+     = 7 * 7 by ring;
+  a * a < 7 by Integer.cancel_lt_by_positive < 8;
+  -2 ≤ a by Integer.square_below_eight_lower_box_bound as aLower;
+  a < 3 by Integer.square_below_eight_upper_box_bound as aUpper;
+  (0 : ℤ) ≤ 7 * (a * a) + (b - c) * (b - c) + c * c
+      by Integer.zero_less_or_equal_of_nonneg as secondRemainderNonnegative;
+  3 * (b * b) + (7 * (a * a) + (b - c) * (b - c) + c * c)
+     = 7 * (a * a) + 3 * (b * b) + (b - c) * (b - c) + c * c by ring
+     < 49 by bound
+  as secondTermBound;
+  3 * (b * b) < 49
+      by Integer.lt_of_add_nonnegative_right(
+        3 * (b * b), 7 * (a * a) + (b - c) * (b - c) + c * c, 49,
+        secondRemainderNonnegative, secondTermBound)
+     < 54
+     = 3 * 18 by ring;
+  b * b < 18 by Integer.cancel_lt_by_positive;
+  -4 ≤ b by Integer.square_below_eighteen_lower_box_bound as bLower;
+  b < 5 by Integer.square_below_eighteen_upper_box_bound as bUpper;
+  (0 : ℤ) ≤ 7 * (a * a) + 3 * (b * b) + (b - c) * (b - c)
+      by Integer.zero_less_or_equal_of_nonneg as thirdRemainderNonnegative;
+  c * c + (7 * (a * a) + 3 * (b * b) + (b - c) * (b - c))
+     = 7 * (a * a) + 3 * (b * b) + (b - c) * (b - c) + c * c by ring
+     < 49 by bound
+  as thirdTermBound;
+  c * c < 49
+      by Integer.lt_of_add_nonnegative_right(
+        c * c, 7 * (a * a) + 3 * (b * b) + (b - c) * (b - c), 49,
+        thirdRemainderNonnegative, thirdTermBound)
+     < 64;
+  -7 ≤ c ∧ c < 8 by Integer.square_below_sixty_four_box as cBox;
+  -7 ≤ c by cBox as cLower;
+  c < 8 by cBox as cUpper;
+  done by Matrix.rankFourOddDiagonalC4_finite_box_classified(
+      a, aLower, aUpper, b, bLower, bUpper, c, cLower, cUpper, bound)
+}
+
+theorem Matrix.squarePlusDoubleSquareOddForm_four_rankFourEscalation_classified
+        (B : Matrix(Integer.commutative_ring_bundle, 4, 4))
+        (escalation : Matrix.IsEscalation(Matrix.squarePlusDoubleSquareOddForm(4), B))
+        : Matrix.IsRankFourOddDiagonalC4NormalForm(B) :=
+  by Matrix.squarePlusDoubleSquareOddRankFourEscalation_classified(
+    formCorner := 4, q := 7, truant := 7, P := Matrix.IsRankFourOddDiagonalC4NormalForm,
+    escalation := escalation, qReads := ring, qPositive := done,
+    truantReads := Matrix.squarePlusDoubleSquareOddForm_four_truant,
+    classifier := Matrix.rankFourOddDiagonalC4_admissible_classified)
+
+theorem Matrix.rankFourOddDiagonalC5_admissible_classified
+        (a b c : ℤ)
+        (bound : 9 * (a * a) + 4 * (b * b) + (b - c) * (b - c) + c * c < 63)
+        : Matrix.IsRankFourOddDiagonalC5NormalForm(
+            Matrix.squarePlusDoubleSquareOddRankFourCandidate(5, 7, a, b, c)) := {
+  (0 : ℤ) ≤ 4 * (b * b) + (b - c) * (b - c) + c * c
+      by Integer.zero_less_or_equal_of_nonneg as firstRemainderNonnegative;
+  9 * (a * a) + (4 * (b * b) + (b - c) * (b - c) + c * c)
+     = 9 * (a * a) + 4 * (b * b) + (b - c) * (b - c) + c * c by ring
+     < 63 by bound
+  as firstTermBound;
+  9 * (a * a) < 63
+      by Integer.lt_of_add_nonnegative_right(
+        9 * (a * a), 4 * (b * b) + (b - c) * (b - c) + c * c, 63,
+        firstRemainderNonnegative, firstTermBound)
+     = 9 * 7 by ring;
+  a * a < 7 by Integer.cancel_lt_by_positive < 8;
+  -2 ≤ a by Integer.square_below_eight_lower_box_bound as aLower;
+  a < 3 by Integer.square_below_eight_upper_box_bound as aUpper;
+  (0 : ℤ) ≤ 9 * (a * a) + (b - c) * (b - c) + c * c
+      by Integer.zero_less_or_equal_of_nonneg as secondRemainderNonnegative;
+  4 * (b * b) + (9 * (a * a) + (b - c) * (b - c) + c * c)
+     = 9 * (a * a) + 4 * (b * b) + (b - c) * (b - c) + c * c by ring
+     < 63 by bound
+  as secondTermBound;
+  4 * (b * b) < 63
+      by Integer.lt_of_add_nonnegative_right(
+        4 * (b * b), 9 * (a * a) + (b - c) * (b - c) + c * c, 63,
+        secondRemainderNonnegative, secondTermBound)
+     < 72
+     = 4 * 18 by ring;
+  b * b < 18 by Integer.cancel_lt_by_positive;
+  -4 ≤ b by Integer.square_below_eighteen_lower_box_bound as bLower;
+  b < 5 by Integer.square_below_eighteen_upper_box_bound as bUpper;
+  (0 : ℤ) ≤ 9 * (a * a) + 4 * (b * b) + (b - c) * (b - c)
+      by Integer.zero_less_or_equal_of_nonneg as thirdRemainderNonnegative;
+  c * c + (9 * (a * a) + 4 * (b * b) + (b - c) * (b - c))
+     = 9 * (a * a) + 4 * (b * b) + (b - c) * (b - c) + c * c by ring
+     < 63 by bound
+  as thirdTermBound;
+  c * c < 63
+      by Integer.lt_of_add_nonnegative_right(
+        c * c, 9 * (a * a) + 4 * (b * b) + (b - c) * (b - c), 63,
+        thirdRemainderNonnegative, thirdTermBound)
+     < 64;
+  -7 ≤ c ∧ c < 8 by Integer.square_below_sixty_four_box as cBox;
+  -7 ≤ c by cBox as cLower;
+  c < 8 by cBox as cUpper;
+  done by Matrix.rankFourOddDiagonalC5_finite_box_classified(
+      a, aLower, aUpper, b, bLower, bUpper, c, cLower, cUpper, bound)
+}
+
+theorem Matrix.squarePlusDoubleSquareOddForm_five_rankFourEscalation_classified
+        (B : Matrix(Integer.commutative_ring_bundle, 4, 4))
+        (escalation : Matrix.IsEscalation(Matrix.squarePlusDoubleSquareOddForm(5), B))
+        : Matrix.IsRankFourOddDiagonalC5NormalForm(B) :=
+  by Matrix.squarePlusDoubleSquareOddRankFourEscalation_classified(
+    formCorner := 5, q := 9, truant := 7, P := Matrix.IsRankFourOddDiagonalC5NormalForm,
+    escalation := escalation, qReads := ring, qPositive := done,
+    truantReads := Matrix.squarePlusDoubleSquareOddForm_five_truant,
+    classifier := Matrix.rankFourOddDiagonalC5_admissible_classified)

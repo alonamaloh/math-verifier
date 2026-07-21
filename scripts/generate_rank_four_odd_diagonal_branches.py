@@ -1,0 +1,387 @@
+#!/usr/bin/env python3
+"""Generate finite classifiers for the C=4,5 odd ternary rank-four branches.
+
+The search computes centered lattice residues and suggested shear vectors.
+Every result is replayed as a ground theorem, and every point in the formal
+coordinate box receives either a reduction certificate or a contradiction.
+"""
+
+from __future__ import annotations
+
+import argparse
+from dataclasses import dataclass
+import itertools
+from pathlib import Path
+import sys
+
+from generate_rank_four_diagonal_branch import integer, name_coordinate, render_integer_all_from
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+@dataclass(frozen=True)
+class Branch:
+    form_corner: int
+    truant: int = 7
+    a_range: range = range(-2, 3)
+    b_range: range = range(-4, 5)
+    c_range: range = range(-7, 8)
+    expected_borders: int = 0
+    expected_normal_forms: int = 0
+
+    @property
+    def key(self) -> str:
+        return f"c{self.form_corner}"
+
+    @property
+    def stem(self) -> str:
+        return f"rank_four_odd_diagonal_{self.key}"
+
+    @property
+    def theorem_prefix(self) -> str:
+        return f"rankFourOddDiagonalC{self.form_corner}"
+
+    @property
+    def predicate(self) -> str:
+        return f"Matrix.IsRankFourOddDiagonalC{self.form_corner}NormalForm"
+
+    @property
+    def determinant(self) -> int:
+        return 2 * self.form_corner - 1
+
+    @property
+    def bound(self) -> int:
+        return self.determinant * self.truant
+
+    @property
+    def outputs(self) -> dict[str, Path]:
+        base = ROOT / "library/Algebra"
+        return {
+            section: base / f"{self.stem}_{suffix}.math"
+            for section, suffix in (
+                ("normal_forms", "normal_forms_generated"),
+                ("certificates", "generated"),
+                ("cases", "box_cases_generated"),
+                ("classifier", "classification_generated"),
+            )
+        }
+
+
+BRANCHES = {
+    branch.key: branch
+    for branch in (
+        Branch(4, expected_borders=203, expected_normal_forms=26),
+        Branch(5, expected_borders=241, expected_normal_forms=32),
+    )
+}
+
+
+def candidate(branch: Branch, a: str, b: str, c: str) -> str:
+    return (
+        "Matrix.squarePlusDoubleSquareOddRankFourCandidate"
+        f"({branch.form_corner}, {branch.truant}, {a}, {b}, {c})"
+    )
+
+
+def representative(branch: Branch, residue: int, corner: int) -> str:
+    return (
+        "Matrix.squarePlusDoubleSquareOddRankFourRepresentative"
+        f"({branch.form_corner}, {residue}, {corner})"
+    )
+
+
+def bound_expression(branch: Branch, a: str, b: str, c: str) -> str:
+    q = branch.determinant
+    return (
+        f"{q} * ({a} * {a}) + {branch.form_corner - 1} * ({b} * {b}) "
+        f"+ ({b} - {c}) * ({b} - {c}) + {c} * {c}"
+    )
+
+
+def bound_value(branch: Branch, border: tuple[int, int, int]) -> int:
+    a, b, c = border
+    return (
+        branch.determinant * a * a
+        + (branch.form_corner - 1) * b * b
+        + (b - c) ** 2
+        + c * c
+    )
+
+
+def raw_borders(branch: Branch) -> list[tuple[int, int, int]]:
+    borders = [
+        border
+        for border in itertools.product(branch.a_range, branch.b_range, branch.c_range)
+        if bound_value(branch, border) < branch.bound
+    ]
+    assert len(borders) == branch.expected_borders
+    return borders
+
+
+def reduce_border(
+    branch: Branch, border: tuple[int, int, int]
+) -> tuple[tuple[int, int, int], tuple[int, int]]:
+    a, b, c = border
+    q = branch.determinant
+    raw_residue = b - 2 * c
+    signed_residue = (raw_residue + q // 2) % q - q // 2
+    z = (raw_residue - signed_residue) // q
+    y = -c - branch.form_corner * z
+    x = -a
+    new_corner = (
+        branch.truant
+        + 2 * (a * x + b * y + c * z)
+        + x * x
+        + 2 * y * y
+        + 2 * y * z
+        + branch.form_corner * z * z
+    )
+    return (x, y, z), (signed_residue, new_corner)
+
+
+def normal_forms(branch: Branch) -> list[tuple[int, int]]:
+    forms = sorted(
+        {(abs(residue), corner) for border in raw_borders(branch) for _, (residue, corner) in [reduce_border(branch, border)]}
+    )
+    assert len(forms) == branch.expected_normal_forms
+    return forms
+
+
+def border_theorem(branch: Branch, border: tuple[int, int, int]) -> str:
+    return "Matrix." + branch.theorem_prefix + "_border_" + "_".join(
+        name_coordinate(value) for value in border
+    )
+
+
+def disjunction_introduction(index: int, count: int) -> str:
+    if index == count - 1:
+        return "Or.introduceRight(" * index + "canonical" + ")" * index
+    return "Or.introduceRight(" * index + "Or.introduceLeft(canonical)" + ")" * index
+
+
+def render_normal_forms(branch: Branch) -> str:
+    clauses = [
+        f"Matrix.IsIsometric(B, {representative(branch, residue, corner)})"
+        for residue, corner in normal_forms(branch)
+    ]
+    return f"""-- Algebra/{branch.stem}_normal_forms_generated.math
+-- Generated by scripts/generate_rank_four_odd_diagonal_branches.py --branch {branch.key}.  Do not edit.
+
+module Algebra.{branch.stem}_normal_forms_generated
+
+import Algebra.rank_four_odd_diagonal_family
+
+definition {branch.predicate}
+        (B : Matrix(Integer.commutative_ring_bundle, 4, 4)) : Proposition :=
+  {chr(10) + '    ∨ '.join(clauses)}
+"""
+
+
+def render_certificate(branch: Branch, border: tuple[int, int, int]) -> str:
+    shift, (signed_residue, corner) = reduce_border(branch, border)
+    canonical_residue = abs(signed_residue)
+    a, b, c = map(integer, border)
+    x, y, z = map(integer, shift)
+    az, bz, cz = (f"({value} : ℤ)" for value in (a, b, c))
+    xz, yz, zz = (f"({value} : ℤ)" for value in (x, y, z))
+    index = normal_forms(branch).index((canonical_residue, corner))
+    if signed_residue < 0:
+        canonical_proof = f"""  Matrix.IsIsometric(
+      {representative(branch, signed_residue, corner)},
+      {representative(branch, canonical_residue, corner)})
+      by Matrix.squarePlusDoubleSquareOddRankFourRepresentative_isometric_negate_residue
+  as signNormalizes;
+  Matrix.IsIsometric(
+      {candidate(branch, a, b, c)},
+      {representative(branch, canonical_residue, corner)})
+      by Matrix.IsIsometric.transitive(leftIsometric := reduced, rightIsometric := signNormalizes)
+  as canonical;
+"""
+    else:
+        canonical_proof = "  Matrix.IsIsometric(\n" + f"      {candidate(branch, a, b, c)},\n      {representative(branch, canonical_residue, corner)}) by reduced as canonical;\n"
+    return f"""automatic theorem {border_theorem(branch, border)}
+        : {branch.predicate}({candidate(branch, a, b, c)}) := {{
+  {az} + {xz} = 0 by ring as firstVanishes;
+  {bz} + 2 * {yz} + {zz} = ({signed_residue} : ℤ) by ring as secondReduces;
+  {cz} + {yz} + {branch.form_corner} * {zz} = 0 by ring as thirdVanishes;
+  ({branch.truant} : ℤ) + 2 * ({az} * {xz} + {bz} * {yz} + {cz} * {zz})
+      + {xz} * {xz} + 2 * ({yz} * {yz}) + 2 * {yz} * {zz}
+      + {branch.form_corner} * ({zz} * {zz}) = {corner} by ring as cornerReduces;
+  Matrix.IsIsometric(
+      {candidate(branch, a, b, c)},
+      {representative(branch, signed_residue, corner)})
+      by Matrix.squarePlusDoubleSquareOddRankFourCandidate_isometric_reduced(
+        x := {x}, y := {y}, z := {z}, residue := {signed_residue}, newCorner := {corner},
+        firstVanishes := firstVanishes, secondReduces := secondReduces,
+        thirdVanishes := thirdVanishes, cornerReduces := cornerReduces)
+  as reduced;
+{canonical_proof}  done by {disjunction_introduction(index, branch.expected_normal_forms)}
+}}
+"""
+
+
+def render_certificates(branch: Branch) -> str:
+    certificates = "\n".join(render_certificate(branch, border) for border in raw_borders(branch))
+    return f"""-- Algebra/{branch.stem}_generated.math
+-- Generated by scripts/generate_rank_four_odd_diagonal_branches.py --branch {branch.key}.  Do not edit.
+-- {branch.expected_borders} admissible borders reduce to {branch.expected_normal_forms} signed normal forms.
+
+module Algebra.{branch.stem}_generated
+
+import Algebra.{branch.stem}_normal_forms_generated
+
+{certificates}"""
+
+
+def render_box_case(branch: Branch, a: int, b: int, c: int) -> str:
+    name = f"Matrix.{branch.theorem_prefix}_box_case_{name_coordinate(a)}_{name_coordinate(b)}_{name_coordinate(c)}"
+    expression = bound_expression(branch, f"({a} : ℤ)", f"({b} : ℤ)", f"({c} : ℤ)")
+    value = bound_value(branch, (a, b, c))
+    if value < branch.bound:
+        proof = f"  done by {border_theorem(branch, (a, b, c))}\n"
+    else:
+        proof = f"""  {expression} = {value} by ring as valueReads;
+  ({value} : ℤ) < {branch.bound} by substituting valueReads;
+  ({branch.bound} : ℤ) ≤ {value};
+  ({value} : ℤ) < {value};
+  ({value} : ℕ) < {value} by Natural.to_integer.LessThan_reflects;
+  False by Natural.lt_irreflexive;
+  done
+"""
+    return f"""automatic theorem {name}
+        (bound : {expression} < {branch.bound})
+        : {branch.predicate}({candidate(branch, str(a), str(b), str(c))}) := {{
+{proof}}}
+"""
+
+
+def render_cases(branch: Branch) -> str:
+    leaves = "\n".join(
+        render_box_case(branch, a, b, c)
+        for a in branch.a_range for b in branch.b_range for c in branch.c_range
+    )
+    volume = len(branch.a_range) * len(branch.b_range) * len(branch.c_range)
+    return f"""-- Algebra/{branch.stem}_box_cases_generated.math
+-- Generated by scripts/generate_rank_four_odd_diagonal_branches.py --branch {branch.key}.  Do not edit.
+-- {volume} explicit finite-box leaves.
+
+module Algebra.{branch.stem}_box_cases_generated
+
+import Algebra.{branch.stem}_generated
+
+{leaves}"""
+
+
+def render_c_sweep(branch: Branch, a: int, b: int) -> str:
+    expression = bound_expression(branch, f"({a} : ℤ)", f"({b} : ℤ)", "c")
+    predicate = f"""{expression} < {branch.bound}
+          → {branch.predicate}({candidate(branch, str(a), str(b), 'c')})"""
+    facts = [
+        (c, f"Matrix.{branch.theorem_prefix}_box_case_{name_coordinate(a)}_{name_coordinate(b)}_{name_coordinate(c)}")
+        for c in branch.c_range
+    ]
+    certificate = render_integer_all_from("P", predicate, "c", branch.c_range, facts)
+    return f"""automatic theorem Matrix.{branch.theorem_prefix}_box_{name_coordinate(a)}_{name_coordinate(b)}_all_c
+        : ∀ (c : ℤ). {branch.c_range.start} ≤ c → c < {branch.c_range.stop}
+          → {expression} < {branch.bound}
+          → {branch.predicate}({candidate(branch, str(a), str(b), 'c')}) := {{
+{certificate}
+}}
+"""
+
+
+def render_b_sweep(branch: Branch, a: int) -> str:
+    expression = bound_expression(branch, f"({a} : ℤ)", "b", "c")
+    predicate = f"""∀ (c : ℤ). {branch.c_range.start} ≤ c → c < {branch.c_range.stop}
+          → {expression} < {branch.bound}
+          → {branch.predicate}({candidate(branch, str(a), 'b', 'c')})"""
+    facts = [
+        (b, f"Matrix.{branch.theorem_prefix}_box_{name_coordinate(a)}_{name_coordinate(b)}_all_c")
+        for b in branch.b_range
+    ]
+    certificate = render_integer_all_from("P", predicate, "b", branch.b_range, facts)
+    return f"""automatic theorem Matrix.{branch.theorem_prefix}_box_{name_coordinate(a)}_all_b_c
+        : ∀ (b : ℤ). {branch.b_range.start} ≤ b → b < {branch.b_range.stop}
+          → ∀ (c : ℤ). {branch.c_range.start} ≤ c → c < {branch.c_range.stop}
+          → {expression} < {branch.bound}
+          → {branch.predicate}({candidate(branch, str(a), 'b', 'c')}) := {{
+{certificate}
+}}
+"""
+
+
+def render_classifier(branch: Branch) -> str:
+    c_sweeps = "\n".join(render_c_sweep(branch, a, b) for a in branch.a_range for b in branch.b_range)
+    b_sweeps = "\n".join(render_b_sweep(branch, a) for a in branch.a_range)
+    expression = bound_expression(branch, "a", "b", "c")
+    predicate = f"""∀ (b : ℤ). {branch.b_range.start} ≤ b → b < {branch.b_range.stop}
+          → ∀ (c : ℤ). {branch.c_range.start} ≤ c → c < {branch.c_range.stop}
+          → {expression} < {branch.bound}
+          → {branch.predicate}({candidate(branch, 'a', 'b', 'c')})"""
+    facts = [
+        (a, f"Matrix.{branch.theorem_prefix}_box_{name_coordinate(a)}_all_b_c")
+        for a in branch.a_range
+    ]
+    certificate = render_integer_all_from("P", predicate, "a", branch.a_range, facts)
+    final = f"""theorem Matrix.{branch.theorem_prefix}_finite_box_classified
+        : ∀ (a : ℤ). {branch.a_range.start} ≤ a → a < {branch.a_range.stop}
+          → ∀ (b : ℤ). {branch.b_range.start} ≤ b → b < {branch.b_range.stop}
+          → ∀ (c : ℤ). {branch.c_range.start} ≤ c → c < {branch.c_range.stop}
+          → {expression} < {branch.bound}
+          → {branch.predicate}({candidate(branch, 'a', 'b', 'c')}) := {{
+{certificate}
+}}
+"""
+    return f"""-- Algebra/{branch.stem}_classification_generated.math
+-- Generated by scripts/generate_rank_four_odd_diagonal_branches.py --branch {branch.key}.  Do not edit.
+
+module Algebra.{branch.stem}_classification_generated
+
+import Algebra.{branch.stem}_box_cases_generated
+
+{c_sweeps}
+{b_sweeps}
+{final}"""
+
+
+RENDERERS = {
+    "normal_forms": render_normal_forms,
+    "certificates": render_certificates,
+    "cases": render_cases,
+    "classifier": render_classifier,
+}
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--branch", choices=BRANCHES)
+    parser.add_argument("--section", choices=RENDERERS)
+    parser.add_argument("--check", action="store_true")
+    parser.add_argument("--stdout", action="store_true")
+    args = parser.parse_args()
+    branches = [BRANCHES[args.branch]] if args.branch else list(BRANCHES.values())
+    sections = [args.section] if args.section else list(RENDERERS)
+    if args.stdout and (len(branches) != 1 or len(sections) != 1):
+        parser.error("--stdout requires one --branch and one --section")
+    if args.stdout:
+        sys.stdout.write(RENDERERS[sections[0]](branches[0]))
+        return 0
+    for branch in branches:
+        for section in sections:
+            output = branch.outputs[section]
+            rendered = RENDERERS[section](branch)
+            if args.check:
+                if not output.exists() or output.read_text() != rendered:
+                    print(f"stale generated file: {output}", file=sys.stderr)
+                    return 1
+            else:
+                output.write_text(rendered)
+                print(f"wrote {output}")
+        if not args.check:
+            print(f"{branch.key}: {branch.expected_borders} borders, {branch.expected_normal_forms} normal forms")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
