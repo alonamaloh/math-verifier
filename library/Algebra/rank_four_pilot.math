@@ -1,0 +1,578 @@
+-- Algebra/rank_four_pilot.math
+--
+-- A rank-four pilot above the sum-of-three-squares escalator.  Its truant
+-- is 7, so every child is the bordered form [I_3 b; b^T 7].  The external
+-- enumerator groups the 81 positive-definite borders by b.b; the theorem
+-- below is the small, reusable kernel certificate behind every reduction.
+
+module Algebra.rank_four_pilot
+
+import Algebra.rank_three_truants
+import Integer.finite_range
+
+-- The boundary decomposition of an identity matrix is itself an identity
+-- block, a zero border, and a unit corner.  These are generally useful facts,
+-- but the pilot is their first consumer.
+
+theorem Matrix.identity_leadingBlock {r : CommutativeRing} {n : ℕ}
+        : Matrix.leadingBlock(Matrix.identity(r, 1 + n)) = Matrix.identity(r, n) := {
+  Matrix.leadingBlock(Matrix.identity(r, 1 + n))
+     = Matrix.submatrix(Matrix.identity(r, 1 + n), NaturalsBelow.inclusion(n), NaturalsBelow.inclusion(n))
+     = Matrix.identity(r, n)
+         by Matrix.submatrix_identity_injective(injective := NaturalsBelow.inclusion_is_injective(n));
+  done
+}
+
+theorem Matrix.identity_borderColumn {r : CommutativeRing} {n : ℕ}
+        : Matrix.borderColumn(Matrix.identity(r, 1 + n)) = RingVector.zero(r, n) := {
+  ∀ (i : NaturalsBelow(n)).
+      Matrix.borderColumn(Matrix.identity(r, 1 + n))(i) = RingVector.zero(r, n)(i)
+      by (i : NaturalsBelow(n)) ↦ {
+          ¬(NaturalsBelow.top(n) = NaturalsBelow.inclusion(n, i))
+              by NaturalsBelow.top_not_inclusion;
+          ¬(NaturalsBelow.inclusion(n, i) = NaturalsBelow.top(n))
+              by (equal : NaturalsBelow.inclusion(n, i) = NaturalsBelow.top(n)) ↦ {
+                  NaturalsBelow.top(n) = NaturalsBelow.inclusion(n, i) by equal;
+                  done
+                };
+          done by Matrix.identity_entry_off
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+theorem Matrix.identity_corner {r : CommutativeRing} {n : ℕ}
+        : Matrix.corner(Matrix.identity(r, 1 + n)) = CommutativeRing.one(r) := {
+  done by Matrix.identity_entry_diagonal
+}
+
+theorem Matrix.sumOfThreeSquaresForm_is_identity
+        : Matrix.sumOfThreeSquaresForm = Matrix.identity(Integer.commutative_ring_bundle, 3) := {
+  let identityThree : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2) :=
+      Matrix.identity(Integer.commutative_ring_bundle, 3);
+  Matrix.leadingBlock(Matrix.sumOfThreeSquaresForm)
+     = Matrix.sumOfTwoSquaresForm by Matrix.diagonalExtension_leadingBlock
+     = Matrix.identity(Integer.commutative_ring_bundle, 2) by Matrix.sumOfTwoSquaresForm_is_identity
+     = Matrix.leadingBlock(identityThree)
+         by Matrix.identity_leadingBlock
+  as blocks;
+  Matrix.borderColumn(Matrix.sumOfThreeSquaresForm)
+     = RingVector.zero(Integer.commutative_ring_bundle, 2) by Matrix.diagonalExtension_borderColumn
+     = Matrix.borderColumn(identityThree)
+         by Matrix.identity_borderColumn
+  as borders;
+  Matrix.corner(Matrix.sumOfThreeSquaresForm)
+     = (1 : ℤ) by Matrix.diagonalExtension_corner
+     = Matrix.corner(identityThree) by Matrix.identity_corner
+  as corners;
+  Matrix.IsSymmetric(identityThree) by Matrix.transpose_identity as identitySymmetric;
+  done by Matrix.symmetric_bordered_extensionality(
+      symmetricB := Matrix.sumOfThreeSquaresForm_symmetric,
+      symmetricC := identitySymmetric,
+      blocks := blocks,
+      borderColumns := borders,
+      corners := corners)
+}
+
+definition Matrix.sumOfThreeSquaresRankFourCandidate
+        (a b c : ℤ) : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+  Matrix.borderedAssembly(
+      Matrix.sumOfThreeSquaresForm,
+      (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+      7)
+
+-- Equal-norm borders of [I_3 b; b^T 7] are related by a top shear.  This
+-- theorem deliberately talks about arbitrary vectors: the generated pilot
+-- only has to prove a ground equality of three squares for each raw border.
+theorem Matrix.sumOfThreeSquaresBorderCandidates_isometric_of_equal_value
+        (b r : RingVector(Integer.commutative_ring_bundle, 3))
+        (equalValue : Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, b)
+          = Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, r))
+        : Matrix.IsIsometric(
+            Matrix.borderedAssembly(Matrix.sumOfThreeSquaresForm, b, 7),
+            Matrix.borderedAssembly(Matrix.sumOfThreeSquaresForm, r, 7)) := {
+  let v : RingVector(Integer.commutative_ring_bundle, 3) := (i : NaturalsBelow(3)) ↦ r(i) - b(i);
+  b + v = r by {
+    ∀ (i : NaturalsBelow(3)). (b + v)(i) = r(i) by (i : NaturalsBelow(3)) ↦ ring;
+    done by RingVector.equal_of_pointwise
+  }
+  as borderMoves;
+  Matrix.sumOfThreeSquaresForm · b = b by {
+    Matrix.sumOfThreeSquaresForm · b
+       = Matrix.identity(Integer.commutative_ring_bundle, 3) · b
+           by substituting Matrix.sumOfThreeSquaresForm_is_identity
+       = b by Matrix.applyVector_identity;
+    done
+  }
+  as actionOnBorder;
+  Matrix.sumOfThreeSquaresForm · v = v by {
+    Matrix.sumOfThreeSquaresForm · v
+       = Matrix.identity(Integer.commutative_ring_bundle, 3) · v
+           by substituting Matrix.sumOfThreeSquaresForm_is_identity
+       = v by Matrix.applyVector_identity;
+    done
+  }
+  as actionOnShift;
+  RingVector.innerProduct(v, Matrix.sumOfThreeSquaresForm · b)
+     = RingVector.innerProduct(v, b) by substituting actionOnBorder
+     = RingVector.innerProduct(b, v) by RingVector.innerProduct_symmetric
+  as pairingsAgree;
+  Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, b)
+      + RingVector.innerProduct(b, v) + RingVector.innerProduct(b, v)
+      + Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, v)
+     = Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, b + v) by {
+        Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, b + v)
+           = Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, b)
+             + RingVector.innerProduct(b, Matrix.sumOfThreeSquaresForm · v)
+             + RingVector.innerProduct(v, Matrix.sumOfThreeSquaresForm · b)
+             + Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, v)
+                 by Matrix.quadraticForm_add
+           = Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, b)
+             + RingVector.innerProduct(b, v)
+             + RingVector.innerProduct(v, Matrix.sumOfThreeSquaresForm · b)
+             + Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, v)
+                 by substituting actionOnShift
+           = Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, b)
+             + RingVector.innerProduct(b, v) + RingVector.innerProduct(b, v)
+             + Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, v)
+                 by substituting pairingsAgree
+        as valueExpansion;
+        done by valueExpansion
+      }
+  as expandedValue;
+  RingVector.innerProduct(b, v) + RingVector.innerProduct(b, v)
+      + Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, v) = 0 by {
+    Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, b)
+        + RingVector.innerProduct(b, v) + RingVector.innerProduct(b, v)
+        + Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, v)
+       = Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, b + v) by expandedValue
+       = Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, r) by substituting borderMoves
+       = Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, b) by equalValue
+    as totalValue;
+    done by linear_combination(totalValue)
+  }
+  as correctionVanishes;
+  Matrix.IsIsometric(
+      Matrix.borderedAssembly(Matrix.sumOfThreeSquaresForm, b, 7),
+      Matrix.borderedAssembly(
+          Matrix.sumOfThreeSquaresForm,
+          b + Matrix.sumOfThreeSquaresForm · v,
+          7 + RingVector.innerProduct(b, v) + RingVector.innerProduct(b, v)
+            + Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, v)))
+      by Matrix.borderedAssembly_isometric_topShear(
+          symmetric := Matrix.sumOfThreeSquaresForm_symmetric);
+  b + Matrix.sumOfThreeSquaresForm · v
+     = b + v by substituting actionOnShift
+     = r by borderMoves
+  as targetBorder;
+  7 + RingVector.innerProduct(b, v) + RingVector.innerProduct(b, v)
+     = 7 + (RingVector.innerProduct(b, v) + RingVector.innerProduct(b, v))
+         by Integer.add_associative
+  as associateFirstThree;
+  7 + (RingVector.innerProduct(b, v) + RingVector.innerProduct(b, v))
+      + Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, v)
+     = 7 + (RingVector.innerProduct(b, v) + RingVector.innerProduct(b, v)
+       + Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, v))
+         by Integer.add_associative
+  as associateCorrection;
+  7 + RingVector.innerProduct(b, v) + RingVector.innerProduct(b, v)
+      + Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, v)
+     = 7 + (RingVector.innerProduct(b, v) + RingVector.innerProduct(b, v))
+       + Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, v) by substituting associateFirstThree
+     = 7 + (RingVector.innerProduct(b, v) + RingVector.innerProduct(b, v)
+       + Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, v)) by associateCorrection
+     = 7 + 0 by substituting correctionVanishes
+     = 7 by Integer.add_identity_right
+  as targetCorner;
+  Matrix.IsIsometric(
+      Matrix.borderedAssembly(Matrix.sumOfThreeSquaresForm, b, 7),
+      Matrix.borderedAssembly(
+          Matrix.sumOfThreeSquaresForm,
+          r,
+          7 + RingVector.innerProduct(b, v) + RingVector.innerProduct(b, v)
+            + Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, v)))
+      by substituting targetBorder;
+  done by substituting targetCorner
+}
+
+theorem Matrix.sumOfThreeSquaresRankFourCandidates_isometric_of_equal_norm
+        (a b c x y z : ℤ)
+        (equalNorm : a * a + b * b + c * c = x * x + y * y + z * z)
+        : Matrix.IsIsometric(
+            Matrix.sumOfThreeSquaresRankFourCandidate(a, b, c),
+            Matrix.sumOfThreeSquaresRankFourCandidate(x, y, z)) := {
+  Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm,
+      (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+     = a * a + b * b + c * c by Matrix.sumOfThreeSquaresForm_coordinateTuple_value
+     = x * x + y * y + z * z by equalNorm
+     = Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm,
+         (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+         by Matrix.sumOfThreeSquaresForm_coordinateTuple_value
+  as valuesAgree;
+  done by Matrix.sumOfThreeSquaresBorderCandidates_isometric_of_equal_value(equalValue := valuesAgree)
+}
+
+-- Positive-definiteness supplies the exact coupled bound, not merely the
+-- three coordinate-wise box bounds.  Evaluating an escalation at (-b, 1)
+-- gives 7 - Q(b), which must be positive.
+theorem Matrix.sumOfThreeSquaresRankFourEscalation_border_value_bound
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 3, 1 + 3))
+        (escalation : Matrix.IsEscalation(Matrix.sumOfThreeSquaresForm, B))
+        : Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, Matrix.borderColumn(B)) < 7 := {
+  let border : RingVector(Integer.commutative_ring_bundle, 3) := Matrix.borderColumn(B);
+  let negatedBorder : RingVector(Integer.commutative_ring_bundle, 3) := RingVector.negate(border);
+  let eliminatingVector : RingVector(Integer.commutative_ring_bundle, 1 + 3) := RingVector.appendCoordinate(negatedBorder, 1);
+  RingVector.restrict(eliminatingVector) = negatedBorder by RingVector.restrict_appendCoordinate as restrictionReads;
+  eliminatingVector(NaturalsBelow.top(3)) = 1 by RingVector.appendCoordinate_top as topReads;
+  ¬(eliminatingVector = RingVector.zero(Integer.commutative_ring_bundle, 4)) by {
+    suppose eliminatingVector = RingVector.zero(Integer.commutative_ring_bundle, 1 + 3) as vectorZero;
+    (1 : ℤ)
+       = eliminatingVector(NaturalsBelow.top(3)) by topReads
+       = RingVector.zero(Integer.commutative_ring_bundle, 1 + 3)(NaturalsBelow.top(3)) by substituting vectorZero
+       = 0;
+    ¬((1 : ℤ) = 0) by Integer.one_not_zero;
+    done
+  };
+  Matrix.leadingBlock(B) = Matrix.sumOfThreeSquaresForm by Matrix.IsEscalation.block as blockReads;
+  (Matrix.truant(Matrix.sumOfThreeSquaresForm) : ℤ) = 7
+      by substituting Matrix.sumOfThreeSquaresForm_truant as truantReads;
+  Matrix.corner(B) = (7 : ℤ) by {
+    Matrix.corner(B)
+       = (Matrix.truant(Matrix.sumOfThreeSquaresForm) : ℤ) by Matrix.IsEscalation.corner_is_truant;
+    done by substituting truantReads
+  }
+  as cornerReads;
+  Matrix.sumOfThreeSquaresForm · border = border by {
+    Matrix.sumOfThreeSquaresForm · border
+       = Matrix.identity(Integer.commutative_ring_bundle, 3) · border
+           by substituting Matrix.sumOfThreeSquaresForm_is_identity
+       = border by Matrix.applyVector_identity;
+    done
+  }
+  as actionReads;
+  Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, border)
+     = RingVector.innerProduct(border, border) by substituting actionReads
+  as borderValueReads;
+  Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, negatedBorder)
+     = Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm,
+         (-(1 : ℤ)) • border) by substituting RingVector.negate_scale_one
+     = ((-(1 : ℤ)) * (-(1 : ℤ))) * Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, border)
+         by Matrix.quadraticForm_scale
+     = Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, border) by ring
+  as negatedValueReads;
+  RingVector.innerProduct(negatedBorder, border)
+     = RingVector.innerProduct((-(1 : ℤ)) • border, border) by substituting RingVector.negate_scale_one
+     = (-(1 : ℤ)) * RingVector.innerProduct(border, border) by RingVector.innerProduct_scale_left
+     = -Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, border) by substituting borderValueReads
+  as firstPairingReads;
+  RingVector.innerProduct(border, negatedBorder)
+     = RingVector.innerProduct(negatedBorder, border) by RingVector.innerProduct_symmetric
+     = -Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, border) by firstPairingReads
+  as secondPairingReads;
+  Matrix.quadraticForm(B, eliminatingVector)
+     = Matrix.quadraticForm(Matrix.leadingBlock(B), RingVector.restrict(eliminatingVector))
+       + eliminatingVector(NaturalsBelow.top(3))
+         * RingVector.innerProduct(RingVector.restrict(eliminatingVector), Matrix.borderColumn(B))
+       + eliminatingVector(NaturalsBelow.top(3))
+         * RingVector.innerProduct(Matrix.borderColumn(B), RingVector.restrict(eliminatingVector))
+       + (eliminatingVector(NaturalsBelow.top(3)) * eliminatingVector(NaturalsBelow.top(3))) * Matrix.corner(B)
+           by Matrix.quadraticForm_bordered(symmetric := Matrix.IsEscalation.symmetric(escalation := escalation))
+     = Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, RingVector.restrict(eliminatingVector))
+       + eliminatingVector(NaturalsBelow.top(3))
+         * RingVector.innerProduct(RingVector.restrict(eliminatingVector), Matrix.borderColumn(B))
+       + eliminatingVector(NaturalsBelow.top(3))
+         * RingVector.innerProduct(Matrix.borderColumn(B), RingVector.restrict(eliminatingVector))
+       + (eliminatingVector(NaturalsBelow.top(3)) * eliminatingVector(NaturalsBelow.top(3))) * Matrix.corner(B)
+           by substituting blockReads
+     = Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, negatedBorder)
+       + eliminatingVector(NaturalsBelow.top(3))
+         * RingVector.innerProduct(negatedBorder, Matrix.borderColumn(B))
+       + eliminatingVector(NaturalsBelow.top(3))
+         * RingVector.innerProduct(Matrix.borderColumn(B), negatedBorder)
+       + (eliminatingVector(NaturalsBelow.top(3)) * eliminatingVector(NaturalsBelow.top(3))) * Matrix.corner(B)
+           by substituting restrictionReads
+     = Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, negatedBorder)
+       + 1 * RingVector.innerProduct(negatedBorder, border)
+       + 1 * RingVector.innerProduct(border, negatedBorder)
+       + (1 * 1) * Matrix.corner(B) by substituting topReads
+     = Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, negatedBorder)
+       + 1 * RingVector.innerProduct(negatedBorder, border)
+       + 1 * RingVector.innerProduct(border, negatedBorder)
+       + (1 * 1) * 7 by substituting cornerReads
+     = Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, border)
+       + 1 * RingVector.innerProduct(negatedBorder, border)
+       + 1 * RingVector.innerProduct(border, negatedBorder)
+       + (1 * 1) * 7 by substituting negatedValueReads
+     = Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, border)
+       + 1 * (-Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, border))
+       + 1 * RingVector.innerProduct(border, negatedBorder)
+       + (1 * 1) * 7 by substituting firstPairingReads
+     = Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, border)
+       + 1 * (-Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, border))
+       + 1 * (-Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, border))
+       + (1 * 1) * 7 by substituting secondPairingReads
+     = 7 - Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, border) by ring
+  as eliminatingValue;
+  Matrix.IsPositiveDefinite(B) by Matrix.IsEscalation.positive_definite as positiveDefinite;
+  Matrix.quadraticForm(B, eliminatingVector) > 0 by positiveDefinite;
+  7 - Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, border) > 0 by substituting eliminatingValue;
+  done by Integer.lt_of_positive_difference
+}
+
+theorem Matrix.sumOfThreeSquaresForm_quadraticForm_nonnegative
+        (x : RingVector(Integer.commutative_ring_bundle, 3))
+        : Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, x) ≥ (0 : ℤ) := {
+  let y : RingVector(Integer.commutative_ring_bundle, 2) := RingVector.restrict(x);
+  let t : ℤ := x(NaturalsBelow.top(2));
+  Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, x)
+     = Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm, y) + t * t
+         by Matrix.sumOfThreeSquaresForm_value
+  as valueSplits;
+  (0 : ℤ) ≤ Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm, y)
+      by Matrix.sumOfTwoSquaresForm_quadraticForm_nonnegative;
+  (0 : ℤ) ≤ t * t by Integer.zero_less_or_equal_of_nonneg;
+  t * t
+     = 0 + t * t
+     ≤ Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm, y) + t * t
+         by Integer.add_preserves_less_or_equal;
+  (0 : ℤ) ≤ Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm, y) + t * t
+      by Integer.LessOrEqual.transitive;
+  done by substituting valueSplits
+}
+
+theorem Matrix.sumOfThreeSquaresRankFourCandidate_determinant
+        (a b c : ℤ)
+        : Matrix.determinant(Matrix.sumOfThreeSquaresRankFourCandidate(a, b, c))
+          = 7 - (a * a + b * b + c * c) := {
+  let border : RingVector(Integer.commutative_ring_bundle, 3) := ⟨a, b, c⟩;
+  let norm : ℤ := a * a + b * b + c * c;
+  Matrix.sumOfThreeSquaresForm · border = border by {
+    Matrix.sumOfThreeSquaresForm · border
+       = Matrix.identity(Integer.commutative_ring_bundle, 3) · border
+           by substituting Matrix.sumOfThreeSquaresForm_is_identity
+       = border by Matrix.applyVector_identity;
+    done
+  }
+  as actionReads;
+  Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, border) = norm
+      by Matrix.sumOfThreeSquaresForm_coordinateTuple_value as valueReads;
+  Matrix.IsIsometric(
+      Matrix.diagonalExtension(Matrix.sumOfThreeSquaresForm, 7 - norm),
+      Matrix.borderedAssembly(
+          Matrix.sumOfThreeSquaresForm,
+          Matrix.sumOfThreeSquaresForm · border,
+          (7 - norm) + Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, border)))
+      by Matrix.diagonalExtension_isometric_borderedAssembly(
+          symmetric := Matrix.sumOfThreeSquaresForm_symmetric);
+  Matrix.IsIsometric(
+      Matrix.diagonalExtension(Matrix.sumOfThreeSquaresForm, 7 - norm),
+      Matrix.sumOfThreeSquaresRankFourCandidate(a, b, c)) by {
+    Matrix.sumOfThreeSquaresForm · border = border by actionReads;
+    (7 - norm) + Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, border)
+       = (7 - norm) + norm by substituting valueReads
+       = 7 by ring
+    as cornerNormalizes;
+    Matrix.IsIsometric(
+        Matrix.diagonalExtension(Matrix.sumOfThreeSquaresForm, 7 - norm),
+        Matrix.borderedAssembly(
+            Matrix.sumOfThreeSquaresForm,
+            border,
+            (7 - norm) + Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, border)))
+        by substituting actionReads;
+    done by substituting cornerNormalizes
+  }
+  as candidateIsometry;
+  ∀ (j : NaturalsBelow(3)).
+      Matrix.diagonalExtension(Matrix.sumOfThreeSquaresForm, 7 - norm)(
+          NaturalsBelow.top(3), NaturalsBelow.inclusion(3, j)) = 0
+      by (j : NaturalsBelow(3)) ↦ {
+          Matrix.borderRow(Matrix.diagonalExtension(Matrix.sumOfThreeSquaresForm, 7 - norm))
+             = RingVector.zero(Integer.commutative_ring_bundle, 3)
+                 by Matrix.diagonalExtension_borderRow as borderRowVanishes;
+          Matrix.diagonalExtension(Matrix.sumOfThreeSquaresForm, 7 - norm)(
+              NaturalsBelow.top(3), NaturalsBelow.inclusion(3, j))
+             = Matrix.borderRow(Matrix.diagonalExtension(Matrix.sumOfThreeSquaresForm, 7 - norm))(j) by reflexivity
+             = RingVector.zero(Integer.commutative_ring_bundle, 3)(j) by substituting borderRowVanishes
+             = (0 : ℤ) by reflexivity
+          as entryReads;
+          done by entryReads
+        }
+  as topRowVanishes;
+  Matrix.determinant(Matrix.diagonalExtension(Matrix.sumOfThreeSquaresForm, 7 - norm))
+     = Matrix.determinant(Matrix.leadingBlock(Matrix.diagonalExtension(Matrix.sumOfThreeSquaresForm, 7 - norm)))
+       * Matrix.corner(Matrix.diagonalExtension(Matrix.sumOfThreeSquaresForm, 7 - norm))
+         by Matrix.determinant_bordered_top_row(vanishes := topRowVanishes)
+     = Matrix.determinant(Matrix.sumOfThreeSquaresForm) * Matrix.corner(
+         Matrix.diagonalExtension(Matrix.sumOfThreeSquaresForm, 7 - norm))
+         by substituting Matrix.diagonalExtension_leadingBlock
+     = Matrix.determinant(Matrix.sumOfThreeSquaresForm) * (7 - norm)
+         by substituting Matrix.diagonalExtension_corner
+     = Matrix.determinant(Matrix.identity(Integer.commutative_ring_bundle, 3)) * (7 - norm)
+         by substituting Matrix.sumOfThreeSquaresForm_is_identity
+     = 1 * (7 - norm) by substituting Matrix.determinant_identity
+     = 7 - norm by ring
+  as diagonalDeterminant;
+  Matrix.determinant(Matrix.sumOfThreeSquaresRankFourCandidate(a, b, c))
+     = Matrix.determinant(Matrix.diagonalExtension(Matrix.sumOfThreeSquaresForm, 7 - norm))
+         by Matrix.isometric_determinant(isometric := candidateIsometry)
+     = 7 - norm by diagonalDeterminant;
+  done
+}
+
+theorem Matrix.sumOfThreeSquaresRankFourCandidates_not_isometric_of_unequal_norm
+        (a b c x y z : ℤ)
+        (unequalNorm : ¬(a * a + b * b + c * c = x * x + y * y + z * z))
+        : ¬(Matrix.IsIsometric(
+            Matrix.sumOfThreeSquaresRankFourCandidate(a, b, c),
+            Matrix.sumOfThreeSquaresRankFourCandidate(x, y, z))) := {
+  suppose Matrix.IsIsometric(
+      Matrix.sumOfThreeSquaresRankFourCandidate(a, b, c),
+      Matrix.sumOfThreeSquaresRankFourCandidate(x, y, z)) as isometric;
+  Matrix.determinant(Matrix.sumOfThreeSquaresRankFourCandidate(x, y, z))
+     = Matrix.determinant(Matrix.sumOfThreeSquaresRankFourCandidate(a, b, c))
+         by Matrix.isometric_determinant(isometric := isometric)
+     = 7 - (a * a + b * b + c * c) by Matrix.sumOfThreeSquaresRankFourCandidate_determinant
+  as determinantReads;
+  Matrix.determinant(Matrix.sumOfThreeSquaresRankFourCandidate(x, y, z))
+     = 7 - (x * x + y * y + z * z) by Matrix.sumOfThreeSquaresRankFourCandidate_determinant
+  as targetDeterminantReads;
+  a * a + b * b + c * c = x * x + y * y + z * z
+      by linear_combination(determinantReads - targetDeterminantReads);
+  done
+}
+
+-- Every actual escalation reconstructs to this bordered family.  Candidate
+-- enumeration remains intentionally external; only these reconstruction and
+-- isometry certificates enter the trusted proof.
+theorem Matrix.sumOfThreeSquaresRankFourEscalation_reconstructs
+        (B : Matrix(Integer.commutative_ring_bundle, 4, 4))
+        (escalation : Matrix.IsEscalation(Matrix.sumOfThreeSquaresForm, B))
+        : B = Matrix.borderedAssembly(
+            Matrix.sumOfThreeSquaresForm, Matrix.borderColumn(B), 7) := {
+  B = Matrix.borderedAssembly(
+          Matrix.sumOfThreeSquaresForm,
+          Matrix.borderColumn(B),
+          Matrix.truant(Matrix.sumOfThreeSquaresForm))
+      by Matrix.IsEscalation.eq_borderedAssembly(escalation := escalation)
+   = Matrix.borderedAssembly(
+          Matrix.sumOfThreeSquaresForm,
+          Matrix.borderColumn(B),
+          7) by substituting Matrix.sumOfThreeSquaresForm_truant;
+  done
+}
+
+theorem Matrix.sumOfThreeSquaresRankFourEscalation_isometric_to_candidate_of_value
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 3, 1 + 3))
+        (escalation : Matrix.IsEscalation(Matrix.sumOfThreeSquaresForm, B))
+        (x y z : ℤ)
+        (targetValue : Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, Matrix.borderColumn(B))
+          = x * x + y * y + z * z)
+        : Matrix.IsIsometric(B, Matrix.sumOfThreeSquaresRankFourCandidate(x, y, z)) := {
+  Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, Matrix.borderColumn(B))
+     = x * x + y * y + z * z by targetValue
+     = Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm,
+         (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+         by Matrix.sumOfThreeSquaresForm_coordinateTuple_value
+  as equalValue;
+  Matrix.IsIsometric(
+      Matrix.borderedAssembly(Matrix.sumOfThreeSquaresForm, Matrix.borderColumn(B), 7),
+      Matrix.sumOfThreeSquaresRankFourCandidate(x, y, z))
+      by Matrix.sumOfThreeSquaresBorderCandidates_isometric_of_equal_value(equalValue := equalValue);
+  B = Matrix.borderedAssembly(Matrix.sumOfThreeSquaresForm, Matrix.borderColumn(B), 7)
+      by Matrix.sumOfThreeSquaresRankFourEscalation_reconstructs as reconstructs;
+  done by substituting reconstructs
+}
+
+definition Matrix.IsSumOfThreeSquaresRankFourPilotRepresentative
+        (B : Matrix(Integer.commutative_ring_bundle, 4, 4)) : Proposition :=
+  Matrix.IsIsometric(B, Matrix.sumOfThreeSquaresRankFourCandidate(0, 0, 0))
+    ∨ Matrix.IsIsometric(B, Matrix.sumOfThreeSquaresRankFourCandidate(0, 0, 1))
+    ∨ Matrix.IsIsometric(B, Matrix.sumOfThreeSquaresRankFourCandidate(0, 1, 1))
+    ∨ Matrix.IsIsometric(B, Matrix.sumOfThreeSquaresRankFourCandidate(1, 1, 1))
+    ∨ Matrix.IsIsometric(B, Matrix.sumOfThreeSquaresRankFourCandidate(0, 0, 2))
+    ∨ Matrix.IsIsometric(B, Matrix.sumOfThreeSquaresRankFourCandidate(0, 1, 2))
+    ∨ Matrix.IsIsometric(B, Matrix.sumOfThreeSquaresRankFourCandidate(1, 1, 2))
+
+theorem Integer.nonnegative_below_seven_values
+        (q : ℤ) (nonnegative : q ≥ 0) (below : q < 7)
+        : q = 0 ∨ q = 1 ∨ q = 2 ∨ q = 3 ∨ q = 4 ∨ q = 5 ∨ q = 6 := {
+  ∀ (z : ℤ). 0 ≤ z → z < 7 → (z = 0 ∨ z = 1 ∨ z = 2 ∨ z = 3 ∨ z = 4 ∨ z = 5 ∨ z = 6)
+      by finite_check z from 0 until 7;
+  done
+}
+
+-- The pilot's end-to-end classification theorem: every actual escalation
+-- above x²+y²+z² lands in one of the seven generated classes.
+theorem Matrix.sumOfThreeSquaresRankFourEscalation_classified
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 3, 1 + 3))
+        (escalation : Matrix.IsEscalation(Matrix.sumOfThreeSquaresForm, B))
+        : Matrix.IsSumOfThreeSquaresRankFourPilotRepresentative(B) := {
+  let q : ℤ := Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm, Matrix.borderColumn(B));
+  q ≥ 0 by Matrix.sumOfThreeSquaresForm_quadraticForm_nonnegative;
+  q < 7 by Matrix.sumOfThreeSquaresRankFourEscalation_border_value_bound;
+  q = 0 ∨ q = 1 ∨ q = 2 ∨ q = 3 ∨ q = 4 ∨ q = 5 ∨ q = 6
+      by Integer.nonnegative_below_seven_values;
+  done by cases {
+    case q = 0 as qZero: {
+      q = 0 * 0 + 0 * 0 + 0 * 0 by substituting qZero as targetValue;
+      Matrix.IsIsometric(B, Matrix.sumOfThreeSquaresRankFourCandidate(0, 0, 0))
+          by Matrix.sumOfThreeSquaresRankFourEscalation_isometric_to_candidate_of_value(
+              escalation := escalation, targetValue := targetValue);
+      done by Or.introduceLeft
+    }
+    case q = 1 ∨ q = 2 ∨ q = 3 ∨ q = 4 ∨ q = 5 ∨ q = 6: done by cases {
+      case q = 1 as qOne: {
+        q = 0 * 0 + 0 * 0 + 1 * 1 by substituting qOne as targetValue;
+        Matrix.IsIsometric(B, Matrix.sumOfThreeSquaresRankFourCandidate(0, 0, 1))
+            by Matrix.sumOfThreeSquaresRankFourEscalation_isometric_to_candidate_of_value(
+                escalation := escalation, targetValue := targetValue);
+        done by Or.introduceRight(Or.introduceLeft(done))
+      }
+      case q = 2 ∨ q = 3 ∨ q = 4 ∨ q = 5 ∨ q = 6: done by cases {
+        case q = 2 as qTwo: {
+          q = 0 * 0 + 1 * 1 + 1 * 1 by substituting qTwo as targetValue;
+          Matrix.IsIsometric(B, Matrix.sumOfThreeSquaresRankFourCandidate(0, 1, 1))
+              by Matrix.sumOfThreeSquaresRankFourEscalation_isometric_to_candidate_of_value(
+                  escalation := escalation, targetValue := targetValue);
+          done by Or.introduceRight(Or.introduceRight(Or.introduceLeft(done)))
+        }
+        case q = 3 ∨ q = 4 ∨ q = 5 ∨ q = 6: done by cases {
+          case q = 3 as qThree: {
+            q = 1 * 1 + 1 * 1 + 1 * 1 by substituting qThree as targetValue;
+            Matrix.IsIsometric(B, Matrix.sumOfThreeSquaresRankFourCandidate(1, 1, 1))
+                by Matrix.sumOfThreeSquaresRankFourEscalation_isometric_to_candidate_of_value(
+                    escalation := escalation, targetValue := targetValue);
+            done by Or.introduceRight(Or.introduceRight(Or.introduceRight(Or.introduceLeft(done))))
+          }
+          case q = 4 ∨ q = 5 ∨ q = 6: done by cases {
+            case q = 4 as qFour: {
+              q = 0 * 0 + 0 * 0 + 2 * 2 by substituting qFour as targetValue;
+              Matrix.IsIsometric(B, Matrix.sumOfThreeSquaresRankFourCandidate(0, 0, 2))
+                  by Matrix.sumOfThreeSquaresRankFourEscalation_isometric_to_candidate_of_value(
+                      escalation := escalation, targetValue := targetValue);
+              done by Or.introduceRight(Or.introduceRight(Or.introduceRight(
+                  Or.introduceRight(Or.introduceLeft(done)))))
+            }
+            case q = 5 ∨ q = 6: done by cases {
+              case q = 5 as qFive: {
+                q = 0 * 0 + 1 * 1 + 2 * 2 by substituting qFive as targetValue;
+                Matrix.IsIsometric(B, Matrix.sumOfThreeSquaresRankFourCandidate(0, 1, 2))
+                    by Matrix.sumOfThreeSquaresRankFourEscalation_isometric_to_candidate_of_value(
+                        escalation := escalation, targetValue := targetValue);
+                done by Or.introduceRight(Or.introduceRight(Or.introduceRight(
+                    Or.introduceRight(Or.introduceRight(Or.introduceLeft(done))))))
+              }
+              case q = 6 as qSix: {
+                q = 1 * 1 + 1 * 1 + 2 * 2 by substituting qSix as targetValue;
+                Matrix.IsIsometric(B, Matrix.sumOfThreeSquaresRankFourCandidate(1, 1, 2))
+                    by Matrix.sumOfThreeSquaresRankFourEscalation_isometric_to_candidate_of_value(
+                        escalation := escalation, targetValue := targetValue);
+                done by Or.introduceRight(Or.introduceRight(Or.introduceRight(
+                    Or.introduceRight(Or.introduceRight(Or.introduceRight(done))))))
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
