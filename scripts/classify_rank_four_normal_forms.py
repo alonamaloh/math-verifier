@@ -195,6 +195,32 @@ def columns_to_matrix(columns: list[Vector]) -> Matrix:
     return tuple(tuple(columns[j][i] for j in range(4)) for i in range(4))  # type: ignore[return-value]
 
 
+def multiply(left: Matrix, right: Matrix) -> Matrix:
+    return tuple(
+        tuple(sum(left[i][k] * right[k][j] for k in range(4)) for j in range(4))
+        for i in range(4)
+    )  # type: ignore[return-value]
+
+
+def inverse_unimodular(matrix: Matrix) -> Matrix:
+    det = determinant(matrix)
+    assert abs(det) == 1
+
+    def cofactor(row: int, column: int) -> int:
+        minor = tuple(
+            tuple(value for j, value in enumerate(source_row) if j != column)
+            for i, source_row in enumerate(matrix)
+            if i != row
+        )
+        return (-1 if (row + column) % 2 else 1) * determinant(minor)
+
+    inverse = tuple(tuple(cofactor(j, i) // det for j in range(4)) for i in range(4))
+    identity: Matrix = ((1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1))
+    assert multiply(matrix, inverse) == identity
+    assert multiply(inverse, matrix) == identity
+    return inverse  # type: ignore[return-value]
+
+
 def find_isometry(target: Matrix, source: Matrix) -> Matrix | None:
     """Find ``U`` with ``U^T source U = target``, or exhaust all such ``U``."""
     maximum_norm = max(target[i][i] for i in range(4))

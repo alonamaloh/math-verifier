@@ -1,0 +1,744 @@
+-- Algebra/matrix_four_by_four.math
+--
+-- A compact constructor and computation interface for concrete 4x4 integer
+-- matrices.  Rank-four isometry certificates should state their change of
+-- basis as four rows and reduce its action to ordinary integer arithmetic,
+-- rather than open-coding sixteen finite-index cases per matrix equality.
+
+module Algebra.matrix_four_by_four
+
+import Algebra.rank_four_weighted_diagonal_orbits
+
+definition NaturalsBelow.firstOfFour : NaturalsBelow(4) :=
+  NaturalsBelow.inclusion(3, NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo))
+
+definition NaturalsBelow.secondOfFour : NaturalsBelow(4) :=
+  NaturalsBelow.inclusion(3, NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo))
+
+definition NaturalsBelow.thirdOfFour : NaturalsBelow(4) :=
+  NaturalsBelow.inclusion(3, NaturalsBelow.top(2))
+
+definition NaturalsBelow.fourthOfFour : NaturalsBelow(4) :=
+  NaturalsBelow.top(3)
+
+theorem NaturalsBelow.four_split (i : NaturalsBelow(4))
+        : i = NaturalsBelow.firstOfFour
+          ∨ i = NaturalsBelow.secondOfFour
+          ∨ i = NaturalsBelow.thirdOfFour
+          ∨ i = NaturalsBelow.fourthOfFour := {
+  (∃ (j : NaturalsBelow(3)). i = NaturalsBelow.inclusion(3, j))
+      ∨ i = NaturalsBelow.top(3) by NaturalsBelow.inclusion_or_top;
+  done by cases {
+    case ∃ (j : NaturalsBelow(3)). i = NaturalsBelow.inclusion(3, j) as belowTop: {
+      choose j such that i = NaturalsBelow.inclusion(3, j) from belowTop;
+      (∃ (k : NaturalsBelow(2)). j = NaturalsBelow.inclusion(2, k))
+          ∨ j = NaturalsBelow.top(2) by NaturalsBelow.inclusion_or_top;
+      done by cases {
+        case ∃ (k : NaturalsBelow(2)). j = NaturalsBelow.inclusion(2, k) as belowThird: {
+          choose k such that j = NaturalsBelow.inclusion(2, k) from belowThird;
+          k = NaturalsBelow.firstOfTwo ∨ k = NaturalsBelow.secondOfTwo
+              by NaturalsBelow.two_split;
+          done by cases {
+            case k = NaturalsBelow.firstOfTwo: {
+              i = NaturalsBelow.firstOfFour by substitution;
+              done by Or.introduceLeft
+            }
+            case k = NaturalsBelow.secondOfTwo: {
+              i = NaturalsBelow.secondOfFour by substitution;
+              done by Or.introduceRight(Or.introduceLeft)
+            }
+          }
+        }
+        case j = NaturalsBelow.top(2): {
+          i = NaturalsBelow.thirdOfFour by substitution;
+          done by Or.introduceRight(Or.introduceRight(Or.introduceLeft))
+        }
+      }
+    }
+    case i = NaturalsBelow.top(3): {
+      i = NaturalsBelow.fourthOfFour by substitution;
+      done by Or.introduceRight(Or.introduceRight(Or.introduceRight))
+    }
+  }
+}
+
+theorem RingVector.eq_fourCoordinates
+        (v : RingVector(Integer.commutative_ring_bundle, 4))
+        : v = (⟨v(NaturalsBelow.firstOfFour), v(NaturalsBelow.secondOfFour),
+                v(NaturalsBelow.thirdOfFour), v(NaturalsBelow.fourthOfFour)⟩
+              : RingVector(Integer.commutative_ring_bundle, 4)) := {
+  let initial : RingVector(Integer.commutative_ring_bundle, 3) := RingVector.restrict(v);
+  initial
+     = (⟨initial(NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo)),
+          initial(NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo)),
+          initial(NaturalsBelow.top(2))⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+         by RingVector.eq_threeCoordinates
+     = (⟨v(NaturalsBelow.firstOfFour), v(NaturalsBelow.secondOfFour),
+          v(NaturalsBelow.thirdOfFour)⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+  as initialReads;
+  v
+     = RingVector.appendCoordinate(initial, v(NaturalsBelow.top(3))) by RingVector.eq_appendCoordinate(v)
+     = RingVector.appendCoordinate(
+         (⟨v(NaturalsBelow.firstOfFour), v(NaturalsBelow.secondOfFour),
+            v(NaturalsBelow.thirdOfFour)⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+         v(NaturalsBelow.top(3))) by substituting initialReads
+     = (⟨v(NaturalsBelow.firstOfFour), v(NaturalsBelow.secondOfFour),
+          v(NaturalsBelow.thirdOfFour), v(NaturalsBelow.fourthOfFour)⟩
+        : RingVector(Integer.commutative_ring_bundle, 4));
+  done
+}
+
+theorem RingVector.innerProduct_fourCoordinates
+        (a b c d x y z w : ℤ)
+        : RingVector.innerProduct(
+            (⟨a, b, c, d⟩ : RingVector(Integer.commutative_ring_bundle, 4)),
+            (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4)))
+          = a * x + b * y + c * z + d * w := {
+  RingVector.innerProduct(
+      (⟨a, b, c, d⟩ : RingVector(Integer.commutative_ring_bundle, 4)),
+      (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4)))
+     = RingVector.innerProduct(
+         (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+         (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3))) + d * w
+         by RingVector.innerProduct_appendCoordinate
+     = (a * x + b * y + c * z) + d * w by RingVector.innerProduct_threeCoordinates
+     = a * x + b * y + c * z + d * w;
+  done
+}
+
+theorem RingVector.fourCoordinates_equal
+        (a0 a1 a2 a3 b0 b1 b2 b3 : ℤ)
+        (first : a0 = b0) (second : a1 = b1) (third : a2 = b2) (fourth : a3 = b3)
+        : (⟨a0, a1, a2, a3⟩ : RingVector(Integer.commutative_ring_bundle, 4))
+          = (⟨b0, b1, b2, b3⟩ : RingVector(Integer.commutative_ring_bundle, 4)) := {
+  (⟨a0, a1, a2, a3⟩ : RingVector(Integer.commutative_ring_bundle, 4))
+     = (⟨b0, a1, a2, a3⟩ : RingVector(Integer.commutative_ring_bundle, 4)) by substituting first
+     = (⟨b0, b1, a2, a3⟩ : RingVector(Integer.commutative_ring_bundle, 4)) by substituting second
+     = (⟨b0, b1, b2, a3⟩ : RingVector(Integer.commutative_ring_bundle, 4)) by substituting third
+     = (⟨b0, b1, b2, b3⟩ : RingVector(Integer.commutative_ring_bundle, 4)) by substituting fourth;
+  done
+}
+
+theorem RingVector.fourCoordinates_first (a b c d : ℤ)
+        : (⟨a, b, c, d⟩ : RingVector(Integer.commutative_ring_bundle, 4))(
+            NaturalsBelow.firstOfFour) = a := {
+  let pair : RingVector(Integer.commutative_ring_bundle, 2) := ⟨a, b⟩;
+  pair = RingVector.twoCoordinates(a, b) by RingVector.coordinatePair_eq_twoCoordinates as pairReads;
+  (⟨a, b, c, d⟩ : RingVector(Integer.commutative_ring_bundle, 4))(NaturalsBelow.firstOfFour)
+     = (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3))(
+         NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo)) by RingVector.appendCoordinate_inclusion
+     = pair(NaturalsBelow.firstOfTwo) by RingVector.appendCoordinate_inclusion
+     = (RingVector.twoCoordinates(a, b) : RingVector(Integer.commutative_ring_bundle, 2))(
+         NaturalsBelow.firstOfTwo) by substituting pairReads
+     = a by RingVector.twoCoordinates_first;
+  done
+}
+
+theorem RingVector.fourCoordinates_second (a b c d : ℤ)
+        : (⟨a, b, c, d⟩ : RingVector(Integer.commutative_ring_bundle, 4))(
+            NaturalsBelow.secondOfFour) = b := {
+  let pair : RingVector(Integer.commutative_ring_bundle, 2) := ⟨a, b⟩;
+  pair = RingVector.twoCoordinates(a, b) by RingVector.coordinatePair_eq_twoCoordinates as pairReads;
+  (⟨a, b, c, d⟩ : RingVector(Integer.commutative_ring_bundle, 4))(NaturalsBelow.secondOfFour)
+     = (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3))(
+         NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo)) by RingVector.appendCoordinate_inclusion
+     = pair(NaturalsBelow.secondOfTwo) by RingVector.appendCoordinate_inclusion
+     = (RingVector.twoCoordinates(a, b) : RingVector(Integer.commutative_ring_bundle, 2))(
+         NaturalsBelow.secondOfTwo) by substituting pairReads
+     = b by RingVector.twoCoordinates_second;
+  done
+}
+
+theorem RingVector.fourCoordinates_third (a b c d : ℤ)
+        : (⟨a, b, c, d⟩ : RingVector(Integer.commutative_ring_bundle, 4))(
+            NaturalsBelow.thirdOfFour) = c := {
+  (⟨a, b, c, d⟩ : RingVector(Integer.commutative_ring_bundle, 4))(NaturalsBelow.thirdOfFour)
+     = (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3))(NaturalsBelow.top(2))
+         by RingVector.appendCoordinate_inclusion
+     = c by RingVector.appendCoordinate_top;
+  done
+}
+
+theorem RingVector.fourCoordinates_fourth (a b c d : ℤ)
+        : (⟨a, b, c, d⟩ : RingVector(Integer.commutative_ring_bundle, 4))(
+            NaturalsBelow.fourthOfFour) = d := {
+  done by RingVector.appendCoordinate_top
+}
+
+theorem RingVector.threeCoordinates_first (a b c : ℤ)
+        : (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3))(
+            NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo)) = a := {
+  let pair : RingVector(Integer.commutative_ring_bundle, 2) := ⟨a, b⟩;
+  pair = RingVector.twoCoordinates(a, b) by RingVector.coordinatePair_eq_twoCoordinates as pairReads;
+  (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3))(
+      NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo))
+     = pair(NaturalsBelow.firstOfTwo) by RingVector.appendCoordinate_inclusion
+     = (RingVector.twoCoordinates(a, b) : RingVector(Integer.commutative_ring_bundle, 2))(
+         NaturalsBelow.firstOfTwo) by substituting pairReads
+     = a by RingVector.twoCoordinates_first;
+  done
+}
+
+theorem RingVector.threeCoordinates_second (a b c : ℤ)
+        : (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3))(
+            NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo)) = b := {
+  let pair : RingVector(Integer.commutative_ring_bundle, 2) := ⟨a, b⟩;
+  pair = RingVector.twoCoordinates(a, b) by RingVector.coordinatePair_eq_twoCoordinates as pairReads;
+  (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3))(
+      NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo))
+     = pair(NaturalsBelow.secondOfTwo) by RingVector.appendCoordinate_inclusion
+     = (RingVector.twoCoordinates(a, b) : RingVector(Integer.commutative_ring_bundle, 2))(
+         NaturalsBelow.secondOfTwo) by substituting pairReads
+     = b by RingVector.twoCoordinates_second;
+  done
+}
+
+theorem RingVector.threeCoordinates_third (a b c : ℤ)
+        : (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3))(
+            NaturalsBelow.top(2)) = c := {
+  done by RingVector.appendCoordinate_top
+}
+
+theorem RingVector.threeCoordinates_scale (s a b c : ℤ)
+        : s • (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+          = (⟨s*a, s*b, s*c⟩ : RingVector(Integer.commutative_ring_bundle, 3)) := {
+  ∀ (i : NaturalsBelow(3)).
+      (s • (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)))(i)
+        = (⟨s*a, s*b, s*c⟩ : RingVector(Integer.commutative_ring_bundle, 3))(i)
+      by (i : NaturalsBelow(3)) ↦ {
+        (∃ (j : NaturalsBelow(2)). i = NaturalsBelow.inclusion(2, j))
+            ∨ i = NaturalsBelow.top(2) by NaturalsBelow.inclusion_or_top;
+        done by cases {
+          case ∃ (j : NaturalsBelow(2)). i = NaturalsBelow.inclusion(2, j) as belowThird: {
+            choose j such that i = NaturalsBelow.inclusion(2, j) as atInclusion from belowThird;
+            j = NaturalsBelow.firstOfTwo ∨ j = NaturalsBelow.secondOfTwo by NaturalsBelow.two_split;
+            done by cases {
+              case j = NaturalsBelow.firstOfTwo as atFirst: {
+                i = NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo) by {
+                  i = NaturalsBelow.inclusion(2, j) by atInclusion
+                     = NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo) by substituting atFirst;
+                  done
+                }
+                as atFirstIndex;
+                (s • (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)))(i)
+                   = s * (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3))(
+                       NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo))
+                       by substituting atFirstIndex
+                   = s*a by RingVector.threeCoordinates_first
+                   = (⟨s*a, s*b, s*c⟩ : RingVector(Integer.commutative_ring_bundle, 3))(
+                       NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo))
+                       by Equality.symmetry(RingVector.threeCoordinates_first(s*a, s*b, s*c))
+                   = (⟨s*a, s*b, s*c⟩ : RingVector(Integer.commutative_ring_bundle, 3))(i)
+                       by substituting atFirstIndex;
+                done
+              }
+              case j = NaturalsBelow.secondOfTwo as atSecond: {
+                i = NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo) by {
+                  i = NaturalsBelow.inclusion(2, j) by atInclusion
+                     = NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo) by substituting atSecond;
+                  done
+                }
+                as atSecondIndex;
+                (s • (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)))(i)
+                   = s * (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3))(
+                       NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo))
+                       by substituting atSecondIndex
+                   = s*b by RingVector.threeCoordinates_second
+                   = (⟨s*a, s*b, s*c⟩ : RingVector(Integer.commutative_ring_bundle, 3))(
+                       NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo))
+                       by Equality.symmetry(RingVector.threeCoordinates_second(s*a, s*b, s*c))
+                   = (⟨s*a, s*b, s*c⟩ : RingVector(Integer.commutative_ring_bundle, 3))(i)
+                       by substituting atSecondIndex;
+                done
+              }
+            }
+          }
+          case i = NaturalsBelow.top(2) as atTop: {
+            (s • (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)))(i)
+               = s * (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3))(NaturalsBelow.top(2))
+                   by substituting atTop
+               = s*c by RingVector.threeCoordinates_third
+               = (⟨s*a, s*b, s*c⟩ : RingVector(Integer.commutative_ring_bundle, 3))(NaturalsBelow.top(2))
+                   by Equality.symmetry(RingVector.threeCoordinates_third(s*a, s*b, s*c))
+               = (⟨s*a, s*b, s*c⟩ : RingVector(Integer.commutative_ring_bundle, 3))(i)
+                   by substituting atTop;
+            done
+          }
+        }
+      };
+  done by RingVector.equal_of_pointwise
+}
+
+theorem Matrix.borderedAssembly_apply_fourCoordinates
+        (A : Matrix(Integer.commutative_ring_bundle, 3, 3))
+        (b0 b1 b2 corner x0 x1 x2 x3 y0 y1 y2 : ℤ)
+        (symmetric : Matrix.IsSymmetric(A))
+        (parentAction : A · (⟨x0, x1, x2⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+          = (⟨y0, y1, y2⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+        : Matrix.borderedAssembly(
+            A, (⟨b0, b1, b2⟩ : RingVector(Integer.commutative_ring_bundle, 3)), corner) ·
+              (⟨x0, x1, x2, x3⟩ : RingVector(Integer.commutative_ring_bundle, 4))
+          = (⟨y0 + x3*b0, y1 + x3*b1, y2 + x3*b2,
+               b0*x0 + b1*x1 + b2*x2 + corner*x3⟩
+             : RingVector(Integer.commutative_ring_bundle, 4)) := {
+  let v : RingVector(Integer.commutative_ring_bundle, 3) := ⟨x0, x1, x2⟩;
+  let b : RingVector(Integer.commutative_ring_bundle, 3) := ⟨b0, b1, b2⟩;
+  x3 • b = (⟨x3*b0, x3*b1, x3*b2⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+      by RingVector.threeCoordinates_scale as borderScales;
+  A · v + x3 • b
+     = (⟨y0, y1, y2⟩ : RingVector(Integer.commutative_ring_bundle, 3)) + x3 • b
+         by substituting parentAction
+     = (⟨y0, y1, y2⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+       + (⟨x3*b0, x3*b1, x3*b2⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+         by substituting borderScales
+     = (⟨y0 + x3*b0, y1 + x3*b1, y2 + x3*b2⟩
+        : RingVector(Integer.commutative_ring_bundle, 3)) by RingVector.threeCoordinates_add
+  as lowerReads;
+  RingVector.innerProduct(b, v) + corner*x3
+     = (b0*x0 + b1*x1 + b2*x2) + corner*x3 by RingVector.innerProduct_threeCoordinates
+     = b0*x0 + b1*x1 + b2*x2 + corner*x3
+  as topReads;
+  Matrix.borderedAssembly(A, b, corner) ·
+      (⟨x0, x1, x2, x3⟩ : RingVector(Integer.commutative_ring_bundle, 4))
+     = RingVector.appendCoordinate(A · v + x3 • b, RingVector.innerProduct(b, v) + corner*x3)
+         by Matrix.borderedAssembly_apply_appendCoordinate(
+           A := A, b := b, c := corner, symmetric := symmetric, v := v, t := x3)
+     = RingVector.appendCoordinate(
+         (⟨y0 + x3*b0, y1 + x3*b1, y2 + x3*b2⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+         RingVector.innerProduct(b, v) + corner*x3) by substituting lowerReads
+     = RingVector.appendCoordinate(
+         (⟨y0 + x3*b0, y1 + x3*b1, y2 + x3*b2⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+         b0*x0 + b1*x1 + b2*x2 + corner*x3) by substituting topReads
+     = (⟨y0 + x3*b0, y1 + x3*b1, y2 + x3*b2,
+          b0*x0 + b1*x1 + b2*x2 + corner*x3⟩
+        : RingVector(Integer.commutative_ring_bundle, 4));
+  done
+}
+
+definition Matrix.fourByFour
+        (a00 a01 a02 a03 a10 a11 a12 a13 a20 a21 a22 a23 a30 a31 a32 a33 : ℤ)
+        : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+  Function.extendByValue(
+    Function.extendByValue(
+      Function.extendByValue(
+        (_ : NaturalsBelow(1)) ↦
+          (⟨a00, a01, a02, a03⟩ : RingVector(Integer.commutative_ring_bundle, 4)),
+        (⟨a10, a11, a12, a13⟩ : RingVector(Integer.commutative_ring_bundle, 4))),
+      (⟨a20, a21, a22, a23⟩ : RingVector(Integer.commutative_ring_bundle, 4))),
+    (⟨a30, a31, a32, a33⟩ : RingVector(Integer.commutative_ring_bundle, 4)))
+
+theorem Matrix.fourByFour_row_first
+        (a00 a01 a02 a03 a10 a11 a12 a13 a20 a21 a22 a23 a30 a31 a32 a33 : ℤ)
+        : Matrix.fourByFour(a00, a01, a02, a03, a10, a11, a12, a13,
+            a20, a21, a22, a23, a30, a31, a32, a33)(NaturalsBelow.firstOfFour)
+          = (⟨a00, a01, a02, a03⟩ : RingVector(Integer.commutative_ring_bundle, 4)) := {
+  Matrix.fourByFour(a00, a01, a02, a03, a10, a11, a12, a13,
+      a20, a21, a22, a23, a30, a31, a32, a33)(NaturalsBelow.firstOfFour)
+     = Matrix.fourByFour(a00, a01, a02, a03, a10, a11, a12, a13,
+         a20, a21, a22, a23, a30, a31, a32, a33)(
+           NaturalsBelow.inclusion(3, NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo)))
+     = Function.extendByValue(
+         Function.extendByValue(
+           (_ : NaturalsBelow(1)) ↦
+             (⟨a00, a01, a02, a03⟩ : RingVector(Integer.commutative_ring_bundle, 4)),
+           (⟨a10, a11, a12, a13⟩ : RingVector(Integer.commutative_ring_bundle, 4))),
+         (⟨a20, a21, a22, a23⟩ : RingVector(Integer.commutative_ring_bundle, 4)))(
+           NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo))
+         by Function.apply_extendByValue_inclusion
+     = Function.extendByValue(
+         (_ : NaturalsBelow(1)) ↦
+           (⟨a00, a01, a02, a03⟩ : RingVector(Integer.commutative_ring_bundle, 4)),
+         (⟨a10, a11, a12, a13⟩ : RingVector(Integer.commutative_ring_bundle, 4)))(NaturalsBelow.firstOfTwo)
+         by Function.apply_extendByValue_inclusion
+     = Function.extendByValue(
+         (_ : NaturalsBelow(1)) ↦
+           (⟨a00, a01, a02, a03⟩ : RingVector(Integer.commutative_ring_bundle, 4)),
+         (⟨a10, a11, a12, a13⟩ : RingVector(Integer.commutative_ring_bundle, 4)))(
+           NaturalsBelow.inclusion(1, NaturalsBelow.top(0)))
+         by substituting NaturalsBelow.firstOfTwo_is_inclusion
+     = (⟨a00, a01, a02, a03⟩ : RingVector(Integer.commutative_ring_bundle, 4))
+         by Function.apply_extendByValue_inclusion;
+  done
+}
+
+theorem Matrix.fourByFour_row_second
+        (a00 a01 a02 a03 a10 a11 a12 a13 a20 a21 a22 a23 a30 a31 a32 a33 : ℤ)
+        : Matrix.fourByFour(a00, a01, a02, a03, a10, a11, a12, a13,
+            a20, a21, a22, a23, a30, a31, a32, a33)(NaturalsBelow.secondOfFour)
+          = (⟨a10, a11, a12, a13⟩ : RingVector(Integer.commutative_ring_bundle, 4)) := {
+  Matrix.fourByFour(a00, a01, a02, a03, a10, a11, a12, a13,
+      a20, a21, a22, a23, a30, a31, a32, a33)(NaturalsBelow.secondOfFour)
+     = Function.extendByValue(
+         Function.extendByValue(
+           (_ : NaturalsBelow(1)) ↦
+             (⟨a00, a01, a02, a03⟩ : RingVector(Integer.commutative_ring_bundle, 4)),
+           (⟨a10, a11, a12, a13⟩ : RingVector(Integer.commutative_ring_bundle, 4))),
+         (⟨a20, a21, a22, a23⟩ : RingVector(Integer.commutative_ring_bundle, 4)))(
+           NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo))
+         by Function.apply_extendByValue_inclusion
+     = Function.extendByValue(
+         (_ : NaturalsBelow(1)) ↦
+           (⟨a00, a01, a02, a03⟩ : RingVector(Integer.commutative_ring_bundle, 4)),
+         (⟨a10, a11, a12, a13⟩ : RingVector(Integer.commutative_ring_bundle, 4)))(NaturalsBelow.secondOfTwo)
+         by Function.apply_extendByValue_inclusion
+     = Function.extendByValue(
+         (_ : NaturalsBelow(1)) ↦
+           (⟨a00, a01, a02, a03⟩ : RingVector(Integer.commutative_ring_bundle, 4)),
+         (⟨a10, a11, a12, a13⟩ : RingVector(Integer.commutative_ring_bundle, 4)))(NaturalsBelow.top(1))
+         by substituting NaturalsBelow.secondOfTwo_is_top
+     = (⟨a10, a11, a12, a13⟩ : RingVector(Integer.commutative_ring_bundle, 4))
+         by Function.apply_extendByValue_top;
+  done
+}
+
+theorem Matrix.fourByFour_row_third
+        (a00 a01 a02 a03 a10 a11 a12 a13 a20 a21 a22 a23 a30 a31 a32 a33 : ℤ)
+        : Matrix.fourByFour(a00, a01, a02, a03, a10, a11, a12, a13,
+            a20, a21, a22, a23, a30, a31, a32, a33)(NaturalsBelow.thirdOfFour)
+          = (⟨a20, a21, a22, a23⟩ : RingVector(Integer.commutative_ring_bundle, 4)) := {
+  Matrix.fourByFour(a00, a01, a02, a03, a10, a11, a12, a13,
+      a20, a21, a22, a23, a30, a31, a32, a33)(NaturalsBelow.thirdOfFour)
+     = Function.extendByValue(
+         Function.extendByValue(
+           (_ : NaturalsBelow(1)) ↦
+             (⟨a00, a01, a02, a03⟩ : RingVector(Integer.commutative_ring_bundle, 4)),
+           (⟨a10, a11, a12, a13⟩ : RingVector(Integer.commutative_ring_bundle, 4))),
+         (⟨a20, a21, a22, a23⟩ : RingVector(Integer.commutative_ring_bundle, 4)))(NaturalsBelow.top(2))
+         by Function.apply_extendByValue_inclusion
+     = (⟨a20, a21, a22, a23⟩ : RingVector(Integer.commutative_ring_bundle, 4))
+         by Function.apply_extendByValue_top;
+  done
+}
+
+theorem Matrix.fourByFour_row_fourth
+        (a00 a01 a02 a03 a10 a11 a12 a13 a20 a21 a22 a23 a30 a31 a32 a33 : ℤ)
+        : Matrix.fourByFour(a00, a01, a02, a03, a10, a11, a12, a13,
+            a20, a21, a22, a23, a30, a31, a32, a33)(NaturalsBelow.fourthOfFour)
+          = (⟨a30, a31, a32, a33⟩ : RingVector(Integer.commutative_ring_bundle, 4)) := {
+  Matrix.fourByFour(a00, a01, a02, a03, a10, a11, a12, a13,
+      a20, a21, a22, a23, a30, a31, a32, a33)(NaturalsBelow.fourthOfFour)
+     = (⟨a30, a31, a32, a33⟩ : RingVector(Integer.commutative_ring_bundle, 4))
+         by Function.apply_extendByValue_top;
+  done
+}
+
+theorem Matrix.fourByFour_apply_coordinateTuple
+        (a00 a01 a02 a03 a10 a11 a12 a13 a20 a21 a22 a23 a30 a31 a32 a33 x0 x1 x2 x3 : ℤ)
+        : Matrix.fourByFour(a00, a01, a02, a03, a10, a11, a12, a13,
+            a20, a21, a22, a23, a30, a31, a32, a33) ·
+              (⟨x0, x1, x2, x3⟩ : RingVector(Integer.commutative_ring_bundle, 4))
+          = (⟨a00*x0 + a01*x1 + a02*x2 + a03*x3,
+               a10*x0 + a11*x1 + a12*x2 + a13*x3,
+               a20*x0 + a21*x1 + a22*x2 + a23*x3,
+               a30*x0 + a31*x1 + a32*x2 + a33*x3⟩
+             : RingVector(Integer.commutative_ring_bundle, 4)) := {
+  let A : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+      Matrix.fourByFour(a00, a01, a02, a03, a10, a11, a12, a13,
+        a20, a21, a22, a23, a30, a31, a32, a33);
+  let x : RingVector(Integer.commutative_ring_bundle, 4) := ⟨x0, x1, x2, x3⟩;
+  let y : RingVector(Integer.commutative_ring_bundle, 4) := A · x;
+  y(NaturalsBelow.firstOfFour)
+     = RingVector.innerProduct(A(NaturalsBelow.firstOfFour), x)
+     = RingVector.innerProduct((⟨a00, a01, a02, a03⟩ : RingVector(Integer.commutative_ring_bundle, 4)), x)
+         by substituting Matrix.fourByFour_row_first
+     = a00*x0 + a01*x1 + a02*x2 + a03*x3 by RingVector.innerProduct_fourCoordinates
+  as firstReads;
+  y(NaturalsBelow.secondOfFour)
+     = RingVector.innerProduct(A(NaturalsBelow.secondOfFour), x)
+     = RingVector.innerProduct((⟨a10, a11, a12, a13⟩ : RingVector(Integer.commutative_ring_bundle, 4)), x)
+         by substituting Matrix.fourByFour_row_second
+     = a10*x0 + a11*x1 + a12*x2 + a13*x3 by RingVector.innerProduct_fourCoordinates
+  as secondReads;
+  y(NaturalsBelow.thirdOfFour)
+     = RingVector.innerProduct(A(NaturalsBelow.thirdOfFour), x)
+     = RingVector.innerProduct((⟨a20, a21, a22, a23⟩ : RingVector(Integer.commutative_ring_bundle, 4)), x)
+         by substituting Matrix.fourByFour_row_third
+     = a20*x0 + a21*x1 + a22*x2 + a23*x3 by RingVector.innerProduct_fourCoordinates
+  as thirdReads;
+  y(NaturalsBelow.fourthOfFour)
+     = RingVector.innerProduct(A(NaturalsBelow.fourthOfFour), x)
+     = RingVector.innerProduct((⟨a30, a31, a32, a33⟩ : RingVector(Integer.commutative_ring_bundle, 4)), x)
+         by substituting Matrix.fourByFour_row_fourth
+     = a30*x0 + a31*x1 + a32*x2 + a33*x3 by RingVector.innerProduct_fourCoordinates
+  as fourthReads;
+  y
+     = (⟨y(NaturalsBelow.firstOfFour), y(NaturalsBelow.secondOfFour),
+          y(NaturalsBelow.thirdOfFour), y(NaturalsBelow.fourthOfFour)⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by RingVector.eq_fourCoordinates
+     = (⟨a00*x0 + a01*x1 + a02*x2 + a03*x3,
+          y(NaturalsBelow.secondOfFour), y(NaturalsBelow.thirdOfFour),
+          y(NaturalsBelow.fourthOfFour)⟩ : RingVector(Integer.commutative_ring_bundle, 4))
+        by substituting firstReads
+     = (⟨a00*x0 + a01*x1 + a02*x2 + a03*x3,
+          a10*x0 + a11*x1 + a12*x2 + a13*x3,
+          y(NaturalsBelow.thirdOfFour), y(NaturalsBelow.fourthOfFour)⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by substituting secondReads
+     = (⟨a00*x0 + a01*x1 + a02*x2 + a03*x3,
+          a10*x0 + a11*x1 + a12*x2 + a13*x3,
+          a20*x0 + a21*x1 + a22*x2 + a23*x3,
+          y(NaturalsBelow.fourthOfFour)⟩ : RingVector(Integer.commutative_ring_bundle, 4))
+        by substituting thirdReads
+     = (⟨a00*x0 + a01*x1 + a02*x2 + a03*x3,
+          a10*x0 + a11*x1 + a12*x2 + a13*x3,
+          a20*x0 + a21*x1 + a22*x2 + a23*x3,
+          a30*x0 + a31*x1 + a32*x2 + a33*x3⟩
+        : RingVector(Integer.commutative_ring_bundle, 4))
+        by substituting fourthReads;
+  done
+}
+
+theorem Matrix.fourByFour_transpose_apply_coordinateTuple
+        (a00 a01 a02 a03 a10 a11 a12 a13 a20 a21 a22 a23 a30 a31 a32 a33 x0 x1 x2 x3 : ℤ)
+        : Matrix.fourByFour(a00, a01, a02, a03, a10, a11, a12, a13,
+            a20, a21, a22, a23, a30, a31, a32, a33)ᵀ ·
+              (⟨x0, x1, x2, x3⟩ : RingVector(Integer.commutative_ring_bundle, 4))
+          = (⟨a00*x0 + a10*x1 + a20*x2 + a30*x3,
+               a01*x0 + a11*x1 + a21*x2 + a31*x3,
+               a02*x0 + a12*x1 + a22*x2 + a32*x3,
+               a03*x0 + a13*x1 + a23*x2 + a33*x3⟩
+             : RingVector(Integer.commutative_ring_bundle, 4)) := {
+  let A : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+      Matrix.fourByFour(a00, a01, a02, a03, a10, a11, a12, a13,
+        a20, a21, a22, a23, a30, a31, a32, a33);
+  let row0 : RingVector(Integer.commutative_ring_bundle, 4) := ⟨a00, a01, a02, a03⟩;
+  let row1 : RingVector(Integer.commutative_ring_bundle, 4) := ⟨a10, a11, a12, a13⟩;
+  let row2 : RingVector(Integer.commutative_ring_bundle, 4) := ⟨a20, a21, a22, a23⟩;
+  let row3 : RingVector(Integer.commutative_ring_bundle, 4) := ⟨a30, a31, a32, a33⟩;
+  A(NaturalsBelow.firstOfFour) = row0 by Matrix.fourByFour_row_first as row0Reads;
+  A(NaturalsBelow.secondOfFour) = row1 by Matrix.fourByFour_row_second as row1Reads;
+  A(NaturalsBelow.thirdOfFour) = row2 by Matrix.fourByFour_row_third as row2Reads;
+  A(NaturalsBelow.fourthOfFour) = row3 by Matrix.fourByFour_row_fourth as row3Reads;
+
+  let column0 : RingVector(Integer.commutative_ring_bundle, 4) := Aᵀ(NaturalsBelow.firstOfFour);
+  column0(NaturalsBelow.firstOfFour)
+     = A(NaturalsBelow.firstOfFour, NaturalsBelow.firstOfFour) by Matrix.transpose_entry
+     = row0(NaturalsBelow.firstOfFour) by substituting row0Reads
+     = a00 by RingVector.fourCoordinates_first
+  as column00;
+  column0(NaturalsBelow.secondOfFour)
+     = A(NaturalsBelow.secondOfFour, NaturalsBelow.firstOfFour) by Matrix.transpose_entry
+     = row1(NaturalsBelow.firstOfFour) by substituting row1Reads
+     = a10 by RingVector.fourCoordinates_first
+  as column01;
+  column0(NaturalsBelow.thirdOfFour)
+     = A(NaturalsBelow.thirdOfFour, NaturalsBelow.firstOfFour) by Matrix.transpose_entry
+     = row2(NaturalsBelow.firstOfFour) by substituting row2Reads
+     = a20 by RingVector.fourCoordinates_first
+  as column02;
+  column0(NaturalsBelow.fourthOfFour)
+     = A(NaturalsBelow.fourthOfFour, NaturalsBelow.firstOfFour) by Matrix.transpose_entry
+     = row3(NaturalsBelow.firstOfFour) by substituting row3Reads
+     = a30 by RingVector.fourCoordinates_first
+  as column03;
+  column0
+     = (⟨column0(NaturalsBelow.firstOfFour), column0(NaturalsBelow.secondOfFour),
+          column0(NaturalsBelow.thirdOfFour), column0(NaturalsBelow.fourthOfFour)⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by RingVector.eq_fourCoordinates
+     = (⟨a00, column0(NaturalsBelow.secondOfFour),
+          column0(NaturalsBelow.thirdOfFour), column0(NaturalsBelow.fourthOfFour)⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by substituting column00
+     = (⟨a00, a10, column0(NaturalsBelow.thirdOfFour), column0(NaturalsBelow.fourthOfFour)⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by substituting column01
+     = (⟨a00, a10, a20, column0(NaturalsBelow.fourthOfFour)⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by substituting column02
+     = (⟨a00, a10, a20, a30⟩ : RingVector(Integer.commutative_ring_bundle, 4)) by substituting column03
+  as column0Reads;
+
+  let column1 : RingVector(Integer.commutative_ring_bundle, 4) := Aᵀ(NaturalsBelow.secondOfFour);
+  column1(NaturalsBelow.firstOfFour)
+     = A(NaturalsBelow.firstOfFour, NaturalsBelow.secondOfFour) by Matrix.transpose_entry
+     = row0(NaturalsBelow.secondOfFour) by substituting row0Reads
+     = a01 by RingVector.fourCoordinates_second
+  as column10;
+  column1(NaturalsBelow.secondOfFour)
+     = A(NaturalsBelow.secondOfFour, NaturalsBelow.secondOfFour) by Matrix.transpose_entry
+     = row1(NaturalsBelow.secondOfFour) by substituting row1Reads
+     = a11 by RingVector.fourCoordinates_second
+  as column11;
+  column1(NaturalsBelow.thirdOfFour)
+     = A(NaturalsBelow.thirdOfFour, NaturalsBelow.secondOfFour) by Matrix.transpose_entry
+     = row2(NaturalsBelow.secondOfFour) by substituting row2Reads
+     = a21 by RingVector.fourCoordinates_second
+  as column12;
+  column1(NaturalsBelow.fourthOfFour)
+     = A(NaturalsBelow.fourthOfFour, NaturalsBelow.secondOfFour) by Matrix.transpose_entry
+     = row3(NaturalsBelow.secondOfFour) by substituting row3Reads
+     = a31 by RingVector.fourCoordinates_second
+  as column13;
+  column1
+     = (⟨column1(NaturalsBelow.firstOfFour), column1(NaturalsBelow.secondOfFour),
+          column1(NaturalsBelow.thirdOfFour), column1(NaturalsBelow.fourthOfFour)⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by RingVector.eq_fourCoordinates
+     = (⟨a01, column1(NaturalsBelow.secondOfFour),
+          column1(NaturalsBelow.thirdOfFour), column1(NaturalsBelow.fourthOfFour)⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by substituting column10
+     = (⟨a01, a11, column1(NaturalsBelow.thirdOfFour), column1(NaturalsBelow.fourthOfFour)⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by substituting column11
+     = (⟨a01, a11, a21, column1(NaturalsBelow.fourthOfFour)⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by substituting column12
+     = (⟨a01, a11, a21, a31⟩ : RingVector(Integer.commutative_ring_bundle, 4)) by substituting column13
+  as column1Reads;
+
+  let column2 : RingVector(Integer.commutative_ring_bundle, 4) := Aᵀ(NaturalsBelow.thirdOfFour);
+  column2(NaturalsBelow.firstOfFour)
+     = A(NaturalsBelow.firstOfFour, NaturalsBelow.thirdOfFour) by Matrix.transpose_entry
+     = row0(NaturalsBelow.thirdOfFour) by substituting row0Reads
+     = a02 by RingVector.fourCoordinates_third
+  as column20;
+  column2(NaturalsBelow.secondOfFour)
+     = A(NaturalsBelow.secondOfFour, NaturalsBelow.thirdOfFour) by Matrix.transpose_entry
+     = row1(NaturalsBelow.thirdOfFour) by substituting row1Reads
+     = a12 by RingVector.fourCoordinates_third
+  as column21;
+  column2(NaturalsBelow.thirdOfFour)
+     = A(NaturalsBelow.thirdOfFour, NaturalsBelow.thirdOfFour) by Matrix.transpose_entry
+     = row2(NaturalsBelow.thirdOfFour) by substituting row2Reads
+     = a22 by RingVector.fourCoordinates_third
+  as column22;
+  column2(NaturalsBelow.fourthOfFour)
+     = A(NaturalsBelow.fourthOfFour, NaturalsBelow.thirdOfFour) by Matrix.transpose_entry
+     = row3(NaturalsBelow.thirdOfFour) by substituting row3Reads
+     = a32 by RingVector.fourCoordinates_third
+  as column23;
+  column2
+     = (⟨column2(NaturalsBelow.firstOfFour), column2(NaturalsBelow.secondOfFour),
+          column2(NaturalsBelow.thirdOfFour), column2(NaturalsBelow.fourthOfFour)⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by RingVector.eq_fourCoordinates
+     = (⟨a02, column2(NaturalsBelow.secondOfFour),
+          column2(NaturalsBelow.thirdOfFour), column2(NaturalsBelow.fourthOfFour)⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by substituting column20
+     = (⟨a02, a12, column2(NaturalsBelow.thirdOfFour), column2(NaturalsBelow.fourthOfFour)⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by substituting column21
+     = (⟨a02, a12, a22, column2(NaturalsBelow.fourthOfFour)⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by substituting column22
+     = (⟨a02, a12, a22, a32⟩ : RingVector(Integer.commutative_ring_bundle, 4)) by substituting column23
+  as column2Reads;
+
+  let column3 : RingVector(Integer.commutative_ring_bundle, 4) := Aᵀ(NaturalsBelow.fourthOfFour);
+  column3(NaturalsBelow.firstOfFour)
+     = A(NaturalsBelow.firstOfFour, NaturalsBelow.fourthOfFour) by Matrix.transpose_entry
+     = row0(NaturalsBelow.fourthOfFour) by substituting row0Reads
+     = a03 by RingVector.fourCoordinates_fourth
+  as column30;
+  column3(NaturalsBelow.secondOfFour)
+     = A(NaturalsBelow.secondOfFour, NaturalsBelow.fourthOfFour) by Matrix.transpose_entry
+     = row1(NaturalsBelow.fourthOfFour) by substituting row1Reads
+     = a13 by RingVector.fourCoordinates_fourth
+  as column31;
+  column3(NaturalsBelow.thirdOfFour)
+     = A(NaturalsBelow.thirdOfFour, NaturalsBelow.fourthOfFour) by Matrix.transpose_entry
+     = row2(NaturalsBelow.fourthOfFour) by substituting row2Reads
+     = a23 by RingVector.fourCoordinates_fourth
+  as column32;
+  column3(NaturalsBelow.fourthOfFour)
+     = A(NaturalsBelow.fourthOfFour, NaturalsBelow.fourthOfFour) by Matrix.transpose_entry
+     = row3(NaturalsBelow.fourthOfFour) by substituting row3Reads
+     = a33 by RingVector.fourCoordinates_fourth
+  as column33;
+  column3
+     = (⟨column3(NaturalsBelow.firstOfFour), column3(NaturalsBelow.secondOfFour),
+          column3(NaturalsBelow.thirdOfFour), column3(NaturalsBelow.fourthOfFour)⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by RingVector.eq_fourCoordinates
+     = (⟨a03, column3(NaturalsBelow.secondOfFour),
+          column3(NaturalsBelow.thirdOfFour), column3(NaturalsBelow.fourthOfFour)⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by substituting column30
+     = (⟨a03, a13, column3(NaturalsBelow.thirdOfFour), column3(NaturalsBelow.fourthOfFour)⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by substituting column31
+     = (⟨a03, a13, a23, column3(NaturalsBelow.fourthOfFour)⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by substituting column32
+     = (⟨a03, a13, a23, a33⟩ : RingVector(Integer.commutative_ring_bundle, 4)) by substituting column33
+  as column3Reads;
+
+  let x : RingVector(Integer.commutative_ring_bundle, 4) := ⟨x0, x1, x2, x3⟩;
+  let y : RingVector(Integer.commutative_ring_bundle, 4) := Aᵀ · x;
+  y(NaturalsBelow.firstOfFour)
+     = RingVector.innerProduct(column0, x)
+     = RingVector.innerProduct((⟨a00, a10, a20, a30⟩ : RingVector(Integer.commutative_ring_bundle, 4)), x)
+         by substituting column0Reads
+     = a00*x0 + a10*x1 + a20*x2 + a30*x3 by RingVector.innerProduct_fourCoordinates
+  as firstReads;
+  y(NaturalsBelow.secondOfFour)
+     = RingVector.innerProduct(column1, x)
+     = RingVector.innerProduct((⟨a01, a11, a21, a31⟩ : RingVector(Integer.commutative_ring_bundle, 4)), x)
+         by substituting column1Reads
+     = a01*x0 + a11*x1 + a21*x2 + a31*x3 by RingVector.innerProduct_fourCoordinates
+  as secondReads;
+  y(NaturalsBelow.thirdOfFour)
+     = RingVector.innerProduct(column2, x)
+     = RingVector.innerProduct((⟨a02, a12, a22, a32⟩ : RingVector(Integer.commutative_ring_bundle, 4)), x)
+         by substituting column2Reads
+     = a02*x0 + a12*x1 + a22*x2 + a32*x3 by RingVector.innerProduct_fourCoordinates
+  as thirdReads;
+  y(NaturalsBelow.fourthOfFour)
+     = RingVector.innerProduct(column3, x)
+     = RingVector.innerProduct((⟨a03, a13, a23, a33⟩ : RingVector(Integer.commutative_ring_bundle, 4)), x)
+         by substituting column3Reads
+     = a03*x0 + a13*x1 + a23*x2 + a33*x3 by RingVector.innerProduct_fourCoordinates
+  as fourthReads;
+  y
+     = (⟨y(NaturalsBelow.firstOfFour), y(NaturalsBelow.secondOfFour),
+          y(NaturalsBelow.thirdOfFour), y(NaturalsBelow.fourthOfFour)⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by RingVector.eq_fourCoordinates
+     = (⟨a00*x0 + a10*x1 + a20*x2 + a30*x3,
+          y(NaturalsBelow.secondOfFour), y(NaturalsBelow.thirdOfFour),
+          y(NaturalsBelow.fourthOfFour)⟩ : RingVector(Integer.commutative_ring_bundle, 4)) by substituting firstReads
+     = (⟨a00*x0 + a10*x1 + a20*x2 + a30*x3,
+          a01*x0 + a11*x1 + a21*x2 + a31*x3,
+          y(NaturalsBelow.thirdOfFour), y(NaturalsBelow.fourthOfFour)⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by substituting secondReads
+     = (⟨a00*x0 + a10*x1 + a20*x2 + a30*x3,
+          a01*x0 + a11*x1 + a21*x2 + a31*x3,
+          a02*x0 + a12*x1 + a22*x2 + a32*x3,
+          y(NaturalsBelow.fourthOfFour)⟩ : RingVector(Integer.commutative_ring_bundle, 4)) by substituting thirdReads
+     = (⟨a00*x0 + a10*x1 + a20*x2 + a30*x3,
+          a01*x0 + a11*x1 + a21*x2 + a31*x3,
+          a02*x0 + a12*x1 + a22*x2 + a32*x3,
+          a03*x0 + a13*x1 + a23*x2 + a33*x3⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by substituting fourthReads;
+  done
+}
+
+-- A certificate can be checked entirely through actions on arbitrary vectors:
+-- the first two actions make U and V mutual inverses, and the third is the
+-- pullback equality.  This avoids repeating matrix extensionality plumbing in
+-- every generated ground certificate.
+theorem Matrix.isometric_of_inverse_and_pullback_actions {r : CommutativeRing} {n : ℕ}
+        (A B U V : Matrix(r, n, n))
+        (forwardInverse : ∀ (x : RingVector(r, n)). U · (V · x) = x)
+        (backwardInverse : ∀ (x : RingVector(r, n)). V · (U · x) = x)
+        (pullback : ∀ (x : RingVector(r, n)). Uᵀ · (A · (U · x)) = B · x)
+        : Matrix.IsIsometric(A, B) := {
+  U * V = Matrix.identity(r, n) by Matrix.equal_of_applyVector(
+      actions := (x : RingVector(r, n)) ↦ {
+        (U * V) · x
+           = U · (V · x) by Matrix.applyVector_multiply
+           = x by forwardInverse
+           = Matrix.identity(r, n) · x by Equality.symmetry(Matrix.applyVector_identity(x));
+        done
+      })
+  as forwardProduct;
+  V * U = Matrix.identity(r, n) by Matrix.equal_of_applyVector(
+      actions := (x : RingVector(r, n)) ↦ {
+        (V * U) · x
+           = V · (U · x) by Matrix.applyVector_multiply
+           = x by backwardInverse
+           = Matrix.identity(r, n) · x by Equality.symmetry(Matrix.applyVector_identity(x));
+        done
+      })
+  as backwardProduct;
+  Matrix.IsInvertible(U) by {
+    witness V with done by And.introduction(forwardProduct, backwardProduct)
+  }
+  as uInvertible;
+  Uᵀ * A * U = B by Matrix.equal_of_applyVector(
+      actions := (x : RingVector(r, n)) ↦ {
+        (Uᵀ * A * U) · x
+           = (Uᵀ * A) · (U · x) by Matrix.applyVector_multiply
+           = Uᵀ · (A · (U · x)) by Matrix.applyVector_multiply
+           = B · x by pullback;
+        done
+      })
+  as pullbackEquality;
+  B = Uᵀ * A * U by Equality.symmetry(pullbackEquality);
+  witness U with done by And.introduction(uInvertible, done)
+}

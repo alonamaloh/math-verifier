@@ -1,0 +1,140 @@
+-- Algebra/rank_four_isometry_certificates.math
+--
+-- Stable computation faces for the concrete rank-four forms.  The generated
+-- global-deduplication certificates use only these action formulas and the
+-- 4x4 change-of-basis API; changes to the bordered implementations therefore
+-- do not leak into sixty-nine ground proofs.
+
+module Algebra.rank_four_isometry_certificates
+
+import Algebra.matrix_four_by_four
+import Algebra.rank_four_weighted_diagonal_branches_coverage
+import Algebra.rank_four_odd_diagonal_branches_coverage
+
+theorem Matrix.sumOfThreeSquaresRankFourCandidate_apply_coordinateTuple
+        (a b c x0 x1 x2 x3 : ℤ)
+        : Matrix.sumOfThreeSquaresRankFourCandidate(a, b, c) ·
+            (⟨x0, x1, x2, x3⟩ : RingVector(Integer.commutative_ring_bundle, 4))
+          = (⟨x0 + a*x3, x1 + b*x3, x2 + c*x3,
+               a*x0 + b*x1 + c*x2 + 7*x3⟩
+             : RingVector(Integer.commutative_ring_bundle, 4)) := {
+  let v : RingVector(Integer.commutative_ring_bundle, 3) := ⟨x0, x1, x2⟩;
+  Matrix.sumOfThreeSquaresForm · v
+     = Matrix.identity(Integer.commutative_ring_bundle, 3) · v
+         by substituting Matrix.sumOfThreeSquaresForm_is_identity
+     = v by Matrix.applyVector_identity
+  as parentAction;
+  Matrix.sumOfThreeSquaresRankFourCandidate(a, b, c) ·
+      (⟨x0, x1, x2, x3⟩ : RingVector(Integer.commutative_ring_bundle, 4))
+     = (⟨x0 + x3*a, x1 + x3*b, x2 + x3*c,
+          a*x0 + b*x1 + c*x2 + 7*x3⟩
+        : RingVector(Integer.commutative_ring_bundle, 4))
+         by Matrix.borderedAssembly_apply_fourCoordinates(
+           symmetric := Matrix.sumOfThreeSquaresForm_symmetric,
+           parentAction := parentAction)
+     = (⟨x0 + a*x3, x1 + b*x3, x2 + c*x3,
+          a*x0 + b*x1 + c*x2 + 7*x3⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by {
+          x0 + x3*a = x0 + a*x3 by ring as first;
+          x1 + x3*b = x1 + b*x3 by ring as second;
+          x2 + x3*c = x2 + c*x3 by ring as third;
+          done by RingVector.fourCoordinates_equal(first := first, second := second, third := third)
+        };
+  done
+}
+
+theorem Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative_apply_coordinateTuple
+        (d residue corner x0 x1 x2 x3 : ℤ)
+        : Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(d, residue, corner) ·
+            (⟨x0, x1, x2, x3⟩ : RingVector(Integer.commutative_ring_bundle, 4))
+          = (⟨x0, x1, d*x2 + residue*x3, residue*x2 + corner*x3⟩
+             : RingVector(Integer.commutative_ring_bundle, 4)) := {
+  Matrix.sumOfTwoSquaresPlusScaledSquareForm(d) ·
+      (⟨x0, x1, x2⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+    = (⟨x0, x1, d*x2⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+      by Matrix.sumOfTwoSquaresPlusScaledSquareForm_apply_coordinateTuple
+  as parentAction;
+  Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(d, residue, corner) ·
+      (⟨x0, x1, x2, x3⟩ : RingVector(Integer.commutative_ring_bundle, 4))
+     = (⟨x0 + x3*0, x1 + x3*0, d*x2 + x3*residue,
+          0*x0 + 0*x1 + residue*x2 + corner*x3⟩
+        : RingVector(Integer.commutative_ring_bundle, 4))
+         by Matrix.borderedAssembly_apply_fourCoordinates(
+           symmetric := Matrix.sumOfTwoSquaresPlusScaledSquareForm_symmetric(d),
+           parentAction := parentAction)
+     = (⟨x0, x1, d*x2 + residue*x3, residue*x2 + corner*x3⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by {
+          x0 + x3*0 = x0 by ring as first;
+          x1 + x3*0 = x1 by ring as second;
+          d*x2 + x3*residue = d*x2 + residue*x3 by ring as third;
+          0*x0 + 0*x1 + residue*x2 + corner*x3 = residue*x2 + corner*x3 by ring as fourth;
+          done by RingVector.fourCoordinates_equal(first := first, second := second, third := third, fourth := fourth)
+        };
+  done
+}
+
+theorem Matrix.squarePlusDoublePlusScaledRankFourRepresentative_apply_coordinateTuple
+        (d secondResidue thirdResidue corner x0 x1 x2 x3 : ℤ)
+        : Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+            d, secondResidue, thirdResidue, corner) ·
+              (⟨x0, x1, x2, x3⟩ : RingVector(Integer.commutative_ring_bundle, 4))
+          = (⟨x0, 2*x1 + secondResidue*x3, d*x2 + thirdResidue*x3,
+               secondResidue*x1 + thirdResidue*x2 + corner*x3⟩
+             : RingVector(Integer.commutative_ring_bundle, 4)) := {
+  Matrix.squarePlusDoublePlusScaledSquareForm(d) ·
+      (⟨x0, x1, x2⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+    = (⟨x0, 2*x1, d*x2⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+      by Matrix.squarePlusDoublePlusScaledSquareForm_apply_coordinateTuple
+  as parentAction;
+  Matrix.squarePlusDoublePlusScaledRankFourRepresentative(d, secondResidue, thirdResidue, corner) ·
+      (⟨x0, x1, x2, x3⟩ : RingVector(Integer.commutative_ring_bundle, 4))
+     = (⟨x0 + x3*0, 2*x1 + x3*secondResidue, d*x2 + x3*thirdResidue,
+          0*x0 + secondResidue*x1 + thirdResidue*x2 + corner*x3⟩
+        : RingVector(Integer.commutative_ring_bundle, 4))
+         by Matrix.borderedAssembly_apply_fourCoordinates(
+           symmetric := Matrix.squarePlusDoublePlusScaledSquareForm_symmetric(d),
+           parentAction := parentAction)
+     = (⟨x0, 2*x1 + secondResidue*x3, d*x2 + thirdResidue*x3,
+          secondResidue*x1 + thirdResidue*x2 + corner*x3⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by {
+          x0 + x3*0 = x0 by ring as first;
+          2*x1 + x3*secondResidue = 2*x1 + secondResidue*x3 by ring as second;
+          d*x2 + x3*thirdResidue = d*x2 + thirdResidue*x3 by ring as third;
+          0*x0 + secondResidue*x1 + thirdResidue*x2 + corner*x3
+              = secondResidue*x1 + thirdResidue*x2 + corner*x3 by ring as fourth;
+          done by RingVector.fourCoordinates_equal(first := first, second := second, third := third, fourth := fourth)
+        };
+  done
+}
+
+theorem Matrix.squarePlusDoubleSquareOddRankFourRepresentative_apply_coordinateTuple
+        (formCorner residue corner x0 x1 x2 x3 : ℤ)
+        : Matrix.squarePlusDoubleSquareOddRankFourRepresentative(formCorner, residue, corner) ·
+            (⟨x0, x1, x2, x3⟩ : RingVector(Integer.commutative_ring_bundle, 4))
+          = (⟨x0, 2*x1 + x2 + residue*x3, x1 + formCorner*x2,
+               residue*x1 + corner*x3⟩
+             : RingVector(Integer.commutative_ring_bundle, 4)) := {
+  Matrix.squarePlusDoubleSquareOddForm(formCorner) ·
+      (⟨x0, x1, x2⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+    = (⟨x0, 2*x1 + x2, x1 + formCorner*x2⟩
+      : RingVector(Integer.commutative_ring_bundle, 3))
+      by Matrix.squarePlusDoubleSquareOddForm_apply_coordinateTuple
+  as parentAction;
+  Matrix.squarePlusDoubleSquareOddRankFourRepresentative(formCorner, residue, corner) ·
+      (⟨x0, x1, x2, x3⟩ : RingVector(Integer.commutative_ring_bundle, 4))
+     = (⟨x0 + x3*0, 2*x1 + x2 + x3*residue, x1 + formCorner*x2 + x3*0,
+          0*x0 + residue*x1 + 0*x2 + corner*x3⟩
+        : RingVector(Integer.commutative_ring_bundle, 4))
+         by Matrix.borderedAssembly_apply_fourCoordinates(
+           symmetric := Matrix.squarePlusDoubleSquareOddForm_symmetric(formCorner),
+           parentAction := parentAction)
+     = (⟨x0, 2*x1 + x2 + residue*x3, x1 + formCorner*x2,
+          residue*x1 + corner*x3⟩ : RingVector(Integer.commutative_ring_bundle, 4)) by {
+          x0 + x3*0 = x0 by ring as first;
+          2*x1 + x2 + x3*residue = 2*x1 + x2 + residue*x3 by ring as second;
+          x1 + formCorner*x2 + x3*0 = x1 + formCorner*x2 by ring as third;
+          0*x0 + residue*x1 + 0*x2 + corner*x3 = residue*x1 + corner*x3 by ring as fourth;
+          done by RingVector.fourCoordinates_equal(first := first, second := second, third := third, fourth := fourth)
+        };
+  done
+}
