@@ -1,0 +1,270 @@
+-- Algebra/rank_four_diagonal_family.math
+--
+-- Reusable rank-four reduction over the diagonal ternary family
+-- diag(1,1,d).  The parameter d is kept symbolic: one coordinate-action
+-- theorem and one integral Schur-complement calculation serve every
+-- diagonal branch still present in the escalator tree.
+
+module Algebra.rank_four_diagonal_family
+
+import Algebra.rank_four_diagonal_branch
+
+definition Matrix.sumOfTwoSquaresPlusScaledSquareForm
+        (d : ℤ) : Matrix(Integer.commutative_ring_bundle, 3, 3) :=
+  Matrix.diagonalExtension(Matrix.sumOfTwoSquaresForm, d)
+
+theorem Matrix.sumOfTwoSquaresPlusScaledSquareForm_symmetric
+        (d : ℤ)
+        : Matrix.IsSymmetric(Matrix.sumOfTwoSquaresPlusScaledSquareForm(d)) :=
+  by Matrix.diagonalExtension_symmetric(symmetric := Matrix.sumOfTwoSquaresForm_symmetric)
+
+theorem Matrix.sumOfTwoSquaresPlusScaledSquareForm_apply_coordinateTuple
+        (d x y z : ℤ)
+        : Matrix.sumOfTwoSquaresPlusScaledSquareForm(d) ·
+            (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+          = (⟨x, y, d * z⟩ : RingVector(Integer.commutative_ring_bundle, 3)) := {
+  let pair : RingVector(Integer.commutative_ring_bundle, 2) := ⟨x, y⟩;
+  Matrix.sumOfTwoSquaresForm · pair
+     = Matrix.identity(Integer.commutative_ring_bundle, 2) · pair
+         by substituting Matrix.sumOfTwoSquaresForm_is_identity
+     = pair by Matrix.applyVector_identity
+  as parentAction;
+  Matrix.sumOfTwoSquaresPlusScaledSquareForm(d) ·
+      (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+     = RingVector.appendCoordinate(Matrix.sumOfTwoSquaresForm · pair, d * z)
+         by Matrix.diagonalExtension_apply_appendCoordinate(
+             symmetric := Matrix.sumOfTwoSquaresForm_symmetric)
+     = RingVector.appendCoordinate(pair, d * z) by substituting parentAction
+     = (⟨x, y, d * z⟩ : RingVector(Integer.commutative_ring_bundle, 3));
+  done
+}
+
+theorem Matrix.sumOfTwoSquaresPlusScaledSquareForm_coordinateTuple_value
+        (d x y z : ℤ)
+        : Matrix.quadraticForm(
+            Matrix.sumOfTwoSquaresPlusScaledSquareForm(d),
+            (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+          = x * x + y * y + d * (z * z) := {
+  Matrix.quadraticForm(
+      Matrix.sumOfTwoSquaresPlusScaledSquareForm(d),
+      (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+     = RingVector.innerProduct(
+         (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+         Matrix.sumOfTwoSquaresPlusScaledSquareForm(d) ·
+           (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+     = RingVector.innerProduct(
+         (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+         (⟨x, y, d * z⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+         by substituting Matrix.sumOfTwoSquaresPlusScaledSquareForm_apply_coordinateTuple
+     = x * x + y * y + z * (d * z) by RingVector.innerProduct_threeCoordinates
+     = x * x + y * y + d * (z * z) by ring;
+  done
+}
+
+definition Matrix.sumOfTwoSquaresPlusScaledSquareRankFourCandidate
+        (d truant a b c : ℤ) : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+  Matrix.borderedAssembly(
+      Matrix.sumOfTwoSquaresPlusScaledSquareForm(d),
+      (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+      truant)
+
+definition Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative
+        (d residue corner : ℤ) : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+  Matrix.borderedAssembly(
+      Matrix.sumOfTwoSquaresPlusScaledSquareForm(d),
+      (⟨0, 0, residue⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+      corner)
+
+theorem Matrix.sumOfTwoSquaresPlusScaledSquareRankFourCandidate_isometric_shear
+        (d truant a b c x y z : ℤ)
+        : Matrix.IsIsometric(
+            Matrix.sumOfTwoSquaresPlusScaledSquareRankFourCandidate(d, truant, a, b, c),
+            Matrix.borderedAssembly(
+              Matrix.sumOfTwoSquaresPlusScaledSquareForm(d),
+              (⟨a + x, b + y, c + d * z⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+              truant + 2 * (a * x + b * y + c * z) + x * x + y * y + d * (z * z))) := {
+  let border : RingVector(Integer.commutative_ring_bundle, 3) := ⟨a, b, c⟩;
+  let shift : RingVector(Integer.commutative_ring_bundle, 3) := ⟨x, y, z⟩;
+  Matrix.IsIsometric(
+      Matrix.borderedAssembly(Matrix.sumOfTwoSquaresPlusScaledSquareForm(d), border, truant),
+      Matrix.borderedAssembly(
+          Matrix.sumOfTwoSquaresPlusScaledSquareForm(d),
+          border + Matrix.sumOfTwoSquaresPlusScaledSquareForm(d) · shift,
+          truant + RingVector.innerProduct(border, shift) + RingVector.innerProduct(border, shift)
+            + Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusScaledSquareForm(d), shift)))
+      by Matrix.borderedAssembly_isometric_topShear(
+          symmetric := Matrix.sumOfTwoSquaresPlusScaledSquareForm_symmetric(d));
+  Matrix.sumOfTwoSquaresPlusScaledSquareForm(d) · shift = ⟨x, y, d * z⟩
+      by Matrix.sumOfTwoSquaresPlusScaledSquareForm_apply_coordinateTuple as actionReads;
+  border + Matrix.sumOfTwoSquaresPlusScaledSquareForm(d) · shift
+     = border + (⟨x, y, d * z⟩ : RingVector(Integer.commutative_ring_bundle, 3)) by substituting actionReads
+     = (⟨a + x, b + y, c + d * z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+         by RingVector.threeCoordinates_add
+  as borderTarget;
+  RingVector.innerProduct(border, shift) = a * x + b * y + c * z
+      by RingVector.innerProduct_threeCoordinates as pairingReads;
+  Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusScaledSquareForm(d), shift)
+     = x * x + y * y + d * (z * z)
+         by Matrix.sumOfTwoSquaresPlusScaledSquareForm_coordinateTuple_value as shiftValue;
+  truant + RingVector.innerProduct(border, shift) + RingVector.innerProduct(border, shift)
+      + Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusScaledSquareForm(d), shift)
+     = truant + (a * x + b * y + c * z) + RingVector.innerProduct(border, shift)
+       + Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusScaledSquareForm(d), shift) by substituting pairingReads
+     = truant + (a * x + b * y + c * z) + (a * x + b * y + c * z)
+       + Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusScaledSquareForm(d), shift) by substituting pairingReads
+     = truant + (a * x + b * y + c * z) + (a * x + b * y + c * z)
+       + (x * x + y * y + d * (z * z)) by substituting shiftValue
+     = truant + 2 * (a * x + b * y + c * z) + x * x + y * y + d * (z * z) by ring
+  as cornerTarget;
+  Matrix.IsIsometric(
+      Matrix.borderedAssembly(Matrix.sumOfTwoSquaresPlusScaledSquareForm(d), border, truant),
+      Matrix.borderedAssembly(
+          Matrix.sumOfTwoSquaresPlusScaledSquareForm(d),
+          (⟨a + x, b + y, c + d * z⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+          truant + RingVector.innerProduct(border, shift) + RingVector.innerProduct(border, shift)
+            + Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusScaledSquareForm(d), shift)))
+      by substituting borderTarget;
+  done by substituting cornerTarget
+}
+
+theorem Matrix.sumOfTwoSquaresPlusScaledSquareRankFourCandidate_isometric_reduced
+        (d truant a b c x y z residue corner : ℤ)
+        (firstVanishes : a + x = 0)
+        (secondVanishes : b + y = 0)
+        (thirdReduces : c + d * z = residue)
+        (cornerReduces : truant + 2 * (a * x + b * y + c * z) + x * x + y * y + d * (z * z) = corner)
+        : Matrix.IsIsometric(
+            Matrix.sumOfTwoSquaresPlusScaledSquareRankFourCandidate(d, truant, a, b, c),
+            Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(d, residue, corner)) := {
+  Matrix.IsIsometric(
+      Matrix.sumOfTwoSquaresPlusScaledSquareRankFourCandidate(d, truant, a, b, c),
+      Matrix.borderedAssembly(
+          Matrix.sumOfTwoSquaresPlusScaledSquareForm(d),
+          (⟨a + x, b + y, c + d * z⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+          truant + 2 * (a * x + b * y + c * z) + x * x + y * y + d * (z * z)))
+      by Matrix.sumOfTwoSquaresPlusScaledSquareRankFourCandidate_isometric_shear;
+  Matrix.IsIsometric(
+      Matrix.sumOfTwoSquaresPlusScaledSquareRankFourCandidate(d, truant, a, b, c),
+      Matrix.borderedAssembly(
+          Matrix.sumOfTwoSquaresPlusScaledSquareForm(d),
+          (⟨0, b + y, c + d * z⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+          truant + 2 * (a * x + b * y + c * z) + x * x + y * y + d * (z * z)))
+      by substituting firstVanishes;
+  Matrix.IsIsometric(
+      Matrix.sumOfTwoSquaresPlusScaledSquareRankFourCandidate(d, truant, a, b, c),
+      Matrix.borderedAssembly(
+          Matrix.sumOfTwoSquaresPlusScaledSquareForm(d),
+          (⟨0, 0, c + d * z⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+          truant + 2 * (a * x + b * y + c * z) + x * x + y * y + d * (z * z)))
+      by substituting secondVanishes;
+  Matrix.IsIsometric(
+      Matrix.sumOfTwoSquaresPlusScaledSquareRankFourCandidate(d, truant, a, b, c),
+      Matrix.borderedAssembly(
+          Matrix.sumOfTwoSquaresPlusScaledSquareForm(d),
+          (⟨0, 0, residue⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+          truant + 2 * (a * x + b * y + c * z) + x * x + y * y + d * (z * z)))
+      by substituting thirdReduces;
+  done by substituting cornerReduces
+}
+
+-- Fraction-free Schur bound for an arbitrary positive-definite bordered
+-- matrix with leading block diag(1,1,d).  The eliminating vector is
+-- (-da,-db,-c,d), so no division or rational matrix is introduced.
+theorem Matrix.sumOfTwoSquaresPlusScaledSquare_bordered_coupled_bound
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 3, 1 + 3))
+        (symmetric : Matrix.IsSymmetric(B))
+        (positiveDefinite : Matrix.IsPositiveDefinite(B))
+        (d truant a b c : ℤ)
+        (dPositive : d > 0)
+        (blockReads : Matrix.leadingBlock(B) = Matrix.sumOfTwoSquaresPlusScaledSquareForm(d))
+        (borderReads : Matrix.borderColumn(B)
+          = (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+        (cornerReads : Matrix.corner(B) = truant)
+        : d * (a * a) + d * (b * b) + c * c < d * truant := {
+  let eliminatingBase : RingVector(Integer.commutative_ring_bundle, 3) := ⟨-d * a, -d * b, -c⟩;
+  let eliminatingVector : RingVector(Integer.commutative_ring_bundle, 1 + 3) :=
+      RingVector.appendCoordinate(eliminatingBase, d);
+  RingVector.restrict(eliminatingVector) = eliminatingBase
+      by RingVector.restrict_appendCoordinate as restrictionReads;
+  eliminatingVector(NaturalsBelow.top(3)) = d by RingVector.appendCoordinate_top as topReads;
+  ¬(eliminatingVector = RingVector.zero(Integer.commutative_ring_bundle, 1 + 3)) by {
+    suppose eliminatingVector = RingVector.zero(Integer.commutative_ring_bundle, 1 + 3) as vectorZero;
+    d
+       = eliminatingVector(NaturalsBelow.top(3)) by topReads
+       = RingVector.zero(Integer.commutative_ring_bundle, 1 + 3)(NaturalsBelow.top(3)) by substituting vectorZero
+       = 0;
+    0 < d by dPositive;
+    ¬((0 : ℤ) = d) by Integer.LessThan.distinct;
+    done
+  };
+  Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusScaledSquareForm(d), eliminatingBase)
+     = (-d * a) * (-d * a) + (-d * b) * (-d * b) + d * ((-c) * (-c))
+         by Matrix.sumOfTwoSquaresPlusScaledSquareForm_coordinateTuple_value
+     = (d * d) * (a * a) + (d * d) * (b * b) + d * (c * c) by ring
+  as baseValueReads;
+  RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B))
+     = RingVector.innerProduct(eliminatingBase,
+         (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3))) by substituting borderReads
+     = (-d * a) * a + (-d * b) * b + (-c) * c by RingVector.innerProduct_threeCoordinates
+     = -d * (a * a) + -d * (b * b) + -(c * c) by ring
+  as leftPairingReads;
+  RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
+     = RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B)) by RingVector.innerProduct_symmetric
+     = -d * (a * a) + -d * (b * b) + -(c * c) by leftPairingReads
+  as rightPairingReads;
+  Matrix.quadraticForm(B, eliminatingVector)
+     = Matrix.quadraticForm(Matrix.leadingBlock(B), RingVector.restrict(eliminatingVector))
+       + eliminatingVector(NaturalsBelow.top(3))
+         * RingVector.innerProduct(RingVector.restrict(eliminatingVector), Matrix.borderColumn(B))
+       + eliminatingVector(NaturalsBelow.top(3))
+         * RingVector.innerProduct(Matrix.borderColumn(B), RingVector.restrict(eliminatingVector))
+       + (eliminatingVector(NaturalsBelow.top(3)) * eliminatingVector(NaturalsBelow.top(3))) * Matrix.corner(B)
+         by Matrix.quadraticForm_bordered(symmetric := symmetric)
+     = Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusScaledSquareForm(d), RingVector.restrict(eliminatingVector))
+       + eliminatingVector(NaturalsBelow.top(3))
+         * RingVector.innerProduct(RingVector.restrict(eliminatingVector), Matrix.borderColumn(B))
+       + eliminatingVector(NaturalsBelow.top(3))
+         * RingVector.innerProduct(Matrix.borderColumn(B), RingVector.restrict(eliminatingVector))
+       + (eliminatingVector(NaturalsBelow.top(3)) * eliminatingVector(NaturalsBelow.top(3))) * Matrix.corner(B)
+         by congruenceOf(
+             (block : Matrix(Integer.commutative_ring_bundle, 3, 3)) ↦
+               Matrix.quadraticForm(block, RingVector.restrict(eliminatingVector))
+               + eliminatingVector(NaturalsBelow.top(3))
+                 * RingVector.innerProduct(RingVector.restrict(eliminatingVector), Matrix.borderColumn(B))
+               + eliminatingVector(NaturalsBelow.top(3))
+                 * RingVector.innerProduct(Matrix.borderColumn(B), RingVector.restrict(eliminatingVector))
+               + (eliminatingVector(NaturalsBelow.top(3)) * eliminatingVector(NaturalsBelow.top(3))) * Matrix.corner(B),
+             blockReads)
+     = Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusScaledSquareForm(d), eliminatingBase)
+       + eliminatingVector(NaturalsBelow.top(3)) * RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B))
+       + eliminatingVector(NaturalsBelow.top(3)) * RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
+       + (eliminatingVector(NaturalsBelow.top(3)) * eliminatingVector(NaturalsBelow.top(3))) * Matrix.corner(B)
+         by substituting restrictionReads
+     = Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusScaledSquareForm(d), eliminatingBase)
+       + d * RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B))
+       + d * RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
+       + (d * d) * Matrix.corner(B) by substituting topReads
+     = Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusScaledSquareForm(d), eliminatingBase)
+       + d * RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B))
+       + d * RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
+       + (d * d) * truant by substituting cornerReads
+     = ((d * d) * (a * a) + (d * d) * (b * b) + d * (c * c))
+       + d * RingVector.innerProduct(eliminatingBase, Matrix.borderColumn(B))
+       + d * RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
+       + (d * d) * truant by substituting baseValueReads
+     = ((d * d) * (a * a) + (d * d) * (b * b) + d * (c * c))
+       + d * (-d * (a * a) + -d * (b * b) + -(c * c))
+       + d * RingVector.innerProduct(Matrix.borderColumn(B), eliminatingBase)
+       + (d * d) * truant by substituting leftPairingReads
+     = ((d * d) * (a * a) + (d * d) * (b * b) + d * (c * c))
+       + d * (-d * (a * a) + -d * (b * b) + -(c * c))
+       + d * (-d * (a * a) + -d * (b * b) + -(c * c))
+       + (d * d) * truant by substituting rightPairingReads
+     = d * (d * truant - (d * (a * a) + d * (b * b) + c * c)) by ring
+  as eliminatingValueReads;
+  Matrix.quadraticForm(B, eliminatingVector) > 0 by positiveDefinite;
+  d * (d * truant - (d * (a * a) + d * (b * b) + c * c)) > 0 by substituting eliminatingValueReads;
+  d * truant - (d * (a * a) + d * (b * b) + c * c) > 0
+      by Integer.positive_of_multiply_positive;
+  done by Integer.lt_of_positive_difference
+}
