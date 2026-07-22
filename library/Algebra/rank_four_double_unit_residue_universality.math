@@ -202,14 +202,13 @@ theorem Natural.four_power_times_thirty_two_plus_core_not_obstruction
   done by Natural.not_obstruction_four_power_times(exponent, 32 * b + core, coreAdmissible)
 }
 
-theorem Matrix.doubleUnitThreeSquareCover_of_converse
+theorem Matrix.threeSquareCoverOfDoubledTarget_of_converse
         (converse : Matrix.ThreeSquaresConverse)
-        (halfCoefficient core remainder : ℕ) (baseQuotient : ℕ → ℕ)
-        (coreSum : core + (2 * halfCoefficient + 1) = 28)
-        (remainderClass : remainder = 1 ∨ remainder = 3 ∨ remainder = 5)
-        (coreShape : ∀ (b : ℕ).
-          32 * b + core = 8 * baseQuotient(b) + remainder)
-        : Matrix.DoubleUnitThreeSquareCover(2 * halfCoefficient + 1) := {
+        (coefficient core : ℕ)
+        (coreSum : core + coefficient = 28)
+        (residualAdmissible : ∀ (exponent b : ℕ).
+          ¬(Natural.IsThreeSquareObstruction(4 ^ exponent * (32 * b + core))))
+        : Matrix.DoubleUnitThreeSquareCover(coefficient) := {
   take m : ℕ;
   suppose m ≥ 1;
   Natural.IsThreeSquareObstruction(2 * m) ∨ ¬(Natural.IsThreeSquareObstruction(2 * m));
@@ -220,7 +219,7 @@ theorem Matrix.doubleUnitThreeSquareCover_of_converse
           by converse(2 * m, admissible) as represented;
       witness 2 * m with witness 0 with And.introduction(
           represented,
-          { 2 * m + 0 * 0 * (2 * halfCoefficient + 1) = 2 * m })
+          { 2 * m + 0 * 0 * coefficient = 2 * m })
     }
     case Natural.IsThreeSquareObstruction(2 * m) as obstruction: {
       choose exponent : ℕ, b : ℕ such that 2 * m = 4 ^ exponent * (8 * b + 7)
@@ -245,20 +244,19 @@ theorem Matrix.doubleUnitThreeSquareCover_of_converse
           let residual : ℕ := 4 ^ predecessor * (32 * b + core);
           let w : ℕ := 2 ^ predecessor;
           ¬(Natural.IsThreeSquareObstruction(residual))
-              by Natural.four_power_times_thirty_two_plus_core_not_obstruction(
-                  predecessor, b, core, remainder, baseQuotient(b), coreShape(b), remainderClass)
+              by residualAdmissible(predecessor, b)
               as admissible;
-          residual + w * w * (2 * halfCoefficient + 1)
+          residual + w * w * coefficient
              = 4 ^ predecessor * (32 * b + core)
-               + (2 ^ predecessor * 2 ^ predecessor) * (2 * halfCoefficient + 1)
+               + (2 ^ predecessor * 2 ^ predecessor) * coefficient
              = 4 ^ predecessor * (32 * b + core)
-               + 4 ^ predecessor * (2 * halfCoefficient + 1)
+               + 4 ^ predecessor * coefficient
                  by Equality.congruence(
                      (candidate : ℕ) ↦ 4 ^ predecessor * (32 * b + core)
-                       + candidate * (2 * halfCoefficient + 1),
+                       + candidate * coefficient,
                      2 ^ predecessor * 2 ^ predecessor, 4 ^ predecessor,
                      Natural.two_power_square_is_four_power(predecessor))
-             = 4 ^ predecessor * (32 * b + (core + (2 * halfCoefficient + 1)))
+             = 4 ^ predecessor * (32 * b + (core + coefficient))
              = 4 ^ predecessor * (32 * b + 28) by substituting coreSum
              = 4 ^ predecessor * (4 * (8 * b + 7))
              = (4 * 4 ^ predecessor) * (8 * b + 7)
@@ -274,6 +272,22 @@ theorem Matrix.doubleUnitThreeSquareCover_of_converse
       }
     }
   }
+}
+
+theorem Matrix.doubleUnitThreeSquareCover_of_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        (halfCoefficient core remainder : ℕ) (baseQuotient : ℕ → ℕ)
+        (coreSum : core + (2 * halfCoefficient + 1) = 28)
+        (remainderClass : remainder = 1 ∨ remainder = 3 ∨ remainder = 5)
+        (coreShape : ∀ (b : ℕ).
+          32 * b + core = 8 * baseQuotient(b) + remainder)
+        : Matrix.DoubleUnitThreeSquareCover(2 * halfCoefficient + 1) := {
+  done by Matrix.threeSquareCoverOfDoubledTarget_of_converse(
+      converse, coefficient := 2 * halfCoefficient + 1, core := core,
+      coreSum := coreSum,
+      residualAdmissible := (exponent b : ℕ) ↦
+        Natural.four_power_times_thirty_two_plus_core_not_obstruction(
+            exponent, b, core, remainder, baseQuotient(b), coreShape(b), remainderClass))
 }
 
 theorem Matrix.doubleS1C2_universal_of_three_squares_converse

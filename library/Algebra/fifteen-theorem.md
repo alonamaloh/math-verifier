@@ -200,6 +200,13 @@ rank-four escalator by 207 selected normal forms are.
   constants `k` is 1, 3, or 5 modulo 8.  A parity lemma recovers all three
   completed coordinates from any residual representation.  The conditional
   total is therefore 33 selected rank-four forms.
+  `Algebra/rank_four_double_zero_residue_universality` applies the companion
+  identity `2Q=(x+y)^2+(x-y)^2+(2z)^2+2c w^2` to ten of the twelve selected
+  diagonal extensions of `x^2+y^2+2z^2`.  Their obstruction residuals have
+  one of the uniformly admissible even cores
+  `2,4,6,8,10,12,14,18,20,24`.  This raises the conditional total to 43;
+  the two nonuniform diagonal coefficients `c=6,14` require a second
+  residual choice and remain the edge of this family.
   `Algebra/rank_four_completed_cover_universality` gives fraction-free
   completed-square interfaces for all other constructors. Its scaled-square,
   weighted, and odd cover predicates account for the remaining 32, 140, and
