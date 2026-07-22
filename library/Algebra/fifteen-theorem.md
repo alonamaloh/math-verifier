@@ -226,11 +226,18 @@ rank-four escalator by 207 selected normal forms are.
   obstruction `9^a(3b+2)` is therefore derived from the same Dirichlet
   converse, and one uniform residual calculation closes all five forms.
   Thus all ten selected triple forms are conditionally universal, and the
-  selected total is 55.
+  selected total is 55.  The eight diagonal extensions of
+  `x²+2y²+3z²` are now also conditionally universal from the classical
+  converse whose exceptional set is `4^a(16b+10)`.  For coefficients
+  `3,…,9`, subtracting `c(2^a)^2` leaves the admissible core `10-c`; the
+  core 4 case is handled by extracting one further factor of four.  For
+  coefficient 10, a three-way split on the obstruction parameter leaves
+  residual 0, a pure square, or core 2.  This closes the complete selected
+  weighted-`d=3`, zero-residue chunk and raises the selected total to 63.
   `Algebra/rank_four_completed_cover_universality` gives fraction-free
   completed-square interfaces for all other constructors. Its scaled-square,
-  weighted, and odd cover predicates account for the remaining 32, 140, and
-  28 selected forms. The identities and matrix witnesses are proved once;
+  weighted, and odd cover predicates account for the 32, 140, and 28
+  nonpilot selected forms. The identities and matrix witnesses are proved once;
   future per-form work consists only of explicit arithmetic/congruence cover
   facts.
 - The obstruction half of Legendre's three-squares theorem is now complete.

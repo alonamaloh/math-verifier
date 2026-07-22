@@ -1,0 +1,505 @@
+-- Algebra/rank_four_weighted_d3_zero_residue_universality.math
+--
+-- Diagonal extensions of x²+2y²+3z².  The classical represented-set
+-- theorem has exceptional shape 4^a(16b+10); its converse is kept as the
+-- explicit arithmetic input.  Six selected coefficients follow from one
+-- uniform nonzero residue argument, while coefficient 6 uses the same
+-- argument after extracting one additional factor of four.
+
+module Algebra.rank_four_weighted_d3_zero_residue_universality
+
+import Algebra.three_squares_residual_cover_common
+import Algebra.rank_four_completed_cover_universality
+
+definition Natural.IsOneTwoThreeObstruction (n : ℕ) : Proposition :=
+  ∃ (exponent b : ℕ). n = 4 ^ exponent * (16 * b + 10)
+
+definition Matrix.OneTwoThreeConverse : Proposition :=
+  ∀ (n : ℕ). ¬(Natural.IsOneTwoThreeObstruction(n)) →
+    Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(3), (n : ℤ))
+
+theorem Natural.four_power_times_nonzero_mod_four_core_not_one_two_three_obstruction
+        (exponent b core quotient remainder : ℕ)
+        (coreShape : core = 4 * quotient + remainder)
+        (remainderBelow : remainder < 4) (remainderNonzero : remainder ≠ 0)
+        (coreBelow : core < 16) (coreNotTen : core ≠ 10)
+        : ¬(Natural.IsOneTwoThreeObstruction(4 ^ exponent * (16 * b + core))) := {
+  suppose Natural.IsOneTwoThreeObstruction(4 ^ exponent * (16 * b + core)) as obstruction;
+  choose otherExponent : ℕ, otherB : ℕ such that
+      4 ^ exponent * (16 * b + core) = 4 ^ otherExponent * (16 * otherB + 10)
+      as equalShapes from obstruction;
+  exponent < otherExponent ∨ exponent = otherExponent ∨ otherExponent < exponent
+      by Natural.lt_trichotomy;
+  done by cases {
+    case exponent < otherExponent as exponentBelow: {
+      choose gap : ℕ such that exponent + (1 + gap) = otherExponent
+          as exponentSplit from Natural.lt_elim;
+      4 ^ exponent * (16 * b + core)
+         = 4 ^ otherExponent * (16 * otherB + 10) by equalShapes
+         = 4 ^ (exponent + (1 + gap)) * (16 * otherB + 10)
+             by substituting Equality.symmetry(exponentSplit)
+         = (4 ^ exponent * 4 ^ (1 + gap)) * (16 * otherB + 10)
+             by substituting Natural.power_add(4, exponent, 1 + gap)
+         = 4 ^ exponent * (4 ^ (1 + gap) * (16 * otherB + 10))
+      as cancellable;
+      16 * b + core = 4 ^ (1 + gap) * (16 * otherB + 10)
+          by Natural.multiply_cancel_left(
+              4 ^ exponent, 16 * b + core, 4 ^ (1 + gap) * (16 * otherB + 10),
+              Natural.power_positive(4, exponent, done), cancellable)
+      as reduced;
+      4 * (4 * b + quotient) + remainder
+         = 16 * b + core by substituting coreShape
+         = 4 ^ (1 + gap) * (16 * otherB + 10) by reduced
+         = (4 * 4 ^ gap) * (16 * otherB + 10)
+             by substituting Natural.power_one_plus(4, gap)
+         = 4 * (4 ^ gap * (16 * otherB + 10)) + 0
+      as impossible;
+      done by Natural.distinct_affine_residues_not_equal(
+          4, remainder, 0, 4 * b + quotient, 4 ^ gap * (16 * otherB + 10),
+          remainderBelow, done, remainderNonzero, impossible)
+    }
+    case exponent = otherExponent ∨ otherExponent < exponent: done by cases {
+      case exponent = otherExponent as exponentsEqual: {
+        4 ^ exponent * (16 * b + core)
+           = 4 ^ otherExponent * (16 * otherB + 10) by equalShapes
+           = 4 ^ exponent * (16 * otherB + 10)
+               by substituting Equality.symmetry(exponentsEqual)
+        as cancellable;
+        16 * b + core = 16 * otherB + 10
+            by Natural.multiply_cancel_left(
+                4 ^ exponent, 16 * b + core, 16 * otherB + 10,
+                Natural.power_positive(4, exponent, done), cancellable)
+        as impossible;
+        done by Natural.distinct_affine_residues_not_equal(
+            16, core, 10, b, otherB, coreBelow, done, coreNotTen, impossible)
+      }
+      case otherExponent < exponent as otherBelow: {
+        choose gap : ℕ such that otherExponent + (1 + gap) = exponent
+            as exponentSplit from Natural.lt_elim;
+        4 ^ otherExponent * (4 ^ (1 + gap) * (16 * b + core))
+           = (4 ^ otherExponent * 4 ^ (1 + gap)) * (16 * b + core)
+           = 4 ^ (otherExponent + (1 + gap)) * (16 * b + core)
+               by substituting Equality.symmetry(Natural.power_add(4, otherExponent, 1 + gap))
+           = 4 ^ exponent * (16 * b + core) by substituting exponentSplit
+           = 4 ^ otherExponent * (16 * otherB + 10) by equalShapes
+        as cancellable;
+        4 ^ (1 + gap) * (16 * b + core) = 16 * otherB + 10
+            by Natural.multiply_cancel_left(
+                4 ^ otherExponent, 4 ^ (1 + gap) * (16 * b + core), 16 * otherB + 10,
+                Natural.power_positive(4, otherExponent, done), cancellable)
+        as reduced;
+        4 * (4 ^ gap * (16 * b + core)) + 0
+           = (4 * 4 ^ gap) * (16 * b + core)
+           = 4 ^ (1 + gap) * (16 * b + core)
+               by substituting Equality.symmetry(Natural.power_one_plus(4, gap))
+           = 16 * otherB + 10 by reduced
+           = 4 * (4 * otherB + 2) + 2
+        as impossible;
+        done by Natural.distinct_affine_residues_not_equal(
+            4, 0, 2, 4 ^ gap * (16 * b + core), 4 * otherB + 2,
+            done, done, done, impossible)
+      }
+    }
+  }
+}
+
+theorem Natural.one_two_three_obstruction_of_four_times
+        (n : ℕ) (scaled : Natural.IsOneTwoThreeObstruction(4 * n))
+        : Natural.IsOneTwoThreeObstruction(n) := {
+  choose exponent : ℕ, b : ℕ such that 4 * n = 4 ^ exponent * (16 * b + 10)
+      from scaled;
+  exponent = 0 ∨ ∃ (predecessor : ℕ). exponent = 1 + predecessor by Natural.zero_or_one_plus;
+  done by cases {
+    case exponent = 0 as exponentZero: {
+      4 * n + 0
+         = 4 ^ exponent * (16 * b + 10) by done
+         = 4 ^ 0 * (16 * b + 10) by substituting exponentZero
+         = 16 * b + 10 by substituting Natural.power_zero(4)
+         = 4 * (4 * b + 2) + 2
+      as impossible;
+      False by Natural.distinct_affine_residues_not_equal(
+          4, 0, 2, n, 4 * b + 2, done, done, done, impossible);
+      done
+    }
+    case ∃ (predecessor : ℕ). exponent = 1 + predecessor: {
+      choose predecessor : ℕ such that exponent = 1 + predecessor as exponentReads;
+      4 * n
+         = 4 ^ exponent * (16 * b + 10) by done
+         = 4 ^ (1 + predecessor) * (16 * b + 10) by substituting exponentReads
+         = (4 * 4 ^ predecessor) * (16 * b + 10)
+             by substituting Natural.power_one_plus(4, predecessor)
+         = 4 * (4 ^ predecessor * (16 * b + 10))
+      as cancellable;
+      n = 4 ^ predecessor * (16 * b + 10)
+          by Natural.multiply_cancel_left(
+              4, n, 4 ^ predecessor * (16 * b + 10), done, cancellable)
+          as reduced;
+      witness predecessor with witness b with reduced
+    }
+  }
+}
+
+theorem Natural.not_one_two_three_obstruction_four_times
+        (n : ℕ) (admissible : ¬(Natural.IsOneTwoThreeObstruction(n)))
+        : ¬(Natural.IsOneTwoThreeObstruction(4 * n)) := {
+  suppose Natural.IsOneTwoThreeObstruction(4 * n) as scaled;
+  done by admissible(Natural.one_two_three_obstruction_of_four_times(n, scaled))
+}
+
+theorem Natural.not_one_two_three_obstruction_four_power_times
+        (exponent n : ℕ) (admissible : ¬(Natural.IsOneTwoThreeObstruction(n)))
+        : ¬(Natural.IsOneTwoThreeObstruction(4 ^ exponent * n)) :=
+  by induction on exponent with IH {
+    case base: {
+      4 ^ 0 * n = n by substituting Natural.power_zero(4) as valueReads;
+      suppose Natural.IsOneTwoThreeObstruction(4 ^ 0 * n) as obstruction;
+      Natural.IsOneTwoThreeObstruction(n) by substituting valueReads;
+      done by admissible
+    }
+    case step(predecessor): {
+      4 ^ (1 + predecessor) * n
+         = (4 * 4 ^ predecessor) * n by substituting Natural.power_one_plus(4, predecessor)
+         = 4 * (4 ^ predecessor * n)
+      as valueReads;
+      ¬(Natural.IsOneTwoThreeObstruction(4 ^ predecessor * n)) by IH as innerAdmissible;
+      ¬(Natural.IsOneTwoThreeObstruction(4 * (4 ^ predecessor * n)))
+          by Natural.not_one_two_three_obstruction_four_times(4 ^ predecessor * n, innerAdmissible)
+          as scaledAdmissible;
+      suppose Natural.IsOneTwoThreeObstruction(4 ^ (1 + predecessor) * n) as obstruction;
+      Natural.IsOneTwoThreeObstruction(4 * (4 ^ predecessor * n)) by substituting valueReads;
+      done by scaledAdmissible
+    }
+  }
+
+theorem Natural.four_times_plus_one_not_one_two_three_obstruction (b : ℕ)
+        : ¬(Natural.IsOneTwoThreeObstruction(4 * b + 1)) := {
+  suppose Natural.IsOneTwoThreeObstruction(4 * b + 1) as obstruction;
+  choose exponent : ℕ, otherB : ℕ such that
+      4 * b + 1 = 4 ^ exponent * (16 * otherB + 10) as equalShapes from obstruction;
+  exponent = 0 ∨ ∃ (predecessor : ℕ). exponent = 1 + predecessor by Natural.zero_or_one_plus;
+  done by cases {
+    case exponent = 0 as exponentZero: {
+      4 * b + 1
+         = 4 ^ exponent * (16 * otherB + 10) by equalShapes
+         = 4 ^ 0 * (16 * otherB + 10) by substituting exponentZero
+         = 16 * otherB + 10 by substituting Natural.power_zero(4)
+         = 4 * (4 * otherB + 2) + 2
+      as impossible;
+      done by Natural.distinct_affine_residues_not_equal(
+          4, 1, 2, b, 4 * otherB + 2, done, done, done, impossible)
+    }
+    case ∃ (predecessor : ℕ). exponent = 1 + predecessor: {
+      choose predecessor : ℕ such that exponent = 1 + predecessor as exponentReads;
+      4 * b + 1
+         = 4 ^ exponent * (16 * otherB + 10) by equalShapes
+         = 4 ^ (1 + predecessor) * (16 * otherB + 10) by substituting exponentReads
+         = (4 * 4 ^ predecessor) * (16 * otherB + 10)
+             by substituting Natural.power_one_plus(4, predecessor)
+         = 4 * (4 ^ predecessor * (16 * otherB + 10)) + 0
+      as impossible;
+      done by Natural.distinct_affine_residues_not_equal(
+          4, 1, 0, b, 4 ^ predecessor * (16 * otherB + 10), done, done, done, impossible)
+    }
+  }
+}
+
+theorem Natural.four_power_times_sixteen_plus_four_not_one_two_three_obstruction
+        (exponent b : ℕ)
+        : ¬(Natural.IsOneTwoThreeObstruction(4 ^ exponent * (16 * b + 4))) := {
+  ¬(Natural.IsOneTwoThreeObstruction(4 ^ (1 + exponent) * (4 * b + 1)))
+      by Natural.not_one_two_three_obstruction_four_power_times(
+          1 + exponent, 4 * b + 1, Natural.four_times_plus_one_not_one_two_three_obstruction(b))
+      as admissible;
+  4 ^ exponent * (16 * b + 4)
+     = 4 ^ exponent * (4 * (4 * b + 1))
+     = (4 * 4 ^ exponent) * (4 * b + 1)
+     = 4 ^ (1 + exponent) * (4 * b + 1)
+         by substituting Equality.symmetry(Natural.power_one_plus(4, exponent))
+  as valueReads;
+  suppose Natural.IsOneTwoThreeObstruction(4 ^ exponent * (16 * b + 4)) as obstruction;
+  Natural.IsOneTwoThreeObstruction(4 ^ (1 + exponent) * (4 * b + 1)) by substituting valueReads;
+  done by admissible
+}
+
+definition Matrix.OneTwoThreeResidualCover (coefficient : ℕ) : Proposition :=
+  ∀ (m : ℕ). m ≥ 1 →
+    ∃ (residual w : ℕ).
+      Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(3), (residual : ℤ))
+      ∧ residual + w * w * coefficient = m
+
+theorem Matrix.weightedD3Zero_universal_of_residual_cover
+        (coefficient : ℕ) (cover : Matrix.OneTwoThreeResidualCover(coefficient))
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(3, 0, 0, coefficient)) := {
+  take m : ℕ;
+  suppose m ≥ 1 as positive;
+  choose residual : ℕ, w : ℕ such that
+      Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(3), (residual : ℤ))
+      ∧ residual + w * w * coefficient = m
+      from cover(m, positive);
+  Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(3), (residual : ℤ)) as residualRepresented;
+  residual + w * w * coefficient = m as naturalValueReads;
+  choose vector : RingVector(Integer.commutative_ring_bundle, 3) such that
+      Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(3), vector) = (residual : ℤ)
+      as residualValueReads from residualRepresented;
+  let x : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo));
+  let y : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo));
+  let z : ℤ := vector(NaturalsBelow.top(2));
+  vector = (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+      by RingVector.eq_threeCoordinates(vector) as vectorReads;
+  x * x + 2 * (y * y) + 3 * (z * z)
+     = Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(3),
+         (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+         by Equality.symmetry(Matrix.squarePlusDoublePlusScaledSquareForm_coordinateTuple_value(3, x, y, z))
+     = Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(3), vector)
+         by substituting Equality.symmetry(vectorReads)
+     = (residual : ℤ) by residualValueReads
+  as residualScalarReads;
+  (residual : ℤ) + (w : ℤ) * (w : ℤ) * (coefficient : ℤ)
+     = (residual : ℤ) + ((w * w : ℕ) : ℤ) * (coefficient : ℤ)
+         by substituting Natural.to_integer.multiply_preserves(w, w)
+     = (residual : ℤ) + ((w * w * coefficient : ℕ) : ℤ)
+         by substituting Natural.to_integer.multiply_preserves(w * w, coefficient)
+     = ((residual + w * w * coefficient : ℕ) : ℤ)
+         by Equality.symmetry(Natural.to_integer.add_preserves(residual, w * w * coefficient))
+     = (m : ℤ) by substituting naturalValueReads
+  as integerValueReads;
+  x * x + 2 * (y * y) + 3 * (z * z) + 2 * 0 * y * (w : ℤ) + 2 * 0 * z * (w : ℤ)
+      + (coefficient : ℤ) * ((w : ℤ) * (w : ℤ))
+     = (residual : ℤ) + (w : ℤ) * (w : ℤ) * (coefficient : ℤ)
+         by substituting residualScalarReads
+     = (m : ℤ) by integerValueReads
+  as scalarComputation;
+  done by Matrix.represents_by_witness(
+      Matrix.squarePlusDoublePlusScaledRankFourRepresentative(3, 0, 0, coefficient),
+      target := m, vector := ⟨x, y, z, (w : ℤ)⟩,
+      computes := Matrix.squarePlusDoublePlusScaledRankFourRepresentative_coordinateTuple_computes(
+          scalarComputation := scalarComputation))
+}
+
+theorem Matrix.oneTwoThreeResidualCover_selected_core_of_converse
+        (converse : Matrix.OneTwoThreeConverse) (coefficient core : ℕ)
+        (coreSum : core + coefficient = 10)
+        (coreAdmissible : ∀ (exponent b : ℕ).
+          ¬(Natural.IsOneTwoThreeObstruction(4 ^ exponent * (16 * b + core))))
+        : Matrix.OneTwoThreeResidualCover(coefficient) := {
+  take m : ℕ;
+  suppose m ≥ 1;
+  Natural.IsOneTwoThreeObstruction(m) ∨ ¬(Natural.IsOneTwoThreeObstruction(m))
+      by Logic.excluded_middle(Natural.IsOneTwoThreeObstruction(m)) as obstructionDecision;
+  ¬(Natural.IsOneTwoThreeObstruction(m)) ∨ Natural.IsOneTwoThreeObstruction(m)
+      by Or.swap(obstructionDecision);
+  done by cases {
+    case ¬(Natural.IsOneTwoThreeObstruction(m)) as admissible: {
+      Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(3), (m : ℤ))
+          by converse(m, admissible) as represented;
+      witness m with witness 0 with And.introduction(represented, { m + 0 * 0 * coefficient = m })
+    }
+    case Natural.IsOneTwoThreeObstruction(m) as obstruction: {
+      choose exponent : ℕ, b : ℕ such that m = 4 ^ exponent * (16 * b + 10)
+          from obstruction;
+      let residual : ℕ := 4 ^ exponent * (16 * b + core);
+      let w : ℕ := 2 ^ exponent;
+      ¬(Natural.IsOneTwoThreeObstruction(residual)) by coreAdmissible(exponent, b) as residualAdmissible;
+      Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(3), (residual : ℤ))
+          by converse(residual, residualAdmissible) as represented;
+      residual + w * w * coefficient
+         = 4 ^ exponent * (16 * b + core) + (2 ^ exponent * 2 ^ exponent) * coefficient
+         = 4 ^ exponent * (16 * b + core) + 4 ^ exponent * coefficient
+             by Equality.congruence(
+                 (candidate : ℕ) ↦ 4 ^ exponent * (16 * b + core) + candidate * coefficient,
+                 2 ^ exponent * 2 ^ exponent, 4 ^ exponent,
+                 Natural.two_power_square_is_four_power(exponent))
+         = 4 ^ exponent * (16 * b + (core + coefficient))
+         = 4 ^ exponent * (16 * b + 10) by substituting coreSum
+         = m
+      as valueReads;
+      witness residual with witness w with And.introduction(represented, valueReads)
+    }
+  }
+}
+
+theorem Matrix.weightedD3Zero_selected_core_universal_of_converse
+        (converse : Matrix.OneTwoThreeConverse) (coefficient core quotient remainder : ℕ)
+        (coreSum : core + coefficient = 10) (coreShape : core = 4 * quotient + remainder)
+        (remainderBelow : remainder < 4) (remainderNonzero : remainder ≠ 0)
+        (coreBelow : core < 16) (coreNotTen : core ≠ 10)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(3, 0, 0, coefficient)) := {
+  done by Matrix.weightedD3Zero_universal_of_residual_cover(
+      coefficient,
+      Matrix.oneTwoThreeResidualCover_selected_core_of_converse(
+          converse, coefficient, core, coreSum,
+          (exponent b : ℕ) ↦ Natural.four_power_times_nonzero_mod_four_core_not_one_two_three_obstruction(
+              exponent, b, core, quotient, remainder, coreShape,
+              remainderBelow, remainderNonzero, coreBelow, coreNotTen)))
+}
+
+theorem Matrix.weightedD3S0R0C3_universal_of_one_two_three_converse
+        (converse : Matrix.OneTwoThreeConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(3, 0, 0, 3)) :=
+  by Matrix.weightedD3Zero_selected_core_universal_of_converse(
+      converse, coefficient := 3, core := 7, quotient := 1, remainder := 3,
+      coreSum := done, coreShape := done, remainderBelow := done, remainderNonzero := done,
+      coreBelow := done, coreNotTen := done)
+
+theorem Matrix.weightedD3S0R0C4_universal_of_one_two_three_converse
+        (converse : Matrix.OneTwoThreeConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(3, 0, 0, 4)) :=
+  by Matrix.weightedD3Zero_selected_core_universal_of_converse(
+      converse, coefficient := 4, core := 6, quotient := 1, remainder := 2,
+      coreSum := done, coreShape := done, remainderBelow := done, remainderNonzero := done,
+      coreBelow := done, coreNotTen := done)
+
+theorem Matrix.weightedD3S0R0C5_universal_of_one_two_three_converse
+        (converse : Matrix.OneTwoThreeConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(3, 0, 0, 5)) :=
+  by Matrix.weightedD3Zero_selected_core_universal_of_converse(
+      converse, coefficient := 5, core := 5, quotient := 1, remainder := 1,
+      coreSum := done, coreShape := done, remainderBelow := done, remainderNonzero := done,
+      coreBelow := done, coreNotTen := done)
+
+theorem Matrix.weightedD3S0R0C6_universal_of_one_two_three_converse
+        (converse : Matrix.OneTwoThreeConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(3, 0, 0, 6)) :=
+  by Matrix.weightedD3Zero_universal_of_residual_cover(
+      6, Matrix.oneTwoThreeResidualCover_selected_core_of_converse(
+          converse, coefficient := 6, core := 4, coreSum := done,
+          coreAdmissible := Natural.four_power_times_sixteen_plus_four_not_one_two_three_obstruction))
+
+theorem Matrix.weightedD3S0R0C7_universal_of_one_two_three_converse
+        (converse : Matrix.OneTwoThreeConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(3, 0, 0, 7)) :=
+  by Matrix.weightedD3Zero_selected_core_universal_of_converse(
+      converse, coefficient := 7, core := 3, quotient := 0, remainder := 3,
+      coreSum := done, coreShape := done, remainderBelow := done, remainderNonzero := done,
+      coreBelow := done, coreNotTen := done)
+
+theorem Matrix.weightedD3S0R0C8_universal_of_one_two_three_converse
+        (converse : Matrix.OneTwoThreeConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(3, 0, 0, 8)) :=
+  by Matrix.weightedD3Zero_selected_core_universal_of_converse(
+      converse, coefficient := 8, core := 2, quotient := 0, remainder := 2,
+      coreSum := done, coreShape := done, remainderBelow := done, remainderNonzero := done,
+      coreBelow := done, coreNotTen := done)
+
+theorem Matrix.weightedD3S0R0C9_universal_of_one_two_three_converse
+        (converse : Matrix.OneTwoThreeConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(3, 0, 0, 9)) :=
+  by Matrix.weightedD3Zero_selected_core_universal_of_converse(
+      converse, coefficient := 9, core := 1, quotient := 0, remainder := 1,
+      coreSum := done, coreShape := done, remainderBelow := done, remainderNonzero := done,
+      coreBelow := done, coreNotTen := done)
+
+theorem Matrix.oneTwoThreeForm_represents_zero
+        : Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(3), (0 : ℤ)) := {
+  Matrix.quadraticForm(
+     Matrix.squarePlusDoublePlusScaledSquareForm(3),
+      (⟨0, 0, 0⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+     = (0 : ℤ) * 0 + 2 * (0 * 0) + 3 * (0 * 0)
+         by Matrix.squarePlusDoublePlusScaledSquareForm_coordinateTuple_value(3, 0, 0, 0)
+     = (0 : ℤ)
+  as computes;
+  done by Matrix.represents_by_witness(
+      Matrix.squarePlusDoublePlusScaledSquareForm(3), target := 0, vector := ⟨0, 0, 0⟩, computes := computes)
+}
+
+theorem Matrix.oneTwoThreeResidualCover_ten_of_converse
+        (converse : Matrix.OneTwoThreeConverse)
+        : Matrix.OneTwoThreeResidualCover(10) := {
+  take m : ℕ;
+  suppose m ≥ 1;
+  Natural.IsOneTwoThreeObstruction(m) ∨ ¬(Natural.IsOneTwoThreeObstruction(m))
+      by Logic.excluded_middle(Natural.IsOneTwoThreeObstruction(m)) as obstructionDecision;
+  ¬(Natural.IsOneTwoThreeObstruction(m)) ∨ Natural.IsOneTwoThreeObstruction(m)
+      by Or.swap(obstructionDecision);
+  done by cases {
+    case ¬(Natural.IsOneTwoThreeObstruction(m)) as admissible: {
+      Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(3), (m : ℤ))
+          by converse(m, admissible) as represented;
+      witness m with witness 0 with And.introduction(represented, { m + 0 * 0 * 10 = m })
+    }
+    case Natural.IsOneTwoThreeObstruction(m) as obstruction: {
+      choose exponent : ℕ, b : ℕ such that m = 4 ^ exponent * (16 * b + 10)
+          as mReads from obstruction;
+      b = 0 ∨ ∃ (predecessor : ℕ). b = 1 + predecessor by Natural.zero_or_one_plus;
+      done by cases {
+        case b = 0 as bZero: {
+          let w : ℕ := 2 ^ exponent;
+          0 + w * w * 10
+             = (2 ^ exponent * 2 ^ exponent) * 10
+             = 4 ^ exponent * 10 by substituting Natural.two_power_square_is_four_power(exponent)
+             = 4 ^ exponent * (16 * 0 + 10)
+             = 4 ^ exponent * (16 * b + 10) by substituting Equality.symmetry(bZero)
+             = m by Equality.symmetry(mReads)
+          as valueReads;
+          witness 0 with witness w with And.introduction(Matrix.oneTwoThreeForm_represents_zero, valueReads)
+        }
+        case ∃ (predecessor : ℕ). b = 1 + predecessor: {
+          choose predecessor : ℕ such that b = 1 + predecessor as bReads;
+          predecessor = 0 ∨ ∃ (tail : ℕ). predecessor = 1 + tail by Natural.zero_or_one_plus;
+          done by cases {
+            case predecessor = 0 as predecessorZero: {
+              let residual : ℕ := 4 ^ (exponent + 2);
+              let w : ℕ := 2 ^ exponent;
+              ¬(Natural.IsOneTwoThreeObstruction(residual))
+                  by Natural.not_one_two_three_obstruction_four_power_times(
+                      exponent + 2, 1, Natural.four_times_plus_one_not_one_two_three_obstruction(0))
+                  as residualAdmissible;
+              Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(3), (residual : ℤ))
+                  by converse(residual, residualAdmissible) as represented;
+              residual + w * w * 10
+                 = 4 ^ (exponent + 2) + (2 ^ exponent * 2 ^ exponent) * 10
+                     by ring
+                 = 4 ^ (exponent + 2) + 4 ^ exponent * 10
+                     by Equality.congruence(
+                         (candidate : ℕ) ↦ 4 ^ (exponent + 2) + candidate * 10,
+                         2 ^ exponent * 2 ^ exponent, 4 ^ exponent,
+                         Natural.two_power_square_is_four_power(exponent))
+                 = 4 ^ exponent * (4 ^ 2) + 4 ^ exponent * 10
+                     by substituting Natural.power_add(4, exponent, 2)
+                 = 4 ^ exponent * 16 + 4 ^ exponent * 10
+                 = 4 ^ exponent * (16 * 1 + 10)
+                 = 4 ^ exponent * (16 * (1 + 0) + 10)
+                 = 4 ^ exponent * (16 * (1 + predecessor) + 10)
+                     by substituting Equality.symmetry(predecessorZero)
+                 = 4 ^ exponent * (16 * b + 10) by substituting Equality.symmetry(bReads)
+                 = m by Equality.symmetry(mReads)
+              as valueReads;
+              witness residual with witness w with And.introduction(represented, valueReads)
+            }
+            case ∃ (tail : ℕ). predecessor = 1 + tail: {
+              choose tail : ℕ such that predecessor = 1 + tail as predecessorReads;
+              let residual : ℕ := 4 ^ exponent * (16 * tail + 2);
+              let w : ℕ := 2 ^ (1 + exponent);
+              ¬(Natural.IsOneTwoThreeObstruction(residual))
+                  by Natural.four_power_times_nonzero_mod_four_core_not_one_two_three_obstruction(
+                      exponent, tail, 2, 0, 2, done, done, done, done, done)
+                  as residualAdmissible;
+              Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(3), (residual : ℤ))
+                  by converse(residual, residualAdmissible) as represented;
+              residual + w * w * 10
+                 = 4 ^ exponent * (16 * tail + 2) + (2 ^ (1 + exponent) * 2 ^ (1 + exponent)) * 10
+                 = 4 ^ exponent * (16 * tail + 2) + 4 ^ (1 + exponent) * 10
+                     by substituting Natural.two_power_square_is_four_power(1 + exponent)
+                 = 4 ^ exponent * (16 * tail + 2) + (4 * 4 ^ exponent) * 10
+                     by substituting Natural.power_one_plus(4, exponent)
+                 = 4 ^ exponent * (16 * (2 + tail) + 10)
+                 = 4 ^ exponent * (16 * (1 + (1 + tail)) + 10)
+                 = 4 ^ exponent * (16 * (1 + predecessor) + 10)
+                     by substituting Equality.symmetry(predecessorReads)
+                 = 4 ^ exponent * (16 * b + 10) by substituting Equality.symmetry(bReads)
+                 = m by Equality.symmetry(mReads)
+              as valueReads;
+              witness residual with witness w with And.introduction(represented, valueReads)
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+theorem Matrix.weightedD3S0R0C10_universal_of_one_two_three_converse
+        (converse : Matrix.OneTwoThreeConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(3, 0, 0, 10)) :=
+  by Matrix.weightedD3Zero_universal_of_residual_cover(
+      10, Matrix.oneTwoThreeResidualCover_ten_of_converse(converse))
