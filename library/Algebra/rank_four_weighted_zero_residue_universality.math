@@ -1,0 +1,69 @@
+-- Algebra/rank_four_weighted_zero_residue_universality.math
+--
+-- Generic diagonal-extension lift for the weighted ternaries x²+2y²+dz².
+
+module Algebra.rank_four_weighted_zero_residue_universality
+
+import Algebra.rank_four_weighted_d3_both_unit_covers
+
+definition Matrix.WeightedDiagonalResidualCover (d coefficient : ℕ) : Proposition :=
+  ∀ (m : ℕ). m ≥ 1 →
+    ∃ (residual w : ℕ).
+      Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm((d : ℤ)), (residual : ℤ))
+      ∧ residual + w * w * coefficient = m
+
+theorem Matrix.weightedZero_universal_of_residual_cover
+        (d coefficient : ℕ) (cover : Matrix.WeightedDiagonalResidualCover(d, coefficient))
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(d, 0, 0, coefficient)) := {
+  take m : ℕ;
+  suppose m ≥ 1 as positive;
+  choose residual : ℕ, w : ℕ such that
+      Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm((d : ℤ)), (residual : ℤ))
+      ∧ residual + w * w * coefficient = m
+      as covered from cover(m, positive);
+  Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm((d : ℤ)), (residual : ℤ))
+      by And.left(
+          Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm((d : ℤ)), (residual : ℤ)),
+          residual + w * w * coefficient = m, covered)
+      as residualRepresented;
+  residual + w * w * coefficient = m by And.right(
+      Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm((d : ℤ)), (residual : ℤ)),
+      residual + w * w * coefficient = m, covered) as naturalValueReads;
+  choose vector : RingVector(Integer.commutative_ring_bundle, 3) such that
+      Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm((d : ℤ)), vector) = (residual : ℤ)
+      as residualValueReads from residualRepresented;
+  let x : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo));
+  let y : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo));
+  let z : ℤ := vector(NaturalsBelow.top(2));
+  vector = (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+      by RingVector.eq_threeCoordinates(vector) as vectorReads;
+  x * x + 2 * (y * y) + (d : ℤ) * (z * z)
+     = Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm((d : ℤ)),
+         (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+         by Equality.symmetry(Matrix.squarePlusDoublePlusScaledSquareForm_coordinateTuple_value((d : ℤ), x, y, z))
+     = Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm((d : ℤ)), vector)
+         by substituting Equality.symmetry(vectorReads)
+     = (residual : ℤ) by residualValueReads
+  as residualScalarReads;
+  (residual : ℤ) + (w : ℤ) * (w : ℤ) * (coefficient : ℤ)
+     = (residual : ℤ) + ((w * w : ℕ) : ℤ) * (coefficient : ℤ)
+         by substituting Natural.to_integer.multiply_preserves(w, w)
+     = (residual : ℤ) + ((w * w * coefficient : ℕ) : ℤ)
+         by substituting Natural.to_integer.multiply_preserves(w * w, coefficient)
+     = ((residual + w * w * coefficient : ℕ) : ℤ)
+         by Equality.symmetry(Natural.to_integer.add_preserves(residual, w * w * coefficient))
+     = (m : ℤ) by substituting naturalValueReads
+  as integerValueReads;
+  x * x + 2 * (y * y) + (d : ℤ) * (z * z) + 2 * 0 * y * (w : ℤ) + 2 * 0 * z * (w : ℤ)
+      + (coefficient : ℤ) * ((w : ℤ) * (w : ℤ))
+     = x * x + 2 * (y * y) + (d : ℤ) * (z * z) + (w : ℤ) * (w : ℤ) * (coefficient : ℤ) by ring
+     = (residual : ℤ) + (w : ℤ) * (w : ℤ) * (coefficient : ℤ)
+         by substituting residualScalarReads
+     = (m : ℤ) by integerValueReads
+  as scalarComputation;
+  done by Matrix.represents_by_witness(
+      Matrix.squarePlusDoublePlusScaledRankFourRepresentative(d, 0, 0, coefficient),
+      target := m, vector := ⟨x, y, z, (w : ℤ)⟩,
+      computes := Matrix.squarePlusDoublePlusScaledRankFourRepresentative_coordinateTuple_computes(
+          scalarComputation := scalarComputation))
+}

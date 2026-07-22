@@ -1,0 +1,37 @@
+-- Algebra/rank_four_weighted_d4_foundation.math
+--
+-- Dickson's represented set for x²+2y²+4z² has the same exceptional
+-- shape 4^a(16b+14) already used by the one-three-six branch.
+
+module Algebra.rank_four_weighted_d4_foundation
+
+import Algebra.rank_four_weighted_zero_residue_universality
+
+definition Matrix.OneTwoFourConverse : Proposition :=
+  ∀ (n : ℕ). ¬(Natural.IsOneThreeSixFourObstruction(n)) →
+    Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(4), (n : ℤ))
+
+theorem Natural.four_power_times_sixteen_plus_four_not_one_three_six_four_obstruction
+        (exponent b : ℕ)
+        : ¬(Natural.IsOneThreeSixFourObstruction(4 ^ exponent * (16 * b + 4))) := {
+  ¬(Natural.IsOneThreeSixFourObstruction(4 ^ (1 + exponent) * (4 * b + 1)))
+      by Natural.not_one_three_six_four_obstruction_four_power_times(
+          1 + exponent, 4 * b + 1, Natural.four_times_plus_one_not_one_three_six_four_obstruction(b))
+      as admissible;
+  4 ^ exponent * (16 * b + 4)
+     = 4 ^ exponent * (4 * (4 * b + 1)) by ring
+     = (4 * 4 ^ exponent) * (4 * b + 1) by ring
+     = 4 ^ (1 + exponent) * (4 * b + 1)
+         by substituting Equality.symmetry(Natural.power_one_plus(4, exponent))
+  as valueReads;
+  suppose Natural.IsOneThreeSixFourObstruction(4 ^ exponent * (16 * b + 4)) as obstruction;
+  Natural.IsOneThreeSixFourObstruction(4 ^ (1 + exponent) * (4 * b + 1))
+      by substituting valueReads as transformedObstruction;
+  done by admissible(transformedObstruction)
+}
+
+theorem Matrix.oneTwoFourForm_represents_zero
+        : Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(4), (0 : ℤ)) :=
+  by Matrix.represents_by_witness(
+      Matrix.squarePlusDoublePlusScaledSquareForm(4), target := 0, vector := ⟨0, 0, 0⟩,
+      computes := Matrix.squarePlusDoublePlusScaledSquareForm_coordinateTuple_value(4, 0, 0, 0))

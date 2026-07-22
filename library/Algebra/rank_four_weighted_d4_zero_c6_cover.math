@@ -1,0 +1,87 @@
+module Algebra.rank_four_weighted_d4_zero_c6_cover
+
+import Algebra.rank_four_weighted_d4_zero_residue_cover
+
+theorem Matrix.oneTwoFourResidualCover_six_of_converse
+        (converse : Matrix.OneTwoFourConverse) : Matrix.WeightedDiagonalResidualCover(4, 6) := {
+  take m : ℕ;
+  suppose m ≥ 1;
+  Natural.IsOneThreeSixFourObstruction(m) ∨ ¬(Natural.IsOneThreeSixFourObstruction(m))
+      by Logic.excluded_middle(Natural.IsOneThreeSixFourObstruction(m)) as obstructionDecision;
+  ¬(Natural.IsOneThreeSixFourObstruction(m)) ∨ Natural.IsOneThreeSixFourObstruction(m)
+      by Or.swap(obstructionDecision);
+  done by cases {
+    case ¬(Natural.IsOneThreeSixFourObstruction(m)) as admissible: {
+      Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(4), (m : ℤ))
+          by converse(m, admissible) as represented;
+      m + 0 * 0 * 6 = m by ring as valueReads;
+      witness m with witness 0 with And.introduction(represented, valueReads)
+    }
+    case Natural.IsOneThreeSixFourObstruction(m) as obstruction: {
+      choose exponent : ℕ, b : ℕ such that m = 4 ^ exponent * (16 * b + 14) as mReads from obstruction;
+      b = 0 ∨ ∃ (q : ℕ). b = 1 + q by Natural.zero_or_one_plus;
+      done by cases {
+        case b = 0 as bZero: {
+          let residual : ℕ := 4 ^ exponent * 8;
+          let w : ℕ := 2 ^ exponent;
+          residual = 4 ^ (1 + exponent) * (16 * 0 + 2) by {
+            residual
+               = 4 ^ exponent * 8
+               = (4 * 4 ^ exponent) * 2 by ring
+               = 4 ^ (1 + exponent) * (16 * 0 + 2)
+                   by substituting Equality.symmetry(Natural.power_one_plus(4, exponent));
+            done
+          }
+          as residualShape;
+          ¬(Natural.IsOneThreeSixFourObstruction(residual)) by {
+            suppose Natural.IsOneThreeSixFourObstruction(residual) as residualObstruction;
+            Natural.IsOneThreeSixFourObstruction(4 ^ (1 + exponent) * (16 * 0 + 2))
+                by substituting residualShape as transformedObstruction;
+            done by Natural.four_power_times_nonzero_mod_four_core_not_one_three_six_four_obstruction(
+                1 + exponent, 0, 2, 0, 2, done, done, done, done, done)(transformedObstruction)
+          }
+          as residualAdmissible;
+          Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(4), (residual : ℤ))
+              by converse(residual, residualAdmissible) as represented;
+          residual + w * w * 6
+             = 4 ^ exponent * 8 + (2 ^ exponent * 2 ^ exponent) * 6
+             = 4 ^ exponent * 8 + 4 ^ exponent * 6
+                 by Equality.congruence(
+                     (candidate : ℕ) ↦ 4 ^ exponent * 8 + candidate * 6,
+                     2 ^ exponent * 2 ^ exponent, 4 ^ exponent,
+                     Natural.two_power_square_is_four_power(exponent))
+             = 4 ^ exponent * (16 * 0 + 14) by ring
+             = 4 ^ exponent * (16 * b + 14) by substituting Equality.symmetry(bZero)
+             = m by Equality.symmetry(mReads)
+          as valueReads;
+          witness residual with witness w with And.introduction(represented, valueReads)
+        }
+        case ∃ (q : ℕ). b = 1 + q: {
+          choose q : ℕ such that b = 1 + q as bReads;
+          let residual : ℕ := 4 ^ exponent * (16 * q + 6);
+          let w : ℕ := 2 ^ (1 + exponent);
+          ¬(Natural.IsOneThreeSixFourObstruction(residual))
+              by Natural.four_power_times_nonzero_mod_four_core_not_one_three_six_four_obstruction(
+                  exponent, q, 6, 1, 2, done, done, done, done, done)
+              as residualAdmissible;
+          Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(4), (residual : ℤ))
+              by converse(residual, residualAdmissible) as represented;
+          residual + w * w * 6
+             = 4 ^ exponent * (16 * q + 6) + (2 ^ (1 + exponent) * 2 ^ (1 + exponent)) * 6
+             = 4 ^ exponent * (16 * q + 6) + 4 ^ (1 + exponent) * 6
+                 by Equality.congruence(
+                     (candidate : ℕ) ↦ 4 ^ exponent * (16 * q + 6) + candidate * 6,
+                     2 ^ (1 + exponent) * 2 ^ (1 + exponent), 4 ^ (1 + exponent),
+                     Natural.two_power_square_is_four_power(1 + exponent))
+             = 4 ^ exponent * (16 * q + 6) + (4 * 4 ^ exponent) * 6
+                 by substituting Natural.power_one_plus(4, exponent)
+             = 4 ^ exponent * (16 * (1 + q) + 14) by ring
+             = 4 ^ exponent * (16 * b + 14) by substituting Equality.symmetry(bReads)
+             = m by Equality.symmetry(mReads)
+          as valueReads;
+          witness residual with witness w with And.introduction(represented, valueReads)
+        }
+      }
+    }
+  }
+}

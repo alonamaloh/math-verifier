@@ -1,0 +1,56 @@
+-- Algebra/one_three_six_obstruction_shift.math
+
+module Algebra.one_three_six_obstruction_shift
+
+import Algebra.rank_four_weighted_d4_zero_residue_cover
+
+theorem Natural.one_three_six_obstruction_seven_shift_is_admissible
+        (b : ℕ) (obstruction : Natural.IsOneThreeSixFourObstruction(b))
+        : ∃ (tail : ℕ). b = 7 + tail ∧ ¬(Natural.IsOneThreeSixFourObstruction(tail)) := {
+  choose exponent : ℕ, q : ℕ such that b = 4 ^ exponent * (16 * q + 14) as bReads from obstruction;
+  exponent = 0 ∨ ∃ (earlier : ℕ). exponent = 1 + earlier by Natural.zero_or_one_plus;
+  done by cases {
+    case exponent = 0 as exponentZero: {
+      let tail : ℕ := 16 * q + 7;
+      b
+         = 4 ^ exponent * (16 * q + 14) by bReads
+         = 4 ^ 0 * (16 * q + 14) by substituting exponentZero
+         = 16 * q + 14 by substituting Natural.power_zero(4)
+         = 7 + tail by ring
+      as shifted;
+      ¬(Natural.IsOneThreeSixFourObstruction(tail)) by {
+        suppose Natural.IsOneThreeSixFourObstruction(tail) as tailObstruction;
+        4 ^ 0 * (16 * q + 7) = 16 * q + 7 by substituting Natural.power_zero(4) = tail as tailReads;
+        Natural.IsOneThreeSixFourObstruction(4 ^ 0 * (16 * q + 7))
+            by substituting Equality.symmetry(tailReads) as transformedObstruction;
+        done by Natural.four_power_times_nonzero_mod_four_core_not_one_three_six_four_obstruction(
+            0, q, 7, 1, 3, done, done, done, done, done)(transformedObstruction)
+      }
+      as tailAdmissible;
+      witness tail with And.introduction(shifted, tailAdmissible)
+    }
+    case ∃ (earlier : ℕ). exponent = 1 + earlier: {
+      choose earlier : ℕ such that exponent = 1 + earlier as exponentReads;
+      choose powerTail : ℕ such that 4 ^ earlier = 1 + powerTail
+          from Natural.subtraction_witness(1, 4 ^ earlier, Natural.power_positive(4, earlier, done));
+      let gap : ℕ := 16 * q + 11 + powerTail * (16 * q + 14);
+      let tail : ℕ := 4 * (gap + 1) + 1;
+      4 ^ earlier * (16 * q + 14)
+         = (1 + powerTail) * (16 * q + 14) by substituting (4 ^ earlier = 1 + powerTail)
+         = 3 + gap by ring
+      as innerReads;
+      b
+         = 4 ^ exponent * (16 * q + 14) by bReads
+         = 4 ^ (1 + earlier) * (16 * q + 14) by substituting exponentReads
+         = (4 * 4 ^ earlier) * (16 * q + 14) by substituting Natural.power_one_plus(4, earlier)
+         = 4 * (4 ^ earlier * (16 * q + 14)) by ring
+         = 4 * (3 + gap) by substituting innerReads
+         = 7 + tail by ring
+      as shifted;
+      ¬(Natural.IsOneThreeSixFourObstruction(tail))
+          by Natural.four_times_plus_one_not_one_three_six_four_obstruction(gap + 1)
+          as tailAdmissible;
+      witness tail with And.introduction(shifted, tailAdmissible)
+    }
+  }
+}

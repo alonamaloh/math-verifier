@@ -1,0 +1,47 @@
+-- Algebra/rank_four_weighted_d4_zero_residue_cover.math
+
+module Algebra.rank_four_weighted_d4_zero_residue_cover
+
+import Algebra.rank_four_weighted_d4_foundation
+
+theorem Matrix.oneTwoFourResidualCover_selected_core_of_converse
+        (converse : Matrix.OneTwoFourConverse) (coefficient core : ℕ)
+        (coreSum : core + coefficient = 14)
+        (coreAdmissible : ∀ (exponent b : ℕ).
+          ¬(Natural.IsOneThreeSixFourObstruction(4 ^ exponent * (16 * b + core))))
+        : Matrix.WeightedDiagonalResidualCover(4, coefficient) := {
+  take m : ℕ;
+  suppose m ≥ 1;
+  Natural.IsOneThreeSixFourObstruction(m) ∨ ¬(Natural.IsOneThreeSixFourObstruction(m))
+      by Logic.excluded_middle(Natural.IsOneThreeSixFourObstruction(m)) as obstructionDecision;
+  ¬(Natural.IsOneThreeSixFourObstruction(m)) ∨ Natural.IsOneThreeSixFourObstruction(m)
+      by Or.swap(obstructionDecision);
+  done by cases {
+    case ¬(Natural.IsOneThreeSixFourObstruction(m)) as admissible: {
+      Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(4), (m : ℤ))
+          by converse(m, admissible) as represented;
+      m + 0 * 0 * coefficient = m by ring as valueReads;
+      witness m with witness 0 with And.introduction(represented, valueReads)
+    }
+    case Natural.IsOneThreeSixFourObstruction(m) as obstruction: {
+      choose exponent : ℕ, b : ℕ such that m = 4 ^ exponent * (16 * b + 14) as mReads from obstruction;
+      let residual : ℕ := 4 ^ exponent * (16 * b + core);
+      let w : ℕ := 2 ^ exponent;
+      ¬(Natural.IsOneThreeSixFourObstruction(residual)) by coreAdmissible(exponent, b) as residualAdmissible;
+      Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(4), (residual : ℤ))
+          by converse(residual, residualAdmissible) as represented;
+      residual + w * w * coefficient
+         = 4 ^ exponent * (16 * b + core) + (2 ^ exponent * 2 ^ exponent) * coefficient
+         = 4 ^ exponent * (16 * b + core) + 4 ^ exponent * coefficient
+             by Equality.congruence(
+                 (candidate : ℕ) ↦ 4 ^ exponent * (16 * b + core) + candidate * coefficient,
+                 2 ^ exponent * 2 ^ exponent, 4 ^ exponent,
+                 Natural.two_power_square_is_four_power(exponent))
+         = 4 ^ exponent * (16 * b + (core + coefficient)) by ring
+         = 4 ^ exponent * (16 * b + 14) by substituting coreSum
+         = m by Equality.symmetry(mReads)
+      as valueReads;
+      witness residual with witness w with And.introduction(represented, valueReads)
+    }
+  }
+}

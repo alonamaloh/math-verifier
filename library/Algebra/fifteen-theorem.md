@@ -260,6 +260,14 @@ equation supplies its modulo-three square condition, as well as the parity
 condition for recovering `y`.  The seven concrete modules aggregated by
 `Algebra/rank_four_weighted_d3_both_unit_covers` cover coefficients
 `c=2,4,5,6,8,9,10` and raise the selected conditional total to 85.
+The diagonal weighted-`d=4` branch uses the Ramanujan–Dickson represented set
+for `x²+2y²+4z²`, with the same exceptional shape `4^a(16b+14)`.
+Nine coefficients use the direct residual core `14-c`.  Coefficient 6 uses
+one extra factor of four after the first inner branch; coefficient 14 shifts
+an obstructed inner parameter `b` to the admissible `b-7` and takes the
+fourth coordinate `3·2^a`.  The eleven modules aggregated by
+`Algebra/rank_four_weighted_d4_zero_residue_covers` raise the selected
+conditional total to 96.
   `Algebra/rank_four_completed_cover_universality` gives fraction-free
   completed-square interfaces for all other constructors. Its scaled-square,
   weighted, and odd cover predicates account for the 32, 140, and 28
