@@ -1,0 +1,419 @@
+-- Algebra/rank_four_weighted_d3_second_unit_universality.math
+--
+-- The selected forms x²+2y²+3z²+2yw+cw².  Completing the y-square gives
+--
+--   2Q = (2y+w)² + 2x² + 6z² + (2c-1)w².
+--
+-- Dickson's represented-set theorem for x²+2y²+6z² has exceptional
+-- shape 4^a(8b+5).  Its converse is the only non-elementary input below.
+
+module Algebra.rank_four_weighted_d3_second_unit_universality
+
+import Algebra.rank_four_weighted_d3_zero_residue_universality
+
+definition Natural.IsOneTwoSixObstruction (n : ℕ) : Proposition :=
+  ∃ (exponent b : ℕ). n = 4 ^ exponent * (8 * b + 5)
+
+definition Matrix.OneTwoSixConverse : Proposition :=
+  ∀ (n : ℕ). ¬(Natural.IsOneTwoSixObstruction(n)) →
+    Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(6), (n : ℤ))
+
+theorem Natural.one_two_six_obstruction_of_four_times
+        (n : ℕ) (scaled : Natural.IsOneTwoSixObstruction(4 * n))
+        : Natural.IsOneTwoSixObstruction(n) := {
+  choose exponent : ℕ, b : ℕ such that 4 * n = 4 ^ exponent * (8 * b + 5)
+      as scaledReads from scaled;
+  exponent = 0 ∨ ∃ (predecessor : ℕ). exponent = 1 + predecessor by Natural.zero_or_one_plus;
+  done by cases {
+    case exponent = 0 as exponentZero: {
+      4 * n + 0
+         = 4 ^ exponent * (8 * b + 5) by scaledReads
+         = 4 ^ 0 * (8 * b + 5) by substituting exponentZero
+         = 8 * b + 5 by substituting Natural.power_zero(4)
+         = 4 * (2 * b + 1) + 1 by ring
+      as impossible;
+      False by Natural.distinct_affine_residues_not_equal(
+          4, 0, 1, n, 2 * b + 1, done, done, done, impossible);
+      done
+    }
+    case ∃ (predecessor : ℕ). exponent = 1 + predecessor: {
+      choose predecessor : ℕ such that exponent = 1 + predecessor as exponentReads;
+      4 * n
+         = 4 ^ exponent * (8 * b + 5) by scaledReads
+         = 4 ^ (1 + predecessor) * (8 * b + 5) by substituting exponentReads
+         = (4 * 4 ^ predecessor) * (8 * b + 5)
+             by substituting Natural.power_one_plus(4, predecessor)
+         = 4 * (4 ^ predecessor * (8 * b + 5))
+      as cancellable;
+      n = 4 ^ predecessor * (8 * b + 5)
+          by Natural.multiply_cancel_left(
+              4, n, 4 ^ predecessor * (8 * b + 5), done, cancellable)
+          as reduced;
+      witness predecessor with witness b with reduced
+    }
+  }
+}
+
+theorem Natural.not_one_two_six_obstruction_four_times
+        (n : ℕ) (admissible : ¬(Natural.IsOneTwoSixObstruction(n)))
+        : ¬(Natural.IsOneTwoSixObstruction(4 * n)) := {
+  suppose Natural.IsOneTwoSixObstruction(4 * n) as scaled;
+  done by admissible(Natural.one_two_six_obstruction_of_four_times(n, scaled))
+}
+
+theorem Natural.not_one_two_six_obstruction_four_power_times
+        (exponent n : ℕ) (admissible : ¬(Natural.IsOneTwoSixObstruction(n)))
+        : ¬(Natural.IsOneTwoSixObstruction(4 ^ exponent * n)) :=
+  by induction on exponent with IH {
+    case base: {
+      4 ^ 0 * n = n by substituting Natural.power_zero(4) as valueReads;
+      suppose Natural.IsOneTwoSixObstruction(4 ^ 0 * n) as obstruction;
+      Natural.IsOneTwoSixObstruction(n) by substituting valueReads;
+      done by admissible
+    }
+    case step(predecessor): {
+      4 ^ (1 + predecessor) * n
+         = (4 * 4 ^ predecessor) * n by substituting Natural.power_one_plus(4, predecessor)
+         = 4 * (4 ^ predecessor * n)
+      as valueReads;
+      ¬(Natural.IsOneTwoSixObstruction(4 ^ predecessor * n)) by IH as innerAdmissible;
+      ¬(Natural.IsOneTwoSixObstruction(4 * (4 ^ predecessor * n)))
+          by Natural.not_one_two_six_obstruction_four_times(4 ^ predecessor * n, innerAdmissible)
+          as scaledAdmissible;
+      suppose Natural.IsOneTwoSixObstruction(4 ^ (1 + predecessor) * n) as obstruction;
+      Natural.IsOneTwoSixObstruction(4 * (4 ^ predecessor * n)) by substituting valueReads;
+      done by scaledAdmissible
+    }
+  }
+
+theorem Natural.eight_times_plus_nonzero_mod_four_nonfive_not_one_two_six_obstruction
+        (quotient remainder quarter modFour : ℕ)
+        (remainderShape : remainder = 4 * quarter + modFour)
+        (modFourBelow : modFour < 4) (modFourNonzero : modFour ≠ 0)
+        (remainderBelow : remainder < 8) (remainderNotFive : remainder ≠ 5)
+        : ¬(Natural.IsOneTwoSixObstruction(8 * quotient + remainder)) := {
+  suppose Natural.IsOneTwoSixObstruction(8 * quotient + remainder) as obstruction;
+  choose exponent : ℕ, b : ℕ such that
+      8 * quotient + remainder = 4 ^ exponent * (8 * b + 5) as equalShapes from obstruction;
+  exponent = 0 ∨ ∃ (predecessor : ℕ). exponent = 1 + predecessor by Natural.zero_or_one_plus;
+  done by cases {
+    case exponent = 0 as exponentZero: {
+      8 * quotient + remainder
+         = 4 ^ exponent * (8 * b + 5) by equalShapes
+         = 4 ^ 0 * (8 * b + 5) by substituting exponentZero
+         = 8 * b + 5 by substituting Natural.power_zero(4)
+      as impossible;
+      done by Natural.distinct_affine_residues_not_equal(
+          8, remainder, 5, quotient, b, remainderBelow, done, remainderNotFive, impossible)
+    }
+    case ∃ (predecessor : ℕ). exponent = 1 + predecessor: {
+      choose predecessor : ℕ such that exponent = 1 + predecessor as exponentReads;
+      4 * (2 * quotient + quarter) + modFour
+         = 8 * quotient + (4 * quarter + modFour) by ring
+         = 8 * quotient + remainder by substituting Equality.symmetry(remainderShape)
+         = 4 ^ exponent * (8 * b + 5) by equalShapes
+         = 4 ^ (1 + predecessor) * (8 * b + 5) by substituting exponentReads
+         = (4 * 4 ^ predecessor) * (8 * b + 5)
+             by substituting Natural.power_one_plus(4, predecessor)
+         = 4 * (4 ^ predecessor * (8 * b + 5)) + 0 by ring
+      as impossible;
+      done by Natural.distinct_affine_residues_not_equal(
+          4, modFour, 0, 2 * quotient + quarter, 4 ^ predecessor * (8 * b + 5),
+          modFourBelow, done, modFourNonzero, impossible)
+    }
+  }
+}
+
+theorem Natural.four_power_times_thirty_two_plus_core_not_one_two_six_obstruction
+        (exponent b core remainder quotient quarter modFour : ℕ)
+        (coreShape : 32 * b + core = 8 * quotient + remainder)
+        (remainderShape : remainder = 4 * quarter + modFour)
+        (modFourBelow : modFour < 4) (modFourNonzero : modFour ≠ 0)
+        (remainderBelow : remainder < 8) (remainderNotFive : remainder ≠ 5)
+        : ¬(Natural.IsOneTwoSixObstruction(4 ^ exponent * (32 * b + core))) := {
+  ¬(Natural.IsOneTwoSixObstruction(8 * quotient + remainder))
+      by Natural.eight_times_plus_nonzero_mod_four_nonfive_not_one_two_six_obstruction(
+          quotient, remainder, quarter, modFour, remainderShape,
+          modFourBelow, modFourNonzero, remainderBelow, remainderNotFive)
+      as shapedAdmissible;
+  ¬(Natural.IsOneTwoSixObstruction(32 * b + core)) by {
+    suppose Natural.IsOneTwoSixObstruction(32 * b + core) as obstruction;
+    Natural.IsOneTwoSixObstruction(8 * quotient + remainder) by substituting coreShape;
+    done by shapedAdmissible
+  }
+  as coreAdmissible;
+  done by Natural.not_one_two_six_obstruction_four_power_times(
+      exponent, 32 * b + core, coreAdmissible)
+}
+
+definition Matrix.OneTwoSixDoubledTargetCover (oddCoefficient : ℕ) : Proposition :=
+  ∀ (m : ℕ). m ≥ 1 →
+    ∃ (residual w : ℕ).
+      Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(6), (residual : ℤ))
+      ∧ residual + w * w * oddCoefficient = 2 * m
+
+theorem Integer.weightedD3_second_unit_compatible
+        (u x z w target halfCoefficient : ℤ)
+        (completedReads : u * u + 2 * (x * x) + 6 * (z * z)
+          + (2 * halfCoefficient + 1) * (w * w) = 2 * target)
+        : Integer.divides(2, u - w) := {
+  u * u + w * w
+     = (u * u + 2 * (x * x) + 6 * (z * z) + (2 * halfCoefficient + 1) * (w * w))
+       - 2 * (x * x) - 6 * (z * z) - 2 * halfCoefficient * (w * w) by ring
+     = 2 * target - 2 * (x * x) - 6 * (z * z) - 2 * halfCoefficient * (w * w)
+         by substituting completedReads
+     = 2 * (target - x * x - 3 * (z * z) - halfCoefficient * (w * w)) by ring
+  as squareSumEven;
+  (u - w) * (u - w)
+     = (u * u + w * w) - 2 * u * w by ring
+     = 2 * (target - x * x - 3 * (z * z) - halfCoefficient * (w * w)) - 2 * u * w
+         by substituting squareSumEven
+     = 2 * (target - x * x - 3 * (z * z) - halfCoefficient * (w * w) - u * w) by ring
+  as differenceSquareReads;
+  Integer.divides(2, (u - w) * (u - w)) by {
+    witness target - x * x - 3 * (z * z) - halfCoefficient * (w * w) - u * w
+        with differenceSquareReads
+  };
+  done by Integer.two_divides_of_two_divides_square(u - w, done)
+}
+
+theorem Matrix.weightedD3SecondUnit_universal_of_oneTwoSixCover
+        (halfCoefficient : ℕ)
+        (cover : Matrix.OneTwoSixDoubledTargetCover(2 * halfCoefficient + 1))
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+            3, 1, 0, ((halfCoefficient + 1 : ℕ) : ℤ))) := {
+  take m : ℕ;
+  suppose m ≥ 1 as positive;
+  choose residual : ℕ, w : ℕ such that
+      Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(6), (residual : ℤ))
+      ∧ residual + w * w * (2 * halfCoefficient + 1) = 2 * m
+      as covered from cover(m, positive);
+  Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(6), (residual : ℤ))
+      by And.left(
+          Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(6), (residual : ℤ)),
+          residual + w * w * (2 * halfCoefficient + 1) = 2 * m, covered)
+      as residualRepresented;
+  residual + w * w * (2 * halfCoefficient + 1) = 2 * m
+      by And.right(
+          Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(6), (residual : ℤ)),
+          residual + w * w * (2 * halfCoefficient + 1) = 2 * m, covered)
+      as naturalCompletedReads;
+  choose vector : RingVector(Integer.commutative_ring_bundle, 3) such that
+      Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(6), vector) = (residual : ℤ)
+      as residualValueReads from residualRepresented;
+  let u : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo));
+  let x : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo));
+  let z : ℤ := vector(NaturalsBelow.top(2));
+  vector = (⟨u, x, z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+      by RingVector.eq_threeCoordinates(vector) as vectorReads;
+  u * u + 2 * (x * x) + 6 * (z * z)
+     = Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(6),
+         (⟨u, x, z⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+         by Equality.symmetry(Matrix.squarePlusDoublePlusScaledSquareForm_coordinateTuple_value(6, u, x, z))
+     = Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(6), vector)
+         by substituting Equality.symmetry(vectorReads)
+     = (residual : ℤ) by residualValueReads
+  as residualReads;
+  ((2 * halfCoefficient + 1 : ℕ) : ℤ)
+     = ((2 * halfCoefficient : ℕ) : ℤ) + 1 by Natural.to_integer.add_preserves
+     = 2 * (halfCoefficient : ℤ) + 1
+         by substituting Natural.to_integer.multiply_preserves(2, halfCoefficient)
+  as coefficientCastReads;
+  (residual : ℤ) + (w : ℤ) * (w : ℤ) * ((2 * halfCoefficient + 1 : ℕ) : ℤ)
+     = ((residual + w * w * (2 * halfCoefficient + 1) : ℕ) : ℤ) by {
+          ((residual + w * w * (2 * halfCoefficient + 1) : ℕ) : ℤ)
+             = (residual : ℤ) + ((w * w * (2 * halfCoefficient + 1) : ℕ) : ℤ)
+                 by Natural.to_integer.add_preserves
+             = (residual : ℤ) + ((w * w : ℕ) : ℤ) * ((2 * halfCoefficient + 1 : ℕ) : ℤ)
+                 by substituting Natural.to_integer.multiply_preserves(w * w, 2 * halfCoefficient + 1)
+             = (residual : ℤ) + ((w : ℤ) * (w : ℤ)) * ((2 * halfCoefficient + 1 : ℕ) : ℤ)
+                 by substituting Natural.to_integer.multiply_preserves(w, w);
+          done
+        }
+     = ((2 * m : ℕ) : ℤ) by substituting naturalCompletedReads
+     = 2 * (m : ℤ) by Natural.to_integer.multiply_preserves
+  as castCompletedReads;
+  u * u + 2 * (x * x) + 6 * (z * z) + (2 * (halfCoefficient : ℤ) + 1) * ((w : ℤ) * (w : ℤ))
+     = (residual : ℤ) + (2 * (halfCoefficient : ℤ) + 1) * ((w : ℤ) * (w : ℤ))
+         by substituting residualReads
+     = (residual : ℤ) + ((2 * halfCoefficient + 1 : ℕ) : ℤ) * ((w : ℤ) * (w : ℤ))
+         by substituting Equality.symmetry(coefficientCastReads)
+     = (residual : ℤ) + (w : ℤ) * (w : ℤ) * ((2 * halfCoefficient + 1 : ℕ) : ℤ) by ring
+     = 2 * (m : ℤ) by castCompletedReads
+  as completedReads;
+  Integer.divides(2, u - (w : ℤ))
+      by Integer.weightedD3_second_unit_compatible(
+          u, x, z, (w : ℤ), (m : ℤ), (halfCoefficient : ℤ), completedReads)
+      as compatible;
+  choose y : ℤ such that u - (w : ℤ) = 2 * y as differenceReads from compatible;
+  u = 2 * y + (w : ℤ) by linear_combination(differenceReads) as uReads;
+  2 * (x * x + 2 * (y * y) + 3 * (z * z) + 2 * y * (w : ℤ)
+      + ((halfCoefficient + 1 : ℕ) : ℤ) * ((w : ℤ) * (w : ℤ)))
+     = (2 * y + (w : ℤ)) * (2 * y + (w : ℤ)) + 2 * (x * x) + 6 * (z * z)
+       + (2 * (halfCoefficient : ℤ) + 1) * ((w : ℤ) * (w : ℤ)) by ring
+     = u * u + 2 * (x * x) + 6 * (z * z)
+       + (2 * (halfCoefficient : ℤ) + 1) * ((w : ℤ) * (w : ℤ))
+         by substituting Equality.symmetry(uReads)
+     = 2 * (m : ℤ) by completedReads
+  as doubledScalarReads;
+  (2 : ℤ) ≠ 0 as twoNonzero;
+  x * x + 2 * (y * y) + 3 * (z * z) + 2 * y * (w : ℤ)
+      + ((halfCoefficient + 1 : ℕ) : ℤ) * ((w : ℤ) * (w : ℤ)) = (m : ℤ)
+      by Integer.multiply_cancel_left_by_nonzero(
+          x * x + 2 * (y * y) + 3 * (z * z) + 2 * y * (w : ℤ)
+            + ((halfCoefficient + 1 : ℕ) : ℤ) * ((w : ℤ) * (w : ℤ)),
+          (m : ℤ), 2, twoNonzero, doubledScalarReads)
+      as scalarCore;
+  x * x + 2 * (y * y) + 3 * (z * z) + 2 * 1 * y * (w : ℤ) + 2 * 0 * z * (w : ℤ)
+      + ((halfCoefficient + 1 : ℕ) : ℤ) * ((w : ℤ) * (w : ℤ))
+     = x * x + 2 * (y * y) + 3 * (z * z) + 2 * y * (w : ℤ)
+       + ((halfCoefficient + 1 : ℕ) : ℤ) * ((w : ℤ) * (w : ℤ)) by ring
+     = (m : ℤ) by scalarCore
+  as scalarComputation;
+  done by Matrix.represents_by_witness(
+      Matrix.squarePlusDoublePlusScaledRankFourRepresentative(3, 1, 0, ((halfCoefficient + 1 : ℕ) : ℤ)),
+      target := m, vector := ⟨x, y, z, (w : ℤ)⟩,
+      computes := Matrix.squarePlusDoublePlusScaledRankFourRepresentative_coordinateTuple_computes(
+          scalarComputation := scalarComputation))
+}
+
+theorem Matrix.oneTwoSixDoubledTargetCover_of_converse
+        (converse : Matrix.OneTwoSixConverse)
+        (halfCoefficient core remainder quarter modFour : ℕ) (baseQuotient : ℕ → ℕ)
+        (coreSum : core + (2 * halfCoefficient + 1) = 20)
+        (coreShape : ∀ (b : ℕ). 32 * b + core = 8 * baseQuotient(b) + remainder)
+        (remainderShape : remainder = 4 * quarter + modFour)
+        (modFourBelow : modFour < 4) (modFourNonzero : modFour ≠ 0)
+        (remainderBelow : remainder < 8) (remainderNotFive : remainder ≠ 5)
+        : Matrix.OneTwoSixDoubledTargetCover(2 * halfCoefficient + 1) := {
+  take m : ℕ;
+  suppose m ≥ 1;
+  Natural.IsOneTwoSixObstruction(2 * m) ∨ ¬(Natural.IsOneTwoSixObstruction(2 * m))
+      by Logic.excluded_middle(Natural.IsOneTwoSixObstruction(2 * m)) as obstructionDecision;
+  ¬(Natural.IsOneTwoSixObstruction(2 * m)) ∨ Natural.IsOneTwoSixObstruction(2 * m)
+      by Or.swap(obstructionDecision);
+  done by cases {
+    case ¬(Natural.IsOneTwoSixObstruction(2 * m)) as admissible: {
+      Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(6), ((2 * m : ℕ) : ℤ))
+          by converse(2 * m, admissible) as represented;
+      2 * m + 0 * 0 * (2 * halfCoefficient + 1) = 2 * m by ring as valueReads;
+      witness 2 * m with witness 0 with And.introduction(represented, valueReads)
+    }
+    case Natural.IsOneTwoSixObstruction(2 * m) as obstruction: {
+      choose exponent : ℕ, b : ℕ such that 2 * m = 4 ^ exponent * (8 * b + 5)
+          as obstructionReads from obstruction;
+      exponent = 0 ∨ ∃ (predecessor : ℕ). exponent = 1 + predecessor by Natural.zero_or_one_plus;
+      done by cases {
+        case exponent = 0 as exponentZero: {
+          2 * m + 0
+             = 4 ^ exponent * (8 * b + 5) by obstructionReads
+             = 4 ^ 0 * (8 * b + 5) by substituting exponentZero
+             = 8 * b + 5 by substituting Natural.power_zero(4)
+             = 2 * (4 * b + 2) + 1 by ring
+          as impossible;
+          False by Natural.distinct_affine_residues_not_equal(
+              2, 0, 1, m, 4 * b + 2, done, done, done, impossible);
+          done
+        }
+        case ∃ (predecessor : ℕ). exponent = 1 + predecessor: {
+          choose predecessor : ℕ such that exponent = 1 + predecessor as exponentReads;
+          let residual : ℕ := 4 ^ predecessor * (32 * b + core);
+          let w : ℕ := 2 ^ predecessor;
+          ¬(Natural.IsOneTwoSixObstruction(residual))
+              by Natural.four_power_times_thirty_two_plus_core_not_one_two_six_obstruction(
+                  predecessor, b, core, remainder, baseQuotient(b), quarter, modFour,
+                  coreShape(b), remainderShape, modFourBelow, modFourNonzero, remainderBelow, remainderNotFive)
+              as residualAdmissible;
+          Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(6), (residual : ℤ))
+              by converse(residual, residualAdmissible) as represented;
+          residual + w * w * (2 * halfCoefficient + 1)
+             = 4 ^ predecessor * (32 * b + core)
+               + (2 ^ predecessor * 2 ^ predecessor) * (2 * halfCoefficient + 1)
+             = 4 ^ predecessor * (32 * b + core)
+               + 4 ^ predecessor * (2 * halfCoefficient + 1)
+                 by Equality.congruence(
+                     (candidate : ℕ) ↦ 4 ^ predecessor * (32 * b + core)
+                       + candidate * (2 * halfCoefficient + 1),
+                     2 ^ predecessor * 2 ^ predecessor, 4 ^ predecessor,
+                     Natural.two_power_square_is_four_power(predecessor))
+             = 4 ^ predecessor * (32 * b + (core + (2 * halfCoefficient + 1))) by ring
+             = 4 ^ predecessor * (32 * b + 20) by substituting coreSum
+             = 4 ^ predecessor * (4 * (8 * b + 5)) by ring
+             = (4 * 4 ^ predecessor) * (8 * b + 5) by ring
+             = 4 ^ (1 + predecessor) * (8 * b + 5)
+                 by substituting Equality.symmetry(Natural.power_one_plus(4, predecessor))
+             = 4 ^ exponent * (8 * b + 5) by substituting Equality.symmetry(exponentReads)
+             = 2 * m by Equality.symmetry(obstructionReads)
+          as coverReads;
+          witness residual with witness w with And.introduction(represented, coverReads)
+        }
+      }
+    }
+  }
+}
+
+theorem Matrix.weightedD3SecondUnit_universal_of_one_two_six_converse
+        (converse : Matrix.OneTwoSixConverse)
+        (halfCoefficient core remainder quarter modFour : ℕ) (baseQuotient : ℕ → ℕ)
+        (coreSum : core + (2 * halfCoefficient + 1) = 20)
+        (coreShape : ∀ (b : ℕ). 32 * b + core = 8 * baseQuotient(b) + remainder)
+        (remainderShape : remainder = 4 * quarter + modFour)
+        (modFourBelow : modFour < 4) (modFourNonzero : modFour ≠ 0)
+        (remainderBelow : remainder < 8) (remainderNotFive : remainder ≠ 5)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+            3, 1, 0, ((halfCoefficient + 1 : ℕ) : ℤ))) :=
+  by Matrix.weightedD3SecondUnit_universal_of_oneTwoSixCover(
+      halfCoefficient,
+      Matrix.oneTwoSixDoubledTargetCover_of_converse(
+          converse, halfCoefficient, core, remainder, quarter, modFour, baseQuotient,
+          coreSum, coreShape, remainderShape,
+          modFourBelow, modFourNonzero, remainderBelow, remainderNotFive))
+
+theorem Matrix.weightedD3S1R0C2_universal_of_one_two_six_converse (converse : Matrix.OneTwoSixConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(3, 1, 0, 2)) :=
+  by Matrix.weightedD3SecondUnit_universal_of_one_two_six_converse(
+      converse, halfCoefficient := 1, core := 17, remainder := 1, quarter := 0, modFour := 1,
+      baseQuotient := (b : ℕ) ↦ 4 * b + 2, coreSum := done, coreShape := (b : ℕ) ↦ { done },
+      remainderShape := done, modFourBelow := done, modFourNonzero := done, remainderBelow := done, remainderNotFive := done)
+
+theorem Matrix.weightedD3S1R0C3_universal_of_one_two_six_converse (converse : Matrix.OneTwoSixConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(3, 1, 0, 3)) :=
+  by Matrix.weightedD3SecondUnit_universal_of_one_two_six_converse(
+      converse, halfCoefficient := 2, core := 15, remainder := 7, quarter := 1, modFour := 3,
+      baseQuotient := (b : ℕ) ↦ 4 * b + 1, coreSum := done, coreShape := (b : ℕ) ↦ { done },
+      remainderShape := done, modFourBelow := done, modFourNonzero := done, remainderBelow := done, remainderNotFive := done)
+
+theorem Matrix.weightedD3S1R0C5_universal_of_one_two_six_converse (converse : Matrix.OneTwoSixConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(3, 1, 0, 5)) :=
+  by Matrix.weightedD3SecondUnit_universal_of_one_two_six_converse(
+      converse, halfCoefficient := 4, core := 11, remainder := 3, quarter := 0, modFour := 3,
+      baseQuotient := (b : ℕ) ↦ 4 * b + 1, coreSum := done, coreShape := (b : ℕ) ↦ { done },
+      remainderShape := done, modFourBelow := done, modFourNonzero := done, remainderBelow := done, remainderNotFive := done)
+
+theorem Matrix.weightedD3S1R0C6_universal_of_one_two_six_converse (converse : Matrix.OneTwoSixConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(3, 1, 0, 6)) :=
+  by Matrix.weightedD3SecondUnit_universal_of_one_two_six_converse(
+      converse, halfCoefficient := 5, core := 9, remainder := 1, quarter := 0, modFour := 1,
+      baseQuotient := (b : ℕ) ↦ 4 * b + 1, coreSum := done, coreShape := (b : ℕ) ↦ { done },
+      remainderShape := done, modFourBelow := done, modFourNonzero := done, remainderBelow := done, remainderNotFive := done)
+
+theorem Matrix.weightedD3S1R0C7_universal_of_one_two_six_converse (converse : Matrix.OneTwoSixConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(3, 1, 0, 7)) :=
+  by Matrix.weightedD3SecondUnit_universal_of_one_two_six_converse(
+      converse, halfCoefficient := 6, core := 7, remainder := 7, quarter := 1, modFour := 3,
+      baseQuotient := (b : ℕ) ↦ 4 * b, coreSum := done, coreShape := (b : ℕ) ↦ { done },
+      remainderShape := done, modFourBelow := done, modFourNonzero := done, remainderBelow := done, remainderNotFive := done)
+
+theorem Matrix.weightedD3S1R0C9_universal_of_one_two_six_converse (converse : Matrix.OneTwoSixConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(3, 1, 0, 9)) :=
+  by Matrix.weightedD3SecondUnit_universal_of_one_two_six_converse(
+      converse, halfCoefficient := 8, core := 3, remainder := 3, quarter := 0, modFour := 3,
+      baseQuotient := (b : ℕ) ↦ 4 * b, coreSum := done, coreShape := (b : ℕ) ↦ { done },
+      remainderShape := done, modFourBelow := done, modFourNonzero := done, remainderBelow := done, remainderNotFive := done)
+
+theorem Matrix.weightedD3S1R0C10_universal_of_one_two_six_converse (converse : Matrix.OneTwoSixConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(3, 1, 0, 10)) :=
+  by Matrix.weightedD3SecondUnit_universal_of_one_two_six_converse(
+      converse, halfCoefficient := 9, core := 1, remainder := 1, quarter := 0, modFour := 1,
+      baseQuotient := (b : ℕ) ↦ 4 * b, coreSum := done, coreShape := (b : ℕ) ↦ { done },
+      remainderShape := done, modFourBelow := done, modFourNonzero := done, remainderBelow := done, remainderNotFive := done)

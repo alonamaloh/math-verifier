@@ -234,6 +234,13 @@ rank-four escalator by 207 selected normal forms are.
   coefficient 10, a three-way split on the obstruction parameter leaves
   residual 0, a pure square, or core 2.  This closes the complete selected
   weighted-`d=3`, zero-residue chunk and raises the selected total to 63.
+  The seven selected forms with second residue one and third residue zero
+  reduce instead to `x²+2y²+6z²`, whose exceptional set is
+  `4^a(8b+5)`.  Completing the square gives
+  `2Q=(2y+w)²+2x²+6z²+(2c-1)w²`; the equation itself forces the
+  represented first root to have the parity of `w`, so no extra congruence
+  hypothesis is needed.  One uniform obstruction residual closes all seven
+  coefficients and raises the selected total to 70.
   `Algebra/rank_four_completed_cover_universality` gives fraction-free
   completed-square interfaces for all other constructors. Its scaled-square,
   weighted, and odd cover predicates account for the 32, 140, and 28
