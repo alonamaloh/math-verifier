@@ -1,0 +1,106 @@
+-- Algebra/twenty_five_power_obstruction_arithmetic.math
+
+module Algebra.twenty_five_power_obstruction_arithmetic
+
+import Algebra.rank_four_weighted_d4_zero_residue_covers
+
+definition Natural.IsTwentyFiveAffineObstruction (forbidden n : ℕ) : Proposition :=
+  ∃ (exponent b : ℕ). n = 25 ^ exponent * (25 * b + forbidden)
+
+theorem Natural.five_power_square_is_twenty_five_power (exponent : ℕ)
+        : 5 ^ exponent * 5 ^ exponent = 25 ^ exponent :=
+  by induction on exponent with IH {
+    case base:
+      5 ^ 0 * 5 ^ 0
+         = 1 * 1 by substituting Natural.power_zero(5)
+         = 1
+         = 25 ^ 0 by Equality.symmetry(Natural.power_zero(25))
+    case step(predecessor):
+      5 ^ (1 + predecessor) * 5 ^ (1 + predecessor)
+         = (5 * 5 ^ predecessor) * (5 * 5 ^ predecessor)
+             by substituting Natural.power_one_plus(5, predecessor)
+         = 25 * (5 ^ predecessor * 5 ^ predecessor) by ring
+         = 25 * 25 ^ predecessor by substituting IH
+         = 25 ^ (1 + predecessor) by Equality.symmetry(Natural.power_one_plus(25, predecessor))
+  }
+
+theorem Natural.twenty_five_power_times_distinct_nonzero_core_not_affine_obstruction
+        (exponent b core forbidden : ℕ)
+        (coreBelow : core < 25) (coreNonzero : core ≠ 0)
+        (forbiddenBelow : forbidden < 25) (forbiddenNonzero : forbidden ≠ 0)
+        (coresDistinct : core ≠ forbidden)
+        : ¬(Natural.IsTwentyFiveAffineObstruction(
+            forbidden, 25 ^ exponent * (25 * b + core))) := {
+  suppose Natural.IsTwentyFiveAffineObstruction(forbidden, 25 ^ exponent * (25 * b + core)) as obstruction;
+  choose otherExponent : ℕ, otherB : ℕ such that
+      25 ^ exponent * (25 * b + core) = 25 ^ otherExponent * (25 * otherB + forbidden)
+      as equalShapes from obstruction;
+  exponent < otherExponent ∨ exponent = otherExponent ∨ otherExponent < exponent
+      by Natural.lt_trichotomy;
+  done by cases {
+    case exponent < otherExponent as exponentBelow: {
+      choose gap : ℕ such that exponent + (1 + gap) = otherExponent as exponentSplit from Natural.lt_elim;
+      25 ^ exponent * (25 * b + core)
+         = 25 ^ otherExponent * (25 * otherB + forbidden) by equalShapes
+         = 25 ^ (exponent + (1 + gap)) * (25 * otherB + forbidden)
+             by substituting Equality.symmetry(exponentSplit)
+         = (25 ^ exponent * 25 ^ (1 + gap)) * (25 * otherB + forbidden)
+             by substituting Natural.power_add(25, exponent, 1 + gap)
+         = 25 ^ exponent * (25 ^ (1 + gap) * (25 * otherB + forbidden)) by ring
+      as cancellable;
+      25 * b + core = 25 ^ (1 + gap) * (25 * otherB + forbidden)
+          by Natural.multiply_cancel_left(
+              25 ^ exponent, 25 * b + core, 25 ^ (1 + gap) * (25 * otherB + forbidden),
+              Natural.power_positive(25, exponent, done), cancellable)
+      as reduced;
+      25 * b + core
+         = 25 ^ (1 + gap) * (25 * otherB + forbidden) by reduced
+         = (25 * 25 ^ gap) * (25 * otherB + forbidden)
+             by substituting Natural.power_one_plus(25, gap)
+         = 25 * (25 ^ gap * (25 * otherB + forbidden)) + 0 by ring
+      as impossible;
+      done by Natural.distinct_affine_residues_not_equal(
+          25, core, 0, b, 25 ^ gap * (25 * otherB + forbidden),
+          coreBelow, done, coreNonzero, impossible)
+    }
+    case exponent = otherExponent ∨ otherExponent < exponent: done by cases {
+      case exponent = otherExponent as exponentsEqual: {
+        25 ^ exponent * (25 * b + core)
+           = 25 ^ otherExponent * (25 * otherB + forbidden) by equalShapes
+           = 25 ^ exponent * (25 * otherB + forbidden) by substituting Equality.symmetry(exponentsEqual)
+        as cancellable;
+        25 * b + core = 25 * otherB + forbidden
+            by Natural.multiply_cancel_left(
+                25 ^ exponent, 25 * b + core, 25 * otherB + forbidden,
+                Natural.power_positive(25, exponent, done), cancellable)
+        as impossible;
+        done by Natural.distinct_affine_residues_not_equal(
+            25, core, forbidden, b, otherB, coreBelow, forbiddenBelow, coresDistinct, impossible)
+      }
+      case otherExponent < exponent as otherBelow: {
+        choose gap : ℕ such that otherExponent + (1 + gap) = exponent as exponentSplit from Natural.lt_elim;
+        25 ^ otherExponent * (25 ^ (1 + gap) * (25 * b + core))
+           = (25 ^ otherExponent * 25 ^ (1 + gap)) * (25 * b + core) by ring
+           = 25 ^ (otherExponent + (1 + gap)) * (25 * b + core)
+               by substituting Equality.symmetry(Natural.power_add(25, otherExponent, 1 + gap))
+           = 25 ^ exponent * (25 * b + core) by substituting exponentSplit
+           = 25 ^ otherExponent * (25 * otherB + forbidden) by equalShapes
+        as cancellable;
+        25 ^ (1 + gap) * (25 * b + core) = 25 * otherB + forbidden
+            by Natural.multiply_cancel_left(
+                25 ^ otherExponent, 25 ^ (1 + gap) * (25 * b + core), 25 * otherB + forbidden,
+                Natural.power_positive(25, otherExponent, done), cancellable)
+        as reduced;
+        25 * (25 ^ gap * (25 * b + core)) + 0
+           = (25 * 25 ^ gap) * (25 * b + core) by ring
+           = 25 ^ (1 + gap) * (25 * b + core)
+               by substituting Equality.symmetry(Natural.power_one_plus(25, gap))
+           = 25 * otherB + forbidden by reduced
+        as impossible;
+        done by Natural.distinct_affine_residues_not_equal(
+            25, 0, forbidden, 25 ^ gap * (25 * b + core), otherB,
+            done, forbiddenBelow, forbiddenNonzero, impossible)
+      }
+    }
+  }
+}

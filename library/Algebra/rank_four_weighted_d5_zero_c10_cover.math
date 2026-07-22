@@ -1,0 +1,133 @@
+module Algebra.rank_four_weighted_d5_zero_c10_cover
+
+import Algebra.rank_four_weighted_d5_zero_residue_cover
+
+theorem Matrix.oneTwoFiveResidualCover_ten_of_converse
+        (converse : Matrix.OneTwoFiveConverse) : Matrix.WeightedDiagonalResidualCover(5, 10) := {
+  take m : ℕ;
+  suppose m ≥ 1;
+  Natural.IsOneTwoFiveObstruction(m) ∨ ¬(Natural.IsOneTwoFiveObstruction(m))
+      by Logic.excluded_middle(Natural.IsOneTwoFiveObstruction(m)) as obstructionDecision;
+  ¬(Natural.IsOneTwoFiveObstruction(m)) ∨ Natural.IsOneTwoFiveObstruction(m)
+      by Or.swap(obstructionDecision);
+  done by cases {
+    case ¬(Natural.IsOneTwoFiveObstruction(m)) as admissible: {
+      Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(5), (m : ℤ))
+          by converse(m, admissible) as represented;
+      m + 0 * 0 * 10 = m by ring as valueReads;
+      witness m with witness 0 with And.introduction(represented, valueReads)
+    }
+    case Natural.IsOneTwoFiveObstruction(m) as obstruction: done by cases {
+      case Natural.IsTwentyFiveAffineObstruction(10, m) as tenObstruction: {
+        choose exponent : ℕ, b : ℕ such that m = 25 ^ exponent * (25 * b + 10) as mReads from tenObstruction;
+        b = 0 ∨ ∃ (predecessor : ℕ). b = 1 + predecessor by Natural.zero_or_one_plus;
+        done by cases {
+          case b = 0 as bZero: {
+            let w : ℕ := 5 ^ exponent;
+            Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(5), (0 : ℤ))
+                by Matrix.represents_by_witness(
+                    Matrix.squarePlusDoublePlusScaledSquareForm(5), target := 0, vector := ⟨0, 0, 0⟩,
+                    computes := Matrix.squarePlusDoublePlusScaledSquareForm_coordinateTuple_value(5, 0, 0, 0))
+                as represented;
+            0 + w * w * 10
+               = (5 ^ exponent * 5 ^ exponent) * 10
+               = 25 ^ exponent * 10
+                   by substituting Natural.five_power_square_is_twenty_five_power(exponent)
+               = 25 ^ exponent * (25 * 0 + 10) by ring
+               = 25 ^ exponent * (25 * b + 10) by substituting Equality.symmetry(bZero)
+               = m by Equality.symmetry(mReads)
+            as valueReads;
+            witness 0 with witness w with And.introduction(represented, valueReads)
+          }
+          case ∃ (predecessor : ℕ). b = 1 + predecessor: {
+            choose predecessor : ℕ such that b = 1 + predecessor as bReads;
+            predecessor = 0 ∨ ∃ (tail : ℕ). predecessor = 1 + tail by Natural.zero_or_one_plus;
+            done by cases {
+              case predecessor = 0 as predecessorZero: {
+                let residual : ℕ := 25 ^ (1 + exponent);
+                let w : ℕ := 5 ^ exponent;
+                residual = 25 ^ (1 + exponent) * (25 * 0 + 1) by ring as residualShape;
+                ¬(Natural.IsOneTwoFiveObstruction(residual)) by {
+                  suppose Natural.IsOneTwoFiveObstruction(residual) as residualObstruction;
+                  Natural.IsOneTwoFiveObstruction(25 ^ (1 + exponent) * (25 * 0 + 1))
+                      by substituting residualShape as transformedObstruction;
+                  done by Natural.twenty_five_power_times_admissible_core_not_one_two_five_obstruction(
+                      1 + exponent, 0, 1, done, done, done, done)(transformedObstruction)
+                }
+                as residualAdmissible;
+                Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(5), (residual : ℤ))
+                    by converse(residual, residualAdmissible) as represented;
+                residual + w * w * 10
+                   = 25 ^ (1 + exponent) + (5 ^ exponent * 5 ^ exponent) * 10
+                   = 25 ^ (1 + exponent) + 25 ^ exponent * 10
+                       by Equality.congruence(
+                           (candidate : ℕ) ↦ 25 ^ (1 + exponent) + candidate * 10,
+                           5 ^ exponent * 5 ^ exponent, 25 ^ exponent,
+                           Natural.five_power_square_is_twenty_five_power(exponent))
+                   = 25 * 25 ^ exponent + 25 ^ exponent * 10
+                       by substituting Natural.power_one_plus(25, exponent)
+                   = 25 ^ exponent * (25 * 1 + 10) by ring
+                   = 25 ^ exponent * (25 * (1 + 0) + 10) by ring
+                   = 25 ^ exponent * (25 * (1 + predecessor) + 10)
+                       by substituting Equality.symmetry(predecessorZero)
+                   = 25 ^ exponent * (25 * b + 10) by substituting Equality.symmetry(bReads)
+                   = m by Equality.symmetry(mReads)
+                as valueReads;
+                witness residual with witness w with And.introduction(represented, valueReads)
+              }
+              case ∃ (tail : ℕ). predecessor = 1 + tail: {
+                choose tail : ℕ such that predecessor = 1 + tail as predecessorReads;
+                let residual : ℕ := 25 ^ exponent * (25 * tail + 20);
+                let w : ℕ := 2 * 5 ^ exponent;
+                ¬(Natural.IsOneTwoFiveObstruction(residual))
+                    by Natural.twenty_five_power_times_admissible_core_not_one_two_five_obstruction(
+                        exponent, tail, 20, done, done, done, done)
+                    as residualAdmissible;
+                Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(5), (residual : ℤ))
+                    by converse(residual, residualAdmissible) as represented;
+                residual + w * w * 10
+                   = 25 ^ exponent * (25 * tail + 20) + ((2 * 5 ^ exponent) * (2 * 5 ^ exponent)) * 10
+                   = 25 ^ exponent * (25 * tail + 20) + (4 * (5 ^ exponent * 5 ^ exponent)) * 10 by ring
+                   = 25 ^ exponent * (25 * tail + 20) + (4 * 25 ^ exponent) * 10
+                       by Equality.congruence(
+                           (candidate : ℕ) ↦ 25 ^ exponent * (25 * tail + 20) + (4 * candidate) * 10,
+                           5 ^ exponent * 5 ^ exponent, 25 ^ exponent,
+                           Natural.five_power_square_is_twenty_five_power(exponent))
+                   = 25 ^ exponent * (25 * (2 + tail) + 10) by ring
+                   = 25 ^ exponent * (25 * (1 + (1 + tail)) + 10) by ring
+                   = 25 ^ exponent * (25 * (1 + predecessor) + 10)
+                       by substituting Equality.symmetry(predecessorReads)
+                   = 25 ^ exponent * (25 * b + 10) by substituting Equality.symmetry(bReads)
+                   = m by Equality.symmetry(mReads)
+                as valueReads;
+                witness residual with witness w with And.introduction(represented, valueReads)
+              }
+            }
+          }
+        }
+      }
+      case Natural.IsTwentyFiveAffineObstruction(15, m) as fifteenObstruction: {
+        choose exponent : ℕ, b : ℕ such that m = 25 ^ exponent * (25 * b + 15) as mReads from fifteenObstruction;
+        let residual : ℕ := 25 ^ exponent * (25 * b + 5);
+        let w : ℕ := 5 ^ exponent;
+        ¬(Natural.IsOneTwoFiveObstruction(residual))
+            by Natural.twenty_five_power_times_admissible_core_not_one_two_five_obstruction(
+                exponent, b, 5, done, done, done, done)
+            as residualAdmissible;
+        Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(5), (residual : ℤ))
+            by converse(residual, residualAdmissible) as represented;
+        residual + w * w * 10
+           = 25 ^ exponent * (25 * b + 5) + (5 ^ exponent * 5 ^ exponent) * 10
+           = 25 ^ exponent * (25 * b + 5) + 25 ^ exponent * 10
+               by Equality.congruence(
+                   (candidate : ℕ) ↦ 25 ^ exponent * (25 * b + 5) + candidate * 10,
+                   5 ^ exponent * 5 ^ exponent, 25 ^ exponent,
+                   Natural.five_power_square_is_twenty_five_power(exponent))
+           = 25 ^ exponent * (25 * b + 15) by ring
+           = m by Equality.symmetry(mReads)
+        as valueReads;
+        witness residual with witness w with And.introduction(represented, valueReads)
+      }
+    }
+  }
+}

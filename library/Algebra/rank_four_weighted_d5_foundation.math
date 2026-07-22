@@ -1,0 +1,31 @@
+-- Algebra/rank_four_weighted_d5_foundation.math
+--
+-- The Ramanujan–Dickson ternary x²+2y²+5z² misses exactly
+-- 25^a(25b+10) and 25^a(25b+15).
+
+module Algebra.rank_four_weighted_d5_foundation
+
+import Algebra.twenty_five_power_obstruction_arithmetic
+
+definition Natural.IsOneTwoFiveObstruction (n : ℕ) : Proposition :=
+  Natural.IsTwentyFiveAffineObstruction(10, n) ∨ Natural.IsTwentyFiveAffineObstruction(15, n)
+
+definition Matrix.OneTwoFiveConverse : Proposition :=
+  ∀ (n : ℕ). ¬(Natural.IsOneTwoFiveObstruction(n)) →
+    Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(5), (n : ℤ))
+
+theorem Natural.twenty_five_power_times_admissible_core_not_one_two_five_obstruction
+        (exponent b core : ℕ)
+        (coreBelow : core < 25) (coreNonzero : core ≠ 0)
+        (coreNotTen : core ≠ 10) (coreNotFifteen : core ≠ 15)
+        : ¬(Natural.IsOneTwoFiveObstruction(25 ^ exponent * (25 * b + core))) := {
+  suppose Natural.IsOneTwoFiveObstruction(25 ^ exponent * (25 * b + core)) as obstruction;
+  done by cases {
+    case Natural.IsTwentyFiveAffineObstruction(10, 25 ^ exponent * (25 * b + core)) as tenObstruction:
+      done by Natural.twenty_five_power_times_distinct_nonzero_core_not_affine_obstruction(
+          exponent, b, core, 10, coreBelow, coreNonzero, done, done, coreNotTen)(tenObstruction)
+    case Natural.IsTwentyFiveAffineObstruction(15, 25 ^ exponent * (25 * b + core)) as fifteenObstruction:
+      done by Natural.twenty_five_power_times_distinct_nonzero_core_not_affine_obstruction(
+          exponent, b, core, 15, coreBelow, coreNonzero, done, done, coreNotFifteen)(fifteenObstruction)
+  }
+}

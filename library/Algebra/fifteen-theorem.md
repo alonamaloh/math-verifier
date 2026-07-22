@@ -268,6 +268,12 @@ an obstructed inner parameter `b` to the admissible `b-7` and takes the
 fourth coordinate `3·2^a`.  The eleven modules aggregated by
 `Algebra/rank_four_weighted_d4_zero_residue_covers` raise the selected
 conditional total to 96.
+For weighted `d=5`, the ternary `x²+2y²+5z²` misses exactly the two
+families `25^a(25b+10)` and `25^a(25b+15)`.  A shared 25-adic separation
+lemma handles every nonzero residual core.  This closes the five universal
+diagonal extensions `c=6,...,10`; `c=5` is correctly omitted because it is
+one of the exact-truant-15 forms.  The selected conditional-universality
+total is now 101.
   `Algebra/rank_four_completed_cover_universality` gives fraction-free
   completed-square interfaces for all other constructors. Its scaled-square,
   weighted, and odd cover predicates account for the 32, 140, and 28

@@ -1,0 +1,72 @@
+-- Algebra/rank_four_weighted_d5_zero_residue_cover.math
+
+module Algebra.rank_four_weighted_d5_zero_residue_cover
+
+import Algebra.rank_four_weighted_d5_foundation
+
+theorem Matrix.oneTwoFiveResidualCover_selected_cores_of_converse
+        (converse : Matrix.OneTwoFiveConverse) (coefficient coreTen coreFifteen : ℕ)
+        (tenCoreSum : coreTen + coefficient = 10)
+        (fifteenCoreSum : coreFifteen + coefficient = 15)
+        (tenCoreAdmissible : ∀ (exponent b : ℕ).
+          ¬(Natural.IsOneTwoFiveObstruction(25 ^ exponent * (25 * b + coreTen))))
+        (fifteenCoreAdmissible : ∀ (exponent b : ℕ).
+          ¬(Natural.IsOneTwoFiveObstruction(25 ^ exponent * (25 * b + coreFifteen))))
+        : Matrix.WeightedDiagonalResidualCover(5, coefficient) := {
+  take m : ℕ;
+  suppose m ≥ 1;
+  Natural.IsOneTwoFiveObstruction(m) ∨ ¬(Natural.IsOneTwoFiveObstruction(m))
+      by Logic.excluded_middle(Natural.IsOneTwoFiveObstruction(m)) as obstructionDecision;
+  ¬(Natural.IsOneTwoFiveObstruction(m)) ∨ Natural.IsOneTwoFiveObstruction(m)
+      by Or.swap(obstructionDecision);
+  done by cases {
+    case ¬(Natural.IsOneTwoFiveObstruction(m)) as admissible: {
+      Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(5), (m : ℤ))
+          by converse(m, admissible) as represented;
+      m + 0 * 0 * coefficient = m by ring as valueReads;
+      witness m with witness 0 with And.introduction(represented, valueReads)
+    }
+    case Natural.IsOneTwoFiveObstruction(m) as obstruction: done by cases {
+      case Natural.IsTwentyFiveAffineObstruction(10, m) as tenObstruction: {
+        choose exponent : ℕ, b : ℕ such that m = 25 ^ exponent * (25 * b + 10) as mReads from tenObstruction;
+        let residual : ℕ := 25 ^ exponent * (25 * b + coreTen);
+        let w : ℕ := 5 ^ exponent;
+        ¬(Natural.IsOneTwoFiveObstruction(residual)) by tenCoreAdmissible(exponent, b) as residualAdmissible;
+        Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(5), (residual : ℤ))
+            by converse(residual, residualAdmissible) as represented;
+        residual + w * w * coefficient
+           = 25 ^ exponent * (25 * b + coreTen) + (5 ^ exponent * 5 ^ exponent) * coefficient
+           = 25 ^ exponent * (25 * b + coreTen) + 25 ^ exponent * coefficient
+               by Equality.congruence(
+                   (candidate : ℕ) ↦ 25 ^ exponent * (25 * b + coreTen) + candidate * coefficient,
+                   5 ^ exponent * 5 ^ exponent, 25 ^ exponent,
+                   Natural.five_power_square_is_twenty_five_power(exponent))
+           = 25 ^ exponent * (25 * b + (coreTen + coefficient)) by ring
+           = 25 ^ exponent * (25 * b + 10) by substituting tenCoreSum
+           = m by Equality.symmetry(mReads)
+        as valueReads;
+        witness residual with witness w with And.introduction(represented, valueReads)
+      }
+      case Natural.IsTwentyFiveAffineObstruction(15, m) as fifteenObstruction: {
+        choose exponent : ℕ, b : ℕ such that m = 25 ^ exponent * (25 * b + 15) as mReads from fifteenObstruction;
+        let residual : ℕ := 25 ^ exponent * (25 * b + coreFifteen);
+        let w : ℕ := 5 ^ exponent;
+        ¬(Natural.IsOneTwoFiveObstruction(residual)) by fifteenCoreAdmissible(exponent, b) as residualAdmissible;
+        Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(5), (residual : ℤ))
+            by converse(residual, residualAdmissible) as represented;
+        residual + w * w * coefficient
+           = 25 ^ exponent * (25 * b + coreFifteen) + (5 ^ exponent * 5 ^ exponent) * coefficient
+           = 25 ^ exponent * (25 * b + coreFifteen) + 25 ^ exponent * coefficient
+               by Equality.congruence(
+                   (candidate : ℕ) ↦ 25 ^ exponent * (25 * b + coreFifteen) + candidate * coefficient,
+                   5 ^ exponent * 5 ^ exponent, 25 ^ exponent,
+                   Natural.five_power_square_is_twenty_five_power(exponent))
+           = 25 ^ exponent * (25 * b + (coreFifteen + coefficient)) by ring
+           = 25 ^ exponent * (25 * b + 15) by substituting fifteenCoreSum
+           = m by Equality.symmetry(mReads)
+        as valueReads;
+        witness residual with witness w with And.introduction(represented, valueReads)
+      }
+    }
+  }
+}
