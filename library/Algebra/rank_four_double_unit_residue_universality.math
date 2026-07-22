@@ -1,0 +1,387 @@
+-- Algebra/rank_four_double_unit_residue_universality.math
+--
+-- The selected forms
+--
+--   x²+y²+2z²+2zw+c w².
+--
+-- Their completed identity is
+--
+--   2Q = (x+y)²+(x-y)²+(2z+w)²+(2c-1)w².
+--
+-- A same-parity pair among three square roots supplies x and y.  The
+-- remaining root has the parity of w and therefore supplies z.
+
+module Algebra.rank_four_double_unit_residue_universality
+
+import Algebra.rank_four_d2_third_residue_universality
+
+definition Matrix.DoubleUnitThreeSquareCover (oddCoefficient : ℕ) : Proposition :=
+  ∀ (m : ℕ). m ≥ 1 →
+    ∃ (residual w : ℕ).
+      Matrix.Represents(Matrix.sumOfThreeSquaresForm, (residual : ℤ))
+      ∧ residual + w * w * oddCoefficient = 2 * m
+
+theorem Integer.recover_sum_and_difference_from_same_parity
+        (p q : ℤ) (sameParity : Integer.divides(2, p - q))
+        : ∃ (x y : ℤ). p = x + y ∧ q = x - y := {
+  choose y : ℤ such that p - q = 2 * y as differenceReads from sameParity;
+  let x : ℤ := q + y;
+  witness x with witness y with And.introduction(
+      { p = q + 2 * y by linear_combination(differenceReads) = x + y by ring },
+      { q = x - y by ring })
+}
+
+theorem Integer.remaining_root_matches_shift_parity
+        (p q v w target halfCoefficient : ℤ)
+        (sameParity : Integer.divides(2, p - q))
+        (completedReads : p * p + q * q + v * v
+          + (2 * halfCoefficient + 1) * (w * w) = 2 * target)
+        : Integer.divides(2, v - w) := {
+  choose pairX : ℤ, pairY : ℤ such that
+      p * p + q * q = 2 * (pairX * pairX) + 2 * (pairY * pairY)
+      as pairCompressed from Integer.same_parity_pair_of_squares_compresses(p, q, sameParity);
+  v * v + w * w
+     = (p * p + q * q + v * v + (2 * halfCoefficient + 1) * (w * w))
+       - (p * p + q * q) - 2 * halfCoefficient * (w * w) by ring
+     = 2 * target - (p * p + q * q) - 2 * halfCoefficient * (w * w)
+         by substituting completedReads
+     = 2 * target - (2 * (pairX * pairX) + 2 * (pairY * pairY))
+       - 2 * halfCoefficient * (w * w) by substituting pairCompressed
+     = 2 * (target - pairX * pairX - pairY * pairY - halfCoefficient * (w * w)) by ring
+  as squareSumEven;
+  (v - w) * (v - w)
+     = (v * v + w * w) - 2 * v * w by ring
+     = 2 * (target - pairX * pairX - pairY * pairY - halfCoefficient * (w * w)) - 2 * v * w
+         by substituting squareSumEven
+     = 2 * (target - pairX * pairX - pairY * pairY - halfCoefficient * (w * w) - v * w) by ring
+  as differenceSquareReads;
+  Integer.divides(2, (v - w) * (v - w)) by {
+    witness target - pairX * pairX - pairY * pairY - halfCoefficient * (w * w) - v * w
+        with differenceSquareReads
+  };
+  done by Integer.two_divides_of_two_divides_square(v - w, done)
+}
+
+theorem Matrix.doubleUnit_represents_of_completed_three_squares
+        (halfCoefficient target p q v w : ℤ)
+        (sameParity : Integer.divides(2, p - q))
+        (completedReads : p * p + q * q + v * v
+          + (2 * halfCoefficient + 1) * (w * w) = 2 * target)
+        : Matrix.Represents(
+            Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(
+              2, 1, halfCoefficient + 1), target) := {
+  choose x : ℤ, y : ℤ such that p = x + y ∧ q = x - y
+      from Integer.recover_sum_and_difference_from_same_parity(p, q, sameParity);
+  p = x + y as pReads;
+  q = x - y as qReads;
+  Integer.divides(2, v - w)
+      by Integer.remaining_root_matches_shift_parity(
+          p, q, v, w, target, halfCoefficient, sameParity, completedReads)
+      as remainingCompatible;
+  choose z : ℤ such that v - w = 2 * z as differenceReads from remainingCompatible;
+  v = 2 * z + w by linear_combination(differenceReads) as vReads;
+  2 * (x * x + y * y + 2 * (z * z) + 2 * z * w + (halfCoefficient + 1) * (w * w))
+     = (x + y) * (x + y) + (x - y) * (x - y) + (2 * z + w) * (2 * z + w)
+       + (2 * halfCoefficient + 1) * (w * w) by ring
+     = p * p + (x - y) * (x - y) + (2 * z + w) * (2 * z + w)
+       + (2 * halfCoefficient + 1) * (w * w) by substituting Equality.symmetry(pReads)
+     = p * p + q * q + (2 * z + w) * (2 * z + w)
+       + (2 * halfCoefficient + 1) * (w * w) by substituting Equality.symmetry(qReads)
+     = p * p + q * q + v * v + (2 * halfCoefficient + 1) * (w * w)
+         by substituting Equality.symmetry(vReads)
+     = 2 * target by completedReads
+  as doubledScalarReads;
+  (2 : ℤ) ≠ 0 as twoNonzero;
+  x * x + y * y + 2 * (z * z) + 2 * z * w + (halfCoefficient + 1) * (w * w) = target
+      by Integer.multiply_cancel_left_by_nonzero(
+          x * x + y * y + 2 * (z * z) + 2 * z * w + (halfCoefficient + 1) * (w * w),
+          target, 2, twoNonzero, doubledScalarReads)
+      as scalarCore;
+  x * x + y * y + 2 * (z * z) + 2 * 1 * z * w + (halfCoefficient + 1) * (w * w)
+     = x * x + y * y + 2 * (z * z) + 2 * z * w + (halfCoefficient + 1) * (w * w) by ring
+     = target by scalarCore
+  as scalarComputation;
+  done by Matrix.represents_by_witness(
+      Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(2, 1, halfCoefficient + 1),
+      target := target, vector := ⟨x, y, z, w⟩,
+      computes := Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative_coordinateTuple_computes(
+          scalarComputation := scalarComputation))
+}
+
+theorem Matrix.doubleUnit_universal_of_threeSquareCover
+        (halfCoefficient : ℕ)
+        (cover : Matrix.DoubleUnitThreeSquareCover(2 * halfCoefficient + 1))
+        : Matrix.IsUniversal(
+            Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(
+              2, 1, ((halfCoefficient + 1 : ℕ) : ℤ))) := {
+  take m : ℕ;
+  suppose m ≥ 1 as positive;
+  choose residual : ℕ, w : ℕ such that
+      Matrix.Represents(Matrix.sumOfThreeSquaresForm, (residual : ℤ))
+      ∧ residual + w * w * (2 * halfCoefficient + 1) = 2 * m
+      from cover(m, positive);
+  Matrix.Represents(Matrix.sumOfThreeSquaresForm, (residual : ℤ)) as residualRepresented;
+  residual + w * w * (2 * halfCoefficient + 1) = 2 * m as naturalCompletedReads;
+  Integer.ThreeSquareRepresentation((residual : ℤ))
+      by Integer.three_square_representation_of_matrix_representation((residual : ℤ), residualRepresented)
+      as coordinateRepresentation;
+  choose a : ℤ, b : ℤ, c : ℤ such that a * a + b * b + c * c = (residual : ℤ)
+      from coordinateRepresentation;
+  a * a + b * b + c * c = (residual : ℤ) as residualReads;
+  (residual : ℤ) + (w : ℤ) * (w : ℤ) * ((2 * halfCoefficient + 1 : ℕ) : ℤ)
+     = ((residual + w * w * (2 * halfCoefficient + 1) : ℕ) : ℤ) by {
+          ((residual + w * w * (2 * halfCoefficient + 1) : ℕ) : ℤ)
+             = (residual : ℤ) + ((w * w * (2 * halfCoefficient + 1) : ℕ) : ℤ)
+                 by Natural.to_integer.add_preserves
+             = (residual : ℤ) + ((w * w : ℕ) : ℤ) * ((2 * halfCoefficient + 1 : ℕ) : ℤ)
+                 by substituting Natural.to_integer.multiply_preserves(w * w, 2 * halfCoefficient + 1)
+             = (residual : ℤ) + ((w : ℤ) * (w : ℤ)) * ((2 * halfCoefficient + 1 : ℕ) : ℤ)
+                 by substituting Natural.to_integer.multiply_preserves(w, w);
+          done
+        }
+     = ((2 * m : ℕ) : ℤ) by substituting naturalCompletedReads
+     = 2 * (m : ℤ) by Natural.to_integer.multiply_preserves
+  as castCompletedReads;
+  ((2 * halfCoefficient + 1 : ℕ) : ℤ)
+     = ((2 * halfCoefficient : ℕ) : ℤ) + 1 by Natural.to_integer.add_preserves
+     = 2 * (halfCoefficient : ℤ) + 1 by substituting Natural.to_integer.multiply_preserves(2, halfCoefficient)
+  as coefficientCastReads;
+  a * a + b * b + c * c + (2 * (halfCoefficient : ℤ) + 1) * ((w : ℤ) * (w : ℤ))
+     = (residual : ℤ) + (2 * (halfCoefficient : ℤ) + 1) * ((w : ℤ) * (w : ℤ))
+         by substituting residualReads
+     = (residual : ℤ) + ((w : ℤ) * (w : ℤ)) * (2 * (halfCoefficient : ℤ) + 1) by ring
+     = (residual : ℤ) + ((w : ℤ) * (w : ℤ)) * ((2 * halfCoefficient + 1 : ℕ) : ℤ)
+         by substituting Equality.symmetry(coefficientCastReads)
+     = 2 * (m : ℤ) by castCompletedReads
+  as completedReads;
+  Integer.divides(2, a - b) ∨ Integer.divides(2, a - c) ∨ Integer.divides(2, b - c)
+      by Integer.three_integers_have_same_parity_pair(a, b, c);
+  done by cases {
+    case Integer.divides(2, a - b) as sameParity:
+      done by Matrix.doubleUnit_represents_of_completed_three_squares(
+          (halfCoefficient : ℤ), (m : ℤ), a, b, c, (w : ℤ), sameParity, completedReads)
+    case Integer.divides(2, a - c) as sameParity: {
+      a * a + c * c + b * b + (2 * (halfCoefficient : ℤ) + 1) * ((w : ℤ) * (w : ℤ))
+         = a * a + b * b + c * c + (2 * (halfCoefficient : ℤ) + 1) * ((w : ℤ) * (w : ℤ)) by ring
+         = 2 * (m : ℤ) by completedReads
+      as reordered;
+      done by Matrix.doubleUnit_represents_of_completed_three_squares(
+          (halfCoefficient : ℤ), (m : ℤ), a, c, b, (w : ℤ), sameParity, reordered)
+    }
+    case Integer.divides(2, b - c) as sameParity: {
+      b * b + c * c + a * a + (2 * (halfCoefficient : ℤ) + 1) * ((w : ℤ) * (w : ℤ))
+         = a * a + b * b + c * c + (2 * (halfCoefficient : ℤ) + 1) * ((w : ℤ) * (w : ℤ)) by ring
+         = 2 * (m : ℤ) by completedReads
+      as reordered;
+      done by Matrix.doubleUnit_represents_of_completed_three_squares(
+          (halfCoefficient : ℤ), (m : ℤ), b, c, a, (w : ℤ), sameParity, reordered)
+    }
+  }
+}
+
+theorem Natural.four_power_times_thirty_two_plus_core_not_obstruction
+        (exponent b core remainder quotient : ℕ)
+        (coreShape : 32 * b + core = 8 * quotient + remainder)
+        (remainderClass : remainder = 1 ∨ remainder = 3 ∨ remainder = 5)
+        : ¬(Natural.IsThreeSquareObstruction(4 ^ exponent * (32 * b + core))) := {
+  ¬(Natural.IsThreeSquareObstruction(32 * b + core)) by {
+    ¬(Natural.IsThreeSquareObstruction(8 * quotient + remainder)) by cases {
+      case remainder = 1:
+        done by Natural.eight_times_plus_one_not_obstruction(quotient)
+      case remainder = 3:
+        done by Natural.eight_times_plus_three_not_obstruction(quotient)
+      case remainder = 5:
+        done by Natural.eight_times_plus_five_not_obstruction(quotient)
+    }
+    as shapedAdmissible;
+    suppose Natural.IsThreeSquareObstruction(32 * b + core) as obstruction;
+    Natural.IsThreeSquareObstruction(8 * quotient + remainder) by substituting coreShape;
+    done by shapedAdmissible(done)
+  }
+  as coreAdmissible;
+  done by Natural.not_obstruction_four_power_times(exponent, 32 * b + core, coreAdmissible)
+}
+
+theorem Matrix.doubleUnitThreeSquareCover_of_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        (halfCoefficient core remainder : ℕ) (baseQuotient : ℕ → ℕ)
+        (coreSum : core + (2 * halfCoefficient + 1) = 28)
+        (remainderClass : remainder = 1 ∨ remainder = 3 ∨ remainder = 5)
+        (coreShape : ∀ (b : ℕ).
+          32 * b + core = 8 * baseQuotient(b) + remainder)
+        : Matrix.DoubleUnitThreeSquareCover(2 * halfCoefficient + 1) := {
+  take m : ℕ;
+  suppose m ≥ 1;
+  Natural.IsThreeSquareObstruction(2 * m) ∨ ¬(Natural.IsThreeSquareObstruction(2 * m));
+  ¬(Natural.IsThreeSquareObstruction(2 * m)) ∨ Natural.IsThreeSquareObstruction(2 * m) by Or.swap;
+  done by cases {
+    case ¬(Natural.IsThreeSquareObstruction(2 * m)) as admissible: {
+      Matrix.Represents(Matrix.sumOfThreeSquaresForm, ((2 * m : ℕ) : ℤ))
+          by converse(2 * m, admissible) as represented;
+      witness 2 * m with witness 0 with And.introduction(
+          represented,
+          { 2 * m + 0 * 0 * (2 * halfCoefficient + 1) = 2 * m })
+    }
+    case Natural.IsThreeSquareObstruction(2 * m) as obstruction: {
+      choose exponent : ℕ, b : ℕ such that 2 * m = 4 ^ exponent * (8 * b + 7)
+          from obstruction;
+      2 * m = 4 ^ exponent * (8 * b + 7) as obstructionReads;
+      exponent = 0 ∨ ∃ (predecessor : ℕ). exponent = 1 + predecessor by Natural.zero_or_one_plus;
+      done by cases {
+        case exponent = 0 as exponentZero: {
+          2 * m + 0
+             = 4 ^ exponent * (8 * b + 7) by obstructionReads
+             = 4 ^ 0 * (8 * b + 7) by substituting exponentZero
+             = 8 * b + 7 by substituting Natural.power_zero(4)
+             = 2 * (4 * b + 3) + 1
+          as distinctResiduesEqual;
+          False by Natural.distinct_affine_residues_not_equal(
+              2, 0, 1, m, 4 * b + 3,
+              done, done, done, distinctResiduesEqual);
+          done
+        }
+        case ∃ (predecessor : ℕ). exponent = 1 + predecessor: {
+          choose predecessor : ℕ such that exponent = 1 + predecessor as exponentReads;
+          let residual : ℕ := 4 ^ predecessor * (32 * b + core);
+          let w : ℕ := 2 ^ predecessor;
+          ¬(Natural.IsThreeSquareObstruction(residual))
+              by Natural.four_power_times_thirty_two_plus_core_not_obstruction(
+                  predecessor, b, core, remainder, baseQuotient(b), coreShape(b), remainderClass)
+              as admissible;
+          residual + w * w * (2 * halfCoefficient + 1)
+             = 4 ^ predecessor * (32 * b + core)
+               + (2 ^ predecessor * 2 ^ predecessor) * (2 * halfCoefficient + 1)
+             = 4 ^ predecessor * (32 * b + core)
+               + 4 ^ predecessor * (2 * halfCoefficient + 1)
+                 by Equality.congruence(
+                     (candidate : ℕ) ↦ 4 ^ predecessor * (32 * b + core)
+                       + candidate * (2 * halfCoefficient + 1),
+                     2 ^ predecessor * 2 ^ predecessor, 4 ^ predecessor,
+                     Natural.two_power_square_is_four_power(predecessor))
+             = 4 ^ predecessor * (32 * b + (core + (2 * halfCoefficient + 1)))
+             = 4 ^ predecessor * (32 * b + 28) by substituting coreSum
+             = 4 ^ predecessor * (4 * (8 * b + 7))
+             = (4 * 4 ^ predecessor) * (8 * b + 7)
+             = 4 ^ (1 + predecessor) * (8 * b + 7)
+                 by substituting Equality.symmetry(Natural.power_one_plus(4, predecessor))
+             = 4 ^ exponent * (8 * b + 7) by substituting Equality.symmetry(exponentReads)
+             = 2 * m by Equality.symmetry(obstructionReads)
+          as coverReads;
+          Matrix.Represents(Matrix.sumOfThreeSquaresForm, (residual : ℤ))
+              by converse(residual, admissible) as represented;
+          witness residual with witness w with And.introduction(represented, coverReads)
+        }
+      }
+    }
+  }
+}
+
+theorem Matrix.doubleS1C2_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(2, 1, 2)) := {
+  done by Matrix.doubleUnit_universal_of_threeSquareCover(
+      1, Matrix.doubleUnitThreeSquareCover_of_converse(
+          converse, halfCoefficient := 1, core := 25, remainder := 1,
+          baseQuotient := (b : ℕ) ↦ 4 * b + 3,
+          coreSum := done, remainderClass := Or.introduceLeft(done),
+          coreShape := (b : ℕ) ↦ { done }))
+}
+
+theorem Matrix.doubleS1C4_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(2, 1, 4)) := {
+  done by Matrix.doubleUnit_universal_of_threeSquareCover(
+      3, Matrix.doubleUnitThreeSquareCover_of_converse(
+          converse, halfCoefficient := 3, core := 21, remainder := 5,
+          baseQuotient := (b : ℕ) ↦ 4 * b + 2,
+          coreSum := done, remainderClass := Or.introduceRight(Or.introduceRight(done)),
+          coreShape := (b : ℕ) ↦ { done }))
+}
+
+theorem Matrix.doubleS1C5_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(2, 1, 5)) := {
+  done by Matrix.doubleUnit_universal_of_threeSquareCover(
+      4, Matrix.doubleUnitThreeSquareCover_of_converse(
+          converse, halfCoefficient := 4, core := 19, remainder := 3,
+          baseQuotient := (b : ℕ) ↦ 4 * b + 2,
+          coreSum := done, remainderClass := Or.introduceRight(Or.introduceLeft(done)),
+          coreShape := (b : ℕ) ↦ { done }))
+}
+
+theorem Matrix.doubleS1C6_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(2, 1, 6)) := {
+  done by Matrix.doubleUnit_universal_of_threeSquareCover(
+      5, Matrix.doubleUnitThreeSquareCover_of_converse(
+          converse, halfCoefficient := 5, core := 17, remainder := 1,
+          baseQuotient := (b : ℕ) ↦ 4 * b + 2,
+          coreSum := done, remainderClass := Or.introduceLeft(done),
+          coreShape := (b : ℕ) ↦ { done }))
+}
+
+theorem Matrix.doubleS1C8_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(2, 1, 8)) := {
+  done by Matrix.doubleUnit_universal_of_threeSquareCover(
+      7, Matrix.doubleUnitThreeSquareCover_of_converse(
+          converse, halfCoefficient := 7, core := 13, remainder := 5,
+          baseQuotient := (b : ℕ) ↦ 4 * b + 1,
+          coreSum := done, remainderClass := Or.introduceRight(Or.introduceRight(done)),
+          coreShape := (b : ℕ) ↦ { done }))
+}
+
+theorem Matrix.doubleS1C9_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(2, 1, 9)) := {
+  done by Matrix.doubleUnit_universal_of_threeSquareCover(
+      8, Matrix.doubleUnitThreeSquareCover_of_converse(
+          converse, halfCoefficient := 8, core := 11, remainder := 3,
+          baseQuotient := (b : ℕ) ↦ 4 * b + 1,
+          coreSum := done, remainderClass := Or.introduceRight(Or.introduceLeft(done)),
+          coreShape := (b : ℕ) ↦ { done }))
+}
+
+theorem Matrix.doubleS1C10_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(2, 1, 10)) := {
+  done by Matrix.doubleUnit_universal_of_threeSquareCover(
+      9, Matrix.doubleUnitThreeSquareCover_of_converse(
+          converse, halfCoefficient := 9, core := 9, remainder := 1,
+          baseQuotient := (b : ℕ) ↦ 4 * b + 1,
+          coreSum := done, remainderClass := Or.introduceLeft(done),
+          coreShape := (b : ℕ) ↦ { done }))
+}
+
+theorem Matrix.doubleS1C12_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(2, 1, 12)) := {
+  done by Matrix.doubleUnit_universal_of_threeSquareCover(
+      11, Matrix.doubleUnitThreeSquareCover_of_converse(
+          converse, halfCoefficient := 11, core := 5, remainder := 5,
+          baseQuotient := (b : ℕ) ↦ 4 * b,
+          coreSum := done, remainderClass := Or.introduceRight(Or.introduceRight(done)),
+          coreShape := (b : ℕ) ↦ { done }))
+}
+
+theorem Matrix.doubleS1C13_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(2, 1, 13)) := {
+  done by Matrix.doubleUnit_universal_of_threeSquareCover(
+      12, Matrix.doubleUnitThreeSquareCover_of_converse(
+          converse, halfCoefficient := 12, core := 3, remainder := 3,
+          baseQuotient := (b : ℕ) ↦ 4 * b,
+          coreSum := done, remainderClass := Or.introduceRight(Or.introduceLeft(done)),
+          coreShape := (b : ℕ) ↦ { done }))
+}
+
+theorem Matrix.doubleS1C14_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(2, 1, 14)) := {
+  done by Matrix.doubleUnit_universal_of_threeSquareCover(
+      13, Matrix.doubleUnitThreeSquareCover_of_converse(
+          converse, halfCoefficient := 13, core := 1, remainder := 1,
+          baseQuotient := (b : ℕ) ↦ 4 * b,
+          coreSum := done, remainderClass := Or.introduceLeft(done),
+          coreShape := (b : ℕ) ↦ { done }))
+}

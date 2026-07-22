@@ -192,7 +192,14 @@ rank-four escalator by 207 selected normal forms are.
   parity needed to recover `y,z`.  The existing through-15 tables cover the
   smaller targets.  Thus 23 selected rank-four forms now have complete
   conditional universality proofs, including every selected weighted
-  `d=2` form.
+  `d=2` form. `Algebra/rank_four_double_unit_residue_universality` treats
+  all ten selected `x^2+y^2+2z^2+2zw+c w^2` forms.  The completed identity
+  `2Q=(x+y)^2+(x-y)^2+(2z+w)^2+(2c-1)w^2` reduces them directly to three
+  squares.  In an obstructed doubled target `4^e(8b+7)`, necessarily
+  `e>0`; taking `w=2^(e-1)` leaves `4^(e-1)(32b+k)`, where each of the ten
+  constants `k` is 1, 3, or 5 modulo 8.  A parity lemma recovers all three
+  completed coordinates from any residual representation.  The conditional
+  total is therefore 33 selected rank-four forms.
   `Algebra/rank_four_completed_cover_universality` gives fraction-free
   completed-square interfaces for all other constructors. Its scaled-square,
   weighted, and odd cover predicates account for the remaining 32, 140, and
