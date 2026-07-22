@@ -1,0 +1,323 @@
+-- Algebra/three_squares_parity_transforms.math
+--
+-- Integral parity transforms relating the sum of three squares to the
+-- diagonal ternary x² + 2y² + 2z².  These identities show that the latter
+-- has exactly the same represented integers as the former; it therefore
+-- needs no independent genus or regularity argument.
+
+module Algebra.three_squares_parity_transforms
+
+import Algebra.three_squares_rational_descent
+import Algebra.rank_three_representative_truants
+import Algebra.rank_four_diagonal_family
+import Algebra.integer_euclidean
+import Natural.multiply_bounds
+
+definition Integer.ThreeSquaresConverse : Proposition :=
+  ∀ (n : ℕ). ¬(Natural.IsThreeSquareObstruction(n)) →
+    Integer.ThreeSquareRepresentation((n : ℤ))
+
+theorem Integer.three_squares_converse_of_rational
+        (converse : Rational.ThreeSquaresConverse)
+        : Integer.ThreeSquaresConverse := {
+  take n : ℕ;
+  suppose ¬(Natural.IsThreeSquareObstruction(n)) as admissible;
+  Rational.ThreeSquareRepresentation((n : ℤ))
+      by converse(n, admissible) as rationalRepresentation;
+  done by Rational.three_square_representation_is_integral((n : ℤ), rationalRepresentation)
+}
+
+theorem Integer.same_remainder_mod_two_implies_same_parity
+        (a b quotientA quotientB : ℤ) (remainderA remainderB : ℕ)
+        (aReads : a = 2 * quotientA + (remainderA : ℤ))
+        (bReads : b = 2 * quotientB + (remainderB : ℤ))
+        (remaindersEqual : remainderA = remainderB)
+        : Integer.divides(2, a - b) := {
+  (remainderA : ℤ) = (remainderB : ℤ) by substituting remaindersEqual as castRemaindersEqual;
+  witness quotientA - quotientB with
+    a - b
+       = (2 * quotientA + (remainderA : ℤ)) - b by substituting aReads
+       = (2 * quotientA + (remainderA : ℤ)) - (2 * quotientB + (remainderB : ℤ)) by substituting bReads
+       = (2 * quotientA + (remainderB : ℤ)) - (2 * quotientB + (remainderB : ℤ))
+           by substituting castRemaindersEqual
+       = 2 * (quotientA - quotientB) by ring
+}
+
+theorem Integer.three_integers_have_same_parity_pair
+        (a b c : ℤ)
+        : Integer.divides(2, a - b)
+          ∨ Integer.divides(2, a - c)
+          ∨ Integer.divides(2, b - c) := {
+  choose quotientA : ℤ, remainderA : ℕ such that
+      a = 2 * quotientA + (remainderA : ℤ) ∧ remainderA < 2
+      from Integer.divide_by_positive(a, 2, done);
+  choose quotientB : ℤ, remainderB : ℕ such that
+      b = 2 * quotientB + (remainderB : ℤ) ∧ remainderB < 2
+      from Integer.divide_by_positive(b, 2, done);
+  choose quotientC : ℤ, remainderC : ℕ such that
+      c = 2 * quotientC + (remainderC : ℤ) ∧ remainderC < 2
+      from Integer.divide_by_positive(c, 2, done);
+  a = 2 * quotientA + (remainderA : ℤ) as aReads;
+  b = 2 * quotientB + (remainderB : ℤ) as bReads;
+  c = 2 * quotientC + (remainderC : ℤ) as cReads;
+  remainderA < 2 as remainderABelow;
+  remainderB < 2 as remainderBBelow;
+  remainderC < 2 as remainderCBelow;
+  remainderA = 0 ∨ remainderA = 1 by Natural.below_two(remainderA, remainderABelow);
+  remainderB = 0 ∨ remainderB = 1 by Natural.below_two(remainderB, remainderBBelow);
+  remainderC = 0 ∨ remainderC = 1 by Natural.below_two(remainderC, remainderCBelow);
+  done by cases {
+    case remainderA = 0 as remainderAZero: done by cases {
+      case remainderB = 0 as remainderBZero: {
+        remainderA = remainderB by { remainderA = 0 by remainderAZero = remainderB by Equality.symmetry(remainderBZero) };
+        done by disjunct(Integer.same_remainder_mod_two_implies_same_parity(
+            a, b, quotientA, quotientB, remainderA, remainderB, aReads, bReads, done))
+      }
+      case remainderB = 1 as remainderBOne: done by cases {
+        case remainderC = 0 as remainderCZero: {
+          remainderA = remainderC by { remainderA = 0 by remainderAZero = remainderC by Equality.symmetry(remainderCZero) };
+          done by disjunct(Integer.same_remainder_mod_two_implies_same_parity(
+              a, c, quotientA, quotientC, remainderA, remainderC, aReads, cReads, done))
+        }
+        case remainderC = 1 as remainderCOne: {
+          remainderB = remainderC by { remainderB = 1 by remainderBOne = remainderC by Equality.symmetry(remainderCOne) };
+          done by disjunct(Integer.same_remainder_mod_two_implies_same_parity(
+              b, c, quotientB, quotientC, remainderB, remainderC, bReads, cReads, done))
+        }
+      }
+    }
+    case remainderA = 1 as remainderAOne: done by cases {
+      case remainderB = 0 as remainderBZero: done by cases {
+        case remainderC = 0 as remainderCZero: {
+          remainderB = remainderC by { remainderB = 0 by remainderBZero = remainderC by Equality.symmetry(remainderCZero) };
+          done by disjunct(Integer.same_remainder_mod_two_implies_same_parity(
+              b, c, quotientB, quotientC, remainderB, remainderC, bReads, cReads, done))
+        }
+        case remainderC = 1 as remainderCOne: {
+          remainderA = remainderC by { remainderA = 1 by remainderAOne = remainderC by Equality.symmetry(remainderCOne) };
+          done by disjunct(Integer.same_remainder_mod_two_implies_same_parity(
+              a, c, quotientA, quotientC, remainderA, remainderC, aReads, cReads, done))
+        }
+      }
+      case remainderB = 1 as remainderBOne: {
+        remainderA = remainderB by { remainderA = 1 by remainderAOne = remainderB by Equality.symmetry(remainderBOne) };
+        done by disjunct(Integer.same_remainder_mod_two_implies_same_parity(
+            a, b, quotientA, quotientB, remainderA, remainderB, aReads, bReads, done))
+      }
+    }
+  }
+}
+
+theorem Integer.same_parity_pair_of_squares_compresses
+        (a b : ℤ) (sameParity : Integer.divides(2, a - b))
+        : ∃ (u v : ℤ). a * a + b * b = 2 * (u * u) + 2 * (v * v) := {
+  choose v : ℤ such that a - b = 2 * v as differenceReads from sameParity;
+  let u : ℤ := a - v;
+  a = u + v by ring as aReads;
+  b
+     = a - 2 * v by linear_combination(-differenceReads)
+     = (u + v) - 2 * v by substituting aReads
+     = u - v by ring
+  as bReads;
+  witness u with witness v with
+    a * a + b * b
+       = (u + v) * (u + v) + b * b by substituting aReads
+       = (u + v) * (u + v) + (u - v) * (u - v) by substituting bReads
+       = 2 * (u * u) + 2 * (v * v) by ring
+}
+
+theorem Integer.three_square_representation_to_square_double_double
+        (n : ℤ) (represented : Integer.ThreeSquareRepresentation(n))
+        : ∃ (x y z : ℤ). x * x + 2 * (y * y) + 2 * (z * z) = n := {
+  choose a : ℤ such that ∃ (b c : ℤ). a * a + b * b + c * c = n from represented;
+  choose b : ℤ such that ∃ (c : ℤ). a * a + b * b + c * c = n;
+  choose c : ℤ such that a * a + b * b + c * c = n as representedByCoordinates;
+  Integer.divides(2, a - b) ∨ Integer.divides(2, a - c) ∨ Integer.divides(2, b - c)
+      by Integer.three_integers_have_same_parity_pair(a, b, c);
+  done by cases {
+    case Integer.divides(2, a - b) as sameParity: {
+      choose y : ℤ, z : ℤ such that a * a + b * b = 2 * (y * y) + 2 * (z * z)
+          as pairCompressed from Integer.same_parity_pair_of_squares_compresses(a, b, sameParity);
+      witness c with witness y with witness z with
+        c * c + 2 * (y * y) + 2 * (z * z)
+           = c * c + (a * a + b * b) by substituting Equality.symmetry(pairCompressed)
+           = a * a + b * b + c * c by ring
+           = n by representedByCoordinates
+    }
+    case Integer.divides(2, a - c) as sameParity: {
+      choose y : ℤ, z : ℤ such that a * a + c * c = 2 * (y * y) + 2 * (z * z)
+          as pairCompressed from Integer.same_parity_pair_of_squares_compresses(a, c, sameParity);
+      witness b with witness y with witness z with
+        b * b + 2 * (y * y) + 2 * (z * z)
+           = b * b + (a * a + c * c) by substituting Equality.symmetry(pairCompressed)
+           = a * a + b * b + c * c by ring
+           = n by representedByCoordinates
+    }
+    case Integer.divides(2, b - c) as sameParity: {
+      choose y : ℤ, z : ℤ such that b * b + c * c = 2 * (y * y) + 2 * (z * z)
+          as pairCompressed from Integer.same_parity_pair_of_squares_compresses(b, c, sameParity);
+      witness a with witness y with witness z with
+        a * a + 2 * (y * y) + 2 * (z * z)
+           = a * a + (b * b + c * c) by substituting Equality.symmetry(pairCompressed)
+           = a * a + b * b + c * c by ring
+           = n by representedByCoordinates
+    }
+  }
+}
+
+theorem Integer.square_double_double_representation_to_three_square
+        (n : ℤ)
+        (represented : ∃ (x y z : ℤ). x * x + 2 * (y * y) + 2 * (z * z) = n)
+        : Integer.ThreeSquareRepresentation(n) := {
+  choose x : ℤ such that ∃ (y z : ℤ). x * x + 2 * (y * y) + 2 * (z * z) = n from represented;
+  choose y : ℤ such that ∃ (z : ℤ). x * x + 2 * (y * y) + 2 * (z * z) = n;
+  choose z : ℤ such that x * x + 2 * (y * y) + 2 * (z * z) = n as representedByCoordinates;
+  witness x with witness y + z with witness y - z with
+    x * x + (y + z) * (y + z) + (y - z) * (y - z)
+       = x * x + 2 * (y * y) + 2 * (z * z) by ring
+       = n by representedByCoordinates
+}
+
+theorem Integer.remaining_coordinate_even_of_same_parity_pair
+        (a b c n : ℤ)
+        (sameParity : Integer.divides(2, a - b))
+        (evenSum : a * a + b * b + c * c = 2 * n)
+        : Integer.divides(2, c) := {
+  choose u : ℤ, v : ℤ such that
+      a * a + b * b = 2 * (u * u) + 2 * (v * v)
+      as pairCompressed from Integer.same_parity_pair_of_squares_compresses(a, b, sameParity);
+  a * a + b * b = 2 * (u * u + v * v) by {
+    a * a + b * b
+       = 2 * (u * u) + 2 * (v * v) by pairCompressed
+       = 2 * (u * u + v * v) by ring;
+    done
+  }
+  as pairEven;
+  c * c
+     = (a * a + b * b + c * c) - (a * a + b * b) by ring
+     = 2 * n - (a * a + b * b) by substituting evenSum
+     = 2 * n - 2 * (u * u + v * v) by substituting pairEven
+     = 2 * (n - (u * u + v * v)) by ring
+  as squareEvenReads;
+  Integer.divides(2, c * c) by {
+    witness n - (u * u + v * v) with squareEvenReads
+  };
+  done by Integer.two_divides_of_two_divides_square(c, done)
+}
+
+theorem Integer.even_three_square_sum_to_square_square_double_for_pair
+        (a b c n : ℤ)
+        (sameParity : Integer.divides(2, a - b))
+        (evenSum : a * a + b * b + c * c = 2 * n)
+        : ∃ (x y z : ℤ). x * x + y * y + 2 * (z * z) = n := {
+  choose x : ℤ, y : ℤ such that
+      a * a + b * b = 2 * (x * x) + 2 * (y * y)
+      as pairCompressed from Integer.same_parity_pair_of_squares_compresses(a, b, sameParity);
+  Integer.divides(2, c)
+      by Integer.remaining_coordinate_even_of_same_parity_pair(a, b, c, n, sameParity, evenSum)
+      as cEven;
+  choose z : ℤ such that c = 2 * z as cReads from cEven;
+  2 * (x * x + y * y + 2 * (z * z))
+     = (2 * (x * x) + 2 * (y * y)) + (2 * z) * (2 * z) by ring
+     = (a * a + b * b) + (2 * z) * (2 * z) by substituting Equality.symmetry(pairCompressed)
+     = (a * a + b * b) + c * c by substituting Equality.symmetry(cReads)
+     = a * a + b * b + c * c by ring
+     = 2 * n by evenSum
+  as doubledReads;
+  (2 : ℤ) ≠ 0 as twoNonzero;
+  x * x + y * y + 2 * (z * z) = n
+      by Integer.multiply_cancel_left_by_nonzero(
+          x * x + y * y + 2 * (z * z), n, 2, twoNonzero, doubledReads)
+      as represented;
+  witness x with witness y with witness z with represented
+}
+
+theorem Integer.three_square_representation_of_double_to_square_square_double
+        (n : ℤ) (represented : Integer.ThreeSquareRepresentation(2 * n))
+        : ∃ (x y z : ℤ). x * x + y * y + 2 * (z * z) = n := {
+  choose a : ℤ such that ∃ (b c : ℤ). a * a + b * b + c * c = 2 * n from represented;
+  choose b : ℤ such that ∃ (c : ℤ). a * a + b * b + c * c = 2 * n;
+  choose c : ℤ such that a * a + b * b + c * c = 2 * n as representedByCoordinates;
+  Integer.divides(2, a - b) ∨ Integer.divides(2, a - c) ∨ Integer.divides(2, b - c)
+      by Integer.three_integers_have_same_parity_pair(a, b, c);
+  done by cases {
+    case Integer.divides(2, a - b) as sameParity:
+      done by Integer.even_three_square_sum_to_square_square_double_for_pair(
+          a, b, c, n, sameParity, representedByCoordinates)
+    case Integer.divides(2, a - c) as sameParity: {
+      a * a + c * c + b * b
+         = a * a + b * b + c * c by ring
+         = 2 * n by representedByCoordinates
+      as reordered;
+      done by Integer.even_three_square_sum_to_square_square_double_for_pair(
+          a, c, b, n, sameParity, reordered)
+    }
+    case Integer.divides(2, b - c) as sameParity: {
+      b * b + c * c + a * a
+         = a * a + b * b + c * c by ring
+         = 2 * n by representedByCoordinates
+      as reordered;
+      done by Integer.even_three_square_sum_to_square_square_double_for_pair(
+          b, c, a, n, sameParity, reordered)
+    }
+  }
+}
+
+theorem Integer.square_square_double_representation_to_three_square_of_double
+        (n : ℤ)
+        (represented : ∃ (x y z : ℤ). x * x + y * y + 2 * (z * z) = n)
+        : Integer.ThreeSquareRepresentation(2 * n) := {
+  choose x : ℤ such that ∃ (y z : ℤ). x * x + y * y + 2 * (z * z) = n from represented;
+  choose y : ℤ such that ∃ (z : ℤ). x * x + y * y + 2 * (z * z) = n;
+  choose z : ℤ such that x * x + y * y + 2 * (z * z) = n as representedByCoordinates;
+  witness x + y with witness x - y with witness 2 * z with
+    (x + y) * (x + y) + (x - y) * (x - y) + (2 * z) * (2 * z)
+       = 2 * (x * x + y * y + 2 * (z * z)) by ring
+       = 2 * n by substituting representedByCoordinates
+}
+
+theorem Matrix.squarePlusDoubleSquareDiagonalForm_two_represents_of_three_square
+        (n : ℤ) (represented : Integer.ThreeSquareRepresentation(n))
+        : Matrix.Represents(Matrix.squarePlusDoubleSquareDiagonalForm(2), n) := {
+  choose x : ℤ such that ∃ (y z : ℤ). x * x + 2 * (y * y) + 2 * (z * z) = n
+      from Integer.three_square_representation_to_square_double_double(n, represented);
+  choose y : ℤ such that ∃ (z : ℤ). x * x + 2 * (y * y) + 2 * (z * z) = n;
+  choose z : ℤ such that x * x + 2 * (y * y) + 2 * (z * z) = n as scalarComputation;
+  done by Matrix.represents_by_witness(
+      Matrix.squarePlusDoubleSquareDiagonalForm(2), n, ⟨x, y, z⟩,
+      Matrix.squarePlusDoubleSquareDiagonalForm_two_coordinateTuple_computes(
+          x, y, z, n, scalarComputation))
+}
+
+theorem Matrix.sumOfTwoSquaresPlusScaledSquareForm_two_represents_of_three_square_double
+        (n : ℤ) (represented : Integer.ThreeSquareRepresentation(2 * n))
+        : Matrix.Represents(Matrix.sumOfTwoSquaresPlusScaledSquareForm(2), n) := {
+  choose x : ℤ such that ∃ (y z : ℤ). x * x + y * y + 2 * (z * z) = n
+      from Integer.three_square_representation_of_double_to_square_square_double(n, represented);
+  choose y : ℤ such that ∃ (z : ℤ). x * x + y * y + 2 * (z * z) = n;
+  choose z : ℤ such that x * x + y * y + 2 * (z * z) = n as scalarComputation;
+  done by Matrix.represents_by_witness(
+      Matrix.sumOfTwoSquaresPlusScaledSquareForm(2), n, ⟨x, y, z⟩,
+      { Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusScaledSquareForm(2), ⟨x, y, z⟩)
+           = x * x + y * y + 2 * (z * z)
+               by Matrix.sumOfTwoSquaresPlusScaledSquareForm_coordinateTuple_value
+           = n by scalarComputation })
+}
+
+theorem Matrix.squarePlusDoubleSquareDiagonalForm_two_represents_admissible
+        (converse : Integer.ThreeSquaresConverse)
+        (n : ℕ) (admissible : ¬(Natural.IsThreeSquareObstruction(n)))
+        : Matrix.Represents(Matrix.squarePlusDoubleSquareDiagonalForm(2), (n : ℤ)) := {
+  Integer.ThreeSquareRepresentation((n : ℤ)) by converse(n, admissible) as represented;
+  done by Matrix.squarePlusDoubleSquareDiagonalForm_two_represents_of_three_square((n : ℤ), represented)
+}
+
+theorem Matrix.sumOfTwoSquaresPlusScaledSquareForm_two_represents_when_double_admissible
+        (converse : Integer.ThreeSquaresConverse)
+        (n : ℕ) (doubleAdmissible : ¬(Natural.IsThreeSquareObstruction(2 * n)))
+        : Matrix.Represents(Matrix.sumOfTwoSquaresPlusScaledSquareForm(2), (n : ℤ)) := {
+  Integer.ThreeSquareRepresentation(2 * (n : ℤ))
+      by converse(2 * n, doubleAdmissible) as representedDouble;
+  done by Matrix.sumOfTwoSquaresPlusScaledSquareForm_two_represents_of_three_square_double(
+      (n : ℤ), representedDouble)
+}
