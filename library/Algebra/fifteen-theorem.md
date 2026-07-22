@@ -210,7 +210,9 @@ rank-four escalator by 207 selected normal forms are.
   the first obstruction parameter; the `c=14` resolver uses residuals
   `0,32,64` in its three small branches and the admissible core 12
   thereafter.  Thus all 22 selected double forms are conditionally
-  universal, and the overall total is 45.
+  universal.  A global coordinate-swap certificate then transports the
+  otherwise-unselected `double.r0.c3` proof to `triple.r0.c2`, so the overall
+  total is 46 selected rank-four forms.
   `Algebra/rank_four_completed_cover_universality` gives fraction-free
   completed-square interfaces for all other constructors. Its scaled-square,
   weighted, and odd cover predicates account for the remaining 32, 140, and
