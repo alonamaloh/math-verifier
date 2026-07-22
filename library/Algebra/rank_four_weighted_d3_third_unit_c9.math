@@ -1,0 +1,158 @@
+module Algebra.rank_four_weighted_d3_third_unit_c9
+
+import Algebra.rank_four_weighted_d3_third_unit_universality
+
+theorem Matrix.weightedD3S0R1C9_universal_of_one_three_six_converse (converse : Matrix.OneThreeSixLocalConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(3, 0, 1, 9)) := {
+  3 * 9 = 26 + 1 by ring as coefficientShape;
+  3 * 9 ∸ 1 = 26 by Natural.three_times_monus_one_value(9, 26, coefficientShape) as naturalCoefficientReads;
+  ((3 * 9 ∸ 1 : ℕ) : ℤ) = 3 * (9 : ℤ) - 1
+      by Natural.three_times_monus_one_to_integer(9, 26, coefficientShape) as coefficientReads;
+  6 = 4 * 1 + 2 by ring as sixShape;
+  2 + (1 + 1) = 4 by ring as twoBelowFourReads;
+  2 < 4 by Natural.lt_intro(2, 4, 1, twoBelowFourReads) as twoBelowFour;
+  0 + (1 + 1) = 2 by ring as twoPositiveReads;
+  0 < 2 by Natural.lt_intro(0, 2, 1, twoPositiveReads) as twoPositive;
+  2 ≠ 0 by Natural.not_equal_of_greater_than(2, 0, twoPositive) as twoNonzero;
+  6 + (1 + 9) = 16 by ring as sixBelowSixteenReads;
+  6 < 16 by Natural.lt_intro(6, 16, 9, sixBelowSixteenReads) as sixBelowSixteen;
+  6 + (1 + 7) = 14 by ring as sixBelowFourteenReads;
+  6 < 14 by Natural.lt_intro(6, 14, 7, sixBelowFourteenReads) as sixBelowFourteen;
+  6 ≠ 14 by Natural.not_equal_of_less_than(6, 14, sixBelowFourteen) as sixNotFourteen;
+  Matrix.OneThreeSixTripleTargetCover(9) by {
+    take m : ℕ;
+    suppose m ≥ 1;
+    Natural.IsOneThreeSixFourObstruction(3 * m) ∨ ¬(Natural.IsOneThreeSixFourObstruction(3 * m))
+        by Logic.excluded_middle(Natural.IsOneThreeSixFourObstruction(3 * m)) as obstructionDecision;
+    ¬(Natural.IsOneThreeSixFourObstruction(3 * m)) ∨ Natural.IsOneThreeSixFourObstruction(3 * m)
+        by Or.swap(obstructionDecision);
+    done by cases {
+      case ¬(Natural.IsOneThreeSixFourObstruction(3 * m)) as admissible: {
+        3 * m + 0 * 0 * (3 * 9 ∸ 1) = 3 * m by ring as valueReads;
+        Matrix.Represents(Matrix.oneThreeSixForm, ((3 * m : ℕ) : ℤ))
+            by Matrix.oneThreeSixCover_witness_of_local_converse(
+                converse, 9, m, 3 * m, 0, admissible, valueReads, coefficientReads) as represented;
+        witness 3 * m with witness 0 with And.introduction(represented, valueReads)
+      }
+      case Natural.IsOneThreeSixFourObstruction(3 * m) as obstruction: {
+        choose exponent : ℕ, b : ℕ such that 3 * m = 4 ^ exponent * (16 * b + 14)
+            as obstructionReads from obstruction;
+        exponent = 0 ∨ ∃ (predecessor : ℕ). exponent = 1 + predecessor by Natural.zero_or_one_plus;
+        done by cases {
+          case exponent = 0 as exponentZero: {
+            3 * m
+               = 4 ^ exponent * (16 * b + 14) by obstructionReads
+               = 4 ^ 0 * (16 * b + 14) by substituting exponentZero
+               = 16 * b + 14 by substituting Natural.power_zero(4)
+            as unscaledReads;
+            choose q : ℕ such that b = 1 + q
+                as bReads from Natural.positive_inner_parameter_of_unscaled_one_three_six_obstruction(m, b, unscaledReads);
+            let residual : ℕ := 4 * (4 * q + 1);
+            ¬(Natural.IsOneThreeSixFourObstruction(4 * q + 1))
+                by Natural.four_times_plus_one_not_one_three_six_four_obstruction(q) as innerAdmissible;
+            ¬(Natural.IsOneThreeSixFourObstruction(residual))
+                by Natural.not_one_three_six_four_obstruction_four_times(4 * q + 1, innerAdmissible) as residualAdmissible;
+            residual + 1 * 1 * (3 * 9 ∸ 1)
+               = 4 * (4 * q + 1) + 26 by substituting naturalCoefficientReads
+               = 16 * (1 + q) + 14 by ring
+               = 16 * b + 14 by substituting Equality.symmetry(bReads)
+               = 3 * m by Equality.symmetry(unscaledReads)
+            as valueReads;
+            Matrix.Represents(Matrix.oneThreeSixForm, (residual : ℤ))
+                by Matrix.oneThreeSixCover_witness_of_local_converse(
+                    converse, 9, m, residual, 1, residualAdmissible, valueReads, coefficientReads) as represented;
+            witness residual with witness 1 with And.introduction(represented, valueReads)
+          }
+          case ∃ (predecessor : ℕ). exponent = 1 + predecessor: {
+            choose predecessor : ℕ such that exponent = 1 + predecessor as exponentReads;
+            predecessor = 0 ∨ ∃ (tail : ℕ). predecessor = 1 + tail by Natural.zero_or_one_plus;
+            done by cases {
+              case predecessor = 0 as predecessorZero: {
+                3 * m
+                   = 4 ^ exponent * (16 * b + 14) by obstructionReads
+                   = 4 ^ (1 + predecessor) * (16 * b + 14) by substituting exponentReads
+                   = (4 * 4 ^ predecessor) * (16 * b + 14) by substituting Natural.power_one_plus(4, predecessor)
+                   = (4 * 4 ^ 0) * (16 * b + 14) by substituting predecessorZero
+                   = 4 * (16 * b + 14) by substituting Natural.power_zero(4)
+                as onceScaledReads;
+                b = 0 ∨ ∃ (q : ℕ). b = 1 + q by Natural.zero_or_one_plus;
+                done by cases {
+                  case b = 0 as bZero: {
+                    3 * m + 0
+                       = 4 * (16 * b + 14) by onceScaledReads
+                       = 4 * (16 * 0 + 14) by substituting bZero
+                       = 3 * 18 + 2 by ring
+                    as impossible;
+                    False by Natural.distinct_affine_residues_not_equal(
+                        3, 0, 2, m, 18, done, done, done, impossible);
+                    done
+                  }
+                  case ∃ (q : ℕ). b = 1 + q: {
+                    choose q : ℕ such that b = 1 + q as bReads;
+                    let residual : ℕ := 4 * (4 * (4 * q + 1));
+                    ¬(Natural.IsOneThreeSixFourObstruction(4 * q + 1))
+                        by Natural.four_times_plus_one_not_one_three_six_four_obstruction(q) as innerAdmissible;
+                    ¬(Natural.IsOneThreeSixFourObstruction(4 * (4 * q + 1)))
+                        by Natural.not_one_three_six_four_obstruction_four_times(4 * q + 1, innerAdmissible)
+                        as onceAdmissible;
+                    ¬(Natural.IsOneThreeSixFourObstruction(residual))
+                        by Natural.not_one_three_six_four_obstruction_four_times(4 * (4 * q + 1), onceAdmissible)
+                        as residualAdmissible;
+                    residual + 2 * 2 * (3 * 9 ∸ 1)
+                       = 4 * (4 * (4 * q + 1)) + 2 * 2 * 26 by substituting naturalCoefficientReads
+                       = 4 * (16 * (1 + q) + 14) by ring
+                       = 4 * (16 * b + 14) by substituting Equality.symmetry(bReads)
+                       = 3 * m by Equality.symmetry(onceScaledReads)
+                    as valueReads;
+                    Matrix.Represents(Matrix.oneThreeSixForm, (residual : ℤ))
+                        by Matrix.oneThreeSixCover_witness_of_local_converse(
+                            converse, 9, m, residual, 2, residualAdmissible, valueReads, coefficientReads) as represented;
+                    witness residual with witness 2 with And.introduction(represented, valueReads)
+                  }
+                }
+              }
+              case ∃ (tail : ℕ). predecessor = 1 + tail: {
+                choose tail : ℕ such that predecessor = 1 + tail as predecessorReads;
+                let residual : ℕ := 4 ^ tail * (256 * b + 198);
+                let w : ℕ := 2 ^ tail;
+                4 ^ tail * (256 * b + 198) = 4 ^ tail * (16 * (16 * b + 12) + 6) by ring
+                    as residualShape;
+                ¬(Natural.IsOneThreeSixFourObstruction(residual)) by {
+                  suppose Natural.IsOneThreeSixFourObstruction(residual) as residualObstruction;
+                  Natural.IsOneThreeSixFourObstruction(4 ^ tail * (16 * (16 * b + 12) + 6))
+                      by substituting residualShape as transformedObstruction;
+                  done by Natural.four_power_times_nonzero_mod_four_core_not_one_three_six_four_obstruction(
+                      tail, 16 * b + 12, 6, 1, 2, sixShape,
+                      twoBelowFour, twoNonzero, sixBelowSixteen, sixNotFourteen)(transformedObstruction)
+                } as residualAdmissible;
+                residual + w * w * (3 * 9 ∸ 1)
+                   = 4 ^ tail * (256 * b + 198) + (2 ^ tail * 2 ^ tail) * 26
+                       by substituting naturalCoefficientReads
+                   = 4 ^ tail * (256 * b + 198) + 4 ^ tail * 26
+                       by Equality.congruence(
+                           (candidate : ℕ) ↦ 4 ^ tail * (256 * b + 198) + candidate * 26,
+                           2 ^ tail * 2 ^ tail, 4 ^ tail,
+                           Natural.two_power_square_is_four_power(tail))
+                   = 4 ^ tail * (16 * (16 * b + 14)) by ring
+                   = (4 * (4 * 4 ^ tail)) * (16 * b + 14) by ring
+                   = (4 * 4 ^ (1 + tail)) * (16 * b + 14)
+                       by substituting Equality.symmetry(Natural.power_one_plus(4, tail))
+                   = 4 ^ (1 + (1 + tail)) * (16 * b + 14)
+                       by substituting Equality.symmetry(Natural.power_one_plus(4, 1 + tail))
+                   = 4 ^ (1 + predecessor) * (16 * b + 14) by substituting Equality.symmetry(predecessorReads)
+                   = 4 ^ exponent * (16 * b + 14) by substituting Equality.symmetry(exponentReads)
+                   = 3 * m by Equality.symmetry(obstructionReads)
+                as valueReads;
+                Matrix.Represents(Matrix.oneThreeSixForm, (residual : ℤ))
+                    by Matrix.oneThreeSixCover_witness_of_local_converse(
+                        converse, 9, m, residual, w, residualAdmissible, valueReads, coefficientReads) as represented;
+                witness residual with witness w with And.introduction(represented, valueReads)
+              }
+            }
+          }
+        }
+      }
+    }
+  } as cover;
+  done by Matrix.weightedD3ThirdUnit_universal_of_cover(9, coefficientReads, cover)
+}
