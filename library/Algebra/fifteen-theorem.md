@@ -241,6 +241,15 @@ rank-four escalator by 207 selected normal forms are.
   represented first root to have the parity of `w`, so no extra congruence
   hypothesis is needed.  One uniform obstruction residual closes all seven
   coefficients and raises the selected total to 70.
+  The six easy forms with second residue zero and third residue one are handled
+  by the one-three-six local converse in
+  `Algebra/rank_four_weighted_d3_third_unit_universality`.  The identity
+  `3Q=(3z+w)^2+3x^2+6y^2+(3c-1)w^2` makes the square-residue condition modulo
+  three automatic, while explicit 4-adic residual covers settle
+  `c=3,4,6,7,8,10`.  The import-only
+  `Algebra/rank_four_weighted_d3_third_unit_covers` collects these results,
+  raising the selected conditional total to 76; `c=5,9` require the remaining
+  exceptional case splits.
   `Algebra/rank_four_completed_cover_universality` gives fraction-free
   completed-square interfaces for all other constructors. Its scaled-square,
   weighted, and odd cover predicates account for the 32, 140, and 28
