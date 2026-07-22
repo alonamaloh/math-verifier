@@ -1,0 +1,442 @@
+-- Algebra/rank_four_triple_zero_residue_universality.math
+--
+-- Diagonal extensions of x²+y²+3z².  Dirichlet's represented-set
+-- theorem has exceptional shape 9^a(9b+6); its converse remains an explicit
+-- arithmetic input here, independently of Legendre's three-squares converse.
+-- Everything after that input is elementary obstruction arithmetic.
+
+module Algebra.rank_four_triple_zero_residue_universality
+
+import Algebra.rank_four_triple_isometric_universality
+
+definition Natural.IsTripleSquareObstruction (n : ℕ) : Proposition :=
+  ∃ (exponent b : ℕ). n = 9 ^ exponent * (9 * b + 6)
+
+definition Matrix.TripleSquaresConverse : Proposition :=
+  ∀ (n : ℕ). ¬(Natural.IsTripleSquareObstruction(n)) →
+    Matrix.Represents(Matrix.sumOfTwoSquaresPlusTripleSquareForm, (n : ℤ))
+
+theorem Natural.nine_power_times_nonzero_non_six_core_not_triple_square_obstruction
+        (exponent b core : ℕ)
+        (coreBelow : core < 9) (coreNonzero : core ≠ 0) (coreNotSix : core ≠ 6)
+        : ¬(Natural.IsTripleSquareObstruction(9 ^ exponent * (9 * b + core))) := {
+  suppose Natural.IsTripleSquareObstruction(9 ^ exponent * (9 * b + core)) as obstruction;
+  choose otherExponent : ℕ such that ∃ (otherB : ℕ).
+      9 ^ exponent * (9 * b + core) = 9 ^ otherExponent * (9 * otherB + 6)
+      from obstruction;
+  choose otherB : ℕ such that
+      9 ^ exponent * (9 * b + core) = 9 ^ otherExponent * (9 * otherB + 6)
+      as equalShapes;
+  exponent < otherExponent ∨ exponent = otherExponent ∨ otherExponent < exponent
+      by Natural.lt_trichotomy;
+  done by cases {
+    case exponent < otherExponent as exponentBelow: {
+      choose gap : ℕ such that exponent + (1 + gap) = otherExponent
+          as exponentSplit from Natural.lt_elim;
+      9 ^ exponent * (9 * b + core)
+         = 9 ^ otherExponent * (9 * otherB + 6) by equalShapes
+         = 9 ^ (exponent + (1 + gap)) * (9 * otherB + 6)
+             by substituting Equality.symmetry(exponentSplit)
+         = (9 ^ exponent * 9 ^ (1 + gap)) * (9 * otherB + 6)
+             by substituting Natural.power_add(9, exponent, 1 + gap)
+         = 9 ^ exponent * (9 ^ (1 + gap) * (9 * otherB + 6))
+      as cancellable;
+      9 * b + core = 9 ^ (1 + gap) * (9 * otherB + 6)
+          by Natural.multiply_cancel_left(
+              9 ^ exponent, 9 * b + core, 9 ^ (1 + gap) * (9 * otherB + 6),
+              Natural.power_positive(9, exponent, done), cancellable)
+      as reduced;
+      9 * b + core
+         = 9 ^ (1 + gap) * (9 * otherB + 6) by reduced
+         = (9 * 9 ^ gap) * (9 * otherB + 6)
+             by substituting Natural.power_one_plus(9, gap)
+         = 9 * (9 ^ gap * (9 * otherB + 6)) + 0
+      as impossible;
+      done by Natural.distinct_affine_residues_not_equal(
+          9, core, 0, b, 9 ^ gap * (9 * otherB + 6), coreBelow, done, coreNonzero, impossible)
+    }
+    case exponent = otherExponent ∨ otherExponent < exponent: done by cases {
+      case exponent = otherExponent as exponentsEqual: {
+        9 ^ exponent * (9 * b + core)
+           = 9 ^ otherExponent * (9 * otherB + 6) by equalShapes
+           = 9 ^ exponent * (9 * otherB + 6)
+               by substituting Equality.symmetry(exponentsEqual)
+        as cancellable;
+        9 * b + core = 9 * otherB + 6
+            by Natural.multiply_cancel_left(
+                9 ^ exponent, 9 * b + core, 9 * otherB + 6,
+                Natural.power_positive(9, exponent, done), cancellable)
+        as impossible;
+        done by Natural.distinct_affine_residues_not_equal(
+            9, core, 6, b, otherB, coreBelow, done, coreNotSix, impossible)
+      }
+      case otherExponent < exponent as otherBelow: {
+        choose gap : ℕ such that otherExponent + (1 + gap) = exponent
+            as exponentSplit from Natural.lt_elim;
+        9 ^ otherExponent * (9 ^ (1 + gap) * (9 * b + core))
+           = (9 ^ otherExponent * 9 ^ (1 + gap)) * (9 * b + core)
+           = 9 ^ (otherExponent + (1 + gap)) * (9 * b + core)
+               by substituting Equality.symmetry(Natural.power_add(9, otherExponent, 1 + gap))
+           = 9 ^ exponent * (9 * b + core) by substituting exponentSplit
+           = 9 ^ otherExponent * (9 * otherB + 6) by equalShapes
+        as cancellable;
+        9 ^ (1 + gap) * (9 * b + core) = 9 * otherB + 6
+            by Natural.multiply_cancel_left(
+                9 ^ otherExponent, 9 ^ (1 + gap) * (9 * b + core), 9 * otherB + 6,
+                Natural.power_positive(9, otherExponent, done), cancellable)
+        as reduced;
+        9 * (9 ^ gap * (9 * b + core)) + 0
+           = (9 * 9 ^ gap) * (9 * b + core)
+           = 9 ^ (1 + gap) * (9 * b + core)
+               by substituting Equality.symmetry(Natural.power_one_plus(9, gap))
+           = 9 * otherB + 6 by reduced
+        as impossible;
+        done by Natural.distinct_affine_residues_not_equal(
+            9, 0, 6, 9 ^ gap * (9 * b + core), otherB, done, done, done, impossible)
+      }
+    }
+  }
+}
+
+theorem Natural.triple_square_obstruction_of_nine_times
+        (n : ℕ) (scaled : Natural.IsTripleSquareObstruction(9 * n))
+        : Natural.IsTripleSquareObstruction(n) := {
+  choose exponent : ℕ, b : ℕ such that 9 * n = 9 ^ exponent * (9 * b + 6)
+      from scaled;
+  exponent = 0 ∨ ∃ (predecessor : ℕ). exponent = 1 + predecessor by Natural.zero_or_one_plus;
+  done by cases {
+    case exponent = 0 as exponentZero: {
+      9 * n + 0
+         = 9 ^ exponent * (9 * b + 6) by done
+         = 9 ^ 0 * (9 * b + 6) by substituting exponentZero
+         = 9 * b + 6 by substituting Natural.power_zero(9)
+      as impossible;
+      False by Natural.distinct_affine_residues_not_equal(
+          9, 0, 6, n, b, done, done, done, impossible);
+      done
+    }
+    case ∃ (predecessor : ℕ). exponent = 1 + predecessor: {
+      choose predecessor : ℕ such that exponent = 1 + predecessor as exponentReads;
+      9 * n
+         = 9 ^ exponent * (9 * b + 6) by done
+         = 9 ^ (1 + predecessor) * (9 * b + 6) by substituting exponentReads
+         = (9 * 9 ^ predecessor) * (9 * b + 6)
+             by substituting Natural.power_one_plus(9, predecessor)
+         = 9 * (9 ^ predecessor * (9 * b + 6))
+      as cancellable;
+      n = 9 ^ predecessor * (9 * b + 6)
+          by Natural.multiply_cancel_left(
+              9, n, 9 ^ predecessor * (9 * b + 6), done, cancellable)
+          as reduced;
+      witness predecessor with witness b with reduced
+    }
+  }
+}
+
+theorem Natural.not_triple_square_obstruction_nine_times
+        (n : ℕ) (admissible : ¬(Natural.IsTripleSquareObstruction(n)))
+        : ¬(Natural.IsTripleSquareObstruction(9 * n)) := {
+  suppose Natural.IsTripleSquareObstruction(9 * n) as scaled;
+  done by admissible(Natural.triple_square_obstruction_of_nine_times(n, scaled))
+}
+
+theorem Natural.not_triple_square_obstruction_nine_power_times
+        (exponent n : ℕ) (admissible : ¬(Natural.IsTripleSquareObstruction(n)))
+        : ¬(Natural.IsTripleSquareObstruction(9 ^ exponent * n)) :=
+  by induction on exponent with IH {
+    case base: {
+      9 ^ 0 * n = n by substituting Natural.power_zero(9) as valueReads;
+      suppose Natural.IsTripleSquareObstruction(9 ^ 0 * n) as obstruction;
+      Natural.IsTripleSquareObstruction(n) by substituting valueReads;
+      done by admissible
+    }
+    case step(predecessor): {
+      9 ^ (1 + predecessor) * n
+         = (9 * 9 ^ predecessor) * n by substituting Natural.power_one_plus(9, predecessor)
+         = 9 * (9 ^ predecessor * n)
+      as valueReads;
+      ¬(Natural.IsTripleSquareObstruction(9 ^ predecessor * n)) by IH as innerAdmissible;
+      ¬(Natural.IsTripleSquareObstruction(9 * (9 ^ predecessor * n)))
+          by Natural.not_triple_square_obstruction_nine_times(
+              9 ^ predecessor * n, innerAdmissible) as scaledAdmissible;
+      suppose Natural.IsTripleSquareObstruction(9 ^ (1 + predecessor) * n) as obstruction;
+      Natural.IsTripleSquareObstruction(9 * (9 ^ predecessor * n)) by substituting valueReads;
+      done by scaledAdmissible
+    }
+  }
+
+theorem Natural.three_power_square_is_nine_power (exponent : ℕ)
+        : 3 ^ exponent * 3 ^ exponent = 9 ^ exponent :=
+  by induction on exponent with IH {
+    case base:
+      3 ^ 0 * 3 ^ 0
+         = 1 * 1 by substituting Natural.power_zero(3)
+         = 1
+         = 9 ^ 0 by Equality.symmetry(Natural.power_zero(9))
+    case step(predecessor):
+      3 ^ (1 + predecessor) * 3 ^ (1 + predecessor)
+         = (3 * 3 ^ predecessor) * (3 * 3 ^ predecessor)
+             by substituting Natural.power_one_plus(3, predecessor)
+         = 9 * (3 ^ predecessor * 3 ^ predecessor)
+         = 9 * 9 ^ predecessor by substituting IH
+         = 9 ^ (1 + predecessor) by Equality.symmetry(Natural.power_one_plus(9, predecessor))
+  }
+
+definition Matrix.TripleSquareResidualCover (coefficient : ℕ) : Proposition :=
+  ∀ (m : ℕ). m ≥ 1 →
+    ∃ (residual w : ℕ).
+      Matrix.Represents(Matrix.sumOfTwoSquaresPlusTripleSquareForm, (residual : ℤ))
+      ∧ residual + w * w * coefficient = m
+
+theorem Matrix.tripleZero_universal_of_residual_cover
+        (coefficient : ℕ) (cover : Matrix.TripleSquareResidualCover(coefficient))
+        : Matrix.IsUniversal(
+            Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(3, 0, (coefficient : ℤ))) := {
+  take m : ℕ;
+  suppose m ≥ 1 as positive;
+  choose residual : ℕ, w : ℕ such that
+      Matrix.Represents(Matrix.sumOfTwoSquaresPlusTripleSquareForm, (residual : ℤ))
+      ∧ residual + w * w * coefficient = m
+      from cover(m, positive);
+  Matrix.Represents(Matrix.sumOfTwoSquaresPlusTripleSquareForm, (residual : ℤ)) as residualRepresented;
+  residual + w * w * coefficient = m as naturalValueReads;
+  choose vector : RingVector(Integer.commutative_ring_bundle, 3) such that
+      Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusTripleSquareForm, vector) = (residual : ℤ)
+      as residualValueReads from residualRepresented;
+  let x : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo));
+  let y : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo));
+  let z : ℤ := vector(NaturalsBelow.top(2));
+  vector = (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+      by RingVector.eq_threeCoordinates(vector) as vectorReads;
+  x * x + y * y + 3 * (z * z)
+     = Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusTripleSquareForm,
+         (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+         by Equality.symmetry(Matrix.sumOfTwoSquaresPlusTripleSquareForm_coordinateTuple_value(x, y, z))
+     = Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusTripleSquareForm, vector)
+         by substituting Equality.symmetry(vectorReads)
+     = (residual : ℤ) by residualValueReads
+  as residualScalarReads;
+  (residual : ℤ) + (w : ℤ) * (w : ℤ) * (coefficient : ℤ)
+     = (residual : ℤ) + ((w * w : ℕ) : ℤ) * (coefficient : ℤ)
+         by substituting Natural.to_integer.multiply_preserves(w, w)
+     = (residual : ℤ) + ((w * w * coefficient : ℕ) : ℤ)
+         by substituting Natural.to_integer.multiply_preserves(w * w, coefficient)
+     = ((residual + w * w * coefficient : ℕ) : ℤ)
+         by Equality.symmetry(Natural.to_integer.add_preserves(residual, w * w * coefficient))
+     = (m : ℤ) by substituting naturalValueReads
+  as integerValueReads;
+  x * x + y * y + 3 * (z * z) + 2 * 0 * z * (w : ℤ)
+      + (coefficient : ℤ) * ((w : ℤ) * (w : ℤ))
+     = (residual : ℤ) + (w : ℤ) * (w : ℤ) * (coefficient : ℤ)
+         by substituting residualScalarReads
+     = (m : ℤ) by integerValueReads
+  as scalarComputation;
+  done by Matrix.represents_by_witness(
+      Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(3, 0, (coefficient : ℤ)),
+      target := m, vector := ⟨x, y, z, (w : ℤ)⟩,
+      computes := Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative_coordinateTuple_computes(
+          scalarComputation := scalarComputation))
+}
+
+theorem Matrix.tripleSquareResidualCover_selected_core_of_converse
+        (converse : Matrix.TripleSquaresConverse) (coefficient core : ℕ)
+        (coreSum : core + coefficient = 6)
+        (coreBelow : core < 9) (coreNonzero : core ≠ 0) (coreNotSix : core ≠ 6)
+        : Matrix.TripleSquareResidualCover(coefficient) := {
+  take m : ℕ;
+  suppose m ≥ 1;
+  Natural.IsTripleSquareObstruction(m) ∨ ¬(Natural.IsTripleSquareObstruction(m));
+  ¬(Natural.IsTripleSquareObstruction(m)) ∨ Natural.IsTripleSquareObstruction(m) by Or.swap;
+  done by cases {
+    case ¬(Natural.IsTripleSquareObstruction(m)) as admissible: {
+      Matrix.Represents(Matrix.sumOfTwoSquaresPlusTripleSquareForm, (m : ℤ))
+          by converse(m, admissible) as represented;
+      witness m with witness 0 with And.introduction(represented, { m + 0 * 0 * coefficient = m })
+    }
+    case Natural.IsTripleSquareObstruction(m) as obstruction: {
+      choose exponent : ℕ, b : ℕ such that m = 9 ^ exponent * (9 * b + 6)
+          from obstruction;
+      let residual : ℕ := 9 ^ exponent * (9 * b + core);
+      let w : ℕ := 3 ^ exponent;
+      ¬(Natural.IsTripleSquareObstruction(residual))
+          by Natural.nine_power_times_nonzero_non_six_core_not_triple_square_obstruction(
+              exponent, b, core, coreBelow, coreNonzero, coreNotSix)
+          as residualAdmissible;
+      Matrix.Represents(Matrix.sumOfTwoSquaresPlusTripleSquareForm, (residual : ℤ))
+          by converse(residual, residualAdmissible) as represented;
+      residual + w * w * coefficient
+         = 9 ^ exponent * (9 * b + core) + (3 ^ exponent * 3 ^ exponent) * coefficient
+         = 9 ^ exponent * (9 * b + core) + 9 ^ exponent * coefficient
+             by Equality.congruence(
+                 (candidate : ℕ) ↦ 9 ^ exponent * (9 * b + core) + candidate * coefficient,
+                 3 ^ exponent * 3 ^ exponent, 9 ^ exponent,
+                 Natural.three_power_square_is_nine_power(exponent))
+         = 9 ^ exponent * (9 * b + (core + coefficient))
+         = 9 ^ exponent * (9 * b + 6) by substituting coreSum
+         = m
+      as valueReads;
+      witness residual with witness w with And.introduction(represented, valueReads)
+    }
+  }
+}
+
+theorem Matrix.tripleR0C3_universal_of_triple_squares_converse
+        (converse : Matrix.TripleSquaresConverse)
+        : Matrix.IsUniversal(Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(3, 0, 3)) := {
+  done by Matrix.tripleZero_universal_of_residual_cover(
+      3, Matrix.tripleSquareResidualCover_selected_core_of_converse(
+        converse, coefficient := 3, core := 3, coreSum := done,
+        coreBelow := done, coreNonzero := done, coreNotSix := done))
+}
+
+theorem Matrix.tripleR0C4_universal_of_triple_squares_converse
+        (converse : Matrix.TripleSquaresConverse)
+        : Matrix.IsUniversal(Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(3, 0, 4)) := {
+  done by Matrix.tripleZero_universal_of_residual_cover(
+      4, Matrix.tripleSquareResidualCover_selected_core_of_converse(
+        converse, coefficient := 4, core := 2, coreSum := done,
+        coreBelow := done, coreNonzero := done, coreNotSix := done))
+}
+
+theorem Matrix.tripleR0C5_universal_of_triple_squares_converse
+        (converse : Matrix.TripleSquaresConverse)
+        : Matrix.IsUniversal(Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(3, 0, 5)) := {
+  done by Matrix.tripleZero_universal_of_residual_cover(
+      5, Matrix.tripleSquareResidualCover_selected_core_of_converse(
+        converse, coefficient := 5, core := 1, coreSum := done,
+        coreBelow := done, coreNonzero := done, coreNotSix := done))
+}
+
+theorem Matrix.tripleSquareResidualCover_six_of_converse
+        (converse : Matrix.TripleSquaresConverse)
+        : Matrix.TripleSquareResidualCover(6) := {
+  take m : ℕ;
+  suppose m ≥ 1;
+  Natural.IsTripleSquareObstruction(m) ∨ ¬(Natural.IsTripleSquareObstruction(m));
+  ¬(Natural.IsTripleSquareObstruction(m)) ∨ Natural.IsTripleSquareObstruction(m) by Or.swap;
+  done by cases {
+    case ¬(Natural.IsTripleSquareObstruction(m)) as admissible: {
+      Matrix.Represents(Matrix.sumOfTwoSquaresPlusTripleSquareForm, (m : ℤ))
+          by converse(m, admissible) as represented;
+      witness m with witness 0 with And.introduction(represented, { m + 0 * 0 * 6 = m })
+    }
+    case Natural.IsTripleSquareObstruction(m) as obstruction: {
+      choose exponent : ℕ, b : ℕ such that m = 9 ^ exponent * (9 * b + 6)
+          as mReads from obstruction;
+      Natural.IsTripleSquareObstruction(b) ∨ ¬(Natural.IsTripleSquareObstruction(b));
+      ¬(Natural.IsTripleSquareObstruction(b)) ∨ Natural.IsTripleSquareObstruction(b) by Or.swap;
+      done by cases {
+        case ¬(Natural.IsTripleSquareObstruction(b)) as bAdmissible: {
+          let residual : ℕ := 9 ^ (1 + exponent) * b;
+          let w : ℕ := 3 ^ exponent;
+          ¬(Natural.IsTripleSquareObstruction(residual))
+              by Natural.not_triple_square_obstruction_nine_power_times(
+                  1 + exponent, b, bAdmissible) as residualAdmissible;
+          Matrix.Represents(Matrix.sumOfTwoSquaresPlusTripleSquareForm, (residual : ℤ))
+              by converse(residual, residualAdmissible) as represented;
+          residual + w * w * 6
+             = 9 ^ (1 + exponent) * b + (3 ^ exponent * 3 ^ exponent) * 6
+             = 9 ^ (1 + exponent) * b + 9 ^ exponent * 6
+                 by Equality.congruence(
+                     (candidate : ℕ) ↦ 9 ^ (1 + exponent) * b + candidate * 6,
+                     3 ^ exponent * 3 ^ exponent, 9 ^ exponent,
+                     Natural.three_power_square_is_nine_power(exponent))
+             = (9 * 9 ^ exponent) * b + 9 ^ exponent * 6
+                 by substituting Natural.power_one_plus(9, exponent)
+             = 9 ^ exponent * (9 * b + 6)
+             = m by Equality.symmetry(mReads)
+          as valueReads;
+          witness residual with witness w with And.introduction(represented, valueReads)
+        }
+        case Natural.IsTripleSquareObstruction(b) as bObstruction: {
+          choose innerExponent : ℕ, innerB : ℕ such that
+              b = 9 ^ innerExponent * (9 * innerB + 6) as bReads
+              from bObstruction;
+          innerExponent = 0 ∨ ∃ (predecessor : ℕ). innerExponent = 1 + predecessor
+              by Natural.zero_or_one_plus;
+          done by cases {
+            case innerExponent = 0 as innerExponentZero: {
+              let residual : ℕ := 9 ^ (1 + exponent) * (9 * innerB + 4);
+              let w : ℕ := 2 * 3 ^ exponent;
+              ¬(Natural.IsTripleSquareObstruction(residual))
+                  by Natural.nine_power_times_nonzero_non_six_core_not_triple_square_obstruction(
+                      1 + exponent, innerB, 4, done, done, done)
+                  as residualAdmissible;
+              Matrix.Represents(Matrix.sumOfTwoSquaresPlusTripleSquareForm, (residual : ℤ))
+                  by converse(residual, residualAdmissible) as represented;
+              b = 9 * innerB + 6 by {
+                b = 9 ^ innerExponent * (9 * innerB + 6) by bReads
+                  = 9 ^ 0 * (9 * innerB + 6) by substituting innerExponentZero
+                  = 9 * innerB + 6 by substituting Natural.power_zero(9)
+              }
+              as bReduced;
+              residual + w * w * 6
+                 = 9 ^ (1 + exponent) * (9 * innerB + 4)
+                   + ((2 * 3 ^ exponent) * (2 * 3 ^ exponent)) * 6
+                 = (9 * 9 ^ exponent) * (9 * innerB + 4)
+                   + (4 * (3 ^ exponent * 3 ^ exponent)) * 6
+                     by substituting Natural.power_one_plus(9, exponent)
+                 = (9 * 9 ^ exponent) * (9 * innerB + 4) + (4 * 9 ^ exponent) * 6
+                     by substituting Natural.three_power_square_is_nine_power(exponent)
+                 = 9 ^ exponent * (9 * (9 * innerB + 6) + 6)
+                 = 9 ^ exponent * (9 * b + 6) by substituting Equality.symmetry(bReduced)
+                 = m by Equality.symmetry(mReads)
+              as valueReads;
+              witness residual with witness w with And.introduction(represented, valueReads)
+            }
+            case ∃ (predecessor : ℕ). innerExponent = 1 + predecessor: {
+              choose predecessor : ℕ such that innerExponent = 1 + predecessor
+                  as innerExponentReads;
+              let factor : ℕ := 9 ^ predecessor * (9 * innerB + 6);
+              1 ≤ 6
+                 ≤ 9 * innerB + 6
+                 ≤ 9 ^ predecessor * (9 * innerB + 6)
+                     by Natural.le_multiply_when_factor_at_least_one(
+                         9 * innerB + 6, 9 ^ predecessor,
+                         Natural.power_positive(9, predecessor, done))
+              as factorPositive;
+              choose offset : ℕ such that factor = 1 + offset as factorReads
+                  from Natural.subtraction_witness(1, factor, factorPositive);
+              let residual : ℕ := 9 ^ (1 + exponent) * (9 * offset + 7);
+              let w : ℕ := 2 * 3 ^ exponent;
+              ¬(Natural.IsTripleSquareObstruction(residual))
+                  by Natural.nine_power_times_nonzero_non_six_core_not_triple_square_obstruction(
+                      1 + exponent, offset, 7, done, done, done)
+                  as residualAdmissible;
+              Matrix.Represents(Matrix.sumOfTwoSquaresPlusTripleSquareForm, (residual : ℤ))
+                  by converse(residual, residualAdmissible) as represented;
+              b
+                 = 9 ^ innerExponent * (9 * innerB + 6) by bReads
+                 = 9 ^ (1 + predecessor) * (9 * innerB + 6) by substituting innerExponentReads
+                 = (9 * 9 ^ predecessor) * (9 * innerB + 6)
+                     by substituting Natural.power_one_plus(9, predecessor)
+                 = 9 * factor
+                 = 9 * (1 + offset) by substituting factorReads
+              as bReduced;
+              residual + w * w * 6
+                 = 9 ^ (1 + exponent) * (9 * offset + 7)
+                   + ((2 * 3 ^ exponent) * (2 * 3 ^ exponent)) * 6
+                 = (9 * 9 ^ exponent) * (9 * offset + 7)
+                   + (4 * (3 ^ exponent * 3 ^ exponent)) * 6
+                     by substituting Natural.power_one_plus(9, exponent)
+                 = (9 * 9 ^ exponent) * (9 * offset + 7) + (4 * 9 ^ exponent) * 6
+                     by substituting Natural.three_power_square_is_nine_power(exponent)
+                 = 9 ^ exponent * (9 * (9 * (1 + offset)) + 6)
+                 = 9 ^ exponent * (9 * b + 6) by substituting Equality.symmetry(bReduced)
+                 = m by Equality.symmetry(mReads)
+              as valueReads;
+              witness residual with witness w with And.introduction(represented, valueReads)
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+theorem Matrix.tripleR0C6_universal_of_triple_squares_converse
+        (converse : Matrix.TripleSquaresConverse)
+        : Matrix.IsUniversal(Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(3, 0, 6)) := {
+  done by Matrix.tripleZero_universal_of_residual_cover(
+      6, Matrix.tripleSquareResidualCover_six_of_converse(converse))
+}

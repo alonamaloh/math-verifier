@@ -212,7 +212,14 @@ rank-four escalator by 207 selected normal forms are.
   thereafter.  Thus all 22 selected double forms are conditionally
   universal.  A global coordinate-swap certificate then transports the
   otherwise-unselected `double.r0.c3` proof to `triple.r0.c2`, so the overall
-  total is 46 selected rank-four forms.
+  total is 46 selected rank-four forms.  The diagonal part of the triple
+  branch now uses Dirichlet's independent converse for
+  `x²+y²+3z²`, whose exceptional shape is `9^a(9b+6)`.  A reusable
+  9-adic separation lemma handles coefficients 3, 4, and 5 directly; for
+  coefficient 6, a second fourth-coordinate choice handles the case where
+  the inner quotient is itself exceptional.  All five selected diagonal
+  triple forms are therefore conditionally universal, raising the total to
+  50.
   `Algebra/rank_four_completed_cover_universality` gives fraction-free
   completed-square interfaces for all other constructors. Its scaled-square,
   weighted, and odd cover predicates account for the remaining 32, 140, and
