@@ -205,8 +205,12 @@ rank-four escalator by 207 selected normal forms are.
   diagonal extensions of `x^2+y^2+2z^2`.  Their obstruction residuals have
   one of the uniformly admissible even cores
   `2,4,6,8,10,12,14,18,20,24`.  This raises the conditional total to 43;
-  the two nonuniform diagonal coefficients `c=6,14` require a second
-  residual choice and remain the edge of this family.
+  a piecewise obstruction-resolver then handles the two nonuniform diagonal
+  coefficients `c=6,14`.  The `c=6` resolver switches to a doubled `w` after
+  the first obstruction parameter; the `c=14` resolver uses residuals
+  `0,32,64` in its three small branches and the admissible core 12
+  thereafter.  Thus all 22 selected double forms are conditionally
+  universal, and the overall total is 45.
   `Algebra/rank_four_completed_cover_universality` gives fraction-free
   completed-square interfaces for all other constructors. Its scaled-square,
   weighted, and odd cover predicates account for the remaining 32, 140, and

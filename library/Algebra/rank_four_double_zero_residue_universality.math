@@ -263,6 +263,316 @@ theorem Matrix.doubleZero_universal_of_selected_uniform_core
   done by Matrix.doubleZero_universal_of_threeSquareCover(corner, cover)
 }
 
+definition Matrix.DoubledTargetObstructionResolver (coefficient : ℕ) : Proposition :=
+  ∀ (predecessor b : ℕ).
+    ∃ (residual w : ℕ).
+      Matrix.Represents(Matrix.sumOfThreeSquaresForm, (residual : ℤ))
+      ∧ residual + w * w * coefficient = 4 ^ (1 + predecessor) * (8 * b + 7)
+
+theorem Matrix.threeSquareCoverOfDoubledTarget_of_resolver
+        (converse : Matrix.ThreeSquaresConverse) (coefficient : ℕ)
+        (resolver : Matrix.DoubledTargetObstructionResolver(coefficient))
+        : Matrix.DoubleUnitThreeSquareCover(coefficient) := {
+  take m : ℕ;
+  suppose m ≥ 1;
+  Natural.IsThreeSquareObstruction(2 * m) ∨ ¬(Natural.IsThreeSquareObstruction(2 * m));
+  ¬(Natural.IsThreeSquareObstruction(2 * m)) ∨ Natural.IsThreeSquareObstruction(2 * m) by Or.swap;
+  done by cases {
+    case ¬(Natural.IsThreeSquareObstruction(2 * m)) as admissible: {
+      Matrix.Represents(Matrix.sumOfThreeSquaresForm, ((2 * m : ℕ) : ℤ))
+          by converse(2 * m, admissible) as represented;
+      witness 2 * m with witness 0 with And.introduction(
+          represented, { 2 * m + 0 * 0 * coefficient = 2 * m })
+    }
+    case Natural.IsThreeSquareObstruction(2 * m) as obstruction: {
+      choose exponent : ℕ, b : ℕ such that 2 * m = 4 ^ exponent * (8 * b + 7)
+          from obstruction;
+      2 * m = 4 ^ exponent * (8 * b + 7) as obstructionReads;
+      exponent = 0 ∨ ∃ (predecessor : ℕ). exponent = 1 + predecessor by Natural.zero_or_one_plus;
+      done by cases {
+        case exponent = 0 as exponentZero: {
+          2 * m + 0
+             = 4 ^ exponent * (8 * b + 7) by obstructionReads
+             = 4 ^ 0 * (8 * b + 7) by substituting exponentZero
+             = 8 * b + 7 by substituting Natural.power_zero(4)
+             = 2 * (4 * b + 3) + 1
+          as distinctResiduesEqual;
+          False by Natural.distinct_affine_residues_not_equal(
+              2, 0, 1, m, 4 * b + 3, done, done, done, distinctResiduesEqual);
+          done
+        }
+        case ∃ (predecessor : ℕ). exponent = 1 + predecessor: {
+          choose predecessor : ℕ such that exponent = 1 + predecessor as exponentReads;
+          choose residual : ℕ, w : ℕ such that
+              Matrix.Represents(Matrix.sumOfThreeSquaresForm, (residual : ℤ))
+              ∧ residual + w * w * coefficient = 4 ^ (1 + predecessor) * (8 * b + 7)
+              from resolver(predecessor, b);
+          Matrix.Represents(Matrix.sumOfThreeSquaresForm, (residual : ℤ)) as represented;
+          residual + w * w * coefficient = 4 ^ (1 + predecessor) * (8 * b + 7) as resolverReads;
+          residual + w * w * coefficient
+             = 4 ^ (1 + predecessor) * (8 * b + 7) by resolverReads
+             = 4 ^ exponent * (8 * b + 7) by substituting Equality.symmetry(exponentReads)
+             = 2 * m by Equality.symmetry(obstructionReads)
+          as coverReads;
+          witness residual with witness w with And.introduction(represented, coverReads)
+        }
+      }
+    }
+  }
+}
+
+theorem Natural.sixteen_not_three_square_obstruction
+        : ¬(Natural.IsThreeSquareObstruction(16)) := {
+  ¬(Natural.IsThreeSquareObstruction(1))
+      by Natural.eight_times_plus_one_not_obstruction(0) as oneAdmissible;
+  ¬(Natural.IsThreeSquareObstruction(4))
+      by Natural.not_obstruction_four_times(1, oneAdmissible) as fourAdmissible;
+  done by Natural.not_obstruction_four_times(4, fourAdmissible)
+}
+
+theorem Matrix.doubledTargetObstructionResolver_twelve_of_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.DoubledTargetObstructionResolver(12) := {
+  take predecessor : ℕ;
+  take b : ℕ;
+  b = 0 ∨ ∃ (earlier : ℕ). b = 1 + earlier by Natural.zero_or_one_plus;
+  done by cases {
+    case b = 0 as bZero: {
+      let residual : ℕ := 4 ^ predecessor * 16;
+      let w : ℕ := 2 ^ predecessor;
+      ¬(Natural.IsThreeSquareObstruction(residual))
+          by Natural.not_obstruction_four_power_times(
+              predecessor, 16, Natural.sixteen_not_three_square_obstruction)
+          as admissible;
+      Matrix.Represents(Matrix.sumOfThreeSquaresForm, (residual : ℤ))
+          by converse(residual, admissible) as represented;
+      residual + w * w * 12
+         = 4 ^ predecessor * 16 + (2 ^ predecessor * 2 ^ predecessor) * 12
+         = 4 ^ predecessor * 16 + 4 ^ predecessor * 12
+             by Equality.congruence(
+                 (candidate : ℕ) ↦ 4 ^ predecessor * 16 + candidate * 12,
+                 2 ^ predecessor * 2 ^ predecessor, 4 ^ predecessor,
+                 Natural.two_power_square_is_four_power(predecessor))
+         = 4 ^ predecessor * 28
+         = (4 * 4 ^ predecessor) * 7
+         = 4 ^ (1 + predecessor) * 7
+             by substituting Equality.symmetry(Natural.power_one_plus(4, predecessor))
+         = 4 ^ (1 + predecessor) * (8 * b + 7) by substituting Equality.symmetry(bZero)
+      as coverReads;
+      witness residual with witness w with And.introduction(represented, coverReads)
+    }
+    case ∃ (earlier : ℕ). b = 1 + earlier: {
+      choose earlier : ℕ such that b = 1 + earlier as bReads;
+      let residual : ℕ := 4 ^ predecessor * (32 * earlier + 12);
+      let w : ℕ := 2 ^ (1 + predecessor);
+      12 = 2 ∨ 12 = 4 ∨ 12 = 6 ∨ 12 = 8 ∨ 12 = 10
+        ∨ 12 = 12 ∨ 12 = 14 ∨ 12 = 18 ∨ 12 = 20 ∨ 12 = 24
+          by Or.introduceRight(Or.introduceRight(Or.introduceRight(
+            Or.introduceRight(Or.introduceRight(Or.introduceLeft(done))))))
+          as selectedCore;
+      ¬(Natural.IsThreeSquareObstruction(residual))
+          by Natural.four_power_times_thirty_two_plus_selected_even_core_not_obstruction(
+              predecessor, earlier, 12, selectedCore)
+          as admissible;
+      Matrix.Represents(Matrix.sumOfThreeSquaresForm, (residual : ℤ))
+          by converse(residual, admissible) as represented;
+      residual + w * w * 12
+         = 4 ^ predecessor * (32 * earlier + 12)
+           + (2 ^ (1 + predecessor) * 2 ^ (1 + predecessor)) * 12
+         = 4 ^ predecessor * (32 * earlier + 12) + 4 ^ (1 + predecessor) * 12
+             by Equality.congruence(
+                 (candidate : ℕ) ↦ 4 ^ predecessor * (32 * earlier + 12) + candidate * 12,
+                 2 ^ (1 + predecessor) * 2 ^ (1 + predecessor), 4 ^ (1 + predecessor),
+                 Natural.two_power_square_is_four_power(1 + predecessor))
+         = 4 ^ predecessor * (32 * earlier + 12) + (4 * 4 ^ predecessor) * 12
+             by substituting Natural.power_one_plus(4, predecessor)
+         = 4 ^ predecessor * (32 * earlier + 60)
+         = (4 * 4 ^ predecessor) * (8 * (1 + earlier) + 7)
+         = 4 ^ (1 + predecessor) * (8 * (1 + earlier) + 7)
+             by substituting Equality.symmetry(Natural.power_one_plus(4, predecessor))
+         = 4 ^ (1 + predecessor) * (8 * b + 7) by substituting Equality.symmetry(bReads)
+      as coverReads;
+      witness residual with witness w with And.introduction(represented, coverReads)
+    }
+  }
+}
+
+theorem Matrix.doubleS0C6_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(2, 0, 6)) := {
+  Matrix.DoubleUnitThreeSquareCover(12)
+      by Matrix.threeSquareCoverOfDoubledTarget_of_resolver(
+          converse, 12, Matrix.doubledTargetObstructionResolver_twelve_of_converse(converse))
+      as cover;
+  done by Matrix.doubleZero_universal_of_threeSquareCover(6, cover)
+}
+
+theorem Natural.thirty_two_not_three_square_obstruction
+        : ¬(Natural.IsThreeSquareObstruction(32)) := {
+  ¬(Natural.IsThreeSquareObstruction(2))
+      by Natural.four_times_plus_two_not_obstruction(0) as twoAdmissible;
+  ¬(Natural.IsThreeSquareObstruction(8))
+      by Natural.not_obstruction_four_times(2, twoAdmissible) as eightAdmissible;
+  done by Natural.not_obstruction_four_times(8, eightAdmissible)
+}
+
+theorem Natural.sixty_four_not_three_square_obstruction
+        : ¬(Natural.IsThreeSquareObstruction(64)) := {
+  done by Natural.not_obstruction_four_times(16, Natural.sixteen_not_three_square_obstruction)
+}
+
+theorem Matrix.sumOfThreeSquaresForm_represents_zero
+        : Matrix.Represents(Matrix.sumOfThreeSquaresForm, 0) := {
+  Matrix.quadraticForm(Matrix.sumOfThreeSquaresForm,
+      (⟨0, 0, 0⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+     = (0 : ℤ) * 0 + 0 * 0 + 0 * 0 by Matrix.sumOfThreeSquaresForm_coordinateTuple_value(0, 0, 0)
+     = 0
+  as computes;
+  done by Matrix.represents_by_witness(
+      Matrix.sumOfThreeSquaresForm, target := 0, vector := ⟨0, 0, 0⟩, computes := computes)
+}
+
+theorem Matrix.doubledTargetObstructionResolver_twenty_eight_of_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.DoubledTargetObstructionResolver(28) := {
+  take predecessor : ℕ;
+  take b : ℕ;
+  b = 0 ∨ ∃ (first : ℕ). b = 1 + first by Natural.zero_or_one_plus;
+  done by cases {
+    case b = 0 as bZero: {
+      let w : ℕ := 2 ^ predecessor;
+      0 + w * w * 28
+         = (2 ^ predecessor * 2 ^ predecessor) * 28
+         = 4 ^ predecessor * 28
+             by Equality.congruence(
+                 (candidate : ℕ) ↦ candidate * 28,
+                 2 ^ predecessor * 2 ^ predecessor, 4 ^ predecessor,
+                 Natural.two_power_square_is_four_power(predecessor))
+         = (4 * 4 ^ predecessor) * 7
+         = 4 ^ (1 + predecessor) * 7
+             by substituting Equality.symmetry(Natural.power_one_plus(4, predecessor))
+         = 4 ^ (1 + predecessor) * (8 * b + 7) by substituting Equality.symmetry(bZero)
+      as coverReads;
+      witness 0 with witness w with And.introduction(Matrix.sumOfThreeSquaresForm_represents_zero, coverReads)
+    }
+    case ∃ (first : ℕ). b = 1 + first: {
+      choose first : ℕ such that b = 1 + first as bReads;
+      first = 0 ∨ ∃ (second : ℕ). first = 1 + second by Natural.zero_or_one_plus;
+      done by cases {
+        case first = 0 as firstZero: {
+          let residual : ℕ := 4 ^ predecessor * 32;
+          let w : ℕ := 2 ^ predecessor;
+          ¬(Natural.IsThreeSquareObstruction(residual))
+              by Natural.not_obstruction_four_power_times(
+                  predecessor, 32, Natural.thirty_two_not_three_square_obstruction)
+              as admissible;
+          Matrix.Represents(Matrix.sumOfThreeSquaresForm, (residual : ℤ))
+              by converse(residual, admissible) as represented;
+          b = 1 by { b = 1 + first by bReads = 1 + 0 by substituting firstZero = 1 } as bOne;
+          residual + w * w * 28
+             = 4 ^ predecessor * 32 + (2 ^ predecessor * 2 ^ predecessor) * 28
+             = 4 ^ predecessor * 32 + 4 ^ predecessor * 28
+                 by Equality.congruence(
+                     (candidate : ℕ) ↦ 4 ^ predecessor * 32 + candidate * 28,
+                     2 ^ predecessor * 2 ^ predecessor, 4 ^ predecessor,
+                     Natural.two_power_square_is_four_power(predecessor))
+             = (4 * 4 ^ predecessor) * 15
+             = 4 ^ (1 + predecessor) * 15
+                 by substituting Equality.symmetry(Natural.power_one_plus(4, predecessor))
+             = 4 ^ (1 + predecessor) * (8 * b + 7) by substituting Equality.symmetry(bOne)
+          as coverReads;
+          witness residual with witness w with And.introduction(represented, coverReads)
+        }
+        case ∃ (second : ℕ). first = 1 + second: {
+          choose second : ℕ such that first = 1 + second as firstReads;
+          second = 0 ∨ ∃ (later : ℕ). second = 1 + later by Natural.zero_or_one_plus;
+          done by cases {
+            case second = 0 as secondZero: {
+              let residual : ℕ := 4 ^ predecessor * 64;
+              let w : ℕ := 2 ^ predecessor;
+              ¬(Natural.IsThreeSquareObstruction(residual))
+                  by Natural.not_obstruction_four_power_times(
+                      predecessor, 64, Natural.sixty_four_not_three_square_obstruction)
+                  as admissible;
+              Matrix.Represents(Matrix.sumOfThreeSquaresForm, (residual : ℤ))
+                  by converse(residual, admissible) as represented;
+              b = 2 by {
+                b = 1 + first by bReads
+                  = 1 + (1 + second) by substituting firstReads
+                  = 1 + (1 + 0) by substituting secondZero
+                  = 2
+              }
+              as bTwo;
+              residual + w * w * 28
+                 = 4 ^ predecessor * 64 + (2 ^ predecessor * 2 ^ predecessor) * 28
+                 = 4 ^ predecessor * 64 + 4 ^ predecessor * 28
+                     by Equality.congruence(
+                         (candidate : ℕ) ↦ 4 ^ predecessor * 64 + candidate * 28,
+                         2 ^ predecessor * 2 ^ predecessor, 4 ^ predecessor,
+                         Natural.two_power_square_is_four_power(predecessor))
+                 = (4 * 4 ^ predecessor) * 23
+                 = 4 ^ (1 + predecessor) * 23
+                     by substituting Equality.symmetry(Natural.power_one_plus(4, predecessor))
+                 = 4 ^ (1 + predecessor) * (8 * b + 7) by substituting Equality.symmetry(bTwo)
+              as coverReads;
+              witness residual with witness w with And.introduction(represented, coverReads)
+            }
+            case ∃ (later : ℕ). second = 1 + later: {
+              choose later : ℕ such that second = 1 + later as secondReads;
+              let residual : ℕ := 4 ^ predecessor * (32 * later + 12);
+              let w : ℕ := 2 ^ (1 + predecessor);
+              12 = 2 ∨ 12 = 4 ∨ 12 = 6 ∨ 12 = 8 ∨ 12 = 10
+                ∨ 12 = 12 ∨ 12 = 14 ∨ 12 = 18 ∨ 12 = 20 ∨ 12 = 24
+                  by Or.introduceRight(Or.introduceRight(Or.introduceRight(
+                    Or.introduceRight(Or.introduceRight(Or.introduceLeft(done))))))
+                  as selectedCore;
+              ¬(Natural.IsThreeSquareObstruction(residual))
+                  by Natural.four_power_times_thirty_two_plus_selected_even_core_not_obstruction(
+                      predecessor, later, 12, selectedCore)
+                  as admissible;
+              Matrix.Represents(Matrix.sumOfThreeSquaresForm, (residual : ℤ))
+                  by converse(residual, admissible) as represented;
+              b = 3 + later by {
+                b = 1 + first by bReads
+                  = 1 + (1 + second) by substituting firstReads
+                  = 1 + (1 + (1 + later)) by substituting secondReads
+                  = 3 + later
+              }
+              as bLater;
+              residual + w * w * 28
+                 = 4 ^ predecessor * (32 * later + 12)
+                   + (2 ^ (1 + predecessor) * 2 ^ (1 + predecessor)) * 28
+                 = 4 ^ predecessor * (32 * later + 12) + 4 ^ (1 + predecessor) * 28
+                     by Equality.congruence(
+                         (candidate : ℕ) ↦ 4 ^ predecessor * (32 * later + 12) + candidate * 28,
+                         2 ^ (1 + predecessor) * 2 ^ (1 + predecessor), 4 ^ (1 + predecessor),
+                         Natural.two_power_square_is_four_power(1 + predecessor))
+                 = 4 ^ predecessor * (32 * later + 12) + (4 * 4 ^ predecessor) * 28
+                     by substituting Natural.power_one_plus(4, predecessor)
+                 = (4 * 4 ^ predecessor) * (8 * (3 + later) + 7)
+                 = 4 ^ (1 + predecessor) * (8 * (3 + later) + 7)
+                     by substituting Equality.symmetry(Natural.power_one_plus(4, predecessor))
+                 = 4 ^ (1 + predecessor) * (8 * b + 7) by substituting Equality.symmetry(bLater)
+              as coverReads;
+              witness residual with witness w with And.introduction(represented, coverReads)
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+theorem Matrix.doubleS0C14_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(2, 0, 14)) := {
+  Matrix.DoubleUnitThreeSquareCover(28)
+      by Matrix.threeSquareCoverOfDoubledTarget_of_resolver(
+          converse, 28, Matrix.doubledTargetObstructionResolver_twenty_eight_of_converse(converse))
+      as cover;
+  done by Matrix.doubleZero_universal_of_threeSquareCover(14, cover)
+}
+
 theorem Matrix.doubleS0C2_universal_of_three_squares_converse
         (converse : Matrix.ThreeSquaresConverse)
         : Matrix.IsUniversal(Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(2, 0, 2)) := {
