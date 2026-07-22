@@ -27,6 +27,29 @@ theorem Integer.three_squares_converse_of_rational
   done by Rational.three_square_representation_is_integral((n : ℤ), rationalRepresentation)
 }
 
+theorem Integer.parity_cases (a : ℤ)
+        : (∃ (q : ℤ). a = 2 * q) ∨ (∃ (q : ℤ). a = 2 * q + 1) := {
+  choose q : ℤ, r : ℕ such that a = 2 * q + (r : ℤ) ∧ r < 2
+      from Integer.divide_by_positive(a, 2, done);
+  a = 2 * q + (r : ℤ) as aReads;
+  r < 2 as rBelow;
+  r = 0 ∨ r = 1 by Natural.below_two(r, rBelow);
+  done by cases {
+    case r = 0 as rZero: {
+      ∃ (half : ℤ). a = 2 * half by {
+        witness q with a = 2 * q + (r : ℤ) by aReads = 2 * q by substituting rZero
+      } as even;
+      done by Or.introduceLeft(even)
+    }
+    case r = 1 as rOne: {
+      ∃ (half : ℤ). a = 2 * half + 1 by {
+        witness q with a = 2 * q + (r : ℤ) by aReads = 2 * q + 1 by substituting rOne
+      } as odd;
+      done by Or.introduceRight(odd)
+    }
+  }
+}
+
 theorem Integer.same_remainder_mod_two_implies_same_parity
         (a b quotientA quotientB : ℤ) (remainderA remainderB : ℕ)
         (aReads : a = 2 * quotientA + (remainderA : ℤ))

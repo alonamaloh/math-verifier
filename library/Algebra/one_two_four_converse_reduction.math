@@ -1,0 +1,245 @@
+-- Algebra/one_two_four_converse_reduction.math
+--
+-- The Ramanujan--Dickson converse for x²+2y²+4z² needs no independent
+-- genus argument.  Doubling the target converts its exceptional set into
+-- Legendre's three-square exceptional set.  A three-square representation
+-- of 2n first descends to x²+y²+2z²=n; the parity transform below then
+-- makes one coefficient-one coordinate even and obtains x²+2y²+4z²=n.
+
+module Algebra.one_two_four_converse_reduction
+
+import Algebra.rank_four_weighted_d4_foundation
+import Algebra.three_squares_matrix_bridge
+
+theorem Integer.three_squares_converse_of_matrix
+        (converse : Matrix.ThreeSquaresConverse)
+        : Integer.ThreeSquaresConverse := {
+  take n : ℕ;
+  suppose ¬(Natural.IsThreeSquareObstruction(n)) as admissible;
+  Matrix.Represents(Matrix.sumOfThreeSquaresForm, (n : ℤ))
+      by converse(n, admissible) as represented;
+  done by Integer.three_square_representation_of_matrix_representation((n : ℤ), represented)
+}
+
+theorem Natural.one_three_six_four_obstruction_of_double_three_square_obstruction
+        (n : ℕ) (obstruction : Natural.IsThreeSquareObstruction(2 * n))
+        : Natural.IsOneThreeSixFourObstruction(n) := {
+  choose exponent : ℕ, b : ℕ such that 2 * n = 4 ^ exponent * (8 * b + 7)
+      as doubledReads from obstruction;
+  exponent = 0 ∨ ∃ (predecessor : ℕ). exponent = 1 + predecessor by Natural.zero_or_one_plus;
+  done by cases {
+    case exponent = 0 as exponentZero: {
+      2 * n + 0
+         = 4 ^ exponent * (8 * b + 7) by doubledReads
+         = 4 ^ 0 * (8 * b + 7) by substituting exponentZero
+         = 8 * b + 7 by substituting Natural.power_zero(4)
+         = 2 * (4 * b + 3) + 1 by ring
+      as impossible;
+      False by Natural.distinct_affine_residues_not_equal(
+          2, 0, 1, n, 4 * b + 3, done, done, done, impossible);
+      done
+    }
+    case ∃ (predecessor : ℕ). exponent = 1 + predecessor: {
+      choose predecessor : ℕ such that exponent = 1 + predecessor as exponentReads;
+      2 * n
+         = 4 ^ exponent * (8 * b + 7) by doubledReads
+         = 4 ^ (1 + predecessor) * (8 * b + 7) by substituting exponentReads
+         = (4 * 4 ^ predecessor) * (8 * b + 7)
+             by substituting Natural.power_one_plus(4, predecessor)
+         = 2 * (4 ^ predecessor * (16 * b + 14)) by ring
+      as cancellable;
+      n = 4 ^ predecessor * (16 * b + 14)
+          by Natural.multiply_cancel_left(
+              2, n, 4 ^ predecessor * (16 * b + 14), done, cancellable)
+          as nReads;
+      witness predecessor with witness b with nReads
+    }
+  }
+}
+
+theorem Natural.double_not_three_square_obstruction_of_not_one_three_six_four_obstruction
+        (n : ℕ) (admissible : ¬(Natural.IsOneThreeSixFourObstruction(n)))
+        : ¬(Natural.IsThreeSquareObstruction(2 * n)) := {
+  suppose Natural.IsThreeSquareObstruction(2 * n) as obstruction;
+  done by admissible(
+      Natural.one_three_six_four_obstruction_of_double_three_square_obstruction(n, obstruction))
+}
+
+theorem Integer.square_square_double_to_square_double_four_of_first_even
+        (first second doubled half target : ℤ)
+        (firstReads : first = 2 * half)
+        (valueReads : first * first + second * second + 2 * (doubled * doubled) = target)
+        : ∃ (x y z : ℤ). x * x + 2 * (y * y) + 4 * (z * z) = target := {
+  witness second with witness doubled with witness half with
+    second * second + 2 * (doubled * doubled) + 4 * (half * half)
+       = (2 * half) * (2 * half) + second * second + 2 * (doubled * doubled) by ring
+       = first * first + second * second + 2 * (doubled * doubled)
+           by substituting Equality.symmetry(firstReads)
+       = target by valueReads
+}
+
+theorem Integer.square_square_double_representation_to_square_double_four
+        (target : ℤ)
+        (represented : ∃ (a b c : ℤ). a * a + b * b + 2 * (c * c) = target)
+        : ∃ (x y z : ℤ). x * x + 2 * (y * y) + 4 * (z * z) = target := {
+  choose a : ℤ, b : ℤ, c : ℤ such that a * a + b * b + 2 * (c * c) = target
+      as valueReads from represented;
+  (∃ (p : ℤ). a = 2 * p) ∨ (∃ (p : ℤ). a = 2 * p + 1) by Integer.parity_cases(a);
+  done by cases {
+    case ∃ (p : ℤ). a = 2 * p: {
+      choose p : ℤ such that a = 2 * p as aReads;
+      done by Integer.square_square_double_to_square_double_four_of_first_even(
+          a, b, c, p, target, aReads, valueReads)
+    }
+    case ∃ (p : ℤ). a = 2 * p + 1: {
+      choose p : ℤ such that a = 2 * p + 1 as aReads;
+      (∃ (q : ℤ). b = 2 * q) ∨ (∃ (q : ℤ). b = 2 * q + 1) by Integer.parity_cases(b);
+      done by cases {
+        case ∃ (q : ℤ). b = 2 * q: {
+          choose q : ℤ such that b = 2 * q as bReads;
+          b * b + a * a + 2 * (c * c) = target by {
+            b * b + a * a + 2 * (c * c)
+               = a * a + b * b + 2 * (c * c) by ring
+               = target by valueReads;
+            done
+          } as reordered;
+          done by Integer.square_square_double_to_square_double_four_of_first_even(
+              b, a, c, q, target, bReads, reordered)
+        }
+        case ∃ (q : ℤ). b = 2 * q + 1: {
+          choose q : ℤ such that b = 2 * q + 1 as bReads;
+          (∃ (r : ℤ). p + q + 1 = 2 * r) ∨ (∃ (r : ℤ). p + q + 1 = 2 * r + 1)
+              by Integer.parity_cases(p + q + 1);
+          (∃ (s : ℤ). c = 2 * s) ∨ (∃ (s : ℤ). c = 2 * s + 1) by Integer.parity_cases(c);
+          done by cases {
+            case ∃ (r : ℤ). p + q + 1 = 2 * r: {
+              choose r : ℤ such that p + q + 1 = 2 * r as sumReads;
+              done by cases {
+                case ∃ (s : ℤ). c = 2 * s: {
+                  choose s : ℤ such that c = 2 * s as cReads;
+                  p + q + 1 + c
+                     = 2 * r + c by substituting sumReads
+                     = 2 * r + 2 * s by substituting cReads
+                     = 2 * (r + s) by ring
+                  as firstEven;
+                  (p + q + 1 + c) * (p + q + 1 + c)
+                    + (p + q + 1 - c) * (p + q + 1 - c) + 2 * ((p - q) * (p - q))
+                     = (2 * p + 1) * (2 * p + 1) + (2 * q + 1) * (2 * q + 1)
+                       + 2 * (c * c) by ring
+                     = a * a + (2 * q + 1) * (2 * q + 1) + 2 * (c * c)
+                         by substituting Equality.symmetry(aReads)
+                     = a * a + b * b + 2 * (c * c) by substituting Equality.symmetry(bReads)
+                     = target by valueReads
+                  as transformed;
+                  done by Integer.square_square_double_to_square_double_four_of_first_even(
+                      p + q + 1 + c, p + q + 1 - c, p - q, r + s, target, firstEven, transformed)
+                }
+                case ∃ (s : ℤ). c = 2 * s + 1: {
+                  choose s : ℤ such that c = 2 * s + 1 as cReads;
+                  p - q
+                     = 2 * p - (p + q + 1) + 1 by ring
+                     = 2 * p - 2 * r + 1 by substituting sumReads
+                     = 2 * (p - r) + 1 by ring
+                  as differenceReads;
+                  p - q + c
+                     = (2 * (p - r) + 1) + c by substituting differenceReads
+                     = (2 * (p - r) + 1) + (2 * s + 1) by substituting cReads
+                     = 2 * (p - r + s + 1) by ring
+                  as firstEven;
+                  (p - q + c) * (p - q + c) + (p - q - c) * (p - q - c)
+                    + 2 * ((p + q + 1) * (p + q + 1))
+                     = (2 * p + 1) * (2 * p + 1) + (2 * q + 1) * (2 * q + 1)
+                       + 2 * (c * c) by ring
+                     = a * a + (2 * q + 1) * (2 * q + 1) + 2 * (c * c)
+                         by substituting Equality.symmetry(aReads)
+                     = a * a + b * b + 2 * (c * c) by substituting Equality.symmetry(bReads)
+                     = target by valueReads
+                  as transformed;
+                  done by Integer.square_square_double_to_square_double_four_of_first_even(
+                      p - q + c, p - q - c, p + q + 1, p - r + s + 1, target, firstEven, transformed)
+                }
+              }
+            }
+            case ∃ (r : ℤ). p + q + 1 = 2 * r + 1: {
+              choose r : ℤ such that p + q + 1 = 2 * r + 1 as sumReads;
+              done by cases {
+                case ∃ (s : ℤ). c = 2 * s: {
+                  choose s : ℤ such that c = 2 * s as cReads;
+                  p - q
+                     = 2 * p - (p + q + 1) + 1 by ring
+                     = 2 * p - (2 * r + 1) + 1 by substituting sumReads
+                     = 2 * (p - r) by ring
+                  as differenceReads;
+                  p - q + c
+                     = 2 * (p - r) + c by substituting differenceReads
+                     = 2 * (p - r) + 2 * s by substituting cReads
+                     = 2 * (p - r + s) by ring
+                  as firstEven;
+                  (p - q + c) * (p - q + c) + (p - q - c) * (p - q - c)
+                    + 2 * ((p + q + 1) * (p + q + 1))
+                     = (2 * p + 1) * (2 * p + 1) + (2 * q + 1) * (2 * q + 1)
+                       + 2 * (c * c) by ring
+                     = a * a + (2 * q + 1) * (2 * q + 1) + 2 * (c * c)
+                         by substituting Equality.symmetry(aReads)
+                     = a * a + b * b + 2 * (c * c) by substituting Equality.symmetry(bReads)
+                     = target by valueReads
+                  as transformed;
+                  done by Integer.square_square_double_to_square_double_four_of_first_even(
+                      p - q + c, p - q - c, p + q + 1, p - r + s, target, firstEven, transformed)
+                }
+                case ∃ (s : ℤ). c = 2 * s + 1: {
+                  choose s : ℤ such that c = 2 * s + 1 as cReads;
+                  p + q + 1 + c
+                     = (2 * r + 1) + c by substituting sumReads
+                     = (2 * r + 1) + (2 * s + 1) by substituting cReads
+                     = 2 * (r + s + 1) by ring
+                  as firstEven;
+                  (p + q + 1 + c) * (p + q + 1 + c)
+                    + (p + q + 1 - c) * (p + q + 1 - c) + 2 * ((p - q) * (p - q))
+                     = (2 * p + 1) * (2 * p + 1) + (2 * q + 1) * (2 * q + 1)
+                       + 2 * (c * c) by ring
+                     = a * a + (2 * q + 1) * (2 * q + 1) + 2 * (c * c)
+                         by substituting Equality.symmetry(aReads)
+                     = a * a + b * b + 2 * (c * c) by substituting Equality.symmetry(bReads)
+                     = target by valueReads
+                  as transformed;
+                  done by Integer.square_square_double_to_square_double_four_of_first_even(
+                      p + q + 1 + c, p + q + 1 - c, p - q, r + s + 1, target, firstEven, transformed)
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+theorem Matrix.one_two_four_converse_of_three_squares
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.OneTwoFourConverse := {
+  take n : ℕ;
+  suppose ¬(Natural.IsOneThreeSixFourObstruction(n)) as admissible;
+  ¬(Natural.IsThreeSquareObstruction(2 * n))
+      by Natural.double_not_three_square_obstruction_of_not_one_three_six_four_obstruction(n, admissible)
+      as doubledAdmissible;
+  Integer.ThreeSquaresConverse by Integer.three_squares_converse_of_matrix(converse) as integerConverse;
+  Integer.ThreeSquareRepresentation(((2 * n : ℕ) : ℤ)) by integerConverse(2 * n, doubledAdmissible);
+  ((2 * n : ℕ) : ℤ) = 2 * (n : ℤ) by Natural.to_integer.multiply_preserves as doubleCast;
+  Integer.ThreeSquareRepresentation(2 * (n : ℤ))
+      by substituting Equality.symmetry(doubleCast) as representedDouble;
+  (∃ (a b c : ℤ). a * a + b * b + 2 * (c * c) = (n : ℤ))
+      by Integer.three_square_representation_of_double_to_square_square_double((n : ℤ), representedDouble)
+      as squareSquareDouble;
+  choose x : ℤ, y : ℤ, z : ℤ such that x * x + 2 * (y * y) + 4 * (z * z) = (n : ℤ)
+      as scalarComputation from Integer.square_square_double_representation_to_square_double_four(
+          (n : ℤ), squareSquareDouble);
+  done by Matrix.represents_by_witness(
+      Matrix.squarePlusDoublePlusScaledSquareForm(4), target := (n : ℤ), vector := ⟨x, y, z⟩,
+      computes := {
+        Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(4), ⟨x, y, z⟩)
+           = x * x + 2 * (y * y) + 4 * (z * z)
+               by Matrix.squarePlusDoublePlusScaledSquareForm_coordinateTuple_value
+           = (n : ℤ) by scalarComputation
+      })
+}

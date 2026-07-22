@@ -302,6 +302,15 @@ raises the selected conditional total to 110.
   respectively.  `Algebra/rank_four_weighted_d4_covers` aggregates all 57
   selected weighted-`d=4` universality theorems, raising the selected
   conditional total to 147.
+  The converse pilot in `Algebra/one_two_four_converse_reduction` removes the
+  apparent independent input behind this entire family.  If `n` avoids
+  `4^a(16b+14)`, then `2n` avoids Legendre's `4^a(8b+7)` obstruction.  A
+  three-square representation of `2n` descends to
+  `a²+b²+2c²=n`, and a four-case parity transform rewrites that witness as
+  `x²+2y²+4z²=n`.  Therefore `Matrix.one_two_four_converse_of_three_squares`
+  derives the Ramanujan--Dickson converse from `Matrix.ThreeSquaresConverse`;
+  none of the 57 weighted-`d=4` forms requires a separate genus or
+  regularity theorem.
   `Algebra/rank_four_completed_cover_universality` gives fraction-free
   completed-square interfaces for all other constructors. Its scaled-square,
   weighted, and odd cover predicates account for the 32, 140, and 28
