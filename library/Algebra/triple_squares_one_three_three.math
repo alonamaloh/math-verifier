@@ -1,0 +1,503 @@
+-- Algebra/triple_squares_one_three_three.math
+--
+-- Relate x²+3y²+3z² to x²+y²+3z².  The former represents n
+-- exactly when the latter represents 3n: modulo three, the two unit-square
+-- coordinates in a representation of 3n must both be divisible by three;
+-- a final sign choice preserves the square while matching any residue mod 3.
+
+module Algebra.triple_squares_one_three_three
+
+import Algebra.rank_four_triple_zero_residue_universality
+
+definition Natural.IsOneThreeThreeObstruction (n : ℕ) : Proposition :=
+  ∃ (exponent b : ℕ). n = 9 ^ exponent * (3 * b + 2)
+
+definition Integer.OneThreeThreeRepresentation (n : ℤ) : Proposition :=
+  ∃ (x y z : ℤ). x * x + 3 * (y * y) + 3 * (z * z) = n
+
+theorem IntegerMod.zero_not_one_mod_three
+        : ¬(IntegerMod.zero(3) = IntegerMod.one(3)) :=
+  by IntegerMod.residue_distinct_below_modulus(3, 0, 1, done, done, done)
+
+theorem IntegerMod.square_mod_three (x : IntegerMod(3))
+        : x * x = IntegerMod.zero(3) ∨ x * x = IntegerMod.one(3) := {
+  choose r such that r < 3 ∧ x = IntegerMod.make(3, (r : ℤ))
+      from IntegerMod.exists_natural_representative(3, done, x);
+  r < 3 by And.left(r < 3, x = IntegerMod.make(3, (r : ℤ)));
+  x = IntegerMod.make(3, (r : ℤ))
+      by And.right(r < 3, x = IntegerMod.make(3, (r : ℤ))) as xReads;
+  IntegerMod.make(3, (0 : ℤ)) * IntegerMod.make(3, (0 : ℤ)) = IntegerMod.zero(3)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := 0) as squareZero;
+  IntegerMod.make(3, (1 : ℤ)) * IntegerMod.make(3, (1 : ℤ)) = IntegerMod.one(3)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := 0) as squareOne;
+  IntegerMod.make(3, (2 : ℤ)) * IntegerMod.make(3, (2 : ℤ)) = IntegerMod.one(3)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := 1) as squareTwo;
+  r < 3 < 4;
+  r = 0 ∨ r = 1 ∨ r = 2 ∨ r = 3 by Natural.below_four_values;
+  IntegerMod.make(3, (r : ℤ)) * IntegerMod.make(3, (r : ℤ)) = IntegerMod.zero(3)
+      ∨ IntegerMod.make(3, (r : ℤ)) * IntegerMod.make(3, (r : ℤ)) = IntegerMod.one(3) by cases {
+    case r = 0: done by Or.introduceLeft(squareZero)
+    case r = 1 ∨ r = 2 ∨ r = 3: done by cases {
+      case r = 1: done by Or.introduceRight(squareOne)
+      case r = 2 ∨ r = 3: done by cases {
+        case r = 2: done by Or.introduceRight(squareTwo)
+        case r = 3: {
+          3 < 3 by substituting (r = 3);
+          False by Natural.lt_irreflexive(3, done);
+          done
+        }
+      }
+    }
+  } as squareClass;
+  IntegerMod.make(3, (r : ℤ)) = x by Equality.symmetry(xReads) as reverseReads;
+  done by Equality.transport_proposition(
+      (candidate : IntegerMod(3)) ↦ candidate * candidate = IntegerMod.zero(3)
+        ∨ candidate * candidate = IntegerMod.one(3),
+      IntegerMod.make(3, (r : ℤ)), x, reverseReads, squareClass)
+}
+
+theorem IntegerMod.mod_three_cases (x : IntegerMod(3))
+        : x = IntegerMod.zero(3) ∨ x = IntegerMod.one(3)
+          ∨ x = IntegerMod.residue(3, 2) := {
+  choose r such that r < 3 ∧ x = IntegerMod.make(3, (r : ℤ))
+      from IntegerMod.exists_natural_representative(3, done, x);
+  r < 3 by And.left(r < 3, x = IntegerMod.make(3, (r : ℤ)));
+  x = IntegerMod.make(3, (r : ℤ))
+      by And.right(r < 3, x = IntegerMod.make(3, (r : ℤ))) as xReads;
+  IntegerMod.make(3, (0 : ℤ)) = IntegerMod.zero(3)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := 0) as valueZero;
+  IntegerMod.make(3, (1 : ℤ)) = IntegerMod.one(3)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := 0) as valueOne;
+  IntegerMod.make(3, (2 : ℤ)) = IntegerMod.residue(3, 2)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := 0) as valueTwo;
+  r < 3 < 4;
+  r = 0 ∨ r = 1 ∨ r = 2 ∨ r = 3 by Natural.below_four_values;
+  IntegerMod.make(3, (r : ℤ)) = IntegerMod.zero(3)
+      ∨ IntegerMod.make(3, (r : ℤ)) = IntegerMod.one(3)
+      ∨ IntegerMod.make(3, (r : ℤ)) = IntegerMod.residue(3, 2) by cases {
+    case r = 0: done by Or.introduceLeft(valueZero)
+    case r = 1 ∨ r = 2 ∨ r = 3: done by cases {
+      case r = 1: done by Or.introduceRight(Or.introduceLeft(valueOne))
+      case r = 2 ∨ r = 3: done by cases {
+        case r = 2: done by Or.introduceRight(Or.introduceRight(valueTwo))
+        case r = 3: {
+          3 < 3 by substituting (r = 3);
+          False by Natural.lt_irreflexive(3, done);
+          done
+        }
+      }
+    }
+  } as residueClass;
+  done by Equality.transport_proposition(
+      (candidate : IntegerMod(3)) ↦ candidate = IntegerMod.zero(3)
+        ∨ candidate = IntegerMod.one(3) ∨ candidate = IntegerMod.residue(3, 2),
+      IntegerMod.make(3, (r : ℤ)), x, Equality.symmetry(xReads), residueClass)
+}
+
+theorem IntegerMod.one_square_not_zero_mod_three
+        : ¬(IntegerMod.one(3) * IntegerMod.one(3) = IntegerMod.zero(3)) := {
+  suppose IntegerMod.one(3) * IntegerMod.one(3) = IntegerMod.zero(3) as squareZero;
+  IntegerMod.one(3) * IntegerMod.one(3) = IntegerMod.one(3)
+      by IntegerMod.multiply_identity_left(3, IntegerMod.one(3)) as squareOne;
+  IntegerMod.one(3) = IntegerMod.zero(3)
+      by Equality.transitivity(
+        IntegerMod.one(3), IntegerMod.one(3) * IntegerMod.one(3), IntegerMod.zero(3),
+        Equality.symmetry(squareOne), squareZero) as oneEqualsZero;
+  done by IntegerMod.zero_not_one_mod_three(Equality.symmetry(oneEqualsZero))
+}
+
+theorem IntegerMod.two_square_not_zero_mod_three
+        : ¬(IntegerMod.residue(3, 2) * IntegerMod.residue(3, 2) = IntegerMod.zero(3)) := {
+  suppose IntegerMod.residue(3, 2) * IntegerMod.residue(3, 2) = IntegerMod.zero(3) as squareZero;
+  IntegerMod.residue(3, 2) * IntegerMod.residue(3, 2) = IntegerMod.one(3)
+      by IntegerMod.make_equal_of_difference_multiple(multiple := 1) as squareOne;
+  IntegerMod.one(3) = IntegerMod.zero(3)
+      by Equality.transitivity(
+        IntegerMod.one(3), IntegerMod.residue(3, 2) * IntegerMod.residue(3, 2), IntegerMod.zero(3),
+        Equality.symmetry(squareOne), squareZero) as oneEqualsZero;
+  done by IntegerMod.zero_not_one_mod_three(Equality.symmetry(oneEqualsZero))
+}
+
+theorem IntegerMod.square_zero_contradicts_equal_one_mod_three
+        (x : IntegerMod(3)) (squareZero : x * x = IntegerMod.zero(3))
+        (xOne : x = IntegerMod.one(3)) : False := {
+  x * x = IntegerMod.one(3) * IntegerMod.one(3)
+      by Equality.congruence((candidate : IntegerMod(3)) ↦ candidate * candidate, x, IntegerMod.one(3), xOne)
+      as squareReads;
+  IntegerMod.one(3) * IntegerMod.one(3) = IntegerMod.zero(3)
+      by Equality.transitivity(
+        IntegerMod.one(3) * IntegerMod.one(3), x * x, IntegerMod.zero(3), Equality.symmetry(squareReads), squareZero)
+      as impossibleSquare;
+  done by IntegerMod.one_square_not_zero_mod_three(impossibleSquare)
+}
+
+theorem IntegerMod.square_zero_contradicts_equal_two_mod_three
+        (x : IntegerMod(3)) (squareZero : x * x = IntegerMod.zero(3))
+        (xTwo : x = IntegerMod.residue(3, 2)) : False := {
+  x * x = IntegerMod.residue(3, 2) * IntegerMod.residue(3, 2)
+      by Equality.congruence(
+        (candidate : IntegerMod(3)) ↦ candidate * candidate, x, IntegerMod.residue(3, 2), xTwo)
+      as squareReads;
+  IntegerMod.residue(3, 2) * IntegerMod.residue(3, 2) = IntegerMod.zero(3)
+      by Equality.transitivity(
+        IntegerMod.residue(3, 2) * IntegerMod.residue(3, 2), x * x, IntegerMod.zero(3),
+        Equality.symmetry(squareReads), squareZero) as impossibleSquare;
+  done by IntegerMod.two_square_not_zero_mod_three(impossibleSquare)
+}
+
+theorem IntegerMod.square_zero_mod_three_forces_zero
+        (x : IntegerMod(3)) (squareZero : x * x = IntegerMod.zero(3))
+        : x = IntegerMod.zero(3) := {
+  x = IntegerMod.zero(3) ∨ x = IntegerMod.one(3) ∨ x = IntegerMod.residue(3, 2)
+      by IntegerMod.mod_three_cases(x) as residueClass;
+  done by Or.eliminate(
+    x = IntegerMod.zero(3),
+    x = IntegerMod.one(3) ∨ x = IntegerMod.residue(3, 2),
+    x = IntegerMod.zero(3),
+    (xZero : x = IntegerMod.zero(3)) ↦ xZero,
+    (nonzeroClass : x = IntegerMod.one(3) ∨ x = IntegerMod.residue(3, 2)) ↦
+      Or.eliminate(
+        x = IntegerMod.one(3),
+        x = IntegerMod.residue(3, 2),
+        x = IntegerMod.zero(3),
+        (xOne : x = IntegerMod.one(3)) ↦
+          False.eliminate_proposition(
+            x = IntegerMod.zero(3),
+            IntegerMod.square_zero_contradicts_equal_one_mod_three(x, squareZero, xOne)),
+        (xTwo : x = IntegerMod.residue(3, 2)) ↦
+          False.eliminate_proposition(
+            x = IntegerMod.zero(3),
+            IntegerMod.square_zero_contradicts_equal_two_mod_three(x, squareZero, xTwo)),
+        nonzeroClass),
+    residueClass)
+}
+
+theorem IntegerMod.two_squares_zero_mod_three_forces_each_zero
+        (x y : IntegerMod(3))
+        (sumZero : x * x + y * y = IntegerMod.zero(3))
+        : x = IntegerMod.zero(3) ∧ y = IntegerMod.zero(3) := {
+  x * x = IntegerMod.zero(3) ∨ x * x = IntegerMod.one(3)
+      by IntegerMod.square_mod_three(x);
+  y * y = IntegerMod.zero(3) ∨ y * y = IntegerMod.one(3)
+      by IntegerMod.square_mod_three(y);
+  done by cases {
+    case x * x = IntegerMod.zero(3) as xSquareZero: done by cases {
+      case y * y = IntegerMod.zero(3) as ySquareZero:
+        done by And.introduction(
+            IntegerMod.square_zero_mod_three_forces_zero(x, xSquareZero),
+            IntegerMod.square_zero_mod_three_forces_zero(y, ySquareZero))
+      case y * y = IntegerMod.one(3) as ySquareOne: {
+        IntegerMod.one(3)
+           = IntegerMod.zero(3) + IntegerMod.one(3)
+           = x * x + IntegerMod.one(3) by substituting Equality.symmetry(xSquareZero)
+           = x * x + y * y by substituting Equality.symmetry(ySquareOne)
+           = IntegerMod.zero(3) by sumZero
+        as oneEqualsZero;
+        False by IntegerMod.zero_not_one_mod_three(Equality.symmetry(oneEqualsZero)) as impossible;
+        done by False.eliminate_proposition(x = IntegerMod.zero(3) ∧ y = IntegerMod.zero(3), impossible)
+      }
+    }
+    case x * x = IntegerMod.one(3) as xSquareOne: done by cases {
+      case y * y = IntegerMod.zero(3) as ySquareZero: {
+        IntegerMod.one(3)
+           = IntegerMod.one(3) + IntegerMod.zero(3)
+           = x * x + IntegerMod.zero(3) by substituting Equality.symmetry(xSquareOne)
+           = x * x + y * y by substituting Equality.symmetry(ySquareZero)
+           = IntegerMod.zero(3) by sumZero
+        as oneEqualsZero;
+        False by IntegerMod.zero_not_one_mod_three(Equality.symmetry(oneEqualsZero)) as impossible;
+        done by False.eliminate_proposition(x = IntegerMod.zero(3) ∧ y = IntegerMod.zero(3), impossible)
+      }
+      case y * y = IntegerMod.one(3) as ySquareOne: {
+        IntegerMod.residue(3, 2)
+           = IntegerMod.one(3) + IntegerMod.one(3)
+               by Equality.symmetry(IntegerMod.make_equal_of_difference_multiple(3, 2, 2, 0, done))
+           = x * x + IntegerMod.one(3) by substituting Equality.symmetry(xSquareOne)
+           = x * x + y * y by substituting Equality.symmetry(ySquareOne)
+           = IntegerMod.zero(3) by sumZero
+        as twoEqualsZero;
+        IntegerMod.residue(3, 2) ≠ IntegerMod.residue(3, 0)
+            by IntegerMod.residue_distinct_below_modulus(3, 2, 0, done, done, done) as twoNotZero;
+        False by twoNotZero(twoEqualsZero) as impossible;
+        done by False.eliminate_proposition(x = IntegerMod.zero(3) ∧ y = IntegerMod.zero(3), impossible)
+      }
+    }
+  }
+}
+
+theorem Integer.one_three_three_representation_of_triple_representation
+        (n : ℕ)
+        (represented : Matrix.Represents(
+          Matrix.sumOfTwoSquaresPlusTripleSquareForm, ((3 * n : ℕ) : ℤ)))
+        : Integer.OneThreeThreeRepresentation((n : ℤ)) := {
+  choose vector : RingVector(Integer.commutative_ring_bundle, 3) such that
+      Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusTripleSquareForm, vector) = ((3 * n : ℕ) : ℤ)
+      as valueReads from represented;
+  let a : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo));
+  let b : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo));
+  let c : ℤ := vector(NaturalsBelow.top(2));
+  vector = (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+      by RingVector.eq_threeCoordinates(vector) as vectorReads;
+  a * a + b * b + 3 * (c * c)
+     = Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusTripleSquareForm,
+         (⟨a, b, c⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+         by Equality.symmetry(Matrix.sumOfTwoSquaresPlusTripleSquareForm_coordinateTuple_value(a, b, c))
+     = Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusTripleSquareForm, vector)
+         by substituting Equality.symmetry(vectorReads)
+     = ((3 * n : ℕ) : ℤ) by valueReads
+     = 3 * (n : ℤ) by Natural.to_integer.multiply_preserves
+  as scalarReads;
+  let aMod : IntegerMod(3) := IntegerMod.make(3, a);
+  let bMod : IntegerMod(3) := IntegerMod.make(3, b);
+  aMod * aMod + bMod * bMod
+     = IntegerMod.make(3, a * a + b * b)
+     = IntegerMod.make(3, 3 * ((n : ℤ) - c * c)) by {
+         a * a + b * b = 3 * ((n : ℤ) - c * c) by linear_combination(scalarReads) as abReads;
+         done by Equality.congruence(
+           (value : ℤ) ↦ IntegerMod.make(3, value),
+           a * a + b * b, 3 * ((n : ℤ) - c * c), abReads)
+       }
+     = IntegerMod.zero(3)
+         by IntegerMod.make_equal_of_difference_multiple(
+           3, 3 * ((n : ℤ) - c * c), 0, (n : ℤ) - c * c, done by ring)
+  as sumZero;
+  aMod = IntegerMod.zero(3) ∧ bMod = IntegerMod.zero(3)
+      by IntegerMod.two_squares_zero_mod_three_forces_each_zero(aMod, bMod, sumZero);
+  aMod = IntegerMod.zero(3) as aZero;
+  bMod = IntegerMod.zero(3) as bZero;
+  Integer.CongruentModulo(3, a, 0)
+      by Quotient.equal_implies_equivalent(a, 0, aZero) as aCongruent;
+  Integer.CongruentModulo(3, b, 0)
+      by Quotient.equal_implies_equivalent(b, 0, bZero) as bCongruent;
+  Integer.divides(3, a) by Integer.divides_of_congruent_zero(3, a, aCongruent) as threeDividesA;
+  Integer.divides(3, b) by Integer.divides_of_congruent_zero(3, b, bCongruent) as threeDividesB;
+  choose y : ℤ such that a = 3 * y as aReads from threeDividesA;
+  choose z : ℤ such that b = 3 * z as bReads from threeDividesB;
+  3 * (c * c + 3 * (y * y) + 3 * (z * z))
+     = (3 * y) * (3 * y) + (3 * z) * (3 * z) + 3 * (c * c) by ring
+     = a * a + (3 * z) * (3 * z) + 3 * (c * c) by substituting Equality.symmetry(aReads)
+     = a * a + b * b + 3 * (c * c) by substituting Equality.symmetry(bReads)
+     = 3 * (n : ℤ) by scalarReads;
+  c * c + 3 * (y * y) + 3 * (z * z) = (n : ℤ)
+      by Integer.multiply_cancel_left_by_nonzero as reduced;
+  witness c with witness y with witness z with reduced
+}
+
+theorem Matrix.oneThreeThreeConverse_of_tripleSquaresConverse
+        (converse : Matrix.TripleSquaresConverse) (n : ℕ)
+        (admissible : ¬(Natural.IsOneThreeThreeObstruction(n)))
+        : Integer.OneThreeThreeRepresentation((n : ℤ)) := {
+  ¬(Natural.IsTripleSquareObstruction(3 * n)) by {
+    suppose Natural.IsTripleSquareObstruction(3 * n) as obstruction;
+    choose exponent : ℕ, b : ℕ such that 3 * n = 9 ^ exponent * (9 * b + 6)
+        from obstruction;
+    3 * n
+       = 9 ^ exponent * (9 * b + 6) by done
+       = 9 ^ exponent * (3 * (3 * b + 2))
+       = 3 * (9 ^ exponent * (3 * b + 2))
+    as cancellable;
+    n = 9 ^ exponent * (3 * b + 2)
+        by Natural.multiply_cancel_left(3, n, 9 ^ exponent * (3 * b + 2), done, cancellable)
+        as obstructionReads;
+    Natural.IsOneThreeThreeObstruction(n) by {
+      witness exponent with witness b with obstructionReads
+    };
+    done by admissible(done)
+  }
+  as scaledAdmissible;
+  Matrix.Represents(Matrix.sumOfTwoSquaresPlusTripleSquareForm, ((3 * n : ℕ) : ℤ))
+      by converse(3 * n, scaledAdmissible) as represented;
+  done by Integer.one_three_three_representation_of_triple_representation(n, represented)
+}
+
+theorem IntegerMod.zero_not_two_mod_three
+        : ¬(IntegerMod.zero(3) = IntegerMod.residue(3, 2)) :=
+  by IntegerMod.residue_distinct_below_modulus(3, 0, 2, done, done, done)
+
+theorem IntegerMod.square_zero_of_equal_zero_mod_three
+        (x : IntegerMod(3)) (xZero : x = IntegerMod.zero(3))
+        : x * x = IntegerMod.zero(3) := {
+  x * x = IntegerMod.zero(3) * IntegerMod.zero(3)
+      by Equality.congruence((candidate : IntegerMod(3)) ↦ candidate * candidate, x, IntegerMod.zero(3), xZero)
+      as squareReads;
+  done by Equality.transitivity(
+    x * x, IntegerMod.zero(3) * IntegerMod.zero(3), IntegerMod.zero(3), squareReads,
+    IntegerMod.make_equal_of_difference_multiple(3, 0, 0, 0, done))
+}
+
+theorem IntegerMod.equal_squares_left_zero_forces_right_zero_mod_three
+        (x y : IntegerMod(3)) (squaresEqual : x * x = y * y)
+        (xZero : x = IntegerMod.zero(3)) : y = IntegerMod.zero(3) := {
+  x * x = IntegerMod.zero(3) by IntegerMod.square_zero_of_equal_zero_mod_three(x, xZero) as xSquareZero;
+  y * y = IntegerMod.zero(3)
+      by Equality.transitivity(y * y, x * x, IntegerMod.zero(3), Equality.symmetry(squaresEqual), xSquareZero)
+      as ySquareZero;
+  done by IntegerMod.square_zero_mod_three_forces_zero(y, ySquareZero)
+}
+
+theorem IntegerMod.equal_squares_left_zero_gives_equal_mod_three
+        (x y : IntegerMod(3)) (squaresEqual : x * x = y * y)
+        (xZero : x = IntegerMod.zero(3)) : x = y := {
+  y = IntegerMod.zero(3)
+      by IntegerMod.equal_squares_left_zero_forces_right_zero_mod_three(x, y, squaresEqual, xZero) as yZero;
+  done by Equality.transitivity(x, IntegerMod.zero(3), y, xZero, Equality.symmetry(yZero))
+}
+
+theorem IntegerMod.equal_squares_one_zero_impossible_mod_three
+        (x y : IntegerMod(3)) (squaresEqual : x * x = y * y)
+        (xOne : x = IntegerMod.one(3)) (yZero : y = IntegerMod.zero(3)) : False := {
+  x = IntegerMod.zero(3)
+      by IntegerMod.equal_squares_left_zero_forces_right_zero_mod_three(
+        y, x, Equality.symmetry(squaresEqual), yZero) as xZero;
+  IntegerMod.zero(3) = IntegerMod.one(3)
+      by Equality.transitivity(IntegerMod.zero(3), x, IntegerMod.one(3), Equality.symmetry(xZero), xOne)
+      as zeroEqualsOne;
+  done by IntegerMod.zero_not_one_mod_three(zeroEqualsOne)
+}
+
+theorem IntegerMod.equal_squares_two_zero_impossible_mod_three
+        (x y : IntegerMod(3)) (squaresEqual : x * x = y * y)
+        (xTwo : x = IntegerMod.residue(3, 2)) (yZero : y = IntegerMod.zero(3)) : False := {
+  x = IntegerMod.zero(3)
+      by IntegerMod.equal_squares_left_zero_forces_right_zero_mod_three(
+        y, x, Equality.symmetry(squaresEqual), yZero) as xZero;
+  IntegerMod.zero(3) = IntegerMod.residue(3, 2)
+      by Equality.transitivity(IntegerMod.zero(3), x, IntegerMod.residue(3, 2), Equality.symmetry(xZero), xTwo)
+      as zeroEqualsTwo;
+  done by IntegerMod.zero_not_two_mod_three(zeroEqualsTwo)
+}
+
+theorem IntegerMod.equal_one_is_negate_equal_two_mod_three
+        (x y : IntegerMod(3)) (xOne : x = IntegerMod.one(3))
+        (yTwo : y = IntegerMod.residue(3, 2)) : x = -y := {
+  -y = -IntegerMod.residue(3, 2)
+      by Equality.congruence(
+        (candidate : IntegerMod(3)) ↦ -candidate, y, IntegerMod.residue(3, 2), yTwo) as negatedReads;
+  x
+     = IntegerMod.one(3) by xOne
+     = -IntegerMod.residue(3, 2) by IntegerMod.residue_negate_of_add_to_modulus(3, 1, 2, done)
+     = -y by Equality.symmetry(negatedReads)
+}
+
+theorem IntegerMod.equal_two_is_negate_equal_one_mod_three
+        (x y : IntegerMod(3)) (xTwo : x = IntegerMod.residue(3, 2))
+        (yOne : y = IntegerMod.one(3)) : x = -y := {
+  -y = -IntegerMod.one(3)
+      by Equality.congruence(
+        (candidate : IntegerMod(3)) ↦ -candidate, y, IntegerMod.one(3), yOne) as negatedReads;
+  x
+     = IntegerMod.residue(3, 2) by xTwo
+     = -IntegerMod.one(3) by IntegerMod.residue_negate_of_add_to_modulus(3, 2, 1, done)
+     = -y by Equality.symmetry(negatedReads)
+}
+
+theorem IntegerMod.equal_squares_mod_three_implies_equal_or_negate
+        (x y : IntegerMod(3)) (squaresEqual : x * x = y * y)
+        : x = y ∨ x = -y := {
+  x = IntegerMod.zero(3) ∨ x = IntegerMod.one(3) ∨ x = IntegerMod.residue(3, 2)
+      by IntegerMod.mod_three_cases(x) as xClass;
+  y = IntegerMod.zero(3) ∨ y = IntegerMod.one(3) ∨ y = IntegerMod.residue(3, 2)
+      by IntegerMod.mod_three_cases(y) as yClass;
+  done by Or.eliminate(
+    x = IntegerMod.zero(3),
+    x = IntegerMod.one(3) ∨ x = IntegerMod.residue(3, 2),
+    x = y ∨ x = -y,
+    (xZero : x = IntegerMod.zero(3)) ↦
+      Or.introduceLeft(
+        x = y, x = -y,
+        IntegerMod.equal_squares_left_zero_gives_equal_mod_three(x, y, squaresEqual, xZero)),
+    (xNonzeroClass : x = IntegerMod.one(3) ∨ x = IntegerMod.residue(3, 2)) ↦
+      Or.eliminate(
+        x = IntegerMod.one(3), x = IntegerMod.residue(3, 2), x = y ∨ x = -y,
+        (xOne : x = IntegerMod.one(3)) ↦
+          Or.eliminate(
+            y = IntegerMod.zero(3),
+            y = IntegerMod.one(3) ∨ y = IntegerMod.residue(3, 2),
+            x = y ∨ x = -y,
+            (yZero : y = IntegerMod.zero(3)) ↦
+              False.eliminate_proposition(
+                x = y ∨ x = -y,
+                IntegerMod.equal_squares_one_zero_impossible_mod_three(x, y, squaresEqual, xOne, yZero)),
+            (yNonzeroClass : y = IntegerMod.one(3) ∨ y = IntegerMod.residue(3, 2)) ↦
+              Or.eliminate(
+                y = IntegerMod.one(3), y = IntegerMod.residue(3, 2), x = y ∨ x = -y,
+                (yOne : y = IntegerMod.one(3)) ↦
+                  Or.introduceLeft(
+                    x = y, x = -y,
+                    Equality.transitivity(x, IntegerMod.one(3), y, xOne, Equality.symmetry(yOne))),
+                (yTwo : y = IntegerMod.residue(3, 2)) ↦
+                  Or.introduceRight(
+                    x = y, x = -y,
+                    IntegerMod.equal_one_is_negate_equal_two_mod_three(x, y, xOne, yTwo)),
+                yNonzeroClass),
+            yClass),
+        (xTwo : x = IntegerMod.residue(3, 2)) ↦
+          Or.eliminate(
+            y = IntegerMod.zero(3),
+            y = IntegerMod.one(3) ∨ y = IntegerMod.residue(3, 2),
+            x = y ∨ x = -y,
+            (yZero : y = IntegerMod.zero(3)) ↦
+              False.eliminate_proposition(
+                x = y ∨ x = -y,
+                IntegerMod.equal_squares_two_zero_impossible_mod_three(x, y, squaresEqual, xTwo, yZero)),
+            (yNonzeroClass : y = IntegerMod.one(3) ∨ y = IntegerMod.residue(3, 2)) ↦
+              Or.eliminate(
+                y = IntegerMod.one(3), y = IntegerMod.residue(3, 2), x = y ∨ x = -y,
+                (yOne : y = IntegerMod.one(3)) ↦
+                  Or.introduceRight(
+                    x = y, x = -y,
+                    IntegerMod.equal_two_is_negate_equal_one_mod_three(x, y, xTwo, yOne)),
+                (yTwo : y = IntegerMod.residue(3, 2)) ↦
+                  Or.introduceLeft(
+                    x = y, x = -y,
+                    Equality.transitivity(x, IntegerMod.residue(3, 2), y, xTwo, Equality.symmetry(yTwo))),
+                yNonzeroClass),
+            yClass),
+        xNonzeroClass),
+    xClass)
+}
+
+theorem Integer.choose_sign_congruent_mod_three
+        (u w : ℤ) (squareDifferenceDivisible : Integer.divides(3, u * u - w * w))
+        : ∃ (v z : ℤ). (v = u ∨ v = -u) ∧ v = 3 * z + w := {
+  choose quotient : ℤ such that u * u - w * w = 3 * quotient
+      as squareDifferenceReads from squareDifferenceDivisible;
+  let uMod : IntegerMod(3) := IntegerMod.make(3, u);
+  let wMod : IntegerMod(3) := IntegerMod.make(3, w);
+  uMod * uMod
+     = IntegerMod.make(3, u * u)
+     = IntegerMod.make(3, w * w) by {
+         done by IntegerMod.make_equal_of_difference_multiple(
+           3, u * u, w * w, quotient, squareDifferenceReads)
+       }
+     = wMod * wMod
+  as squaresEqual;
+  uMod = wMod ∨ uMod = -wMod
+      by IntegerMod.equal_squares_mod_three_implies_equal_or_negate(uMod, wMod, squaresEqual);
+  done by cases {
+    case uMod = wMod as sameClass: {
+      Integer.CongruentModulo(3, u, w)
+          by Quotient.equal_implies_equivalent(u, w, sameClass);
+      choose z : ℤ such that u - w = 3 * z as differenceReads;
+      u = 3 * z + w by linear_combination(differenceReads) as recovered;
+      witness u with witness z with And.introduction(
+        Or.introduceLeft(reflexivity(ℤ, u)), recovered)
+    }
+    case uMod = -wMod as oppositeClass: {
+      IntegerMod.make(3, -u) = IntegerMod.make(3, w) by {
+        IntegerMod.make(3, -u)
+           = -uMod
+           = -(-wMod) by substituting oppositeClass
+           = wMod;
+        done
+      }
+      as negatedClass;
+      Integer.CongruentModulo(3, -u, w)
+          by Quotient.equal_implies_equivalent(-u, w, negatedClass);
+      choose z : ℤ such that -u - w = 3 * z as differenceReads;
+      -u = 3 * z + w by linear_combination(differenceReads) as recovered;
+      witness -u with witness z with And.introduction(
+        Or.introduceRight(reflexivity(ℤ, -u)), recovered)
+    }
+  }
+}

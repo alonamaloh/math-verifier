@@ -219,7 +219,14 @@ rank-four escalator by 207 selected normal forms are.
   coefficient 6, a second fourth-coordinate choice handles the case where
   the inner quotient is itself exceptional.  All five selected diagonal
   triple forms are therefore conditionally universal, raising the total to
-  50.
+  50.  For the five residue-one triple forms, completing the square changes
+  the ternary part to `x²+3y²+3z²`.  The library now proves that this
+  form represents `n` whenever `x²+y²+3z²` represents `3n`, including the
+  modulo-three descent and the sign choice that recovers `3z+w`.  Its
+  obstruction `9^a(3b+2)` is therefore derived from the same Dirichlet
+  converse, and one uniform residual calculation closes all five forms.
+  Thus all ten selected triple forms are conditionally universal, and the
+  selected total is 55.
   `Algebra/rank_four_completed_cover_universality` gives fraction-free
   completed-square interfaces for all other constructors. Its scaled-square,
   weighted, and odd cover predicates account for the remaining 32, 140, and

@@ -1,0 +1,287 @@
+-- Algebra/rank_four_triple_unit_residue_universality.math
+--
+-- The selected forms x²+y²+3z²+2zw+cw², c=2,...,6.  Completing
+-- the square gives
+--
+--   3Q = (3z+w)² + 3x² + 3y² + (3c-1)w².
+--
+-- The ternary form on the right is x²+3y²+3z², reduced in the
+-- preceding module to the same Dirichlet converse for x²+y²+3z².
+
+module Algebra.rank_four_triple_unit_residue_universality
+
+import Algebra.triple_squares_one_three_three
+
+theorem Natural.nine_power_times_three_plus_one_not_one_three_three_obstruction
+        (exponent b : ℕ)
+        : ¬(Natural.IsOneThreeThreeObstruction(9 ^ exponent * (3 * b + 1))) := {
+  suppose Natural.IsOneThreeThreeObstruction(9 ^ exponent * (3 * b + 1)) as obstruction;
+  choose otherExponent : ℕ, otherB : ℕ such that
+      9 ^ exponent * (3 * b + 1) = 9 ^ otherExponent * (3 * otherB + 2)
+      as equalShapes from obstruction;
+  exponent < otherExponent ∨ exponent = otherExponent ∨ otherExponent < exponent
+      by Natural.lt_trichotomy;
+  done by cases {
+    case exponent < otherExponent as exponentBelow: {
+      choose gap : ℕ such that exponent + (1 + gap) = otherExponent
+          as exponentSplit from Natural.lt_elim;
+      9 ^ exponent * (3 * b + 1)
+         = 9 ^ otherExponent * (3 * otherB + 2) by equalShapes
+         = 9 ^ (exponent + (1 + gap)) * (3 * otherB + 2)
+             by substituting Equality.symmetry(exponentSplit)
+         = (9 ^ exponent * 9 ^ (1 + gap)) * (3 * otherB + 2)
+             by substituting Natural.power_add(9, exponent, 1 + gap)
+         = 9 ^ exponent * (9 ^ (1 + gap) * (3 * otherB + 2))
+      as cancellable;
+      3 * b + 1 = 9 ^ (1 + gap) * (3 * otherB + 2)
+          by Natural.multiply_cancel_left(
+              9 ^ exponent, 3 * b + 1, 9 ^ (1 + gap) * (3 * otherB + 2),
+              Natural.power_positive(9, exponent, done), cancellable)
+      as reduced;
+      3 * b + 1
+         = 9 ^ (1 + gap) * (3 * otherB + 2) by reduced
+         = (9 * 9 ^ gap) * (3 * otherB + 2)
+             by substituting Natural.power_one_plus(9, gap)
+         = 3 * (3 * 9 ^ gap * (3 * otherB + 2)) + 0
+      as impossible;
+      done by Natural.distinct_affine_residues_not_equal(
+          3, 1, 0, b, 3 * 9 ^ gap * (3 * otherB + 2), done, done, done, impossible)
+    }
+    case exponent = otherExponent ∨ otherExponent < exponent: done by cases {
+      case exponent = otherExponent as exponentsEqual: {
+        9 ^ exponent * (3 * b + 1)
+           = 9 ^ otherExponent * (3 * otherB + 2) by equalShapes
+           = 9 ^ exponent * (3 * otherB + 2)
+               by substituting Equality.symmetry(exponentsEqual)
+        as cancellable;
+        3 * b + 1 = 3 * otherB + 2
+            by Natural.multiply_cancel_left(
+                9 ^ exponent, 3 * b + 1, 3 * otherB + 2,
+                Natural.power_positive(9, exponent, done), cancellable)
+        as impossible;
+        done by Natural.distinct_affine_residues_not_equal(
+            3, 1, 2, b, otherB, done, done, done, impossible)
+      }
+      case otherExponent < exponent as otherBelow: {
+        choose gap : ℕ such that otherExponent + (1 + gap) = exponent
+            as exponentSplit from Natural.lt_elim;
+        9 ^ otherExponent * (9 ^ (1 + gap) * (3 * b + 1))
+           = (9 ^ otherExponent * 9 ^ (1 + gap)) * (3 * b + 1)
+           = 9 ^ (otherExponent + (1 + gap)) * (3 * b + 1)
+               by substituting Equality.symmetry(Natural.power_add(9, otherExponent, 1 + gap))
+           = 9 ^ exponent * (3 * b + 1) by substituting exponentSplit
+           = 9 ^ otherExponent * (3 * otherB + 2) by equalShapes
+        as cancellable;
+        9 ^ (1 + gap) * (3 * b + 1) = 3 * otherB + 2
+            by Natural.multiply_cancel_left(
+                9 ^ otherExponent, 9 ^ (1 + gap) * (3 * b + 1), 3 * otherB + 2,
+                Natural.power_positive(9, otherExponent, done), cancellable)
+        as reduced;
+        3 * (3 * 9 ^ gap * (3 * b + 1)) + 0
+           = (9 * 9 ^ gap) * (3 * b + 1)
+           = 9 ^ (1 + gap) * (3 * b + 1)
+               by substituting Equality.symmetry(Natural.power_one_plus(9, gap))
+           = 3 * otherB + 2 by reduced
+        as impossible;
+        done by Natural.distinct_affine_residues_not_equal(
+            3, 0, 2, 3 * 9 ^ gap * (3 * b + 1), otherB, done, done, done, impossible)
+      }
+    }
+  }
+}
+
+theorem Matrix.tripleUnit_completed_witness_of_one_three_three
+        (corner coefficient m residual w : ℕ)
+        (coefficientReads : coefficient + 1 = 3 * corner)
+        (represented : Integer.OneThreeThreeRepresentation((residual : ℤ)))
+        (valueReads : residual + w * w * coefficient = 3 * m)
+        : ∃ (x y z integerW u : ℤ).
+            u = 3 * z + 1 * integerW
+            ∧ 3 * (m : ℤ) = 3 * (x * x) + 3 * (y * y) + u * u
+              + (3 * (corner : ℤ) - 1) * (integerW * integerW) := {
+  choose initialU : ℤ, x : ℤ, y : ℤ such that
+      initialU * initialU + 3 * (x * x) + 3 * (y * y) = (residual : ℤ)
+      from represented;
+  initialU * initialU + 3 * (x * x) + 3 * (y * y) = (residual : ℤ)
+      as representedReads;
+  (coefficient : ℤ) + 1
+     = ((coefficient + 1 : ℕ) : ℤ) by Equality.symmetry(Natural.to_integer.add_preserves(coefficient, 1))
+     = ((3 * corner : ℕ) : ℤ) by substituting coefficientReads
+     = 3 * (corner : ℤ) by Natural.to_integer.multiply_preserves
+  as coefficientCastReads;
+  (residual : ℤ) + (w : ℤ) * (w : ℤ) * (coefficient : ℤ)
+     = (residual : ℤ) + ((w * w : ℕ) : ℤ) * (coefficient : ℤ)
+         by substituting Natural.to_integer.multiply_preserves(w, w)
+     = (residual : ℤ) + ((w * w * coefficient : ℕ) : ℤ)
+         by substituting Natural.to_integer.multiply_preserves(w * w, coefficient)
+     = ((residual + w * w * coefficient : ℕ) : ℤ)
+         by Equality.symmetry(Natural.to_integer.add_preserves(residual, w * w * coefficient))
+     = ((3 * m : ℕ) : ℤ) by substituting valueReads
+     = 3 * (m : ℤ) by Natural.to_integer.multiply_preserves
+  as completedReads;
+  Integer.divides(3, initialU * initialU - (w : ℤ) * (w : ℤ)) by {
+    witness (m : ℤ) - x * x - y * y - (corner : ℤ) * ((w : ℤ) * (w : ℤ)) with
+      initialU * initialU - (w : ℤ) * (w : ℤ)
+         = ((residual : ℤ) + (w : ℤ) * (w : ℤ) * (coefficient : ℤ))
+           - 3 * (x * x) - 3 * (y * y)
+           - ((coefficient : ℤ) + 1) * ((w : ℤ) * (w : ℤ))
+             by substituting Equality.symmetry(representedReads)
+         = 3 * (m : ℤ) - 3 * (x * x) - 3 * (y * y)
+           - ((coefficient : ℤ) + 1) * ((w : ℤ) * (w : ℤ))
+             by substituting completedReads
+         = 3 * (m : ℤ) - 3 * (x * x) - 3 * (y * y)
+           - 3 * (corner : ℤ) * ((w : ℤ) * (w : ℤ))
+             by substituting coefficientCastReads
+         = 3 * ((m : ℤ) - x * x - y * y
+           - (corner : ℤ) * ((w : ℤ) * (w : ℤ))) by ring
+  }
+  as squareDifferenceDivisible;
+  choose u : ℤ, z : ℤ such that
+      (u = initialU ∨ u = -initialU) ∧ u = 3 * z + (w : ℤ)
+      from Integer.choose_sign_congruent_mod_three(
+          initialU, (w : ℤ), squareDifferenceDivisible);
+  u = initialU ∨ u = -initialU;
+  u = 3 * z + (w : ℤ) as uReads;
+  u * u = initialU * initialU by {
+    done by cases {
+      case u = initialU: done
+      case u = -initialU: ring
+    }
+  }
+  as squareReads;
+  (coefficient : ℤ) = 3 * (corner : ℤ) - 1
+      by linear_combination(coefficientCastReads) as coefficientIsCompleted;
+  3 * (m : ℤ)
+     = (residual : ℤ) + (w : ℤ) * (w : ℤ) * (coefficient : ℤ)
+         by Equality.symmetry(completedReads)
+     = initialU * initialU + 3 * (x * x) + 3 * (y * y)
+       + (coefficient : ℤ) * ((w : ℤ) * (w : ℤ))
+         by substituting Equality.symmetry(representedReads)
+     = u * u + 3 * (x * x) + 3 * (y * y)
+       + (coefficient : ℤ) * ((w : ℤ) * (w : ℤ))
+         by substituting Equality.symmetry(squareReads)
+     = 3 * (x * x) + 3 * (y * y) + u * u
+       + (3 * (corner : ℤ) - 1) * ((w : ℤ) * (w : ℤ))
+         by substituting coefficientIsCompleted
+  as finalReads;
+  witness x with witness y with witness z with witness (w : ℤ) with witness u with
+      And.introduction({ u = 3 * z + 1 * (w : ℤ) by substituting uReads }, finalReads)
+}
+
+theorem Matrix.tripleUnitCompletedCover_of_triple_squares_converse
+        (converse : Matrix.TripleSquaresConverse)
+        (corner coefficient offset : ℕ)
+        (coefficientReads : coefficient + 1 = 3 * corner)
+        (offsetReads : offset + corner = 6)
+        : Matrix.TwoSquaresScaledCompletedCover(3, 1, (corner : ℤ)) := {
+  take m : ℕ;
+  suppose m ≥ 1;
+  Natural.IsOneThreeThreeObstruction(3 * m) ∨ ¬(Natural.IsOneThreeThreeObstruction(3 * m));
+  ¬(Natural.IsOneThreeThreeObstruction(3 * m)) ∨ Natural.IsOneThreeThreeObstruction(3 * m) by Or.swap;
+  done by cases {
+    case ¬(Natural.IsOneThreeThreeObstruction(3 * m)) as admissible: {
+      Integer.OneThreeThreeRepresentation(((3 * m : ℕ) : ℤ))
+          by Matrix.oneThreeThreeConverse_of_tripleSquaresConverse(converse, 3 * m, admissible)
+          as represented;
+      done by Matrix.tripleUnit_completed_witness_of_one_three_three(
+          corner, coefficient, m, 3 * m, 0, coefficientReads, represented,
+          { 3 * m + 0 * 0 * coefficient = 3 * m })
+    }
+    case Natural.IsOneThreeThreeObstruction(3 * m) as obstruction: {
+      choose exponent : ℕ, b : ℕ such that 3 * m = 9 ^ exponent * (3 * b + 2)
+          as targetReads from obstruction;
+      exponent = 0 ∨ ∃ (predecessor : ℕ). exponent = 1 + predecessor by Natural.zero_or_one_plus;
+      done by cases {
+        case exponent = 0 as exponentZero: {
+          3 * m + 0
+             = 9 ^ exponent * (3 * b + 2) by targetReads
+             = 9 ^ 0 * (3 * b + 2) by substituting exponentZero
+             = 3 * b + 2 by substituting Natural.power_zero(9)
+          as impossible;
+          False by Natural.distinct_affine_residues_not_equal(
+              3, 0, 2, m, b, done, done, done, impossible);
+          done
+        }
+        case ∃ (predecessor : ℕ). exponent = 1 + predecessor: {
+          choose predecessor : ℕ such that exponent = 1 + predecessor as exponentReads;
+          let residualBase : ℕ := 9 * b + offset;
+          let residual : ℕ := 9 ^ predecessor * (3 * residualBase + 1);
+          let w : ℕ := 3 ^ predecessor;
+          ¬(Natural.IsOneThreeThreeObstruction(residual))
+              by Natural.nine_power_times_three_plus_one_not_one_three_three_obstruction(
+                  predecessor, residualBase) as residualAdmissible;
+          Integer.OneThreeThreeRepresentation((residual : ℤ))
+              by Matrix.oneThreeThreeConverse_of_tripleSquaresConverse(
+                  converse, residual, residualAdmissible) as represented;
+          residual + w * w * coefficient
+             = 9 ^ predecessor * (3 * (9 * b + offset) + 1)
+               + (3 ^ predecessor * 3 ^ predecessor) * coefficient
+             = 9 ^ predecessor * (3 * (9 * b + offset) + 1)
+               + 9 ^ predecessor * coefficient
+                 by Equality.congruence(
+                     (candidate : ℕ) ↦ 9 ^ predecessor * (3 * (9 * b + offset) + 1)
+                       + candidate * coefficient,
+                     3 ^ predecessor * 3 ^ predecessor, 9 ^ predecessor,
+                     Natural.three_power_square_is_nine_power(predecessor))
+             = 9 ^ predecessor * (3 * (9 * b + offset) + (coefficient + 1))
+             = 9 ^ predecessor * (3 * (9 * b + offset) + 3 * corner)
+                 by substituting coefficientReads
+             = 9 ^ predecessor * (27 * b + 3 * (offset + corner))
+             = 9 ^ predecessor * (27 * b + 3 * 6) by substituting offsetReads
+             = 9 ^ predecessor * (9 * (3 * b + 2))
+             = 9 ^ (1 + predecessor) * (3 * b + 2)
+                 by substituting Equality.symmetry(Natural.power_one_plus(9, predecessor))
+             = 9 ^ exponent * (3 * b + 2) by substituting Equality.symmetry(exponentReads)
+             = 3 * m by Equality.symmetry(targetReads)
+          as valueReads;
+          done by Matrix.tripleUnit_completed_witness_of_one_three_three(
+              corner, coefficient, m, residual, w, coefficientReads, represented, valueReads)
+        }
+      }
+    }
+  }
+}
+
+theorem Matrix.tripleUnit_universal_of_triple_squares_converse
+        (converse : Matrix.TripleSquaresConverse)
+        (corner coefficient offset : ℕ)
+        (coefficientReads : coefficient + 1 = 3 * corner)
+        (offsetReads : offset + corner = 6)
+        : Matrix.IsUniversal(
+            Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(3, 1, (corner : ℤ))) := {
+  (3 : ℤ) ≠ 0 as threeNonzero;
+  done by Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative_universal(
+      3, 1, (corner : ℤ), threeNonzero,
+      Matrix.tripleUnitCompletedCover_of_triple_squares_converse(
+          converse, corner, coefficient, offset, coefficientReads, offsetReads))
+}
+
+theorem Matrix.tripleR1C2_universal_of_triple_squares_converse
+        (converse : Matrix.TripleSquaresConverse)
+        : Matrix.IsUniversal(Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(3, 1, 2)) :=
+  by Matrix.tripleUnit_universal_of_triple_squares_converse(
+      converse, corner := 2, coefficient := 5, offset := 4, coefficientReads := done, offsetReads := done)
+
+theorem Matrix.tripleR1C3_universal_of_triple_squares_converse
+        (converse : Matrix.TripleSquaresConverse)
+        : Matrix.IsUniversal(Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(3, 1, 3)) :=
+  by Matrix.tripleUnit_universal_of_triple_squares_converse(
+      converse, corner := 3, coefficient := 8, offset := 3, coefficientReads := done, offsetReads := done)
+
+theorem Matrix.tripleR1C4_universal_of_triple_squares_converse
+        (converse : Matrix.TripleSquaresConverse)
+        : Matrix.IsUniversal(Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(3, 1, 4)) :=
+  by Matrix.tripleUnit_universal_of_triple_squares_converse(
+      converse, corner := 4, coefficient := 11, offset := 2, coefficientReads := done, offsetReads := done)
+
+theorem Matrix.tripleR1C5_universal_of_triple_squares_converse
+        (converse : Matrix.TripleSquaresConverse)
+        : Matrix.IsUniversal(Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(3, 1, 5)) :=
+  by Matrix.tripleUnit_universal_of_triple_squares_converse(
+      converse, corner := 5, coefficient := 14, offset := 1, coefficientReads := done, offsetReads := done)
+
+theorem Matrix.tripleR1C6_universal_of_triple_squares_converse
+        (converse : Matrix.TripleSquaresConverse)
+        : Matrix.IsUniversal(Matrix.sumOfTwoSquaresPlusScaledSquareRankFourRepresentative(3, 1, 6)) :=
+  by Matrix.tripleUnit_universal_of_triple_squares_converse(
+      converse, corner := 6, coefficient := 17, offset := 0, coefficientReads := done, offsetReads := done)
