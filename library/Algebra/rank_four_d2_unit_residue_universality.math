@@ -1,0 +1,645 @@
+-- Algebra/rank_four_d2_unit_residue_universality.math
+--
+-- The selected rank-four forms
+--
+--   x² + 2y² + 2z² + 2yw + 2zw + c w².
+--
+-- Put p = y+z+w and q = y-z.  Then the displayed form is
+-- x²+p²+q²+(c-1)w².  Recovering y and z is possible exactly when
+-- p-w-q is even.  This module packages that parity condition and proves
+-- the elementary modulo-four lemma used to arrange it.
+
+module Algebra.rank_four_d2_unit_residue_universality
+
+import Algebra.rank_four_d2_zero_residue_universality
+import Algebra.three_squares_obstruction_arithmetic
+
+theorem Natural.four_power_times_eight_plus_five_not_obstruction
+        (exponent b : ℕ)
+        : ¬(Natural.IsThreeSquareObstruction(4 ^ exponent * (8 * b + 5))) := {
+  ¬(Natural.IsThreeSquareObstruction(8 * b + 5))
+      by Natural.eight_times_plus_five_not_obstruction(b) as coreAdmissible;
+  done by Natural.not_obstruction_four_power_times(exponent, 8 * b + 5, coreAdmissible)
+}
+
+theorem Natural.eight_times_plus_two_not_obstruction (b : ℕ)
+        : ¬(Natural.IsThreeSquareObstruction(8 * b + 2)) := {
+  8 * b + 2 = 4 * (2 * b) + 2 as coreReads;
+  ¬(Natural.IsThreeSquareObstruction(4 * (2 * b) + 2))
+      by Natural.four_times_plus_two_not_obstruction(2 * b) as admissible;
+  suppose Natural.IsThreeSquareObstruction(8 * b + 2) as obstruction;
+  Natural.IsThreeSquareObstruction(4 * (2 * b) + 2) by substituting Equality.symmetry(coreReads);
+  done by admissible(done)
+}
+
+theorem Natural.four_power_times_eight_plus_two_not_obstruction
+        (exponent b : ℕ)
+        : ¬(Natural.IsThreeSquareObstruction(4 ^ exponent * (8 * b + 2))) := {
+  ¬(Natural.IsThreeSquareObstruction(8 * b + 2))
+      by Natural.eight_times_plus_two_not_obstruction(b) as coreAdmissible;
+  done by Natural.not_obstruction_four_power_times(exponent, 8 * b + 2, coreAdmissible)
+}
+
+theorem Natural.four_power_times_eight_plus_one_not_obstruction
+        (exponent b : ℕ)
+        : ¬(Natural.IsThreeSquareObstruction(4 ^ exponent * (8 * b + 1))) := {
+  ¬(Natural.IsThreeSquareObstruction(8 * b + 1))
+      by Natural.eight_times_plus_one_not_obstruction(b) as coreAdmissible;
+  done by Natural.not_obstruction_four_power_times(exponent, 8 * b + 1, coreAdmissible)
+}
+
+theorem Integer.eight_times_plus_six_is_four_times_plus_two (b : ℕ)
+        : ((8 * b + 6 : ℕ) : ℤ) = 4 * (2 * (b : ℤ) + 1) + 2 := {
+  ((8 * b + 6 : ℕ) : ℤ)
+     = ((8 * b : ℕ) : ℤ) + 6 by Natural.to_integer.add_preserves
+     = 8 * (b : ℤ) + 6 by substituting Natural.to_integer.multiply_preserves(8, b)
+     = 4 * (2 * (b : ℤ) + 1) + 2 by ring;
+  done
+}
+
+theorem Integer.eight_times_plus_five_is_four_times_plus_one (b : ℕ)
+        : ((8 * b + 5 : ℕ) : ℤ) = 4 * (2 * (b : ℤ) + 1) + 1 := {
+  ((8 * b + 5 : ℕ) : ℤ)
+     = ((8 * b : ℕ) : ℤ) + 5 by Natural.to_integer.add_preserves
+     = 8 * (b : ℤ) + 5 by substituting Natural.to_integer.multiply_preserves(8, b)
+     = 4 * (2 * (b : ℤ) + 1) + 1 by ring;
+  done
+}
+
+theorem Integer.eight_times_plus_two_is_four_times_plus_two (b : ℕ)
+        : ((8 * b + 2 : ℕ) : ℤ) = 4 * (2 * (b : ℤ)) + 2 := {
+  ((8 * b + 2 : ℕ) : ℤ)
+     = ((8 * b : ℕ) : ℤ) + 2 by Natural.to_integer.add_preserves
+     = 8 * (b : ℤ) + 2 by substituting Natural.to_integer.multiply_preserves(8, b)
+     = 4 * (2 * (b : ℤ)) + 2 by ring;
+  done
+}
+
+theorem Integer.eight_times_plus_one_is_four_times_plus_one (b : ℕ)
+        : ((8 * b + 1 : ℕ) : ℤ) = 4 * (2 * (b : ℤ)) + 1 := {
+  ((8 * b + 1 : ℕ) : ℤ)
+     = ((8 * b : ℕ) : ℤ) + 1 by Natural.to_integer.add_preserves
+     = 8 * (b : ℤ) + 1 by substituting Natural.to_integer.multiply_preserves(8, b)
+     = 4 * (2 * (b : ℤ)) + 1 by ring;
+  done
+}
+
+theorem Integer.even_odd_pair_is_one_compatible
+        (evenValue oddValue evenQuotient oddQuotient : ℤ)
+        (evenReads : evenValue = 2 * evenQuotient)
+        (oddReads : oddValue = 2 * oddQuotient + 1)
+        : Integer.divides(2, evenValue - 1 - oddValue) := {
+  witness evenQuotient - oddQuotient - 1 with
+    evenValue - 1 - oddValue
+       = 2 * evenQuotient - 1 - oddValue by substituting evenReads
+       = 2 * evenQuotient - 1 - (2 * oddQuotient + 1) by substituting oddReads
+       = 2 * (evenQuotient - oddQuotient - 1) by ring
+}
+
+theorem Integer.odd_even_pair_is_one_compatible
+        (oddValue evenValue oddQuotient evenQuotient : ℤ)
+        (oddReads : oddValue = 2 * oddQuotient + 1)
+        (evenReads : evenValue = 2 * evenQuotient)
+        : Integer.divides(2, oddValue - 1 - evenValue) := {
+  witness oddQuotient - evenQuotient with
+    oddValue - 1 - evenValue
+       = (2 * oddQuotient + 1) - 1 - evenValue by substituting oddReads
+       = (2 * oddQuotient + 1) - 1 - 2 * evenQuotient by substituting evenReads
+       = 2 * (oddQuotient - evenQuotient) by ring
+}
+
+theorem Integer.compatible_pair_of_three_squares_four_times_plus_one_or_two
+        (a b c quotient : ℤ) (remainder : ℕ)
+        (remainderClass : remainder = 1 ∨ remainder = 2)
+        (valueReads : a * a + b * b + c * c = 4 * quotient + (remainder : ℤ))
+        : Integer.divides(2, a - 1 - b)
+          ∨ Integer.divides(2, a - 1 - c)
+          ∨ Integer.divides(2, b - 1 - c) := {
+  choose quotientA : ℤ, remainderA : ℕ such that
+      a = 2 * quotientA + (remainderA : ℤ) ∧ remainderA < 2
+      from Integer.divide_by_positive(a, 2, done);
+  choose quotientB : ℤ, remainderB : ℕ such that
+      b = 2 * quotientB + (remainderB : ℤ) ∧ remainderB < 2
+      from Integer.divide_by_positive(b, 2, done);
+  choose quotientC : ℤ, remainderC : ℕ such that
+      c = 2 * quotientC + (remainderC : ℤ) ∧ remainderC < 2
+      from Integer.divide_by_positive(c, 2, done);
+  a = 2 * quotientA + (remainderA : ℤ) as aReads;
+  b = 2 * quotientB + (remainderB : ℤ) as bReads;
+  c = 2 * quotientC + (remainderC : ℤ) as cReads;
+  remainderA < 2 as remainderABelow;
+  remainderB < 2 as remainderBBelow;
+  remainderC < 2 as remainderCBelow;
+  remainderA = 0 ∨ remainderA = 1 by Natural.below_two(remainderA, remainderABelow);
+  remainderB = 0 ∨ remainderB = 1 by Natural.below_two(remainderB, remainderBBelow);
+  remainderC = 0 ∨ remainderC = 1 by Natural.below_two(remainderC, remainderCBelow);
+  done by cases {
+    case remainderA = 0 as remainderAZero: done by cases {
+      case remainderB = 0 as remainderBZero: done by cases {
+        case remainderC = 0 as remainderCZero: {
+          a = 2 * quotientA + (remainderA : ℤ) by aReads
+            = 2 * quotientA + 0 by substituting remainderAZero
+            = 2 * quotientA
+          as aEven;
+          b = 2 * quotientB + (remainderB : ℤ) by bReads
+            = 2 * quotientB + 0 by substituting remainderBZero
+            = 2 * quotientB
+          as bEven;
+          c = 2 * quotientC + (remainderC : ℤ) by cReads
+            = 2 * quotientC + 0 by substituting remainderCZero
+            = 2 * quotientC
+          as cEven;
+          4 * (quotientA * quotientA + quotientB * quotientB + quotientC * quotientC)
+             = (2 * quotientA) * (2 * quotientA)
+               + (2 * quotientB) * (2 * quotientB)
+               + (2 * quotientC) * (2 * quotientC) by ring
+             = a * a + (2 * quotientB) * (2 * quotientB)
+               + (2 * quotientC) * (2 * quotientC) by substituting Equality.symmetry(aEven)
+             = a * a + b * b + (2 * quotientC) * (2 * quotientC)
+                 by substituting Equality.symmetry(bEven)
+             = a * a + b * b + c * c by substituting Equality.symmetry(cEven)
+             = 4 * quotient + (remainder : ℤ) by valueReads
+          as impossibleShape;
+          done by cases {
+            case remainder = 1 as remainderReads: {
+              4 * (quotientA * quotientA + quotientB * quotientB + quotientC * quotientC) + 0
+                 = 4 * (quotientA * quotientA + quotientB * quotientB + quotientC * quotientC)
+                 = 4 * quotient + (remainder : ℤ) by impossibleShape
+                 = 4 * quotient + 1 by substituting remainderReads
+              as distinctResiduesEqual;
+              False by Integer.distinct_affine_residues_not_equal(
+                  4, 0, 1,
+                  quotientA * quotientA + quotientB * quotientB + quotientC * quotientC,
+                  quotient, done, done, done, distinctResiduesEqual);
+              done
+            }
+            case remainder = 2 as remainderReads: {
+              4 * (quotientA * quotientA + quotientB * quotientB + quotientC * quotientC) + 0
+                 = 4 * (quotientA * quotientA + quotientB * quotientB + quotientC * quotientC)
+                 = 4 * quotient + (remainder : ℤ) by impossibleShape
+                 = 4 * quotient + 2 by substituting remainderReads
+              as distinctResiduesEqual;
+              False by Integer.distinct_affine_residues_not_equal(
+                  4, 0, 2,
+                  quotientA * quotientA + quotientB * quotientB + quotientC * quotientC,
+                  quotient, done, done, done, distinctResiduesEqual);
+              done
+            }
+          }
+        }
+        case remainderC = 1 as remainderCOne: {
+          a = 2 * quotientA + (remainderA : ℤ) by aReads
+            = 2 * quotientA + 0 by substituting remainderAZero
+            = 2 * quotientA
+          as aEven;
+          c = 2 * quotientC + (remainderC : ℤ) by cReads
+            = 2 * quotientC + 1 by substituting remainderCOne
+          as cOdd;
+          done by Or.introduceRight(Or.introduceLeft(
+              Integer.even_odd_pair_is_one_compatible(a, c, quotientA, quotientC, aEven, cOdd)))
+        }
+      }
+      case remainderB = 1 as remainderBOne: {
+        a = 2 * quotientA + (remainderA : ℤ) by aReads
+          = 2 * quotientA + 0 by substituting remainderAZero
+          = 2 * quotientA
+        as aEven;
+        b = 2 * quotientB + (remainderB : ℤ) by bReads
+          = 2 * quotientB + 1 by substituting remainderBOne
+        as bOdd;
+        done by Or.introduceLeft(
+            Integer.even_odd_pair_is_one_compatible(a, b, quotientA, quotientB, aEven, bOdd))
+      }
+    }
+    case remainderA = 1 as remainderAOne: done by cases {
+      case remainderB = 0 as remainderBZero: {
+        a = 2 * quotientA + (remainderA : ℤ) by aReads
+          = 2 * quotientA + 1 by substituting remainderAOne
+        as aOdd;
+        b = 2 * quotientB + (remainderB : ℤ) by bReads
+          = 2 * quotientB + 0 by substituting remainderBZero
+          = 2 * quotientB
+        as bEven;
+        done by Or.introduceLeft(
+            Integer.odd_even_pair_is_one_compatible(a, b, quotientA, quotientB, aOdd, bEven))
+      }
+      case remainderB = 1 as remainderBOne: done by cases {
+        case remainderC = 0 as remainderCZero: {
+          a = 2 * quotientA + (remainderA : ℤ) by aReads
+            = 2 * quotientA + 1 by substituting remainderAOne
+          as aOdd;
+          c = 2 * quotientC + (remainderC : ℤ) by cReads
+            = 2 * quotientC + 0 by substituting remainderCZero
+            = 2 * quotientC
+          as cEven;
+          done by Or.introduceRight(Or.introduceLeft(
+              Integer.odd_even_pair_is_one_compatible(a, c, quotientA, quotientC, aOdd, cEven)))
+        }
+        case remainderC = 1 as remainderCOne: {
+          a = 2 * quotientA + (remainderA : ℤ) by aReads
+            = 2 * quotientA + 1 by substituting remainderAOne
+          as aOdd;
+          b = 2 * quotientB + (remainderB : ℤ) by bReads
+            = 2 * quotientB + 1 by substituting remainderBOne
+          as bOdd;
+          c = 2 * quotientC + (remainderC : ℤ) by cReads
+            = 2 * quotientC + 1 by substituting remainderCOne
+          as cOdd;
+          4 * (quotientA * quotientA + quotientA
+              + quotientB * quotientB + quotientB
+              + quotientC * quotientC + quotientC) + 3
+             = (2 * quotientA + 1) * (2 * quotientA + 1)
+               + (2 * quotientB + 1) * (2 * quotientB + 1)
+               + (2 * quotientC + 1) * (2 * quotientC + 1) by ring
+             = a * a + (2 * quotientB + 1) * (2 * quotientB + 1)
+               + (2 * quotientC + 1) * (2 * quotientC + 1)
+                 by substituting Equality.symmetry(aOdd)
+             = a * a + b * b + (2 * quotientC + 1) * (2 * quotientC + 1)
+                 by substituting Equality.symmetry(bOdd)
+             = a * a + b * b + c * c by substituting Equality.symmetry(cOdd)
+             = 4 * quotient + (remainder : ℤ) by valueReads
+          as impossibleShape;
+          done by cases {
+            case remainder = 1 as remainderReads: {
+              4 * (quotientA * quotientA + quotientA
+                    + quotientB * quotientB + quotientB
+                    + quotientC * quotientC + quotientC) + 3
+                 = 4 * quotient + (remainder : ℤ) by impossibleShape
+                 = 4 * quotient + 1 by substituting remainderReads
+              as distinctResiduesEqual;
+              False by Integer.distinct_affine_residues_not_equal(
+                  4, 3, 1,
+                  quotientA * quotientA + quotientA
+                    + quotientB * quotientB + quotientB
+                    + quotientC * quotientC + quotientC,
+                  quotient, done, done, done, distinctResiduesEqual);
+              done
+            }
+            case remainder = 2 as remainderReads: {
+              4 * (quotientA * quotientA + quotientA
+                    + quotientB * quotientB + quotientB
+                    + quotientC * quotientC + quotientC) + 3
+                 = 4 * quotient + (remainder : ℤ) by impossibleShape
+                 = 4 * quotient + 2 by substituting remainderReads
+              as distinctResiduesEqual;
+              False by Integer.distinct_affine_residues_not_equal(
+                  4, 3, 2,
+                  quotientA * quotientA + quotientA
+                    + quotientB * quotientB + quotientB
+                    + quotientC * quotientC + quotientC,
+                  quotient, done, done, done, distinctResiduesEqual);
+              done
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+theorem Integer.compatible_of_same_parity_and_even_shift
+        (p q w : ℤ)
+        (sameParity : Integer.divides(2, p - q))
+        (wEven : Integer.divides(2, w))
+        : Integer.divides(2, p - w - q) := {
+  choose pairHalf : ℤ such that p - q = 2 * pairHalf as pairReads from sameParity;
+  choose wHalf : ℤ such that w = 2 * wHalf as wReads from wEven;
+  witness pairHalf - wHalf with
+    p - w - q
+       = (p - q) - w by ring
+       = 2 * pairHalf - w by substituting pairReads
+       = 2 * pairHalf - 2 * wHalf by substituting wReads
+       = 2 * (pairHalf - wHalf) by ring
+}
+
+theorem Integer.three_integers_have_compatible_pair_for_even_shift
+        (a b c w : ℤ) (wEven : Integer.divides(2, w))
+        : Integer.divides(2, a - w - b)
+          ∨ Integer.divides(2, a - w - c)
+          ∨ Integer.divides(2, b - w - c) := {
+  Integer.divides(2, a - b) ∨ Integer.divides(2, a - c) ∨ Integer.divides(2, b - c)
+      by Integer.three_integers_have_same_parity_pair(a, b, c);
+  done by cases {
+    case Integer.divides(2, a - b) as sameParity:
+      done by Or.introduceLeft(Integer.compatible_of_same_parity_and_even_shift(a, b, w, sameParity, wEven))
+    case Integer.divides(2, a - c) as sameParity:
+      done by Or.introduceRight(Or.introduceLeft(
+          Integer.compatible_of_same_parity_and_even_shift(a, c, w, sameParity, wEven)))
+    case Integer.divides(2, b - c) as sameParity:
+      done by Or.introduceRight(Or.introduceRight(
+          Integer.compatible_of_same_parity_and_even_shift(b, c, w, sameParity, wEven)))
+  }
+}
+
+theorem Integer.reorder_three_squares_for_compatible_pair
+        (a b c n w : ℤ)
+        (valueReads : a * a + b * b + c * c = n)
+        (compatiblePair : Integer.divides(2, a - w - b)
+          ∨ Integer.divides(2, a - w - c)
+          ∨ Integer.divides(2, b - w - c))
+        : ∃ (x p q : ℤ).
+            x * x + p * p + q * q = n ∧ Integer.divides(2, p - w - q) := {
+  done by cases {
+    case Integer.divides(2, a - w - b) as compatible: {
+      witness c with witness a with witness b with And.introduction(
+          { c * c + a * a + b * b = a * a + b * b + c * c by ring = n by valueReads },
+          compatible)
+    }
+    case Integer.divides(2, a - w - c) as compatible: {
+      witness b with witness a with witness c with And.introduction(
+          { b * b + a * a + c * c = a * a + b * b + c * c by ring = n by valueReads },
+          compatible)
+    }
+    case Integer.divides(2, b - w - c) as compatible: {
+      witness a with witness b with witness c with And.introduction(valueReads, compatible)
+    }
+  }
+}
+
+theorem Integer.recover_two_coordinates_from_compatible_pair
+        (p q w : ℤ) (compatible : Integer.divides(2, p - w - q))
+        : ∃ (y z : ℤ). p = y + z + w ∧ q = y - z := {
+  choose z : ℤ such that p - w - q = 2 * z as differenceReads from compatible;
+  let y : ℤ := q + z;
+  witness y with witness z with And.introduction(
+      { p
+           = q + 2 * z + w by linear_combination(differenceReads)
+           = y + z + w by ring },
+      { q = y - z by ring })
+}
+
+definition Matrix.UnitResidueThreeSquareCover (corner : ℤ) : Proposition :=
+  ∀ (m : ℕ). m ≥ 1 →
+    ∃ (x p q w : ℤ).
+      x * x + p * p + q * q + (corner - 1) * (w * w) = (m : ℤ)
+      ∧ Integer.divides(2, p - w - q)
+
+theorem Matrix.weightedD2UnitResidue_universal_of_cover
+        (corner : ℤ) (cover : Matrix.UnitResidueThreeSquareCover(corner))
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(2, 1, 1, corner)) := {
+  take m : ℕ;
+  suppose m ≥ 1 as positive;
+  choose x : ℤ such that ∃ (p q w : ℤ).
+      x * x + p * p + q * q + (corner - 1) * (w * w) = (m : ℤ)
+      ∧ Integer.divides(2, p - w - q)
+      from cover(m, positive);
+  choose p : ℤ such that ∃ (q w : ℤ).
+      x * x + p * p + q * q + (corner - 1) * (w * w) = (m : ℤ)
+      ∧ Integer.divides(2, p - w - q);
+  choose q : ℤ such that ∃ (w : ℤ).
+      x * x + p * p + q * q + (corner - 1) * (w * w) = (m : ℤ)
+      ∧ Integer.divides(2, p - w - q);
+  choose w : ℤ such that
+      x * x + p * p + q * q + (corner - 1) * (w * w) = (m : ℤ)
+      ∧ Integer.divides(2, p - w - q);
+  x * x + p * p + q * q + (corner - 1) * (w * w) = (m : ℤ) as diagonalReads;
+  Integer.divides(2, p - w - q) as compatible;
+  choose y : ℤ, z : ℤ such that p = y + z + w ∧ q = y - z
+      from Integer.recover_two_coordinates_from_compatible_pair(p, q, w, compatible);
+  p = y + z + w as pReads;
+  q = y - z as qReads;
+  x * x + 2 * (y * y) + 2 * (z * z) + 2 * y * w + 2 * z * w + corner * (w * w)
+     = x * x + (y + z + w) * (y + z + w) + (y - z) * (y - z) + (corner - 1) * (w * w) by ring
+     = x * x + p * p + (y - z) * (y - z) + (corner - 1) * (w * w) by substituting Equality.symmetry(pReads)
+     = x * x + p * p + q * q + (corner - 1) * (w * w) by substituting Equality.symmetry(qReads)
+     = (m : ℤ) by diagonalReads
+  as scalarComputation;
+  done by Matrix.represents_by_witness(
+      Matrix.squarePlusDoublePlusScaledRankFourRepresentative(2, 1, 1, corner),
+      target := m, vector := ⟨x, y, z, w⟩,
+      computes := Matrix.squarePlusDoublePlusScaledRankFourRepresentative_coordinateTuple_computes(
+          scalarComputation := scalarComputation))
+}
+
+theorem Matrix.unitResidueThreeSquareCover_one_plus_of_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        (d core remainder : ℕ) (baseQuotient : ℕ → ℤ)
+        (coreSum : core + d = 7)
+        (remainderClass : remainder = 1 ∨ remainder = 2)
+        (baseShape : ∀ (b : ℕ).
+          ((8 * b + core : ℕ) : ℤ) = 4 * baseQuotient(b) + (remainder : ℤ))
+        (residualAdmissible : ∀ (exponent b : ℕ).
+          ¬(Natural.IsThreeSquareObstruction(4 ^ exponent * (8 * b + core))))
+        : Matrix.UnitResidueThreeSquareCover(((1 + d : ℕ) : ℤ)) := {
+  take m : ℕ;
+  suppose m ≥ 1;
+  Natural.IsThreeSquareObstruction(m) ∨ ¬(Natural.IsThreeSquareObstruction(m));
+  ¬(Natural.IsThreeSquareObstruction(m)) ∨ Natural.IsThreeSquareObstruction(m) by Or.swap;
+  done by cases {
+    case ¬(Natural.IsThreeSquareObstruction(m)) as admissible: {
+      Matrix.Represents(Matrix.sumOfThreeSquaresForm, (m : ℤ))
+          by converse(m, admissible) as represented;
+      Integer.ThreeSquareRepresentation((m : ℤ))
+          by Integer.three_square_representation_of_matrix_representation((m : ℤ), represented)
+          as coordinateRepresentation;
+      choose a : ℤ such that ∃ (b c : ℤ). a * a + b * b + c * c = (m : ℤ)
+          from coordinateRepresentation;
+      choose b : ℤ such that ∃ (c : ℤ). a * a + b * b + c * c = (m : ℤ);
+      choose c : ℤ such that a * a + b * b + c * c = (m : ℤ) as valueReads;
+      Integer.divides(2, 0) by Integer.divides_zero(2) as zeroEven;
+      Integer.divides(2, a - 0 - b)
+        ∨ Integer.divides(2, a - 0 - c)
+        ∨ Integer.divides(2, b - 0 - c)
+          by Integer.three_integers_have_compatible_pair_for_even_shift(a, b, c, 0, zeroEven)
+          as compatiblePair;
+      choose x : ℤ, p : ℤ, q : ℤ such that
+          x * x + p * p + q * q = (m : ℤ) ∧ Integer.divides(2, p - 0 - q)
+          from Integer.reorder_three_squares_for_compatible_pair(
+              a, b, c, (m : ℤ), 0, valueReads, compatiblePair);
+      x * x + p * p + q * q = (m : ℤ) as reorderedReads;
+      Integer.divides(2, p - 0 - q) as compatible;
+      witness x with witness p with witness q with witness 0 with And.introduction(
+          { x * x + p * p + q * q + (((1 + d : ℕ) : ℤ) - 1) * (0 * 0)
+               = x * x + p * p + q * q by ring
+               = (m : ℤ) by reorderedReads },
+          compatible)
+    }
+    case Natural.IsThreeSquareObstruction(m) as obstruction: {
+      choose exponent : ℕ such that ∃ (b : ℕ). m = 4 ^ exponent * (8 * b + 7)
+          from obstruction;
+      choose b : ℕ such that m = 4 ^ exponent * (8 * b + 7) as mReads;
+      let residual : ℕ := 4 ^ exponent * (8 * b + core);
+      let w : ℕ := 2 ^ exponent;
+      ¬(Natural.IsThreeSquareObstruction(residual))
+          by residualAdmissible(exponent, b) as admissible;
+      residual + w * w * d
+         = 4 ^ exponent * (8 * b + core) + (2 ^ exponent * 2 ^ exponent) * d
+         = 4 ^ exponent * (8 * b + core) + 4 ^ exponent * d
+             by Equality.congruence(
+                 (candidate : ℕ) ↦ 4 ^ exponent * (8 * b + core) + candidate * d,
+                 2 ^ exponent * 2 ^ exponent, 4 ^ exponent,
+                 Natural.two_power_square_is_four_power(exponent))
+         = 4 ^ exponent * (8 * b + (core + d))
+         = 4 ^ exponent * (8 * b + 7) by substituting coreSum
+         = m by Equality.symmetry(mReads)
+      as naturalCoverReads;
+      (residual : ℤ) + (w : ℤ) * (w : ℤ) * (d : ℤ)
+         = ((residual + w * w * d : ℕ) : ℤ) by {
+              ((residual + w * w * d : ℕ) : ℤ)
+                 = (residual : ℤ) + ((w * w * d : ℕ) : ℤ)
+                     by Natural.to_integer.add_preserves
+                 = (residual : ℤ) + ((w * w : ℕ) : ℤ) * (d : ℤ)
+                     by substituting Natural.to_integer.multiply_preserves(w * w, d)
+                 = (residual : ℤ) + ((w : ℤ) * (w : ℤ)) * (d : ℤ)
+                     by substituting Natural.to_integer.multiply_preserves(w, w);
+              done
+            }
+         = (m : ℤ) by substituting naturalCoverReads
+      as integerCoverReads;
+      Matrix.Represents(Matrix.sumOfThreeSquaresForm, (residual : ℤ))
+          by converse(residual, admissible) as represented;
+      Integer.ThreeSquareRepresentation((residual : ℤ))
+          by Integer.three_square_representation_of_matrix_representation((residual : ℤ), represented)
+          as coordinateRepresentation;
+      choose a : ℤ such that ∃ (bb cc : ℤ). a * a + bb * bb + cc * cc = (residual : ℤ)
+          from coordinateRepresentation;
+      choose bb : ℤ such that ∃ (cc : ℤ). a * a + bb * bb + cc * cc = (residual : ℤ);
+      choose cc : ℤ such that a * a + bb * bb + cc * cc = (residual : ℤ) as residualReads;
+      exponent = 0 ∨ ∃ (predecessor : ℕ). exponent = 1 + predecessor by Natural.zero_or_one_plus;
+      Integer.divides(2, a - (w : ℤ) - bb)
+        ∨ Integer.divides(2, a - (w : ℤ) - cc)
+        ∨ Integer.divides(2, bb - (w : ℤ) - cc) by cases {
+        case exponent = 0 as exponentZero: {
+          (w : ℤ)
+             = ((2 ^ exponent : ℕ) : ℤ)
+             = ((2 ^ 0 : ℕ) : ℤ) by substituting exponentZero
+             = 1 by substituting Natural.power_zero(2)
+          as wReads;
+          (residual : ℤ)
+             = ((4 ^ exponent * (8 * b + core) : ℕ) : ℤ)
+             = ((4 ^ 0 * (8 * b + core) : ℕ) : ℤ) by substituting exponentZero
+             = ((8 * b + core : ℕ) : ℤ) by substituting Natural.power_zero(4)
+             = 4 * baseQuotient(b) + (remainder : ℤ) by baseShape(b)
+          as residualBaseShape;
+          a * a + bb * bb + cc * cc
+             = (residual : ℤ) by residualReads
+             = 4 * baseQuotient(b) + (remainder : ℤ) by residualBaseShape
+          as baseValueReads;
+          Integer.divides(2, a - 1 - bb)
+            ∨ Integer.divides(2, a - 1 - cc)
+            ∨ Integer.divides(2, bb - 1 - cc)
+              by Integer.compatible_pair_of_three_squares_four_times_plus_one_or_two(
+                  a, bb, cc, baseQuotient(b), remainder, remainderClass, baseValueReads);
+          done by substituting Equality.symmetry(wReads)
+        }
+        case ∃ (predecessor : ℕ). exponent = 1 + predecessor: {
+          choose predecessor : ℕ such that exponent = 1 + predecessor as exponentReads;
+          (w : ℤ)
+             = ((2 ^ exponent : ℕ) : ℤ)
+             = ((2 ^ (1 + predecessor) : ℕ) : ℤ) by substituting exponentReads
+             = ((2 * 2 ^ predecessor : ℕ) : ℤ) by substituting Natural.power_one_plus(2, predecessor)
+             = 2 * ((2 ^ predecessor : ℕ) : ℤ) by Natural.to_integer.multiply_preserves
+          as wReads;
+          Integer.divides(2, (w : ℤ)) by {
+            witness ((2 ^ predecessor : ℕ) : ℤ) with wReads
+          } as wEven;
+          done by Integer.three_integers_have_compatible_pair_for_even_shift(a, bb, cc, (w : ℤ), wEven)
+        }
+      }
+      as compatiblePair;
+      choose x : ℤ, p : ℤ, q : ℤ such that
+          x * x + p * p + q * q = (residual : ℤ)
+          ∧ Integer.divides(2, p - (w : ℤ) - q)
+          from Integer.reorder_three_squares_for_compatible_pair(
+              a, bb, cc, (residual : ℤ), (w : ℤ), residualReads, compatiblePair);
+      x * x + p * p + q * q = (residual : ℤ) as reorderedReads;
+      Integer.divides(2, p - (w : ℤ) - q) as compatible;
+      (((1 + d : ℕ) : ℤ) - 1) = (d : ℤ) by {
+        ((1 + d : ℕ) : ℤ) - 1
+           = (1 : ℤ) + (d : ℤ) - 1 by substituting Natural.to_integer.add_preserves(1, d)
+           = (d : ℤ) by ring;
+        done
+      }
+      as coefficientReads;
+      witness x with witness p with witness q with witness (w : ℤ) with And.introduction(
+          { x * x + p * p + q * q + (((1 + d : ℕ) : ℤ) - 1) * ((w : ℤ) * (w : ℤ))
+               = x * x + p * p + q * q + (d : ℤ) * ((w : ℤ) * (w : ℤ))
+                   by substituting coefficientReads
+               = (residual : ℤ) + (d : ℤ) * ((w : ℤ) * (w : ℤ))
+                   by substituting reorderedReads
+               = (residual : ℤ) + (w : ℤ) * (w : ℤ) * (d : ℤ) by ring
+               = (m : ℤ) by integerCoverReads },
+          compatible)
+    }
+  }
+}
+
+theorem Matrix.unitResidueThreeSquareCover_two_of_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.UnitResidueThreeSquareCover(2) := {
+  done by Matrix.unitResidueThreeSquareCover_one_plus_of_converse(
+      converse, d := 1, core := 6, remainder := 2,
+      baseQuotient := (b : ℕ) ↦ 2 * (b : ℤ) + 1,
+      coreSum := done,
+      remainderClass := Or.introduceRight(done),
+      baseShape := (b : ℕ) ↦ Integer.eight_times_plus_six_is_four_times_plus_two(b),
+      residualAdmissible := (exponent b : ℕ) ↦
+        Natural.four_power_times_eight_plus_six_not_obstruction(exponent, b))
+}
+
+theorem Matrix.unitResidueThreeSquareCover_three_of_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.UnitResidueThreeSquareCover(3) := {
+  done by Matrix.unitResidueThreeSquareCover_one_plus_of_converse(
+      converse, d := 2, core := 5, remainder := 1,
+      baseQuotient := (b : ℕ) ↦ 2 * (b : ℤ) + 1,
+      coreSum := done,
+      remainderClass := Or.introduceLeft(done),
+      baseShape := (b : ℕ) ↦ Integer.eight_times_plus_five_is_four_times_plus_one(b),
+      residualAdmissible := (exponent b : ℕ) ↦
+        Natural.four_power_times_eight_plus_five_not_obstruction(exponent, b))
+}
+
+theorem Matrix.unitResidueThreeSquareCover_six_of_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.UnitResidueThreeSquareCover(6) := {
+  done by Matrix.unitResidueThreeSquareCover_one_plus_of_converse(
+      converse, d := 5, core := 2, remainder := 2,
+      baseQuotient := (b : ℕ) ↦ 2 * (b : ℤ),
+      coreSum := done,
+      remainderClass := Or.introduceRight(done),
+      baseShape := (b : ℕ) ↦ Integer.eight_times_plus_two_is_four_times_plus_two(b),
+      residualAdmissible := (exponent b : ℕ) ↦
+        Natural.four_power_times_eight_plus_two_not_obstruction(exponent, b))
+}
+
+theorem Matrix.unitResidueThreeSquareCover_seven_of_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.UnitResidueThreeSquareCover(7) := {
+  done by Matrix.unitResidueThreeSquareCover_one_plus_of_converse(
+      converse, d := 6, core := 1, remainder := 1,
+      baseQuotient := (b : ℕ) ↦ 2 * (b : ℤ),
+      coreSum := done,
+      remainderClass := Or.introduceLeft(done),
+      baseShape := (b : ℕ) ↦ Integer.eight_times_plus_one_is_four_times_plus_one(b),
+      residualAdmissible := (exponent b : ℕ) ↦
+        Natural.four_power_times_eight_plus_one_not_obstruction(exponent, b))
+}
+
+theorem Matrix.weightedD2S1R1C2_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(2, 1, 1, 2)) := {
+  done by Matrix.weightedD2UnitResidue_universal_of_cover(
+      2, Matrix.unitResidueThreeSquareCover_two_of_converse(converse))
+}
+
+theorem Matrix.weightedD2S1R1C3_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(2, 1, 1, 3)) := {
+  done by Matrix.weightedD2UnitResidue_universal_of_cover(
+      3, Matrix.unitResidueThreeSquareCover_three_of_converse(converse))
+}
+
+theorem Matrix.weightedD2S1R1C6_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(2, 1, 1, 6)) := {
+  done by Matrix.weightedD2UnitResidue_universal_of_cover(
+      6, Matrix.unitResidueThreeSquareCover_six_of_converse(converse))
+}
+
+theorem Matrix.weightedD2S1R1C7_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(2, 1, 1, 7)) := {
+  done by Matrix.weightedD2UnitResidue_universal_of_cover(
+      7, Matrix.unitResidueThreeSquareCover_seven_of_converse(converse))
+}

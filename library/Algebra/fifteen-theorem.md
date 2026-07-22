@@ -173,6 +173,17 @@ rank-four escalator by 207 selected normal forms are.
   `Matrix.ThreeSquareResidualCover(d)` isolates their remaining arithmetic
   input, and `Matrix.selectedRankFourPilot_universal` turns the seven such
   residual-cover facts into universality of the whole selected pilot family.
+  `Algebra/rank_four_d2_zero_residue_universality` then transports those
+  covers through the integral parity equivalence between three squares and
+  `x^2+2y^2+2z^2`, proving six more selected forms conditionally universal.
+  `Algebra/rank_four_d2_unit_residue_universality` handles the four selected
+  forms `x^2+2y^2+2z^2+2yw+2zw+c w^2`, for `c=2,3,6,7`.  Its reusable
+  identity
+  `x^2+2y^2+2z^2+2yw+2zw+c w^2 = x^2+p^2+q^2+(c-1)w^2`
+  has `p=y+z+w` and `q=y-z`; a modulo-four lemma arranges the parity needed
+  to recover `y,z`.  Consequently 17 selected rank-four forms now have
+  complete universality proofs conditional only on the three-squares
+  converse.
   `Algebra/rank_four_completed_cover_universality` gives fraction-free
   completed-square interfaces for all other constructors. Its scaled-square,
   weighted, and odd cover predicates account for the remaining 32, 140, and
