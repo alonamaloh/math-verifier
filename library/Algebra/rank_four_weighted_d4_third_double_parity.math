@@ -1,0 +1,227 @@
+-- Algebra/rank_four_weighted_d4_third_double_parity.math
+--
+-- Integral parity transforms for the three even base residuals left by the
+-- selected odd corners in the weighted d=4, third-residue-two family.
+
+module Algebra.rank_four_weighted_d4_third_double_parity
+
+import Algebra.rank_four_weighted_d4_third_double_cover
+
+theorem Integer.odd_root_of_odd_square
+        (u q : ℤ) (squareReads : u * u = 2 * q + 1)
+        : ∃ (half : ℤ). u = 2 * half + 1 := {
+  (u - 1) * (u - 1)
+     = u * u - 2 * u + 1 by ring
+     = (2 * q + 1) - 2 * u + 1 by substituting squareReads
+     = 2 * (q - u + 1) by ring
+  as differenceSquareReads;
+  Integer.divides(2, (u - 1) * (u - 1)) by {
+    witness q - u + 1 with differenceSquareReads
+  };
+  Integer.divides(2, u - 1) by Integer.two_divides_of_two_divides_square(u - 1, done);
+  choose half : ℤ such that u - 1 = 2 * half as differenceReads;
+  u = 2 * half + 1 by linear_combination(differenceReads);
+  witness half with done
+}
+
+theorem Integer.one_two_four_eight_times_plus_two_has_odd_completed_coordinate
+        (a y c q : ℤ)
+        (valueReads : a * a + 2 * (y * y) + 4 * (c * c) = 8 * q + 2)
+        : ∃ (x newY z : ℤ).
+            x * x + 2 * (newY * newY) + (2 * z + 1) * (2 * z + 1) = 8 * q + 2 := {
+  a * a = 2 * (4 * q + 1 - y * y - 2 * (c * c)) by linear_combination(valueReads)
+      as aSquareEvenReads;
+  Integer.divides(2, a * a) by {
+    witness 4 * q + 1 - y * y - 2 * (c * c) with aSquareEvenReads
+  };
+  Integer.divides(2, a) by Integer.two_divides_of_two_divides_square(a, done);
+  choose h : ℤ such that a = 2 * h as aReads;
+  4 * (h * h) + 2 * (y * y) + 4 * (c * c)
+     = (2 * h) * (2 * h) + 2 * (y * y) + 4 * (c * c) by ring
+     = a * (2 * h) + 2 * (y * y) + 4 * (c * c) by substituting Equality.symmetry(aReads)
+     = a * a + 2 * (y * y) + 4 * (c * c) by substituting Equality.symmetry(aReads)
+     = 8 * q + 2 by valueReads
+  as halvedAReads;
+  2 * (y * y) = 2 * (2 * (2 * q - h * h - c * c) + 1)
+      by linear_combination(halvedAReads) as doubledYSquareReads;
+  (2 : ℤ) ≠ 0 as twoNonzero;
+  y * y = 2 * (2 * q - h * h - c * c) + 1 by Integer.multiply_cancel_left_by_nonzero(
+      y * y, 2 * (2 * q - h * h - c * c) + 1, 2, twoNonzero, doubledYSquareReads)
+      as ySquareOddReads;
+  choose d : ℤ such that y = 2 * d + 1
+      as yReads from Integer.odd_root_of_odd_square(y, 2 * q - h * h - c * c, ySquareOddReads);
+  4 * (h * h) + 2 * ((2 * d + 1) * (2 * d + 1)) + 4 * (c * c)
+     = 4 * (h * h) + 2 * (y * y) + 4 * (c * c) by substituting Equality.symmetry(yReads)
+     = 8 * q + 2 by halvedAReads
+  as specializedReads;
+  4 * ((h + c) * (h + c)) = 4 * (2 * (q - d * d - d + h * c))
+      by linear_combination(specializedReads) as scaledSumSquareReads;
+  (4 : ℤ) ≠ 0 as fourNonzero;
+  (h + c) * (h + c) = 2 * (q - d * d - d + h * c)
+      by Integer.multiply_cancel_left_by_nonzero(
+          (h + c) * (h + c), 2 * (q - d * d - d + h * c), 4, fourNonzero, scaledSumSquareReads)
+      as sumSquareEvenReads;
+  Integer.divides(2, (h + c) * (h + c)) by {
+    witness q - d * d - d + h * c with sumSquareEvenReads
+  };
+  Integer.divides(2, h + c) by Integer.two_divides_of_two_divides_square(h + c, done);
+  choose s : ℤ such that h + c = 2 * s as sumReads;
+  let x : ℤ := h + c + y;
+  let newY : ℤ := h - c;
+  let z : ℤ := s - d - 1;
+  h + c - y
+     = 2 * s - y by substituting sumReads
+     = 2 * s - (2 * d + 1) by substituting yReads
+     = 2 * z + 1 by ring
+  as completedReads;
+  witness x with witness newY with witness z with
+    x * x + 2 * (newY * newY) + (2 * z + 1) * (2 * z + 1)
+       = (h + c + y) * (h + c + y) + 2 * ((h - c) * (h - c)) + (h + c - y) * (h + c - y)
+           by substituting Equality.symmetry(completedReads)
+       = (2 * h) * (2 * h) + 2 * (y * y) + 4 * (c * c) by ring
+       = a * (2 * h) + 2 * (y * y) + 4 * (c * c) by substituting Equality.symmetry(aReads)
+       = a * a + 2 * (y * y) + 4 * (c * c) by substituting Equality.symmetry(aReads)
+       = 8 * q + 2 by valueReads
+}
+
+theorem Integer.one_two_four_eight_times_plus_four_has_odd_completed_coordinate
+        (a y c q : ℤ)
+        (valueReads : a * a + 2 * (y * y) + 4 * (c * c) = 8 * q + 4)
+        : ∃ (x newY z : ℤ).
+            x * x + 2 * (newY * newY) + (2 * z + 1) * (2 * z + 1) = 8 * q + 4 := {
+  a * a = 2 * (4 * q + 2 - y * y - 2 * (c * c)) by linear_combination(valueReads)
+      as aSquareEvenReads;
+  Integer.divides(2, a * a) by {
+    witness 4 * q + 2 - y * y - 2 * (c * c) with aSquareEvenReads
+  };
+  Integer.divides(2, a) by Integer.two_divides_of_two_divides_square(a, done);
+  choose h : ℤ such that a = 2 * h as aReads;
+  4 * (h * h) + 2 * (y * y) + 4 * (c * c)
+     = (2 * h) * (2 * h) + 2 * (y * y) + 4 * (c * c) by ring
+     = a * (2 * h) + 2 * (y * y) + 4 * (c * c) by substituting Equality.symmetry(aReads)
+     = a * a + 2 * (y * y) + 4 * (c * c) by substituting Equality.symmetry(aReads)
+     = 8 * q + 4 by valueReads
+  as halvedAReads;
+  2 * (y * y) = 2 * (2 * (2 * q + 1 - h * h - c * c))
+      by linear_combination(halvedAReads) as doubledYSquareReads;
+  (2 : ℤ) ≠ 0 as twoNonzero;
+  y * y = 2 * (2 * q + 1 - h * h - c * c) by Integer.multiply_cancel_left_by_nonzero(
+      y * y, 2 * (2 * q + 1 - h * h - c * c), 2, twoNonzero, doubledYSquareReads)
+      as ySquareEvenReads;
+  Integer.divides(2, y * y) by {
+    witness 2 * q + 1 - h * h - c * c with ySquareEvenReads
+  };
+  Integer.divides(2, y) by Integer.two_divides_of_two_divides_square(y, done);
+  choose d : ℤ such that y = 2 * d as yReads;
+  4 * (h * h) + 2 * ((2 * d) * (2 * d)) + 4 * (c * c)
+     = 4 * (h * h) + 2 * (y * y) + 4 * (c * c) by substituting Equality.symmetry(yReads)
+     = 8 * q + 4 by halvedAReads
+  as specializedReads;
+  4 * ((h + c) * (h + c)) = 4 * (2 * (q - d * d + h * c) + 1)
+      by linear_combination(specializedReads) as scaledSumSquareReads;
+  (4 : ℤ) ≠ 0 as fourNonzero;
+  (h + c) * (h + c) = 2 * (q - d * d + h * c) + 1
+      by Integer.multiply_cancel_left_by_nonzero(
+          (h + c) * (h + c), 2 * (q - d * d + h * c) + 1, 4, fourNonzero, scaledSumSquareReads)
+      as sumSquareOddReads;
+  choose s : ℤ such that h + c = 2 * s + 1
+      as sumReads from Integer.odd_root_of_odd_square(h + c, q - d * d + h * c, sumSquareOddReads);
+  let x : ℤ := h + c + y;
+  let newY : ℤ := h - c;
+  let z : ℤ := s - d;
+  h + c - y
+     = (2 * s + 1) - y by substituting sumReads
+     = (2 * s + 1) - 2 * d by substituting yReads
+     = 2 * z + 1 by ring
+  as completedReads;
+  witness x with witness newY with witness z with
+    x * x + 2 * (newY * newY) + (2 * z + 1) * (2 * z + 1)
+       = (h + c + y) * (h + c + y) + 2 * ((h - c) * (h - c)) + (h + c - y) * (h + c - y)
+           by substituting Equality.symmetry(completedReads)
+       = (2 * h) * (2 * h) + 2 * (y * y) + 4 * (c * c) by ring
+       = a * (2 * h) + 2 * (y * y) + 4 * (c * c) by substituting Equality.symmetry(aReads)
+       = a * a + 2 * (y * y) + 4 * (c * c) by substituting Equality.symmetry(aReads)
+       = 8 * q + 4 by valueReads
+}
+
+theorem Matrix.oneTwoFour_core_ten_odd_completed_base_control
+        : Matrix.OneTwoFourOddCompletedBaseControl(10) := {
+  take b : ℕ;
+  take a : ℤ;
+  take y : ℤ;
+  take c : ℤ;
+  suppose a * a + 2 * (y * y) + 4 * (c * c) = ((16 * b + 10 : ℕ) : ℤ) as represented;
+  ((16 * b + 10 : ℕ) : ℤ) = 8 * ((2 * b + 1 : ℕ) : ℤ) + 2 by {
+    ((16 * b + 10 : ℕ) : ℤ)
+       = ((8 * (2 * b + 1) + 2 : ℕ) : ℤ) by ring
+       = ((8 * (2 * b + 1) : ℕ) : ℤ) + 2 by Natural.to_integer.add_preserves
+       = 8 * ((2 * b + 1 : ℕ) : ℤ) + 2
+           by substituting Natural.to_integer.multiply_preserves(8, 2 * b + 1);
+    done
+  }
+  as targetReads;
+  a * a + 2 * (y * y) + 4 * (c * c) = 8 * ((2 * b + 1 : ℕ) : ℤ) + 2
+      by substituting targetReads as affineRepresentation;
+  choose x : ℤ, newY : ℤ, z : ℤ such that
+      x * x + 2 * (newY * newY) + (2 * z + 1) * (2 * z + 1) = 8 * ((2 * b + 1 : ℕ) : ℤ) + 2
+      as transformed from Integer.one_two_four_eight_times_plus_two_has_odd_completed_coordinate(
+          a, y, c, ((2 * b + 1 : ℕ) : ℤ), affineRepresentation);
+  witness x with witness newY with witness z with
+    x * x + 2 * (newY * newY) + (2 * z + 1) * (2 * z + 1)
+       = 8 * ((2 * b + 1 : ℕ) : ℤ) + 2 by transformed
+       = ((16 * b + 10 : ℕ) : ℤ) by Equality.symmetry(targetReads)
+}
+
+theorem Matrix.oneTwoFour_core_four_odd_completed_base_control
+        : Matrix.OneTwoFourOddCompletedBaseControl(4) := {
+  take b : ℕ;
+  take a : ℤ;
+  take y : ℤ;
+  take c : ℤ;
+  suppose a * a + 2 * (y * y) + 4 * (c * c) = ((16 * b + 4 : ℕ) : ℤ) as represented;
+  ((16 * b + 4 : ℕ) : ℤ) = 8 * ((2 * b : ℕ) : ℤ) + 4 by {
+    ((16 * b + 4 : ℕ) : ℤ)
+       = ((8 * (2 * b) + 4 : ℕ) : ℤ) by ring
+       = ((8 * (2 * b) : ℕ) : ℤ) + 4 by Natural.to_integer.add_preserves
+       = 8 * ((2 * b : ℕ) : ℤ) + 4 by substituting Natural.to_integer.multiply_preserves(8, 2 * b);
+    done
+  }
+  as targetReads;
+  a * a + 2 * (y * y) + 4 * (c * c) = 8 * ((2 * b : ℕ) : ℤ) + 4
+      by substituting targetReads as affineRepresentation;
+  choose x : ℤ, newY : ℤ, z : ℤ such that
+      x * x + 2 * (newY * newY) + (2 * z + 1) * (2 * z + 1) = 8 * ((2 * b : ℕ) : ℤ) + 4
+      as transformed from Integer.one_two_four_eight_times_plus_four_has_odd_completed_coordinate(
+          a, y, c, ((2 * b : ℕ) : ℤ), affineRepresentation);
+  witness x with witness newY with witness z with
+    x * x + 2 * (newY * newY) + (2 * z + 1) * (2 * z + 1)
+       = 8 * ((2 * b : ℕ) : ℤ) + 4 by transformed
+       = ((16 * b + 4 : ℕ) : ℤ) by Equality.symmetry(targetReads)
+}
+
+theorem Matrix.oneTwoFour_core_two_odd_completed_base_control
+        : Matrix.OneTwoFourOddCompletedBaseControl(2) := {
+  take b : ℕ;
+  take a : ℤ;
+  take y : ℤ;
+  take c : ℤ;
+  suppose a * a + 2 * (y * y) + 4 * (c * c) = ((16 * b + 2 : ℕ) : ℤ) as represented;
+  ((16 * b + 2 : ℕ) : ℤ) = 8 * ((2 * b : ℕ) : ℤ) + 2 by {
+    ((16 * b + 2 : ℕ) : ℤ)
+       = ((8 * (2 * b) + 2 : ℕ) : ℤ) by ring
+       = ((8 * (2 * b) : ℕ) : ℤ) + 2 by Natural.to_integer.add_preserves
+       = 8 * ((2 * b : ℕ) : ℤ) + 2 by substituting Natural.to_integer.multiply_preserves(8, 2 * b);
+    done
+  }
+  as targetReads;
+  a * a + 2 * (y * y) + 4 * (c * c) = 8 * ((2 * b : ℕ) : ℤ) + 2
+      by substituting targetReads as affineRepresentation;
+  choose x : ℤ, newY : ℤ, z : ℤ such that
+      x * x + 2 * (newY * newY) + (2 * z + 1) * (2 * z + 1) = 8 * ((2 * b : ℕ) : ℤ) + 2
+      as transformed from Integer.one_two_four_eight_times_plus_two_has_odd_completed_coordinate(
+          a, y, c, ((2 * b : ℕ) : ℤ), affineRepresentation);
+  witness x with witness newY with witness z with
+    x * x + 2 * (newY * newY) + (2 * z + 1) * (2 * z + 1)
+       = 8 * ((2 * b : ℕ) : ℤ) + 2 by transformed
+       = ((16 * b + 2 : ℕ) : ℤ) by Equality.symmetry(targetReads)
+}

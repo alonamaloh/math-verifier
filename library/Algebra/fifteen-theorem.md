@@ -274,6 +274,19 @@ lemma handles every nonzero residual core.  This closes the five universal
 diagonal extensions `c=6,...,10`; `c=5` is correctly omitted because it is
 one of the exact-truant-15 forms.  The selected conditional-universality
 total is now 101.
+For the weighted-`d=4` forms with third border residue two, completing the
+last square gives
+`Q=x²+2y²+(2z+w)²+(c-1)w²`.  A witness for
+`x²+2y²+4z²` supplies an even completed coordinate whenever `w` is
+even.  At 4-adic exponent zero, the six even selected corners leave an odd
+residual, and the existing parity-ordering transform supplies an odd
+completed coordinate.  The remaining cores 10, 4, and 2 use the integral
+norm-preserving transform
+`(a,2c,y) ↦ (a/2+c+y,a/2+c-y,a/2-c)`; their residue classes modulo eight
+force the completed output coordinate to be odd.  Thus
+`Algebra/rank_four_weighted_d4_third_double_covers` closes all nine selected
+corners `c=4,5,6,8,10,11,12,13,14` from the same one-two-four converse and
+raises the selected conditional total to 110.
   `Algebra/rank_four_completed_cover_universality` gives fraction-free
   completed-square interfaces for all other constructors. Its scaled-square,
   weighted, and odd cover predicates account for the 32, 140, and 28
