@@ -1,0 +1,306 @@
+-- Algebra/rank_four_d2_third_residue_universality.math
+--
+-- Universality of the six selected forms
+--
+--   x² + 2y² + 2z² + 2zw + c w²,   2 ≤ c ≤ 7.
+--
+-- For w=1, doubling and completing the z-square gives
+--
+--   2Q = (2y)² + (2z+1)² + 2x² + (2c-1).
+--
+-- Above the small range m<c, the residual is 2(m-c)+1.  Twice this
+-- odd residual is 4(m-c)+2, hence is admissible for three squares.
+-- The odd residual also forces the first two coordinates of a
+-- x²+y²+2z² representation to have opposite parity.
+
+module Algebra.rank_four_d2_third_residue_universality
+
+import Algebra.rank_four_d2_unit_residue_universality
+import Algebra.rank_four_short_values_weighted_d2_chunk0_generated
+import Algebra.rank_four_short_values_weighted_d2_chunk1_generated
+
+theorem Integer.odd_square_square_double_has_even_odd_order
+        (a b x offset : ℤ)
+        (valueReads : a * a + b * b + 2 * (x * x) = 2 * offset + 1)
+        : ∃ (u v y z : ℤ).
+            u * u + v * v + 2 * (x * x) = 2 * offset + 1
+            ∧ u = 2 * y
+            ∧ v = 2 * z + 1 := {
+  choose quotientA : ℤ, remainderA : ℕ such that
+      a = 2 * quotientA + (remainderA : ℤ) ∧ remainderA < 2
+      from Integer.divide_by_positive(a, 2, done);
+  choose quotientB : ℤ, remainderB : ℕ such that
+      b = 2 * quotientB + (remainderB : ℤ) ∧ remainderB < 2
+      from Integer.divide_by_positive(b, 2, done);
+  a = 2 * quotientA + (remainderA : ℤ) as aReads;
+  b = 2 * quotientB + (remainderB : ℤ) as bReads;
+  remainderA < 2 as remainderABelow;
+  remainderB < 2 as remainderBBelow;
+  remainderA = 0 ∨ remainderA = 1 by Natural.below_two(remainderA, remainderABelow);
+  remainderB = 0 ∨ remainderB = 1 by Natural.below_two(remainderB, remainderBBelow);
+  done by cases {
+    case remainderA = 0 as remainderAZero: {
+      a = 2 * quotientA + (remainderA : ℤ) by aReads
+        = 2 * quotientA + 0 by substituting remainderAZero
+        = 2 * quotientA
+      as aEven;
+      done by cases {
+        case remainderB = 0 as remainderBZero: {
+          b = 2 * quotientB + (remainderB : ℤ) by bReads
+            = 2 * quotientB + 0 by substituting remainderBZero
+            = 2 * quotientB
+          as bEven;
+          2 * (2 * (quotientA * quotientA) + 2 * (quotientB * quotientB) + x * x) + 0
+             = (2 * quotientA) * (2 * quotientA)
+               + (2 * quotientB) * (2 * quotientB) + 2 * (x * x)
+                 by ring
+             = a * a + (2 * quotientB) * (2 * quotientB) + 2 * (x * x)
+                 by substituting Equality.symmetry(aEven)
+             = a * a + b * b + 2 * (x * x) by substituting Equality.symmetry(bEven)
+          as leftNormalizes;
+          2 * (2 * (quotientA * quotientA) + 2 * (quotientB * quotientB) + x * x) + 0
+             = a * a + b * b + 2 * (x * x) by leftNormalizes
+             = 2 * offset + 1 by valueReads
+          as distinctResiduesEqual;
+          False by Integer.distinct_affine_residues_not_equal(
+              2, 0, 1,
+              2 * (quotientA * quotientA) + 2 * (quotientB * quotientB) + x * x,
+              offset, done, done, done, distinctResiduesEqual);
+          done
+        }
+        case remainderB = 1 as remainderBOne: {
+          b = 2 * quotientB + (remainderB : ℤ) by bReads
+            = 2 * quotientB + 1 by substituting remainderBOne
+          as bOdd;
+          witness a with witness b with witness quotientA with witness quotientB with
+            And.introduction(valueReads, And.introduction(aEven, bOdd))
+        }
+      }
+    }
+    case remainderA = 1 as remainderAOne: {
+      a = 2 * quotientA + (remainderA : ℤ) by aReads
+        = 2 * quotientA + 1 by substituting remainderAOne
+      as aOdd;
+      done by cases {
+        case remainderB = 0 as remainderBZero: {
+          b = 2 * quotientB + (remainderB : ℤ) by bReads
+            = 2 * quotientB + 0 by substituting remainderBZero
+            = 2 * quotientB
+          as bEven;
+          witness b with witness a with witness quotientB with witness quotientA with
+            And.introduction(
+                { b * b + a * a + 2 * (x * x)
+                     = a * a + b * b + 2 * (x * x) by ring
+                     = 2 * offset + 1 by valueReads },
+                And.introduction(bEven, aOdd))
+        }
+        case remainderB = 1 as remainderBOne: {
+          b = 2 * quotientB + (remainderB : ℤ) by bReads
+            = 2 * quotientB + 1 by substituting remainderBOne
+          as bOdd;
+          let evenQuotient : ℤ :=
+            2 * (quotientA * quotientA) + 2 * quotientA
+              + 2 * (quotientB * quotientB) + 2 * quotientB + 1 + x * x;
+          2 * evenQuotient + 0
+             = (2 * quotientA + 1) * (2 * quotientA + 1)
+               + (2 * quotientB + 1) * (2 * quotientB + 1) + 2 * (x * x) by ring
+             = a * a + (2 * quotientB + 1) * (2 * quotientB + 1) + 2 * (x * x)
+                 by substituting Equality.symmetry(aOdd)
+             = a * a + b * b + 2 * (x * x) by substituting Equality.symmetry(bOdd)
+             = 2 * offset + 1 by valueReads
+          as distinctResiduesEqual;
+          False by Integer.distinct_affine_residues_not_equal(
+              2, 0, 1, evenQuotient, offset,
+              done, done, done, distinctResiduesEqual);
+          done
+        }
+      }
+    }
+  }
+}
+
+theorem Matrix.weightedD2ThirdResidue_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        (corner oddCoefficient : ℕ)
+        (coefficientReads : 1 + oddCoefficient = 2 * corner)
+        (cornerBelowSixteen : corner < 16)
+        (shortValues : ∀ (s : ℕ). s ≥ 1 → s < 16 →
+          Matrix.Represents(
+            Matrix.squarePlusDoublePlusScaledRankFourRepresentative(2, 0, 1, (corner : ℤ)),
+            (s : ℤ)))
+        : Matrix.IsUniversal(
+            Matrix.squarePlusDoublePlusScaledRankFourRepresentative(2, 0, 1, (corner : ℤ))) := {
+  take m : ℕ;
+  suppose m ≥ 1 as positive;
+  m < corner ∨ corner ≤ m by Natural.lt_or_le;
+  done by cases {
+    case m < corner as small: {
+      m < corner < 16;
+      done by shortValues(m, positive, done)
+    }
+    case corner ≤ m as cornerLeM: {
+      choose offset : ℕ such that m = corner + offset as mReads
+          from Natural.subtraction_witness(corner, m, cornerLeM);
+      let residual : ℕ := 2 * offset + 1;
+      2 * residual
+         = 2 * (2 * offset + 1)
+         = 4 * offset + 2
+      as doubleResidualReads;
+      ¬(Natural.IsThreeSquareObstruction(4 * offset + 2))
+          by Natural.four_times_plus_two_not_obstruction(offset) as admissibleShape;
+      ¬(Natural.IsThreeSquareObstruction(2 * residual)) by {
+        suppose Natural.IsThreeSquareObstruction(2 * residual) as obstruction;
+        Natural.IsThreeSquareObstruction(4 * offset + 2) by substituting doubleResidualReads;
+        done by admissibleShape(done)
+      }
+      as doubleResidualAdmissible;
+      Matrix.Represents(Matrix.sumOfThreeSquaresForm, ((2 * residual : ℕ) : ℤ))
+          by converse(2 * residual, doubleResidualAdmissible) as matrixRepresentation;
+      Integer.ThreeSquareRepresentation(((2 * residual : ℕ) : ℤ))
+          by Integer.three_square_representation_of_matrix_representation(
+              ((2 * residual : ℕ) : ℤ), matrixRepresentation)
+          as castRepresentation;
+      ((2 * residual : ℕ) : ℤ) = 2 * (residual : ℤ)
+          by Natural.to_integer.multiply_preserves(2, residual) as doubleCastReads;
+      Integer.ThreeSquareRepresentation(2 * (residual : ℤ)) by {
+        Integer.ThreeSquareRepresentation(((2 * residual : ℕ) : ℤ)) by castRepresentation;
+        done by substituting doubleCastReads
+      };
+      choose a : ℤ such that ∃ (b x : ℤ).
+          a * a + b * b + 2 * (x * x) = (residual : ℤ)
+          from Integer.three_square_representation_of_double_to_square_square_double(
+              (residual : ℤ), done);
+      choose b : ℤ such that ∃ (x : ℤ).
+          a * a + b * b + 2 * (x * x) = (residual : ℤ);
+      choose x : ℤ such that
+          a * a + b * b + 2 * (x * x) = (residual : ℤ) as residualRepresented;
+      (residual : ℤ)
+         = ((2 * offset + 1 : ℕ) : ℤ)
+         = ((2 * offset : ℕ) : ℤ) + 1 by Natural.to_integer.add_preserves
+         = 2 * (offset : ℤ) + 1 by substituting Natural.to_integer.multiply_preserves(2, offset)
+      as residualCastReads;
+      a * a + b * b + 2 * (x * x)
+         = (residual : ℤ) by residualRepresented
+         = 2 * (offset : ℤ) + 1 by residualCastReads
+      as oddValueReads;
+      choose u : ℤ, v : ℤ, y : ℤ, z : ℤ such that
+          u * u + v * v + 2 * (x * x) = 2 * (offset : ℤ) + 1
+          ∧ u = 2 * y
+          ∧ v = 2 * z + 1
+          from Integer.odd_square_square_double_has_even_odd_order(
+              a, b, x, (offset : ℤ), oddValueReads);
+      u * u + v * v + 2 * (x * x) = 2 * (offset : ℤ) + 1 as orderedRepresentation;
+      u = 2 * y as uReads;
+      v = 2 * z + 1 as vReads;
+      oddCoefficient + residual
+         = oddCoefficient + (2 * offset + 1)
+         = (1 + oddCoefficient) + 2 * offset
+         = 2 * corner + 2 * offset by substituting coefficientReads
+         = 2 * (corner + offset)
+         = 2 * m by substituting Equality.symmetry(mReads)
+      as naturalTargetReads;
+      (oddCoefficient : ℤ) + (residual : ℤ)
+         = ((oddCoefficient + residual : ℕ) : ℤ)
+             by Equality.symmetry(Natural.to_integer.add_preserves(oddCoefficient, residual))
+         = ((2 * m : ℕ) : ℤ) by substituting naturalTargetReads
+         = 2 * (m : ℤ) by Natural.to_integer.multiply_preserves
+      as integerTargetReads;
+      (oddCoefficient : ℤ) = 2 * (corner : ℤ) - 1 by {
+        (1 : ℤ) + (oddCoefficient : ℤ)
+           = ((1 + oddCoefficient : ℕ) : ℤ)
+               by Equality.symmetry(Natural.to_integer.add_preserves(1, oddCoefficient))
+           = ((2 * corner : ℕ) : ℤ) by substituting coefficientReads
+           = 2 * (corner : ℤ) by Natural.to_integer.multiply_preserves
+        as castCoefficientReads;
+        linear_combination(castCoefficientReads)
+      }
+      as integerCoefficientReads;
+      2 * (x * x + 2 * (y * y) + 2 * (z * z) + 2 * z + (corner : ℤ))
+         = 2 * (x * x) + (2 * y) * (2 * y) + (2 * z + 1) * (2 * z + 1)
+           + (2 * (corner : ℤ) - 1) by ring
+         = 2 * (x * x) + u * u + (2 * z + 1) * (2 * z + 1)
+           + (2 * (corner : ℤ) - 1) by substituting Equality.symmetry(uReads)
+         = 2 * (x * x) + u * u + v * v + (2 * (corner : ℤ) - 1)
+             by substituting Equality.symmetry(vReads)
+         = 2 * (x * x) + u * u + v * v + (oddCoefficient : ℤ)
+             by substituting Equality.symmetry(integerCoefficientReads)
+         = (u * u + v * v + 2 * (x * x)) + (oddCoefficient : ℤ) by ring
+         = (2 * (offset : ℤ) + 1) + (oddCoefficient : ℤ)
+             by substituting orderedRepresentation
+         = (residual : ℤ) + (oddCoefficient : ℤ) by substituting Equality.symmetry(residualCastReads)
+         = (oddCoefficient : ℤ) + (residual : ℤ) by ring
+         = 2 * (m : ℤ) by integerTargetReads
+      as doubledScalarReads;
+      (2 : ℤ) ≠ 0 as twoNonzero;
+      x * x + 2 * (y * y) + 2 * (z * z) + 2 * z + (corner : ℤ) = (m : ℤ)
+          by Integer.multiply_cancel_left_by_nonzero(
+              x * x + 2 * (y * y) + 2 * (z * z) + 2 * z + (corner : ℤ),
+              (m : ℤ), 2, twoNonzero, doubledScalarReads)
+          as scalarCore;
+      x * x + 2 * (y * y) + 2 * (z * z)
+        + 2 * 0 * y * 1 + 2 * 1 * z * 1 + (corner : ℤ) * (1 * 1)
+         = x * x + 2 * (y * y) + 2 * (z * z) + 2 * z + (corner : ℤ) by ring
+         = (m : ℤ) by scalarCore
+      as scalarComputation;
+      done by Matrix.represents_by_witness(
+          Matrix.squarePlusDoublePlusScaledRankFourRepresentative(2, 0, 1, (corner : ℤ)),
+          target := m, vector := ⟨x, y, z, 1⟩,
+          computes := Matrix.squarePlusDoublePlusScaledRankFourRepresentative_coordinateTuple_computes(
+              scalarComputation := scalarComputation))
+    }
+  }
+}
+
+theorem Matrix.weightedD2S0R1C2_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(2, 0, 1, 2)) := {
+  done by Matrix.weightedD2ThirdResidue_universal_of_three_squares_converse(
+      converse, corner := 2, oddCoefficient := 3,
+      coefficientReads := done, cornerBelowSixteen := done,
+      shortValues := Matrix.rankFourRepresentsThroughFifteen_weighted_d2_s0_r1_c2)
+}
+
+theorem Matrix.weightedD2S0R1C3_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(2, 0, 1, 3)) := {
+  done by Matrix.weightedD2ThirdResidue_universal_of_three_squares_converse(
+      converse, corner := 3, oddCoefficient := 5,
+      coefficientReads := done, cornerBelowSixteen := done,
+      shortValues := Matrix.rankFourRepresentsThroughFifteen_weighted_d2_s0_r1_c3)
+}
+
+theorem Matrix.weightedD2S0R1C4_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(2, 0, 1, 4)) := {
+  done by Matrix.weightedD2ThirdResidue_universal_of_three_squares_converse(
+      converse, corner := 4, oddCoefficient := 7,
+      coefficientReads := done, cornerBelowSixteen := done,
+      shortValues := Matrix.rankFourRepresentsThroughFifteen_weighted_d2_s0_r1_c4)
+}
+
+theorem Matrix.weightedD2S0R1C5_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(2, 0, 1, 5)) := {
+  done by Matrix.weightedD2ThirdResidue_universal_of_three_squares_converse(
+      converse, corner := 5, oddCoefficient := 9,
+      coefficientReads := done, cornerBelowSixteen := done,
+      shortValues := Matrix.rankFourRepresentsThroughFifteen_weighted_d2_s0_r1_c5)
+}
+
+theorem Matrix.weightedD2S0R1C6_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(2, 0, 1, 6)) := {
+  done by Matrix.weightedD2ThirdResidue_universal_of_three_squares_converse(
+      converse, corner := 6, oddCoefficient := 11,
+      coefficientReads := done, cornerBelowSixteen := done,
+      shortValues := Matrix.rankFourRepresentsThroughFifteen_weighted_d2_s0_r1_c6)
+}
+
+theorem Matrix.weightedD2S0R1C7_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(2, 0, 1, 7)) := {
+  done by Matrix.weightedD2ThirdResidue_universal_of_three_squares_converse(
+      converse, corner := 7, oddCoefficient := 13,
+      coefficientReads := done, cornerBelowSixteen := done,
+      shortValues := Matrix.rankFourRepresentsThroughFifteen_weighted_d2_s0_r1_c7)
+}

@@ -183,7 +183,16 @@ rank-four escalator by 207 selected normal forms are.
   has `p=y+z+w` and `q=y-z`; a modulo-four lemma arranges the parity needed
   to recover `y,z`.  Consequently 17 selected rank-four forms now have
   complete universality proofs conditional only on the three-squares
-  converse.
+  converse. `Algebra/rank_four_d2_third_residue_universality` closes the
+  remaining six selected `d=2` forms, with residues `(0,1)`, by doubling
+  and completing the square:
+  `2Q=(2y)^2+(2z+w)^2+2x^2+(2c-1)w^2`.  Taking `w=1` above the finite
+  range leaves the odd residual `2(m-c)+1`; twice that residual has the
+  automatically admissible shape `4(m-c)+2`, and its oddness supplies the
+  parity needed to recover `y,z`.  The existing through-15 tables cover the
+  smaller targets.  Thus 23 selected rank-four forms now have complete
+  conditional universality proofs, including every selected weighted
+  `d=2` form.
   `Algebra/rank_four_completed_cover_universality` gives fraction-free
   completed-square interfaces for all other constructors. Its scaled-square,
   weighted, and odd cover predicates account for the remaining 32, 140, and
