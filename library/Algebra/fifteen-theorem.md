@@ -293,6 +293,15 @@ raises the selected conditional total to 110.
   coordinates by the obstruction scale removes the positive-exponent parity
   split; the base core is `1 mod 4`, so only a sign choice and evenness of the
   coefficient-two coordinate remain.  The selected conditional total is 121.
+  The same completion now handles every remaining selected weighted-`d=4`
+  border.  `Algebra/rank_four_weighted_d4_even_cosets` controls the even base
+  cores 2, 6, and 10, including the coefficient-one-square exchange needed to
+  choose residue zero or two.  `Algebra/rank_four_weighted_d4_odd_cosets`
+  controls every core congruent to 3 modulo 4.  The second-unit, both-unit,
+  and second-third-double cover modules contribute 7, 13, and 6 forms,
+  respectively.  `Algebra/rank_four_weighted_d4_covers` aggregates all 57
+  selected weighted-`d=4` universality theorems, raising the selected
+  conditional total to 147.
   `Algebra/rank_four_completed_cover_universality` gives fraction-free
   completed-square interfaces for all other constructors. Its scaled-square,
   weighted, and odd cover predicates account for the 32, 140, and 28

@@ -1,0 +1,109 @@
+-- Algebra/rank_four_weighted_d4_odd_cosets.math
+--
+-- Odd base cosets with both affine residues equal to one.
+
+module Algebra.rank_four_weighted_d4_odd_cosets
+
+import Algebra.rank_four_weighted_d4_coset_cover
+
+theorem Integer.one_two_four_four_times_plus_three_has_one_one_coset
+        (a y x q : ℤ)
+        (valueReads : a * a + 2 * (y * y) + 4 * (x * x) = 4 * q + 3)
+        : ∃ (newX newY z : ℤ).
+            (4 * z + 1) * (4 * z + 1) + 2 * ((2 * newY + 1) * (2 * newY + 1))
+              + 4 * (newX * newX) = 4 * q + 3 := {
+  (∃ (h : ℤ). a = 2 * h) ∨ (∃ (h : ℤ). a = 2 * h + 1) by Integer.parity_cases(a);
+  (∃ (d : ℤ). y = 2 * d) ∨ (∃ (d : ℤ). y = 2 * d + 1) by Integer.parity_cases(y);
+  done by cases {
+    case ∃ (h : ℤ). a = 2 * h: {
+      choose h : ℤ such that a = 2 * h as aReads;
+      done by cases {
+        case ∃ (d : ℤ). y = 2 * d: {
+          choose d : ℤ such that y = 2 * d as yReads;
+          4 * (h * h + 2 * (d * d) + x * x) + 0
+             = (2 * h) * (2 * h) + 2 * ((2 * d) * (2 * d)) + 4 * (x * x) by ring
+             = a * a + 2 * ((2 * d) * (2 * d)) + 4 * (x * x) by substituting Equality.symmetry(aReads)
+             = a * a + 2 * (y * y) + 4 * (x * x) by substituting Equality.symmetry(yReads)
+             = 4 * q + 3 by valueReads
+          as impossible;
+          False by Integer.distinct_affine_residues_not_equal(
+              4, 0, 3, h * h + 2 * (d * d) + x * x, q, done, done, done, impossible);
+          done
+        }
+        case ∃ (d : ℤ). y = 2 * d + 1: {
+          choose d : ℤ such that y = 2 * d + 1 as yReads;
+          4 * (h * h + 2 * (d * d + d) + x * x) + 2
+             = (2 * h) * (2 * h) + 2 * ((2 * d + 1) * (2 * d + 1)) + 4 * (x * x) by ring
+             = a * a + 2 * ((2 * d + 1) * (2 * d + 1)) + 4 * (x * x)
+                 by substituting Equality.symmetry(aReads)
+             = a * a + 2 * (y * y) + 4 * (x * x) by substituting Equality.symmetry(yReads)
+             = 4 * q + 3 by valueReads
+          as impossible;
+          False by Integer.distinct_affine_residues_not_equal(
+              4, 2, 3, h * h + 2 * (d * d + d) + x * x, q, done, done, done, impossible);
+          done
+        }
+      }
+    }
+    case ∃ (h : ℤ). a = 2 * h + 1: {
+      choose h : ℤ such that a = 2 * h + 1 as aReads;
+      done by cases {
+        case ∃ (d : ℤ). y = 2 * d: {
+          choose d : ℤ such that y = 2 * d as yReads;
+          4 * (h * h + h + 2 * (d * d) + x * x) + 1
+             = (2 * h + 1) * (2 * h + 1) + 2 * ((2 * d) * (2 * d)) + 4 * (x * x) by ring
+             = a * a + 2 * ((2 * d) * (2 * d)) + 4 * (x * x) by substituting Equality.symmetry(aReads)
+             = a * a + 2 * (y * y) + 4 * (x * x) by substituting Equality.symmetry(yReads)
+             = 4 * q + 3 by valueReads
+          as impossible;
+          False by Integer.distinct_affine_residues_not_equal(
+              4, 1, 3, h * h + h + 2 * (d * d) + x * x, q, done, done, done, impossible);
+          done
+        }
+        case ∃ (d : ℤ). y = 2 * d + 1: {
+          choose d : ℤ such that y = 2 * d + 1 as yReads;
+          choose z : ℤ such that (4 * z + 1) * (4 * z + 1) = a * a
+              as signedSquare from Integer.odd_square_can_be_signed_one_mod_four(a, h, aReads);
+          witness x with witness d with witness z with
+            (4 * z + 1) * (4 * z + 1) + 2 * ((2 * d + 1) * (2 * d + 1)) + 4 * (x * x)
+               = a * a + 2 * ((2 * d + 1) * (2 * d + 1)) + 4 * (x * x) by substituting signedSquare
+               = a * a + 2 * (y * y) + 4 * (x * x) by substituting Equality.symmetry(yReads)
+               = 4 * q + 3 by valueReads
+        }
+      }
+    }
+  }
+}
+
+theorem Matrix.oneTwoFour_one_one_base_coset_of_converse
+        (converse : Matrix.OneTwoFourConverse) (core quarter : ℕ)
+        (coreReads : core = 4 * quarter + 3)
+        (coreAdmissible : ∀ (b : ℕ). ¬(Natural.IsOneThreeSixFourObstruction(16 * b + core)))
+        : Matrix.OneTwoFourBaseCoset(core, 1, 1) := {
+  take b : ℕ;
+  choose a : ℤ, y : ℤ, x : ℤ such that
+      a * a + 2 * (y * y) + 4 * (x * x) = ((16 * b + core : ℕ) : ℤ)
+      from Matrix.oneTwoFour_coordinates_of_converse(converse, 16 * b + core, coreAdmissible(b));
+  ((16 * b + core : ℕ) : ℤ)
+     = ((16 * b : ℕ) : ℤ) + (core : ℤ) by Natural.to_integer.add_preserves
+     = 16 * (b : ℤ) + (core : ℤ) by substituting Natural.to_integer.multiply_preserves(16, b)
+     = 16 * (b : ℤ) + (4 * (quarter : ℤ) + 3) by {
+         (core : ℤ) = ((4 * quarter + 3 : ℕ) : ℤ) by substituting coreReads
+             = ((4 * quarter : ℕ) : ℤ) + 3 by Natural.to_integer.add_preserves
+             = 4 * (quarter : ℤ) + 3 by substituting Natural.to_integer.multiply_preserves(4, quarter);
+         done
+       }
+     = 4 * (4 * (b : ℤ) + (quarter : ℤ)) + 3 by ring
+  as targetReads;
+  a * a + 2 * (y * y) + 4 * (x * x) = 4 * (4 * (b : ℤ) + (quarter : ℤ)) + 3
+      by substituting targetReads as affineRepresentation;
+  choose newX : ℤ, newY : ℤ, z : ℤ such that
+      (4 * z + 1) * (4 * z + 1) + 2 * ((2 * newY + 1) * (2 * newY + 1)) + 4 * (newX * newX)
+        = 4 * (4 * (b : ℤ) + (quarter : ℤ)) + 3
+      as controlled from Integer.one_two_four_four_times_plus_three_has_one_one_coset(
+          a, y, x, 4 * (b : ℤ) + (quarter : ℤ), affineRepresentation);
+  witness newX with witness newY with witness z with
+    (4 * z + 1) * (4 * z + 1) + 2 * ((2 * newY + 1) * (2 * newY + 1)) + 4 * (newX * newX)
+       = 4 * (4 * (b : ℤ) + (quarter : ℤ)) + 3 by controlled
+       = ((16 * b + core : ℕ) : ℤ) by Equality.symmetry(targetReads)
+}
