@@ -1,0 +1,386 @@
+-- Algebra/rank_four_weighted_d4_coset_cover.math
+--
+-- A common completion interface for the non-diagonal weighted-d4 forms.
+-- For
+--
+--   Q = x² + 2y² + 4z² + 2syw + 2rzw + cw²
+--
+-- one has
+--
+--   4Q = (4z+rw)² + 2(2y+sw)² + 4x²
+--          + (4c-2s²-r²)w².
+--
+-- In the obstructed case m=4^a(16b+14), we represent a fixed admissible
+-- core first and then scale all three coordinates by 2^a.  This makes the
+-- positive 4-adic exponents automatic; only the base coset modulo four has
+-- to be controlled.
+
+module Algebra.rank_four_weighted_d4_coset_cover
+
+import Algebra.rank_four_weighted_d4_foundation
+
+definition Matrix.OneTwoFourBaseCoset
+        (core firstResidue secondResidue : ℕ) : Proposition :=
+  ∀ (b : ℕ).
+    ∃ (x y z : ℤ).
+      (4 * z + (firstResidue : ℤ)) * (4 * z + (firstResidue : ℤ))
+        + 2 * ((2 * y + (secondResidue : ℤ)) * (2 * y + (secondResidue : ℤ)))
+        + 4 * (x * x) = ((16 * b + core : ℕ) : ℤ)
+
+theorem Natural.sixteen_plus_nonzero_mod_four_core_not_one_three_six_four_obstruction
+        (b core quotient remainder : ℕ)
+        (coreShape : core = 4 * quotient + remainder)
+        (remainderBelow : remainder < 4) (remainderNonzero : remainder ≠ 0)
+        (coreBelow : core < 16) (coreNotFourteen : core ≠ 14)
+        : ¬(Natural.IsOneThreeSixFourObstruction(16 * b + core)) := {
+  ¬(Natural.IsOneThreeSixFourObstruction(4 ^ 0 * (16 * b + core)))
+      by Natural.four_power_times_nonzero_mod_four_core_not_one_three_six_four_obstruction(
+          0, b, core, quotient, remainder, coreShape, remainderBelow, remainderNonzero,
+          coreBelow, coreNotFourteen) as powered;
+  4 ^ 0 * (16 * b + core) = 16 * b + core by substituting Natural.power_zero(4) as valueReads;
+  suppose Natural.IsOneThreeSixFourObstruction(16 * b + core) as obstruction;
+  Natural.IsOneThreeSixFourObstruction(4 ^ 0 * (16 * b + core))
+      by substituting Equality.symmetry(valueReads);
+  done by powered(done)
+}
+
+theorem Integer.parity_cases (a : ℤ)
+        : (∃ (q : ℤ). a = 2 * q) ∨ (∃ (q : ℤ). a = 2 * q + 1) := {
+  choose q : ℤ, r : ℕ such that a = 2 * q + (r : ℤ) ∧ r < 2
+      from Integer.divide_by_positive(a, 2, done);
+  a = 2 * q + (r : ℤ) as aReads;
+  r < 2 as rBelow;
+  r = 0 ∨ r = 1 by Natural.below_two(r, rBelow);
+  done by cases {
+    case r = 0 as rZero: {
+      ∃ (half : ℤ). a = 2 * half by {
+        witness q with a = 2 * q + (r : ℤ) by aReads = 2 * q by substituting rZero
+      } as even;
+      done by Or.introduceLeft(even)
+    }
+    case r = 1 as rOne: {
+      ∃ (half : ℤ). a = 2 * half + 1 by {
+        witness q with a = 2 * q + (r : ℤ) by aReads = 2 * q + 1 by substituting rOne
+      } as odd;
+      done by Or.introduceRight(odd)
+    }
+  }
+}
+
+theorem Integer.odd_square_can_be_signed_one_mod_four
+        (a h : ℤ) (aReads : a = 2 * h + 1)
+        : ∃ (z : ℤ). (4 * z + 1) * (4 * z + 1) = a * a := {
+  (∃ (q : ℤ). h = 2 * q) ∨ (∃ (q : ℤ). h = 2 * q + 1)
+      by Integer.parity_cases(h);
+  done by cases {
+    case ∃ (q : ℤ). h = 2 * q: {
+      choose q : ℤ such that h = 2 * q as hReads;
+      witness q with
+        (4 * q + 1) * (4 * q + 1)
+           = (2 * (2 * q) + 1) * (2 * (2 * q) + 1) by ring
+           = (2 * h + 1) * (2 * h + 1) by substituting Equality.symmetry(hReads)
+           = a * a by substituting Equality.symmetry(aReads)
+    }
+    case ∃ (q : ℤ). h = 2 * q + 1: {
+      choose q : ℤ such that h = 2 * q + 1 as hReads;
+      witness -q - 1 with
+        (4 * (-q - 1) + 1) * (4 * (-q - 1) + 1)
+           = (2 * (2 * q + 1) + 1) * (2 * (2 * q + 1) + 1) by ring
+           = (2 * h + 1) * (2 * h + 1) by substituting Equality.symmetry(hReads)
+           = a * a by substituting Equality.symmetry(aReads)
+    }
+  }
+}
+
+theorem Integer.one_two_four_four_times_plus_one_has_one_zero_coset
+        (a y x q : ℤ)
+        (valueReads : a * a + 2 * (y * y) + 4 * (x * x) = 4 * q + 1)
+        : ∃ (newX newY z : ℤ).
+            (4 * z + 1) * (4 * z + 1) + 2 * ((2 * newY) * (2 * newY))
+              + 4 * (newX * newX) = 4 * q + 1 := {
+  (∃ (h : ℤ). a = 2 * h) ∨ (∃ (h : ℤ). a = 2 * h + 1) by Integer.parity_cases(a);
+  (∃ (d : ℤ). y = 2 * d) ∨ (∃ (d : ℤ). y = 2 * d + 1) by Integer.parity_cases(y);
+  done by cases {
+    case ∃ (h : ℤ). a = 2 * h as aEven: {
+      choose h : ℤ such that a = 2 * h as aReads;
+      done by cases {
+        case ∃ (d : ℤ). y = 2 * d: {
+          choose d : ℤ such that y = 2 * d as yReads;
+          4 * (h * h + 2 * (d * d) + x * x) + 0
+             = (2 * h) * (2 * h) + 2 * ((2 * d) * (2 * d)) + 4 * (x * x) by ring
+             = a * a + 2 * ((2 * d) * (2 * d)) + 4 * (x * x)
+                 by substituting Equality.symmetry(aReads)
+             = a * a + 2 * (y * y) + 4 * (x * x) by substituting Equality.symmetry(yReads)
+             = 4 * q + 1 by valueReads
+          as impossible;
+          False by Integer.distinct_affine_residues_not_equal(
+              4, 0, 1, h * h + 2 * (d * d) + x * x, q, done, done, done, impossible);
+          done
+        }
+        case ∃ (d : ℤ). y = 2 * d + 1: {
+          choose d : ℤ such that y = 2 * d + 1 as yReads;
+          4 * (h * h + 2 * (d * d + d) + x * x) + 2
+             = (2 * h) * (2 * h) + 2 * ((2 * d + 1) * (2 * d + 1)) + 4 * (x * x) by ring
+             = a * a + 2 * ((2 * d + 1) * (2 * d + 1)) + 4 * (x * x)
+                 by substituting Equality.symmetry(aReads)
+             = a * a + 2 * (y * y) + 4 * (x * x) by substituting Equality.symmetry(yReads)
+             = 4 * q + 1 by valueReads
+          as impossible;
+          False by Integer.distinct_affine_residues_not_equal(
+              4, 2, 1, h * h + 2 * (d * d + d) + x * x, q, done, done, done, impossible);
+          done
+        }
+      }
+    }
+    case ∃ (h : ℤ). a = 2 * h + 1 as aOdd: {
+      choose h : ℤ such that a = 2 * h + 1 as aReads;
+      done by cases {
+        case ∃ (d : ℤ). y = 2 * d: {
+          choose d : ℤ such that y = 2 * d as yReads;
+          choose z : ℤ such that (4 * z + 1) * (4 * z + 1) = a * a
+              as signedSquare from Integer.odd_square_can_be_signed_one_mod_four(a, h, aReads);
+          witness x with witness d with witness z with
+            (4 * z + 1) * (4 * z + 1) + 2 * ((2 * d) * (2 * d)) + 4 * (x * x)
+               = a * a + 2 * ((2 * d) * (2 * d)) + 4 * (x * x) by substituting signedSquare
+               = a * a + 2 * (y * y) + 4 * (x * x) by substituting Equality.symmetry(yReads)
+               = 4 * q + 1 by valueReads
+        }
+        case ∃ (d : ℤ). y = 2 * d + 1: {
+          choose d : ℤ such that y = 2 * d + 1 as yReads;
+          4 * (h * h + h + 2 * (d * d + d) + x * x) + 3
+             = (2 * h + 1) * (2 * h + 1) + 2 * ((2 * d + 1) * (2 * d + 1)) + 4 * (x * x) by ring
+             = a * a + 2 * ((2 * d + 1) * (2 * d + 1)) + 4 * (x * x)
+                 by substituting Equality.symmetry(aReads)
+             = a * a + 2 * (y * y) + 4 * (x * x) by substituting Equality.symmetry(yReads)
+             = 4 * q + 1 by valueReads
+          as impossible;
+          False by Integer.distinct_affine_residues_not_equal(
+              4, 3, 1, h * h + h + 2 * (d * d + d) + x * x, q, done, done, done, impossible);
+          done
+        }
+      }
+    }
+  }
+}
+
+theorem Matrix.oneTwoFour_coordinates_of_converse
+        (converse : Matrix.OneTwoFourConverse) (n : ℕ)
+        (admissible : ¬(Natural.IsOneThreeSixFourObstruction(n)))
+        : ∃ (a y x : ℤ). a * a + 2 * (y * y) + 4 * (x * x) = (n : ℤ) := {
+  Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(4), (n : ℤ))
+      by converse(n, admissible) as represented;
+  choose vector : RingVector(Integer.commutative_ring_bundle, 3) such that
+      Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(4), vector) = (n : ℤ)
+      as valueReads from represented;
+  let a : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo));
+  let y : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo));
+  let x : ℤ := vector(NaturalsBelow.top(2));
+  vector = (⟨a, y, x⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+      by RingVector.eq_threeCoordinates(vector) as vectorReads;
+  witness a with witness y with witness x with
+    a * a + 2 * (y * y) + 4 * (x * x)
+       = Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(4), ⟨a, y, x⟩)
+           by Equality.symmetry(Matrix.squarePlusDoublePlusScaledSquareForm_coordinateTuple_value(4, a, y, x))
+       = Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(4), vector)
+           by substituting Equality.symmetry(vectorReads)
+       = (n : ℤ) by valueReads
+}
+
+theorem Matrix.oneTwoFour_one_zero_base_coset_of_converse
+        (converse : Matrix.OneTwoFourConverse) (core quarter : ℕ)
+        (coreReads : core = 4 * quarter + 1)
+        (coreAdmissible : ∀ (b : ℕ). ¬(Natural.IsOneThreeSixFourObstruction(16 * b + core)))
+        : Matrix.OneTwoFourBaseCoset(core, 1, 0) := {
+  take b : ℕ;
+  choose a : ℤ, y : ℤ, x : ℤ such that
+      a * a + 2 * (y * y) + 4 * (x * x) = ((16 * b + core : ℕ) : ℤ)
+      as represented from Matrix.oneTwoFour_coordinates_of_converse(
+          converse, 16 * b + core, coreAdmissible(b));
+  ((16 * b + core : ℕ) : ℤ)
+     = ((16 * b : ℕ) : ℤ) + (core : ℤ) by Natural.to_integer.add_preserves
+     = 16 * (b : ℤ) + (core : ℤ) by substituting Natural.to_integer.multiply_preserves(16, b)
+     = 16 * (b : ℤ) + (4 * (quarter : ℤ) + 1) by {
+         (core : ℤ) = ((4 * quarter + 1 : ℕ) : ℤ) by substituting coreReads
+             = ((4 * quarter : ℕ) : ℤ) + 1 by Natural.to_integer.add_preserves
+             = 4 * (quarter : ℤ) + 1 by substituting Natural.to_integer.multiply_preserves(4, quarter);
+         done
+       }
+     = 4 * (4 * (b : ℤ) + (quarter : ℤ)) + 1 by ring
+  as targetReads;
+  a * a + 2 * (y * y) + 4 * (x * x) = 4 * (4 * (b : ℤ) + (quarter : ℤ)) + 1
+      by substituting targetReads as affineRepresentation;
+  choose newX : ℤ, newY : ℤ, z : ℤ such that
+      (4 * z + 1) * (4 * z + 1) + 2 * ((2 * newY) * (2 * newY)) + 4 * (newX * newX)
+        = 4 * (4 * (b : ℤ) + (quarter : ℤ)) + 1
+      as controlled from Integer.one_two_four_four_times_plus_one_has_one_zero_coset(
+          a, y, x, 4 * (b : ℤ) + (quarter : ℤ), affineRepresentation);
+  witness newX with witness newY with witness z with
+    (4 * z + 1) * (4 * z + 1) + 2 * ((2 * newY + 0) * (2 * newY + 0)) + 4 * (newX * newX)
+       = (4 * z + 1) * (4 * z + 1) + 2 * ((2 * newY) * (2 * newY)) + 4 * (newX * newX) by ring
+       = 4 * (4 * (b : ℤ) + (quarter : ℤ)) + 1 by controlled
+       = ((16 * b + core : ℕ) : ℤ) by Equality.symmetry(targetReads)
+}
+
+theorem Matrix.weightedD4_universal_of_base_coset
+        (converse : Matrix.OneTwoFourConverse)
+        (secondResidue thirdResidue corner coefficient shift core : ℕ)
+        (coefficientReads : (coefficient : ℤ)
+          = 4 * (corner : ℤ) - 2 * (secondResidue : ℤ) * (secondResidue : ℤ)
+            - (thirdResidue : ℤ) * (thirdResidue : ℤ))
+        (completionReads : 16 * shift + core + coefficient = 56)
+        (baseControl : Matrix.OneTwoFourBaseCoset(core, thirdResidue, secondResidue))
+        : Matrix.IsUniversal(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+            4, (secondResidue : ℤ), (thirdResidue : ℤ), (corner : ℤ))) := {
+  take m : ℕ;
+  suppose m ≥ 1 as positive;
+  Natural.IsOneThreeSixFourObstruction(m) ∨ ¬(Natural.IsOneThreeSixFourObstruction(m))
+      by Logic.excluded_middle(Natural.IsOneThreeSixFourObstruction(m)) as obstructionDecision;
+  ¬(Natural.IsOneThreeSixFourObstruction(m)) ∨ Natural.IsOneThreeSixFourObstruction(m)
+      by Or.swap(obstructionDecision);
+  done by cases {
+    case ¬(Natural.IsOneThreeSixFourObstruction(m)) as admissible: {
+      choose a : ℤ, y : ℤ, x : ℤ such that
+          a * a + 2 * (y * y) + 4 * (x * x) = (m : ℤ)
+          as represented from Matrix.oneTwoFour_coordinates_of_converse(converse, m, admissible);
+      a * a + 2 * (y * y) + 4 * (x * x)
+          + 2 * (secondResidue : ℤ) * y * 0 + 2 * (thirdResidue : ℤ) * x * 0
+          + (corner : ℤ) * (0 * 0)
+         = a * a + 2 * (y * y) + 4 * (x * x) by ring
+         = (m : ℤ) by represented
+      as scalarComputation;
+      done by Matrix.represents_by_witness(
+          Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+              4, (secondResidue : ℤ), (thirdResidue : ℤ), (corner : ℤ)),
+          target := m, vector := ⟨a, y, x, 0⟩,
+          computes := Matrix.squarePlusDoublePlusScaledRankFourRepresentative_coordinateTuple_computes(
+              scalarComputation := scalarComputation))
+    }
+    case Natural.IsOneThreeSixFourObstruction(m) as obstruction: {
+      choose exponent : ℕ, b : ℕ such that m = 4 ^ exponent * (16 * b + 14)
+          as mReads from obstruction;
+      let w : ℕ := 2 ^ exponent;
+      choose x : ℤ, y : ℤ, z : ℤ such that
+          (4 * z + (thirdResidue : ℤ)) * (4 * z + (thirdResidue : ℤ))
+            + 2 * ((2 * y + (secondResidue : ℤ)) * (2 * y + (secondResidue : ℤ)))
+            + 4 * (x * x) = ((16 * (4 * b + shift) + core : ℕ) : ℤ)
+          as baseReads from baseControl(4 * b + shift);
+      ((16 * (4 * b + shift) + core + coefficient : ℕ) : ℤ)
+         = ((16 * (4 * b + shift) + core : ℕ) : ℤ) + (coefficient : ℤ)
+             by Natural.to_integer.add_preserves
+         = 64 * (b : ℤ) + 16 * (shift : ℤ) + (core : ℤ) + (coefficient : ℤ)
+             by {
+               ((16 * (4 * b + shift) + core : ℕ) : ℤ)
+                  = ((16 * (4 * b + shift) : ℕ) : ℤ) + (core : ℤ)
+                      by Natural.to_integer.add_preserves
+                  = 16 * ((4 * b + shift : ℕ) : ℤ) + (core : ℤ)
+                      by substituting Natural.to_integer.multiply_preserves(16, 4 * b + shift)
+                  = 16 * (((4 * b : ℕ) : ℤ) + (shift : ℤ)) + (core : ℤ)
+                      by substituting Natural.to_integer.add_preserves(4 * b, shift)
+                  = 16 * (4 * (b : ℤ) + (shift : ℤ)) + (core : ℤ)
+                      by substituting Natural.to_integer.multiply_preserves(4, b)
+                  = 64 * (b : ℤ) + 16 * (shift : ℤ) + (core : ℤ) by ring;
+               done
+             }
+         = 64 * (b : ℤ) + 56 by {
+             ((16 * shift + core + coefficient : ℕ) : ℤ) = (56 : ℤ)
+                 by substituting completionReads as castCompletion;
+             16 * (shift : ℤ) + (core : ℤ) + (coefficient : ℤ)
+                = ((16 * shift + core + coefficient : ℕ) : ℤ) by {
+                    ((16 * shift + core + coefficient : ℕ) : ℤ)
+                       = ((16 * shift + core : ℕ) : ℤ) + (coefficient : ℤ)
+                           by Natural.to_integer.add_preserves
+                       = ((16 * shift : ℕ) : ℤ) + (core : ℤ) + (coefficient : ℤ)
+                           by substituting Natural.to_integer.add_preserves(16 * shift, core)
+                       = 16 * (shift : ℤ) + (core : ℤ) + (coefficient : ℤ)
+                           by substituting Natural.to_integer.multiply_preserves(16, shift);
+                    done
+                  }
+                = 56 by castCompletion
+             as integerCompletion;
+             64 * (b : ℤ) + 16 * (shift : ℤ) + (core : ℤ) + (coefficient : ℤ)
+                = 64 * (b : ℤ) + (16 * (shift : ℤ) + (core : ℤ) + (coefficient : ℤ)) by ring
+                = 64 * (b : ℤ) + 56 by substituting integerCompletion;
+             done
+           }
+      as basePlusCoefficient;
+      (w : ℤ) * (w : ℤ) = (4 ^ exponent : ℕ) by {
+        ((w * w : ℕ) : ℤ)
+           = (w : ℤ) * (w : ℤ) by Natural.to_integer.multiply_preserves;
+        w * w = 4 ^ exponent by Natural.two_power_square_is_four_power(exponent);
+        done
+      } as wSquare;
+      4 * ((w : ℤ) * x * ((w : ℤ) * x)
+          + 2 * ((w : ℤ) * y * ((w : ℤ) * y))
+          + 4 * ((w : ℤ) * z * ((w : ℤ) * z))
+          + 2 * (secondResidue : ℤ) * ((w : ℤ) * y) * (w : ℤ)
+          + 2 * (thirdResidue : ℤ) * ((w : ℤ) * z) * (w : ℤ)
+          + (corner : ℤ) * ((w : ℤ) * (w : ℤ)))
+         = (w : ℤ) * (w : ℤ)
+             * ((4 * z + (thirdResidue : ℤ)) * (4 * z + (thirdResidue : ℤ))
+               + 2 * ((2 * y + (secondResidue : ℤ)) * (2 * y + (secondResidue : ℤ)))
+               + 4 * (x * x) + (coefficient : ℤ))
+             by {
+               (w : ℤ) * (w : ℤ)
+                   * ((4 * z + (thirdResidue : ℤ)) * (4 * z + (thirdResidue : ℤ))
+                     + 2 * ((2 * y + (secondResidue : ℤ)) * (2 * y + (secondResidue : ℤ)))
+                     + 4 * (x * x) + (coefficient : ℤ))
+                  = (w : ℤ) * (w : ℤ)
+                   * ((4 * z + (thirdResidue : ℤ)) * (4 * z + (thirdResidue : ℤ))
+                     + 2 * ((2 * y + (secondResidue : ℤ)) * (2 * y + (secondResidue : ℤ)))
+                     + 4 * (x * x)
+                     + (4 * (corner : ℤ)
+                       - 2 * (secondResidue : ℤ) * (secondResidue : ℤ)
+                       - (thirdResidue : ℤ) * (thirdResidue : ℤ)))
+                      by substituting coefficientReads
+                  = 4 * ((w : ℤ) * x * ((w : ℤ) * x)
+                      + 2 * ((w : ℤ) * y * ((w : ℤ) * y))
+                      + 4 * ((w : ℤ) * z * ((w : ℤ) * z))
+                      + 2 * (secondResidue : ℤ) * ((w : ℤ) * y) * (w : ℤ)
+                      + 2 * (thirdResidue : ℤ) * ((w : ℤ) * z) * (w : ℤ)
+                      + (corner : ℤ) * ((w : ℤ) * (w : ℤ))) by ring
+               as reverseCompletion;
+               done by Equality.symmetry(reverseCompletion)
+             }
+         = (w : ℤ) * (w : ℤ)
+             * (((16 * (4 * b + shift) + core : ℕ) : ℤ) + (coefficient : ℤ))
+             by substituting baseReads
+         = (w : ℤ) * (w : ℤ)
+             * ((16 * (4 * b + shift) + core + coefficient : ℕ) : ℤ)
+             by substituting Equality.symmetry(Natural.to_integer.add_preserves(
+                 16 * (4 * b + shift) + core, coefficient))
+         = (w : ℤ) * (w : ℤ) * (64 * (b : ℤ) + 56)
+             by substituting basePlusCoefficient
+         = (4 ^ exponent : ℕ) * (64 * (b : ℤ) + 56) by substituting wSquare
+         = 4 * ((4 ^ exponent : ℕ) * ((16 * b + 14 : ℕ) : ℤ)) by {
+             ((16 * b + 14 : ℕ) : ℤ)
+                = ((16 * b : ℕ) : ℤ) + 14 by Natural.to_integer.add_preserves
+                = 16 * (b : ℤ) + 14 by substituting Natural.to_integer.multiply_preserves(16, b);
+             ring
+           }
+         = 4 * ((4 ^ exponent * (16 * b + 14) : ℕ) : ℤ)
+             by substituting Equality.symmetry(Natural.to_integer.multiply_preserves(4 ^ exponent, 16 * b + 14))
+         = 4 * (m : ℤ) by substituting Equality.symmetry(mReads)
+      as scaledComputation;
+      (w : ℤ) * x * ((w : ℤ) * x)
+          + 2 * ((w : ℤ) * y * ((w : ℤ) * y))
+          + 4 * ((w : ℤ) * z * ((w : ℤ) * z))
+          + 2 * (secondResidue : ℤ) * ((w : ℤ) * y) * (w : ℤ)
+          + 2 * (thirdResidue : ℤ) * ((w : ℤ) * z) * (w : ℤ)
+          + (corner : ℤ) * ((w : ℤ) * (w : ℤ)) = (m : ℤ)
+          by Integer.multiply_cancel_left_by_nonzero(
+              (w : ℤ) * x * ((w : ℤ) * x)
+                + 2 * ((w : ℤ) * y * ((w : ℤ) * y))
+                + 4 * ((w : ℤ) * z * ((w : ℤ) * z))
+                + 2 * (secondResidue : ℤ) * ((w : ℤ) * y) * (w : ℤ)
+                + 2 * (thirdResidue : ℤ) * ((w : ℤ) * z) * (w : ℤ)
+                + (corner : ℤ) * ((w : ℤ) * (w : ℤ)),
+              (m : ℤ), 4, done, scaledComputation) as scalarComputation;
+      done by Matrix.represents_by_witness(
+          Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+              4, (secondResidue : ℤ), (thirdResidue : ℤ), (corner : ℤ)),
+          target := m, vector := ⟨(w : ℤ) * x, (w : ℤ) * y, (w : ℤ) * z, (w : ℤ)⟩,
+          computes := Matrix.squarePlusDoublePlusScaledRankFourRepresentative_coordinateTuple_computes(
+              scalarComputation := scalarComputation))
+    }
+  }
+}

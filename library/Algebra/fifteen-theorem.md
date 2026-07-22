@@ -287,6 +287,12 @@ force the completed output coordinate to be odd.  Thus
 `Algebra/rank_four_weighted_d4_third_double_covers` closes all nine selected
 corners `c=4,5,6,8,10,11,12,13,14` from the same one-two-four converse and
 raises the selected conditional total to 110.
+  The common scaled-coset completion in
+  `Algebra/rank_four_weighted_d4_coset_cover` then closes all eleven selected
+  third-unit corners.  Representing the residual core before multiplying its
+  coordinates by the obstruction scale removes the positive-exponent parity
+  split; the base core is `1 mod 4`, so only a sign choice and evenness of the
+  coefficient-two coordinate remain.  The selected conditional total is 121.
   `Algebra/rank_four_completed_cover_universality` gives fraction-free
   completed-square interfaces for all other constructors. Its scaled-square,
   weighted, and odd cover predicates account for the 32, 140, and 28
