@@ -251,6 +251,15 @@ rank-four escalator by 207 selected normal forms are.
   before reaching their uniform residual cores.  The import-only
   `Algebra/rank_four_weighted_d3_third_unit_covers` collects these results,
   raises the selected conditional total to 78.
+
+The next weighted-`d=3` family has both reduced border residues equal to one.
+Completing both coordinates gives
+`6Q=2(3z+w)²+3(2y+w)²+6x²+(6c-5)w²`.  The local represented-set
+input for `2u²+3v²+6x²` excludes `3m+1` and `4^a(8b+7)`; the completed
+equation supplies its modulo-three square condition, as well as the parity
+condition for recovering `y`.  The seven concrete modules aggregated by
+`Algebra/rank_four_weighted_d3_both_unit_covers` cover coefficients
+`c=2,4,5,6,8,9,10` and raise the selected conditional total to 85.
   `Algebra/rank_four_completed_cover_universality` gives fraction-free
   completed-square interfaces for all other constructors. Its scaled-square,
   weighted, and odd cover predicates account for the 32, 140, and 28

@@ -1,0 +1,114 @@
+-- Algebra/rank_four_weighted_d3_both_unit_cover.math
+--
+-- A uniform residual construction for the seven selected both-unit forms.
+-- If 6m is obstructed for three squares, parity supplies one factor of four,
+-- divisibility by three forces the inner parameter to be positive, and
+-- w=2^e leaves the admissible core 32q+core.
+
+module Algebra.rank_four_weighted_d3_both_unit_cover
+
+import Algebra.rank_four_weighted_d3_both_unit_local_witness
+
+theorem Matrix.twoThreeSixSextupleTargetCover_of_local_converse
+        (converse : Integer.TwoThreeSixLocalConverse)
+        (corner coefficient core : ℕ)
+        (coefficientShape : 6 * corner = coefficient + 5)
+        (coreSum : core + coefficient = 60)
+        (coreAdmissible : ∀ (q : ℕ). ¬(Natural.IsThreeSquareObstruction(32 * q + core)))
+        : Matrix.TwoThreeSixSextupleTargetCover(corner) := {
+  6 * corner ∸ 5 = coefficient by {
+    6 * corner ∸ 5
+       = (coefficient + 5) ∸ 5 by substituting coefficientShape
+       = coefficient by Natural.monus_add_cancel_right;
+    done
+  }
+  as coefficientValue;
+  ((6 * corner ∸ 5 : ℕ) : ℤ) = 6 * (corner : ℤ) - 5
+      by Natural.six_times_monus_five_to_integer(corner, coefficient, coefficientShape)
+      as coefficientReads;
+  take m : ℕ;
+  suppose m ≥ 1;
+  Natural.IsThreeSquareObstruction(6 * m) ∨ ¬(Natural.IsThreeSquareObstruction(6 * m))
+      by Logic.excluded_middle(Natural.IsThreeSquareObstruction(6 * m)) as obstructionDecision;
+  ¬(Natural.IsThreeSquareObstruction(6 * m)) ∨ Natural.IsThreeSquareObstruction(6 * m)
+      by Or.swap(obstructionDecision);
+  done by cases {
+    case ¬(Natural.IsThreeSquareObstruction(6 * m)) as admissible: {
+      6 * m + 0 * 0 * (6 * corner ∸ 5) = 6 * m by ring as valueReads;
+      Integer.TwoThreeSixRepresentation(((6 * m : ℕ) : ℤ))
+          by Integer.twoThreeSixCover_witness_of_local_converse(
+              converse, corner, m, 6 * m, 0, admissible, valueReads, coefficientReads)
+          as represented;
+      witness 6 * m with witness 0 with And.introduction(represented, valueReads)
+    }
+    case Natural.IsThreeSquareObstruction(6 * m) as obstruction: {
+      choose exponent : ℕ, b : ℕ such that 6 * m = 4 ^ exponent * (8 * b + 7)
+          as obstructionReads from obstruction;
+      exponent = 0 ∨ ∃ (earlier : ℕ). exponent = 1 + earlier by Natural.zero_or_one_plus;
+      done by cases {
+        case exponent = 0 as exponentZero: {
+          2 * (3 * m) + 0
+             = 6 * m by ring
+             = 4 ^ exponent * (8 * b + 7) by obstructionReads
+             = 4 ^ 0 * (8 * b + 7) by substituting exponentZero
+             = 8 * b + 7 by substituting Natural.power_zero(4)
+             = 2 * (4 * b + 3) + 1 by ring
+          as impossible;
+          False by Natural.distinct_affine_residues_not_equal(
+              2, 0, 1, 3 * m, 4 * b + 3, done, done, done, impossible);
+          done
+        }
+        case ∃ (earlier : ℕ). exponent = 1 + earlier: {
+          choose earlier : ℕ such that exponent = 1 + earlier as exponentReads;
+          b = 0 ∨ ∃ (q : ℕ). b = 1 + q by Natural.zero_or_one_plus;
+          done by cases {
+            case b = 0 as bZero: {
+              choose powerQuotient : ℕ such that 4 ^ exponent = 3 * powerQuotient + 1
+                  as powerReads from Natural.four_power_is_three_times_plus_one(exponent);
+              3 * (2 * m) + 0
+                 = 6 * m by ring
+                 = 4 ^ exponent * (8 * b + 7) by obstructionReads
+                 = 4 ^ exponent * 7 by substituting bZero
+                 = (3 * powerQuotient + 1) * 7 by substituting powerReads
+                 = 3 * (7 * powerQuotient + 2) + 1 by ring
+              as impossible;
+              False by Natural.distinct_affine_residues_not_equal(
+                  3, 0, 1, 2 * m, 7 * powerQuotient + 2, done, done, done, impossible);
+              done
+            }
+            case ∃ (q : ℕ). b = 1 + q: {
+              choose q : ℕ such that b = 1 + q as bReads;
+              let residual : ℕ := 4 ^ earlier * (32 * q + core);
+              let w : ℕ := 2 ^ earlier;
+              ¬(Natural.IsThreeSquareObstruction(residual))
+                  by Natural.not_obstruction_four_power_times(earlier, 32 * q + core, coreAdmissible(q))
+                  as residualAdmissible;
+              residual + w * w * (6 * corner ∸ 5)
+                 = 4 ^ earlier * (32 * q + core) + (2 ^ earlier * 2 ^ earlier) * (6 * corner ∸ 5)
+                 = 4 ^ earlier * (32 * q + core) + 4 ^ earlier * (6 * corner ∸ 5)
+                     by Equality.congruence(
+                         (candidate : ℕ) ↦ 4 ^ earlier * (32 * q + core) + candidate * (6 * corner ∸ 5),
+                         2 ^ earlier * 2 ^ earlier, 4 ^ earlier, Natural.two_power_square_is_four_power(earlier))
+                 = 4 ^ earlier * (32 * q + core) + 4 ^ earlier * coefficient by substituting coefficientValue
+                 = 4 ^ earlier * (32 * q + (core + coefficient)) by ring
+                 = 4 ^ earlier * (32 * q + 60) by substituting coreSum
+                 = 4 ^ earlier * (4 * (8 * (1 + q) + 7)) by ring
+                 = (4 * 4 ^ earlier) * (8 * (1 + q) + 7) by ring
+                 = 4 ^ (1 + earlier) * (8 * (1 + q) + 7)
+                     by substituting Equality.symmetry(Natural.power_one_plus(4, earlier))
+                 = 4 ^ exponent * (8 * (1 + q) + 7) by substituting Equality.symmetry(exponentReads)
+                 = 4 ^ exponent * (8 * b + 7) by substituting Equality.symmetry(bReads)
+                 = 6 * m by Equality.symmetry(obstructionReads)
+              as valueReads;
+              Integer.TwoThreeSixRepresentation((residual : ℤ))
+                  by Integer.twoThreeSixCover_witness_of_local_converse(
+                      converse, corner, m, residual, w, residualAdmissible, valueReads, coefficientReads)
+                  as represented;
+              witness residual with witness w with And.introduction(represented, valueReads)
+            }
+          }
+        }
+      }
+    }
+  }
+}

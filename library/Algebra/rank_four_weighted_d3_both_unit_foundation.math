@@ -1,0 +1,98 @@
+-- Algebra/rank_four_weighted_d3_both_unit_foundation.math
+--
+-- The selected forms x²+2y²+3z²+2yw+2zw+cw².  Completing both
+-- bordered squares gives
+--
+--   6Q = 2(3z+w)² + 3(2y+w)² + 6x² + (6c-5)w².
+--
+-- Dickson's represented-set theorem says that 2u²+3v²+6x² represents
+-- exactly the positive integers outside 3m+1 and 4^a(8b+7).  The local
+-- converse below records the first condition positively, using the square
+-- residue supplied by the completed coordinate w, and excludes the second.
+
+module Algebra.rank_four_weighted_d3_both_unit_foundation
+
+import Algebra.rank_four_weighted_d3_third_unit_covers
+
+definition Integer.TwoThreeSixRepresentation (n : ℤ) : Proposition :=
+  ∃ (u v x : ℤ). 2 * (u * u) + 3 * (v * v) + 6 * (x * x) = n
+
+definition Integer.TwoThreeSixLocalConverse : Proposition :=
+  ∀ (n : ℕ) (w : ℤ).
+    IntegerMod.make(3, (n : ℤ)) = IntegerMod.make(3, 2 * (w * w)) →
+    ¬(Natural.IsThreeSquareObstruction(n)) →
+    Integer.TwoThreeSixRepresentation((n : ℤ))
+
+definition Matrix.TwoThreeSixSextupleTargetCover (corner : ℕ) : Proposition :=
+  ∀ (m : ℕ). m ≥ 1 →
+    ∃ (residual w : ℕ).
+      Integer.TwoThreeSixRepresentation((residual : ℤ))
+      ∧ residual + w * w * (6 * corner ∸ 5) = 6 * m
+
+theorem Natural.six_times_monus_five_to_integer
+        (corner coefficient : ℕ) (coefficientShape : 6 * corner = coefficient + 5)
+        : ((6 * corner ∸ 5 : ℕ) : ℤ) = 6 * (corner : ℤ) - 5 := {
+  6 * corner ∸ 5 = coefficient
+      by {
+        6 * corner ∸ 5
+           = (coefficient + 5) ∸ 5 by substituting coefficientShape
+           = coefficient by Natural.monus_add_cancel_right;
+        done
+      }
+      as naturalValueReads;
+  6 * (corner : ℤ)
+     = ((6 * corner : ℕ) : ℤ) by Equality.symmetry(Natural.to_integer.multiply_preserves(6, corner))
+     = ((coefficient + 5 : ℕ) : ℤ) by substituting coefficientShape
+     = (coefficient : ℤ) + 5 by Natural.to_integer.add_preserves
+  as integerShape;
+  ((6 * corner ∸ 5 : ℕ) : ℤ)
+     = (coefficient : ℤ) by substituting naturalValueReads
+     = ((coefficient : ℤ) + 5) - 5 by ring
+     = 6 * (corner : ℤ) - 5 by substituting Equality.symmetry(integerShape)
+}
+
+theorem Integer.weightedD3_both_unit_parity_compatible
+        (u v x w target corner : ℤ)
+        (completedReads : 2 * (u * u) + 3 * (v * v) + 6 * (x * x)
+          + (6 * corner - 5) * (w * w) = 6 * target)
+        : Integer.divides(2, v - w) := {
+  v * v + w * w
+     = (2 * (u * u) + 3 * (v * v) + 6 * (x * x) + (6 * corner - 5) * (w * w))
+       - 2 * (u * u) - 2 * (v * v) - 6 * (x * x) - (6 * corner - 6) * (w * w) by ring
+     = 6 * target - 2 * (u * u) - 2 * (v * v) - 6 * (x * x) - (6 * corner - 6) * (w * w)
+         by substituting completedReads
+     = 2 * (3 * target - u * u - v * v - 3 * (x * x) - (3 * corner - 3) * (w * w)) by ring
+  as squareSumEven;
+  (v - w) * (v - w)
+     = (v * v + w * w) - 2 * v * w by ring
+     = 2 * (3 * target - u * u - v * v - 3 * (x * x) - (3 * corner - 3) * (w * w)) - 2 * v * w
+         by substituting squareSumEven
+     = 2 * (3 * target - u * u - v * v - 3 * (x * x) - (3 * corner - 3) * (w * w) - v * w) by ring
+  as differenceSquareReads;
+  Integer.divides(2, (v - w) * (v - w)) by {
+    witness 3 * target - u * u - v * v - 3 * (x * x) - (3 * corner - 3) * (w * w) - v * w
+        with differenceSquareReads
+  };
+  done by Integer.two_divides_of_two_divides_square(v - w, done)
+}
+
+theorem Integer.weightedD3_both_unit_mod_three_compatible
+        (u v x w target corner : ℤ)
+        (completedReads : 2 * (u * u) + 3 * (v * v) + 6 * (x * x)
+          + (6 * corner - 5) * (w * w) = 6 * target)
+        : Integer.divides(3, u * u - w * w) := {
+  let difference : ℤ := u * u - w * w;
+  let quotient : ℤ := 2 * target - v * v - 2 * (x * x) - (2 * corner - 1) * (w * w);
+  2 * difference
+     = (2 * (u * u) + 3 * (v * v) + 6 * (x * x) + (6 * corner - 5) * (w * w))
+       - 3 * (v * v) - 6 * (x * x) - (6 * corner - 3) * (w * w) by ring
+     = 6 * target - 3 * (v * v) - 6 * (x * x) - (6 * corner - 3) * (w * w)
+         by substituting completedReads
+     = 3 * quotient by ring
+  as twiceDifferenceReads;
+  witness 2 * quotient - difference with
+    difference
+       = 2 * (2 * difference) - 3 * difference by ring
+       = 2 * (3 * quotient) - 3 * difference by substituting twiceDifferenceReads
+       = 3 * (2 * quotient - difference) by ring
+}

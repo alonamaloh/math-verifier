@@ -1,0 +1,46 @@
+-- Algebra/rank_four_weighted_d3_both_unit_local_witness.math
+
+module Algebra.rank_four_weighted_d3_both_unit_local_witness
+
+import Algebra.four_power_mod_three
+
+theorem Integer.twoThreeSixCover_witness_of_local_converse
+        (converse : Integer.TwoThreeSixLocalConverse)
+        (corner m residual w : ℕ)
+        (admissible : ¬(Natural.IsThreeSquareObstruction(residual)))
+        (valueReads : residual + w * w * (6 * corner ∸ 5) = 6 * m)
+        (coefficientReads : ((6 * corner ∸ 5 : ℕ) : ℤ) = 6 * (corner : ℤ) - 5)
+        : Integer.TwoThreeSixRepresentation((residual : ℤ)) := {
+  (residual : ℤ) + (w : ℤ) * (w : ℤ) * ((6 * corner ∸ 5 : ℕ) : ℤ)
+     = ((residual + w * w * (6 * corner ∸ 5) : ℕ) : ℤ) by {
+          ((residual + w * w * (6 * corner ∸ 5) : ℕ) : ℤ)
+             = (residual : ℤ) + ((w * w * (6 * corner ∸ 5) : ℕ) : ℤ)
+                 by Natural.to_integer.add_preserves
+             = (residual : ℤ) + ((w * w : ℕ) : ℤ) * ((6 * corner ∸ 5 : ℕ) : ℤ)
+                 by substituting Natural.to_integer.multiply_preserves(w * w, 6 * corner ∸ 5)
+             = (residual : ℤ) + (w : ℤ) * (w : ℤ) * ((6 * corner ∸ 5 : ℕ) : ℤ)
+                 by substituting Natural.to_integer.multiply_preserves(w, w);
+          done
+        }
+     = ((6 * m : ℕ) : ℤ) by substituting valueReads
+     = 6 * (m : ℤ) by Natural.to_integer.multiply_preserves
+  as integerValueReads;
+  (residual : ℤ) + (w : ℤ) * (w : ℤ) * (6 * (corner : ℤ) - 5)
+     = (residual : ℤ) + (w : ℤ) * (w : ℤ) * ((6 * corner ∸ 5 : ℕ) : ℤ)
+         by substituting Equality.symmetry(coefficientReads)
+     = 6 * (m : ℤ) by integerValueReads
+  as expandedValueReads;
+  (residual : ℤ) - 2 * ((w : ℤ) * (w : ℤ))
+     = ((residual : ℤ) + (w : ℤ) * (w : ℤ) * (6 * (corner : ℤ) - 5))
+       - (6 * (corner : ℤ) - 3) * ((w : ℤ) * (w : ℤ)) by ring
+     = 6 * (m : ℤ) - (6 * (corner : ℤ) - 3) * ((w : ℤ) * (w : ℤ))
+         by substituting expandedValueReads
+     = 3 * (2 * (m : ℤ) - (2 * (corner : ℤ) - 1) * ((w : ℤ) * (w : ℤ))) by ring
+  as residueDifference;
+  IntegerMod.make(3, (residual : ℤ)) = IntegerMod.make(3, 2 * ((w : ℤ) * (w : ℤ)))
+      by IntegerMod.make_equal_of_difference_multiple(
+          3, (residual : ℤ), 2 * ((w : ℤ) * (w : ℤ)),
+          2 * (m : ℤ) - (2 * (corner : ℤ) - 1) * ((w : ℤ) * (w : ℤ)), residueDifference)
+      as localCompatible;
+  done by converse(residual, (w : ℤ), localCompatible, admissible)
+}
