@@ -1891,3 +1891,22 @@ implicit `{m}` needs `1 + ?m ≡ 1`, the known ground-defeq inference gap
 `Matrix.corner(bordered)` — ζ-transparency keeps every citation honest.
 Same fix direction as the S3 filing (ground evaluation inside implicit
 unification).
+
+**GOOD MESSAGES (Cramer's rule, 2026-07-23, Algebra/cramer.math).** Two
+error messages guided the multilinear-determinant proof straight to the
+fix — worth keeping as models. (1) A misused under-binder step
+`= sumOver(…) by ((j) ↦ bReads)` where the body proved `b(j) = …` but the
+summand equality needed `b(j)·cof = …·cof`: "the `by ((x) ↦ …)` proof is
+the under-binder pointwise-congruence form, but it did not apply: the
+assembled congruence application failed to type-check for lemma
+`CommutativeRing.sumOver_congruence`: Application: argument type does not
+match Pi domain (fallback: state the pointwise fact as a `∀` and close the
+step with the argument-free congruence lemma)." — names the mechanism,
+the exact lemma, AND the fallback. (2) An argument-free `by
+CommutativeRing.sumOver_interchange` on an `=` chain step: "this step's
+justification proves a different relation than the step claims … but its
+proof shows: (r) → (left) → (right) → (term) → … = …" — printing the
+lemma's full unapplied Π-type made it obvious the lemma needed its `term`
+supplied (higher-order, uninferable on an `=` step). Both turned a
+head-scratch into a one-line fix. No change requested; noting as the bar
+for congruence/citation diagnostics.
