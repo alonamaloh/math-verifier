@@ -36,13 +36,53 @@ forms.  Thus the universality target is 201 forms.
 | `x²+2y²+4z²` | 8 | 2 | not `4^a(16b+14)` | included in the 103 | **Proved reduction.** `Matrix.one_two_four_converse_of_three_squares` derives it from three squares. |
 | `x²+2y²+5z²` | 10 | 2, 5 | not `25^a(25b+10)` or `25^a(25b+15)` | 33 | Genuine deep input. The form is alone in its genus, so a genus route is valid; a specialized Mordell route is also known. See `PLAN_ONE_TWO_FIVE_CONVERSE.md`. |
 | `x²+2y²+2yz+5z²` | 9 | 2, 3 | not `4^a(8b+7)` | 12 | **Proved reduction and covers.** `Algebra/odd_five_converse_reduction` proves equality of represented sets with three squares; `Algebra/rank_four_odd_c5_covers` discharges all 12 selected rank-four clients. |
-| `x²+2y²+2yz+4z²` | 7 | 2, 7 | no regular represented set | 14 universal candidates, 2 exact truants | Do not introduce a false parent converse. This determinant-seven parent is not regular: local admissibility alone misses global values. Attack the 14 rank-four cosets directly, or prove a restricted coset theorem tailored to them. |
+| `x²+2y²+2yz+4z²` | 7 | 2, 7 | no regular represented set | 14 universal candidates, 2 exact truants | Do not introduce a false parent converse. Seven rank-four clients now have direct conditional covers; seven remain and require larger neighbor-coset arguments. |
 
-There are now 187 selected forms with conditional universality proofs:
+There are now 194 selected forms with conditional universality proofs:
 115 from three squares (including all weighted `d=4` and odd-`C=5`
 clients), 9 from triple squares, 8 from one-two-three, 7 from one-two-six,
-8 from one-three-six, 7 from two-three-six, and 33 from one-two-five.  The
-14 outstanding nonexceptional forms are exactly the odd-`C=4` family.
+8 from one-three-six, 7 from two-three-six, 33 from one-two-five, and seven
+direct determinant-seven covers (whose hypotheses reuse those converse
+interfaces).  The seven outstanding nonexceptional forms are exactly the
+unresolved half of the odd-`C=4` family.
+
+## Determinant-seven direct frontier
+
+The first all-at-once reconnaissance is complete.  It compared the 14
+nonexceptional odd-`C=4` lattices against every already-covered rank-four
+family and then inspected their small ternary sublattices and orthogonal
+cosets.  Seven forms now have kernel-checked conditional universality proofs:
+
+- `(r,c)=(0,4)` and `(3,8)` contain covered weighted-`d=4` lattices at
+  index two and therefore reduce to three squares;
+- `(1,3)` contains a covered weighted-`d=5` lattice at index two;
+- `(3,7)` contains a covered weighted-`d=3` lattice at index two;
+- `(0,6)` contains one-two-six, and an orthogonal norm-14 shift carries
+  every base obstruction after the two initial witnesses to an admissible
+  one-two-six residual;
+- `(1,4)` has two index-two neighbor cosets.  The even coset is
+  one-two-six, while the odd coset is recovered from `16b+6` represented by
+  one-two-three.  A rational isometry of `x²+2y²+3z²` with denominator two
+  makes the two outer coordinates odd and supplies integral coordinates;
+- `(1,5)` is the auxiliary odd-`C=5` `(r,c)=(1,4)` form after swapping the
+  last two coordinates.  It reuses the generic odd-`C=5` tail and a
+  generated, 20-rows-per-theorem finite prefix.
+
+The unresolved forms are
+
+```text
+(0,7), (1,6), (1,7), (2,8), (2,9), (3,10), (3,11).
+```
+
+This is the point where the cheap generalization stops.  The `(2,8)` and
+`(3,10)` forms contain one-two-six only at index six, so their six image
+cosets must be controlled rather than the two parity cosets used for
+`(1,4)`.  The `(0,7)`, `(2,9)`, and `(3,11)` forms expose one-two-seven
+neighbors, for which the library has no converse interface.  The remaining
+`(1,6)` and `(1,7)` forms have no small embedding of any current standard
+ternary parent.  A new theorem should therefore be phrased as a restricted
+neighbor-coset result for these seven quaternary lattices, not as a false
+local-global converse for their nonregular determinant-seven parent.
 
 ## Elementary reductions
 
@@ -135,8 +175,11 @@ the deep-interface count by 15.
 3. Pilot the two-three-six and one-three-six index-lattice recoveries.  Keep a
    pilot only if it eliminates the existing exact local converse without
    adding an equally deep replacement.
-4. Pilot one determinant-seven odd rank-four coset.  Measure whether direct
-   residual selection plus finite tables scales to all 14 forms.
+4. **Partially done:** determinant-seven reconnaissance and the cheap direct
+   covers close seven of 14 forms.  Next pilot an index-six image-coset
+   theorem on `(2,8)` or `(3,10)`.  Continue only if its six congruence
+   classes package into a reusable lemma; otherwise begin the restricted
+   determinant-seven neighbor theorem shared by the seven remaining forms.
 5. Recount the remaining interfaces and choose either a shared
    class-one/genus development or shared Mordell infrastructure.  Do not
    start with one-two-five in isolation.

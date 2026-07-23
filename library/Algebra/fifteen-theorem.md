@@ -307,10 +307,14 @@ clients.  At the base obstruction `8b+7`, an integral shear with
 generator supplies 586 explicit kernel-checked witnesses for those
 prefixes.  Scaling all coordinates by `2^a` handles
 `4^a(8b+7)`.  The selected conditional-universality total is therefore
-187.  The determinant-seven odd-`C=4` parent is nonregular, so its 14
-nonexceptional clients are the only remaining selected forms and need a
-direct rank-four or restricted-coset argument rather than a generic parent
-converse.
+194.  The determinant-seven odd-`C=4` parent is nonregular, so its clients
+need direct rank-four or restricted-coset arguments rather than a generic
+parent converse.  Seven are now covered: four by index-two transports into
+previously covered rank-four lattices, one by a norm-14 one-two-six shift,
+one by the two neighbor cosets of one-two-six and one-two-three, and one by
+swapping into an auxiliary odd-`C=5` cover.  The remaining seven are the
+index-six or one-two-seven neighbor cases recorded in
+`PLAN_TERNARY_CONVERSES.md`.
 For the weighted-`d=4` forms with third border residue two, completing the
 last square gives
 `Q=x²+2y²+(2z+w)²+(c-1)w²`.  A witness for
