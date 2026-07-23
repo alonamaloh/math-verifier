@@ -1,0 +1,157 @@
+-- Algebra/cramer.math  (WIP — building incrementally)
+module Algebra.cramer
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.classical_decidable
+import Integer.basics
+import Set.finite
+import Lists.list
+import Lists.distinct
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.matrix_transpose
+import Algebra.matrix_vector
+import Algebra.determinant
+import Algebra.adjugate
+
+-- Replacing row i by row k of M has determinant det(M) at k = i
+-- (`updateRow_same`) and 0 at k ≠ i (repeated row), so the sum collapses.
+theorem Matrix.cramer_diagonal_sum {c : CommutativeRing} {n : ℕ}
+        (M : Matrix(c, n, n)) (x : RingVector(c, n)) (i : NaturalsBelow(n))
+        : CommutativeRing.sumOver(
+              (k : NaturalsBelow(n)) ↦ x(k) * Matrix.determinant(Matrix.updateRow(M, i, M(k))),
+              NaturalsBelow.enumerate(n))
+          = x(i) * Matrix.determinant(M) := {
+  List.Distinct(NaturalsBelow(n), NaturalsBelow.enumerate(n)) by NaturalsBelow.enumerate_distinct;
+  i ∈ NaturalsBelow.enumerate(n) by NaturalsBelow.enumerate_complete;
+  ∀ (k : NaturalsBelow(n)). k ∈ NaturalsBelow.enumerate(n) → ¬(k = i)
+      → x(k) * Matrix.determinant(Matrix.updateRow(M, i, M(k))) = CommutativeRing.zero(c)
+      by (k : NaturalsBelow(n)) ↦ {
+          suppose k ∈ NaturalsBelow.enumerate(n);
+          suppose ¬(k = i) as rowsDiffer;
+          Matrix.determinant(Matrix.updateRow(M, i, M(k))) = CommutativeRing.zero(c)
+              by Matrix.determinant_updateRow_repeated;
+          x(k) * Matrix.determinant(Matrix.updateRow(M, i, M(k)))
+             = x(k) * CommutativeRing.zero(c) by substitution
+             = CommutativeRing.zero(c) by ring;
+          done
+        };
+  CommutativeRing.sumOver(
+      (k : NaturalsBelow(n)) ↦ x(k) * Matrix.determinant(Matrix.updateRow(M, i, M(k))),
+      NaturalsBelow.enumerate(n))
+     = x(i) * Matrix.determinant(Matrix.updateRow(M, i, M(i))) by CommutativeRing.sumOver_single
+     = x(i) * Matrix.determinant(M) by substituting Matrix.updateRow_same;
+  done
+}
+
+-- Distribute the cofactor into the inner sum and commute out x(k).
+theorem Matrix.cramer_row_summand {c : CommutativeRing} {n : ℕ}
+        (M : Matrix(c, n, n)) (x : RingVector(c, n)) (i j : NaturalsBelow(n))
+        : CommutativeRing.sumOver((k : NaturalsBelow(n)) ↦ M(k, j) * x(k), NaturalsBelow.enumerate(n))
+            * Matrix.cofactor(M, i, j)
+          = CommutativeRing.sumOver(
+                (k : NaturalsBelow(n)) ↦ x(k) * (M(k, j) * Matrix.cofactor(M, i, j)),
+                NaturalsBelow.enumerate(n)) := {
+  CommutativeRing.sumOver((k : NaturalsBelow(n)) ↦ M(k, j) * x(k), NaturalsBelow.enumerate(n))
+        * Matrix.cofactor(M, i, j)
+     = CommutativeRing.sumOver(
+           (k : NaturalsBelow(n)) ↦ (M(k, j) * x(k)) * Matrix.cofactor(M, i, j),
+           NaturalsBelow.enumerate(n))
+           by substituting CommutativeRing.sumOver_scale_right
+     = CommutativeRing.sumOver(
+           (k : NaturalsBelow(n)) ↦ x(k) * (M(k, j) * Matrix.cofactor(M, i, j)),
+           NaturalsBelow.enumerate(n))
+           by ((k : NaturalsBelow(n)) ↦ ring);
+  done
+}
+
+-- Pull x(k) out and recognise the inner sum as det(M with row i ← row k).
+theorem Matrix.cramer_column_summand {c : CommutativeRing} {n : ℕ}
+        (M : Matrix(c, n, n)) (x : RingVector(c, n)) (i k : NaturalsBelow(n))
+        : CommutativeRing.sumOver(
+              (j : NaturalsBelow(n)) ↦ x(k) * (M(k, j) * Matrix.cofactor(M, i, j)),
+              NaturalsBelow.enumerate(n))
+          = x(k) * Matrix.determinant(Matrix.updateRow(M, i, M(k))) := {
+  Matrix.determinant(Matrix.updateRow(M, i, M(k)))
+      = CommutativeRing.sumOver(
+            (j : NaturalsBelow(n)) ↦ M(k)(j) * Matrix.cofactor(M, i, j), NaturalsBelow.enumerate(n))
+          by Matrix.determinant_updateRow_expansion as expandRowK;
+  x(k) * CommutativeRing.sumOver(
+            (j : NaturalsBelow(n)) ↦ M(k, j) * Matrix.cofactor(M, i, j), NaturalsBelow.enumerate(n))
+      = CommutativeRing.sumOver(
+            (j : NaturalsBelow(n)) ↦ x(k) * (M(k, j) * Matrix.cofactor(M, i, j)),
+            NaturalsBelow.enumerate(n))
+          by CommutativeRing.sumOver_scale_left as pulled;
+  CommutativeRing.sumOver(
+      (j : NaturalsBelow(n)) ↦ x(k) * (M(k, j) * Matrix.cofactor(M, i, j)),
+      NaturalsBelow.enumerate(n))
+     = x(k) * CommutativeRing.sumOver(
+            (j : NaturalsBelow(n)) ↦ M(k, j) * Matrix.cofactor(M, i, j), NaturalsBelow.enumerate(n))
+           by pulled
+     = x(k) * Matrix.determinant(Matrix.updateRow(M, i, M(k))) by expandRowK;
+  done
+}
+
+theorem Matrix.cramer {c : CommutativeRing} {n : ℕ}
+        (M : Matrix(c, n, n)) (x b : RingVector(c, n)) (i : NaturalsBelow(n))
+        (leftSystem : b = Matrix.applyVector(Matrix.transpose(M), x))
+        : Matrix.determinant(Matrix.updateRow(M, i, b))
+          = Matrix.determinant(M) * x(i) := {
+  -- Each entry of b is the i-th solution's combination of the rows of M.
+  ∀ (j : NaturalsBelow(n)).
+      b(j) = CommutativeRing.sumOver((k : NaturalsBelow(n)) ↦ M(k, j) * x(k), NaturalsBelow.enumerate(n))
+      by (j : NaturalsBelow(n)) ↦ {
+          b(j) = Matrix.applyVector(Matrix.transpose(M), x)(j) by substituting leftSystem
+               = CommutativeRing.sumOver(
+                     (k : NaturalsBelow(n)) ↦ Matrix.transpose(M)(j, k) * x(k), NaturalsBelow.enumerate(n))
+               = CommutativeRing.sumOver(
+                     (k : NaturalsBelow(n)) ↦ M(k, j) * x(k), NaturalsBelow.enumerate(n))
+                     by ((k : NaturalsBelow(n)) ↦ Matrix.transpose_entry(M, j, k));
+          done
+        }
+      as bReads;
+
+  Matrix.determinant(Matrix.updateRow(M, i, b))
+     = CommutativeRing.sumOver(
+           (j : NaturalsBelow(n)) ↦ b(j) * Matrix.cofactor(M, i, j), NaturalsBelow.enumerate(n))
+           by Matrix.determinant_updateRow_expansion
+     = CommutativeRing.sumOver(
+           (j : NaturalsBelow(n)) ↦
+               CommutativeRing.sumOver((k : NaturalsBelow(n)) ↦ M(k, j) * x(k), NaturalsBelow.enumerate(n))
+                 * Matrix.cofactor(M, i, j),
+           NaturalsBelow.enumerate(n))
+           by ((j : NaturalsBelow(n)) ↦ { done by substituting bReads })
+     = CommutativeRing.sumOver(
+           (j : NaturalsBelow(n)) ↦
+               CommutativeRing.sumOver(
+                   (k : NaturalsBelow(n)) ↦ x(k) * (M(k, j) * Matrix.cofactor(M, i, j)),
+                   NaturalsBelow.enumerate(n)),
+           NaturalsBelow.enumerate(n))
+           by ((j : NaturalsBelow(n)) ↦ Matrix.cramer_row_summand(M, x, i, j))
+     = CommutativeRing.sumOver(
+           (k : NaturalsBelow(n)) ↦
+               CommutativeRing.sumOver(
+                   (j : NaturalsBelow(n)) ↦ x(k) * (M(k, j) * Matrix.cofactor(M, i, j)),
+                   NaturalsBelow.enumerate(n)),
+           NaturalsBelow.enumerate(n))
+           by CommutativeRing.sumOver_interchange(
+                  term := (j : NaturalsBelow(n)) ↦ (k : NaturalsBelow(n)) ↦
+                      x(k) * (M(k, j) * Matrix.cofactor(M, i, j)),
+                  leftItems := NaturalsBelow.enumerate(n),
+                  rightItems := NaturalsBelow.enumerate(n))
+     = CommutativeRing.sumOver(
+           (k : NaturalsBelow(n)) ↦ x(k) * Matrix.determinant(Matrix.updateRow(M, i, M(k))),
+           NaturalsBelow.enumerate(n))
+           by ((k : NaturalsBelow(n)) ↦ Matrix.cramer_column_summand(M, x, i, k))
+     = x(i) * Matrix.determinant(M) by Matrix.cramer_diagonal_sum
+     = Matrix.determinant(M) * x(i);
+  done
+}

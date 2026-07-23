@@ -5,7 +5,7 @@ list](https://www.cs.ru.nl/~freek/100/) as a goal thread. This file is
 the index of the entries verified so far: the list number, the headline
 theorem(s) as declared, and the file where each lives.
 
-**17 of 100** as of 2026-06-11.
+**19 of 100** as of 2026-07-23.
 
 | # | Theorem | Declaration | File |
 |---|---------|-------------|------|
@@ -19,6 +19,7 @@ theorem(s) as declared, and the file where each lives.
 | 38 | The inequality of arithmetic and geometric means | `Real.arithmetic_mean_geometric_mean` (division-free form nⁿ·Πs ≤ (Σs)ⁿ; two-variable forms in the same file) | `library/Real/arithmetic_geometric_mean.math` |
 | 42 | Sum of the reciprocals of the triangular numbers | `Real.triangular_reciprocals_sum_to_two` | `library/Real/triangular_series.math` |
 | 44 | The binomial theorem | `Real.binomial_theorem` | `library/Real/binomial_theorem.math` |
+| 49 | The Cayley–Hamilton theorem | `Matrix.cayley_hamilton` | `library/Algebra/cayley_hamilton.math` |
 | 51 | Wilson's theorem | `Natural.wilson` (and the converse, `Natural.prime_of_divides_factorial_plus_one`) | `library/IntegerMod/wilson.math` |
 | 63 | Cantor's theorem | `Cantor.no_surjection_onto_powerset` | `library/Set/cantor.math` |
 | 66 | Sum of a geometric series | `Real.geometric_series` | `library/Real/series.math` |
@@ -26,6 +27,7 @@ theorem(s) as declared, and the file where each lives.
 | 78 | The Cauchy–Schwarz inequality | `Real.cauchy_schwarz` | `library/Real/cauchy_schwarz.math` |
 | 79 | The intermediate value theorem | `Real.intermediate_value` | `library/Real/intermediate_value.math` |
 | 80 | The fundamental theorem of arithmetic | `Natural.fundamental_theorem_of_arithmetic` | `library/Natural/prime_factorization_unique.math` |
+| 97 | Cramer's rule | `Matrix.cramer` (det(M with row i ← b) = det(M)·x(i) for the system x·M = b) | `library/Algebra/cramer.math` |
 
 ## Near-term targets
 

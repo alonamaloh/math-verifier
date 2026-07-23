@@ -53,7 +53,8 @@ prime elements, associates, and uniqueness handled in `irreducible`,
 
 Headline results include `VectorSpace.extend_to_basis`,
 `LinearMap.rank_nullity`, `Matrix.determinant_multiply`,
-`Matrix.multiply_adjugate`, and `Matrix.cayley_hamilton`.
+`Matrix.multiply_adjugate`, and the two Freek-100 entries
+`Matrix.cayley_hamilton` (#49) and `Matrix.cramer` (#97).
 
 ## Quadratic forms and the Fifteen Theorem (in progress)
 
