@@ -1,0 +1,269 @@
+-- Algebra/rank_four_odd_c4_r1_c4.math
+--
+-- The determinant-seven form
+--
+--   Q = x² + 2y² + 2yz + 4z² + 2yw + 4w²
+--
+-- has two index-two coordinate cosets.  On the even coset,
+--
+--   Q(X,-Y-Z,Z,Z) = X² + 2Y² + 6Z².
+--
+-- This covers every integer outside the one-two-six obstruction.  For a
+-- base obstruction n=8b+5, represent 2n-4=16b+6 by x²+2y²+3z².  The
+-- outer coordinates can be made odd, and then
+--
+--   Q(X,-h-k-1,k,k+1) = n
+--
+-- whenever (2h+1)²+2X²+3(2k+1)²=2n-4.  Scaling handles powers of four.
+
+module Algebra.rank_four_odd_c4_r1_c4
+
+import Algebra.rank_four_odd_c4_r0_c6
+import Algebra.rank_four_weighted_d4_third_double_parity
+
+theorem Integer.one_two_three_sixteen_plus_six_has_odd_outer_coordinates
+        (a x c q : ℤ)
+        (valueReads : a * a + 2 * (x * x) + 3 * (c * c) = 16 * q + 6)
+        : ∃ (h newX k : ℤ).
+            (2 * h + 1) * (2 * h + 1) + 2 * (newX * newX)
+              + 3 * ((2 * k + 1) * (2 * k + 1)) = 16 * q + 6 := {
+  (a + c) * (a + c)
+     = 2 * (8 * q + 3 - x * x + a * c - c * c) by linear_combination(valueReads)
+  as sumSquareEven;
+  Integer.divides(2, (a + c) * (a + c)) by {
+    witness 8 * q + 3 - x * x + a * c - c * c with sumSquareEven
+  };
+  Integer.divides(2, a + c) by Integer.two_divides_of_two_divides_square(a + c, done);
+  choose sumHalf : ℤ such that a + c = 2 * sumHalf as sumReads;
+  (∃ (aHalf : ℤ). a = 2 * aHalf) ∨ (∃ (h : ℤ). a = 2 * h + 1)
+      by Integer.parity_cases(a) as parity;
+  (∃ (h : ℤ). a = 2 * h + 1) ∨ (∃ (aHalf : ℤ). a = 2 * aHalf)
+      by Or.swap(parity);
+  done by cases {
+    case ∃ (h : ℤ). a = 2 * h + 1: {
+      choose h : ℤ such that a = 2 * h + 1 as aReads;
+      c
+         = 2 * sumHalf - a by linear_combination(sumReads)
+         = 2 * sumHalf - (2 * h + 1) by substituting aReads
+         = 2 * (sumHalf - h - 1) + 1 by ring
+      as cReads;
+      witness h with witness x with witness sumHalf - h - 1 with
+        (2 * h + 1) * (2 * h + 1) + 2 * (x * x)
+            + 3 * ((2 * (sumHalf - h - 1) + 1) * (2 * (sumHalf - h - 1) + 1))
+           = a * a + 2 * (x * x)
+              + 3 * ((2 * (sumHalf - h - 1) + 1) * (2 * (sumHalf - h - 1) + 1))
+               by substituting Equality.symmetry(aReads)
+           = a * a + 2 * (x * x) + 3 * (c * c) by substituting Equality.symmetry(cReads)
+           = 16 * q + 6 by valueReads
+    }
+    case ∃ (aHalf : ℤ). a = 2 * aHalf: {
+      choose aHalf : ℤ such that a = 2 * aHalf as aReads;
+      c
+         = 2 * sumHalf - a by linear_combination(sumReads)
+         = 2 * sumHalf - 2 * aHalf by substituting aReads
+         = 2 * (sumHalf - aHalf) by ring
+      as cReads;
+      let cHalf : ℤ := sumHalf - aHalf;
+      (2 * aHalf) * (2 * aHalf) + 2 * (x * x) + 3 * ((2 * cHalf) * (2 * cHalf))
+         = a * a + 2 * (x * x) + 3 * ((2 * cHalf) * (2 * cHalf))
+             by substituting Equality.symmetry(aReads)
+         = a * a + 2 * (x * x) + 3 * (c * c) by substituting Equality.symmetry(cReads)
+         = 16 * q + 6 by valueReads
+      as specializedValue;
+      2 * (x * x)
+         = 2 * (8 * q + 3 - 2 * (aHalf * aHalf) - 6 * (cHalf * cHalf))
+             by linear_combination(specializedValue)
+      as doubledXSquare;
+      (2 : ℤ) ≠ 0 as twoNonzero;
+      x * x = 2 * (4 * q + 1 - aHalf * aHalf - 3 * (cHalf * cHalf)) + 1
+          by Integer.multiply_cancel_left_by_nonzero(
+            x * x, 2 * (4 * q + 1 - aHalf * aHalf - 3 * (cHalf * cHalf)) + 1,
+            2, twoNonzero, doubledXSquare)
+      as xSquareOdd;
+      choose xHalf : ℤ such that x = 2 * xHalf + 1
+          as xReads from Integer.odd_root_of_odd_square(
+            x, 4 * q + 1 - aHalf * aHalf - 3 * (cHalf * cHalf), xSquareOdd);
+      (2 * aHalf) * (2 * aHalf) + 2 * ((2 * xHalf + 1) * (2 * xHalf + 1))
+          + 3 * ((2 * cHalf) * (2 * cHalf)) = 16 * q + 6
+          by substituting Equality.symmetry(xReads)
+      as oddXValue;
+      4 * (aHalf * aHalf + 3 * (cHalf * cHalf) + 2 * (xHalf * xHalf + xHalf))
+         = 4 * (4 * q + 1) by linear_combination(oddXValue)
+      as scaledHalvedValue;
+      (4 : ℤ) ≠ 0 as fourNonzero;
+      aHalf * aHalf + 3 * (cHalf * cHalf) + 2 * (xHalf * xHalf + xHalf)
+         = 4 * q + 1 by Integer.multiply_cancel_left_by_nonzero(
+           aHalf * aHalf + 3 * (cHalf * cHalf) + 2 * (xHalf * xHalf + xHalf),
+           4 * q + 1, 4, fourNonzero, scaledHalvedValue)
+      as halvedValue;
+      (aHalf + cHalf) * (aHalf + cHalf)
+         = 2 * (2 * q + aHalf * cHalf - cHalf * cHalf - xHalf * xHalf - xHalf) + 1
+             by linear_combination(halvedValue)
+      as halfSumSquareOdd;
+      choose halfSum : ℤ such that aHalf + cHalf = 2 * halfSum + 1
+          as halfSumReads from Integer.odd_root_of_odd_square(
+            aHalf + cHalf,
+            2 * q + aHalf * cHalf - cHalf * cHalf - xHalf * xHalf - xHalf,
+            halfSumSquareOdd);
+      2 * (-halfSum - cHalf - 1) + 1 = -aHalf - 3 * cHalf
+          by linear_combination(halfSumReads) as newAReads;
+      2 * (cHalf - halfSum - 1) + 1 = -aHalf + cHalf
+          by linear_combination(halfSumReads) as newCReads;
+      (-aHalf - 3 * cHalf) * (-aHalf - 3 * cHalf)
+          + 2 * ((-x) * (-x)) + 3 * ((-aHalf + cHalf) * (-aHalf + cHalf))
+         = (2 * aHalf) * (2 * aHalf) + 2 * (x * x) + 3 * ((2 * cHalf) * (2 * cHalf)) by ring
+         = a * a + 2 * (x * x) + 3 * ((2 * cHalf) * (2 * cHalf))
+             by substituting Equality.symmetry(aReads)
+         = a * a + 2 * (x * x) + 3 * (c * c) by substituting Equality.symmetry(cReads)
+         = 16 * q + 6 by valueReads
+      as transformed;
+      witness -halfSum - cHalf - 1 with witness -x with witness cHalf - halfSum - 1 with
+        (2 * (-halfSum - cHalf - 1) + 1) * (2 * (-halfSum - cHalf - 1) + 1)
+            + 2 * ((-x) * (-x))
+            + 3 * ((2 * (cHalf - halfSum - 1) + 1) * (2 * (cHalf - halfSum - 1) + 1))
+           = (-aHalf - 3 * cHalf) * (-aHalf - 3 * cHalf)
+              + 2 * ((-x) * (-x))
+              + 3 * ((2 * (cHalf - halfSum - 1) + 1) * (2 * (cHalf - halfSum - 1) + 1))
+               by substituting newAReads
+           = (-aHalf - 3 * cHalf) * (-aHalf - 3 * cHalf)
+              + 2 * ((-x) * (-x)) + 3 * ((-aHalf + cHalf) * (-aHalf + cHalf))
+               by substituting newCReads
+           = 16 * q + 6 by transformed
+    }
+  }
+}
+
+theorem Matrix.oddC4R1C4_base_obstruction_cover
+        (converse : Matrix.OneTwoThreeConverse)
+        : ∀ (b : ℕ).
+          Matrix.Represents(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 1, 4),
+            ((8 * b + 5 : ℕ) : ℤ)) := {
+  take b : ℕ;
+  ¬(Natural.IsOneTwoThreeObstruction(4 ^ 0 * (16 * b + 6)))
+      by Natural.four_power_times_nonzero_mod_four_core_not_one_two_three_obstruction(
+        0, b, 6, 1, 2, done, done, done, done, done)
+  as poweredAdmissible;
+  4 ^ 0 * (16 * b + 6) = 16 * b + 6 by substituting Natural.power_zero(4) as unpoweredReads;
+  ¬(Natural.IsOneTwoThreeObstruction(16 * b + 6)) by {
+    suppose Natural.IsOneTwoThreeObstruction(16 * b + 6);
+    Natural.IsOneTwoThreeObstruction(4 ^ 0 * (16 * b + 6))
+        by substituting Equality.symmetry(unpoweredReads);
+    done by poweredAdmissible(done)
+  }
+  as admissible;
+  Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(3), ((16 * b + 6 : ℕ) : ℤ))
+      by converse(16 * b + 6, admissible) as represented;
+  choose vector : RingVector(Integer.commutative_ring_bundle, 3) such that
+      Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(3), vector)
+        = ((16 * b + 6 : ℕ) : ℤ)
+      as valueReads from represented;
+  let a : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo));
+  let x : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo));
+  let c : ℤ := vector(NaturalsBelow.top(2));
+  vector = (⟨a, x, c⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+      by RingVector.eq_threeCoordinates(vector) as vectorReads;
+  a * a + 2 * (x * x) + 3 * (c * c)
+     = Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(3), ⟨a, x, c⟩)
+         by Equality.symmetry(Matrix.squarePlusDoublePlusScaledSquareForm_coordinateTuple_value(3, a, x, c))
+     = Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(3), vector)
+         by substituting Equality.symmetry(vectorReads)
+     = ((16 * b + 6 : ℕ) : ℤ) by valueReads
+  ;
+  ((16 * b + 6 : ℕ) : ℤ) = 16 * (b : ℤ) + 6 by {
+    ((16 * b + 6 : ℕ) : ℤ)
+       = ((16 * b : ℕ) : ℤ) + 6 by Natural.to_integer.add_preserves
+       = 16 * (b : ℤ) + 6 by substituting Natural.to_integer.multiply_preserves(16, b);
+    done
+  }
+  as affineValue;
+  a * a + 2 * (x * x) + 3 * (c * c) = 16 * (b : ℤ) + 6 by substituting affineValue
+      as affineCoordinateValue;
+  choose h : ℤ, newX : ℤ, k : ℤ such that
+      (2 * h + 1) * (2 * h + 1) + 2 * (newX * newX)
+        + 3 * ((2 * k + 1) * (2 * k + 1)) = 16 * (b : ℤ) + 6
+      as oddCoordinates from Integer.one_two_three_sixteen_plus_six_has_odd_outer_coordinates(
+        a, x, c, (b : ℤ), affineCoordinateValue);
+  let scalar : ℤ :=
+    newX * newX + 2 * ((-h - k - 1) * (-h - k - 1))
+      + 2 * (-h - k - 1) * k + 4 * (k * k)
+      + 2 * (-h - k - 1) * (k + 1) + 4 * ((k + 1) * (k + 1));
+  2 * scalar
+     = (2 * h + 1) * (2 * h + 1) + 2 * (newX * newX)
+        + 3 * ((2 * k + 1) * (2 * k + 1)) + 4 by ring
+     = 16 * (b : ℤ) + 10 by substituting oddCoordinates
+     = 2 * (8 * (b : ℤ) + 5) by ring
+  as doubledScalar;
+  (2 : ℤ) ≠ 0 as twoNonzero;
+  scalar = 8 * (b : ℤ) + 5
+      by Integer.multiply_cancel_left_by_nonzero(
+        scalar, 8 * (b : ℤ) + 5, 2, twoNonzero, doubledScalar)
+  ;
+  (8 * (b : ℤ) + 5) = ((8 * b + 5 : ℕ) : ℤ) by {
+    ((8 * b + 5 : ℕ) : ℤ)
+       = ((8 * b : ℕ) : ℤ) + 5 by Natural.to_integer.add_preserves
+       = 8 * (b : ℤ) + 5 by substituting Natural.to_integer.multiply_preserves(8, b);
+    done
+  }
+  as targetReads;
+  scalar = ((8 * b + 5 : ℕ) : ℤ) by substituting Equality.symmetry(targetReads) as scalarComputation;
+  done by Matrix.represents_by_witness(
+    Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 1, 4),
+    target := ((8 * b + 5 : ℕ) : ℤ), vector := ⟨newX, -h - k - 1, k, k + 1⟩,
+    computes := Matrix.squarePlusDoubleSquareOddRankFourRepresentative_coordinateTuple_computes(
+      scalarComputation := scalarComputation))
+}
+
+theorem Matrix.oddC4R1C4_universal
+        (oneTwoSix : Matrix.OneTwoSixConverse)
+        (oneTwoThree : Matrix.OneTwoThreeConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 1, 4)) := {
+  let A : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+    Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 1, 4);
+  take m : ℕ;
+  suppose m ≥ 1;
+  Natural.IsOneTwoSixObstruction(m) ∨ ¬(Natural.IsOneTwoSixObstruction(m))
+      by Logic.excluded_middle(Natural.IsOneTwoSixObstruction(m)) as obstructionDecision;
+  ¬(Natural.IsOneTwoSixObstruction(m)) ∨ Natural.IsOneTwoSixObstruction(m)
+      by Or.swap(obstructionDecision);
+  done by cases {
+    case ¬(Natural.IsOneTwoSixObstruction(m)) as admissible: {
+      Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(6), (m : ℤ))
+          by oneTwoSix(m, admissible) as represented;
+      choose vector : RingVector(Integer.commutative_ring_bundle, 3) such that
+          Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(6), vector) = (m : ℤ)
+          as valueReads from represented;
+      let x : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo));
+      let y : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo));
+      let z : ℤ := vector(NaturalsBelow.top(2));
+      vector = (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+          by RingVector.eq_threeCoordinates(vector) as vectorReads;
+      x * x + 2 * (y * y) + 6 * (z * z)
+         = Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(6), ⟨x, y, z⟩)
+             by Equality.symmetry(Matrix.squarePlusDoublePlusScaledSquareForm_coordinateTuple_value(6, x, y, z))
+         = Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(6), vector)
+             by substituting Equality.symmetry(vectorReads)
+         = (m : ℤ) by valueReads
+      as donorValue;
+      x * x + 2 * ((-y - z) * (-y - z)) + 2 * (-y - z) * z + 4 * (z * z)
+          + 2 * (-y - z) * z + 4 * (z * z)
+         = x * x + 2 * (y * y) + 6 * (z * z) by ring
+         = (m : ℤ) by donorValue
+      as scalarComputation;
+      done by Matrix.represents_by_witness(
+        A, target := m, vector := ⟨x, -y - z, z, z⟩,
+        computes := Matrix.squarePlusDoubleSquareOddRankFourRepresentative_coordinateTuple_computes(
+          4, 1, 4, x, -y - z, z, z, (m : ℤ), scalarComputation))
+    }
+    case Natural.IsOneTwoSixObstruction(m) as obstruction: {
+      choose exponent : ℕ, b : ℕ such that m = 4 ^ exponent * (8 * b + 5)
+          as mReads from obstruction;
+      Matrix.Represents(A, ((8 * b + 5 : ℕ) : ℤ))
+          by Matrix.oddC4R1C4_base_obstruction_cover(oneTwoThree, b) as baseRepresented;
+      Matrix.Represents(A, ((4 ^ exponent * (8 * b + 5) : ℕ) : ℤ))
+          by Matrix.represents_four_power_times(A, 8 * b + 5, exponent, baseRepresented);
+      Matrix.Represents(A, (m : ℤ)) by substituting mReads;
+      done
+    }
+  }
+}
