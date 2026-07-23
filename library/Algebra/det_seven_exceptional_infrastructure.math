@@ -1,0 +1,205 @@
+-- Algebra/det_seven_exceptional_infrastructure.math
+--
+-- The exceptional determinant-seven form Q_(1,7) contains a second ternary
+-- section, twice the odd-five form, with an orthogonal vector of norm 90:
+--
+--   Q_(1,7)(2y+z, x+z+t, -z-4t, -z+2t)
+--     = 2(x²+2y²+2yz+5z²) + 90t².
+
+module Algebra.det_seven_exceptional_infrastructure
+
+import Algebra.det_seven_generic_universality
+import Algebra.odd_five_converse_reduction
+import Algebra.rank_four_d2_unit_residue_universality
+
+theorem Matrix.oddC4R1C7_even_section_orthogonal_lift
+        (residual t : ℤ)
+        (represented : Matrix.Represents(
+          Matrix.squarePlusDoubleSquareOddForm(5), residual))
+        : Matrix.Represents(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 1, 7),
+            2 * residual + 90 * (t * t)) := {
+  choose vector : RingVector(Integer.commutative_ring_bundle, 3) such that
+      Matrix.quadraticForm(Matrix.squarePlusDoubleSquareOddForm(5), vector) = residual
+      as valueReads from represented;
+  let x : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo));
+  let y : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo));
+  let z : ℤ := vector(NaturalsBelow.top(2));
+  vector = (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+      by RingVector.eq_threeCoordinates(vector) as vectorReads;
+  x * x + 2 * (y * y) + 2 * y * z + 5 * (z * z)
+     = Matrix.quadraticForm(Matrix.squarePlusDoubleSquareOddForm(5), ⟨x, y, z⟩)
+         by Equality.symmetry(
+           Matrix.squarePlusDoubleSquareOddForm_coordinateTuple_value(5, x, y, z))
+     = Matrix.quadraticForm(Matrix.squarePlusDoubleSquareOddForm(5), vector)
+         by substituting Equality.symmetry(vectorReads)
+     = residual by valueReads
+  as ternaryValue;
+  let qx : ℤ := 2 * y + z;
+  let qy : ℤ := x + z + t;
+  let qz : ℤ := -z - 4 * t;
+  let qw : ℤ := -z + 2 * t;
+  qx * qx + 2 * (qy * qy) + 2 * qy * qz + 4 * (qz * qz)
+      + 2 * 1 * qy * qw + 7 * (qw * qw)
+     = 2 * (x * x + 2 * (y * y) + 2 * y * z + 5 * (z * z))
+       + 90 * (t * t) by ring
+     = 2 * residual + 90 * (t * t) by substituting ternaryValue
+  as scalarComputation;
+  done by Matrix.represents_by_witness(
+    Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 1, 7),
+    target := 2 * residual + 90 * (t * t), vector := ⟨qx, qy, qz, qw⟩,
+    computes := Matrix.detSevenRankFour_coordinateTuple_computes(
+      scalarComputation := scalarComputation))
+}
+
+theorem Matrix.oddC4R1C7_even_natural_lift
+        (residual t : ℕ)
+        (represented : Matrix.Represents(
+          Matrix.squarePlusDoubleSquareOddForm(5), (residual : ℤ)))
+        : Matrix.Represents(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 1, 7),
+            ((2 * residual + 90 * t * t : ℕ) : ℤ)) := {
+  Matrix.Represents(
+      Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 1, 7),
+      2 * (residual : ℤ) + 90 * ((t : ℤ) * (t : ℤ)))
+      by Matrix.oddC4R1C7_even_section_orthogonal_lift(
+        (residual : ℤ), (t : ℤ), represented);
+  ((2 * residual + 90 * t * t : ℕ) : ℤ)
+     = ((2 * residual : ℕ) : ℤ) + ((90 * t * t : ℕ) : ℤ)
+         by Natural.to_integer.add_preserves
+     = 2 * (residual : ℤ) + ((90 * t : ℕ) : ℤ) * (t : ℤ)
+         by substituting Natural.to_integer.multiply_preserves(90 * t, t)
+     = 2 * (residual : ℤ) + 90 * (t : ℤ) * (t : ℤ)
+         by substituting Natural.to_integer.multiply_preserves(90, t)
+     = 2 * (residual : ℤ) + 90 * ((t : ℤ) * (t : ℤ)) by ring
+  as targetReads;
+  done by substituting targetReads
+}
+
+theorem Natural.even_squarefree_half_obstruction_shape
+        (n half : ℕ)
+        (squarefree : Natural.IsSquarefree(n))
+        (doubleReads : n = 2 * half)
+        (obstruction : Natural.IsThreeSquareObstruction(half))
+        : ∃ (b : ℕ). n = 16 * b + 14 := {
+  choose exponent : ℕ, b : ℕ such that
+      half = 4 ^ exponent * (8 * b + 7) as halfReads from obstruction;
+  exponent = 0 ∨ ∃ (predecessor : ℕ). exponent = 1 + predecessor
+      by Natural.zero_or_one_plus;
+  done by cases {
+    case exponent = 0 as exponentZero: {
+      n
+         = 2 * half by doubleReads
+         = 2 * (4 ^ exponent * (8 * b + 7)) by substituting halfReads
+         = 2 * (4 ^ 0 * (8 * b + 7)) by substituting exponentZero
+         = 16 * b + 14 by substituting Natural.power_zero(4)
+      as shape;
+      done by witness b with shape
+    }
+    case ∃ (predecessor : ℕ). exponent = 1 + predecessor: {
+      choose predecessor : ℕ such that exponent = 1 + predecessor as exponentReads;
+      n = (2 * 2) * (2 * 4 ^ predecessor * (8 * b + 7)) by {
+        n
+           = 2 * half by doubleReads
+           = 2 * (4 ^ exponent * (8 * b + 7)) by substituting halfReads
+           = 2 * (4 ^ (1 + predecessor) * (8 * b + 7))
+               by substituting exponentReads
+           = 2 * ((4 * 4 ^ predecessor) * (8 * b + 7))
+               by substituting Natural.power_one_plus(4, predecessor)
+           = (2 * 2) * (2 * 4 ^ predecessor * (8 * b + 7)) by ring;
+        done
+      }
+      as squareDividesReads;
+      2 * 2 ∣ n
+          by witness 2 * 4 ^ predecessor * (8 * b + 7) with squareDividesReads;
+      ¬(2 * 2 ∣ n) by squarefree(2, done);
+      done
+    }
+  }
+}
+
+theorem Natural.sixteen_times_plus_fourteen_at_most_seventy_eight_below_five
+        : ∀ (b : ℕ). b ≥ 0 → b < 5 → 16 * b + 14 ≤ 78 := {
+  done by finite_check b from 0 until 5
+}
+
+theorem Natural.five_le_of_sixteen_times_plus_fourteen_above_ninety
+        (b : ℕ) (above : 90 < 16 * b + 14)
+        : 5 ≤ b := {
+  b < 5 ∨ 5 ≤ b by Natural.lt_or_le;
+  done by cases {
+    case b < 5 as belowFive: {
+      16 * b + 14 ≤ 78
+          by Natural.sixteen_times_plus_fourteen_at_most_seventy_eight_below_five(
+            b, done, belowFive);
+      90
+         < 16 * b + 14 by above
+         ≤ 78
+         < 90;
+      90 < 90;
+      False by Natural.lt_irreflexive;
+      done
+    }
+    case 5 ≤ b: done
+  }
+}
+
+theorem Matrix.oddC4R1C7_represents_even_above_ninety
+        (threeSquares : Matrix.ThreeSquaresConverse)
+        (n : ℕ)
+        (squarefree : Natural.IsSquarefree(n))
+        (even : Natural.modulo(n, 2) = 0)
+        (above : 90 < n)
+        : Matrix.Represents(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 1, 7),
+            (n : ℤ)) := {
+  2 ∣ n by Natural.modulo_zero_implies_divides(n, 2, even);
+  choose half : ℕ such that n = 2 * half as doubleReads;
+  let oddFive : Matrix.OddFiveConverse :=
+    Matrix.odd_five_converse_of_three_squares(threeSquares);
+  Natural.IsThreeSquareObstruction(half)
+      ∨ ¬(Natural.IsThreeSquareObstruction(half))
+      by Logic.excluded_middle(Natural.IsThreeSquareObstruction(half))
+      as obstructionDecision;
+  ¬(Natural.IsThreeSquareObstruction(half))
+      ∨ Natural.IsThreeSquareObstruction(half)
+      by Or.swap(obstructionDecision);
+  done by cases {
+    case ¬(Natural.IsThreeSquareObstruction(half)) as admissible: {
+      Matrix.Represents(
+          Matrix.squarePlusDoubleSquareOddForm(5), (half : ℤ))
+          by oddFive(half, admissible) as represented;
+      Matrix.Represents(
+          Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 1, 7),
+          ((2 * half + 90 * 0 * 0 : ℕ) : ℤ))
+          by Matrix.oddC4R1C7_even_natural_lift(half, 0, represented);
+      2 * half + 90 * 0 * 0 = n by Equality.symmetry(doubleReads) as targetReads;
+      done by substituting targetReads
+    }
+    case Natural.IsThreeSquareObstruction(half) as obstruction: {
+      choose b : ℕ such that n = 16 * b + 14 as obstructionShape
+          from Natural.even_squarefree_half_obstruction_shape(
+            n, half, squarefree, doubleReads, obstruction);
+      90 < 16 * b + 14 by substituting Equality.symmetry(obstructionShape);
+      5 ≤ b by Natural.five_le_of_sixteen_times_plus_fourteen_above_ninety(b, done);
+      choose tail : ℕ such that b = 5 + tail as bReads
+          from Natural.subtraction_witness(5, b, done);
+      ¬(Natural.IsThreeSquareObstruction(8 * tail + 2))
+          by Natural.eight_times_plus_two_not_obstruction(tail)
+          as admissible;
+      Matrix.Represents(
+          Matrix.squarePlusDoubleSquareOddForm(5), ((8 * tail + 2 : ℕ) : ℤ))
+          by oddFive(8 * tail + 2, admissible) as represented;
+      Matrix.Represents(
+          Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 1, 7),
+          ((2 * (8 * tail + 2) + 90 * 1 * 1 : ℕ) : ℤ))
+          by Matrix.oddC4R1C7_even_natural_lift(8 * tail + 2, 1, represented);
+      2 * (8 * tail + 2) + 90 * 1 * 1
+         = 16 * (5 + tail) + 14 by ring
+         = 16 * b + 14 by substituting Equality.symmetry(bReads)
+         = n by Equality.symmetry(obstructionShape)
+      as targetReads;
+      done by substituting targetReads
+    }
+  }
+}

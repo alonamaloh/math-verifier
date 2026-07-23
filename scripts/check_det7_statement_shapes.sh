@@ -130,4 +130,17 @@ check_generic_universal Matrix.oddC4R3C11_universal_of_det_seven_safe_converse 3
 check_contains Matrix.detSeven_six_generic_universal \
   'Matrix.DetSevenSafeConverse → And'
 
+check_contains Natural.detSevenOddResidueCover_m315_selected \
+  'Natural.DetSevenOddSelectedResidueCover 315 Natural.DetSevenChoices123456 Natural.DetSevenSelectedM315Odd'
+check_contains Matrix.detSevenFiniteCover_q1c7odd \
+  'Matrix.DetSevenFiniteCover (Matrix.squarePlusDoubleSquareOddRankFourRepresentative (Natural.to_integer 4) (Natural.to_integer 1) (Natural.to_integer 7)) 315 Natural.DetSevenSelectedM315Odd'
+check_contains Matrix.detSevenEvenFiniteCover_q1c7 \
+  '(Natural.modulo n 2) = 0'
+check_contains Matrix.oddC4R1C7_even_section_orthogonal_lift \
+  '((Natural.to_integer 2) * residual + (Natural.to_integer 90) * (t * t))'
+check_contains Matrix.oddC4R1C7_represents_even_above_ninety \
+  'Matrix.ThreeSquaresConverse →'
+check_contains Matrix.oddC4R1C7_universal_of_det_seven_and_three_squares \
+  'Matrix.DetSevenSafeConverse → Matrix.ThreeSquaresConverse → Matrix.IsUniversal'
+
 echo "det7-statement-shape-check: PASS"

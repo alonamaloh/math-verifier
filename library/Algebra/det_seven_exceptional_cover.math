@@ -1,0 +1,163 @@
+-- Algebra/det_seven_exceptional_cover.math
+--
+-- The exceptional Q_(1,7) cover.  Odd least exceptions use the determinant-
+-- seven residual cover with the norm-315 complement.  Even least exceptions
+-- use the doubled odd-five section with its norm-90 complement.
+
+module Algebra.det_seven_exceptional_cover
+
+import Algebra.det_seven_exceptional_infrastructure
+import Algebra.det_seven_residual_m315_odd_generated
+import Algebra.det_seven_finite_q1c7odd_generated
+import Algebra.det_seven_finite_q1c7_even_generated
+
+theorem Matrix.oddC4R1C7_represents_odd
+        (detSeven : Matrix.DetSevenSafeConverse)
+        (n : ℕ)
+        (positive : n ≥ 1)
+        (squarefree : Natural.IsSquarefree(n))
+        (odd : Natural.modulo(n, 2) = 1)
+        : Matrix.Represents(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 1, 7),
+            (n : ℤ)) := {
+  let A : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+    Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 1, 7);
+  Matrix.DetSevenNaturalOrthogonalLift(A, 315)
+      by Matrix.detSevenNaturalOrthogonalLift_of_integer(
+        A, 315,
+        (residual t : ℤ)
+          (represented : Matrix.Represents(
+            Matrix.squarePlusDoubleSquareOddForm(4), residual)) ↦
+          Matrix.oddC4R1C7_orthogonal_lift(residual, t, represented))
+      as lift;
+  Natural.IsDetSevenSafe(n) ∨ ¬(Natural.IsDetSevenSafe(n))
+      by Logic.excluded_middle(Natural.IsDetSevenSafe(n));
+  done by cases {
+    case Natural.IsDetSevenSafe(n) as safe: {
+      Matrix.Represents(
+          Matrix.squarePlusDoubleSquareOddForm(4), (n : ℤ))
+          by detSeven(n, positive, safe) as represented;
+      Matrix.Represents(A, ((315 * 0 * 0 + n : ℕ) : ℤ))
+          by lift(n, 0, represented);
+      315 * 0 * 0 + n = n as targetReads;
+      done by substituting targetReads
+    }
+    case ¬(Natural.IsDetSevenSafe(n)) as unsafe: {
+      Natural.modulo(n, 49) ≠ 0
+          by Natural.IsSquarefree.modulo_forty_nine_nonzero(n, squarefree)
+          as notMultipleFortyNine;
+      choose t : ℕ such that
+          Natural.DetSevenChoices123456(t)
+          ∧ Natural.DetSevenSelectedM315Odd(Natural.modulo(n, 588), t)
+          ∧ Natural.DetSevenResidueSolution(
+              315, Natural.modulo(n, 588), t)
+          from Natural.DetSevenOddSelectedResidueCover.selected_solution(
+            315, Natural.DetSevenChoices123456,
+            Natural.DetSevenSelectedM315Odd,
+            Natural.detSevenOddResidueCover_m315_selected,
+            n, odd, notMultipleFortyNine, unsafe);
+      Natural.DetSevenSelectedM315Odd(
+          Natural.modulo(n, 588), t) as selectedShift;
+      Natural.DetSevenResidueSolution(
+          315, Natural.modulo(n, 588), t) as solution;
+      n ≤ 315 * t * t ∨ 315 * t * t < n
+          by Or.swap(
+            315 * t * t < n, n ≤ 315 * t * t,
+            Natural.lt_or_le(315 * t * t, n));
+      done by cases {
+        case n ≤ 315 * t * t as bounded:
+          done by Matrix.detSevenFiniteCover_q1c7odd(
+            Natural.modulo(n, 588), t, n, selectedShift,
+            positive, bounded, reflexivity(ℕ, Natural.modulo(n, 588)))
+        case 315 * t * t < n as residualPositive: {
+          315 * t * t ≤ n;
+          choose residual : ℕ such that
+              n = 315 * t * t + residual as residualReads
+              from Natural.subtraction_witness(315 * t * t, n, done);
+          residual ≥ 1 by {
+            residual = 0 ∨ ∃ (predecessor : ℕ). residual = 1 + predecessor
+                by Natural.zero_or_one_plus;
+            done by cases {
+              case residual = 0 as residualZero: {
+                n = 315 * t * t by {
+                  n = 315 * t * t + residual by residualReads
+                    = 315 * t * t + 0 by substituting residualZero
+                    = 315 * t * t;
+                  done
+                }
+                as nReads;
+                315 * t * t < 315 * t * t by substituting nReads;
+                False by Natural.lt_irreflexive as impossible;
+                done by absurd(impossible)
+              }
+              case ∃ (predecessor : ℕ). residual = 1 + predecessor: {
+                choose predecessor : ℕ such that residual = 1 + predecessor;
+                1 ≤ 1 + predecessor;
+                done
+              }
+            }
+          }
+          as residualAtLeastOne;
+          Natural.IsDetSevenSafe(residual)
+              by Natural.detSevenResidueSolution_safe_residual(
+                315, n, Natural.modulo(n, 588), t, residual,
+                reflexivity(ℕ, Natural.modulo(n, 588)),
+                solution, residualReads)
+              as residualSafe;
+          Matrix.Represents(
+              Matrix.squarePlusDoubleSquareOddForm(4), (residual : ℤ))
+              by detSeven(residual, residualAtLeastOne, residualSafe)
+              as residualRepresented;
+          Matrix.Represents(
+              A, ((315 * t * t + residual : ℕ) : ℤ))
+              by lift(residual, t, residualRepresented);
+          done by substituting residualReads
+        }
+      }
+    }
+  }
+}
+
+theorem Matrix.oddC4R1C7_universal_of_det_seven_and_three_squares
+        (detSeven : Matrix.DetSevenSafeConverse)
+        (threeSquares : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 1, 7)) := {
+  let A : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+    Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 1, 7);
+  suppose ¬(Matrix.IsUniversal(A)) as nonUniversal for contradiction;
+  let n : ℕ := Matrix.truant(A);
+  Matrix.IsTruant(A, n) by Matrix.truant_is_truant(A, nonUniversal) as isTruant;
+  n ≥ 1 by Matrix.IsTruant.positive as positive;
+  ¬(Matrix.Represents(A, (n : ℤ))) by Matrix.IsTruant.missed as missed;
+  Natural.IsSquarefree(n) by Matrix.IsTruant.squarefree(A, n, isTruant)
+      as squarefree;
+  Natural.modulo(n, 2) < 2 by Natural.modulo_lt(n, 2, done) as parityBelow;
+  Natural.modulo(n, 2) = 0 ∨ Natural.modulo(n, 2) = 1
+      by Natural.below_two(Natural.modulo(n, 2), parityBelow);
+  done by cases {
+    case Natural.modulo(n, 2) = 0 as even: {
+      n ≤ 90 ∨ 90 < n
+          by Or.swap(90 < n, n ≤ 90, Natural.lt_or_le(90, n));
+      done by cases {
+        case n ≤ 90 as bounded: {
+          Matrix.Represents(A, (n : ℤ))
+              by Matrix.detSevenEvenFiniteCover_q1c7(n, bounded, even);
+          done by missed
+        }
+        case 90 < n as above: {
+          Matrix.Represents(A, (n : ℤ))
+              by Matrix.oddC4R1C7_represents_even_above_ninety(
+                threeSquares, n, squarefree, even, above);
+          done by missed
+        }
+      }
+    }
+    case Natural.modulo(n, 2) = 1 as odd: {
+      Matrix.Represents(A, (n : ℤ))
+          by Matrix.oddC4R1C7_represents_odd(
+            detSeven, n, positive, squarefree, odd);
+      done by missed
+    }
+  }
+}
