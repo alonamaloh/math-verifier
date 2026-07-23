@@ -12,7 +12,7 @@
 
 "use strict";
 
-const assert = require("node:assert/strict");
+const assert = require("assert").strict;
 
 const mod = (value, modulus) => ((value % modulus) + modulus) % modulus;
 
