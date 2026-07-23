@@ -73,6 +73,40 @@ Durable backlog of ideas worth trying. Promote to a real task when picked up.
   not a capability we lack. Already used it to clean the two `_at_make`
   lifts in `supremum.math`.
 
+- **Whole-sum `=` chain steps need a spelled-out higher-order argument**
+  (friction, 2026-07-23, writing `Matrix.cramer`; the biggest tax of that
+  proof). Argument-free `by <lemma>` does not apply on an `=` chain step
+  (diff-inference needs the lemma *applied*). So rewriting a whole
+  `sumOver(…)` by a registered aggregation lemma whose *conclusion the
+  endpoints fully pin* — e.g. `CommutativeRing.sumOver_interchange` on
+  `Σ_j Σ_k T = Σ_k Σ_j T` — forces hand-writing the entire two-level
+  `term := (j) ↦ (k) ↦ …` lambda, even though both endpoints determine it.
+  Fix directions, in rough preference: (a) let `by substituting <lemma>`
+  fire on a whole-term `=` rewrite of a registered aggregation lemma
+  (recover `term`/`items` from the endpoints, the way the `=`-step
+  diff-matcher already recovers a rewrite); or (b) an
+  endpoints-pin-the-instance path for argument-free `by <lemma>` on an
+  `=` step when the goal's two sides uniquely determine every argument.
+  This recurs across the determinant / `sumOver` corpus, not just Cramer.
+
+- **Under-binder `by ((x) ↦ …)` body must prove the FULL summand
+  equality, not the inner piece** (minor, same session). In
+  `= sumOver((j) ↦ b(j)·cof) by ((j) ↦ proof)`, the body must prove
+  `b(j)·cof = …·cof`, so a hypothesis `bReads : ∀j. b(j) = …` can't be
+  handed in directly — it needs wrapping as `{ done by substituting
+  bReads }` to lift through the surrounding `·cof`. Reads slightly clunky.
+  The error message here is *good* (names the mismatch + the fallback —
+  logged in `error_message_inbox.md`); the ergonomic gap is that a
+  congruence one level *below* the summand head isn't threaded
+  automatically. Priority: low; the wrap is a one-liner once you know it.
+
+- **`substituting` orientation on aggregation scale lemmas** (trivia,
+  same session). Pulling a constant out of a sum
+  (`Σ_j c·f(j) = c·Σ_j f(j)`) runs `sumOver_scale_left` in reverse of its
+  stated direction, so the chain step needed a named intermediate
+  (`… by pulled`) rather than `by substituting sumOver_scale_left`.
+  A symmetric/bidirectional `substituting` would remove the bridge.
+
 ## Error messages (see docs/error_message_corpus.md for the full catalogue)
 
 - Approach B — provenance quoting: carry the exact surface type string /
