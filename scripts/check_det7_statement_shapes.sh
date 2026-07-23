@@ -84,4 +84,22 @@ check_lift Matrix.oddC4R2C9_orthogonal_lift 2 9 329
 check_lift Matrix.oddC4R3C10_orthogonal_lift 3 10 238
 check_lift Matrix.oddC4R3C11_orthogonal_lift 3 11 287
 
+check_residual_cover() {
+  local declaration=$1
+  local multiplier=$2
+  local choices=$3
+  check_contains "$declaration" "And (Natural.${choices} t)"
+  check_contains "$declaration" \
+    "n = ${multiplier} * t * t + residual → Natural.IsDetSevenSafe residual"
+}
+
+check_residual_cover Natural.detSevenResiduals_m7 7 DetSevenChoices12346
+check_residual_cover Natural.detSevenResiduals_m266 266 DetSevenChoices123456
+check_residual_cover Natural.detSevenResiduals_m280 280 DetSevenChoices123469
+check_residual_cover Natural.detSevenResiduals_m329 329 DetSevenChoices123469
+check_residual_cover Natural.detSevenResiduals_m238 238 DetSevenChoices123456
+check_residual_cover Natural.detSevenResiduals_m287 287 DetSevenChoices123469
+check_residual_cover Natural.detSevenOddResiduals_m315 315 DetSevenChoices123456
+check_contains Natural.detSevenOddResiduals_m315 '(Natural.modulo n 2) = 1'
+
 echo "det7-statement-shape-check: PASS"

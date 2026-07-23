@@ -1,0 +1,482 @@
+-- Algebra/det_seven_residual_arithmetic.math
+--
+-- Congruence transport for the determinant-seven modulo-588 certificates.
+-- Residue certificates use honest Integer subtraction; an application only
+-- turns the result back into a Natural after it supplies
+-- n = m*t² + residual.
+
+module Algebra.det_seven_residual_arithmetic
+
+import Algebra.det_seven_safe_converse
+import Natural.multiply_bounds
+import IntegerMod.representative
+
+definition Natural.DetSevenResidueSolution (m a t : ℕ) : Proposition :=
+  ∃ (b : ℕ). b < 588
+    ∧ Natural.IsDetSevenSafe(b)
+    ∧ Integer.CongruentModulo(
+        588,
+        (a : ℤ) - ((m * t * t : ℕ) : ℤ),
+        (b : ℤ))
+
+definition Natural.DetSevenChoices12346 (t : ℕ) : Proposition :=
+  t = 1 ∨ t = 2 ∨ t = 3 ∨ t = 4 ∨ t = 6
+
+definition Natural.DetSevenChoices123456 (t : ℕ) : Proposition :=
+  t = 1 ∨ t = 2 ∨ t = 3 ∨ t = 4 ∨ t = 5 ∨ t = 6
+
+definition Natural.DetSevenChoices123469 (t : ℕ) : Proposition :=
+  t = 1 ∨ t = 2 ∨ t = 3 ∨ t = 4 ∨ t = 6 ∨ t = 9
+
+definition Natural.DetSevenGenericResidueCover
+        (m : ℕ) (choice : ℕ → Proposition) : Proposition :=
+  ∀ (a : ℕ). a ≥ 0 → a < 588 →
+    Natural.modulo(a, 4) ≠ 0 →
+    Natural.modulo(a, 49) ≠ 0 →
+    ¬(Natural.IsDetSevenSafe(a)) →
+    ∃ (t : ℕ). choice(t) ∧ Natural.DetSevenResidueSolution(m, a, t)
+
+definition Natural.DetSevenOddResidueCover
+        (m : ℕ) (choice : ℕ → Proposition) : Proposition :=
+  ∀ (a : ℕ). a ≥ 0 → a < 588 →
+    Natural.modulo(a, 2) = 1 →
+    Natural.modulo(a, 49) ≠ 0 →
+    ¬(Natural.IsDetSevenSafe(a)) →
+    ∃ (t : ℕ). choice(t) ∧ Natural.DetSevenResidueSolution(m, a, t)
+
+theorem Natural.detSevenResidueSolution_of_certificate
+        (m a t b : ℕ) (quotient : ℤ)
+        (bBelow : b < 588)
+        (bSafe : Natural.IsDetSevenSafe(b))
+        (certificate :
+          ((a : ℤ) - ((m * t * t : ℕ) : ℤ)) - (b : ℤ) = (588 : ℤ) * quotient)
+        : Natural.DetSevenResidueSolution(m, a, t) := {
+  Integer.CongruentModulo(
+      588,
+      (a : ℤ) - ((m * t * t : ℕ) : ℤ),
+      (b : ℤ)) by {
+        unfold Integer.CongruentModulo, Integer.divides in {
+          witness quotient with certificate
+        }
+      };
+  witness b with {
+    b < 588;
+    Natural.IsDetSevenSafe(b);
+    done
+  }
+}
+
+theorem Natural.congruentModulo_remainder (n modulus : ℕ)
+        : Integer.CongruentModulo(
+            modulus,
+            (n : ℤ),
+            (Natural.modulo(n, modulus) : ℤ)) := {
+  modulus * Natural.floor_divide(n, modulus) + Natural.modulo(n, modulus) = n
+      by Natural.floor_divide_modulo_decompose as decomposition;
+  unfold Integer.CongruentModulo, Integer.divides in {
+    witness (Natural.floor_divide(n, modulus) : ℤ) with
+      (n : ℤ) - (Natural.modulo(n, modulus) : ℤ)
+         = ((modulus * Natural.floor_divide(n, modulus)
+              + Natural.modulo(n, modulus) : ℕ) : ℤ)
+             - (Natural.modulo(n, modulus) : ℤ)
+               by substituting decomposition
+         = ((modulus * Natural.floor_divide(n, modulus) : ℕ) : ℤ)
+             + (Natural.modulo(n, modulus) : ℤ)
+             - (Natural.modulo(n, modulus) : ℤ)
+               by substituting Natural.to_integer.add_preserves(
+                 modulus * Natural.floor_divide(n, modulus),
+                 Natural.modulo(n, modulus))
+         = ((modulus * Natural.floor_divide(n, modulus) : ℕ) : ℤ) by ring
+         = (modulus : ℤ) * (Natural.floor_divide(n, modulus) : ℤ)
+             by Natural.to_integer.multiply_preserves
+  }
+}
+
+theorem Integer.CongruentModulo.reduce_modulus
+        (small factor : ℕ) (x y : ℤ)
+        (congruent : Integer.CongruentModulo(small * factor, x, y))
+        : Integer.CongruentModulo(small, x, y) := {
+  unfold Integer.CongruentModulo, Integer.divides in {
+    choose quotient : ℤ such that
+        x - y = ((small * factor : ℕ) : ℤ) * quotient as differenceReads
+        from congruent;
+    witness (factor : ℤ) * quotient with
+      x - y
+         = ((small * factor : ℕ) : ℤ) * quotient by differenceReads
+         = ((small : ℤ) * (factor : ℤ)) * quotient
+             by substituting Natural.to_integer.multiply_preserves(small, factor)
+         = (small : ℤ) * ((factor : ℤ) * quotient) by ring
+  }
+}
+
+theorem Natural.modulo_eq_of_integer_congruent
+        (modulus n r : ℕ) (modulusPositive : modulus ≥ 1)
+        (congruent : Integer.CongruentModulo(modulus, (n : ℤ), (r : ℤ)))
+        : Natural.modulo(n, modulus) = Natural.modulo(r, modulus) := {
+  Integer.CongruentModulo(
+      modulus, (n : ℤ), (Natural.modulo(n, modulus) : ℤ))
+      by Natural.congruentModulo_remainder as nCongruent;
+  Integer.CongruentModulo(
+      modulus, (r : ℤ), (Natural.modulo(r, modulus) : ℤ))
+      by Natural.congruentModulo_remainder as rCongruent;
+  Integer.CongruentModulo(
+      modulus, (Natural.modulo(n, modulus) : ℤ), (n : ℤ))
+      by Integer.CongruentModulo.symmetric(
+        modulus,
+        (n : ℤ),
+        (Natural.modulo(n, modulus) : ℤ),
+        nCongruent)
+      as nReverse;
+  Integer.CongruentModulo(
+      modulus, (Natural.modulo(n, modulus) : ℤ), (r : ℤ))
+      by Integer.CongruentModulo.transitive(
+        modulus,
+        (Natural.modulo(n, modulus) : ℤ),
+        (n : ℤ),
+        (r : ℤ),
+        nReverse,
+        congruent)
+      as throughN;
+  Integer.CongruentModulo(
+      modulus,
+      (Natural.modulo(n, modulus) : ℤ),
+      (Natural.modulo(r, modulus) : ℤ))
+      by Integer.CongruentModulo.transitive(
+        modulus,
+        (Natural.modulo(n, modulus) : ℤ),
+        (r : ℤ),
+        (Natural.modulo(r, modulus) : ℤ),
+        throughN,
+        rCongruent)
+      as remainderCongruent;
+  0 < modulus by {
+    0 < 1 ≤ modulus;
+    done
+  }
+  as modulusStrictPositive;
+  modulus ≠ 0
+      by Natural.nonzero_of_positive(modulus, modulusStrictPositive) as modulusNonzero;
+  Natural.modulo(n, modulus) < modulus
+      by Natural.modulo_lt(n, modulus, modulusNonzero) as nBelow;
+  Natural.modulo(r, modulus) < modulus
+      by Natural.modulo_lt(r, modulus, modulusNonzero) as rBelow;
+  Natural.modulo(n, modulus) < Natural.modulo(r, modulus)
+      ∨ Natural.modulo(r, modulus) ≤ Natural.modulo(n, modulus)
+      by Natural.lt_or_le;
+  done by cases {
+    case Natural.modulo(n, modulus) < Natural.modulo(r, modulus): {
+      Natural.modulo(n, modulus) ≤ Natural.modulo(r, modulus);
+      Integer.CongruentModulo(
+          modulus,
+          (Natural.modulo(r, modulus) : ℤ),
+          (Natural.modulo(n, modulus) : ℤ))
+          by Integer.CongruentModulo.symmetric as reverseCongruent;
+      Natural.modulo(r, modulus) = Natural.modulo(n, modulus)
+          by Integer.CongruentModulo.equal_of_ordered_below(
+            modulus,
+            Natural.modulo(r, modulus),
+            Natural.modulo(n, modulus),
+            done,
+            rBelow,
+            reverseCongruent);
+      done by Equality.symmetry
+    }
+    case Natural.modulo(r, modulus) ≤ Natural.modulo(n, modulus):
+      done by Integer.CongruentModulo.equal_of_ordered_below(
+        modulus,
+        Natural.modulo(n, modulus),
+        Natural.modulo(r, modulus),
+        done,
+        nBelow,
+        remainderCongruent)
+  }
+}
+
+theorem Natural.IsDetSevenSafe.of_congruent_modulo_588
+        (n r : ℕ)
+        (rSafe : Natural.IsDetSevenSafe(r))
+        (congruent : Integer.CongruentModulo(588, (n : ℤ), (r : ℤ)))
+        : Natural.IsDetSevenSafe(n) := {
+  Integer.CongruentModulo(12, (n : ℤ), (r : ℤ))
+      by Integer.CongruentModulo.reduce_modulus(12, 49, (n : ℤ), (r : ℤ), congruent)
+      as congruentTwelve;
+  Integer.CongruentModulo(49, (n : ℤ), (r : ℤ))
+      by Integer.CongruentModulo.reduce_modulus(49, 12, (n : ℤ), (r : ℤ), congruent)
+      as congruentFortyNine;
+  Natural.modulo(n, 12) = Natural.modulo(r, 12)
+      by Natural.modulo_eq_of_integer_congruent(12, n, r, done, congruentTwelve)
+      as moduloTwelveReads;
+  Natural.modulo(n, 49) = Natural.modulo(r, 49)
+      by Natural.modulo_eq_of_integer_congruent(49, n, r, done, congruentFortyNine)
+      as moduloFortyNineReads;
+  unfold Natural.IsDetSevenSafe in {
+    Natural.modulo(r, 12) ≠ 7
+      ∧ Natural.modulo(r, 12) ≠ 10
+      ∧ Natural.modulo(r, 49) ≠ 0
+      ∧ Natural.modulo(r, 49) ≠ 21
+      ∧ Natural.modulo(r, 49) ≠ 35
+      ∧ Natural.modulo(r, 49) ≠ 42 by rSafe;
+    Natural.modulo(n, 12) ≠ 7 by substituting moduloTwelveReads;
+    Natural.modulo(n, 12) ≠ 10 by substituting moduloTwelveReads;
+    Natural.modulo(n, 49) ≠ 0 by substituting moduloFortyNineReads;
+    Natural.modulo(n, 49) ≠ 21 by substituting moduloFortyNineReads;
+    Natural.modulo(n, 49) ≠ 35 by substituting moduloFortyNineReads;
+    Natural.modulo(n, 49) ≠ 42 by substituting moduloFortyNineReads;
+    done
+  }
+}
+
+theorem Natural.detSevenResidueSolution_safe_residual
+        (m n a t residual : ℕ)
+        (remainderReads : Natural.modulo(n, 588) = a)
+        (solution : Natural.DetSevenResidueSolution(m, a, t))
+        (residualReads : n = m * t * t + residual)
+        : Natural.IsDetSevenSafe(residual) := {
+  choose b : ℕ such that
+      b < 588
+      ∧ Natural.IsDetSevenSafe(b)
+      ∧ Integer.CongruentModulo(
+          588,
+          (a : ℤ) - ((m * t * t : ℕ) : ℤ),
+          (b : ℤ))
+      as certificateData from solution;
+  Natural.IsDetSevenSafe(b)
+      ∧ Integer.CongruentModulo(
+          588,
+          (a : ℤ) - ((m * t * t : ℕ) : ℤ),
+          (b : ℤ))
+      by And.right(
+        b < 588,
+        Natural.IsDetSevenSafe(b)
+          ∧ Integer.CongruentModulo(
+              588,
+              (a : ℤ) - ((m * t * t : ℕ) : ℤ),
+              (b : ℤ)),
+        certificateData)
+      as safeAndCongruent;
+  Natural.IsDetSevenSafe(b)
+      by And.left(
+        Natural.IsDetSevenSafe(b),
+        Integer.CongruentModulo(
+          588,
+          (a : ℤ) - ((m * t * t : ℕ) : ℤ),
+          (b : ℤ)),
+        safeAndCongruent)
+      as bSafe;
+  Integer.CongruentModulo(
+      588,
+      (a : ℤ) - ((m * t * t : ℕ) : ℤ),
+      (b : ℤ))
+      by And.right(
+        Natural.IsDetSevenSafe(b),
+        Integer.CongruentModulo(
+          588,
+          (a : ℤ) - ((m * t * t : ℕ) : ℤ),
+          (b : ℤ)),
+        safeAndCongruent)
+      as solutionCongruent;
+  Integer.CongruentModulo(
+      588,
+      (n : ℤ),
+      (Natural.modulo(n, 588) : ℤ))
+      by Natural.congruentModulo_remainder as nCongruentRemainder;
+  Integer.CongruentModulo(588, (n : ℤ), (a : ℤ))
+      by {
+        Integer.CongruentModulo(
+            588,
+            (n : ℤ),
+            (Natural.modulo(n, 588) : ℤ)) by nCongruentRemainder;
+        done by substituting remainderReads
+      }
+      as nCongruentA;
+  Integer.CongruentModulo(
+      588,
+      ((m * t * t : ℕ) : ℤ),
+      ((m * t * t : ℕ) : ℤ))
+      by Integer.CongruentModulo.reflexive as squareCongruent;
+  Integer.CongruentModulo(
+      588,
+      -((m * t * t : ℕ) : ℤ),
+      -((m * t * t : ℕ) : ℤ))
+      by Integer.CongruentModulo.negate_respects(
+        588,
+        ((m * t * t : ℕ) : ℤ),
+        ((m * t * t : ℕ) : ℤ),
+        squareCongruent)
+      as negatedSquareCongruent;
+  Integer.CongruentModulo(
+      588,
+      (n : ℤ) - ((m * t * t : ℕ) : ℤ),
+      (a : ℤ) - ((m * t * t : ℕ) : ℤ))
+      by Integer.CongruentModulo.add_respects(
+        588,
+        (n : ℤ),
+        (a : ℤ),
+        -((m * t * t : ℕ) : ℤ),
+        -((m * t * t : ℕ) : ℤ),
+        nCongruentA,
+        negatedSquareCongruent)
+      as differencesCongruent;
+  Integer.CongruentModulo(
+      588,
+      (n : ℤ) - ((m * t * t : ℕ) : ℤ),
+      (b : ℤ))
+      by Integer.CongruentModulo.transitive(
+        588,
+        (n : ℤ) - ((m * t * t : ℕ) : ℤ),
+        (a : ℤ) - ((m * t * t : ℕ) : ℤ),
+        (b : ℤ),
+        differencesCongruent,
+        solutionCongruent)
+      as residualDifferenceCongruent;
+  (n : ℤ)
+     = ((m * t * t + residual : ℕ) : ℤ) by substituting residualReads
+     = ((m * t * t : ℕ) : ℤ) + (residual : ℤ)
+         by Natural.to_integer.add_preserves
+  as integerResidualReads;
+  (n : ℤ) - ((m * t * t : ℕ) : ℤ)
+     = (((m * t * t : ℕ) : ℤ) + (residual : ℤ))
+         - ((m * t * t : ℕ) : ℤ) by substituting integerResidualReads
+     = (residual : ℤ) by ring
+  as differenceReads;
+  (residual : ℤ) = (n : ℤ) - ((m * t * t : ℕ) : ℤ)
+      by Equality.symmetry(differenceReads) as residualReadsInteger;
+  Integer.CongruentModulo(588, (residual : ℤ), (b : ℤ))
+      by {
+        Integer.CongruentModulo(
+            588,
+            (n : ℤ) - ((m * t * t : ℕ) : ℤ),
+            (b : ℤ)) by residualDifferenceCongruent;
+        done by substituting residualReadsInteger
+      }
+      as residualCongruent;
+  done by Natural.IsDetSevenSafe.of_congruent_modulo_588(
+    residual, b, bSafe, residualCongruent)
+}
+
+theorem Natural.DetSevenGenericResidueCover.safe_residuals
+        (m : ℕ) (choice : ℕ → Proposition)
+        (cover : Natural.DetSevenGenericResidueCover(m, choice))
+        (n : ℕ)
+        (notMultipleFour : Natural.modulo(n, 4) ≠ 0)
+        (notMultipleFortyNine : Natural.modulo(n, 49) ≠ 0)
+        (unsafe : ¬(Natural.IsDetSevenSafe(n)))
+        : ∃ (t : ℕ). choice(t)
+          ∧ (∀ (residual : ℕ). n = m * t * t + residual →
+              Natural.IsDetSevenSafe(residual)) := {
+  let a : ℕ := Natural.modulo(n, 588);
+  a ≥ 0;
+  a < 588 by Natural.modulo_lt(n, 588, done) as aBelow;
+  Integer.CongruentModulo(588, (n : ℤ), (a : ℤ))
+      by Natural.congruentModulo_remainder as nCongruentA;
+  Integer.CongruentModulo(4, (n : ℤ), (a : ℤ))
+      by Integer.CongruentModulo.reduce_modulus(4, 147, (n : ℤ), (a : ℤ), nCongruentA)
+      as congruentFour;
+  Integer.CongruentModulo(49, (n : ℤ), (a : ℤ))
+      by Integer.CongruentModulo.reduce_modulus(49, 12, (n : ℤ), (a : ℤ), nCongruentA)
+      as congruentFortyNine;
+  Natural.modulo(n, 4) = Natural.modulo(a, 4)
+      by Natural.modulo_eq_of_integer_congruent(4, n, a, done, congruentFour)
+      as moduloFourReads;
+  Natural.modulo(n, 49) = Natural.modulo(a, 49)
+      by Natural.modulo_eq_of_integer_congruent(49, n, a, done, congruentFortyNine)
+      as moduloFortyNineReads;
+  Natural.modulo(a, 4) ≠ 0 by substituting Equality.symmetry(moduloFourReads)
+      as aNotMultipleFour;
+  Natural.modulo(a, 49) ≠ 0 by substituting Equality.symmetry(moduloFortyNineReads)
+      as aNotMultipleFortyNine;
+  ¬(Natural.IsDetSevenSafe(a)) by {
+    suppose Natural.IsDetSevenSafe(a) as aSafe;
+    Natural.IsDetSevenSafe(n)
+        by Natural.IsDetSevenSafe.of_congruent_modulo_588(n, a, aSafe, nCongruentA)
+        as nSafe;
+    done by unsafe(nSafe)
+  }
+  as aUnsafe;
+  ∃ (t : ℕ). choice(t) ∧ Natural.DetSevenResidueSolution(m, a, t)
+      by cover(a, done, aBelow, aNotMultipleFour, aNotMultipleFortyNine, aUnsafe);
+  choose t : ℕ such that
+      choice(t) ∧ Natural.DetSevenResidueSolution(m, a, t)
+      as choiceAndSolution;
+  choice(t) by And.left(
+      choice(t), Natural.DetSevenResidueSolution(m, a, t), choiceAndSolution)
+      as chosen;
+  Natural.DetSevenResidueSolution(m, a, t) by And.right(
+      choice(t), Natural.DetSevenResidueSolution(m, a, t), choiceAndSolution)
+      as solution;
+  ∀ (residual : ℕ). n = m * t * t + residual →
+      Natural.IsDetSevenSafe(residual)
+      by (residual : ℕ) (residualReads : n = m * t * t + residual) ↦
+        Natural.detSevenResidueSolution_safe_residual(
+          m, n, a, t, residual, reflexivity(ℕ, a), solution, residualReads)
+      as everyResidualSafe;
+  witness t with {
+    choice(t) by chosen;
+    done by everyResidualSafe
+  }
+}
+
+theorem Natural.DetSevenOddResidueCover.safe_residuals
+        (m : ℕ) (choice : ℕ → Proposition)
+        (cover : Natural.DetSevenOddResidueCover(m, choice))
+        (n : ℕ)
+        (odd : Natural.modulo(n, 2) = 1)
+        (notMultipleFortyNine : Natural.modulo(n, 49) ≠ 0)
+        (unsafe : ¬(Natural.IsDetSevenSafe(n)))
+        : ∃ (t : ℕ). choice(t)
+          ∧ (∀ (residual : ℕ). n = m * t * t + residual →
+              Natural.IsDetSevenSafe(residual)) := {
+  let a : ℕ := Natural.modulo(n, 588);
+  a ≥ 0;
+  a < 588 by Natural.modulo_lt(n, 588, done) as aBelow;
+  Integer.CongruentModulo(588, (n : ℤ), (a : ℤ))
+      by Natural.congruentModulo_remainder as nCongruentA;
+  Integer.CongruentModulo(2, (n : ℤ), (a : ℤ))
+      by Integer.CongruentModulo.reduce_modulus(2, 294, (n : ℤ), (a : ℤ), nCongruentA)
+      as congruentTwo;
+  Integer.CongruentModulo(49, (n : ℤ), (a : ℤ))
+      by Integer.CongruentModulo.reduce_modulus(49, 12, (n : ℤ), (a : ℤ), nCongruentA)
+      as congruentFortyNine;
+  Natural.modulo(n, 2) = Natural.modulo(a, 2)
+      by Natural.modulo_eq_of_integer_congruent(2, n, a, done, congruentTwo)
+      as moduloTwoReads;
+  Natural.modulo(n, 49) = Natural.modulo(a, 49)
+      by Natural.modulo_eq_of_integer_congruent(49, n, a, done, congruentFortyNine)
+      as moduloFortyNineReads;
+  Natural.modulo(a, 2) = 1 by {
+    Natural.modulo(n, 2) = 1 by odd;
+    done by substituting Equality.symmetry(moduloTwoReads)
+  }
+  as aOdd;
+  Natural.modulo(a, 49) ≠ 0 by substituting Equality.symmetry(moduloFortyNineReads)
+      as aNotMultipleFortyNine;
+  ¬(Natural.IsDetSevenSafe(a)) by {
+    suppose Natural.IsDetSevenSafe(a) as aSafe;
+    Natural.IsDetSevenSafe(n)
+        by Natural.IsDetSevenSafe.of_congruent_modulo_588(n, a, aSafe, nCongruentA)
+        as nSafe;
+    done by unsafe(nSafe)
+  }
+  as aUnsafe;
+  ∃ (t : ℕ). choice(t) ∧ Natural.DetSevenResidueSolution(m, a, t)
+      by cover(a, done, aBelow, aOdd, aNotMultipleFortyNine, aUnsafe);
+  choose t : ℕ such that
+      choice(t) ∧ Natural.DetSevenResidueSolution(m, a, t)
+      as choiceAndSolution;
+  choice(t) by And.left(
+      choice(t), Natural.DetSevenResidueSolution(m, a, t), choiceAndSolution)
+      as chosen;
+  Natural.DetSevenResidueSolution(m, a, t) by And.right(
+      choice(t), Natural.DetSevenResidueSolution(m, a, t), choiceAndSolution)
+      as solution;
+  ∀ (residual : ℕ). n = m * t * t + residual →
+      Natural.IsDetSevenSafe(residual)
+      by (residual : ℕ) (residualReads : n = m * t * t + residual) ↦
+        Natural.detSevenResidueSolution_safe_residual(
+          m, n, a, t, residual, reflexivity(ℕ, a), solution, residualReads)
+      as everyResidualSafe;
+  witness t with {
+    choice(t) by chosen;
+    done by everyResidualSafe
+  }
+}
