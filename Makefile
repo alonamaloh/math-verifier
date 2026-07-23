@@ -172,7 +172,7 @@ library: $(LIBRARY_MATHV_FILES) $(LIBRARY_MATHV_IFACE_FILES)
 
 tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES) checker-tests \
 	carrier-normal-form-check matrix-ergonomics-statement-check rank-four-generated-check \
-	three-squares-generated-check
+	three-squares-generated-check det-seven-statement-shape-check
 
 # ----------------------------------------------------------------------
 # The clean set (see docs/CLEAN_STYLE_PLAN.md). `scripts/clean_manifest.txt`
@@ -315,6 +315,9 @@ carrier-normal-form-check: $(BUILD_DIR)/library/Test/expected_carrier_propagatio
 matrix-ergonomics-statement-check: $(BUILD_DIR)/library/Test/matrix_ergonomics_test.mathv
 	@bash scripts/check_matrix_ergonomics_statements.sh ./kernel $<
 
+det-seven-statement-shape-check: $(BUILD_DIR)/library/Test/det_seven_safe_converse_test.mathv
+	@bash scripts/check_det7_statement_shapes.sh ./kernel $<
+
 # Generated rank-four certificates are ordinary checked source, but a stale
 # checked-in output could otherwise remain green indefinitely.  Regenerate in
 # a deliberate authoring step; CI only compares the deterministic renderings.
@@ -335,8 +338,8 @@ rank-four-generated-check:
 three-squares-generated-check:
 	@python3 scripts/generate_three_squares_mod_eight.py --check
 
-.PHONY: carrier-normal-form-check matrix-ergonomics-statement-check rank-four-generated-check \
-	three-squares-generated-check
+.PHONY: carrier-normal-form-check matrix-ergonomics-statement-check det-seven-statement-shape-check \
+	rank-four-generated-check three-squares-generated-check
 
 # B3.4 — morphism-packet audit: re-verify the audit surface module
 # (which imports every packet-lemma home) with the audit flag on and
