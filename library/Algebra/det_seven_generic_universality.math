@@ -1,0 +1,163 @@
+-- Algebra/det_seven_generic_universality.math
+--
+-- The common least-exception argument for the six generic determinant-seven
+-- rank-four covers.  Concrete forms supply only their orthogonal lift and
+-- their generated finite certificate.
+
+module Algebra.det_seven_generic_universality
+
+import Algebra.det_seven_rank_four_infrastructure
+import Algebra.det_seven_residual_arithmetic
+
+definition Matrix.DetSevenNaturalOrthogonalLift
+        (A : Matrix(Integer.commutative_ring_bundle, 4, 4))
+        (m : ℕ) : Proposition :=
+  ∀ (residual t : ℕ).
+    Matrix.Represents(
+      Matrix.squarePlusDoubleSquareOddForm(4), (residual : ℤ)) →
+    Matrix.Represents(A, ((m * t * t + residual : ℕ) : ℤ))
+
+theorem Matrix.detSevenNaturalOrthogonalLift_of_integer
+        (A : Matrix(Integer.commutative_ring_bundle, 4, 4))
+        (m : ℕ)
+        (integerLift :
+          ∀ (residual t : ℤ).
+            Matrix.Represents(
+              Matrix.squarePlusDoubleSquareOddForm(4), residual) →
+            Matrix.Represents(
+              A, residual + (m : ℤ) * (t * t)))
+        : Matrix.DetSevenNaturalOrthogonalLift(A, m) := {
+  unfold Matrix.DetSevenNaturalOrthogonalLift in {
+    take residual : ℕ;
+    take t : ℕ;
+    suppose Matrix.Represents(
+      Matrix.squarePlusDoubleSquareOddForm(4), (residual : ℤ)) as represented;
+    Matrix.Represents(
+        A, (residual : ℤ) + (m : ℤ) * ((t : ℤ) * (t : ℤ)))
+        by integerLift((residual : ℤ), (t : ℤ), represented);
+    ((m * t * t + residual : ℕ) : ℤ)
+       = ((m * t * t : ℕ) : ℤ) + (residual : ℤ)
+           by Natural.to_integer.add_preserves
+       = ((m * t : ℕ) : ℤ) * (t : ℤ) + (residual : ℤ)
+           by substituting Natural.to_integer.multiply_preserves(m * t, t)
+       = ((m : ℤ) * (t : ℤ)) * (t : ℤ) + (residual : ℤ)
+           by substituting Natural.to_integer.multiply_preserves(m, t)
+       = (residual : ℤ) + (m : ℤ) * ((t : ℤ) * (t : ℤ)) by ring
+    as targetReads;
+    done by substituting targetReads
+  }
+}
+
+theorem Matrix.detSeven_universal_of_generic_cover
+        (A : Matrix(Integer.commutative_ring_bundle, 4, 4))
+        (m : ℕ)
+        (choice : ℕ → Proposition)
+        (selected : ℕ → ℕ → Proposition)
+        (converse : Matrix.DetSevenSafeConverse)
+        (residueCover :
+          Natural.DetSevenGenericSelectedResidueCover(m, choice, selected))
+        (finiteCover : Matrix.DetSevenFiniteCover(A, m, selected))
+        (lift : Matrix.DetSevenNaturalOrthogonalLift(A, m))
+        : Matrix.IsUniversal(A) := {
+  suppose ¬(Matrix.IsUniversal(A)) as nonUniversal for contradiction;
+  let n : ℕ := Matrix.truant(A);
+  Matrix.IsTruant(A, n) by Matrix.truant_is_truant(A, nonUniversal) as isTruant;
+  n ≥ 1 by Matrix.IsTruant.positive as positive;
+  ¬(Matrix.Represents(A, (n : ℤ))) by Matrix.IsTruant.missed as missed;
+  Natural.IsSquarefree(n) by Matrix.IsTruant.squarefree(A, n, isTruant)
+      as squarefree;
+  ¬(Matrix.Represents(
+      Matrix.squarePlusDoubleSquareOddForm(4), (n : ℤ))) by {
+    suppose Matrix.Represents(
+        Matrix.squarePlusDoubleSquareOddForm(4), (n : ℤ)) as represented;
+    Matrix.Represents(A, ((m * 0 * 0 + n : ℕ) : ℤ))
+        by lift(n, 0, represented);
+    m * 0 * 0 + n = n as zeroShift;
+    Matrix.Represents(A, (n : ℤ)) by substituting zeroShift;
+    done by missed
+  }
+  as ternaryMissed;
+  ¬(Natural.IsDetSevenSafe(n)) by {
+    suppose Natural.IsDetSevenSafe(n) as safe;
+    Matrix.Represents(
+        Matrix.squarePlusDoubleSquareOddForm(4), (n : ℤ))
+        by converse(n, positive, safe);
+    done by ternaryMissed
+  }
+  as unsafe;
+  Natural.modulo(n, 4) ≠ 0
+      by Natural.IsSquarefree.modulo_four_nonzero(n, squarefree)
+      as notMultipleFour;
+  Natural.modulo(n, 49) ≠ 0
+      by Natural.IsSquarefree.modulo_forty_nine_nonzero(n, squarefree)
+      as notMultipleFortyNine;
+  choose t : ℕ such that
+      choice(t)
+      ∧ selected(Natural.modulo(n, 588), t)
+      ∧ Natural.DetSevenResidueSolution(
+          m, Natural.modulo(n, 588), t)
+      from Natural.DetSevenGenericSelectedResidueCover.selected_solution(
+        m, choice, selected, residueCover, n,
+        notMultipleFour, notMultipleFortyNine, unsafe);
+  selected(Natural.modulo(n, 588), t) as selectedShift;
+  Natural.DetSevenResidueSolution(
+      m, Natural.modulo(n, 588), t) as solution;
+  n ≤ m * t * t ∨ m * t * t < n
+      by Or.swap(
+        m * t * t < n, n ≤ m * t * t,
+        Natural.lt_or_le(m * t * t, n));
+  done by cases {
+    case n ≤ m * t * t as bounded: {
+      Matrix.Represents(A, (n : ℤ))
+          by finiteCover(
+            Natural.modulo(n, 588), t, n, selectedShift,
+            positive, bounded, reflexivity(ℕ, Natural.modulo(n, 588)));
+      done by missed
+    }
+    case m * t * t < n as residualPositive: {
+      m * t * t ≤ n;
+      choose residual : ℕ such that
+          n = m * t * t + residual as residualReads
+          from Natural.subtraction_witness(m * t * t, n, done);
+      residual ≥ 1 by {
+        residual = 0 ∨ ∃ (predecessor : ℕ). residual = 1 + predecessor
+            by Natural.zero_or_one_plus;
+        done by cases {
+          case residual = 0 as residualZero: {
+            n = m * t * t by {
+              n = m * t * t + residual by residualReads
+                = m * t * t + 0 by substituting residualZero
+                = m * t * t;
+              done
+            }
+            as nReads;
+            m * t * t < m * t * t by substituting nReads;
+            False by Natural.lt_irreflexive as impossible;
+            done by absurd(impossible)
+          }
+          case ∃ (predecessor : ℕ). residual = 1 + predecessor: {
+            choose predecessor : ℕ such that residual = 1 + predecessor;
+            1 ≤ 1 + predecessor;
+            done
+          }
+        }
+      }
+      as residualAtLeastOne;
+      Natural.IsDetSevenSafe(residual)
+          by Natural.detSevenResidueSolution_safe_residual(
+            m, n, Natural.modulo(n, 588), t, residual,
+            reflexivity(ℕ, Natural.modulo(n, 588)),
+            solution, residualReads)
+          as residualSafe;
+      Matrix.Represents(
+          Matrix.squarePlusDoubleSquareOddForm(4), (residual : ℤ))
+          by converse(residual, residualAtLeastOne, residualSafe)
+          as residualRepresented;
+      Matrix.Represents(
+          A, ((m * t * t + residual : ℕ) : ℤ))
+          by lift(residual, t, residualRepresented);
+      Matrix.Represents(A, (n : ℤ)) by substituting residualReads;
+      done by missed
+    }
+  }
+}

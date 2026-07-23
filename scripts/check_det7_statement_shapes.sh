@@ -111,4 +111,23 @@ check_contains Matrix.detSevenFiniteCover_q0c7 \
 check_contains Matrix.detSevenFiniteCover_q2c9 \
   'Matrix.DetSevenFiniteCover (Matrix.squarePlusDoubleSquareOddRankFourRepresentative (Natural.to_integer 4) (Natural.to_integer 2) (Natural.to_integer 9)) 329 Natural.DetSevenSelectedM329'
 
+check_generic_universal() {
+  local declaration=$1
+  local residue=$2
+  local corner=$3
+  check_contains "$declaration" \
+    'Matrix.DetSevenSafeConverse → Matrix.IsUniversal'
+  check_contains "$declaration" \
+    "Matrix.squarePlusDoubleSquareOddRankFourRepresentative (Natural.to_integer 4) (Natural.to_integer ${residue}) (Natural.to_integer ${corner})"
+}
+
+check_generic_universal Matrix.oddC4R0C7_universal_of_det_seven_safe_converse 0 7
+check_generic_universal Matrix.oddC4R1C6_universal_of_det_seven_safe_converse 1 6
+check_generic_universal Matrix.oddC4R2C8_universal_of_det_seven_safe_converse 2 8
+check_generic_universal Matrix.oddC4R2C9_universal_of_det_seven_safe_converse 2 9
+check_generic_universal Matrix.oddC4R3C10_universal_of_det_seven_safe_converse 3 10
+check_generic_universal Matrix.oddC4R3C11_universal_of_det_seven_safe_converse 3 11
+check_contains Matrix.detSeven_six_generic_universal \
+  'Matrix.DetSevenSafeConverse → And'
+
 echo "det7-statement-shape-check: PASS"

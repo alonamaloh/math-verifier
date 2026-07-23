@@ -480,6 +480,67 @@ theorem Natural.DetSevenGenericResidueCover.safe_residuals
   }
 }
 
+theorem Natural.DetSevenGenericSelectedResidueCover.selected_solution
+        (m : ℕ) (choice : ℕ → Proposition)
+        (selected : ℕ → ℕ → Proposition)
+        (cover : Natural.DetSevenGenericSelectedResidueCover(m, choice, selected))
+        (n : ℕ)
+        (notMultipleFour : Natural.modulo(n, 4) ≠ 0)
+        (notMultipleFortyNine : Natural.modulo(n, 49) ≠ 0)
+        (unsafe : ¬(Natural.IsDetSevenSafe(n)))
+        : ∃ (t : ℕ). choice(t)
+          ∧ selected(Natural.modulo(n, 588), t)
+          ∧ Natural.DetSevenResidueSolution(
+              m, Natural.modulo(n, 588), t) := {
+  let a : ℕ := Natural.modulo(n, 588);
+  a ≥ 0;
+  a < 588 by Natural.modulo_lt(n, 588, done) as aBelow;
+  Integer.CongruentModulo(588, (n : ℤ), (a : ℤ))
+      by Natural.congruentModulo_remainder as nCongruentA;
+  Integer.CongruentModulo(4, (n : ℤ), (a : ℤ))
+      by Integer.CongruentModulo.reduce_modulus(
+        4, 147, (n : ℤ), (a : ℤ), nCongruentA)
+      as congruentFour;
+  Integer.CongruentModulo(49, (n : ℤ), (a : ℤ))
+      by Integer.CongruentModulo.reduce_modulus(
+        49, 12, (n : ℤ), (a : ℤ), nCongruentA)
+      as congruentFortyNine;
+  Natural.modulo(n, 4) = Natural.modulo(a, 4)
+      by Natural.modulo_eq_of_integer_congruent(
+        4, n, a, done, congruentFour)
+      as moduloFourReads;
+  Natural.modulo(n, 49) = Natural.modulo(a, 49)
+      by Natural.modulo_eq_of_integer_congruent(
+        49, n, a, done, congruentFortyNine)
+      as moduloFortyNineReads;
+  Natural.modulo(a, 4) ≠ 0
+      by substituting Equality.symmetry(moduloFourReads)
+      as aNotMultipleFour;
+  Natural.modulo(a, 49) ≠ 0
+      by substituting Equality.symmetry(moduloFortyNineReads)
+      as aNotMultipleFortyNine;
+  ¬(Natural.IsDetSevenSafe(a)) by {
+    suppose Natural.IsDetSevenSafe(a) as aSafe;
+    Natural.IsDetSevenSafe(n)
+        by Natural.IsDetSevenSafe.of_congruent_modulo_588(
+          n, a, aSafe, nCongruentA);
+    done by unsafe
+  }
+  as aUnsafe;
+  choose t : ℕ such that
+      choice(t)
+      ∧ selected(a, t)
+      ∧ Natural.DetSevenResidueSolution(m, a, t)
+      from cover(
+        a, done, aBelow, aNotMultipleFour, aNotMultipleFortyNine, aUnsafe);
+  witness t with {
+    choice(t);
+    selected(Natural.modulo(n, 588), t);
+    Natural.DetSevenResidueSolution(m, Natural.modulo(n, 588), t);
+    done
+  }
+}
+
 theorem Natural.DetSevenOddResidueCover.safe_residuals
         (m : ℕ) (choice : ℕ → Proposition)
         (cover : Natural.DetSevenOddResidueCover(m, choice))

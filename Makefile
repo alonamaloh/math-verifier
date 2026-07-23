@@ -325,7 +325,8 @@ det-seven-statement-shape-check: \
 		$(BUILD_DIR)/library/Algebra/det_seven_residual_m7_generated.mathv \
 		$(BUILD_DIR)/library/Algebra/det_seven_residual_m329_generated.mathv \
 		$(BUILD_DIR)/library/Algebra/det_seven_finite_q0c7_generated.mathv \
-		$(BUILD_DIR)/library/Algebra/det_seven_finite_q2c9_generated.mathv
+		$(BUILD_DIR)/library/Algebra/det_seven_finite_q2c9_generated.mathv \
+		$(BUILD_DIR)/library/Algebra/det_seven_generic_covers.mathv
 	@bash scripts/check_det7_statement_shapes.sh ./kernel $^
 
 # Generated rank-four certificates are ordinary checked source, but a stale
@@ -352,7 +353,7 @@ det-seven-residual-generated-check:
 	@python3 scripts/generate_det_seven_residual_covers.py --check
 
 det-seven-finite-generated-check:
-	@python3 scripts/generate_det_seven_finite_covers.py --check --forms pilot
+	@python3 scripts/generate_det_seven_finite_covers.py --check --forms all
 
 .PHONY: carrier-normal-form-check matrix-ergonomics-statement-check det-seven-statement-shape-check \
 	rank-four-generated-check three-squares-generated-check det-seven-residual-generated-check \
