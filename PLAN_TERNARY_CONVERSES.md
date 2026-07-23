@@ -36,22 +36,22 @@ forms.  Thus the universality target is 201 forms.
 | `x²+2y²+4z²` | 8 | 2 | not `4^a(16b+14)` | included in the 103 | **Proved reduction.** `Matrix.one_two_four_converse_of_three_squares` derives it from three squares. |
 | `x²+2y²+5z²` | 10 | 2, 5 | not `25^a(25b+10)` or `25^a(25b+15)` | 33 | Genuine deep input. The form is alone in its genus, so a genus route is valid; a specialized Mordell route is also known. See `PLAN_ONE_TWO_FIVE_CONVERSE.md`. |
 | `x²+2y²+2yz+5z²` | 9 | 2, 3 | not `4^a(8b+7)` | 12 | **Proved reduction and covers.** `Algebra/odd_five_converse_reduction` proves equality of represented sets with three squares; `Algebra/rank_four_odd_c5_covers` discharges all 12 selected rank-four clients. |
-| `x²+2y²+2yz+4z²` | 7 | 2, 7 | no regular represented set | 14 universal candidates, 2 exact truants | Do not introduce a false parent converse. Seven rank-four clients now have direct conditional covers; seven remain and require larger neighbor-coset arguments. |
+| `x²+2y²+2yz+4z²` | 7 | 2, 7 | restricted safe set modulo 12 and 49 | 14 universal candidates, 2 exact truants | **All direct covers proved.** Seven earlier clients use sublattice or neighbor arguments. The final seven use `Matrix.DetSevenSafeConverse`, explicit modulo-588 residual covers, and finite witness tables; exceptional `Q_(1,7)` also uses `Matrix.ThreeSquaresConverse`. The parent remains nonregular, so no blanket converse is claimed. |
 
-There are now 194 selected forms with conditional universality proofs:
+All 201 selected universality targets now have conditional proofs:
 115 from three squares (including all weighted `d=4` and odd-`C=5`
 clients), 9 from triple squares, 8 from one-two-three, 7 from one-two-six,
 8 from one-three-six, 7 from two-three-six, 33 from one-two-five, and seven
-direct determinant-seven covers (whose hypotheses reuse those converse
-interfaces).  The seven outstanding nonexceptional forms are exactly the
-unresolved half of the odd-`C=4` family.
+earlier direct determinant-seven covers, with the final seven determinant-
+seven forms supplied by `Algebra.det_seven_covers`. These client groups
+partition the 201 targets, although their classical converse dependencies
+overlap. The other six selected rank-four forms remain the kernel-certified
+exact-truant forms and are deliberately not called universal.
 
 ## Determinant-seven direct frontier
 
-The first all-at-once reconnaissance is complete.  It compared the 14
-nonexceptional odd-`C=4` lattices against every already-covered rank-four
-family and then inspected their small ternary sublattices and orthogonal
-cosets.  Seven forms now have kernel-checked conditional universality proofs:
+All 14 nonexceptional odd-`C=4` lattices now have kernel-checked conditional
+universality proofs. The first seven are the inexpensive direct reductions:
 
 - `(r,c)=(0,4)` and `(3,8)` contain covered weighted-`d=4` lattices at
   index two and therefore reduce to three squares;
@@ -68,21 +68,16 @@ cosets.  Seven forms now have kernel-checked conditional universality proofs:
   last two coordinates.  It reuses the generic odd-`C=5` tail and a
   generated, 20-rows-per-theorem finite prefix.
 
-The unresolved forms are
-
-```text
-(0,7), (1,6), (1,7), (2,8), (2,9), (3,10), (3,11).
-```
-
-This is the point where the cheap generalization stops.  The `(2,8)` and
-`(3,10)` forms contain one-two-six only at index six, so their six image
-cosets must be controlled rather than the two parity cosets used for
-`(1,4)`.  The `(0,7)`, `(2,9)`, and `(3,11)` forms expose one-two-seven
-neighbors, for which the library has no converse interface.  The remaining
-`(1,6)` and `(1,7)` forms have no small embedding of any current standard
-ternary parent.  A new theorem should therefore be phrased as a restricted
-neighbor-coset result for these seven quaternary lattices, not as a false
-local-global converse for their nonregular determinant-seven parent.
+The final seven, `(0,7)`, `(1,6)`, `(1,7)`, `(2,8)`, `(2,9)`, `(3,10)`,
+and `(3,11)`, use the precise restricted parent interface
+`Matrix.DetSevenSafeConverse`. Deterministic modulo-588 certificates choose
+an orthogonal shift whose positive residual lies in that safe set, while
+explicit kernel-checked tables cover the bounded branch. Six forms use the
+determinant-seven section directly. For `Q_(1,7)`, odd targets use the same
+norm-315 construction; even targets use the alternative section
+`2(x²+2y²+2yz+5z²)` and its norm-90 complement, reducing through the proved
+odd-five/three-squares equivalence. `Matrix.detSeven_seven_universal`
+collects the seven theorems while retaining both classical inputs.
 
 ## Elementary reductions
 
@@ -175,17 +170,15 @@ the deep-interface count by 15.
 3. Pilot the two-three-six and one-three-six index-lattice recoveries.  Keep a
    pilot only if it eliminates the existing exact local converse without
    adding an equally deep replacement.
-4. **Partially done:** determinant-seven reconnaissance and the cheap direct
-   covers close seven of 14 forms.  Next pilot an index-six image-coset
-   theorem on `(2,8)` or `(3,10)`.  Continue only if its six congruence
-   classes package into a reusable lemma; otherwise begin the restricted
-   determinant-seven neighbor theorem shared by the seven remaining forms.
+4. **Done:** all 14 nonexceptional determinant-seven clients have direct
+   conditional covers. The final seven use the reviewed restricted-safe-set
+   proof and generated finite certificates, not a false regularity converse.
 5. Recount the remaining interfaces and choose either a shared
    class-one/genus development or shared Mordell infrastructure.  Do not
    start with one-two-five in isolation.
-6. Preserve statement-shape guards and cold-library verification throughout:
-   all these interfaces feed many conditional clients, so a silently
-   weakened converse would have a large blast radius.
+6. Preserve statement-shape guards and independent cold-library verification
+   throughout: all these interfaces feed many conditional clients, so a
+   silently weakened converse would have a large blast radius.
 
 ## References
 

@@ -331,7 +331,8 @@ det-seven-statement-shape-check: \
 		$(BUILD_DIR)/library/Algebra/det_seven_finite_q1c7_even_generated.mathv \
 		$(BUILD_DIR)/library/Algebra/det_seven_generic_covers.mathv \
 		$(BUILD_DIR)/library/Algebra/det_seven_exceptional_infrastructure.mathv \
-		$(BUILD_DIR)/library/Algebra/det_seven_exceptional_cover.mathv
+		$(BUILD_DIR)/library/Algebra/det_seven_exceptional_cover.mathv \
+		$(BUILD_DIR)/library/Algebra/det_seven_covers.mathv
 	@bash scripts/check_det7_statement_shapes.sh ./kernel $^
 
 # Generated rank-four certificates are ordinary checked source, but a stale

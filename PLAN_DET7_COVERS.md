@@ -1,5 +1,26 @@
 # Plan: the final determinant-seven rank-four covers
 
+## Status
+
+**Complete 2026-07-23.** All seven forms have kernel-checked conditional
+universality theorems. `Algebra.det_seven_covers` is the final formal
+assembly; its signature explicitly retains `Matrix.DetSevenSafeConverse`
+and `Matrix.ThreeSquaresConverse`. The six generic forms use only the former.
+The exceptional form uses both.
+
+The accepted finite-certificate design is the deterministic selected-shift
+scheme described in D3: 998 residue-local targets for the six generic forms,
+120 for the exceptional odd branch, and 46 even-prefix witnesses through 90.
+Every row is an explicit `Matrix.represents_by_witness` certificate, the
+generator drift checks pass, and the elaborated statement guard covers both
+interfaces and the final clients.
+
+There was no pre-existing monolithic theorem collecting the earlier 194
+conditional clients. Rather than manufacture a 201-arm duplicate dispatcher,
+the formal addition is the seven-form determinant assembly and the selected
+classification ledger is updated to 201/201 conditional targets plus six
+exact truants.
+
 ## Purpose and scope
 
 `PROOF_15_THEOREM_REMAINING.md` gives the detailed mathematical proof for the
@@ -429,8 +450,9 @@ if either disappears.
 ### D6 — Rank-four assembly and documentation
 
 - Add one final theorem collecting all seven covers.
-- Wire it into the selected rank-four coverage theorem so the count becomes
-  201/201 conditional universality targets plus six exact-truant forms.
+- Update the selected rank-four coverage ledger to 201/201 conditional
+  universality targets plus six exact-truant forms. (No monolithic theorem
+  for the earlier 194 clients existed to extend.)
 - Update `PLAN_TERNARY_CONVERSES.md`, `PLAN_15_THEOREM.md`, and
   `library/Algebra/fifteen-theorem.md` with the precise new boundary.
 - Keep `PROOF_15_THEOREM_REMAINING.md` as the reviewed mathematical source;

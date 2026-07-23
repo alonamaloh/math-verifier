@@ -142,5 +142,7 @@ check_contains Matrix.oddC4R1C7_represents_even_above_ninety \
   'Matrix.ThreeSquaresConverse →'
 check_contains Matrix.oddC4R1C7_universal_of_det_seven_and_three_squares \
   'Matrix.DetSevenSafeConverse → Matrix.ThreeSquaresConverse → Matrix.IsUniversal'
+check_contains Matrix.detSeven_seven_universal \
+  'Matrix.DetSevenSafeConverse → Matrix.ThreeSquaresConverse → And'
 
 echo "det7-statement-shape-check: PASS"
