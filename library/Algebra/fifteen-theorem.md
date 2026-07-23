@@ -290,9 +290,22 @@ The converse pilot found no three-squares reduction analogous to the
 one-two-four identity.  The known proof isolates the desired determinant-10
 ternary class by a Mordell construction, quadratic-reciprocity congruences,
 primes in arithmetic progressions, and a finite class elimination.
-`PLAN_ONE_TWO_FIVE_CONVERSE.md` records this as a genuine deep input and
-leaves the choice between the specialized Mordell route and the gated genus
-route until the odd-family converse requirements are known.
+`PLAN_ONE_TWO_FIVE_CONVERSE.md` records this as a genuine deep input.
+`PLAN_TERNARY_CONVERSES.md` now gives the all-at-once census: the
+one-two-five form is alone in its genus, so either the genus or Mordell route
+is valid, but the latter's restricted Dirichlet theorem may dominate its
+cost.
+The same census produced one immediate reduction.
+`Algebra/odd_five_converse_reduction` proves that
+`x²+2y²+2yz+5z²` represents exactly the same integers as three squares:
+the identity
+`x²+2y²+2yz+5z²=x²+(y+2z)²+(y-z)²` is inverted by selecting two roots
+with equal squares modulo three and changing one sign.  Therefore all 12
+selected odd-`C=5` forms reuse the central three-squares converse; only
+their rank-four residual/coset covers remain.  The determinant-seven
+odd-`C=4` parent is nonregular, so its 14 nonexceptional clients need a
+direct rank-four or restricted-coset argument rather than a generic parent
+converse.
 For the weighted-`d=4` forms with third border residue two, completing the
 last square gives
 `Q=x²+2y²+(2z+w)²+(c-1)w²`.  A witness for

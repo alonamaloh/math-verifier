@@ -1,0 +1,235 @@
+-- Algebra/odd_five_converse_reduction.math
+--
+-- The odd rank-three parent
+--
+--   x² + 2y² + 2yz + 5z²
+--
+-- has the same represented integers as the sum of three squares.  The
+-- forward identity is
+--
+--   x² + 2y² + 2yz + 5z² = x² + (y + 2z)² + (y - z)².
+--
+-- Conversely, among three square roots two have equal squares modulo three.
+-- After changing one sign, write the pair as (y + 2z, y - z).  This is the
+-- index-three lattice condition hidden by the identity.
+
+module Algebra.odd_five_converse_reduction
+
+import Algebra.one_two_four_converse_reduction
+import Algebra.rank_four_odd_diagonal_family
+import Algebra.triple_squares_one_three_three
+
+definition Integer.OddFiveRepresentation (n : ℤ) : Proposition :=
+  ∃ (x y z : ℤ). x * x + 2 * (y * y) + 2 * y * z + 5 * (z * z) = n
+
+definition Matrix.OddFiveConverse : Proposition :=
+  ∀ (n : ℕ). ¬(Natural.IsThreeSquareObstruction(n)) →
+    Matrix.Represents(Matrix.squarePlusDoubleSquareOddForm(5), (n : ℤ))
+
+theorem Integer.odd_five_representation_gives_three_squares
+        (n : ℤ) (represented : Integer.OddFiveRepresentation(n))
+        : Integer.ThreeSquareRepresentation(n) := {
+  choose x : ℤ, y : ℤ, z : ℤ such that
+      x * x + 2 * (y * y) + 2 * y * z + 5 * (z * z) = n
+      as valueReads from represented;
+  witness x with witness y + 2 * z with witness y - z with
+    x * x + (y + 2 * z) * (y + 2 * z) + (y - z) * (y - z)
+       = x * x + 2 * (y * y) + 2 * y * z + 5 * (z * z) by ring
+       = n by valueReads
+}
+
+theorem IntegerMod.three_integers_have_equal_square_pair_mod_three
+        (a b c : ℤ)
+        : IntegerMod.make(3, a * a) = IntegerMod.make(3, b * b)
+          ∨ IntegerMod.make(3, a * a) = IntegerMod.make(3, c * c)
+          ∨ IntegerMod.make(3, b * b) = IntegerMod.make(3, c * c) := {
+  let aMod : IntegerMod(3) := IntegerMod.make(3, a);
+  let bMod : IntegerMod(3) := IntegerMod.make(3, b);
+  let cMod : IntegerMod(3) := IntegerMod.make(3, c);
+  aMod * aMod = IntegerMod.zero(3) ∨ aMod * aMod = IntegerMod.one(3)
+      by IntegerMod.square_mod_three(aMod);
+  bMod * bMod = IntegerMod.zero(3) ∨ bMod * bMod = IntegerMod.one(3)
+      by IntegerMod.square_mod_three(bMod);
+  cMod * cMod = IntegerMod.zero(3) ∨ cMod * cMod = IntegerMod.one(3)
+      by IntegerMod.square_mod_three(cMod);
+  aMod * aMod = bMod * bMod
+      ∨ aMod * aMod = cMod * cMod
+      ∨ bMod * bMod = cMod * cMod by cases {
+    case aMod * aMod = IntegerMod.zero(3) as aZero: done by cases {
+      case bMod * bMod = IntegerMod.zero(3) as bZero: {
+        aMod * aMod = bMod * bMod by {
+          aMod * aMod = IntegerMod.zero(3) by aZero = bMod * bMod by Equality.symmetry(bZero)
+        } as equalAB;
+        done by Or.introduceLeft(equalAB)
+      }
+      case bMod * bMod = IntegerMod.one(3) as bOne: done by cases {
+        case cMod * cMod = IntegerMod.zero(3) as cZero: {
+          aMod * aMod = cMod * cMod by {
+            aMod * aMod = IntegerMod.zero(3) by aZero = cMod * cMod by Equality.symmetry(cZero)
+          } as equalAC;
+          done by Or.introduceRight(Or.introduceLeft(equalAC))
+        }
+        case cMod * cMod = IntegerMod.one(3) as cOne: {
+          bMod * bMod = cMod * cMod by {
+            bMod * bMod = IntegerMod.one(3) by bOne = cMod * cMod by Equality.symmetry(cOne)
+          } as equalBC;
+          done by Or.introduceRight(Or.introduceRight(equalBC))
+        }
+      }
+    }
+    case aMod * aMod = IntegerMod.one(3) as aOne: done by cases {
+      case bMod * bMod = IntegerMod.zero(3) as bZero: done by cases {
+        case cMod * cMod = IntegerMod.zero(3) as cZero: {
+          bMod * bMod = cMod * cMod by {
+            bMod * bMod = IntegerMod.zero(3) by bZero = cMod * cMod by Equality.symmetry(cZero)
+          } as equalBC;
+          done by Or.introduceRight(Or.introduceRight(equalBC))
+        }
+        case cMod * cMod = IntegerMod.one(3) as cOne: {
+          aMod * aMod = cMod * cMod by {
+            aMod * aMod = IntegerMod.one(3) by aOne = cMod * cMod by Equality.symmetry(cOne)
+          } as equalAC;
+          done by Or.introduceRight(Or.introduceLeft(equalAC))
+        }
+      }
+      case bMod * bMod = IntegerMod.one(3) as bOne: {
+        aMod * aMod = bMod * bMod by {
+          aMod * aMod = IntegerMod.one(3) by aOne = bMod * bMod by Equality.symmetry(bOne)
+        } as equalAB;
+        done by Or.introduceLeft(equalAB)
+      }
+    }
+  };
+  aMod * aMod = IntegerMod.make(3, a * a) as aSquareReads;
+  bMod * bMod = IntegerMod.make(3, b * b) as bSquareReads;
+  cMod * cMod = IntegerMod.make(3, c * c) as cSquareReads;
+  done by cases {
+    case aMod * aMod = bMod * bMod as equal: {
+      IntegerMod.make(3, a * a) = IntegerMod.make(3, b * b) by {
+        IntegerMod.make(3, a * a)
+           = aMod * aMod by Equality.symmetry(aSquareReads)
+           = bMod * bMod by equal
+           = IntegerMod.make(3, b * b) by bSquareReads
+      } as equalAB;
+      done by Or.introduceLeft(equalAB)
+    }
+    case aMod * aMod = cMod * cMod ∨ bMod * bMod = cMod * cMod: done by cases {
+      case aMod * aMod = cMod * cMod as equal: {
+        IntegerMod.make(3, a * a) = IntegerMod.make(3, c * c) by {
+          IntegerMod.make(3, a * a)
+             = aMod * aMod by Equality.symmetry(aSquareReads)
+             = cMod * cMod by equal
+             = IntegerMod.make(3, c * c) by cSquareReads
+        } as equalAC;
+        done by Or.introduceRight(Or.introduceLeft(equalAC))
+      }
+      case bMod * bMod = cMod * cMod as equal: {
+        IntegerMod.make(3, b * b) = IntegerMod.make(3, c * c) by {
+          IntegerMod.make(3, b * b)
+             = bMod * bMod by Equality.symmetry(bSquareReads)
+             = cMod * cMod by equal
+             = IntegerMod.make(3, c * c) by cSquareReads
+        } as equalBC;
+        done by Or.introduceRight(Or.introduceRight(equalBC))
+      }
+    }
+  }
+}
+
+theorem Integer.odd_five_representation_of_congruent_square_pair
+        (fixed first second n : ℤ)
+        (valueReads : fixed * fixed + first * first + second * second = n)
+        (squareDifferenceDivisible : Integer.divides(3, first * first - second * second))
+        : Integer.OddFiveRepresentation(n) := {
+  choose signed : ℤ, z : ℤ such that
+      (signed = first ∨ signed = -first) ∧ signed = 3 * z + second
+      from Integer.choose_sign_congruent_mod_three(first, second, squareDifferenceDivisible);
+  signed = first ∨ signed = -first;
+  signed = 3 * z + second as signedReads;
+  let y : ℤ := second + z;
+  signed * signed = first * first by cases {
+    case signed = first: done
+    case signed = -first: done by ring
+  } as signedSquare;
+  y + 2 * z
+     = second + 3 * z by ring
+     = signed by Equality.symmetry(signedReads)
+  as firstLinear;
+  y - z = second by ring as secondLinear;
+  witness fixed with witness y with witness z with
+    fixed * fixed + 2 * (y * y) + 2 * y * z + 5 * (z * z)
+       = fixed * fixed + (y + 2 * z) * (y + 2 * z) + (y - z) * (y - z) by ring
+       = fixed * fixed + signed * signed + (y - z) * (y - z) by substituting firstLinear
+       = fixed * fixed + first * first + (y - z) * (y - z) by substituting signedSquare
+       = fixed * fixed + first * first + second * second by substituting secondLinear
+       = n by valueReads
+}
+
+theorem Integer.odd_five_representation_of_three_squares
+        (n : ℤ) (represented : Integer.ThreeSquareRepresentation(n))
+        : Integer.OddFiveRepresentation(n) := {
+  choose a : ℤ, b : ℤ, c : ℤ such that a * a + b * b + c * c = n
+      as valueReads from represented;
+  IntegerMod.make(3, a * a) = IntegerMod.make(3, b * b)
+      ∨ IntegerMod.make(3, a * a) = IntegerMod.make(3, c * c)
+      ∨ IntegerMod.make(3, b * b) = IntegerMod.make(3, c * c)
+      by IntegerMod.three_integers_have_equal_square_pair_mod_three(a, b, c);
+  done by cases {
+    case IntegerMod.make(3, a * a) = IntegerMod.make(3, b * b) as equalSquares: {
+      Integer.CongruentModulo(3, a * a, b * b)
+          by Quotient.equal_implies_equivalent(a * a, b * b, equalSquares)
+          as congruentSquares;
+      done by Integer.odd_five_representation_of_congruent_square_pair(
+          c, a, b, n,
+          { c * c + a * a + b * b = a * a + b * b + c * c by ring = n by valueReads },
+          congruentSquares)
+    }
+    case IntegerMod.make(3, a * a) = IntegerMod.make(3, c * c)
+        ∨ IntegerMod.make(3, b * b) = IntegerMod.make(3, c * c): done by cases {
+      case IntegerMod.make(3, a * a) = IntegerMod.make(3, c * c) as equalSquares: {
+        Integer.CongruentModulo(3, a * a, c * c)
+            by Quotient.equal_implies_equivalent(a * a, c * c, equalSquares)
+            as congruentSquares;
+        done by Integer.odd_five_representation_of_congruent_square_pair(
+            b, a, c, n,
+            { b * b + a * a + c * c = a * a + b * b + c * c by ring = n by valueReads },
+            congruentSquares)
+      }
+      case IntegerMod.make(3, b * b) = IntegerMod.make(3, c * c) as equalSquares: {
+        Integer.CongruentModulo(3, b * b, c * c)
+            by Quotient.equal_implies_equivalent(b * b, c * c, equalSquares)
+            as congruentSquares;
+        done by Integer.odd_five_representation_of_congruent_square_pair(
+            a, b, c, n, valueReads, congruentSquares)
+      }
+    }
+  }
+}
+
+theorem Matrix.squarePlusDoubleSquareOddForm_five_represents_of_three_squares
+        (n : ℤ) (represented : Integer.ThreeSquareRepresentation(n))
+        : Matrix.Represents(Matrix.squarePlusDoubleSquareOddForm(5), n) := {
+  Integer.OddFiveRepresentation(n)
+      by Integer.odd_five_representation_of_three_squares(n, represented);
+  choose x : ℤ, y : ℤ, z : ℤ such that
+      x * x + 2 * (y * y) + 2 * y * z + 5 * (z * z) = n
+      as scalarComputation;
+  done by Matrix.represents_by_witness(
+      Matrix.squarePlusDoubleSquareOddForm(5), target := n, vector := ⟨x, y, z⟩,
+      computes := {
+        Matrix.quadraticForm(Matrix.squarePlusDoubleSquareOddForm(5), ⟨x, y, z⟩)
+           = x * x + 2 * (y * y) + 2 * y * z + 5 * (z * z)
+               by Matrix.squarePlusDoubleSquareOddForm_coordinateTuple_value
+           = n by scalarComputation
+      })
+}
+
+theorem Matrix.odd_five_converse_of_three_squares
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.OddFiveConverse := {
+  take n : ℕ;
+  suppose ¬(Natural.IsThreeSquareObstruction(n)) as admissible;
+  Integer.ThreeSquaresConverse by Integer.three_squares_converse_of_matrix(converse) as integerConverse;
+  Integer.ThreeSquareRepresentation((n : ℤ)) by integerConverse(n, admissible) as represented;
+  done by Matrix.squarePlusDoubleSquareOddForm_five_represents_of_three_squares((n : ℤ), represented)
+}

@@ -2,9 +2,9 @@
 
 ## Decision
 
-Keep `Matrix.OneTwoFiveConverse` as an explicit deep input for now. The bounded
-pilot found no analogue of the elementary one-two-four reduction to the
-three-squares theorem.
+Keep `Matrix.OneTwoFiveConverse` as an explicit deep input for now.  The
+all-at-once census in `PLAN_TERNARY_CONVERSES.md` found no analogue of the
+elementary one-two-four reduction to the three-squares theorem.
 
 This is not merely a failed search for the right identity:
 
@@ -65,8 +65,10 @@ full theory of p-adic lattices.
    - Legendre/Jacobi symbols and quadratic reciprocity.
    - Chinese-remainder assembly of the required congruences.
    - A specialized prime-in-arithmetic-progression theorem strong enough for
-     the residue classes modulo 400 and 800 used in §3.6. This is the largest
-     new external arithmetic input in the Mordell route.
+     the residue classes modulo 400 and 800 used in §3.6.  This is a
+     restricted Dirichlet theorem and may dominate the cost of the entire
+     route; it is the principal formalization risk, not a routine supporting
+     lemma.
 
 3. **Mordell construction at determinant 10**
 
@@ -93,15 +95,23 @@ full theory of p-adic lattices.
 
 ## Alternative route and gate
 
-The genus route is also valid: prove local representability and show the
-one-two-five form is alone in its genus. But that route requires the gated
-`ℤ_p`-lattice/regularity block in `PLAN_15_THEOREM.md`. It should be chosen
-only if several remaining ternary converses will share that machinery.
+The genus route is genuinely valid here: Blackwell et al. state that the
+forms they treat, including `x²+2y²+5z²`, are alone in their genera.  The
+three determinant-ten classes appearing in the Mordell construction do not
+contradict that statement; the construction first lands in a finite list of
+classes, then uses a congruence to select the desired one.
 
-The next decision point comes after the odd-family conditional covers. At
-that point, compare the remaining converse set:
+The all-at-once census has replaced the old “wait for the odd family” gate.
+Several published regular ternary converses remain, so shared deep
+infrastructure may have multiple consumers.  Before committing to it:
 
-- if several forms need the same integral local-global theorem, pay for the
-  genus layer once;
-- if one-two-five is isolated, the specialized Mordell route above is likely
-  the narrower formalization.
+- finish the proved odd-`C=5` reduction's 12 rank-four covers;
+- pilot the index-three/index-six reductions identified in
+  `PLAN_TERNARY_CONVERSES.md`; and
+- keep the nonregular determinant-seven odd parent out of any blanket genus
+  claim.
+
+After those cheap routes are exhausted, compare a shared class-one/genus
+layer with shared Mordell infrastructure.  Do not formalize the
+one-two-five Mordell proof in isolation merely because it has a published
+specialized route.
