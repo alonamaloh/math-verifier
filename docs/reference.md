@@ -63,6 +63,14 @@ lemma(?, knownArgument)
 
 It does not launch proof search.
 
+A finite tuple `⟨e₀, …, eₙ₋₁⟩` builds a `RingVector(r, n)` when the expected
+type fixes the coefficient carrier `r`; each entry is elaborated at that
+carrier (so numerals and negatives need no ascription):
+
+```math
+⟨1, -2, 3⟩            -- : RingVector(Integer.commutative_ring_bundle, 3)
+```
+
 ## Proof blocks
 
 ```math
@@ -319,6 +327,20 @@ by strong induction on n with hypothesis IH { ... }
 
 Here `IH` covers every smaller natural.
 
+## Bounded range check
+
+Close a bounded-universal goal (leading quantified `n` with premises `a ≤ n`
+and `n < b`) by kernel-checked enumeration of the half-open closed range
+`[a, b)`. The endpoints must be integer literals, over `ℕ` or `ℤ`, and the
+case count is capped (`MATH_FINITE_CHECK_MAX_CASES`):
+
+```math
+by finite_check n from 2 until 5      -- proves P(2), P(3), P(4)
+by finite_check z from -2 until 3     -- over ℤ, crossing zero
+```
+
+Each case is closed independently; a failure names the exact value.
+
 ## Substitution and definitions
 
 ```math
@@ -356,7 +378,10 @@ disjunct(proof)
 ```
 
 The applicable carrier structures and limitations are described in
-`conventions/algebra-tactics.md`.
+`conventions/algebra-tactics.md`. On a commutative carrier `ring` normalises
+the usual way; on a **non-commutative** carrier (e.g. the square-matrix ring)
+it normalises to ordered words, keeps factor order, and declines `A * B =
+B * A`.
 
 `disjunct(proof)` injects a proof into the matching branch of a
 right-associated disjunction. It is especially useful for generated finite

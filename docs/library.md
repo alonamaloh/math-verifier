@@ -47,8 +47,16 @@ may import from its own layer and below, never above. (Build/layout depth:
   `polynomial_vector_space` (F[x] with the {xⁿ} basis),
   `exchange_lemma` (the Steinitz inequality `independent_le_spanning`:
   an independent family is ≤ a spanning one — where `Field.reciprocal`
-  enters). The quadratic-form/escalator development has its own concise map
-  at [`Algebra/fifteen-theorem.md`](../library/Algebra/fifteen-theorem.md).
+  enters). Matrices over a commutative ring (`matrix`, the `matrix_ring`
+  bundle, `matrix_vector`, `matrix_transpose`): the `determinant` via the
+  permutation expansion (multiplicativity, transpose, bordered/Schur),
+  `adjugate`/`matrix_inverse` and the Cramer identities, `permutation_sign`,
+  `characteristic_polynomial`, `rank_nullity`, and `cayley_hamilton`. The
+  quadratic-form/escalator development (now the largest part of `Algebra/` —
+  quadratic forms, escalation, truants, the rank-two/three classifications
+  and the 207-form rank-four cover, driving toward the Fifteen Theorem) has
+  its own concise map at
+  [`Algebra/fifteen-theorem.md`](../library/Algebra/fifteen-theorem.md).
 - **`Polynomial/`** — the polynomial ring over a coefficient ring:
   `addition`/`multiplication`, `degree` (+ degree-of-product), `division`,
   `bezout`, `irreducible`, `units`, `quotient_field`.
@@ -75,7 +83,9 @@ laws:
 
 - **`Set/`** — the finite-cardinality / counting layer: `Equinumerous`,
   `HasSize`, pigeonhole, sum/product/power rules, Cantor, enumerability.
-- **`Lists/`** — `NaturalList` and `Permutation`.
+- **`Lists/`** — the polymorphic `List(A)` (`list`): `append`, `map`,
+  `filter`, `range`, `length`, `remove`, `distinct`, `cartesian`, `pairing`,
+  membership, and permutations.
 
 ## Not math content
 

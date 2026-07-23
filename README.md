@@ -209,7 +209,9 @@ reciprocals of the triangular numbers (#42).
 
 ## Elaborator features at a glance
 
-The patterns are documented in detail in `CLAUDE.md`. Highlights:
+The conventions are documented in detail in `CLAUDE.md` and
+`docs/conventions/` (and the surface catalogue in `docs/reference.md`).
+Highlights:
 
 - **`ring` / `field` tactics.** `ring` normalises any commutative-ring
   identity (distributivity, AC-rearrangement, like-term collection at
@@ -321,9 +323,11 @@ These have been load-bearing decisions that show up everywhere:
   (analysis depth, geometry/topology, metatheory, abstract linear
   algebra, new quotients) chosen to load one layer — prover, surface
   language, or foundations — at a time and reveal where it bends.
-- `PLAN_LANGUAGE_IMPROVEMENT.md` — the single forward plan for the surface
-  language (opaque-by-default + successor-free + cite-only prover); its
-  Status ledger is the authoritative progress tracker.
+- `PLAN_*.md` (repo root) — active and historical plans. The largest current
+  effort is **`PLAN_15_THEOREM.md`** (the quadratic-forms / Fifteen Theorem
+  development, with its own status ledger); `PLAN_LANGUAGE_IMPROVEMENT.md`
+  tracks the surface-language direction (opaque-by-default + successor-free +
+  cite-only prover).
 - `LUX_PLAN.md` — the design note behind the planned higher-level proof
   surface (Lux).
 - `HASH_USE_VS_LEAN.md` — design note pinning down where our

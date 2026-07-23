@@ -70,14 +70,19 @@ recursion, or [number-theory.md](number-theory.md) for division, gcd, and primes
   `Natural.fundamental_theorem_of_arithmetic`, and
   `Natural.infinitely_many_primes`.
 - Small-square bounds in [multiply_bounds.math](multiply_bounds.math):
-  `Natural.below_two`, `Natural.positive_below_five`,
-  `Natural.square_below_two`/`_four`/`_six`/`_ten`,
-  `Natural.two_is_not_a_square`, `Natural.three_not_sum_of_two_squares`,
-  and `Natural.five_not_square_plus_double_square`. For the next ternary
-  layer, `Natural.square_plus_double_square_values_below_sixteen` classifies
-  every value of `m² + 2n²` below 16, while
+  `Natural.below_two`, `Natural.positive_below_five`/`_six`/`_seven`/`_eight`/
+  `_fourteen`, `Natural.square_below_two`/`_four`/`_six`/`_ten`/`_sixteen`/
+  `_eighteen`/`_thirty_six`/`_sixty_four`, `Natural.two_is_not_a_square`, the
+  `Natural.<n>_not_sum_of_two_squares` family (`three`, `six`, `seven`,
+  `twelve`, `fourteen`), and `Natural.five_not_square_plus_double_square`. For
+  the ternary layer, `Natural.square_plus_double_square_values_below_sixteen`
+  classifies every value of `m² + 2n²` below 16, while
   `Natural.not_square_plus_double_square_below_sixteen` turns exclusion from
-  that finite list into a nonrepresentation theorem.
+  that finite list into a nonrepresentation theorem. These bound lemmas exist
+  to support the Algebra rank-three/four escalator work.
+- Kernel-visible finite ranges in [finite_range.math](finite_range.math):
+  `Natural.AllFrom_at_offset` / `AllFrom_between`, the certificate behind the
+  `finite_check` proof form.
 
 ## Where to look
 
@@ -85,7 +90,7 @@ recursion, or [number-theory.md](number-theory.md) for division, gcd, and primes
 - Order and induction: `order`, `add_order`, `one_plus_induction`,
   `strong_recursion`, `well_founded`
 - Subtraction and bounds: `subtraction`, `monus`, `distance`, `maximum`,
-  `multiply_order`, `multiply_bounds`
+  `multiply_order`, `multiply_bounds`, `finite_range`
 - Decisions and data-producing comparison: `decide`, `decide_divides`,
   `compare`, `classical_decidable`
 - Division and gcd: `floor_divide`, `division`, `divisibility`, `gcd`,

@@ -91,6 +91,33 @@ double-check the direction: the bridge looks for one side of the
 equation in the fact being transported. Stating it the wrong way round
 gives the "left endpoint does not appear (structurally)" error.
 
+## `ring` on a non-commutative carrier
+
+An explicit `ring` also closes identities over a ring whose multiplication
+is **not** commutative — most importantly the square-matrix ring
+`Matrix.ring(c, n)`. There it uses a different normal form: expressions
+expand to a signed-integer-weighted sum of **ordered words** in the atoms,
+concatenating factors *without sorting them* (the empty word is the identity,
+addition is still commutative so the outer sum is ordered). So the full
+distributive expansion of a matrix product — e.g.
+`(I + T) * D * (I + N) = D + T*D + D*N + (T*D)*N` — is one `ring` call, but
+`A * B = B * A` is **declined** (the two ordered normal forms differ), with a
+message noting that matrix multiplication is noncommutative.
+
+Two consequences:
+
+- Reach for `ring` on matrix-ring goals the same way you do on ℤ/ℝ; it
+  removes the manual `multiply_associative` / distributivity choreography.
+- `ring` does *not* itself normalise transpose, `outerProduct`,
+  matrix–vector application, or finite sums — rewrite those to ring atoms by
+  named structural facts first, then let `ring` do the algebra.
+- Supplied relations are not consulted: a nilpotency like `N*N = 0` is a
+  separate `by substituting`/named-lemma step, not something `ring` assumes.
+
+The dispatch is automatic from the carrier (commutative carriers keep the
+commutative normaliser unchanged); this mode fires only for an explicit
+`by ring`, not from the automatic relation-chain battery.
+
 ## Ring lemmas: foundational vs. derived
 
 Two flavours of ring lemma; they live in different places and you

@@ -29,7 +29,12 @@ than `IntegerRepresentative`.
   `Integer.cancel_le_by_positive` and `Integer.cancel_lt_by_positive`
 - `Integer.divide_balanced` for nearest/balanced quotient and remainder
 - `Integer.sum_of_squares_zero`, `Integer.square_as_natural_square`,
-  and `Integer.square_below_three`/`_four`/`_five`/`_eight`/`_ten`
+  and `Integer.square_below_three`/`_four`/`_five`/`_eight`/`_ten`/`_sixteen`/
+  `_eighteen`/`_thirty_six`/`_sixty_four` (small-square bounds supporting the
+  Algebra escalator work), in `sum_of_squares.math`
+- Kernel-visible finite integer ranges in
+  [finite_range.math](finite_range.math): `Integer.AllFrom_at_offset` /
+  `AllFrom_between`, the certificate behind the `finite_check` proof form
 
 `Integer.absolute_value` is implemented from `Natural.distance`; the
 natural-valued form is the norm used by Euclidean and divisibility arguments.

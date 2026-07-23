@@ -25,7 +25,9 @@ placeholder.
 ## Algebra and number systems
 
 - [Algebra](Algebra/README.md): groups, rings, fields, factorization, linear
-  algebra, matrices, determinants, and Cayley–Hamilton
+  algebra, matrices, determinants, and Cayley–Hamilton; and the quadratic-form
+  development toward the Fifteen Theorem
+  ([fifteen-theorem.md](Algebra/fifteen-theorem.md))
 - [Integer](Integer/README.md), [Rational](Rational/README.md), and
   [Real](Real/README.md): the number tower `ℤ → ℚ → ℝ`
 - [Polynomial](Polynomial/README.md): polynomial rings, degree, division,
