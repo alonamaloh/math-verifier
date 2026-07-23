@@ -137,29 +137,40 @@ claimed by this plan.
 
 ## Deep-route decision
 
-After the two remaining elementary pilots, recount the irreducible
-interfaces.
+The dependency audit and determinant-three pilot are now recorded in
+`PROOF_TERNARY_CONVERSE_DEPENDENCIES.md`. They settle the route-selection
+question conservatively: even if both remaining elementary pilots succeed,
+four non-three-squares regular forms remain, feeding 57 selected rank-four
+clients. Shared infrastructure is therefore justified without waiting for
+those pilots.
 
-1. If triple squares, one-two-three, one-two-six, and one-two-five remain,
-   there are enough consumers to justify shared infrastructure rather than a
-   one-off theorem.
-2. A genus route must prove integral local representability and one-class
+1. Build a bounded rank-three genus development rather than a general
+   arbitrary-rank theory. Its first end-to-end target is
+   `Matrix.TripleSquaresConverse`.
+2. A genus route must separately prove integral local representability,
+   representation by some class in the genus, and the relevant one-class
    genus results for each participating form.  It is mathematically valid for
    one-two-five: the determinant-ten form is alone in its genus.  The three
    determinant-ten classes used in the Mordell proof are not thereby
    genus-mates; the finite class elimination belongs to that construction.
-3. A Mordell route shares quadratic-residue, reciprocity, CRT, reduction, and
+3. The verified determinant-three pilot proves that a reduced binary
+   determinant-three complement is one of only
+   `[[1,0],[0,3]]` and `[[2,1],[1,2]]`. This makes the finite table cheap and
+   identifies reduction/short-vector theory, dyadic integral equivalence,
+   and local-to-genus representation as the actual risks.
+4. A Mordell route shares quadratic-residue, reciprocity, CRT, reduction, and
    class-enumeration machinery across several forms.  However, its required
    prime-in-arithmetic-progression input is a restricted Dirichlet theorem,
    and may dominate the entire formalization cost.  It must be budgeted as
    the route's principal risk, not as a routine sublemma.
-4. The determinant-seven odd parent is excluded from either blanket
+5. The determinant-seven odd parent is excluded from either blanket
    regularity route.  Its 14 rank-four clients require direct quaternary or
    restricted-coset work.
 
-No deep route should begin until the two index-lattice pilots have executable
-statements.  The odd-`C=5` clients are complete; the pilots can still change
-the deep-interface count by 15.
+The two index-lattice pilots remain worthwhile because they can remove 15
+clients, but they no longer gate the shared route. The first implementation
+slice is the determinant-three reducer/enumerator and its local eligibility
+proof; Mordell remains a fallback.
 
 ## Execution order
 
@@ -167,16 +178,20 @@ the deep-interface count by 15.
 2. **Done:** use an integral base shear plus 586 generated,
    kernel-checked finite witnesses to discharge all 12 selected odd-`C=5`
    covers from `Matrix.ThreeSquaresConverse`.
-3. Pilot the two-three-six and one-three-six index-lattice recoveries.  Keep a
+3. Pilot the two-three-six and one-three-six index-lattice recoveries. Keep a
    pilot only if it eliminates the existing exact local converse without
    adding an equally deep replacement.
 4. **Done:** all 14 nonexceptional determinant-seven clients have direct
    conditional covers. The final seven use the reviewed restricted-safe-set
    proof and generated finite certificates, not a false regularity converse.
-5. Recount the remaining interfaces and choose either a shared
-   class-one/genus development or shared Mordell infrastructure.  Do not
-   start with one-two-five in isolation.
-6. Preserve statement-shape guards and independent cold-library verification
+5. **Done:** the exact dependency audit and determinant-three finite
+   classification pilot select a bounded shared class-one/genus development.
+   See `PROOF_TERNARY_CONVERSE_DEPENDENCIES.md` and
+   `Algebra.ternary_genus_determinant_three_pilot`.
+6. Implement G0/G1 from the audit: exact rank-three lattice/equivalence
+   objects, a certificate-producing reducer, and the determinant-three
+   one-class certificate.
+7. Preserve statement-shape guards and independent cold-library verification
    throughout: all these interfaces feed many conditional clients, so a
    silently weakened converse would have a large blast radius.
 

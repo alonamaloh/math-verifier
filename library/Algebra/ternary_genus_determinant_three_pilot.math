@@ -1,0 +1,184 @@
+-- Algebra/ternary_genus_determinant_three_pilot.math
+--
+-- A deliberately bounded pilot for the class-enumeration layer behind the
+-- converse for x²+y²+3z².
+--
+-- If [[a,b],[b,c]] is a reduced positive binary Gram matrix of determinant
+-- three, write b for the non-negative absolute value of its cross entry.
+-- Reduction gives 2b ≤ a ≤ c and determinant three gives ac = b²+3.
+-- The theorem below proves that there are only two possibilities:
+--
+--   [[1,0],[0,3]]  and  [[2,1],[1,2]].
+--
+-- This is the finite arithmetic core of one tiny class-number computation.
+-- It is not a genus theorem: using it in the ternary problem still requires
+-- (1) a reduction/short-vector theorem that produces the binary complement,
+-- (2) a 2-adic argument that distinguishes its parity class, and
+-- (3) an integral local-to-genus representation theorem.
+
+module Algebra.ternary_genus_determinant_three_pilot
+
+import Algebra.three_squares_obstruction_arithmetic
+import Natural.add_order
+import Natural.cancellation
+import Natural.multiply_bounds
+
+-- The reduction inequalities already force the leading coefficient below
+-- three.  Indeed, 2b ≤ a implies 4b² ≤ a², while a ≤ c and ac=b²+3 imply
+-- a² ≤ b²+3.  Scaling and cancelling gives 3a² ≤ 12, which rules out a ≥ 3.
+theorem Natural.reduced_binary_determinant_three_first_coefficient_bounded
+        (a b c : ℕ)
+        (crossReduced : 2 * b ≤ a)
+        (diagonalReduced : a ≤ c)
+        (determinant : a * c = b * b + 3)
+        : a ≤ 2 := {
+  suppose 2 < a for contradiction {
+    3 ≤ a;
+    4 * (b * b)
+       = (2 * b) * (2 * b) by ring
+       ≤ (2 * b) * a by Natural.multiply_monotone_left
+       = a * (2 * b)
+       ≤ a * a by Natural.multiply_monotone_left
+    as fourBSquareBelowASquare;
+    a * a
+       ≤ a * c by Natural.multiply_monotone_left
+       = b * b + 3 by determinant
+    as aSquareBelow;
+    4 * (a * a)
+       ≤ 4 * (b * b + 3)
+           by Natural.multiply_monotone_left(4, a * a, b * b + 3, aSquareBelow)
+       = 4 * (b * b) + 12 by ring
+       ≤ a * a + 12
+           by Natural.le_add_preserves_left(
+             4 * (b * b), a * a, 12, fourBSquareBelowASquare)
+    as scaledBound;
+    a * a + 3 * (a * a)
+       = 4 * (a * a) by ring
+       ≤ a * a + 12 by scaledBound;
+    3 * (a * a) ≤ 12 by Natural.add_left_le_cancel as twelveBound;
+    9
+       = 3 * 3
+       ≤ 3 * a by Natural.multiply_monotone_left
+       = a * 3
+       ≤ a * a by Natural.multiply_monotone_left
+    as nineBelowSquare;
+    27
+       = 3 * 9
+       ≤ 3 * (a * a)
+           by Natural.multiply_monotone_left(3, 9, a * a, nineBelowSquare)
+       ≤ 12 by twelveBound
+       < 27;
+    False by Natural.lt_irreflexive;
+    done
+  };
+  done by Natural.less_or_equal_of_not_less_than
+}
+
+theorem Natural.reduced_binary_determinant_three_classification
+        (a b c : ℕ)
+        (aPositive : 1 ≤ a)
+        (crossReduced : 2 * b ≤ a)
+        (diagonalReduced : a ≤ c)
+        (determinant : a * c = b * b + 3)
+        : (a = 1 ∧ b = 0 ∧ c = 3) ∨ (a = 2 ∧ b = 1 ∧ c = 2) := {
+  a ≤ 2 by Natural.reduced_binary_determinant_three_first_coefficient_bounded(
+      a, b, c, crossReduced, diagonalReduced, determinant) as aAtMostTwo;
+  a = 1 ∨ a = 2 by {
+    a < 2 ∨ a = 2 ∨ 2 < a by Natural.lt_trichotomy;
+    done by cases {
+      case a < 2 as aBelowTwo: {
+        a = 0 ∨ a = 1 by Natural.below_two;
+        done by cases {
+          case a = 0: {
+            1 ≤ 0 < 1 by substituting (a = 0);
+            False by Natural.lt_irreflexive;
+            done
+          }
+          case a = 1: done
+        }
+      }
+      case a = 2: done
+      case 2 < a: {
+        2 < a ≤ 2 by aAtMostTwo;
+        False by Natural.lt_irreflexive;
+        done
+      }
+    }
+  };
+  done by cases {
+    case a = 1 as aOne: {
+      b = 0 by {
+        b = 0 ∨ ∃ (predecessor : ℕ). b = 1 + predecessor by Natural.zero_or_one_plus;
+        done by cases {
+          case b = 0: done
+          case ∃ (predecessor : ℕ). b = 1 + predecessor: {
+            choose predecessor : ℕ such that b = 1 + predecessor;
+            1 ≤ b;
+            2
+               = 2 * 1
+               ≤ 2 * b by Natural.multiply_monotone_left
+               ≤ a by crossReduced
+               = 1 by aOne
+               < 2;
+            False by Natural.lt_irreflexive;
+            done
+          }
+        }
+      } as bZero;
+      c
+         = 1 * c
+         = a * c by substituting Equality.symmetry(aOne)
+         = b * b + 3 by determinant
+         = 0 * 0 + 3 by substituting bZero
+         = 3
+      as cThree;
+      done by Or.introduceLeft(And.introduction(aOne, And.introduction(bZero, cThree)))
+    }
+    case a = 2 as aTwo: {
+      b < 2 by {
+        b < 2 ∨ b = 2 ∨ 2 < b by Natural.lt_trichotomy;
+        done by cases {
+          case b < 2: done
+          case b = 2 ∨ 2 < b: {
+            2 ≤ b by cases {
+              case b = 2: done
+              case 2 < b: done by Natural.LessThan.weaken
+            };
+            4
+               = 2 * 2
+               ≤ 2 * b by Natural.multiply_monotone_left
+               ≤ a by crossReduced
+               = 2 by aTwo
+               < 4;
+            False by Natural.lt_irreflexive;
+            done
+          }
+        }
+      };
+      b = 0 ∨ b = 1 by Natural.below_two;
+      done by cases {
+        case b = 0 as bZero: {
+          2 * c + 0
+             = a * c by substituting Equality.symmetry(aTwo)
+             = b * b + 3 by determinant
+             = 0 * 0 + 3 by substituting bZero
+             = 2 * 1 + 1
+          as impossible;
+          False by Natural.distinct_affine_residues_not_equal(
+              2, 0, 1, c, 1, done, done, done, impossible);
+          done
+        }
+        case b = 1 as bOne: {
+          2 * c
+             = a * c by substituting Equality.symmetry(aTwo)
+             = b * b + 3 by determinant
+             = 1 * 1 + 3 by substituting bOne
+             = 2 * 2
+          as cancellable;
+          c = 2 by Natural.multiply_cancel_left(2, c, 2, done, cancellable) as cTwo;
+          done by Or.introduceRight(And.introduction(aTwo, And.introduction(bOne, cTwo)))
+        }
+      }
+    }
+  }
+}
