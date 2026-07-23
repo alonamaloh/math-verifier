@@ -1,0 +1,89 @@
+-- Algebra/truant_squarefree.math
+--
+-- A least positive exception of an integral quadratic form is squarefree:
+-- if d² divides it, represent the smaller quotient and scale the witness
+-- by d.
+
+module Algebra.truant_squarefree
+
+import Natural.divisibility
+import Natural.multiply_order
+import Algebra.truant
+
+definition Natural.IsSquarefree (n : ℕ) : Proposition :=
+  ∀ (d : ℕ). d ≥ 2 → ¬(d * d ∣ n)
+
+theorem Matrix.represents_natural_square_multiple {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (d target : ℕ)
+        (represented : Matrix.Represents(A, (target : ℤ)))
+        : Matrix.Represents(A, ((d * d * target : ℕ) : ℤ)) := {
+  choose vector : RingVector(Integer.commutative_ring_bundle, n) such that
+      Matrix.quadraticForm(A, vector) = (target : ℤ) as valueReads from represented;
+  Matrix.quadraticForm(A, (d : ℤ) • vector)
+     = ((d : ℤ) * (d : ℤ)) * Matrix.quadraticForm(A, vector)
+         by Matrix.quadraticForm_scale
+     = ((d : ℤ) * (d : ℤ)) * (target : ℤ) by substituting valueReads
+     = ((d * d : ℕ) : ℤ) * (target : ℤ)
+         by substituting Natural.to_integer.multiply_preserves(d, d)
+     = (((d * d) * target : ℕ) : ℤ) by Equality.symmetry(
+         Natural.to_integer.multiply_preserves(d * d, target))
+  as scaledValue;
+  witness (d : ℤ) • vector with scaledValue
+}
+
+theorem Matrix.IsTruant.squarefree {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (truant : ℕ) (isTruant : Matrix.IsTruant(A, truant))
+        : Natural.IsSquarefree(truant) := {
+  take d : ℕ;
+  suppose d ≥ 2 as dAtLeastTwo;
+  suppose d * d ∣ truant as squareDivides;
+  choose quotient : ℕ such that truant = (d * d) * quotient as truantReads
+      from squareDivides;
+  quotient ≥ 1 by {
+    quotient = 0 ∨ ∃ (predecessor : ℕ). quotient = 1 + predecessor
+        by Natural.zero_or_one_plus;
+    done by cases {
+      case quotient = 0 as quotientZero: {
+        truant = (d * d) * 0 by substituting quotientZero
+                = 0;
+        truant ≥ 1 by Matrix.IsTruant.positive;
+        done
+      }
+      case ∃ (predecessor : ℕ). quotient = 1 + predecessor: {
+        choose predecessor : ℕ such that quotient = 1 + predecessor;
+        1 ≤ 1 + predecessor;
+        done
+      }
+    }
+  }
+  as quotientPositive;
+  1 ≤ d by {
+    1 ≤ 2 ≤ d;
+    done
+  }
+  as dPositive;
+  2 ≤ d * d by {
+    d
+       = d * 1
+       ≤ d * d by Natural.multiply_monotone_left(d, 1, d, dPositive);
+    2 ≤ d;
+    done
+  }
+  as squareAtLeastTwo;
+  quotient < (d * d) * quotient
+      by Natural.lt_multiply_of_two_le(d * d, quotient, squareAtLeastTwo, quotientPositive);
+  quotient < truant by substituting truantReads as quotientBelow;
+  Matrix.Represents(A, (quotient : ℤ))
+      by Matrix.IsTruant.represents_below(
+        isTruant := isTruant,
+        sPositive := quotientPositive,
+        sBelowTruant := quotientBelow)
+      as quotientRepresented;
+  Matrix.Represents(A, (((d * d) * quotient : ℕ) : ℤ))
+      by Matrix.represents_natural_square_multiple(A, d, quotient, quotientRepresented);
+  Matrix.Represents(A, (truant : ℤ)) by substituting truantReads;
+  ¬(Matrix.Represents(A, (truant : ℤ))) by Matrix.IsTruant.missed;
+  done
+}

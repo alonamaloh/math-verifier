@@ -1,0 +1,228 @@
+-- Algebra/det_seven_rank_four_infrastructure.math
+--
+-- Reusable elementary infrastructure for the final seven odd-C=4 covers:
+-- add a multiple of an explicit vector orthogonal to the determinant-seven
+-- ternary section, and record the seven resulting norms.
+
+module Algebra.det_seven_rank_four_infrastructure
+
+import Algebra.det_seven_safe_converse
+import Algebra.truant_squarefree
+import Algebra.matrix_four_by_four
+import Algebra.rank_four_odd_diagonal_family
+
+theorem Matrix.detSevenRankFour_coordinateTuple_value
+        (residue corner x y z w : ℤ)
+        : Matrix.quadraticForm(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, residue, corner),
+            (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4)))
+          = x * x + 2 * (y * y) + 2 * y * z + 4 * (z * z)
+            + 2 * residue * y * w + corner * (w * w) := {
+  Matrix.squarePlusDoubleSquareOddForm(4) ·
+      (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+    = (⟨x, 2 * y + z, y + 4 * z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+      by Matrix.squarePlusDoubleSquareOddForm_apply_coordinateTuple
+  as parentAction;
+  Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, residue, corner) ·
+      (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4))
+     = (⟨x + w * 0, 2 * y + z + w * residue, y + 4 * z + w * 0,
+          0 * x + residue * y + 0 * z + corner * w⟩
+        : RingVector(Integer.commutative_ring_bundle, 4))
+         by Matrix.borderedAssembly_apply_fourCoordinates(
+           symmetric := Matrix.squarePlusDoubleSquareOddForm_symmetric(4),
+           parentAction := parentAction)
+     = (⟨x, 2 * y + z + residue * w, y + 4 * z, residue * y + corner * w⟩
+        : RingVector(Integer.commutative_ring_bundle, 4)) by {
+          x + w * 0 = x by ring as first;
+          2 * y + z + w * residue = 2 * y + z + residue * w by ring as second;
+          y + 4 * z + w * 0 = y + 4 * z by ring as third;
+          0 * x + residue * y + 0 * z + corner * w = residue * y + corner * w
+              by ring as fourth;
+          done by RingVector.fourCoordinates_equal(
+            first := first, second := second, third := third, fourth := fourth)
+        }
+  as actionReads;
+  Matrix.quadraticForm(
+      Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, residue, corner),
+      (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4)))
+     = RingVector.innerProduct(
+         (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4)),
+         (⟨x, 2 * y + z + residue * w, y + 4 * z, residue * y + corner * w⟩
+           : RingVector(Integer.commutative_ring_bundle, 4)))
+         by substituting actionReads
+     = x * x + y * (2 * y + z + residue * w)
+       + z * (y + 4 * z) + w * (residue * y + corner * w)
+         by RingVector.innerProduct_fourCoordinates
+     = x * x + 2 * (y * y) + 2 * y * z + 4 * (z * z)
+       + 2 * residue * y * w + corner * (w * w) by ring;
+  done
+}
+
+theorem Matrix.detSevenRankFour_coordinateTuple_computes
+        (residue corner x y z w target : ℤ)
+        (scalarComputation : x * x + 2 * (y * y) + 2 * y * z + 4 * (z * z)
+          + 2 * residue * y * w + corner * (w * w) = target)
+        : Matrix.quadraticForm(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, residue, corner),
+            (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4))) = target :=
+  Matrix.quadraticForm(
+      Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, residue, corner),
+      (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4)))
+     = x * x + 2 * (y * y) + 2 * y * z + 4 * (z * z)
+       + 2 * residue * y * w + corner * (w * w)
+         by Matrix.detSevenRankFour_coordinateTuple_value
+     = target by scalarComputation
+
+theorem Matrix.detSeven_zero_residue_orthogonal_lift
+        (corner residual t : ℤ)
+        (represented : Matrix.Represents(
+          Matrix.squarePlusDoubleSquareOddForm(4), residual))
+        : Matrix.Represents(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 0, corner),
+            residual + corner * (t * t)) := {
+  choose vector : RingVector(Integer.commutative_ring_bundle, 3) such that
+      Matrix.quadraticForm(Matrix.squarePlusDoubleSquareOddForm(4), vector) = residual
+      as valueReads from represented;
+  let x : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo));
+  let y : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo));
+  let z : ℤ := vector(NaturalsBelow.top(2));
+  vector = (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+      by RingVector.eq_threeCoordinates(vector) as vectorReads;
+  x * x + 2 * (y * y) + 2 * y * z + 4 * (z * z)
+     = Matrix.quadraticForm(Matrix.squarePlusDoubleSquareOddForm(4), ⟨x, y, z⟩)
+         by Equality.symmetry(
+           Matrix.squarePlusDoubleSquareOddForm_coordinateTuple_value(4, x, y, z))
+     = Matrix.quadraticForm(Matrix.squarePlusDoubleSquareOddForm(4), vector)
+         by substituting Equality.symmetry(vectorReads)
+     = residual by valueReads
+  as ternaryValue;
+  x * x + 2 * (y * y) + 2 * y * z + 4 * (z * z)
+      + 2 * 0 * y * t + corner * (t * t)
+     = residual + corner * (t * t) by substituting ternaryValue
+  as scalarComputation;
+  done by Matrix.represents_by_witness(
+    Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 0, corner),
+    target := residual + corner * (t * t), vector := ⟨x, y, z, t⟩,
+    computes := Matrix.detSevenRankFour_coordinateTuple_computes(
+      scalarComputation := scalarComputation))
+}
+
+theorem Matrix.detSeven_nonzero_residue_orthogonal_lift
+        (residue corner residual t : ℤ)
+        (represented : Matrix.Represents(
+          Matrix.squarePlusDoubleSquareOddForm(4), residual))
+        : Matrix.Represents(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, residue, corner),
+            residual + (49 * corner - 28 * (residue * residue)) * (t * t)) := {
+  choose vector : RingVector(Integer.commutative_ring_bundle, 3) such that
+      Matrix.quadraticForm(Matrix.squarePlusDoubleSquareOddForm(4), vector) = residual
+      as valueReads from represented;
+  let x : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo));
+  let y : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo));
+  let z : ℤ := vector(NaturalsBelow.top(2));
+  vector = (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+      by RingVector.eq_threeCoordinates(vector) as vectorReads;
+  x * x + 2 * (y * y) + 2 * y * z + 4 * (z * z)
+     = Matrix.quadraticForm(Matrix.squarePlusDoubleSquareOddForm(4), ⟨x, y, z⟩)
+         by Equality.symmetry(
+           Matrix.squarePlusDoubleSquareOddForm_coordinateTuple_value(4, x, y, z))
+     = Matrix.quadraticForm(Matrix.squarePlusDoubleSquareOddForm(4), vector)
+         by substituting Equality.symmetry(vectorReads)
+     = residual by valueReads
+  as ternaryValue;
+  x * x
+      + 2 * ((y - 4 * residue * t) * (y - 4 * residue * t))
+      + 2 * (y - 4 * residue * t) * (z + residue * t)
+      + 4 * ((z + residue * t) * (z + residue * t))
+      + 2 * residue * (y - 4 * residue * t) * (7 * t)
+      + corner * ((7 * t) * (7 * t))
+     = (x * x + 2 * (y * y) + 2 * y * z + 4 * (z * z))
+       + (49 * corner - 28 * (residue * residue)) * (t * t) by ring
+     = residual + (49 * corner - 28 * (residue * residue)) * (t * t)
+         by substituting ternaryValue
+  as scalarComputation;
+  done by Matrix.represents_by_witness(
+    Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, residue, corner),
+    target := residual + (49 * corner - 28 * (residue * residue)) * (t * t),
+    vector := ⟨x, y - 4 * residue * t, z + residue * t, 7 * t⟩,
+    computes := Matrix.detSevenRankFour_coordinateTuple_computes(
+      scalarComputation := scalarComputation))
+}
+
+theorem Matrix.detSeven_nonzero_residue_orthogonal_lift_with_norm
+        (residue corner norm residual t : ℤ)
+        (normReads : 49 * corner - 28 * (residue * residue) = norm)
+        (represented : Matrix.Represents(
+          Matrix.squarePlusDoubleSquareOddForm(4), residual))
+        : Matrix.Represents(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, residue, corner),
+            residual + norm * (t * t)) := {
+  Matrix.Represents(
+      Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, residue, corner),
+      residual + (49 * corner - 28 * (residue * residue)) * (t * t))
+      by Matrix.detSeven_nonzero_residue_orthogonal_lift(
+        residue, corner, residual, t, represented);
+  done by substituting normReads
+}
+
+theorem Matrix.oddC4R0C7_orthogonal_lift
+        (residual t : ℤ)
+        (represented : Matrix.Represents(Matrix.squarePlusDoubleSquareOddForm(4), residual))
+        : Matrix.Represents(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 0, 7),
+            residual + 7 * (t * t)) :=
+  by Matrix.detSeven_zero_residue_orthogonal_lift(7, residual, t, represented)
+
+theorem Matrix.oddC4R1C6_orthogonal_lift
+        (residual t : ℤ)
+        (represented : Matrix.Represents(Matrix.squarePlusDoubleSquareOddForm(4), residual))
+        : Matrix.Represents(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 1, 6),
+            residual + 266 * (t * t)) :=
+  by Matrix.detSeven_nonzero_residue_orthogonal_lift_with_norm(
+    1, 6, 266, residual, t, done, represented)
+
+theorem Matrix.oddC4R1C7_orthogonal_lift
+        (residual t : ℤ)
+        (represented : Matrix.Represents(Matrix.squarePlusDoubleSquareOddForm(4), residual))
+        : Matrix.Represents(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 1, 7),
+            residual + 315 * (t * t)) :=
+  by Matrix.detSeven_nonzero_residue_orthogonal_lift_with_norm(
+    1, 7, 315, residual, t, done, represented)
+
+theorem Matrix.oddC4R2C8_orthogonal_lift
+        (residual t : ℤ)
+        (represented : Matrix.Represents(Matrix.squarePlusDoubleSquareOddForm(4), residual))
+        : Matrix.Represents(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 2, 8),
+            residual + 280 * (t * t)) :=
+  by Matrix.detSeven_nonzero_residue_orthogonal_lift_with_norm(
+    2, 8, 280, residual, t, done, represented)
+
+theorem Matrix.oddC4R2C9_orthogonal_lift
+        (residual t : ℤ)
+        (represented : Matrix.Represents(Matrix.squarePlusDoubleSquareOddForm(4), residual))
+        : Matrix.Represents(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 2, 9),
+            residual + 329 * (t * t)) :=
+  by Matrix.detSeven_nonzero_residue_orthogonal_lift_with_norm(
+    2, 9, 329, residual, t, done, represented)
+
+theorem Matrix.oddC4R3C10_orthogonal_lift
+        (residual t : ℤ)
+        (represented : Matrix.Represents(Matrix.squarePlusDoubleSquareOddForm(4), residual))
+        : Matrix.Represents(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 3, 10),
+            residual + 238 * (t * t)) :=
+  by Matrix.detSeven_nonzero_residue_orthogonal_lift_with_norm(
+    3, 10, 238, residual, t, done, represented)
+
+theorem Matrix.oddC4R3C11_orthogonal_lift
+        (residual t : ℤ)
+        (represented : Matrix.Represents(Matrix.squarePlusDoubleSquareOddForm(4), residual))
+        : Matrix.Represents(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 3, 11),
+            residual + 287 * (t * t)) :=
+  by Matrix.detSeven_nonzero_residue_orthogonal_lift_with_norm(
+    3, 11, 287, residual, t, done, represented)

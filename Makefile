@@ -315,8 +315,11 @@ carrier-normal-form-check: $(BUILD_DIR)/library/Test/expected_carrier_propagatio
 matrix-ergonomics-statement-check: $(BUILD_DIR)/library/Test/matrix_ergonomics_test.mathv
 	@bash scripts/check_matrix_ergonomics_statements.sh ./kernel $<
 
-det-seven-statement-shape-check: $(BUILD_DIR)/library/Test/det_seven_safe_converse_test.mathv
-	@bash scripts/check_det7_statement_shapes.sh ./kernel $<
+det-seven-statement-shape-check: \
+		$(BUILD_DIR)/library/Test/det_seven_safe_converse_test.mathv \
+		$(BUILD_DIR)/library/Algebra/truant_squarefree.mathv \
+		$(BUILD_DIR)/library/Algebra/det_seven_rank_four_infrastructure.mathv
+	@bash scripts/check_det7_statement_shapes.sh ./kernel $^
 
 # Generated rank-four certificates are ordinary checked source, but a stale
 # checked-in output could otherwise remain green indefinitely.  Regenerate in
