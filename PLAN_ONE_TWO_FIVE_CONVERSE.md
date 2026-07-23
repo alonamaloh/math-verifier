@@ -105,7 +105,8 @@ The all-at-once census has replaced the old “wait for the odd family” gate.
 Several published regular ternary converses remain, so shared deep
 infrastructure may have multiple consumers.  Before committing to it:
 
-- finish the proved odd-`C=5` reduction's 12 rank-four covers;
+- note that the proved odd-`C=5` reduction's 12 rank-four covers are now
+  complete and add no deep interface;
 - pilot the index-three/index-six reductions identified in
   `PLAN_TERNARY_CONVERSES.md`; and
 - keep the nonregular determinant-seven odd parent out of any blanket genus

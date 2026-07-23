@@ -329,6 +329,7 @@ rank-four-generated-check:
 	@python3 scripts/generate_rank_four_exceptional_truants.py --check
 	@python3 scripts/generate_rank_four_short_values.py --check
 	@python3 scripts/generate_rank_four_weighted_d5_covers.py --check
+	@python3 scripts/generate_rank_four_odd_c5_covers.py --check
 	@echo "rank-four-generated-check: PASS"
 
 three-squares-generated-check:

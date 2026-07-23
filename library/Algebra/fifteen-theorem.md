@@ -300,10 +300,15 @@ The same census produced one immediate reduction.
 `x²+2y²+2yz+5z²` represents exactly the same integers as three squares:
 the identity
 `x²+2y²+2yz+5z²=x²+(y+2z)²+(y-z)²` is inverted by selecting two roots
-with equal squares modulo three and changing one sign.  Therefore all 12
-selected odd-`C=5` forms reuse the central three-squares converse; only
-their rank-four residual/coset covers remain.  The determinant-seven
-odd-`C=4` parent is nonregular, so its 14 nonexceptional clients need a
+with equal squares modulo three and changing one sign.
+`Algebra/rank_four_odd_c5_cover` now closes all 12 selected rank-four
+clients.  At the base obstruction `8b+7`, an integral shear with
+`9 | rw` leaves an admissible parent residual after a finite prefix; the
+generator supplies 586 explicit kernel-checked witnesses for those
+prefixes.  Scaling all coordinates by `2^a` handles
+`4^a(8b+7)`.  The selected conditional-universality total is therefore
+187.  The determinant-seven odd-`C=4` parent is nonregular, so its 14
+nonexceptional clients are the only remaining selected forms and need a
 direct rank-four or restricted-coset argument rather than a generic parent
 converse.
 For the weighted-`d=4` forms with third border residue two, completing the

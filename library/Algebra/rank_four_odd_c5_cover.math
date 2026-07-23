@@ -1,0 +1,247 @@
+-- Algebra/rank_four_odd_c5_cover.math
+--
+-- The common cover for the selected rank-four forms above
+--
+--   F(x,y,z) = x² + 2y² + 2yz + 5z².
+--
+-- The ternary parent represents exactly the three-square values.  For an
+-- obstructed target 4^a(8b+7), it is enough to represent the base target
+-- 8b+7 and scale all four coordinates by 2^a.
+--
+-- At the base, choose a fixed fourth coordinate w with 9 | r w.  Writing
+-- s = r w / 9 gives the integral shear
+--
+--   Q(x, y-5s, z+s, w) = F(x,y,z) + c w² - 45s².
+--
+-- Thus every sufficiently large base target leaves an admissible
+-- three-square residual.  Generated modules provide explicit witnesses for
+-- the finite prefixes.
+
+module Algebra.rank_four_odd_c5_cover
+
+import Algebra.odd_five_converse_reduction
+import Algebra.three_squares_residual_cover_common
+
+definition Matrix.OddFiveBaseObstructionCover (residue corner : ℕ) : Proposition :=
+  ∀ (b : ℕ).
+    Matrix.Represents(
+      Matrix.squarePlusDoubleSquareOddRankFourRepresentative(
+        5, (residue : ℤ), (corner : ℤ)),
+      ((8 * b + 7 : ℕ) : ℤ))
+
+theorem Natural.eight_times_plus_selected_three_square_core_not_obstruction
+        (b core : ℕ)
+        (selected : core = 1 ∨ core = 2 ∨ core = 3 ∨ core = 5 ∨ core = 6)
+        : ¬(Natural.IsThreeSquareObstruction(8 * b + core)) := {
+  done by cases {
+    case core = 1: done by Natural.eight_times_plus_one_not_obstruction
+    case core = 2: {
+      8 * b + 2 = 4 * (2 * b) + 2 by ring as coreReads;
+      ¬(Natural.IsThreeSquareObstruction(4 * (2 * b) + 2))
+          by Natural.four_times_plus_two_not_obstruction(2 * b) as admissible;
+      suppose Natural.IsThreeSquareObstruction(8 * b + 2) as obstruction;
+      Natural.IsThreeSquareObstruction(4 * (2 * b) + 2) by substituting coreReads;
+      done by admissible(done)
+    }
+    case core = 3: done by Natural.eight_times_plus_three_not_obstruction
+    case core = 5: done by Natural.eight_times_plus_five_not_obstruction
+    case core = 6: {
+      8 * b + 6 = 4 * (2 * b + 1) + 2 by ring as coreReads;
+      ¬(Natural.IsThreeSquareObstruction(4 * (2 * b + 1) + 2))
+          by Natural.four_times_plus_two_not_obstruction(2 * b + 1) as admissible;
+      suppose Natural.IsThreeSquareObstruction(8 * b + 6) as obstruction;
+      Natural.IsThreeSquareObstruction(4 * (2 * b + 1) + 2) by substituting coreReads;
+      done by admissible(done)
+    }
+  }
+}
+
+theorem Matrix.represents_four_power_times
+        {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (target exponent : ℕ)
+        (represented : Matrix.Represents(A, (target : ℤ)))
+        : Matrix.Represents(A, ((4 ^ exponent * target : ℕ) : ℤ)) := {
+  choose vector : RingVector(Integer.commutative_ring_bundle, n) such that
+      Matrix.quadraticForm(A, vector) = (target : ℤ) as valueReads from represented;
+  let scale : ℤ := ((2 ^ exponent : ℕ) : ℤ);
+  scale * scale = ((4 ^ exponent : ℕ) : ℤ) by {
+    ((2 ^ exponent * 2 ^ exponent : ℕ) : ℤ)
+       = ((2 ^ exponent : ℕ) : ℤ) * ((2 ^ exponent : ℕ) : ℤ)
+           by Natural.to_integer.multiply_preserves
+       = scale * scale;
+    ((2 ^ exponent * 2 ^ exponent : ℕ) : ℤ) = ((4 ^ exponent : ℕ) : ℤ)
+        by substituting Natural.two_power_square_is_four_power(exponent);
+    done
+  }
+  as squareReads;
+  Matrix.quadraticForm(A, scale • vector)
+     = (scale * scale) * Matrix.quadraticForm(A, vector) by Matrix.quadraticForm_scale
+     = ((4 ^ exponent : ℕ) : ℤ) * Matrix.quadraticForm(A, vector) by substituting squareReads
+     = ((4 ^ exponent : ℕ) : ℤ) * (target : ℤ) by substituting valueReads
+     = ((4 ^ exponent * target : ℕ) : ℤ)
+         by Equality.symmetry(Natural.to_integer.multiply_preserves(4 ^ exponent, target))
+  as scaledValue;
+  witness scale • vector with scaledValue
+}
+
+theorem Matrix.oddFive_coordinates_of_converse
+        (converse : Matrix.OddFiveConverse) (n : ℕ)
+        (admissible : ¬(Natural.IsThreeSquareObstruction(n)))
+        : ∃ (x y z : ℤ). x * x + 2 * (y * y) + 2 * y * z + 5 * (z * z) = (n : ℤ) := {
+  Matrix.Represents(Matrix.squarePlusDoubleSquareOddForm(5), (n : ℤ))
+      by converse(n, admissible) as represented;
+  choose vector : RingVector(Integer.commutative_ring_bundle, 3) such that
+      Matrix.quadraticForm(Matrix.squarePlusDoubleSquareOddForm(5), vector) = (n : ℤ)
+      as valueReads from represented;
+  let x : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo));
+  let y : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo));
+  let z : ℤ := vector(NaturalsBelow.top(2));
+  vector = (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+      by RingVector.eq_threeCoordinates(vector) as vectorReads;
+  witness x with witness y with witness z with
+    x * x + 2 * (y * y) + 2 * y * z + 5 * (z * z)
+       = Matrix.quadraticForm(Matrix.squarePlusDoubleSquareOddForm(5), ⟨x, y, z⟩)
+           by Equality.symmetry(
+             Matrix.squarePlusDoubleSquareOddForm_coordinateTuple_value(5, x, y, z))
+       = Matrix.quadraticForm(Matrix.squarePlusDoubleSquareOddForm(5), vector)
+           by substituting Equality.symmetry(vectorReads)
+       = (n : ℤ) by valueReads
+}
+
+theorem Matrix.oddFive_base_obstruction_cover_of_tail
+        (converse : Matrix.OddFiveConverse)
+        (residue corner cutoff residualCore fourthCoordinate shift correction : ℕ)
+        (small : ∀ (b : ℕ). b < cutoff →
+          Matrix.Represents(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(
+              5, (residue : ℤ), (corner : ℤ)),
+            ((8 * b + 7 : ℕ) : ℤ)))
+        (selectedCore :
+          residualCore = 1 ∨ residualCore = 2 ∨ residualCore = 3
+            ∨ residualCore = 5 ∨ residualCore = 6)
+        (targetSplit : 8 * cutoff + 7 = residualCore + correction)
+        (shiftReads :
+          9 * (shift : ℤ) = (residue : ℤ) * (fourthCoordinate : ℤ))
+        (correctionReads :
+          (correction : ℤ) = (corner : ℤ) * ((fourthCoordinate : ℤ) * (fourthCoordinate : ℤ))
+            - 45 * ((shift : ℤ) * (shift : ℤ)))
+        : Matrix.OddFiveBaseObstructionCover(residue, corner) := {
+  take b : ℕ;
+  b < cutoff ∨ cutoff ≤ b by Natural.lt_or_le;
+  done by cases {
+    case b < cutoff as below: done by small(b, below)
+    case cutoff ≤ b as above: {
+      choose tail : ℕ such that b = cutoff + tail as bReads
+          from Natural.subtraction_witness(cutoff, b, above);
+      let residual : ℕ := 8 * tail + residualCore;
+      ¬(Natural.IsThreeSquareObstruction(residual))
+          by Natural.eight_times_plus_selected_three_square_core_not_obstruction(
+              tail, residualCore, selectedCore) as residualAdmissible;
+      choose x : ℤ, y : ℤ, z : ℤ such that
+          x * x + 2 * (y * y) + 2 * y * z + 5 * (z * z) = (residual : ℤ)
+          as residualRepresented from Matrix.oddFive_coordinates_of_converse(
+              converse, residual, residualAdmissible);
+      (residue : ℤ) * (fourthCoordinate : ℤ) = 9 * (shift : ℤ)
+          by Equality.symmetry(shiftReads) as borderProduct;
+      2 * (residue : ℤ) * (y - 5 * (shift : ℤ)) * (fourthCoordinate : ℤ)
+         = 2 * ((residue : ℤ) * (fourthCoordinate : ℤ))
+            * (y - 5 * (shift : ℤ)) by ring
+         = 2 * (9 * (shift : ℤ)) * (y - 5 * (shift : ℤ))
+            by substituting borderProduct
+      as borderReads;
+      x * x + 2 * ((y - 5 * (shift : ℤ)) * (y - 5 * (shift : ℤ)))
+          + 2 * (y - 5 * (shift : ℤ)) * (z + (shift : ℤ))
+          + 5 * ((z + (shift : ℤ)) * (z + (shift : ℤ)))
+          + 2 * (residue : ℤ) * (y - 5 * (shift : ℤ)) * (fourthCoordinate : ℤ)
+          + (corner : ℤ) * ((fourthCoordinate : ℤ) * (fourthCoordinate : ℤ))
+         = x * x + 2 * ((y - 5 * (shift : ℤ)) * (y - 5 * (shift : ℤ)))
+          + 2 * (y - 5 * (shift : ℤ)) * (z + (shift : ℤ))
+          + 5 * ((z + (shift : ℤ)) * (z + (shift : ℤ)))
+          + 2 * (9 * (shift : ℤ)) * (y - 5 * (shift : ℤ))
+          + (corner : ℤ) * ((fourthCoordinate : ℤ) * (fourthCoordinate : ℤ))
+            by substituting borderReads
+         = x * x + 2 * (y * y) + 2 * y * z + 5 * (z * z)
+          + ((corner : ℤ) * ((fourthCoordinate : ℤ) * (fourthCoordinate : ℤ))
+            - 45 * ((shift : ℤ) * (shift : ℤ))) by ring
+         = (residual : ℤ)
+          + ((corner : ℤ) * ((fourthCoordinate : ℤ) * (fourthCoordinate : ℤ))
+            - 45 * ((shift : ℤ) * (shift : ℤ)))
+            by substituting residualRepresented
+         = (residual : ℤ) + (correction : ℤ)
+            by substituting Equality.symmetry(correctionReads)
+      as scalarPrefix;
+      residual + correction
+         = 8 * tail + residualCore + correction
+         = 8 * tail + (residualCore + correction) by ring
+         = 8 * tail + (8 * cutoff + 7) by substituting Equality.symmetry(targetSplit)
+         = 8 * (cutoff + tail) + 7 by ring
+         = 8 * b + 7 by substituting Equality.symmetry(bReads)
+      as targetReads;
+      ((residual + correction : ℕ) : ℤ)
+         = (residual : ℤ) + (correction : ℤ) by Natural.to_integer.add_preserves
+      as castSumReads;
+      (residual : ℤ) + (correction : ℤ)
+         = ((residual + correction : ℕ) : ℤ) by Equality.symmetry(castSumReads)
+         = ((8 * b + 7 : ℕ) : ℤ) by substituting targetReads
+      as scalarSuffix;
+      x * x + 2 * ((y - 5 * (shift : ℤ)) * (y - 5 * (shift : ℤ)))
+          + 2 * (y - 5 * (shift : ℤ)) * (z + (shift : ℤ))
+          + 5 * ((z + (shift : ℤ)) * (z + (shift : ℤ)))
+          + 2 * (residue : ℤ) * (y - 5 * (shift : ℤ)) * (fourthCoordinate : ℤ)
+          + (corner : ℤ) * ((fourthCoordinate : ℤ) * (fourthCoordinate : ℤ))
+         = (residual : ℤ) + (correction : ℤ) by scalarPrefix
+         = ((8 * b + 7 : ℕ) : ℤ) by scalarSuffix
+      as scalarComputation;
+      done by Matrix.represents_by_witness(
+          Matrix.squarePlusDoubleSquareOddRankFourRepresentative(
+            5, (residue : ℤ), (corner : ℤ)),
+          target := ((8 * b + 7 : ℕ) : ℤ),
+          vector := ⟨x, y - 5 * (shift : ℤ), z + (shift : ℤ), (fourthCoordinate : ℤ)⟩,
+          computes := Matrix.squarePlusDoubleSquareOddRankFourRepresentative_coordinateTuple_computes(
+            scalarComputation := scalarComputation))
+    }
+  }
+}
+
+theorem Matrix.oddFive_universal_of_base_obstruction_cover
+        (converse : Matrix.OddFiveConverse) (residue corner : ℕ)
+        (baseCover : Matrix.OddFiveBaseObstructionCover(residue, corner))
+        : Matrix.IsUniversal(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(
+              5, (residue : ℤ), (corner : ℤ))) := {
+  let A : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+    Matrix.squarePlusDoubleSquareOddRankFourRepresentative(
+      5, (residue : ℤ), (corner : ℤ));
+  take m : ℕ;
+  suppose m ≥ 1;
+  Natural.IsThreeSquareObstruction(m) ∨ ¬(Natural.IsThreeSquareObstruction(m))
+      by Logic.excluded_middle(Natural.IsThreeSquareObstruction(m)) as obstructionDecision;
+  ¬(Natural.IsThreeSquareObstruction(m)) ∨ Natural.IsThreeSquareObstruction(m)
+      by Or.swap(obstructionDecision);
+  done by cases {
+    case ¬(Natural.IsThreeSquareObstruction(m)) as admissible: {
+      choose x : ℤ, y : ℤ, z : ℤ such that
+          x * x + 2 * (y * y) + 2 * y * z + 5 * (z * z) = (m : ℤ)
+          as represented from Matrix.oddFive_coordinates_of_converse(converse, m, admissible);
+      x * x + 2 * (y * y) + 2 * y * z + 5 * (z * z)
+          + 2 * (residue : ℤ) * y * 0 + (corner : ℤ) * (0 * 0)
+         = x * x + 2 * (y * y) + 2 * y * z + 5 * (z * z) by ring
+         = (m : ℤ) by represented
+      as scalarComputation;
+      done by Matrix.represents_by_witness(
+          A, target := m, vector := ⟨x, y, z, 0⟩,
+          computes := Matrix.squarePlusDoubleSquareOddRankFourRepresentative_coordinateTuple_computes(
+            scalarComputation := scalarComputation))
+    }
+    case Natural.IsThreeSquareObstruction(m) as obstruction: {
+      choose exponent : ℕ, b : ℕ such that m = 4 ^ exponent * (8 * b + 7)
+          as mReads from obstruction;
+      Matrix.Represents(A, ((8 * b + 7 : ℕ) : ℤ)) by baseCover(b) as baseRepresented;
+      Matrix.Represents(A, ((4 ^ exponent * (8 * b + 7) : ℕ) : ℤ))
+          by Matrix.represents_four_power_times(A, 8 * b + 7, exponent, baseRepresented);
+      Matrix.Represents(A, (m : ℤ)) by substituting mReads;
+      done
+    }
+  }
+}
