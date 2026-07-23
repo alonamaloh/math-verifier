@@ -1,0 +1,63 @@
+-- Algebra/rank_four_odd_c4_r1_c5.math
+--
+-- Exchanging the last two coordinates identifies the determinant-seven
+-- odd-C4 r1c5 form with the auxiliary odd-C5 r1c4 form:
+--
+--   x²+2y²+2yz+4z²+2yw+5w²
+--     = x²+2y²+2yw+5w²+2yz+4z².
+--
+-- The latter is covered by the generic odd-C5 obstruction-tail machinery.
+
+module Algebra.rank_four_odd_c4_r1_c5
+
+import Algebra.rank_four_odd_c4_r1_c4
+import Algebra.rank_four_odd_c5_auxiliary_r1_c4_generated
+
+theorem Matrix.oddC4R1C5_represents_of_oddC5R1C4
+        (target : ℤ)
+        (represented : Matrix.Represents(
+          Matrix.squarePlusDoubleSquareOddRankFourRepresentative(5, 1, 4), target))
+        : Matrix.Represents(
+          Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 1, 5), target) := {
+  choose vector : RingVector(Integer.commutative_ring_bundle, 4) such that
+      Matrix.quadraticForm(
+        Matrix.squarePlusDoubleSquareOddRankFourRepresentative(5, 1, 4), vector) = target
+      as valueReads from represented;
+  let x : ℤ := vector(NaturalsBelow.firstOfFour);
+  let y : ℤ := vector(NaturalsBelow.secondOfFour);
+  let z : ℤ := vector(NaturalsBelow.thirdOfFour);
+  let w : ℤ := vector(NaturalsBelow.fourthOfFour);
+  vector = (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4))
+      by RingVector.eq_fourCoordinates(vector) as vectorReads;
+  x * x + 2 * (y * y) + 2 * y * z + 5 * (z * z) + 2 * y * w + 4 * (w * w)
+     = Matrix.quadraticForm(
+       Matrix.squarePlusDoubleSquareOddRankFourRepresentative(5, 1, 4),
+       (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4)))
+         by Equality.symmetry(
+           Matrix.squarePlusDoubleSquareOddRankFourRepresentative_coordinateTuple_value(
+             5, 1, 4, x, y, z, w))
+     = Matrix.quadraticForm(
+       Matrix.squarePlusDoubleSquareOddRankFourRepresentative(5, 1, 4), vector)
+         by substituting Equality.symmetry(vectorReads)
+     = target by valueReads
+  as donorValue;
+  x * x + 2 * (y * y) + 2 * y * w + 4 * (w * w) + 2 * y * z + 5 * (z * z)
+     = x * x + 2 * (y * y) + 2 * y * z + 5 * (z * z) + 2 * y * w + 4 * (w * w) by ring
+     = target by donorValue
+  as scalarComputation;
+  done by Matrix.represents_by_witness(
+    Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 1, 5),
+    target := target, vector := ⟨x, y, w, z⟩,
+    computes := Matrix.squarePlusDoubleSquareOddRankFourRepresentative_coordinateTuple_computes(
+      scalarComputation := scalarComputation))
+}
+
+theorem Matrix.oddC4R1C5_universal_of_three_squares_converse
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.IsUniversal(Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 1, 5)) := {
+  Matrix.IsUniversal(Matrix.squarePlusDoubleSquareOddRankFourRepresentative(5, 1, 4))
+      by Matrix.oddC5R1C4_universal_of_three_squares_converse(converse) as donorUniversal;
+  take m : ℕ;
+  suppose m ≥ 1;
+  done by Matrix.oddC4R1C5_represents_of_oddC5R1C4(m, donorUniversal(m, done))
+}
