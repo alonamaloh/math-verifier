@@ -282,6 +282,53 @@ If all three routes are still impractical, stop at this gate and revise the
 mathematical finite argument. Do not bury the cost under thousands of
 unchecked or automatically visible facts.
 
+### D3 decision (completed)
+
+The selected route is a residue-local quotient certificate.  The modulo-588
+cover now retains the first successful displayed shift \(t_m(a)\).  In the
+finite branch the proof needs only \(n\le m t_m(a)^2\), and
+\(n=588q+a\) reduces each residue to a quotient table of at most 45 entries.
+This sharpens the conservative finite burden from 16,570 filtered generic
+targets to 998 exact residue-compatible targets:
+
+| form | exact finite targets |
+| --- | ---: |
+| \(Q_{0,7}\) | 2 |
+| \(Q_{1,6}\) | 147 |
+| \(Q_{2,8}\) | 234 |
+| \(Q_{2,9}\) | 247 |
+| \(Q_{3,10}\) | 131 |
+| \(Q_{3,11}\) | 237 |
+
+The three proposed routes were assessed as follows.
+
+1. Filtered explicit witnesses reduce expensive representation proofs, but
+   still need a full-interval classifier or thousands of exclusion facts.
+   The \(Q_{0,7}\) count is 48 before preserving the selected residue shift,
+   versus 2 with the selected certificate.
+2. A source-level conditional lookup hides witnesses behind classical
+   decisions and has poor reduction behavior.  A proper reflected table
+   tactic would be reasonable infrastructure, but is unnecessary once the
+   mathematical choice is retained.
+3. The sharper bound above is a direct strengthening of the reviewed proof,
+   not an imported table cutoff.  It was added to
+   `PROOF_15_THEOREM_REMAINING.md` and is the chosen route.
+
+Pilot measurements:
+
+| pilot | source lines | theorem declarations | modules | targeted verification |
+| --- | ---: | ---: | ---: | ---: |
+| \(Q_{0,7}\) | 1,801 | 5 | 2 | included below |
+| \(Q_{2,9}\) | 5,012 | 155 | 11 | included below |
+
+Generating and drift-checking both pilots takes about 1.5 seconds each on
+the development laptop.  A targeted parallel verification of the two
+pilots and their generated leaves completed in about 28 seconds.  The
+largest generated module has 18 theorems; each `finite_check` leaf sees at
+most 20 witness facts.  Removing a required \(Q_{2,9}\) witness makes its
+leaf fail, so the aggregate does not succeed from the residue classifier
+alone.
+
 ## Execution stages and commit boundaries
 
 ### D0 — Interface and guards

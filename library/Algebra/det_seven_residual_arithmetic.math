@@ -44,6 +44,70 @@ definition Natural.DetSevenOddResidueCover
     ¬(Natural.IsDetSevenSafe(a)) →
     ∃ (t : ℕ). choice(t) ∧ Natural.DetSevenResidueSolution(m, a, t)
 
+-- A selected cover records not only that some admissible shift works, but
+-- which shift the finite certificate chose for each residue.  Retaining this
+-- harmless proof-producing choice is what permits the sharp, residue-local
+-- finite bounds m*t² instead of the much larger uniform bound
+-- m*(max choices)².
+definition Natural.DetSevenGenericSelectedResidueCover
+        (m : ℕ) (choice : ℕ → Proposition)
+        (selected : ℕ → ℕ → Proposition) : Proposition :=
+  ∀ (a : ℕ). a ≥ 0 → a < 588 →
+    Natural.modulo(a, 4) ≠ 0 →
+    Natural.modulo(a, 49) ≠ 0 →
+    ¬(Natural.IsDetSevenSafe(a)) →
+    ∃ (t : ℕ). choice(t)
+      ∧ selected(a, t)
+      ∧ Natural.DetSevenResidueSolution(m, a, t)
+
+definition Natural.DetSevenOddSelectedResidueCover
+        (m : ℕ) (choice : ℕ → Proposition)
+        (selected : ℕ → ℕ → Proposition) : Proposition :=
+  ∀ (a : ℕ). a ≥ 0 → a < 588 →
+    Natural.modulo(a, 2) = 1 →
+    Natural.modulo(a, 49) ≠ 0 →
+    ¬(Natural.IsDetSevenSafe(a)) →
+    ∃ (t : ℕ). choice(t)
+      ∧ selected(a, t)
+      ∧ Natural.DetSevenResidueSolution(m, a, t)
+
+-- If modulus*q+r=n≤bound but bound<modulus*count+r, then q<count.
+-- Generated finite tables use this to enumerate the small quotient q rather
+-- than every n below a conservative five-digit bound.
+theorem Natural.quotient_below_of_bounded_decomposition
+        (modulus quotient remainder n bound count : ℕ)
+        (boundBelow : bound < modulus * count + remainder)
+        (decomposition : modulus * quotient + remainder = n)
+        (nBound : n ≤ bound)
+        : quotient < count := {
+  suppose count ≤ quotient for contradiction {
+    modulus * count ≤ modulus * quotient
+        by Natural.multiply_monotone_left(modulus, count, quotient, done);
+    modulus * count + remainder ≤ modulus * quotient + remainder;
+    modulus * count + remainder
+       ≤ modulus * quotient + remainder
+       = n
+       ≤ bound
+       < modulus * count + remainder;
+    done
+  };
+  done by Natural.lt_of_not_le(count, quotient, done)
+}
+
+theorem Natural.remainder_le_of_modulo_eq
+        (n modulus remainder : ℕ)
+        (remainderReads : Natural.modulo(n, modulus) = remainder)
+        : remainder ≤ n := {
+  modulus * Natural.floor_divide(n, modulus) + Natural.modulo(n, modulus) = n
+      by Natural.floor_divide_modulo_decompose;
+  modulus * Natural.floor_divide(n, modulus)
+      + remainder = n by substituting remainderReads;
+  remainder
+     ≤ modulus * Natural.floor_divide(n, modulus) + remainder
+     = n;
+  done
+}
+
 theorem Natural.detSevenResidueSolution_of_certificate
         (m a t b : ℕ) (quotient : ℤ)
         (bBelow : b < 588)

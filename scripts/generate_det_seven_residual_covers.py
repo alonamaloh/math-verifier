@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = ROOT / "library" / "Algebra"
 MODULUS = 588
 CHUNKS = tuple((lower, lower + 49) for lower in range(0, MODULUS, 49))
+SELECTED_CHUNK_SIZE = 12
 
 
 @dataclass(frozen=True)
@@ -65,6 +66,42 @@ def solve(row: Row, value: int) -> tuple[int, int, int]:
     raise AssertionError(f"uncovered residue {value} for multiplier {row.multiplier}")
 
 
+def selected_name(row: Row) -> str:
+    if row.odd_only:
+        return "DetSevenSelectedM315Odd"
+    return f"DetSevenSelectedM{row.multiplier}"
+
+
+def selected_definitions(row: Row, source_values: list[int]) -> str:
+    name = selected_name(row)
+    chunks = [
+        source_values[index : index + SELECTED_CHUNK_SIZE]
+        for index in range(0, len(source_values), SELECTED_CHUNK_SIZE)
+    ]
+    definitions = []
+    for index, values in enumerate(chunks):
+        pairs = "\n  ∨ ".join(
+            f"(a = {value} ∧ t = {solve(row, value)[0]})" for value in values
+        )
+        definitions.append(
+            f"""definition Natural.{name}Chunk{index} (a t : ℕ) : Proposition :=
+  {pairs}"""
+        )
+    top = "\n  ∨ ".join(
+        f"Natural.{name}Chunk{index}(a, t)" for index in range(len(chunks))
+    )
+    definitions.append(
+        f"""definition Natural.{name} (a t : ℕ) : Proposition :=
+  {top}"""
+    )
+    return "\n\n".join(definitions)
+
+
+def selected_chunk_index(row: Row, value: int) -> int:
+    source_values = [candidate for candidate in range(MODULUS) if source(row, candidate)]
+    return source_values.index(value) // SELECTED_CHUNK_SIZE
+
+
 def render_fact(row: Row, value: int) -> str:
     choice, residue, quotient = solve(row, value)
     return f"""  Natural.DetSevenResidueSolution({row.multiplier}, {value}, {choice}) by
@@ -83,6 +120,7 @@ def render_case(row: Row, value: int, choice_disjunction: str) -> str:
     Natural.modulo({value}, 49) ≠ 0 →
     ¬(Natural.IsDetSevenSafe({value})) →
     ∃ (t : ℕ). ({choice_disjunction})
+      ∧ Natural.{selected_name(row)}({value}, t)
       ∧ Natural.DetSevenResidueSolution({row.multiplier}, {value}, t)"""
     introductions = f"""    suppose {parity_condition};
     suppose Natural.modulo({value}, 49) ≠ 0;
@@ -90,11 +128,26 @@ def render_case(row: Row, value: int, choice_disjunction: str) -> str:
     if source(row, value):
         choice, _, _ = solve(row, value)
         choice_ground = choice_disjunction.replace("t =", f"{choice} =")
+        chunk = selected_chunk_index(row, value)
         return f"""{render_fact(row, value)}
   {proposition} by {{
 {introductions}
     witness {choice} with {{
       {choice_ground};
+      {value} = {value} ∧ {choice} = {choice} as selectedPair;
+      Natural.{selected_name(row)}Chunk{chunk}({value}, {choice})
+          by {{
+            unfold Natural.{selected_name(row)}Chunk{chunk} in {{
+              done by disjunct(selectedPair)
+            }}
+          }}
+          as selectedChunk;
+      Natural.{selected_name(row)}({value}, {choice})
+          by {{
+            unfold Natural.{selected_name(row)} in {{
+              done by disjunct(selectedChunk)
+            }}
+          }};
       Natural.DetSevenResidueSolution({row.multiplier}, {value}, {choice});
       done
     }}
@@ -123,7 +176,7 @@ def render_dispatch(row: Row, index: int, lower_proof: str, indent: str) -> str:
     lower, upper = CHUNKS[index]
     if index == len(CHUNKS) - 1:
         return (
-            f"{indent}done by Natural.{row.theorem}_table_part{index}(\n"
+            f"{indent}done by Natural.{row.theorem}_selected_table_part{index}(\n"
             f"{indent}  a, {lower_proof}, aBelow, parityCondition, "
             "notMultipleFortyNine, unsafe)"
         )
@@ -133,7 +186,7 @@ def render_dispatch(row: Row, index: int, lower_proof: str, indent: str) -> str:
     return f"""{indent}a < {upper} ∨ {upper} ≤ a by Natural.lt_or_le;
 {indent}done by cases {{
 {indent}  case a < {upper} as {in_range}:
-{indent}    done by Natural.{row.theorem}_table_part{index}(
+{indent}    done by Natural.{row.theorem}_selected_table_part{index}(
 {indent}      a, {lower_proof}, {in_range}, parityCondition, notMultipleFortyNine, unsafe)
 {indent}  case {upper} ≤ a as {after}: {{
 {rest}
@@ -173,12 +226,13 @@ def render(row: Row) -> str:
             render_case(row, value, choice_disjunction) for value in range(lower, upper)
         )
         chunk_blocks.append(
-            f"""theorem Natural.{row.theorem}_table_part{index}
+            f"""theorem Natural.{row.theorem}_selected_table_part{index}
         : ∀ (a : ℕ). a ≥ {lower} → a < {upper} →
           {parity_condition} →
           Natural.modulo(a, 49) ≠ 0 →
           {unsafe_condition} →
           ∃ (t : ℕ). ({choice_disjunction})
+            ∧ Natural.{selected_name(row)}(a, t)
             ∧ Natural.DetSevenResidueSolution({row.multiplier}, a, t) := {{
 {facts}
   done by finite_check a from {lower} until {upper}
@@ -194,7 +248,26 @@ module Algebra.det_seven_residual_{row.slug}_generated
 
 import Algebra.det_seven_residual_arithmetic
 
+{selected_definitions(row, source_values)}
+
 {chunks}
+
+theorem Natural.{row.theorem}_selected_table
+        : ∀ (a : ℕ). a ≥ 0 → a < 588 →
+          {parity_condition} →
+          Natural.modulo(a, 49) ≠ 0 →
+          {unsafe_condition} →
+          ∃ (t : ℕ). ({choice_disjunction})
+            ∧ Natural.{selected_name(row)}(a, t)
+            ∧ Natural.DetSevenResidueSolution({row.multiplier}, a, t) := {{
+  take a : ℕ;
+  suppose a ≥ 0 as aNonnegative;
+  suppose a < 588 as aBelow;
+  suppose {parity_condition} as parityCondition;
+  suppose Natural.modulo(a, 49) ≠ 0 as notMultipleFortyNine;
+  suppose {unsafe_condition} as unsafe;
+{dispatch}
+}}
 
 theorem Natural.{row.theorem}_table
         : ∀ (a : ℕ). a ≥ 0 → a < 588 →
@@ -209,7 +282,17 @@ theorem Natural.{row.theorem}_table
   suppose {parity_condition} as parityCondition;
   suppose Natural.modulo(a, 49) ≠ 0 as notMultipleFortyNine;
   suppose {unsafe_condition} as unsafe;
-{dispatch}
+  choose t : ℕ such that
+      ({choice_disjunction})
+      ∧ Natural.{selected_name(row)}(a, t)
+      ∧ Natural.DetSevenResidueSolution({row.multiplier}, a, t)
+      from Natural.{row.theorem}_selected_table(
+        a, aNonnegative, aBelow, parityCondition, notMultipleFortyNine, unsafe);
+  witness t with {{
+    ({choice_disjunction});
+    Natural.DetSevenResidueSolution({row.multiplier}, a, t);
+    done
+  }}
 }}
 
 theorem Natural.{row.theorem}
@@ -217,6 +300,15 @@ theorem Natural.{row.theorem}
             {row.multiplier}, Natural.{row.choice_predicate}) := {{
   unfold Natural.{cover}, Natural.{row.choice_predicate}, Natural.IsDetSevenSafe in {{
     done by Natural.{row.theorem}_table
+  }}
+}}
+
+theorem Natural.{row.theorem}_selected
+        : Natural.{"DetSevenOddSelectedResidueCover" if row.odd_only else "DetSevenGenericSelectedResidueCover"}(
+            {row.multiplier}, Natural.{row.choice_predicate}, Natural.{selected_name(row)}) := {{
+  unfold Natural.{"DetSevenOddSelectedResidueCover" if row.odd_only else "DetSevenGenericSelectedResidueCover"},
+      Natural.{row.choice_predicate}, Natural.IsDetSevenSafe in {{
+    done by Natural.{row.theorem}_selected_table
   }}
 }}
 """

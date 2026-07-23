@@ -387,8 +387,8 @@ Let
 M=\{7,238,266,280,287,329\}.
 \]
 Suppose \(m\in M\), \(n\) is squarefree, and
-\(\operatorname{Safe}_7(n)\) is false.  Then one of the choices of \(t\) in
-the corresponding row below satisfies
+\(\operatorname{Safe}_7(n)\) is false.  Read the choices of \(t\) in the
+corresponding row below from left to right, and take the first one satisfying
 \[
 \operatorname{Safe}_7(n-mt^2).
 \]
@@ -440,7 +440,10 @@ for a in {0, ..., 587}:
   assert some displayed t has Safe7(a - m*t*t)
 ```
 
-The executable checker also asserts the six count vectors above.
+The executable checker also asserts the six count vectors above.  In
+particular, this proof defines a deterministic choice \(t_m(a)\), depending
+only on \(a=n\bmod588\): it is the first successful entry in the displayed
+row.  Retaining this choice matters in the finite branch below.
 \(\square\)
 
 The lemma is purely a congruence statement; \(n-mt^2\) may be negative.
@@ -572,17 +575,16 @@ Lemma 3.1 supplies a displayed integer \(t\) such that
 \[
 \operatorname{Safe}_7(n-mt^2).
 \]
-Let \(B\) be the largest \(mt^2\) in that row of Lemma 3.1.
-
-If \(n>B\), then \(n-mt^2>0\).  Proposition 2.5 says that \(g\) represents
+If \(n>mt^2\), then \(n-mt^2>0\).  Proposition 2.5 says that \(g\) represents
 this residual.  Lemma 4.1 supplies an integral vector of norm \(m\)
 orthogonal to the copy of \(g\), and Lemma 1.2 lifts the residual
 representation to a representation of \(n\) by \(Q_{r,c}\).  This
 contradicts the choice of \(n\).
 
-If \(n\le B\), the exhaustive finite check in Section 7 gives a direct
-integral representation of \(n\) by \(Q_{r,c}\), again a contradiction.
-Thus no least exception exists. \(\square\)
+If \(n\le mt^2\), retain the exact residue \(a=n\bmod588\) and the selected
+value \(t=t_m(a)\).  The residue-local exhaustive finite check in Section 7
+gives a direct integral representation of \(n\) by \(Q_{r,c}\), again a
+contradiction.  Thus no least exception exists. \(\square\)
 
 ## 6. The exceptional form \(Q_{1,7}\)
 
@@ -885,7 +887,7 @@ No sign of \(x\) is needed because only \(x^2\) occurs.  If \(h>B\), then
 \(h+x^2>B\) for every integer \(x\), so discarding that triple cannot lose a
 representation in the target interval.
 
-The verified bounds are:
+The following larger, uniform intervals were verified first:
 
 | form | bound \(B\) | triples with \(0\le h\le B\) | missing targets |
 | --- | ---: | ---: | --- |
@@ -896,6 +898,41 @@ The verified bounds are:
 | \(Q_{3,10}\) | \(8568\) | \(569451\) | none |
 | \(Q_{3,11}\) | \(23247\) | \(2318499\) | none |
 | \(Q_{1,7}\) | \(11340\) | \(753905\) | none |
+
+For the six generic forms the formal certificate uses a sharper organization
+that follows directly from the proof of Lemma 3.1.  Put
+\(a=n\bmod588\) and retain its selected shift \(t_m(a)\).  The finite branch
+requires only
+\[
+  n\le m\,t_m(a)^2. \tag{7.3}
+\]
+Write
+\[
+  n=588q+a.
+\]
+For each of the 117 admissible source residues, (7.3) bounds \(q\) by
+\[
+  0\le q<
+  \left\lfloor\frac{m\,t_m(a)^2-a}{588}\right\rfloor+1
+\]
+when \(a\le m\,t_m(a)^2\); if \(a\) is larger, that residue contributes no
+finite target.  Thus no target outside the following residue-local tables
+is used:
+
+| form | residue-compatible finite targets |
+| --- | ---: |
+| \(Q_{0,7}\) | \(2\) |
+| \(Q_{1,6}\) | \(147\) |
+| \(Q_{2,8}\) | \(234\) |
+| \(Q_{2,9}\) | \(247\) |
+| \(Q_{3,10}\) | \(131\) |
+| \(Q_{3,11}\) | \(237\) |
+
+There are 998 targets in total.  This is not a heuristic pruning and does
+not use Bhargava's smaller published cutoffs: it is the exact case split in
+Theorem 5.1 with the deterministic choice already certified modulo 588.
+The generator emits every four-coordinate witness explicitly, in quotient
+chunks of at most 20, and the kernel checks each scalar computation.
 
 The executable checker additionally:
 

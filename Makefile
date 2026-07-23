@@ -172,7 +172,7 @@ library: $(LIBRARY_MATHV_FILES) $(LIBRARY_MATHV_IFACE_FILES)
 
 tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES) checker-tests \
 	carrier-normal-form-check matrix-ergonomics-statement-check rank-four-generated-check \
-	three-squares-generated-check det-seven-residual-generated-check \
+	three-squares-generated-check det-seven-residual-generated-check det-seven-finite-generated-check \
 	det-seven-statement-shape-check
 
 # ----------------------------------------------------------------------
@@ -321,7 +321,11 @@ det-seven-statement-shape-check: \
 		$(BUILD_DIR)/library/Algebra/truant_squarefree.mathv \
 		$(BUILD_DIR)/library/Algebra/det_seven_rank_four_infrastructure.mathv \
 		$(BUILD_DIR)/library/Algebra/det_seven_residual_arithmetic.mathv \
-		$(BUILD_DIR)/library/Algebra/det_seven_residual_covers.mathv
+		$(BUILD_DIR)/library/Algebra/det_seven_residual_covers.mathv \
+		$(BUILD_DIR)/library/Algebra/det_seven_residual_m7_generated.mathv \
+		$(BUILD_DIR)/library/Algebra/det_seven_residual_m329_generated.mathv \
+		$(BUILD_DIR)/library/Algebra/det_seven_finite_q0c7_generated.mathv \
+		$(BUILD_DIR)/library/Algebra/det_seven_finite_q2c9_generated.mathv
 	@bash scripts/check_det7_statement_shapes.sh ./kernel $^
 
 # Generated rank-four certificates are ordinary checked source, but a stale
@@ -347,8 +351,12 @@ three-squares-generated-check:
 det-seven-residual-generated-check:
 	@python3 scripts/generate_det_seven_residual_covers.py --check
 
+det-seven-finite-generated-check:
+	@python3 scripts/generate_det_seven_finite_covers.py --check --forms pilot
+
 .PHONY: carrier-normal-form-check matrix-ergonomics-statement-check det-seven-statement-shape-check \
-	rank-four-generated-check three-squares-generated-check det-seven-residual-generated-check
+	rank-four-generated-check three-squares-generated-check det-seven-residual-generated-check \
+	det-seven-finite-generated-check
 
 # B3.4 — morphism-packet audit: re-verify the audit surface module
 # (which imports every packet-lemma home) with the audit flag on and

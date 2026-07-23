@@ -102,4 +102,13 @@ check_residual_cover Natural.detSevenResiduals_m287 287 DetSevenChoices123469
 check_residual_cover Natural.detSevenOddResiduals_m315 315 DetSevenChoices123456
 check_contains Natural.detSevenOddResiduals_m315 '(Natural.modulo n 2) = 1'
 
+check_contains Natural.detSevenResidueCover_m7_selected \
+  'Natural.DetSevenGenericSelectedResidueCover 7 Natural.DetSevenChoices12346 Natural.DetSevenSelectedM7'
+check_contains Natural.detSevenResidueCover_m329_selected \
+  'Natural.DetSevenGenericSelectedResidueCover 329 Natural.DetSevenChoices123469 Natural.DetSevenSelectedM329'
+check_contains Matrix.detSevenFiniteCover_q0c7 \
+  'Matrix.DetSevenFiniteCover (Matrix.squarePlusDoubleSquareOddRankFourRepresentative (Natural.to_integer 4) (Natural.to_integer 0) (Natural.to_integer 7)) 7 Natural.DetSevenSelectedM7'
+check_contains Matrix.detSevenFiniteCover_q2c9 \
+  'Matrix.DetSevenFiniteCover (Matrix.squarePlusDoubleSquareOddRankFourRepresentative (Natural.to_integer 4) (Natural.to_integer 2) (Natural.to_integer 9)) 329 Natural.DetSevenSelectedM329'
+
 echo "det7-statement-shape-check: PASS"
