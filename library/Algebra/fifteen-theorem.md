@@ -274,6 +274,25 @@ lemma handles every nonzero residual core.  This closes the five universal
 diagonal extensions `c=6,...,10`; `c=5` is correctly omitted because it is
 one of the exact-truant-15 forms.  The selected conditional-universality
 total is now 101.
+The remaining 28 nonexceptional weighted-`d=5` borders are now closed by
+`Algebra/rank_four_weighted_d5_cover`.  For an obstructed target
+`25^a(25b+q)`, it represents the base `25b+q` and scales all four coordinates
+by `5^a`.  A fixed fourth coordinate leaves an admissible one-two-five
+residual after a finite prefix; the generator records 1,470 explicit
+kernel-checked witnesses for those prefixes, while the handwritten theorem
+proves the uniform tails.  To avoid the prover's quadratic local-context
+cost, generated table theorems contain at most 20 rows and each table module
+owns one form.  `Algebra/rank_four_weighted_d5_covers` therefore
+aggregates all 33 nonexceptional selected forms in this family, raising the
+selected conditional total to 175.  The other four weighted-`d=5` forms are
+the already classified exact-truant forms.
+The converse pilot found no three-squares reduction analogous to the
+one-two-four identity.  The known proof isolates the desired determinant-10
+ternary class by a Mordell construction, quadratic-reciprocity congruences,
+primes in arithmetic progressions, and a finite class elimination.
+`PLAN_ONE_TWO_FIVE_CONVERSE.md` records this as a genuine deep input and
+leaves the choice between the specialized Mordell route and the gated genus
+route until the odd-family converse requirements are known.
 For the weighted-`d=4` forms with third border residue two, completing the
 last square gives
 `Q=x²+2y²+(2z+w)²+(c-1)w²`.  A witness for

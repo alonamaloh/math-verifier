@@ -1,0 +1,256 @@
+-- Algebra/rank_four_weighted_d5_cover.math
+--
+-- The common cover for the selected rank-four forms above x²+2y²+5z².
+--
+-- An obstructed target is 25^a(25b+q), q=10 or 15.  It is enough to
+-- represent the base target 25b+q: scaling all four coordinates by 5^a
+-- supplies the original target.  At the base, finitely many small b are
+-- recorded by explicit witnesses.  Beyond a fixed cutoff, a fixed fourth
+-- coordinate leaves an admissible x²+2y²+5z² residual.
+
+module Algebra.rank_four_weighted_d5_cover
+
+import Algebra.rank_four_weighted_d5_foundation
+import Algebra.rank_four_completed_cover_universality
+
+definition Matrix.WeightedD5BaseObstructionCover
+        (secondResidue thirdResidue corner obstructionCore : ℕ) : Proposition :=
+  ∀ (b : ℕ).
+    Matrix.Represents(
+      Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+        5, (secondResidue : ℤ), (thirdResidue : ℤ), (corner : ℤ)),
+      ((25 * b + obstructionCore : ℕ) : ℤ))
+
+theorem Natural.twenty_five_plus_admissible_core_not_one_two_five_obstruction
+        (b core : ℕ)
+        (coreBelow : core < 25) (coreNonzero : core ≠ 0)
+        (coreNotTen : core ≠ 10) (coreNotFifteen : core ≠ 15)
+        : ¬(Natural.IsOneTwoFiveObstruction(25 * b + core)) := {
+  ¬(Natural.IsOneTwoFiveObstruction(25 ^ 0 * (25 * b + core)))
+      by Natural.twenty_five_power_times_admissible_core_not_one_two_five_obstruction(
+          0, b, core, coreBelow, coreNonzero, coreNotTen, coreNotFifteen) as powered;
+  25 ^ 0 * (25 * b + core) = 25 * b + core by substituting Natural.power_zero(25) as valueReads;
+  suppose Natural.IsOneTwoFiveObstruction(25 * b + core) as obstruction;
+  Natural.IsOneTwoFiveObstruction(25 ^ 0 * (25 * b + core))
+      by substituting Equality.symmetry(valueReads);
+  done by powered(done)
+}
+
+theorem Matrix.represents_twenty_five_power_times
+        {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (target exponent : ℕ)
+        (represented : Matrix.Represents(A, (target : ℤ)))
+        : Matrix.Represents(A, ((25 ^ exponent * target : ℕ) : ℤ)) := {
+  choose vector : RingVector(Integer.commutative_ring_bundle, n) such that
+      Matrix.quadraticForm(A, vector) = (target : ℤ) as valueReads from represented;
+  let scale : ℤ := ((5 ^ exponent : ℕ) : ℤ);
+  scale * scale = ((25 ^ exponent : ℕ) : ℤ) by {
+    ((5 ^ exponent * 5 ^ exponent : ℕ) : ℤ)
+       = ((5 ^ exponent : ℕ) : ℤ) * ((5 ^ exponent : ℕ) : ℤ)
+           by Natural.to_integer.multiply_preserves
+       = scale * scale;
+    ((5 ^ exponent * 5 ^ exponent : ℕ) : ℤ) = ((25 ^ exponent : ℕ) : ℤ)
+        by substituting Natural.five_power_square_is_twenty_five_power(exponent);
+    done
+  }
+  as squareReads;
+  Matrix.quadraticForm(A, scale • vector)
+     = (scale * scale) * Matrix.quadraticForm(A, vector) by Matrix.quadraticForm_scale
+     = ((25 ^ exponent : ℕ) : ℤ) * Matrix.quadraticForm(A, vector) by substituting squareReads
+     = ((25 ^ exponent : ℕ) : ℤ) * (target : ℤ) by substituting valueReads
+     = ((25 ^ exponent * target : ℕ) : ℤ)
+         by Equality.symmetry(Natural.to_integer.multiply_preserves(25 ^ exponent, target))
+  as scaledValue;
+  witness scale • vector with scaledValue
+}
+
+theorem Matrix.oneTwoFive_coordinates_of_converse
+        (converse : Matrix.OneTwoFiveConverse) (n : ℕ)
+        (admissible : ¬(Natural.IsOneTwoFiveObstruction(n)))
+        : ∃ (x y z : ℤ). x * x + 2 * (y * y) + 5 * (z * z) = (n : ℤ) := {
+  Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(5), (n : ℤ))
+      by converse(n, admissible) as represented;
+  choose vector : RingVector(Integer.commutative_ring_bundle, 3) such that
+      Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(5), vector) = (n : ℤ)
+      as valueReads from represented;
+  let x : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo));
+  let y : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo));
+  let z : ℤ := vector(NaturalsBelow.top(2));
+  vector = (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+      by RingVector.eq_threeCoordinates(vector) as vectorReads;
+  witness x with witness y with witness z with
+    x * x + 2 * (y * y) + 5 * (z * z)
+       = Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(5), ⟨x, y, z⟩)
+           by Equality.symmetry(Matrix.squarePlusDoublePlusScaledSquareForm_coordinateTuple_value(5, x, y, z))
+       = Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(5), vector)
+           by substituting Equality.symmetry(vectorReads)
+       = (n : ℤ) by valueReads
+}
+
+theorem Matrix.weightedD5_base_obstruction_cover_of_tail
+        (converse : Matrix.OneTwoFiveConverse)
+        (secondResidue thirdResidue corner obstructionCore cutoff residualCore
+          fourthCoordinate secondShift thirdShift correction : ℕ)
+        (small : ∀ (b : ℕ). b < cutoff →
+          Matrix.Represents(
+            Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+              5, (secondResidue : ℤ), (thirdResidue : ℤ), (corner : ℤ)),
+            ((25 * b + obstructionCore : ℕ) : ℤ)))
+        (residualCoreBelow : residualCore < 25) (residualCoreNonzero : residualCore ≠ 0)
+        (residualCoreNotTen : residualCore ≠ 10) (residualCoreNotFifteen : residualCore ≠ 15)
+        (targetSplit : 25 * cutoff + obstructionCore = residualCore + correction)
+        (secondShiftReads :
+          2 * (secondShift : ℤ) = (secondResidue : ℤ) * (fourthCoordinate : ℤ))
+        (thirdShiftReads :
+          5 * (thirdShift : ℤ) = (thirdResidue : ℤ) * (fourthCoordinate : ℤ))
+        (correctionReads :
+          (correction : ℤ) = (corner : ℤ) * ((fourthCoordinate : ℤ) * (fourthCoordinate : ℤ))
+            - 2 * ((secondShift : ℤ) * (secondShift : ℤ))
+            - 5 * ((thirdShift : ℤ) * (thirdShift : ℤ)))
+        : Matrix.WeightedD5BaseObstructionCover(
+            secondResidue, thirdResidue, corner, obstructionCore) := {
+  take b : ℕ;
+  b < cutoff ∨ cutoff ≤ b by Natural.lt_or_le;
+  done by cases {
+    case b < cutoff as below: done by small(b, below)
+    case cutoff ≤ b as above: {
+      choose tail : ℕ such that b = cutoff + tail as bReads
+          from Natural.subtraction_witness(cutoff, b, above);
+      let residual : ℕ := 25 * tail + residualCore;
+      ¬(Natural.IsOneTwoFiveObstruction(residual))
+          by Natural.twenty_five_plus_admissible_core_not_one_two_five_obstruction(
+              tail, residualCore, residualCoreBelow, residualCoreNonzero,
+              residualCoreNotTen, residualCoreNotFifteen) as residualAdmissible;
+      choose x : ℤ, y : ℤ, z : ℤ such that
+          x * x + 2 * (y * y) + 5 * (z * z) = (residual : ℤ)
+          as residualRepresented from Matrix.oneTwoFive_coordinates_of_converse(
+              converse, residual, residualAdmissible);
+      (secondResidue : ℤ) * (fourthCoordinate : ℤ) = 2 * (secondShift : ℤ)
+          by Equality.symmetry(secondShiftReads) as secondProductReads;
+      (thirdResidue : ℤ) * (fourthCoordinate : ℤ) = 5 * (thirdShift : ℤ)
+          by Equality.symmetry(thirdShiftReads) as thirdProductReads;
+      x * x + 2 * ((y - (secondShift : ℤ)) * (y - (secondShift : ℤ)))
+          + 5 * ((z - (thirdShift : ℤ)) * (z - (thirdShift : ℤ)))
+          + 2 * (secondResidue : ℤ) * (y - (secondShift : ℤ)) * (fourthCoordinate : ℤ)
+          + 2 * (thirdResidue : ℤ) * (z - (thirdShift : ℤ)) * (fourthCoordinate : ℤ)
+          + (corner : ℤ) * ((fourthCoordinate : ℤ) * (fourthCoordinate : ℤ))
+         = x * x + 2 * ((y - (secondShift : ℤ)) * (y - (secondShift : ℤ)))
+          + 5 * ((z - (thirdShift : ℤ)) * (z - (thirdShift : ℤ)))
+          + 2 * (2 * (secondShift : ℤ)) * (y - (secondShift : ℤ))
+          + 2 * (5 * (thirdShift : ℤ)) * (z - (thirdShift : ℤ))
+          + (corner : ℤ) * ((fourthCoordinate : ℤ) * (fourthCoordinate : ℤ))
+            by {
+              2 * (secondResidue : ℤ) * (y - (secondShift : ℤ)) * (fourthCoordinate : ℤ)
+                 = 2 * ((secondResidue : ℤ) * (fourthCoordinate : ℤ))
+                    * (y - (secondShift : ℤ)) by ring
+                 = 2 * (2 * (secondShift : ℤ)) * (y - (secondShift : ℤ))
+                    by substituting secondProductReads;
+              2 * (thirdResidue : ℤ) * (z - (thirdShift : ℤ)) * (fourthCoordinate : ℤ)
+                 = 2 * ((thirdResidue : ℤ) * (fourthCoordinate : ℤ))
+                    * (z - (thirdShift : ℤ)) by ring
+                 = 2 * (5 * (thirdShift : ℤ)) * (z - (thirdShift : ℤ))
+                    by substituting thirdProductReads;
+              done
+            }
+         = x * x + 2 * (y * y) + 5 * (z * z)
+          + ((corner : ℤ) * ((fourthCoordinate : ℤ) * (fourthCoordinate : ℤ))
+            - 2 * ((secondShift : ℤ) * (secondShift : ℤ))
+            - 5 * ((thirdShift : ℤ) * (thirdShift : ℤ))) by ring
+         = (residual : ℤ)
+          + ((corner : ℤ) * ((fourthCoordinate : ℤ) * (fourthCoordinate : ℤ))
+            - 2 * ((secondShift : ℤ) * (secondShift : ℤ))
+            - 5 * ((thirdShift : ℤ) * (thirdShift : ℤ)))
+            by substituting residualRepresented
+         = (residual : ℤ) + (correction : ℤ) by substituting Equality.symmetry(correctionReads)
+      as scalarPrefix;
+      residual + correction
+         = 25 * tail + residualCore + correction
+         = 25 * tail + (residualCore + correction) by ring
+         = 25 * tail + (25 * cutoff + obstructionCore) by substituting Equality.symmetry(targetSplit)
+         = 25 * (cutoff + tail) + obstructionCore by ring
+         = 25 * b + obstructionCore by substituting Equality.symmetry(bReads)
+      as targetReads;
+      ((residual + correction : ℕ) : ℤ)
+         = (residual : ℤ) + (correction : ℤ) by Natural.to_integer.add_preserves
+      as castSumReads;
+      (residual : ℤ) + (correction : ℤ)
+         = ((residual + correction : ℕ) : ℤ) by Equality.symmetry(castSumReads)
+         = ((25 * b + obstructionCore : ℕ) : ℤ) by substituting targetReads
+      as scalarSuffix;
+      x * x + 2 * ((y - (secondShift : ℤ)) * (y - (secondShift : ℤ)))
+          + 5 * ((z - (thirdShift : ℤ)) * (z - (thirdShift : ℤ)))
+          + 2 * (secondResidue : ℤ) * (y - (secondShift : ℤ)) * (fourthCoordinate : ℤ)
+          + 2 * (thirdResidue : ℤ) * (z - (thirdShift : ℤ)) * (fourthCoordinate : ℤ)
+          + (corner : ℤ) * ((fourthCoordinate : ℤ) * (fourthCoordinate : ℤ))
+         = (residual : ℤ) + (correction : ℤ) by scalarPrefix
+         = ((25 * b + obstructionCore : ℕ) : ℤ) by scalarSuffix
+      as scalarComputation;
+      done by Matrix.represents_by_witness(
+          Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+            5, (secondResidue : ℤ), (thirdResidue : ℤ), (corner : ℤ)),
+          target := ((25 * b + obstructionCore : ℕ) : ℤ),
+          vector := ⟨x, y - (secondShift : ℤ), z - (thirdShift : ℤ), (fourthCoordinate : ℤ)⟩,
+          computes := Matrix.squarePlusDoublePlusScaledRankFourRepresentative_coordinateTuple_computes(
+            scalarComputation := scalarComputation))
+    }
+  }
+}
+
+theorem Matrix.weightedD5_universal_of_base_obstruction_covers
+        (converse : Matrix.OneTwoFiveConverse)
+        (secondResidue thirdResidue corner : ℕ)
+        (tenCover : Matrix.WeightedD5BaseObstructionCover(secondResidue, thirdResidue, corner, 10))
+        (fifteenCover : Matrix.WeightedD5BaseObstructionCover(secondResidue, thirdResidue, corner, 15))
+        : Matrix.IsUniversal(
+            Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+              5, (secondResidue : ℤ), (thirdResidue : ℤ), (corner : ℤ))) := {
+  let A : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+    Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+      5, (secondResidue : ℤ), (thirdResidue : ℤ), (corner : ℤ));
+  take m : ℕ;
+  suppose m ≥ 1;
+  Natural.IsOneTwoFiveObstruction(m) ∨ ¬(Natural.IsOneTwoFiveObstruction(m))
+      by Logic.excluded_middle(Natural.IsOneTwoFiveObstruction(m)) as obstructionDecision;
+  ¬(Natural.IsOneTwoFiveObstruction(m)) ∨ Natural.IsOneTwoFiveObstruction(m)
+      by Or.swap(obstructionDecision);
+  done by cases {
+    case ¬(Natural.IsOneTwoFiveObstruction(m)) as admissible: {
+      choose x : ℤ, y : ℤ, z : ℤ such that
+          x * x + 2 * (y * y) + 5 * (z * z) = (m : ℤ)
+          as represented from Matrix.oneTwoFive_coordinates_of_converse(converse, m, admissible);
+      x * x + 2 * (y * y) + 5 * (z * z)
+          + 2 * (secondResidue : ℤ) * y * 0 + 2 * (thirdResidue : ℤ) * z * 0
+          + (corner : ℤ) * (0 * 0)
+         = x * x + 2 * (y * y) + 5 * (z * z) by ring
+         = (m : ℤ) by represented
+      as scalarComputation;
+      done by Matrix.represents_by_witness(
+          A, target := m, vector := ⟨x, y, z, 0⟩,
+          computes := Matrix.squarePlusDoublePlusScaledRankFourRepresentative_coordinateTuple_computes(
+            scalarComputation := scalarComputation))
+    }
+    case Natural.IsOneTwoFiveObstruction(m) as obstruction: done by cases {
+      case Natural.IsTwentyFiveAffineObstruction(10, m) as tenObstruction: {
+        choose exponent : ℕ, b : ℕ such that m = 25 ^ exponent * (25 * b + 10)
+            as mReads from tenObstruction;
+        Matrix.Represents(A, ((25 * b + 10 : ℕ) : ℤ)) by tenCover(b) as baseRepresented;
+        Matrix.Represents(A, ((25 ^ exponent * (25 * b + 10) : ℕ) : ℤ))
+            by Matrix.represents_twenty_five_power_times(
+              A, 25 * b + 10, exponent, baseRepresented);
+        Matrix.Represents(A, (m : ℤ)) by substituting mReads;
+        done
+      }
+      case Natural.IsTwentyFiveAffineObstruction(15, m) as fifteenObstruction: {
+        choose exponent : ℕ, b : ℕ such that m = 25 ^ exponent * (25 * b + 15)
+            as mReads from fifteenObstruction;
+        Matrix.Represents(A, ((25 * b + 15 : ℕ) : ℤ)) by fifteenCover(b) as baseRepresented;
+        Matrix.Represents(A, ((25 ^ exponent * (25 * b + 15) : ℕ) : ℤ))
+            by Matrix.represents_twenty_five_power_times(
+              A, 25 * b + 15, exponent, baseRepresented);
+        Matrix.Represents(A, (m : ℤ)) by substituting mReads;
+        done
+      }
+    }
+  }
+}
