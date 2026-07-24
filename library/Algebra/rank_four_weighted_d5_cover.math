@@ -88,6 +88,106 @@ theorem Matrix.oneTwoFive_coordinates_of_converse
        = (n : ℤ) by valueReads
 }
 
+theorem Matrix.weightedD5_tail_represents
+        (converse : Matrix.OneTwoFiveConverse)
+        (secondResidue thirdResidue corner obstructionCore cutoff residualCore
+          fourthCoordinate secondShift thirdShift correction b : ℕ)
+        (above : cutoff ≤ b)
+        (residualCoreBelow : residualCore < 25) (residualCoreNonzero : residualCore ≠ 0)
+        (residualCoreNotTen : residualCore ≠ 10) (residualCoreNotFifteen : residualCore ≠ 15)
+        (targetSplit : 25 * cutoff + obstructionCore = residualCore + correction)
+        (secondShiftReads :
+          2 * (secondShift : ℤ) = (secondResidue : ℤ) * (fourthCoordinate : ℤ))
+        (thirdShiftReads :
+          5 * (thirdShift : ℤ) = (thirdResidue : ℤ) * (fourthCoordinate : ℤ))
+        (correctionReads :
+          (correction : ℤ) = (corner : ℤ) * ((fourthCoordinate : ℤ) * (fourthCoordinate : ℤ))
+            - 2 * ((secondShift : ℤ) * (secondShift : ℤ))
+            - 5 * ((thirdShift : ℤ) * (thirdShift : ℤ)))
+        : Matrix.Represents(
+            Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+              5, (secondResidue : ℤ), (thirdResidue : ℤ), (corner : ℤ)),
+            ((25 * b + obstructionCore : ℕ) : ℤ)) := {
+  choose tail : ℕ such that b = cutoff + tail as bReads
+      from Natural.subtraction_witness(cutoff, b, above);
+  let residual : ℕ := 25 * tail + residualCore;
+  ¬(Natural.IsOneTwoFiveObstruction(residual))
+      by Natural.twenty_five_plus_admissible_core_not_one_two_five_obstruction(
+          tail, residualCore, residualCoreBelow, residualCoreNonzero,
+          residualCoreNotTen, residualCoreNotFifteen) as residualAdmissible;
+  choose x : ℤ, y : ℤ, z : ℤ such that
+      x * x + 2 * (y * y) + 5 * (z * z) = (residual : ℤ)
+      as residualRepresented from Matrix.oneTwoFive_coordinates_of_converse(
+          converse, residual, residualAdmissible);
+  (secondResidue : ℤ) * (fourthCoordinate : ℤ) = 2 * (secondShift : ℤ)
+      by Equality.symmetry(secondShiftReads) as secondProductReads;
+  (thirdResidue : ℤ) * (fourthCoordinate : ℤ) = 5 * (thirdShift : ℤ)
+      by Equality.symmetry(thirdShiftReads) as thirdProductReads;
+  x * x + 2 * ((y - (secondShift : ℤ)) * (y - (secondShift : ℤ)))
+      + 5 * ((z - (thirdShift : ℤ)) * (z - (thirdShift : ℤ)))
+      + 2 * (secondResidue : ℤ) * (y - (secondShift : ℤ)) * (fourthCoordinate : ℤ)
+      + 2 * (thirdResidue : ℤ) * (z - (thirdShift : ℤ)) * (fourthCoordinate : ℤ)
+      + (corner : ℤ) * ((fourthCoordinate : ℤ) * (fourthCoordinate : ℤ))
+     = x * x + 2 * ((y - (secondShift : ℤ)) * (y - (secondShift : ℤ)))
+      + 5 * ((z - (thirdShift : ℤ)) * (z - (thirdShift : ℤ)))
+      + 2 * (2 * (secondShift : ℤ)) * (y - (secondShift : ℤ))
+      + 2 * (5 * (thirdShift : ℤ)) * (z - (thirdShift : ℤ))
+      + (corner : ℤ) * ((fourthCoordinate : ℤ) * (fourthCoordinate : ℤ))
+        by {
+          2 * (secondResidue : ℤ) * (y - (secondShift : ℤ)) * (fourthCoordinate : ℤ)
+             = 2 * ((secondResidue : ℤ) * (fourthCoordinate : ℤ))
+                * (y - (secondShift : ℤ)) by ring
+             = 2 * (2 * (secondShift : ℤ)) * (y - (secondShift : ℤ))
+                by substituting secondProductReads;
+          2 * (thirdResidue : ℤ) * (z - (thirdShift : ℤ)) * (fourthCoordinate : ℤ)
+             = 2 * ((thirdResidue : ℤ) * (fourthCoordinate : ℤ))
+                * (z - (thirdShift : ℤ)) by ring
+             = 2 * (5 * (thirdShift : ℤ)) * (z - (thirdShift : ℤ))
+                by substituting thirdProductReads;
+          done
+        }
+     = x * x + 2 * (y * y) + 5 * (z * z)
+      + ((corner : ℤ) * ((fourthCoordinate : ℤ) * (fourthCoordinate : ℤ))
+        - 2 * ((secondShift : ℤ) * (secondShift : ℤ))
+        - 5 * ((thirdShift : ℤ) * (thirdShift : ℤ))) by ring
+     = (residual : ℤ)
+      + ((corner : ℤ) * ((fourthCoordinate : ℤ) * (fourthCoordinate : ℤ))
+        - 2 * ((secondShift : ℤ) * (secondShift : ℤ))
+        - 5 * ((thirdShift : ℤ) * (thirdShift : ℤ)))
+        by substituting residualRepresented
+     = (residual : ℤ) + (correction : ℤ) by substituting Equality.symmetry(correctionReads)
+  as scalarPrefix;
+  residual + correction
+     = 25 * tail + residualCore + correction
+     = 25 * tail + (residualCore + correction) by ring
+     = 25 * tail + (25 * cutoff + obstructionCore) by substituting Equality.symmetry(targetSplit)
+     = 25 * (cutoff + tail) + obstructionCore by ring
+     = 25 * b + obstructionCore by substituting Equality.symmetry(bReads)
+  as targetReads;
+  ((residual + correction : ℕ) : ℤ)
+     = (residual : ℤ) + (correction : ℤ) by Natural.to_integer.add_preserves
+  as castSumReads;
+  (residual : ℤ) + (correction : ℤ)
+     = ((residual + correction : ℕ) : ℤ) by Equality.symmetry(castSumReads)
+     = ((25 * b + obstructionCore : ℕ) : ℤ) by substituting targetReads
+  as scalarSuffix;
+  x * x + 2 * ((y - (secondShift : ℤ)) * (y - (secondShift : ℤ)))
+      + 5 * ((z - (thirdShift : ℤ)) * (z - (thirdShift : ℤ)))
+      + 2 * (secondResidue : ℤ) * (y - (secondShift : ℤ)) * (fourthCoordinate : ℤ)
+      + 2 * (thirdResidue : ℤ) * (z - (thirdShift : ℤ)) * (fourthCoordinate : ℤ)
+      + (corner : ℤ) * ((fourthCoordinate : ℤ) * (fourthCoordinate : ℤ))
+     = (residual : ℤ) + (correction : ℤ) by scalarPrefix
+     = ((25 * b + obstructionCore : ℕ) : ℤ) by scalarSuffix
+  as scalarComputation;
+  done by Matrix.represents_by_witness(
+      Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+        5, (secondResidue : ℤ), (thirdResidue : ℤ), (corner : ℤ)),
+      target := ((25 * b + obstructionCore : ℕ) : ℤ),
+      vector := ⟨x, y - (secondShift : ℤ), z - (thirdShift : ℤ), (fourthCoordinate : ℤ)⟩,
+      computes := Matrix.squarePlusDoublePlusScaledRankFourRepresentative_coordinateTuple_computes(
+        scalarComputation := scalarComputation))
+}
+
 theorem Matrix.weightedD5_base_obstruction_cover_of_tail
         (converse : Matrix.OneTwoFiveConverse)
         (secondResidue thirdResidue corner obstructionCore cutoff residualCore
@@ -114,86 +214,11 @@ theorem Matrix.weightedD5_base_obstruction_cover_of_tail
   b < cutoff ∨ cutoff ≤ b by Natural.lt_or_le;
   done by cases {
     case b < cutoff as below: done by small(b, below)
-    case cutoff ≤ b as above: {
-      choose tail : ℕ such that b = cutoff + tail as bReads
-          from Natural.subtraction_witness(cutoff, b, above);
-      let residual : ℕ := 25 * tail + residualCore;
-      ¬(Natural.IsOneTwoFiveObstruction(residual))
-          by Natural.twenty_five_plus_admissible_core_not_one_two_five_obstruction(
-              tail, residualCore, residualCoreBelow, residualCoreNonzero,
-              residualCoreNotTen, residualCoreNotFifteen) as residualAdmissible;
-      choose x : ℤ, y : ℤ, z : ℤ such that
-          x * x + 2 * (y * y) + 5 * (z * z) = (residual : ℤ)
-          as residualRepresented from Matrix.oneTwoFive_coordinates_of_converse(
-              converse, residual, residualAdmissible);
-      (secondResidue : ℤ) * (fourthCoordinate : ℤ) = 2 * (secondShift : ℤ)
-          by Equality.symmetry(secondShiftReads) as secondProductReads;
-      (thirdResidue : ℤ) * (fourthCoordinate : ℤ) = 5 * (thirdShift : ℤ)
-          by Equality.symmetry(thirdShiftReads) as thirdProductReads;
-      x * x + 2 * ((y - (secondShift : ℤ)) * (y - (secondShift : ℤ)))
-          + 5 * ((z - (thirdShift : ℤ)) * (z - (thirdShift : ℤ)))
-          + 2 * (secondResidue : ℤ) * (y - (secondShift : ℤ)) * (fourthCoordinate : ℤ)
-          + 2 * (thirdResidue : ℤ) * (z - (thirdShift : ℤ)) * (fourthCoordinate : ℤ)
-          + (corner : ℤ) * ((fourthCoordinate : ℤ) * (fourthCoordinate : ℤ))
-         = x * x + 2 * ((y - (secondShift : ℤ)) * (y - (secondShift : ℤ)))
-          + 5 * ((z - (thirdShift : ℤ)) * (z - (thirdShift : ℤ)))
-          + 2 * (2 * (secondShift : ℤ)) * (y - (secondShift : ℤ))
-          + 2 * (5 * (thirdShift : ℤ)) * (z - (thirdShift : ℤ))
-          + (corner : ℤ) * ((fourthCoordinate : ℤ) * (fourthCoordinate : ℤ))
-            by {
-              2 * (secondResidue : ℤ) * (y - (secondShift : ℤ)) * (fourthCoordinate : ℤ)
-                 = 2 * ((secondResidue : ℤ) * (fourthCoordinate : ℤ))
-                    * (y - (secondShift : ℤ)) by ring
-                 = 2 * (2 * (secondShift : ℤ)) * (y - (secondShift : ℤ))
-                    by substituting secondProductReads;
-              2 * (thirdResidue : ℤ) * (z - (thirdShift : ℤ)) * (fourthCoordinate : ℤ)
-                 = 2 * ((thirdResidue : ℤ) * (fourthCoordinate : ℤ))
-                    * (z - (thirdShift : ℤ)) by ring
-                 = 2 * (5 * (thirdShift : ℤ)) * (z - (thirdShift : ℤ))
-                    by substituting thirdProductReads;
-              done
-            }
-         = x * x + 2 * (y * y) + 5 * (z * z)
-          + ((corner : ℤ) * ((fourthCoordinate : ℤ) * (fourthCoordinate : ℤ))
-            - 2 * ((secondShift : ℤ) * (secondShift : ℤ))
-            - 5 * ((thirdShift : ℤ) * (thirdShift : ℤ))) by ring
-         = (residual : ℤ)
-          + ((corner : ℤ) * ((fourthCoordinate : ℤ) * (fourthCoordinate : ℤ))
-            - 2 * ((secondShift : ℤ) * (secondShift : ℤ))
-            - 5 * ((thirdShift : ℤ) * (thirdShift : ℤ)))
-            by substituting residualRepresented
-         = (residual : ℤ) + (correction : ℤ) by substituting Equality.symmetry(correctionReads)
-      as scalarPrefix;
-      residual + correction
-         = 25 * tail + residualCore + correction
-         = 25 * tail + (residualCore + correction) by ring
-         = 25 * tail + (25 * cutoff + obstructionCore) by substituting Equality.symmetry(targetSplit)
-         = 25 * (cutoff + tail) + obstructionCore by ring
-         = 25 * b + obstructionCore by substituting Equality.symmetry(bReads)
-      as targetReads;
-      ((residual + correction : ℕ) : ℤ)
-         = (residual : ℤ) + (correction : ℤ) by Natural.to_integer.add_preserves
-      as castSumReads;
-      (residual : ℤ) + (correction : ℤ)
-         = ((residual + correction : ℕ) : ℤ) by Equality.symmetry(castSumReads)
-         = ((25 * b + obstructionCore : ℕ) : ℤ) by substituting targetReads
-      as scalarSuffix;
-      x * x + 2 * ((y - (secondShift : ℤ)) * (y - (secondShift : ℤ)))
-          + 5 * ((z - (thirdShift : ℤ)) * (z - (thirdShift : ℤ)))
-          + 2 * (secondResidue : ℤ) * (y - (secondShift : ℤ)) * (fourthCoordinate : ℤ)
-          + 2 * (thirdResidue : ℤ) * (z - (thirdShift : ℤ)) * (fourthCoordinate : ℤ)
-          + (corner : ℤ) * ((fourthCoordinate : ℤ) * (fourthCoordinate : ℤ))
-         = (residual : ℤ) + (correction : ℤ) by scalarPrefix
-         = ((25 * b + obstructionCore : ℕ) : ℤ) by scalarSuffix
-      as scalarComputation;
-      done by Matrix.represents_by_witness(
-          Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
-            5, (secondResidue : ℤ), (thirdResidue : ℤ), (corner : ℤ)),
-          target := ((25 * b + obstructionCore : ℕ) : ℤ),
-          vector := ⟨x, y - (secondShift : ℤ), z - (thirdShift : ℤ), (fourthCoordinate : ℤ)⟩,
-          computes := Matrix.squarePlusDoublePlusScaledRankFourRepresentative_coordinateTuple_computes(
-            scalarComputation := scalarComputation))
-    }
+    case cutoff ≤ b as above: done by Matrix.weightedD5_tail_represents(
+        converse, secondResidue, thirdResidue, corner, obstructionCore, cutoff, residualCore,
+        fourthCoordinate, secondShift, thirdShift, correction, b, above,
+        residualCoreBelow, residualCoreNonzero, residualCoreNotTen, residualCoreNotFifteen,
+        targetSplit, secondShiftReads, thirdShiftReads, correctionReads)
   }
 }
 

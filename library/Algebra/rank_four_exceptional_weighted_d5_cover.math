@@ -1,0 +1,160 @@
+-- Algebra/rank_four_exceptional_weighted_d5_cover.math
+--
+-- The represented-set cover for the four exceptional weighted-d5 forms
+--
+--   x² + 2y² + 5z² + 2syw + 2rzw + cw²,   (s,r,c) ∈ {(0,0,5),(1,1,5),(1,1,9),(1,2,8)}.
+--
+-- Each misses exactly 15.  The 10-family base targets 25b+10 are covered
+-- as for the universal weighted-d5 forms.  The 15-family base targets are
+-- covered only for b ≥ 1; the base value 15 itself is the truant, and its
+-- square-scaled copies 15·25^a descend to a fixed witness for 375.
+
+module Algebra.rank_four_exceptional_weighted_d5_cover
+
+import Algebra.exceptional_representation
+import Algebra.rank_four_weighted_d5_cover
+
+definition Matrix.WeightedD5PositiveBaseObstructionCover
+        (secondResidue thirdResidue corner obstructionCore : ℕ) : Proposition :=
+  ∀ (b : ℕ). b ≥ 1 →
+    Matrix.Represents(
+      Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+        5, (secondResidue : ℤ), (thirdResidue : ℤ), (corner : ℤ)),
+      ((25 * b + obstructionCore : ℕ) : ℤ))
+
+theorem Matrix.weightedD5_positive_base_obstruction_cover_of_tail
+        (converse : Matrix.OneTwoFiveConverse)
+        (secondResidue thirdResidue corner obstructionCore cutoff residualCore
+          fourthCoordinate secondShift thirdShift correction : ℕ)
+        (small : ∀ (b : ℕ). b ≥ 1 → b < cutoff →
+          Matrix.Represents(
+            Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+              5, (secondResidue : ℤ), (thirdResidue : ℤ), (corner : ℤ)),
+            ((25 * b + obstructionCore : ℕ) : ℤ)))
+        (residualCoreBelow : residualCore < 25) (residualCoreNonzero : residualCore ≠ 0)
+        (residualCoreNotTen : residualCore ≠ 10) (residualCoreNotFifteen : residualCore ≠ 15)
+        (targetSplit : 25 * cutoff + obstructionCore = residualCore + correction)
+        (secondShiftReads :
+          2 * (secondShift : ℤ) = (secondResidue : ℤ) * (fourthCoordinate : ℤ))
+        (thirdShiftReads :
+          5 * (thirdShift : ℤ) = (thirdResidue : ℤ) * (fourthCoordinate : ℤ))
+        (correctionReads :
+          (correction : ℤ) = (corner : ℤ) * ((fourthCoordinate : ℤ) * (fourthCoordinate : ℤ))
+            - 2 * ((secondShift : ℤ) * (secondShift : ℤ))
+            - 5 * ((thirdShift : ℤ) * (thirdShift : ℤ)))
+        : Matrix.WeightedD5PositiveBaseObstructionCover(
+            secondResidue, thirdResidue, corner, obstructionCore) := {
+  take b : ℕ;
+  suppose b ≥ 1 as positive;
+  b < cutoff ∨ cutoff ≤ b by Natural.lt_or_le;
+  done by cases {
+    case b < cutoff as below: done by small(b, positive, below)
+    case cutoff ≤ b as above: done by Matrix.weightedD5_tail_represents(
+        converse, secondResidue, thirdResidue, corner, obstructionCore, cutoff, residualCore,
+        fourthCoordinate, secondShift, thirdShift, correction, b, above,
+        residualCoreBelow, residualCoreNonzero, residualCoreNotTen, residualCoreNotFifteen,
+        targetSplit, secondShiftReads, thirdShiftReads, correctionReads)
+  }
+}
+
+theorem Matrix.weightedD5_representsEveryPositiveExceptFifteen_of_covers
+        (converse : Matrix.OneTwoFiveConverse)
+        (secondResidue thirdResidue corner : ℕ)
+        (tenCover : Matrix.WeightedD5BaseObstructionCover(secondResidue, thirdResidue, corner, 10))
+        (fifteenCover : Matrix.WeightedD5PositiveBaseObstructionCover(
+          secondResidue, thirdResidue, corner, 15))
+        (fifteenTimesTwentyFive : Matrix.Represents(
+          Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+            5, (secondResidue : ℤ), (thirdResidue : ℤ), (corner : ℤ)),
+          ((375 : ℕ) : ℤ)))
+        : Matrix.RepresentsEveryPositiveExcept(
+            Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+              5, (secondResidue : ℤ), (thirdResidue : ℤ), (corner : ℤ)), 15) := {
+  let A : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+    Matrix.squarePlusDoublePlusScaledRankFourRepresentative(
+      5, (secondResidue : ℤ), (thirdResidue : ℤ), (corner : ℤ));
+  take m : ℕ;
+  suppose m ≥ 1;
+  suppose m ≠ 15 as notFifteen;
+  Natural.IsOneTwoFiveObstruction(m) ∨ ¬(Natural.IsOneTwoFiveObstruction(m))
+      by Logic.excluded_middle(Natural.IsOneTwoFiveObstruction(m)) as obstructionDecision;
+  ¬(Natural.IsOneTwoFiveObstruction(m)) ∨ Natural.IsOneTwoFiveObstruction(m)
+      by Or.swap(obstructionDecision);
+  done by cases {
+    case ¬(Natural.IsOneTwoFiveObstruction(m)) as admissible: {
+      choose x : ℤ, y : ℤ, z : ℤ such that
+          x * x + 2 * (y * y) + 5 * (z * z) = (m : ℤ)
+          as represented from Matrix.oneTwoFive_coordinates_of_converse(converse, m, admissible);
+      x * x + 2 * (y * y) + 5 * (z * z)
+          + 2 * (secondResidue : ℤ) * y * 0 + 2 * (thirdResidue : ℤ) * z * 0
+          + (corner : ℤ) * (0 * 0)
+         = x * x + 2 * (y * y) + 5 * (z * z) by ring
+         = (m : ℤ) by represented
+      as scalarComputation;
+      done by Matrix.represents_by_witness(
+          A, target := m, vector := ⟨x, y, z, 0⟩,
+          computes := Matrix.squarePlusDoublePlusScaledRankFourRepresentative_coordinateTuple_computes(
+            scalarComputation := scalarComputation))
+    }
+    case Natural.IsOneTwoFiveObstruction(m) as obstruction: done by cases {
+      case Natural.IsTwentyFiveAffineObstruction(10, m) as tenObstruction: {
+        choose exponent : ℕ, b : ℕ such that m = 25 ^ exponent * (25 * b + 10)
+            as mReads from tenObstruction;
+        Matrix.Represents(A, ((25 * b + 10 : ℕ) : ℤ)) by tenCover(b) as baseRepresented;
+        Matrix.Represents(A, ((25 ^ exponent * (25 * b + 10) : ℕ) : ℤ))
+            by Matrix.represents_twenty_five_power_times(
+              A, 25 * b + 10, exponent, baseRepresented);
+        Matrix.Represents(A, (m : ℤ)) by substituting mReads;
+        done
+      }
+      case Natural.IsTwentyFiveAffineObstruction(15, m) as fifteenObstruction: {
+        choose exponent : ℕ, b : ℕ such that m = 25 ^ exponent * (25 * b + 15)
+            as mReads from fifteenObstruction;
+        b = 0 ∨ ∃ (base : ℕ). b = 1 + base by Natural.zero_or_one_plus;
+        done by cases {
+          case b = 0 as bZero: {
+            exponent = 0 ∨ ∃ (tail : ℕ). exponent = 1 + tail by Natural.zero_or_one_plus;
+            done by cases {
+              case exponent = 0 as exponentZero: {
+                m = 25 ^ exponent * (25 * b + 15) by mReads
+                  = 25 ^ 0 * (25 * b + 15) by substituting exponentZero
+                  = 25 ^ 0 * (25 * 0 + 15) by substituting bZero
+                  = 1 * (25 * 0 + 15) by substituting Natural.power_zero(25)
+                  = 15 by ring
+                as equalsFifteen;
+                False by notFifteen(equalsFifteen) as contradiction;
+                done by False.eliminate_proposition(Matrix.Represents(A, (m : ℤ)), contradiction)
+              }
+              case ∃ (tail : ℕ). exponent = 1 + tail: {
+                choose tail : ℕ such that exponent = 1 + tail as exponentReads;
+                Matrix.Represents(A, ((25 ^ tail * 375 : ℕ) : ℤ))
+                    by Matrix.represents_twenty_five_power_times(
+                      A, 375, tail, fifteenTimesTwentyFive);
+                m = 25 ^ exponent * (25 * b + 15) by mReads
+                  = 25 ^ exponent * (25 * 0 + 15) by substituting bZero
+                  = 25 ^ (1 + tail) * (25 * 0 + 15) by substituting exponentReads
+                  = (25 * 25 ^ tail) * (25 * 0 + 15) by substituting Natural.power_one_plus(25, tail)
+                  = 25 ^ tail * 375 by ring
+                as targetReads;
+                Matrix.Represents(A, (m : ℤ)) by substituting targetReads;
+                done
+              }
+            }
+          }
+          case ∃ (base : ℕ). b = 1 + base: {
+            choose base : ℕ such that b = 1 + base as bReads;
+            1 ≤ 1 + base by Natural.one_le_one_plus;
+            b ≥ 1 by substituting Equality.symmetry(bReads) as positive;
+            Matrix.Represents(A, ((25 * b + 15 : ℕ) : ℤ))
+                by fifteenCover(b, positive) as baseRepresented;
+            Matrix.Represents(A, ((25 ^ exponent * (25 * b + 15) : ℕ) : ℤ))
+                by Matrix.represents_twenty_five_power_times(
+                  A, 25 * b + 15, exponent, baseRepresented);
+            Matrix.Represents(A, (m : ℤ)) by substituting mReads;
+            done
+          }
+        }
+      }
+    }
+  }
+}
