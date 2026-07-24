@@ -430,4 +430,37 @@ families. The elementary three-squares obstruction is layered as
 `three_squares_theorem` → `three_squares_obstruction_arithmetic` →
 `three_squares_residual_cover_common` and the seven
 `three_squares_residual_cover_*` cases → `three_squares_residual_covers`.
+
+## The assembly
+
+The Fifteen Theorem itself is now formal, conditional on the named
+interfaces.  `Algebra/escalator_embedding` defines `Matrix.appendColumn`
+with its action and Gram laws (`Matrix.appendColumn_gram`: the appended
+Gram matrix is the bordered assembly of `MᵀGM`, `Mᵀ·(G·x)`, and the norm
+of `x`), proves that positive-definite forms act injectively so the
+adjugate cancels from the left (`Matrix.adjugate_applyVector_left`), and
+builds `Matrix.IsEscalatorEmbedding`: a column matrix with independent
+columns whose Gram matrix is an escalator.  `escalator_embedding_start`
+places any norm-one ambient vector; `escalator_embedding_step` appends
+any ambient vector whose norm is the current truant.  Bhargava's
+same-rank escalation case is refuted outright: a rational dependence
+scales through the adjugate to an integer vector on which the escalator
+takes the value `det²·truant`, and the per-representative exclusion
+certificates (`Algebra/escalator_exclusion`) forbid that value.  The
+rank-one and rank-two certificates are proved; the nine rank-three ones
+are collected behind `Matrix.RankThreeEscalatorExclusion`.
+
+`Algebra/rank_four_outcome_dispatch_generated` (from
+`scripts/generate_rank_four_outcome_dispatch.py`) proves the 207-way
+dispatch `Matrix.selectedRankFourNormalForm_outcome`: every selected
+normal form is conditionally universal or one of the six exceptional
+co-singleton forms, carrying both the represented-set and truant
+certificates.  `Algebra/fifteen_theorem` then proves
+`Matrix.universal_of_critical_values` — a symmetric positive-definite
+form representing 1, 2, 3, 5, 6, 7, 10, 14, 15 is universal — and its
+corollary `Matrix.fifteen_theorem` for the values 1 through 15, along
+with the census: `escalator_rank_four_census` (universal or truant
+10/15), `escalator_rank_five_universal`, and
+`escalator_beyond_rank_four_universal`.
+
 `PLAN_15_THEOREM.md` records unfinished stages.
