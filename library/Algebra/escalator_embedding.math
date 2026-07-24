@@ -1,0 +1,959 @@
+-- Algebra/escalator_embedding.math
+--
+-- Escalator embeddings (fifteen-theorem assembly, stage S3.C2 groundwork).
+--
+-- An escalator embedding of an ambient form G is a rectangular matrix M
+-- with independent columns whose Gram matrix MᵀGM is an escalator.  The
+-- one theorem that drives the Fifteen Theorem assembly is the step: if the
+-- ambient lattice contains a vector x whose norm is the truant of MᵀGM,
+-- then appending x to M is again an escalator embedding — one rank higher.
+--
+-- The delicate point is Bhargava's same-rank escalation: x could a priori
+-- be rationally dependent on the columns of M.  That case is refuted
+-- outright: clearing the dependence denominator through the adjugate of
+-- E = MᵀGM produces an integer vector on which E takes the value
+-- det(E)²·truant(E), and the per-representative exclusion certificates
+-- say no such vector exists.  The escalation chain therefore always
+-- increases rank, and stays inside the enumerated escalator tree.
+
+module Algebra.escalator_embedding
+
+import Integer.sign
+import Algebra.escalator_tree
+
+theorem Integer.not_zero_less_than_zero : ¬((0 : ℤ) < 0) := {
+  suppose (0 : ℤ) < 0 as impossible;
+  choose n such that (0 : ℤ) = ((0 : ℤ) + Integer.one) + (n : ℤ) from impossible;
+  Natural.to_integer(0)
+     = (0 : ℤ)
+     = ((0 : ℤ) + Integer.one) + (n : ℤ)
+     = (1 : ℤ) + (n : ℤ) by ring
+     = Natural.to_integer(1 + n) by Equality.symmetry(Natural.to_integer.add_preserves(1, n))
+  as castReads;
+  0 = 1 + n by Natural.to_integer.injective(0, 1 + n, castReads);
+  ¬(0 = 1 + n) by Natural.zero_not_one_plus;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- Vector conveniences.
+
+theorem RingVector.add_commutative {r : CommutativeRing} {n : ℕ}
+        (u v : RingVector(r, n))
+        : u + v = v + u := {
+  ∀ (i : NaturalsBelow(n)). (u + v)(i) = (v + u)(i)
+      by (i : NaturalsBelow(n)) ↦ ring;
+  done by RingVector.equal_of_pointwise
+}
+
+theorem RingVector.scale_zero_scalar {r : CommutativeRing} {n : ℕ}
+        (x : RingVector(r, n))
+        : CommutativeRing.zero(r) • x = RingVector.zero(r, n) := {
+  ∀ (i : NaturalsBelow(n)).
+      (CommutativeRing.zero(r) • x)(i) = RingVector.zero(r, n)(i)
+      by (i : NaturalsBelow(n)) ↦ ring;
+  done by RingVector.equal_of_pointwise
+}
+
+theorem RingVector.add_zero_right {r : CommutativeRing} {n : ℕ}
+        (x : RingVector(r, n))
+        : x + RingVector.zero(r, n) = x := {
+  ∀ (i : NaturalsBelow(n)). (x + RingVector.zero(r, n))(i) = x(i)
+      by (i : NaturalsBelow(n)) ↦ ring;
+  done by RingVector.equal_of_pointwise
+}
+
+theorem RingVector.zero_add_left {r : CommutativeRing} {n : ℕ}
+        (x : RingVector(r, n))
+        : RingVector.zero(r, n) + x = x := {
+  ∀ (i : NaturalsBelow(n)). (RingVector.zero(r, n) + x)(i) = x(i)
+      by (i : NaturalsBelow(n)) ↦ ring;
+  done by RingVector.equal_of_pointwise
+}
+
+theorem RingVector.add_negate {r : CommutativeRing} {n : ℕ}
+        (x : RingVector(r, n))
+        : x + RingVector.negate(x) = RingVector.zero(r, n) := {
+  RingVector.negate(x) = CommutativeRing.negate(CommutativeRing.one(r)) • x
+      by RingVector.negate_scale_one as negateReads;
+  ∀ (i : NaturalsBelow(n)).
+      (x + CommutativeRing.negate(CommutativeRing.one(r)) • x)(i)
+        = RingVector.zero(r, n)(i)
+      by (i : NaturalsBelow(n)) ↦ ring;
+  x + CommutativeRing.negate(CommutativeRing.one(r)) • x = RingVector.zero(r, n)
+      by RingVector.equal_of_pointwise;
+  done by substituting Equality.symmetry(negateReads)
+}
+
+theorem RingVector.equal_of_difference_zero {r : CommutativeRing} {n : ℕ}
+        (u v : RingVector(r, n))
+        (vanishes : u + RingVector.negate(v) = RingVector.zero(r, n))
+        : u = v := {
+  RingVector.negate(v) = CommutativeRing.negate(CommutativeRing.one(r)) • v
+      by RingVector.negate_scale_one as negateReads;
+  u + CommutativeRing.negate(CommutativeRing.one(r)) • v = RingVector.zero(r, n)
+      by substituting negateReads as scaledVanishes;
+  ∀ (i : NaturalsBelow(n)). u(i) = v(i)
+      by (i : NaturalsBelow(n)) ↦ {
+          (u + CommutativeRing.negate(CommutativeRing.one(r)) • v)(i)
+             = RingVector.zero(r, n)(i)
+             by Equality.congruence(
+               (w : RingVector(r, n)) ↦ w(i),
+               u + CommutativeRing.negate(CommutativeRing.one(r)) • v,
+               RingVector.zero(r, n), scaledVanishes) as coordinateVanishes;
+          u(i) + CommutativeRing.negate(CommutativeRing.one(r)) * v(i)
+             = CommutativeRing.zero(r) by coordinateVanishes as coordinateEquation;
+          done by linear_combination(coordinateEquation)
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+theorem RingVector.flip_of_add_zero {r : CommutativeRing} {n : ℕ}
+        (u v : RingVector(r, n))
+        (vanishes : u + v = RingVector.zero(r, n))
+        : u = RingVector.negate(v) := {
+  RingVector.negate(RingVector.negate(v)) = v by {
+    RingVector.negate(v) = CommutativeRing.negate(CommutativeRing.one(r)) • v
+        by RingVector.negate_scale_one as innerReads;
+    RingVector.negate(RingVector.negate(v))
+        = CommutativeRing.negate(CommutativeRing.one(r)) • RingVector.negate(v)
+        by RingVector.negate_scale_one as outerReads;
+    ∀ (i : NaturalsBelow(n)).
+        (CommutativeRing.negate(CommutativeRing.one(r))
+          • (CommutativeRing.negate(CommutativeRing.one(r)) • v))(i) = v(i)
+        by (i : NaturalsBelow(n)) ↦ ring;
+    CommutativeRing.negate(CommutativeRing.one(r))
+        • (CommutativeRing.negate(CommutativeRing.one(r)) • v) = v
+        by RingVector.equal_of_pointwise as doubleScale;
+    RingVector.negate(RingVector.negate(v))
+       = CommutativeRing.negate(CommutativeRing.one(r)) • RingVector.negate(v)
+           by outerReads
+       = CommutativeRing.negate(CommutativeRing.one(r))
+           • (CommutativeRing.negate(CommutativeRing.one(r)) • v)
+           by substituting innerReads
+       = v by doubleScale;
+    done
+  } as doubleNegate;
+  u + RingVector.negate(RingVector.negate(v)) = RingVector.zero(r, n)
+      by substituting Equality.symmetry(doubleNegate);
+  done by RingVector.equal_of_difference_zero
+}
+
+theorem RingVector.extend_zero {r : CommutativeRing} {n : ℕ}
+        : RingVector.extend(RingVector.zero(r, n)) = RingVector.zero(r, 1 + n) := {
+  ∀ (p : NaturalsBelow(1 + n)).
+      RingVector.extend(RingVector.zero(r, n))(p) = RingVector.zero(r, 1 + n)(p)
+      by (p : NaturalsBelow(1 + n)) ↦ {
+          (∃ (i : NaturalsBelow(n)). p = NaturalsBelow.inclusion(n, i))
+              ∨ p = NaturalsBelow.top(n)
+              by NaturalsBelow.inclusion_or_top;
+          done by cases {
+            case ∃ (i : NaturalsBelow(n)). p = NaturalsBelow.inclusion(n, i): {
+                choose i such that p = NaturalsBelow.inclusion(n, i) as pReads;
+                RingVector.extend(RingVector.zero(r, n))(NaturalsBelow.inclusion(n, i))
+                   = RingVector.zero(r, n)(i) by RingVector.extend_inclusion
+                   = CommutativeRing.zero(r);
+                done by substituting pReads
+              }
+            case p = NaturalsBelow.top(n) as pTop: {
+                RingVector.extend(RingVector.zero(r, n))(NaturalsBelow.top(n))
+                   = CommutativeRing.zero(r) by RingVector.extend_top;
+                done by substituting pTop
+              }
+          }
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+theorem Matrix.quadraticForm_negate {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (x : RingVector(r, n))
+        : Matrix.quadraticForm(A, RingVector.negate(x)) = Matrix.quadraticForm(A, x) := {
+  RingVector.negate(x) = CommutativeRing.negate(CommutativeRing.one(r)) • x
+      by RingVector.negate_scale_one as negateReads;
+  Matrix.quadraticForm(A, RingVector.negate(x))
+     = Matrix.quadraticForm(A, CommutativeRing.negate(CommutativeRing.one(r)) • x)
+         by substituting negateReads
+     = (CommutativeRing.negate(CommutativeRing.one(r))
+         * CommutativeRing.negate(CommutativeRing.one(r)))
+         * Matrix.quadraticForm(A, x)
+         by Matrix.quadraticForm_scale
+     = Matrix.quadraticForm(A, x) by ring;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- Matrix-sum, outer-product, and inclusion actions on vectors.
+
+theorem Matrix.add_applyVector {r : CommutativeRing} {rows columns : ℕ}
+        (A B : Matrix(r, rows, columns)) (x : RingVector(r, columns))
+        : (A + B) · x = A · x + B · x := {
+  ∀ (i : NaturalsBelow(rows)). ((A + B) · x)(i) = (A · x + B · x)(i)
+      by (i : NaturalsBelow(rows)) ↦ {
+          ∀ (k : NaturalsBelow(columns)).
+              (A + B)(i, k) * x(k) = A(i, k) * x(k) + B(i, k) * x(k)
+              by (k : NaturalsBelow(columns)) ↦ ring;
+          ((A + B) · x)(i)
+             = CommutativeRing.sumOver(
+                   (k : NaturalsBelow(columns)) ↦ A(i, k) * x(k) + B(i, k) * x(k),
+                   NaturalsBelow.enumerate(columns))
+                   by CommutativeRing.sumOver_congruence
+             = CommutativeRing.sumOver((k : NaturalsBelow(columns)) ↦ A(i, k) * x(k),
+                   NaturalsBelow.enumerate(columns))
+               + CommutativeRing.sumOver((k : NaturalsBelow(columns)) ↦ B(i, k) * x(k),
+                     NaturalsBelow.enumerate(columns))
+                   by Equality.symmetry(CommutativeRing.sumOver_add(
+                       (k : NaturalsBelow(columns)) ↦ A(i, k) * x(k),
+                       (k : NaturalsBelow(columns)) ↦ B(i, k) * x(k),
+                       NaturalsBelow.enumerate(columns)))
+             = (A · x + B · x)(i);
+          done
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+theorem Matrix.outerProduct_applyVector {r : CommutativeRing} {rows columns : ℕ}
+        (u : RingVector(r, rows)) (v w : RingVector(r, columns))
+        : Matrix.outerProduct(u, v) · w = RingVector.innerProduct(v, w) • u := {
+  ∀ (i : NaturalsBelow(rows)).
+      (Matrix.outerProduct(u, v) · w)(i) = (RingVector.innerProduct(v, w) • u)(i)
+      by (i : NaturalsBelow(rows)) ↦ {
+          ∀ (k : NaturalsBelow(columns)).
+              Matrix.outerProduct(u, v)(i, k) * w(k) = u(i) * (v(k) * w(k))
+              by (k : NaturalsBelow(columns)) ↦ ring;
+          (Matrix.outerProduct(u, v) · w)(i)
+             = CommutativeRing.sumOver(
+                   (k : NaturalsBelow(columns)) ↦ u(i) * (v(k) * w(k)),
+                   NaturalsBelow.enumerate(columns))
+                   by CommutativeRing.sumOver_congruence
+             = u(i) * CommutativeRing.sumOver(
+                   (k : NaturalsBelow(columns)) ↦ v(k) * w(k),
+                   NaturalsBelow.enumerate(columns))
+                   by CommutativeRing.sumOver_scale_left
+             = u(i) * RingVector.innerProduct(v, w)
+             = (RingVector.innerProduct(v, w) • u)(i) by ring;
+          done
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+theorem Matrix.leadingInclusion_applyVector {r : CommutativeRing} {n : ℕ}
+        (b : RingVector(r, n))
+        : Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) · b
+          = RingVector.extend(b) := {
+  Function.IsInjective(NaturalsBelow.inclusion(n)) by NaturalsBelow.inclusion_is_injective;
+  ∀ (p : NaturalsBelow(1 + n)).
+      (Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) · b)(p)
+        = RingVector.extend(b)(p)
+      by (p : NaturalsBelow(1 + n)) ↦ {
+          (∃ (i : NaturalsBelow(n)). p = NaturalsBelow.inclusion(n, i))
+              ∨ p = NaturalsBelow.top(n)
+              by NaturalsBelow.inclusion_or_top;
+          done by cases {
+            case ∃ (i : NaturalsBelow(n)). p = NaturalsBelow.inclusion(n, i): {
+                choose i such that p = NaturalsBelow.inclusion(n, i) as pReads;
+                (Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) · b)(
+                    NaturalsBelow.inclusion(n, i))
+                   = b(i) by Matrix.inclusionMatrix_applyVector_entry
+                   = RingVector.extend(b)(NaturalsBelow.inclusion(n, i))
+                       by Equality.symmetry(RingVector.extend_inclusion(b, i));
+                done by substituting pReads
+              }
+            case p = NaturalsBelow.top(n) as pTop: {
+                ∀ (t : NaturalsBelow(n)).
+                    ¬(NaturalsBelow.top(n) = NaturalsBelow.inclusion(n, t))
+                    by (t : NaturalsBelow(n)) ↦ {
+                        done by NaturalsBelow.top_not_inclusion
+                      };
+                (Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n)) · b)(
+                    NaturalsBelow.top(n))
+                   = CommutativeRing.zero(r) by Matrix.inclusionMatrix_applyVector_off
+                   = RingVector.extend(b)(NaturalsBelow.top(n))
+                       by Equality.symmetry(RingVector.extend_top(b));
+                done by substituting pTop
+              }
+          }
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+theorem Matrix.leadingInclusion_transpose_applyVector {r : CommutativeRing} {n : ℕ}
+        (z : RingVector(r, 1 + n))
+        : Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ · z
+          = RingVector.restrict(z) := {
+  ∀ (j : NaturalsBelow(n)).
+      (Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ · z)(j)
+        = RingVector.restrict(z)(j)
+      by (j : NaturalsBelow(n)) ↦ {
+          List.Distinct(NaturalsBelow(1 + n), NaturalsBelow.enumerate(1 + n))
+              by NaturalsBelow.enumerate_distinct;
+          NaturalsBelow.inclusion(n, j) ∈ NaturalsBelow.enumerate(1 + n)
+              by NaturalsBelow.enumerate_complete;
+          ∀ (p : NaturalsBelow(1 + n)). p ∈ NaturalsBelow.enumerate(1 + n)
+              → ¬(p = NaturalsBelow.inclusion(n, j))
+              → Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ(j, p) * z(p)
+                = CommutativeRing.zero(r)
+              by (p : NaturalsBelow(1 + n))
+                 (member : p ∈ NaturalsBelow.enumerate(1 + n))
+                 (offSelected : ¬(p = NaturalsBelow.inclusion(n, j))) ↦ {
+                  Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))(p, j)
+                      = CommutativeRing.zero(r)
+                      by Matrix.inclusionMatrix_entry_off as entryVanishes;
+                  Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ(j, p) * z(p)
+                     = Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))(p, j) * z(p)
+                     = CommutativeRing.zero(r) * z(p) by substituting entryVanishes
+                     = CommutativeRing.zero(r) by ring;
+                  done
+                };
+          Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))(
+              NaturalsBelow.inclusion(n, j), j)
+             = CommutativeRing.one(r) by Matrix.inclusionMatrix_entry_at
+          as entryAt;
+          (Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ · z)(j)
+             = CommutativeRing.sumOver(
+                   (p : NaturalsBelow(1 + n)) ↦
+                       Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ(j, p) * z(p),
+                   NaturalsBelow.enumerate(1 + n))
+             = Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))ᵀ(
+                   j, NaturalsBelow.inclusion(n, j))
+               * z(NaturalsBelow.inclusion(n, j))
+                   by CommutativeRing.sumOver_single
+             = Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(n))(
+                   NaturalsBelow.inclusion(n, j), j)
+               * z(NaturalsBelow.inclusion(n, j))
+             = CommutativeRing.one(r) * z(NaturalsBelow.inclusion(n, j))
+                   by substituting entryAt
+             = RingVector.restrict(z)(j) by ring;
+          done
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+-- ----------------------------------------------------------------------
+-- Appending a column, its action, and its Gram matrix.
+
+definition Matrix.appendColumn {r : CommutativeRing} {rows columns : ℕ}
+        (M : Matrix(r, rows, columns)) (x : RingVector(r, rows))
+        : Matrix(r, rows, 1 + columns) :=
+  M * Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(columns))ᵀ
+    + Matrix.outerProduct(
+        x, Matrix.standardBasisRow(r, 1 + columns, NaturalsBelow.top(columns)))
+
+theorem Matrix.appendColumn_applyVector {r : CommutativeRing} {rows columns : ℕ}
+        (M : Matrix(r, rows, columns)) (x : RingVector(r, rows))
+        (z : RingVector(r, 1 + columns))
+        : Matrix.appendColumn(M, x) · z
+          = M · RingVector.restrict(z) + z(NaturalsBelow.top(columns)) • x := {
+  let J : Matrix(r, 1 + columns, columns) :=
+      Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(columns));
+  let e : RingVector(r, 1 + columns) :=
+      Matrix.standardBasisRow(r, 1 + columns, NaturalsBelow.top(columns));
+  (M * Jᵀ) · z
+     = M · (Jᵀ · z) by Matrix.applyVector_multiply
+     = M · RingVector.restrict(z)
+         by substituting Matrix.leadingInclusion_transpose_applyVector(z)
+  as blockAction;
+  RingVector.innerProduct(e, z) = z(NaturalsBelow.top(columns))
+      by RingVector.innerProduct_standardBasisRow_left as pairingReads;
+  Matrix.outerProduct(x, e) · z
+     = RingVector.innerProduct(e, z) • x by Matrix.outerProduct_applyVector
+     = z(NaturalsBelow.top(columns)) • x by substituting pairingReads
+  as borderAction;
+  Matrix.appendColumn(M, x) · z
+     = (M * Jᵀ) · z + Matrix.outerProduct(x, e) · z by Matrix.add_applyVector
+     = M · RingVector.restrict(z) + Matrix.outerProduct(x, e) · z
+         by substituting blockAction
+     = M · RingVector.restrict(z) + z(NaturalsBelow.top(columns)) • x
+         by substituting borderAction;
+  done
+}
+
+theorem Matrix.appendColumn_gram {r : CommutativeRing} {rows columns : ℕ}
+        (G : Matrix(r, rows, rows)) (M : Matrix(r, rows, columns))
+        (x : RingVector(r, rows))
+        (symmetric : Matrix.IsSymmetric(G))
+        : Matrix.appendColumn(M, x)ᵀ * G * Matrix.appendColumn(M, x)
+          = Matrix.borderedAssembly(
+              Mᵀ * G * M, Mᵀ · (G · x), Matrix.quadraticForm(G, x)) := {
+  Gᵀ = G by symmetric as gSymmetric;
+  let J : Matrix(r, 1 + columns, columns) :=
+      Matrix.inclusionMatrix(r, NaturalsBelow.inclusion(columns));
+  let e : RingVector(r, 1 + columns) :=
+      Matrix.standardBasisRow(r, 1 + columns, NaturalsBelow.top(columns));
+  let b : RingVector(r, columns) := Mᵀ · (G · x);
+  Matrix.appendColumn(M, x)ᵀ
+     = (M * Jᵀ + Matrix.outerProduct(x, e))ᵀ
+     = (M * Jᵀ)ᵀ + Matrix.outerProduct(x, e)ᵀ by Matrix.transpose_add
+     = Jᵀᵀ * Mᵀ + Matrix.outerProduct(x, e)ᵀ by substituting Matrix.transpose_multiply(M, Jᵀ)
+     = J * Mᵀ + Matrix.outerProduct(x, e)ᵀ by substituting Matrix.transpose_transpose(J)
+     = J * Mᵀ + Matrix.outerProduct(e, x) by substituting Matrix.outerProduct_transpose(x, e)
+  as transposeReads;
+  ((J * Mᵀ) * G) · x
+     = (J * Mᵀ) · (G · x) by Matrix.applyVector_multiply
+     = J · (Mᵀ · (G · x)) by Matrix.applyVector_multiply
+     = RingVector.extend(b) by Matrix.leadingInclusion_applyVector
+  as borderVectorReads;
+  ((J * Mᵀ) * G) * Matrix.outerProduct(x, e)
+     = Matrix.outerProduct(((J * Mᵀ) * G) · x, e) by Matrix.multiply_outerProduct
+     = Matrix.outerProduct(RingVector.extend(b), e) by substituting borderVectorReads
+  as columnTermReads;
+  (G * (M * Jᵀ))ᵀ
+     = (M * Jᵀ)ᵀ * Gᵀ by Matrix.transpose_multiply
+     = (Jᵀᵀ * Mᵀ) * Gᵀ by substituting Matrix.transpose_multiply(M, Jᵀ)
+     = (J * Mᵀ) * Gᵀ by substituting Matrix.transpose_transpose(J)
+     = (J * Mᵀ) * G by substituting gSymmetric
+  as productTransposeReads;
+  Matrix.outerProduct(e, x) * (G * (M * Jᵀ))
+     = Matrix.outerProduct(e, (G * (M * Jᵀ))ᵀ · x) by Matrix.outerProduct_multiply
+     = Matrix.outerProduct(e, ((J * Mᵀ) * G) · x) by substituting productTransposeReads
+     = Matrix.outerProduct(e, RingVector.extend(b)) by substituting borderVectorReads
+  as rowTermReads;
+  G * Matrix.outerProduct(x, e) = Matrix.outerProduct(G · x, e)
+      by Matrix.multiply_outerProduct as scaledColumnReads;
+  Matrix.outerProduct(e, x) * (G * Matrix.outerProduct(x, e))
+     = Matrix.outerProduct(e, x) * Matrix.outerProduct(G · x, e)
+         by substituting scaledColumnReads
+     = RingVector.innerProduct(x, G · x) • Matrix.outerProduct(e, e)
+         by Matrix.outerProduct_multiply_outerProduct
+  as cornerTermReads;
+  ((J * Mᵀ) * G) * (M * Jᵀ)
+     = (J * (Mᵀ * G)) * (M * Jᵀ)
+         by substituting Matrix.multiply_associative(r, 1 + columns, columns, rows, rows, J, Mᵀ, G)
+     = ((J * (Mᵀ * G)) * M) * Jᵀ
+         by substituting Equality.symmetry(Matrix.multiply_associative(
+           r, 1 + columns, rows, columns, 1 + columns, J * (Mᵀ * G), M, Jᵀ))
+     = (J * ((Mᵀ * G) * M)) * Jᵀ
+         by substituting Matrix.multiply_associative(
+           r, 1 + columns, columns, rows, columns, J, Mᵀ * G, M)
+  as blockTermReads;
+  Matrix.appendColumn(M, x)ᵀ * G * Matrix.appendColumn(M, x)
+     = (J * Mᵀ + Matrix.outerProduct(e, x)) * G
+         * (M * Jᵀ + Matrix.outerProduct(x, e))
+         by substituting transposeReads
+     = ((J * Mᵀ) * G + Matrix.outerProduct(e, x) * G)
+         * (M * Jᵀ + Matrix.outerProduct(x, e))
+         by substituting Matrix.distributivity_right(
+           r, 1 + columns, rows, rows, J * Mᵀ, Matrix.outerProduct(e, x), G)
+     = ((J * Mᵀ) * G + Matrix.outerProduct(e, x) * G) * (M * Jᵀ)
+       + ((J * Mᵀ) * G + Matrix.outerProduct(e, x) * G) * Matrix.outerProduct(x, e)
+         by Matrix.distributivity_left
+     = (((J * Mᵀ) * G) * (M * Jᵀ) + (Matrix.outerProduct(e, x) * G) * (M * Jᵀ))
+       + ((J * Mᵀ) * G + Matrix.outerProduct(e, x) * G) * Matrix.outerProduct(x, e)
+         by substituting Matrix.distributivity_right(
+           r, 1 + columns, rows, 1 + columns,
+           (J * Mᵀ) * G, Matrix.outerProduct(e, x) * G, M * Jᵀ)
+     = (((J * Mᵀ) * G) * (M * Jᵀ) + (Matrix.outerProduct(e, x) * G) * (M * Jᵀ))
+       + (((J * Mᵀ) * G) * Matrix.outerProduct(x, e)
+          + (Matrix.outerProduct(e, x) * G) * Matrix.outerProduct(x, e))
+         by substituting Matrix.distributivity_right(
+           r, 1 + columns, rows, 1 + columns,
+           (J * Mᵀ) * G, Matrix.outerProduct(e, x) * G, Matrix.outerProduct(x, e))
+     = (((J * Mᵀ) * G) * (M * Jᵀ) + Matrix.outerProduct(e, x) * (G * (M * Jᵀ)))
+       + (((J * Mᵀ) * G) * Matrix.outerProduct(x, e)
+          + (Matrix.outerProduct(e, x) * G) * Matrix.outerProduct(x, e))
+         by substituting Matrix.multiply_associative(
+           r, 1 + columns, rows, rows, 1 + columns, Matrix.outerProduct(e, x), G, M * Jᵀ)
+     = (((J * Mᵀ) * G) * (M * Jᵀ) + Matrix.outerProduct(e, x) * (G * (M * Jᵀ)))
+       + (((J * Mᵀ) * G) * Matrix.outerProduct(x, e)
+          + Matrix.outerProduct(e, x) * (G * Matrix.outerProduct(x, e)))
+         by substituting Matrix.multiply_associative(
+           r, 1 + columns, rows, rows, 1 + columns,
+           Matrix.outerProduct(e, x), G, Matrix.outerProduct(x, e))
+     = (((J * Mᵀ) * G) * (M * Jᵀ) + Matrix.outerProduct(e, x) * (G * (M * Jᵀ)))
+       + (Matrix.outerProduct(RingVector.extend(b), e)
+          + Matrix.outerProduct(e, x) * (G * Matrix.outerProduct(x, e)))
+         by substituting columnTermReads
+     = (((J * Mᵀ) * G) * (M * Jᵀ) + Matrix.outerProduct(e, RingVector.extend(b)))
+       + (Matrix.outerProduct(RingVector.extend(b), e)
+          + Matrix.outerProduct(e, x) * (G * Matrix.outerProduct(x, e)))
+         by substituting rowTermReads
+     = (((J * Mᵀ) * G) * (M * Jᵀ) + Matrix.outerProduct(e, RingVector.extend(b)))
+       + (Matrix.outerProduct(RingVector.extend(b), e)
+          + RingVector.innerProduct(x, G · x) • Matrix.outerProduct(e, e))
+         by substituting cornerTermReads
+     = ((J * ((Mᵀ * G) * M)) * Jᵀ + Matrix.outerProduct(e, RingVector.extend(b)))
+       + (Matrix.outerProduct(RingVector.extend(b), e)
+          + RingVector.innerProduct(x, G · x) • Matrix.outerProduct(e, e))
+         by substituting blockTermReads
+     = J * (Mᵀ * G * M) * Jᵀ
+       + Matrix.outerProduct(RingVector.extend(b), e)
+       + Matrix.outerProduct(e, RingVector.extend(b))
+       + RingVector.innerProduct(x, G · x) • Matrix.outerProduct(e, e)
+         by ring
+     = Matrix.borderedAssembly(Mᵀ * G * M, b, Matrix.quadraticForm(G, x));
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- Positive-definite forms act injectively, so the adjugate cancels the
+-- action from the left: adj(E)·(E·z) = det(E)·z.
+
+theorem Matrix.applyVector_injective_of_positive_definite {n : ℕ}
+        (E : Matrix(Integer.commutative_ring_bundle, n, n))
+        (positiveDefinite : Matrix.IsPositiveDefinite(E))
+        (u v : RingVector(Integer.commutative_ring_bundle, n))
+        (imagesEqual : E · u = E · v)
+        : u = v := {
+  let difference : RingVector(Integer.commutative_ring_bundle, n) :=
+      u + RingVector.negate(v);
+  E · difference
+     = E · u + E · RingVector.negate(v) by Matrix.applyVector_add
+     = E · u + RingVector.negate(E · v) by substituting Matrix.applyVector_negate(E, v)
+     = E · v + RingVector.negate(E · v) by substituting imagesEqual
+     = RingVector.zero(Integer.commutative_ring_bundle, n) by RingVector.add_negate
+  as imageVanishes;
+  Matrix.quadraticForm(E, difference)
+     = RingVector.innerProduct(difference, E · difference)
+     = RingVector.innerProduct(
+           difference, RingVector.zero(Integer.commutative_ring_bundle, n))
+         by substituting imageVanishes
+     = CommutativeRing.zero(Integer.commutative_ring_bundle)
+         by RingVector.innerProduct_zero_right
+     = (0 : ℤ)
+  as valueVanishes;
+  difference = RingVector.zero(Integer.commutative_ring_bundle, n) by {
+    suppose ¬(difference = RingVector.zero(Integer.commutative_ring_bundle, n))
+        as nonzero for contradiction {
+      Matrix.quadraticForm(E, difference) > 0 by positiveDefinite(difference, nonzero);
+      (0 : ℤ) > 0 by substituting valueVanishes;
+      done by Integer.not_zero_less_than_zero
+    };
+    done
+  };
+  done by RingVector.equal_of_difference_zero
+}
+
+theorem Matrix.adjugate_applyVector_left {n : ℕ}
+        (E : Matrix(Integer.commutative_ring_bundle, n, n))
+        (positiveDefinite : Matrix.IsPositiveDefinite(E))
+        (z : RingVector(Integer.commutative_ring_bundle, n))
+        : Matrix.adjugate(E) · (E · z) = Matrix.determinant(E) • z := {
+  E · (Matrix.adjugate(E) · (E · z))
+     = Matrix.determinant(E) • (E · z) by Matrix.applyVector_adjugate
+     = E · (Matrix.determinant(E) • z)
+         by Equality.symmetry(Matrix.applyVector_scale(E, Matrix.determinant(E), z));
+  done by Matrix.applyVector_injective_of_positive_definite
+}
+
+-- ----------------------------------------------------------------------
+-- Escalator embeddings.
+
+definition Matrix.IsEscalatorEmbedding {ambient rank : ℕ}
+        (G : Matrix(Integer.commutative_ring_bundle, ambient, ambient))
+        (M : Matrix(Integer.commutative_ring_bundle, ambient, rank)) : Proposition :=
+  (∀ (z : RingVector(Integer.commutative_ring_bundle, rank)).
+      ¬(z = RingVector.zero(Integer.commutative_ring_bundle, rank))
+      → ¬(M · z = RingVector.zero(Integer.commutative_ring_bundle, ambient)))
+  ∧ Matrix.IsEscalator(rank, Mᵀ * G * M)
+
+-- ----------------------------------------------------------------------
+-- The escalation step.  The exclusion hypothesis is the same-rank
+-- certificate: the escalator does not represent det²·truant.
+
+theorem Matrix.escalator_embedding_step {ambient rank : ℕ}
+        (G : Matrix(Integer.commutative_ring_bundle, ambient, ambient))
+        (M : Matrix(Integer.commutative_ring_bundle, ambient, rank))
+        (x : RingVector(Integer.commutative_ring_bundle, ambient))
+        (symmetric : Matrix.IsSymmetric(G))
+        (positiveDefinite : Matrix.IsPositiveDefinite(G))
+        (embedding : Matrix.IsEscalatorEmbedding(G, M))
+        (exclusion : ¬(Matrix.Represents(Mᵀ * G * M,
+            (Matrix.determinant(Mᵀ * G * M) * Matrix.determinant(Mᵀ * G * M))
+              * (Matrix.truant(Mᵀ * G * M) : ℤ))))
+        (norm : Matrix.quadraticForm(G, x) = (Matrix.truant(Mᵀ * G * M) : ℤ))
+        : Matrix.IsEscalatorEmbedding(G, Matrix.appendColumn(M, x)) := {
+  let E : Matrix(Integer.commutative_ring_bundle, rank, rank) := Mᵀ * G * M;
+  ∀ (z : RingVector(Integer.commutative_ring_bundle, rank)).
+      ¬(z = RingVector.zero(Integer.commutative_ring_bundle, rank))
+      → ¬(M · z = RingVector.zero(Integer.commutative_ring_bundle, ambient))
+    as columnsIndependent;
+  Matrix.IsEscalator(rank, E);
+  Matrix.IsPositiveDefinite(E) by Matrix.escalator_positive_definite as blockPositiveDefinite;
+  Matrix.IsSymmetric(E) by Matrix.escalator_symmetric as blockSymmetric;
+
+  ∀ (z : RingVector(Integer.commutative_ring_bundle, 1 + rank)).
+      ¬(z = RingVector.zero(Integer.commutative_ring_bundle, 1 + rank))
+      → ¬(Matrix.appendColumn(M, x) · z
+            = RingVector.zero(Integer.commutative_ring_bundle, ambient))
+      by (z : RingVector(Integer.commutative_ring_bundle, 1 + rank))
+         (zNonzero : ¬(z = RingVector.zero(Integer.commutative_ring_bundle, 1 + rank))) ↦ {
+          let y : RingVector(Integer.commutative_ring_bundle, rank) := RingVector.restrict(z);
+          let scale : ℤ := z(NaturalsBelow.top(rank));
+          suppose Matrix.appendColumn(M, x) · z
+              = RingVector.zero(Integer.commutative_ring_bundle, ambient) as imageZero
+              for contradiction {
+            M · y + scale • x = RingVector.zero(Integer.commutative_ring_bundle, ambient)
+                by Equality.transitivity(
+                  Equality.symmetry(Matrix.appendColumn_applyVector(M, x, z)), imageZero)
+            as dependence;
+            scale = 0 ∨ ¬(scale = 0) by Logic.excluded_middle(scale = 0);
+            done by cases {
+              case scale = 0 as scaleZero: {
+                M · y
+                   = M · y + RingVector.zero(Integer.commutative_ring_bundle, ambient)
+                       by Equality.symmetry(RingVector.add_zero_right(M · y))
+                   = M · y + (0 : ℤ) • x
+                       by substituting Equality.symmetry(RingVector.scale_zero_scalar(x))
+                   = M · y + scale • x by substituting Equality.symmetry(scaleZero)
+                   = RingVector.zero(Integer.commutative_ring_bundle, ambient) by dependence
+                as restrictedVanishes;
+                ¬(y = RingVector.zero(Integer.commutative_ring_bundle, rank)) by {
+                  suppose y = RingVector.zero(Integer.commutative_ring_bundle, rank)
+                      as yZero for contradiction {
+                    z = RingVector.extend(y) + scale • Matrix.standardBasisRow(
+                          Integer.commutative_ring_bundle, 1 + rank, NaturalsBelow.top(rank))
+                        by RingVector.bordered_decomposition
+                      = RingVector.extend(RingVector.zero(Integer.commutative_ring_bundle, rank))
+                          + scale • Matrix.standardBasisRow(
+                              Integer.commutative_ring_bundle, 1 + rank, NaturalsBelow.top(rank))
+                          by substituting yZero
+                      = RingVector.zero(Integer.commutative_ring_bundle, 1 + rank)
+                          + scale • Matrix.standardBasisRow(
+                              Integer.commutative_ring_bundle, 1 + rank, NaturalsBelow.top(rank))
+                          by substituting RingVector.extend_zero
+                      = RingVector.zero(Integer.commutative_ring_bundle, 1 + rank)
+                          + (0 : ℤ) • Matrix.standardBasisRow(
+                              Integer.commutative_ring_bundle, 1 + rank, NaturalsBelow.top(rank))
+                          by substituting scaleZero
+                      = RingVector.zero(Integer.commutative_ring_bundle, 1 + rank)
+                          + RingVector.zero(Integer.commutative_ring_bundle, 1 + rank)
+                          by substituting RingVector.scale_zero_scalar(
+                              Matrix.standardBasisRow(
+                                Integer.commutative_ring_bundle, 1 + rank,
+                                NaturalsBelow.top(rank)))
+                      = RingVector.zero(Integer.commutative_ring_bundle, 1 + rank)
+                          by RingVector.add_zero_right;
+                    done by zNonzero
+                  };
+                  done
+                } as restrictedNonzero;
+                done by columnsIndependent(y, restrictedNonzero)(restrictedVanishes)
+              }
+              case ¬(scale = 0) as scaleNonzero: {
+                -- The rational-dependence case: scaling by the adjugate of E
+                -- produces an integer vector representing det²·truant on E.
+                M · y = RingVector.negate(scale • x)
+                    by RingVector.flip_of_add_zero(M · y, scale • x, dependence)
+                as columnCombination;
+                let u : RingVector(Integer.commutative_ring_bundle, rank) := Mᵀ · (G · x);
+                E · y
+                   = (Mᵀ * G) · (M · y) by Matrix.applyVector_multiply
+                   = Mᵀ · (G · (M · y)) by Matrix.applyVector_multiply
+                   = Mᵀ · (G · RingVector.negate(scale • x)) by substituting columnCombination
+                   = Mᵀ · RingVector.negate(G · (scale • x))
+                       by substituting Matrix.applyVector_negate(G, scale • x)
+                   = Mᵀ · RingVector.negate(scale • (G · x))
+                       by substituting Matrix.applyVector_scale(G, scale, x)
+                   = RingVector.negate(Mᵀ · (scale • (G · x)))
+                       by substituting Matrix.applyVector_negate(Mᵀ, scale • (G · x))
+                   = RingVector.negate(scale • (Mᵀ · (G · x)))
+                       by substituting Matrix.applyVector_scale(Mᵀ, scale, G · x)
+                   = RingVector.negate(scale • u)
+                as blockImageReads;
+                E · y + scale • u
+                   = RingVector.negate(scale • u) + scale • u by substituting blockImageReads
+                   = scale • u + RingVector.negate(scale • u) by RingVector.add_commutative
+                   = RingVector.zero(Integer.commutative_ring_bundle, rank)
+                       by RingVector.add_negate
+                as gramDependence;
+                let w : RingVector(Integer.commutative_ring_bundle, rank) :=
+                    Matrix.adjugate(E) · u;
+                Matrix.adjugate(E) · (E · y + scale • u)
+                   = Matrix.adjugate(E) · (E · y) + Matrix.adjugate(E) · (scale • u)
+                       by Matrix.applyVector_add
+                   = Matrix.determinant(E) • y + Matrix.adjugate(E) · (scale • u)
+                       by substituting Matrix.adjugate_applyVector_left(
+                           E, blockPositiveDefinite, y)
+                   = Matrix.determinant(E) • y + scale • w
+                       by substituting Matrix.applyVector_scale(Matrix.adjugate(E), scale, u)
+                as expandedReads;
+                Matrix.determinant(E) • y + scale • w
+                   = Matrix.adjugate(E) · (E · y + scale • u)
+                       by Equality.symmetry(expandedReads)
+                   = Matrix.adjugate(E)
+                       · RingVector.zero(Integer.commutative_ring_bundle, rank)
+                       by substituting gramDependence
+                   = RingVector.zero(Integer.commutative_ring_bundle, rank)
+                       by Matrix.applyVector_zero
+                as adjugateDependence;
+                scale • w + Matrix.determinant(E) • y
+                   = Matrix.determinant(E) • y + scale • w by RingVector.add_commutative
+                   = RingVector.zero(Integer.commutative_ring_bundle, rank)
+                       by adjugateDependence
+                as flippedDependence;
+                scale • w = RingVector.negate(Matrix.determinant(E) • y)
+                    by RingVector.flip_of_add_zero(
+                      scale • w, Matrix.determinant(E) • y, flippedDependence)
+                as scaledWitnessReads;
+                Matrix.quadraticForm(E, y)
+                   = Matrix.quadraticForm(Mᵀ * G * M, y)
+                   = Matrix.quadraticForm(G, M · y) by Matrix.quadraticForm_pullback
+                   = Matrix.quadraticForm(G, RingVector.negate(scale • x))
+                       by substituting columnCombination
+                   = Matrix.quadraticForm(G, scale • x) by Matrix.quadraticForm_negate
+                   = (scale * scale) * Matrix.quadraticForm(G, x) by Matrix.quadraticForm_scale
+                   = (scale * scale) * (Matrix.truant(E) : ℤ) by substituting norm
+                as restrictedValue;
+                (scale * scale) * Matrix.quadraticForm(E, w)
+                   = Matrix.quadraticForm(E, scale • w)
+                       by Equality.symmetry(Matrix.quadraticForm_scale(E, scale, w))
+                   = Matrix.quadraticForm(E, RingVector.negate(Matrix.determinant(E) • y))
+                       by substituting scaledWitnessReads
+                   = Matrix.quadraticForm(E, Matrix.determinant(E) • y)
+                       by Matrix.quadraticForm_negate
+                   = (Matrix.determinant(E) * Matrix.determinant(E))
+                       * Matrix.quadraticForm(E, y) by Matrix.quadraticForm_scale
+                   = (Matrix.determinant(E) * Matrix.determinant(E))
+                       * ((scale * scale) * (Matrix.truant(E) : ℤ))
+                       by substituting restrictedValue
+                   = (scale * scale)
+                       * ((Matrix.determinant(E) * Matrix.determinant(E))
+                           * (Matrix.truant(E) : ℤ)) by ring
+                as scaledValue;
+                ¬(scale * scale = 0) by Integer.multiply_nonzero(
+                    scale, scale, scaleNonzero, scaleNonzero) as squareNonzero;
+                Matrix.quadraticForm(E, w)
+                   = (Matrix.determinant(E) * Matrix.determinant(E)) * (Matrix.truant(E) : ℤ)
+                    by Integer.multiply_cancel_left_by_nonzero(
+                      Matrix.quadraticForm(E, w),
+                      (Matrix.determinant(E) * Matrix.determinant(E)) * (Matrix.truant(E) : ℤ),
+                      scale * scale, squareNonzero, scaledValue);
+                Matrix.Represents(E,
+                    (Matrix.determinant(E) * Matrix.determinant(E)) * (Matrix.truant(E) : ℤ))
+                    by { witness w with done };
+                done by exclusion
+              }
+            }
+          };
+          done
+        }
+  as appendedIndependent;
+
+  Matrix.appendColumn(M, x)ᵀ * G * Matrix.appendColumn(M, x)
+     = Matrix.borderedAssembly(E, Mᵀ · (G · x), Matrix.quadraticForm(G, x))
+         by Matrix.appendColumn_gram
+  as gramReads;
+  Matrix.IsEscalation(
+      E, Matrix.appendColumn(M, x)ᵀ * G * Matrix.appendColumn(M, x)) by {
+    Matrix.IsSymmetric(
+        Matrix.borderedAssembly(E, Mᵀ · (G · x), Matrix.quadraticForm(G, x)))
+        by Matrix.borderedAssembly_symmetric(symmetric := blockSymmetric);
+    Matrix.IsSymmetric(
+        Matrix.appendColumn(M, x)ᵀ * G * Matrix.appendColumn(M, x))
+        by substituting Equality.symmetry(gramReads);
+    Matrix.IsPositiveDefinite(
+        Matrix.appendColumn(M, x)ᵀ * G * Matrix.appendColumn(M, x)) by {
+      take z : RingVector(Integer.commutative_ring_bundle, 1 + rank);
+      suppose ¬(z = RingVector.zero(Integer.commutative_ring_bundle, 1 + rank)) as zNonzero;
+      ¬(Matrix.appendColumn(M, x) · z
+          = RingVector.zero(Integer.commutative_ring_bundle, ambient))
+          by appendedIndependent(z, zNonzero) as imageNonzero;
+      Matrix.quadraticForm(G, Matrix.appendColumn(M, x) · z) > 0
+          by positiveDefinite(Matrix.appendColumn(M, x) · z, imageNonzero);
+      Matrix.quadraticForm(
+          Matrix.appendColumn(M, x)ᵀ * G * Matrix.appendColumn(M, x), z)
+         = Matrix.quadraticForm(G, Matrix.appendColumn(M, x) · z)
+             by Matrix.quadraticForm_pullback
+      as valueReads;
+      done by substituting valueReads
+    };
+    Matrix.leadingBlock(
+        Matrix.appendColumn(M, x)ᵀ * G * Matrix.appendColumn(M, x))
+       = Matrix.leadingBlock(
+           Matrix.borderedAssembly(E, Mᵀ · (G · x), Matrix.quadraticForm(G, x)))
+           by substituting gramReads
+       = E by Matrix.borderedAssembly_leadingBlock;
+    Matrix.corner(
+        Matrix.appendColumn(M, x)ᵀ * G * Matrix.appendColumn(M, x))
+       = Matrix.corner(
+           Matrix.borderedAssembly(E, Mᵀ · (G · x), Matrix.quadraticForm(G, x)))
+           by substituting gramReads
+       = Matrix.quadraticForm(G, x) by Matrix.borderedAssembly_corner
+       = (Matrix.truant(E) : ℤ) by norm;
+    done
+  };
+  Matrix.IsEscalator(
+      1 + rank, Matrix.appendColumn(M, x)ᵀ * G * Matrix.appendColumn(M, x))
+      by Matrix.escalator_step;
+  done by And.introduction(appendedIndependent, done)
+}
+
+-- ----------------------------------------------------------------------
+-- The first step, by hand: any ambient vector of norm 1 spans an
+-- embedding of the rank-one escalator.  (The empty matrix needs no
+-- exclusion certificate: a dependence on no columns already makes the
+-- appended vector zero.)
+
+theorem Matrix.escalator_embedding_start {ambient : ℕ}
+        (G : Matrix(Integer.commutative_ring_bundle, ambient, ambient))
+        (x : RingVector(Integer.commutative_ring_bundle, ambient))
+        (symmetric : Matrix.IsSymmetric(G))
+        (positiveDefinite : Matrix.IsPositiveDefinite(G))
+        (norm : Matrix.quadraticForm(G, x) = (1 : ℤ))
+        : Matrix.IsEscalatorEmbedding(
+            G, Matrix.appendColumn(
+                 Matrix.zero(Integer.commutative_ring_bundle, ambient, 0), x)) := {
+  let emptyBlock : Matrix(Integer.commutative_ring_bundle, ambient, 0) :=
+      Matrix.zero(Integer.commutative_ring_bundle, ambient, 0);
+  ¬(x = RingVector.zero(Integer.commutative_ring_bundle, ambient)) by {
+    suppose x = RingVector.zero(Integer.commutative_ring_bundle, ambient)
+        as xZero for contradiction {
+      (1 : ℤ)
+         = Matrix.quadraticForm(G, x) by Equality.symmetry(norm)
+         = Matrix.quadraticForm(
+               G, RingVector.zero(Integer.commutative_ring_bundle, ambient))
+             by substituting xZero
+         = 0 by Matrix.quadraticForm_zero;
+      ¬((1 : ℤ) = 0) by Integer.one_not_zero;
+      done
+    };
+    done
+  } as xNonzero;
+  ∀ (z : RingVector(Integer.commutative_ring_bundle, 1 + 0)).
+      ¬(z = RingVector.zero(Integer.commutative_ring_bundle, 1 + 0))
+      → ¬(Matrix.appendColumn(emptyBlock, x) · z
+            = RingVector.zero(Integer.commutative_ring_bundle, ambient))
+      by (z : RingVector(Integer.commutative_ring_bundle, 1 + 0))
+         (zNonzero : ¬(z = RingVector.zero(Integer.commutative_ring_bundle, 1 + 0))) ↦ {
+          let scale : ℤ := z(NaturalsBelow.top(0));
+          emptyBlock · RingVector.restrict(z)
+              = RingVector.zero(Integer.commutative_ring_bundle, ambient)
+              by Matrix.zero_applyVector as emptyActionReads;
+          Matrix.appendColumn(emptyBlock, x) · z
+             = emptyBlock · RingVector.restrict(z) + scale • x
+                 by Matrix.appendColumn_applyVector
+             = RingVector.zero(Integer.commutative_ring_bundle, ambient) + scale • x
+                 by substituting emptyActionReads
+             = scale • x by RingVector.zero_add_left
+          as actionReads;
+          ¬(scale = 0) by {
+            suppose scale = 0 as scaleZero for contradiction {
+              RingVector.restrict(z) = RingVector.zero(Integer.commutative_ring_bundle, 0)
+                  by RingVector.zero_dimension_unique as restrictedZero;
+              z = RingVector.extend(RingVector.restrict(z))
+                    + scale • Matrix.standardBasisRow(
+                        Integer.commutative_ring_bundle, 1 + 0, NaturalsBelow.top(0))
+                  by RingVector.bordered_decomposition
+                = RingVector.extend(RingVector.zero(Integer.commutative_ring_bundle, 0))
+                    + scale • Matrix.standardBasisRow(
+                        Integer.commutative_ring_bundle, 1 + 0, NaturalsBelow.top(0))
+                    by substituting restrictedZero
+                = RingVector.zero(Integer.commutative_ring_bundle, 1 + 0)
+                    + scale • Matrix.standardBasisRow(
+                        Integer.commutative_ring_bundle, 1 + 0, NaturalsBelow.top(0))
+                    by substituting RingVector.extend_zero
+                = RingVector.zero(Integer.commutative_ring_bundle, 1 + 0)
+                    + (0 : ℤ) • Matrix.standardBasisRow(
+                        Integer.commutative_ring_bundle, 1 + 0, NaturalsBelow.top(0))
+                    by substituting scaleZero
+                = RingVector.zero(Integer.commutative_ring_bundle, 1 + 0)
+                    + RingVector.zero(Integer.commutative_ring_bundle, 1 + 0)
+                    by substituting RingVector.scale_zero_scalar(
+                        Matrix.standardBasisRow(
+                          Integer.commutative_ring_bundle, 1 + 0, NaturalsBelow.top(0)))
+                = RingVector.zero(Integer.commutative_ring_bundle, 1 + 0)
+                    by RingVector.add_zero_right;
+              done by zNonzero
+            };
+            done
+          } as scaleNonzero;
+          suppose Matrix.appendColumn(emptyBlock, x) · z
+              = RingVector.zero(Integer.commutative_ring_bundle, ambient) as imageZero
+              for contradiction {
+            scale • x = RingVector.zero(Integer.commutative_ring_bundle, ambient)
+                by Equality.transitivity(Equality.symmetry(actionReads), imageZero)
+            as scaledVanishes;
+            ∀ (i : NaturalsBelow(ambient)).
+                x(i) = RingVector.zero(Integer.commutative_ring_bundle, ambient)(i)
+                by (i : NaturalsBelow(ambient)) ↦ {
+                    (scale • x)(i)
+                       = RingVector.zero(Integer.commutative_ring_bundle, ambient)(i)
+                        by Equality.congruence(
+                          (w : RingVector(Integer.commutative_ring_bundle, ambient)) ↦ w(i),
+                          scale • x,
+                          RingVector.zero(Integer.commutative_ring_bundle, ambient),
+                          scaledVanishes);
+                    scale * x(i) = 0 as coordinateVanishes;
+                    scale * x(i) = scale * 0 by linear_combination(coordinateVanishes);
+                    x(i) = 0 by Integer.multiply_cancel_left_by_nonzero(
+                        x(i), 0, scale, scaleNonzero, done);
+                    done
+                  };
+            x = RingVector.zero(Integer.commutative_ring_bundle, ambient)
+                by RingVector.equal_of_pointwise;
+            done by xNonzero
+          };
+          done
+        }
+  as independent;
+  Matrix.appendColumn(emptyBlock, x)ᵀ * G * Matrix.appendColumn(emptyBlock, x)
+     = Matrix.borderedAssembly(
+           emptyBlock ᵀ * G * emptyBlock, emptyBlock ᵀ · (G · x),
+           Matrix.quadraticForm(G, x))
+         by Matrix.appendColumn_gram
+  as gramReads;
+  (Matrix.truant(emptyBlock ᵀ * G * emptyBlock) : ℤ) = (1 : ℤ) by {
+    Matrix.truant(emptyBlock ᵀ * G * emptyBlock) = 1
+        by Matrix.zero_dimension_truant as truantReads;
+    Natural.to_integer(Matrix.truant(emptyBlock ᵀ * G * emptyBlock))
+       = Natural.to_integer(1)
+        by Equality.congruence(
+          (value : ℕ) ↦ Natural.to_integer(value),
+          Matrix.truant(emptyBlock ᵀ * G * emptyBlock), 1, truantReads);
+    done
+  } as truantCastReads;
+  Matrix.IsEscalation(
+      emptyBlock ᵀ * G * emptyBlock,
+      Matrix.appendColumn(emptyBlock, x)ᵀ * G * Matrix.appendColumn(emptyBlock, x)) by {
+    Matrix.IsSymmetric(emptyBlock ᵀ * G * emptyBlock)
+        by Matrix.pullback_symmetric(symmetric := symmetric) as blockSymmetric;
+    Matrix.IsSymmetric(
+        Matrix.borderedAssembly(
+          emptyBlock ᵀ * G * emptyBlock, emptyBlock ᵀ · (G · x),
+          Matrix.quadraticForm(G, x)))
+        by Matrix.borderedAssembly_symmetric(symmetric := blockSymmetric);
+    Matrix.IsSymmetric(
+        Matrix.appendColumn(emptyBlock, x)ᵀ * G * Matrix.appendColumn(emptyBlock, x))
+        by substituting Equality.symmetry(gramReads);
+    Matrix.IsPositiveDefinite(
+        Matrix.appendColumn(emptyBlock, x)ᵀ * G * Matrix.appendColumn(emptyBlock, x)) by {
+      take z : RingVector(Integer.commutative_ring_bundle, 1 + 0);
+      suppose ¬(z = RingVector.zero(Integer.commutative_ring_bundle, 1 + 0)) as zNonzero;
+      ¬(Matrix.appendColumn(emptyBlock, x) · z
+          = RingVector.zero(Integer.commutative_ring_bundle, ambient))
+          by independent(z, zNonzero) as imageNonzero;
+      Matrix.quadraticForm(G, Matrix.appendColumn(emptyBlock, x) · z) > 0
+          by positiveDefinite(Matrix.appendColumn(emptyBlock, x) · z, imageNonzero);
+      Matrix.quadraticForm(
+          Matrix.appendColumn(emptyBlock, x)ᵀ * G * Matrix.appendColumn(emptyBlock, x), z)
+         = Matrix.quadraticForm(G, Matrix.appendColumn(emptyBlock, x) · z)
+             by Matrix.quadraticForm_pullback
+      as valueReads;
+      done by substituting valueReads
+    };
+    Matrix.leadingBlock(
+        Matrix.appendColumn(emptyBlock, x)ᵀ * G * Matrix.appendColumn(emptyBlock, x))
+       = Matrix.leadingBlock(
+           Matrix.borderedAssembly(
+             emptyBlock ᵀ * G * emptyBlock, emptyBlock ᵀ · (G · x),
+             Matrix.quadraticForm(G, x)))
+           by substituting gramReads
+       = emptyBlock ᵀ * G * emptyBlock by Matrix.borderedAssembly_leadingBlock;
+    Matrix.corner(
+        Matrix.appendColumn(emptyBlock, x)ᵀ * G * Matrix.appendColumn(emptyBlock, x))
+       = Matrix.corner(
+           Matrix.borderedAssembly(
+             emptyBlock ᵀ * G * emptyBlock, emptyBlock ᵀ · (G · x),
+             Matrix.quadraticForm(G, x)))
+           by substituting gramReads
+       = Matrix.quadraticForm(G, x) by Matrix.borderedAssembly_corner
+       = (1 : ℤ) by norm
+       = (Matrix.truant(emptyBlock ᵀ * G * emptyBlock) : ℤ)
+           by Equality.symmetry(truantCastReads);
+    done
+  };
+  Matrix.IsEscalator(0, emptyBlock ᵀ * G * emptyBlock) by Matrix.escalator_empty;
+  Matrix.IsEscalator(
+      1 + 0, Matrix.appendColumn(emptyBlock, x)ᵀ * G * Matrix.appendColumn(emptyBlock, x))
+      by Matrix.escalator_step;
+  done by And.introduction(independent, done)
+}
