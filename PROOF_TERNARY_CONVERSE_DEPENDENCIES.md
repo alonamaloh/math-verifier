@@ -56,15 +56,15 @@ references to the interface.
 | `Matrix.TripleSquaresConverse` | \(x^2+y^2+3z^2\), excluding \(9^a(9b+6)\) | 9 | First class-one/genus client and the bounded pilot. |
 | `Matrix.OneTwoThreeConverse` | \(x^2+2y^2+3z^2\), excluding \(4^a(16b+10)\) | 8 | Shared genus route unless a later direct reduction is genuinely cheaper. |
 | `Matrix.OneTwoSixConverse` | \(x^2+2y^2+6z^2\), excluding \(4^a(8b+5)\) | 7 | Shared genus route; no elementary reduction is currently known. |
-| `Matrix.OneThreeSixLocalConverse` | \(x^2+3y^2+6z^2\), with its mod-3 square condition and \(4^a(16b+14)\) exclusion | 8 | Keep the index-three recovery pilot, but budget the shared genus route. |
+| `Matrix.OneThreeSixLocalConverse` | \(x^2+3y^2+6z^2\), with its mod-3 square condition and \(4^a(16b+14)\) exclusion | 8 | The index-three recovery succeeds: derive it from `ThreeSquaresConverse` by the explicit sign/permutation argument in `PROOF_REMAINING_TERNARY_CONVERSES.md`, Section 6. |
 | `Integer.TwoThreeSixLocalConverse` | \(2x^2+3y^2+6z^2\), with its mod-3 condition and three-square exclusion | 7 | Keep the index-six recovery pilot, but budget the shared genus route. |
 | `Matrix.OneTwoFiveConverse` | \(x^2+2y^2+5z^2\), excluding the two \(25^a\) families | 33 | Shared genus route. The form is alone in its genus; Mordell is the fallback, not the default. |
 | `Matrix.DetSevenSafeConverse` | \(x^2+2y^2+2yz+4z^2\) on `Natural.IsDetSevenSafe` | 7 final direct covers | Reuse local/genus foundations, then formalize the two small genus classifications and the safe-class selection from the detailed proof document. |
 
-Even if both pending index-lattice recoveries eliminate their two converse
-interfaces, four non-three-squares regular forms remain, feeding 57 selected
-rank-four clients. Shared infrastructure is therefore justified without
-assuming those pilots succeed.
+The one-three-six recovery is now complete, while the two-three-six recovery
+remains only a pilot.  Four non-three-squares one-class forms still remain,
+feeding 57 selected rank-four clients. Shared infrastructure is therefore
+justified without assuming the remaining pilot succeeds.
 
 The exact obstruction predicates and the interface statements are already
 kernel-visible in their respective library modules. They should remain the
@@ -229,10 +229,11 @@ classical interface.
   the small-vector bound leaves more than a binary complement.
 - Prove the exact local predicates already exposed by the library.
 - Discharge the class-one cases.
-- Continue the two index-lattice recovery experiments; if one succeeds with
-  only elementary transformations, delete the corresponding deep client.
+- Implement the completed one-three-six recovery, and continue the
+  two-three-six index-lattice experiment; if the latter succeeds with only
+  elementary transformations, delete its deep client.
 
-**Gate:** discharge all six regular-form interfaces, or record a precise
+**Gate:** discharge the remaining regular-form interfaces, or record a precise
 counterexample to the class-one route and use the published specialized
 regularity proof for that form.
 

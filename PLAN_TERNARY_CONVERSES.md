@@ -31,7 +31,7 @@ forms.  Thus the universality target is 201 forms.
 | `x²+y²+3z²` | 3 | 2, 3 | not `9^a(9b+6)` | 9 | Published regular form. Keep `Matrix.TripleSquaresConverse` explicit until the shared deep route is chosen. |
 | `x²+2y²+3z²` | 6 | 2, 3 | not `4^a(16b+10)` | 8 | Published regular form; `Matrix.OneTwoThreeConverse` remains deep. |
 | `x²+2y²+6z²` | 12 | 2, 3 | not `4^a(8b+5)` | 7 | Published regular form; `Matrix.OneTwoSixConverse` remains deep. No elementary reduction is currently known. |
-| `x²+3y²+6z²` | 18 | 2, 3 | square mod 3 and not `4^a(16b+14)` | 8 | Published regular form. It embeds as an index-three sublattice of `x²+y²+2z²`; integral recovery is not yet proved. |
+| `x²+3y²+6z²` | 18 | 2, 3 | square mod 3 and not `4^a(16b+14)` | 8 | The index-three recovery is proved in `PROOF_REMAINING_TERNARY_CONVERSES.md`, Section 6: reduce to `x²+u²+2v²`, then use the mod-3 square condition to arrange `u ≡ v`. No independent genus input remains. |
 | `2x²+3y²+6z²` | 36 | 2, 3 | twice a square mod 3 and not `4^a(8b+7)` | 7 | Published regular form. It embeds as an index-six sublattice of three squares; integral recovery is not yet proved. |
 | `x²+2y²+4z²` | 8 | 2 | not `4^a(16b+14)` | included in the 103 | **Proved reduction.** `Matrix.one_two_four_converse_of_three_squares` derives it from three squares. |
 | `x²+2y²+5z²` | 10 | 2, 5 | not `25^a(25b+10)` or `25^a(25b+15)` | 33 | Genuine deep input. The form is alone in its genus, so a genus route is valid; a specialized Mordell route is also known. See `PLAN_ONE_TWO_FIVE_CONVERSE.md`. |
@@ -111,11 +111,9 @@ The generator records 586 explicit base witnesses below the uniform tails,
 split at 20 rows per theorem.  All 12 selected forms are now conditionally
 universal from `Matrix.ThreeSquaresConverse`.
 
-### Candidates: weighted `d=3`
+### Completed mathematically: one-three-six; remaining candidate: two-three-six
 
-These identities are valid over the integers by expansion, but the reverse
-maps impose congruence conditions.  They are therefore candidates, not yet
-reductions:
+The two useful identities are:
 
 ```text
 2x² + 3y² + 6z²
@@ -125,12 +123,16 @@ x² + 3y² + 6z²
   = x² + (y+2z)² + 2(y-z)².
 ```
 
-For the first identity, the image lattice has index six.  For the second, it
-has index three, and `x²+y²+2z²` is already reducible to three squares after
-doubling the target.  The next pilot should prove or refute integral recovery
-from the exact local hypotheses already present in
-`Integer.TwoThreeSixLocalConverse` and `Matrix.OneThreeSixLocalConverse`.
-If recovery works, 15 more clients cease to require deep converse inputs.
+For the first identity, the image lattice has index six; its simultaneous
+modulo-two and modulo-three recovery is still a pilot.
+
+For the second, the recovery is complete in
+`PROOF_REMAINING_TERNARY_CONVERSES.md`, Section 6.  A representation by
+`x²+u²+2v²` is obtained from three squares after doubling the target.  The
+square-modulo-three hypothesis lets us exchange and sign the two
+coefficient-one roots so that `u ≡ v (mod 3)`, giving integral inverse
+coordinates.  This removes the independent one-three-six genus input
+mathematically; the `.math` theorem remains to be implemented.
 
 No elementary reduction for `x²+2y²+6z²` is currently known, and none is
 claimed by this plan.
@@ -139,7 +141,7 @@ claimed by this plan.
 
 The dependency audit and determinant-three pilot are now recorded in
 `PROOF_TERNARY_CONVERSE_DEPENDENCIES.md`. They settle the route-selection
-question conservatively: even if both remaining elementary pilots succeed,
+question conservatively: even if the remaining elementary pilot succeeds,
 four non-three-squares regular forms remain, feeding 57 selected rank-four
 clients. Shared infrastructure is therefore justified without waiting for
 those pilots.
@@ -170,8 +172,8 @@ those pilots.
    regularity route.  Its 14 rank-four clients require direct quaternary or
    restricted-coset work.
 
-The two index-lattice pilots remain worthwhile because they can remove 15
-clients, but they no longer gate the shared route. The first implementation
+The remaining index-six pilot is worthwhile because it can remove seven
+clients, but it no longer gates the shared route. The first implementation
 slice follows `PROOF_TRIPLE_SQUARES_CONVERSE.md`: local eligibility,
 Hasse--Minkowski and lattice patching, the low-dimensional Hermite bound,
 the norm-one split, and the 2-adic separation. Hasse--Minkowski is itself a
@@ -185,9 +187,10 @@ fallback.
 2. **Done:** use an integral base shear plus 586 generated,
    kernel-checked finite witnesses to discharge all 12 selected odd-`C=5`
    covers from `Matrix.ThreeSquaresConverse`.
-3. Pilot the two-three-six and one-three-six index-lattice recoveries. Keep a
-   pilot only if it eliminates the existing exact local converse without
-   adding an equally deep replacement.
+3. **One-three-six done mathematically:** implement the reduction in
+   `PROOF_REMAINING_TERNARY_CONVERSES.md`, Section 6.  Continue the
+   two-three-six index-six pilot only if it eliminates the existing exact
+   local converse without adding an equally deep replacement.
 4. **Done:** all 14 nonexceptional determinant-seven clients have direct
    conditional covers. The final seven use the reviewed restricted-safe-set
    proof and generated finite certificates, not a false regularity converse.

@@ -318,8 +318,15 @@ final seven results without hiding either classical input. Thus all 201
 selected rank-four universality targets now have conditional proofs; the
 other six selected forms remain the exact-truant forms already certified in
 the kernel. This completes rank-four coverage, not the unconditional
-Fifteen Theorem: the converse interfaces and rank-five exceptional
-escalations remain.
+Fifteen Theorem: the converse interfaces, the co-singleton certificates for
+the six exceptional forms, and the ambient-escalator assembly remain.
+`PROOF_FIFTEEN_THEOREM_ASSEMBLY.md` gives the complete mathematical argument:
+each exceptional form represents every positive integer except its truant,
+so every further escalation is universal.  Its Section 6 also proves the
+ambient maximal-chain lemma using Bhargava's same-rank escalation definition.
+The current matrix API models only rank-increasing escalations, so the
+same-rank lattice relation and its bridge to the finite census are still
+formalization work, not missing mathematics.
 For the weighted-`d=4` forms with third border residue two, completing the
 last square gives
 `Q=x²+2y²+(2z+w)²+(c-1)w²`.  A witness for
