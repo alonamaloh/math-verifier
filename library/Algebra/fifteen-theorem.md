@@ -321,11 +321,25 @@ final seven results without hiding either classical input. Thus all 201
 selected rank-four universality targets now have conditional proofs; the
 other six selected forms remain the exact-truant forms already certified in
 the kernel. This completes rank-four coverage, not the unconditional
-Fifteen Theorem: the converse interfaces, the co-singleton certificates for
-the six exceptional forms, and the ambient-escalator assembly remain.
+Fifteen Theorem: the converse interfaces and the ambient-escalator assembly
+remain.
 `PROOF_FIFTEEN_THEOREM_ASSEMBLY.md` gives the complete mathematical argument:
 each exceptional form represents every positive integer except its truant,
-so every further escalation is universal.  Its Section 6 also proves the
+so every further escalation is universal.  All six co-singleton certificates
+are now in the kernel.  `Algebra/rank_four_exceptional_odd_c4_r0_c3` treats
+the first truant-10 form through the one-two-six converse.
+`Algebra/rank_four_exceptional_odd_c4_r2_c7` treats the second: the form
+contains `x²+2y²+5z²` orthogonally to a norm-330 vector, obstructed base
+targets shift by that vector into admissible one-two-five residuals beyond
+generated witness prefixes, and the scaled family `10·25^a` descends to a
+fixed witness for 250.  `Algebra/rank_four_exceptional_weighted_d5` treats
+the four truant-15 forms uniformly: the universal weighted-`d=5` tail was
+extracted as `Matrix.weightedD5_tail_represents`, the 15-family cover holds
+for every positive base multiple, and `15·25^a` descends to a fixed witness
+for 375.  Each certificate ends in an `*_escalation_universal` corollary, so
+every escalation of an exceptional form is universal, conditional only on
+the named one-two-six/one-two-five converses.
+Section 6 of the assembly document also proves the
 ambient maximal-chain lemma using Bhargava's same-rank escalation definition.
 The current matrix API models only rank-increasing escalations, so the
 same-rank lattice relation and its bridge to the finite census are still

@@ -1910,3 +1910,18 @@ lemma's full unapplied Π-type made it obvious the lemma needed its `term`
 supplied (higher-order, uninferable on an `=` step). Both turned a
 head-scratch into a one-line fix. No change requested; noting as the bar
 for congruence/citation diagnostics.
+
+**GOOD MESSAGE (bare classical disjunction, 2026-07-24, co-singleton
+covers).** Polishing replaced the excluded-middle + `Or.swap` pair with a
+single bare claim `¬P ∨ P;` — the prover cannot close that (only the
+`P ∨ ¬P` orientation is automatic), and the failure listed the in-scope
+candidates with the exact remedy per candidate: "`Or.swap : (A B :
+Proposition) → A ∨ B → B ∨ A [needs: A ∨ B] (in scope but not `automatic`
+— cite it as `by Or.swap`, or mark the lemma `automatic`)". The suggested
+one-word citation was precisely the accepted fix (bare `P ∨ ¬P;` then
+`… by Or.swap;`). Noting as the bar for prover-failure hints. Workflow
+caveat (my own miss, not the checker's): the merged one-liner was an
+overreach beyond the two individual findings, and I first "confirmed" it
+with a single-file verify judged only by grepping for "warning" — the
+failure text contains neither "error" nor "warning", so always check the
+verify exit code.

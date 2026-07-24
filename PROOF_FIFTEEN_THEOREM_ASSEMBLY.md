@@ -22,7 +22,10 @@ The goals here are:
         \{1,2,3,5,6,7,10,14,15\}.
 \]
 
-The co-singleton proofs in Sections 3 and 4 are complete relative to the exact ternary converses.  Section 5 is a complete
+The co-singleton proofs in Sections 3 and 4 are complete relative to the exact ternary converses, and as of 2026-07-24 all
+six are formalized: `Algebra/rank_four_exceptional_odd_c4_r0_c3`, `Algebra/rank_four_exceptional_odd_c4_r2_c7`, and
+`Algebra/rank_four_exceptional_weighted_d5` prove each exceptional form represents every positive integer except its
+truant and derive the escalation-universality corollaries.  Section 5 is a complete
 further-escalation argument.  Section 6 proves the theorem that passes from the enumerated escalation tree to an arbitrary
 ambient quadratic form.  The current library does not yet express one feature of the classical definition: an escalation
 may be a same-rank integral overlattice.  This document does not pretend that `Matrix.escalation_exists`, which constructs
@@ -714,7 +717,7 @@ delimited items.
 \text{ambient escalator containment, Theorem 6.1}
   &\text{elementary proof complete; same-rank API/census bridge still to formalize}\\
 \text{rank-four witness/drift certificates}
-  &\text{generated finite computations, already patterned in the library}.
+  &\text{done: generated, kernel-checked (including the co-singleton prefixes)}.
 \end{array}
 \]
 
