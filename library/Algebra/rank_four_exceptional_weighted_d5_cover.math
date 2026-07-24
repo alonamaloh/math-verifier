@@ -49,11 +49,7 @@ theorem Matrix.weightedD5_positive_base_obstruction_cover_of_tail
   b < cutoff ∨ cutoff ≤ b by Natural.lt_or_le;
   done by cases {
     case b < cutoff as below: done by small(b, positive, below)
-    case cutoff ≤ b as above: done by Matrix.weightedD5_tail_represents(
-        converse, secondResidue, thirdResidue, corner, obstructionCore, cutoff, residualCore,
-        fourthCoordinate, secondShift, thirdShift, correction, b, above,
-        residualCoreBelow, residualCoreNonzero, residualCoreNotTen, residualCoreNotFifteen,
-        targetSplit, secondShiftReads, thirdShiftReads, correctionReads)
+    case cutoff ≤ b as above: done by Matrix.weightedD5_tail_represents
   }
 }
 
@@ -76,10 +72,8 @@ theorem Matrix.weightedD5_representsEveryPositiveExceptFifteen_of_covers
   take m : ℕ;
   suppose m ≥ 1;
   suppose m ≠ 15 as notFifteen;
-  Natural.IsOneTwoFiveObstruction(m) ∨ ¬(Natural.IsOneTwoFiveObstruction(m))
-      by Logic.excluded_middle(Natural.IsOneTwoFiveObstruction(m)) as obstructionDecision;
-  ¬(Natural.IsOneTwoFiveObstruction(m)) ∨ Natural.IsOneTwoFiveObstruction(m)
-      by Or.swap(obstructionDecision);
+  Natural.IsOneTwoFiveObstruction(m) ∨ ¬(Natural.IsOneTwoFiveObstruction(m));
+  ¬(Natural.IsOneTwoFiveObstruction(m)) ∨ Natural.IsOneTwoFiveObstruction(m) by Or.swap;
   done by cases {
     case ¬(Natural.IsOneTwoFiveObstruction(m)) as admissible: {
       choose x : ℤ, y : ℤ, z : ℤ such that
@@ -99,58 +93,54 @@ theorem Matrix.weightedD5_representsEveryPositiveExceptFifteen_of_covers
     case Natural.IsOneTwoFiveObstruction(m) as obstruction: done by cases {
       case Natural.IsTwentyFiveAffineObstruction(10, m) as tenObstruction: {
         choose exponent : ℕ, b : ℕ such that m = 25 ^ exponent * (25 * b + 10)
-            as mReads from tenObstruction;
-        Matrix.Represents(A, ((25 * b + 10 : ℕ) : ℤ)) by tenCover(b) as baseRepresented;
+            from tenObstruction;
+        Matrix.Represents(A, ((25 * b + 10 : ℕ) : ℤ)) by tenCover(b);
         Matrix.Represents(A, ((25 ^ exponent * (25 * b + 10) : ℕ) : ℤ))
-            by Matrix.represents_twenty_five_power_times(
-              A, 25 * b + 10, exponent, baseRepresented);
-        Matrix.Represents(A, (m : ℤ)) by substituting mReads;
+            by Matrix.represents_twenty_five_power_times;
+        Matrix.Represents(A, (m : ℤ));
         done
       }
       case Natural.IsTwentyFiveAffineObstruction(15, m) as fifteenObstruction: {
         choose exponent : ℕ, b : ℕ such that m = 25 ^ exponent * (25 * b + 15)
-            as mReads from fifteenObstruction;
-        b = 0 ∨ ∃ (base : ℕ). b = 1 + base by Natural.zero_or_one_plus;
+            from fifteenObstruction;
+        b = 0 ∨ ∃ (base : ℕ). b = 1 + base;
         done by cases {
           case b = 0 as bZero: {
-            exponent = 0 ∨ ∃ (tail : ℕ). exponent = 1 + tail by Natural.zero_or_one_plus;
+            exponent = 0 ∨ ∃ (tail : ℕ). exponent = 1 + tail;
             done by cases {
               case exponent = 0 as exponentZero: {
-                m = 25 ^ exponent * (25 * b + 15) by mReads
+                m = 25 ^ exponent * (25 * b + 15)
                   = 25 ^ 0 * (25 * b + 15) by substituting exponentZero
                   = 25 ^ 0 * (25 * 0 + 15) by substituting bZero
-                  = 1 * (25 * 0 + 15) by substituting Natural.power_zero(25)
-                  = 15 by ring
-                as equalsFifteen;
-                False by notFifteen(equalsFifteen) as contradiction;
-                done by False.eliminate_proposition(Matrix.Represents(A, (m : ℤ)), contradiction)
+                  = 1 * (25 * 0 + 15)
+                  = 15;
+                False;
+                done
               }
               case ∃ (tail : ℕ). exponent = 1 + tail: {
                 choose tail : ℕ such that exponent = 1 + tail as exponentReads;
                 Matrix.Represents(A, ((25 ^ tail * 375 : ℕ) : ℤ))
                     by Matrix.represents_twenty_five_power_times(
                       A, 375, tail, fifteenTimesTwentyFive);
-                m = 25 ^ exponent * (25 * b + 15) by mReads
+                m = 25 ^ exponent * (25 * b + 15)
                   = 25 ^ exponent * (25 * 0 + 15) by substituting bZero
                   = 25 ^ (1 + tail) * (25 * 0 + 15) by substituting exponentReads
                   = (25 * 25 ^ tail) * (25 * 0 + 15) by substituting Natural.power_one_plus(25, tail)
-                  = 25 ^ tail * 375 by ring
-                as targetReads;
-                Matrix.Represents(A, (m : ℤ)) by substituting targetReads;
+                  = 25 ^ tail * 375;
+                Matrix.Represents(A, (m : ℤ));
                 done
               }
             }
           }
           case ∃ (base : ℕ). b = 1 + base: {
-            choose base : ℕ such that b = 1 + base as bReads;
-            1 ≤ 1 + base by Natural.one_le_one_plus;
-            b ≥ 1 by substituting Equality.symmetry(bReads) as positive;
+            choose base : ℕ such that b = 1 + base;
+            1 ≤ 1 + base;
+            b ≥ 1 as positive;
             Matrix.Represents(A, ((25 * b + 15 : ℕ) : ℤ))
-                by fifteenCover(b, positive) as baseRepresented;
+                by fifteenCover(b, positive);
             Matrix.Represents(A, ((25 ^ exponent * (25 * b + 15) : ℕ) : ℤ))
-                by Matrix.represents_twenty_five_power_times(
-                  A, 25 * b + 15, exponent, baseRepresented);
-            Matrix.Represents(A, (m : ℤ)) by substituting mReads;
+                by Matrix.represents_twenty_five_power_times;
+            Matrix.Represents(A, (m : ℤ));
             done
           }
         }
