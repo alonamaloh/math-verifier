@@ -1,0 +1,231 @@
+-- Algebra/escalator_exclusion.math
+--
+-- Same-rank exclusion certificates for the low-rank escalators.  The
+-- ambient escalation chain needs, at each escalator E it passes through,
+-- that E does not represent det(E)²·truant(E): a representation of that
+-- value is exactly what a same-rank (rational-dependence) escalation
+-- would produce after clearing denominators through the adjugate.
+--
+-- The certificate is an isometry invariant, so it is proved at the
+-- classified representatives.  For determinant-one representatives the
+-- value IS the truant and the truant certificate already refuses it.
+-- The rank-three representatives' certificates are collected behind the
+-- named interface Matrix.RankThreeEscalatorExclusion until each of the
+-- nine descent proofs lands.
+
+module Algebra.escalator_exclusion
+
+import Algebra.escalator_embedding
+import Algebra.rank_two_truants
+import Algebra.rank_three_global_classification
+import Algebra.rank_four_exceptional_truants
+import Algebra.rank_four_weighted_diagonal_family
+
+-- ----------------------------------------------------------------------
+-- The certificate transfers along isometry.
+
+theorem Matrix.exclusion_of_isometric_representative {n : ℕ}
+        (E R : Matrix(Integer.commutative_ring_bundle, n, n)) (t : ℕ)
+        (isometric : Matrix.IsIsometric(E, R))
+        (isTruant : Matrix.IsTruant(R, t))
+        (notRepresented : ¬(Matrix.Represents(R,
+            (Matrix.determinant(R) * Matrix.determinant(R)) * (t : ℤ))))
+        : ¬(Matrix.Represents(E,
+            (Matrix.determinant(E) * Matrix.determinant(E))
+              * (Matrix.truant(E) : ℤ))) := {
+  Matrix.IsIsometric(R, E) by Matrix.IsIsometric.symmetric as reverseIsometric;
+  Matrix.truant(E) = t by Matrix.isometric_truant_equals(
+      isometric := reverseIsometric, isTruant := isTruant) as truantReads;
+  (Matrix.truant(E) : ℤ) = (t : ℤ)
+      by Equality.congruence(
+        (value : ℕ) ↦ Natural.to_integer(value),
+        Matrix.truant(E), t, truantReads) as truantCastReads;
+  Matrix.determinant(E) = Matrix.determinant(R)
+      by Matrix.isometric_determinant(isometric := reverseIsometric) as determinantReads;
+  suppose Matrix.Represents(E,
+      (Matrix.determinant(E) * Matrix.determinant(E)) * (Matrix.truant(E) : ℤ))
+      as represented;
+  (Matrix.determinant(E) * Matrix.determinant(E)) * (Matrix.truant(E) : ℤ)
+     = (Matrix.determinant(R) * Matrix.determinant(R)) * (Matrix.truant(E) : ℤ)
+         by substituting determinantReads
+     = (Matrix.determinant(R) * Matrix.determinant(R)) * (t : ℤ)
+         by substituting truantCastReads
+  as valueReads;
+  Matrix.Represents(E,
+      (Matrix.determinant(R) * Matrix.determinant(R)) * (t : ℤ))
+      by substituting valueReads;
+  Matrix.Represents(R,
+      (Matrix.determinant(R) * Matrix.determinant(R)) * (t : ℤ))
+      by Matrix.isometric_represents(isometric := reverseIsometric);
+  done by notRepresented
+}
+
+-- ----------------------------------------------------------------------
+-- Determinants of the low-rank representatives.
+
+theorem Matrix.squareForm_determinant
+        : Matrix.determinant(Matrix.squareForm) = (1 : ℤ) := {
+  CommutativeRing.one(Integer.commutative_ring_bundle) = (1 : ℤ);
+  Matrix.determinant(Matrix.squareForm)
+     = CommutativeRing.one(Integer.commutative_ring_bundle) by Matrix.determinant_identity
+     = (1 : ℤ);
+  done
+}
+
+theorem Matrix.sumOfTwoSquaresForm_determinant
+        : Matrix.determinant(Matrix.sumOfTwoSquaresForm) = (1 : ℤ) := {
+  Matrix.sumOfTwoSquaresForm = Matrix.identity(Integer.commutative_ring_bundle, 2)
+      by Matrix.sumOfTwoSquaresForm_is_identity as identityReads;
+  CommutativeRing.one(Integer.commutative_ring_bundle) = (1 : ℤ);
+  Matrix.determinant(Matrix.sumOfTwoSquaresForm)
+     = Matrix.determinant(Matrix.identity(Integer.commutative_ring_bundle, 2))
+         by substituting identityReads
+     = CommutativeRing.one(Integer.commutative_ring_bundle) by Matrix.determinant_identity
+     = (1 : ℤ);
+  done
+}
+
+theorem Matrix.squarePlusDoubleSquareForm_determinant
+        : Matrix.determinant(Matrix.squarePlusDoubleSquareForm) = (2 : ℤ) := {
+  Matrix.squarePlusDoubleSquareForm
+      = Matrix.diagonalExtension(Matrix.squareForm, 2)
+      by Matrix.squarePlusDoubleSquareForm_is_nested_diagonal as nestedReads;
+  Matrix.determinant(Matrix.squarePlusDoubleSquareForm)
+     = Matrix.determinant(Matrix.diagonalExtension(Matrix.squareForm, 2))
+         by substituting nestedReads
+     = Matrix.determinant(Matrix.squareForm) * 2 by Matrix.diagonalExtension_determinant
+     = (1 : ℤ) * 2 by substituting Matrix.squareForm_determinant
+     = (2 : ℤ) by ring;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The rank-one and rank-two certificates.
+
+theorem Matrix.squareForm_exclusion
+        : ¬(Matrix.Represents(Matrix.squareForm,
+            (Matrix.determinant(Matrix.squareForm) * Matrix.determinant(Matrix.squareForm))
+              * (Matrix.truant(Matrix.squareForm) : ℤ))) := {
+  Matrix.truant(Matrix.squareForm) = 2
+      by Matrix.truant_equals(isTruant := Matrix.squareForm_truant_two) as truantReads;
+  (Matrix.truant(Matrix.squareForm) : ℤ) = (2 : ℤ)
+      by Equality.congruence(
+        (value : ℕ) ↦ Natural.to_integer(value),
+        Matrix.truant(Matrix.squareForm), 2, truantReads) as truantCastReads;
+  (Matrix.determinant(Matrix.squareForm) * Matrix.determinant(Matrix.squareForm))
+      * (Matrix.truant(Matrix.squareForm) : ℤ)
+     = ((1 : ℤ) * (1 : ℤ)) * (Matrix.truant(Matrix.squareForm) : ℤ)
+         by substituting Matrix.squareForm_determinant
+     = ((1 : ℤ) * (1 : ℤ)) * (2 : ℤ) by substituting truantCastReads
+     = (2 : ℤ) by ring
+  as valueReads;
+  suppose Matrix.Represents(Matrix.squareForm,
+      (Matrix.determinant(Matrix.squareForm) * Matrix.determinant(Matrix.squareForm))
+        * (Matrix.truant(Matrix.squareForm) : ℤ)) as represented;
+  Matrix.Represents(Matrix.squareForm, (2 : ℤ)) by substituting valueReads;
+  done by Matrix.squareForm_not_represents_two
+}
+
+theorem Matrix.sumOfTwoSquaresForm_exclusion
+        : ¬(Matrix.Represents(Matrix.sumOfTwoSquaresForm,
+            (Matrix.determinant(Matrix.sumOfTwoSquaresForm)
+              * Matrix.determinant(Matrix.sumOfTwoSquaresForm)) * (3 : ℤ))) := {
+  (Matrix.determinant(Matrix.sumOfTwoSquaresForm)
+      * Matrix.determinant(Matrix.sumOfTwoSquaresForm)) * (3 : ℤ)
+     = ((1 : ℤ) * (1 : ℤ)) * (3 : ℤ) by substituting Matrix.sumOfTwoSquaresForm_determinant
+     = (3 : ℤ) by ring
+  as valueReads;
+  suppose Matrix.Represents(Matrix.sumOfTwoSquaresForm,
+      (Matrix.determinant(Matrix.sumOfTwoSquaresForm)
+        * Matrix.determinant(Matrix.sumOfTwoSquaresForm)) * (3 : ℤ)) as represented;
+  Matrix.Represents(Matrix.sumOfTwoSquaresForm, (3 : ℤ)) by substituting valueReads;
+  ¬(Matrix.Represents(Matrix.sumOfTwoSquaresForm, (3 : ℤ)))
+      by Matrix.IsTruant.missed(isTruant := Matrix.sumOfTwoSquaresForm_truant_three);
+  done
+}
+
+theorem Matrix.squarePlusDoubleSquareForm_not_represents_twenty
+        : ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareForm, (20 : ℤ))) := {
+  suppose Matrix.Represents(Matrix.squarePlusDoubleSquareForm, (20 : ℤ)) as represented;
+  ∃ (a b : ℤ). (20 : ℤ) = a * a + 2 * (b * b)
+      by Matrix.squarePlusDoubleSquareForm_represents_only_squares;
+  choose a such that ∃ (b : ℤ). (20 : ℤ) = a * a + 2 * (b * b);
+  choose b such that (20 : ℤ) = a * a + 2 * (b * b);
+  ∃ (m : ℕ). a * a = m * m by Integer.square_as_natural_square;
+  choose m such that a * a = m * m;
+  ∃ (n : ℕ). b * b = n * n by Integer.square_as_natural_square;
+  choose n such that b * b = n * n;
+  ((20 : ℕ) : ℤ)
+     = a * a + 2 * (b * b)
+     = m * m + 2 * (n * n);
+  20 = m * m + 2 * (n * n) by Natural.to_integer.injective;
+  m * m + 2 * (n * n) = 20;
+  done by Natural.twenty_not_square_plus_double_square
+}
+
+theorem Matrix.squarePlusDoubleSquareForm_exclusion
+        : ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareForm,
+            (Matrix.determinant(Matrix.squarePlusDoubleSquareForm)
+              * Matrix.determinant(Matrix.squarePlusDoubleSquareForm)) * (5 : ℤ))) := {
+  (Matrix.determinant(Matrix.squarePlusDoubleSquareForm)
+      * Matrix.determinant(Matrix.squarePlusDoubleSquareForm)) * (5 : ℤ)
+     = ((2 : ℤ) * (2 : ℤ)) * (5 : ℤ)
+         by substituting Matrix.squarePlusDoubleSquareForm_determinant
+     = (20 : ℤ) by ring
+  as valueReads;
+  suppose Matrix.Represents(Matrix.squarePlusDoubleSquareForm,
+      (Matrix.determinant(Matrix.squarePlusDoubleSquareForm)
+        * Matrix.determinant(Matrix.squarePlusDoubleSquareForm)) * (5 : ℤ)) as represented;
+  Matrix.Represents(Matrix.squarePlusDoubleSquareForm, (20 : ℤ)) by substituting valueReads;
+  done by Matrix.squarePlusDoubleSquareForm_not_represents_twenty
+}
+
+-- ----------------------------------------------------------------------
+-- Exclusion for every rank-one and rank-two escalator, by classification.
+
+theorem Matrix.escalator_rank_one_exclusion
+        (E : Matrix(Integer.commutative_ring_bundle, 1, 1))
+        (escalator : Matrix.IsEscalator(1, E))
+        : ¬(Matrix.Represents(E,
+            (Matrix.determinant(E) * Matrix.determinant(E))
+              * (Matrix.truant(E) : ℤ))) := {
+  E = Matrix.squareForm by Matrix.escalator_rank_one(escalator := escalator) as classified;
+  ¬(Matrix.Represents(Matrix.squareForm,
+      (Matrix.determinant(Matrix.squareForm) * Matrix.determinant(Matrix.squareForm))
+        * (Matrix.truant(Matrix.squareForm) : ℤ))) by Matrix.squareForm_exclusion;
+  done by substituting Equality.symmetry(classified)
+}
+
+theorem Matrix.escalator_rank_two_exclusion
+        (E : Matrix(Integer.commutative_ring_bundle, 2, 2))
+        (escalator : Matrix.IsEscalator(2, E))
+        : ¬(Matrix.Represents(E,
+            (Matrix.determinant(E) * Matrix.determinant(E))
+              * (Matrix.truant(E) : ℤ))) := {
+  Matrix.IsIsometric(E, Matrix.sumOfTwoSquaresForm)
+    ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareForm)
+      by Matrix.escalator_rank_two(escalator := escalator);
+  done by cases {
+    case Matrix.IsIsometric(E, Matrix.sumOfTwoSquaresForm) as isometric:
+      done by Matrix.exclusion_of_isometric_representative(
+        isometric := isometric, isTruant := Matrix.sumOfTwoSquaresForm_truant_three,
+        notRepresented := Matrix.sumOfTwoSquaresForm_exclusion)
+    case Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareForm) as isometric:
+      done by Matrix.exclusion_of_isometric_representative(
+        isometric := isometric, isTruant := Matrix.squarePlusDoubleSquareForm_truant_five,
+        notRepresented := Matrix.squarePlusDoubleSquareForm_exclusion)
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- The rank-three certificates, as a named interface.  Each of the nine
+-- classified ternary representatives owes the bounded non-representation
+-- of its det²·truant value; the interface collects them until all nine
+-- descent proofs land.
+
+definition Matrix.RankThreeEscalatorExclusion : Proposition :=
+  ∀ (E : Matrix(Integer.commutative_ring_bundle, 3, 3)).
+    Matrix.IsEscalator(3, E)
+    → ¬(Matrix.Represents(E,
+          (Matrix.determinant(E) * Matrix.determinant(E))
+            * (Matrix.truant(E) : ℤ)))

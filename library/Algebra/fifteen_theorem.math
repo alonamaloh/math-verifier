@@ -1,0 +1,410 @@
+-- Algebra/fifteen_theorem.math
+--
+-- The Conway–Schneeberger Fifteen Theorem (assembly stages S3.C1, S3.C2,
+-- S5.F1).  A positive-definite integral form that represents the nine
+-- critical values 1, 2, 3, 5, 6, 7, 10, 14, 15 is universal.
+--
+-- The proof builds an escalator embedding chain inside the ambient form:
+-- a norm-1 vector starts it, and at each rank the chain's Gram matrix is a
+-- classified escalator whose truant is one of the critical values, so the
+-- ambient form supplies the next vector.  The same-rank exclusion
+-- certificates keep every escalation rank-increasing, so four steps reach
+-- a rank-four escalator: isometric to a selected normal form that is
+-- either conditionally universal — making the ambient form universal
+-- through the sublattice — or one of the six exceptional co-singleton
+-- forms, whose one missing value is again critical.
+--
+-- The conditional inputs are exactly the named classical ternary converse
+-- interfaces and the rank-three same-rank exclusion certificates.
+
+module Algebra.fifteen_theorem
+
+import Algebra.escalator_exclusion
+import Algebra.critical_truants
+import Algebra.rank_four_global_classification
+import Algebra.rank_four_outcome_dispatch_generated
+
+-- ----------------------------------------------------------------------
+-- The ambient form represents the truant of a chain escalator: rewrite
+-- the classified truant value into the corresponding critical hypothesis.
+
+theorem Matrix.represents_truant_of_value {ambient n : ℕ}
+        (G : Matrix(Integer.commutative_ring_bundle, ambient, ambient))
+        (E : Matrix(Integer.commutative_ring_bundle, n, n)) (t : ℕ)
+        (truantReads : Matrix.truant(E) = t)
+        (represented : Matrix.Represents(G, (t : ℤ)))
+        : Matrix.Represents(G, (Matrix.truant(E) : ℤ)) := {
+  (Matrix.truant(E) : ℤ) = (t : ℤ)
+      by Equality.congruence(
+        (value : ℕ) ↦ Natural.to_integer(value), Matrix.truant(E), t, truantReads)
+      as castReads;
+  done by substituting Equality.symmetry(castReads)
+}
+
+-- ----------------------------------------------------------------------
+-- The master reduction (S3.C2 + S5.F1): representing the nine critical
+-- values forces universality.
+
+theorem Matrix.universal_of_critical_values {ambient : ℕ}
+        (G : Matrix(Integer.commutative_ring_bundle, ambient, ambient))
+        (symmetric : Matrix.IsSymmetric(G))
+        (positiveDefinite : Matrix.IsPositiveDefinite(G))
+        (representsOne : Matrix.Represents(G, (1 : ℤ)))
+        (representsTwo : Matrix.Represents(G, (2 : ℤ)))
+        (representsThree : Matrix.Represents(G, (3 : ℤ)))
+        (representsFive : Matrix.Represents(G, (5 : ℤ)))
+        (representsSix : Matrix.Represents(G, (6 : ℤ)))
+        (representsSeven : Matrix.Represents(G, (7 : ℤ)))
+        (representsTen : Matrix.Represents(G, (10 : ℤ)))
+        (representsFourteen : Matrix.Represents(G, (14 : ℤ)))
+        (representsFifteen : Matrix.Represents(G, (15 : ℤ)))
+        (rankThreeExclusion : Matrix.RankThreeEscalatorExclusion)
+        (threeSquares : Matrix.ThreeSquaresConverse)
+        (tripleSquares : Matrix.TripleSquaresConverse)
+        (oneTwoThree : Matrix.OneTwoThreeConverse)
+        (oneTwoSix : Matrix.OneTwoSixConverse)
+        (twoThreeSix : Integer.TwoThreeSixLocalConverse)
+        (oneTwoFive : Matrix.OneTwoFiveConverse)
+        (detSevenSafe : Matrix.DetSevenSafeConverse)
+        : Matrix.IsUniversal(G) := {
+  -- Rank one: a norm-1 vector spans the embedding of x².
+  choose x1 such that Matrix.quadraticForm(G, x1) = (1 : ℤ) as norm1 from representsOne;
+  let M1 : Matrix(Integer.commutative_ring_bundle, ambient, 1 + 0) :=
+      Matrix.appendColumn(Matrix.zero(Integer.commutative_ring_bundle, ambient, 0), x1);
+  Matrix.IsEscalatorEmbedding(G, M1)
+      by Matrix.escalator_embedding_start(norm := norm1)
+      as embedding1;
+  Matrix.IsEscalator(1 + 0, M1ᵀ * G * M1)
+      by Matrix.IsEscalatorEmbedding.escalator(embedding := embedding1) as escalator1;
+  Matrix.truant(M1ᵀ * G * M1) = 2
+      by Matrix.escalator_rank_one_truant(escalator := escalator1) as truant1;
+  Matrix.Represents(G, (Matrix.truant(M1ᵀ * G * M1) : ℤ))
+      by Matrix.represents_truant_of_value(
+        truantReads := truant1, represented := representsTwo) as ambient1;
+  choose x2 such that
+      Matrix.quadraticForm(G, x2) = (Matrix.truant(M1ᵀ * G * M1) : ℤ) as norm2 from ambient1;
+  ¬(Matrix.Represents(M1ᵀ * G * M1,
+      (Matrix.determinant(M1ᵀ * G * M1) * Matrix.determinant(M1ᵀ * G * M1))
+        * (Matrix.truant(M1ᵀ * G * M1) : ℤ)))
+      by Matrix.escalator_rank_one_exclusion(escalator := escalator1) as exclusion1;
+  Matrix.IsEscalatorEmbedding(G, Matrix.appendColumn(M1, x2))
+      by Matrix.escalator_embedding_step(
+        embedding := embedding1, exclusion := exclusion1,
+        norm := norm2)
+      as embedding2;
+
+  -- Rank two: the truant is 3 or 5.
+  let M2 : Matrix(Integer.commutative_ring_bundle, ambient, 1 + (1 + 0)) :=
+      Matrix.appendColumn(M1, x2);
+  Matrix.IsEscalator(1 + (1 + 0), M2ᵀ * G * M2)
+      by Matrix.IsEscalatorEmbedding.escalator(embedding := embedding2) as escalator2;
+  Matrix.truant(M2ᵀ * G * M2) = 3 ∨ Matrix.truant(M2ᵀ * G * M2) = 5
+      by Matrix.escalator_rank_two_truant(escalator := escalator2);
+  Matrix.Represents(G, (Matrix.truant(M2ᵀ * G * M2) : ℤ)) by cases {
+    case Matrix.truant(M2ᵀ * G * M2) = 3 as truantReads:
+      done by Matrix.represents_truant_of_value(
+        truantReads := truantReads, represented := representsThree)
+    case Matrix.truant(M2ᵀ * G * M2) = 5 as truantReads:
+      done by Matrix.represents_truant_of_value(
+        truantReads := truantReads, represented := representsFive)
+  } as ambient2;
+  choose x3 such that
+      Matrix.quadraticForm(G, x3) = (Matrix.truant(M2ᵀ * G * M2) : ℤ) as norm3 from ambient2;
+  ¬(Matrix.Represents(M2ᵀ * G * M2,
+      (Matrix.determinant(M2ᵀ * G * M2) * Matrix.determinant(M2ᵀ * G * M2))
+        * (Matrix.truant(M2ᵀ * G * M2) : ℤ)))
+      by Matrix.escalator_rank_two_exclusion(escalator := escalator2) as exclusion2;
+  Matrix.IsEscalatorEmbedding(G, Matrix.appendColumn(M2, x3))
+      by Matrix.escalator_embedding_step(
+        embedding := embedding2, exclusion := exclusion2,
+        norm := norm3)
+      as embedding3;
+
+  -- Rank three: the truant is 6, 7, 10, or 14.
+  let M3 : Matrix(Integer.commutative_ring_bundle, ambient, 1 + (1 + (1 + 0))) :=
+      Matrix.appendColumn(M2, x3);
+  Matrix.IsEscalator(1 + (1 + (1 + 0)), M3ᵀ * G * M3)
+      by Matrix.IsEscalatorEmbedding.escalator(embedding := embedding3) as escalator3;
+  Matrix.truant(M3ᵀ * G * M3) = 6 ∨ Matrix.truant(M3ᵀ * G * M3) = 7
+    ∨ Matrix.truant(M3ᵀ * G * M3) = 10 ∨ Matrix.truant(M3ᵀ * G * M3) = 14
+      by Matrix.escalator_rank_three_truant(escalator := escalator3);
+  Matrix.Represents(G, (Matrix.truant(M3ᵀ * G * M3) : ℤ)) by cases {
+    case Matrix.truant(M3ᵀ * G * M3) = 6 as truantReads:
+      done by Matrix.represents_truant_of_value(
+        truantReads := truantReads, represented := representsSix)
+    case Matrix.truant(M3ᵀ * G * M3) = 7 as truantReads:
+      done by Matrix.represents_truant_of_value(
+        truantReads := truantReads, represented := representsSeven)
+    case Matrix.truant(M3ᵀ * G * M3) = 10 as truantReads:
+      done by Matrix.represents_truant_of_value(
+        truantReads := truantReads, represented := representsTen)
+    case Matrix.truant(M3ᵀ * G * M3) = 14 as truantReads:
+      done by Matrix.represents_truant_of_value(
+        truantReads := truantReads, represented := representsFourteen)
+  } as ambient3;
+  choose x4 such that
+      Matrix.quadraticForm(G, x4) = (Matrix.truant(M3ᵀ * G * M3) : ℤ) as norm4 from ambient3;
+  ¬(Matrix.Represents(M3ᵀ * G * M3,
+      (Matrix.determinant(M3ᵀ * G * M3) * Matrix.determinant(M3ᵀ * G * M3))
+        * (Matrix.truant(M3ᵀ * G * M3) : ℤ)))
+      by rankThreeExclusion(M3ᵀ * G * M3, escalator3) as exclusion3;
+  Matrix.IsEscalatorEmbedding(G, Matrix.appendColumn(M3, x4))
+      by Matrix.escalator_embedding_step(
+        embedding := embedding3, exclusion := exclusion3,
+        norm := norm4)
+      as embedding4;
+
+  -- Rank four: the chain's Gram matrix is a classified rank-four
+  -- escalator, so it is isometric to a selected normal form.
+  let M4 : Matrix(Integer.commutative_ring_bundle, ambient, 1 + (1 + (1 + (1 + 0)))) :=
+      Matrix.appendColumn(M3, x4);
+  Matrix.IsEscalator(1 + (1 + (1 + (1 + 0))), M4ᵀ * G * M4)
+      by Matrix.IsEscalatorEmbedding.escalator(embedding := embedding4) as escalator4;
+  Matrix.IsRankFourEscalatorRepresentative(M4ᵀ * G * M4)
+      by Matrix.escalator_rank_four(escalator := escalator4);
+  choose R such that
+      Matrix.IsSelectedRankFourNormalForm(R) ∧ Matrix.IsIsometric(M4ᵀ * G * M4, R);
+  Matrix.IsSelectedRankFourNormalForm(R) as selected;
+  Matrix.IsIsometric(M4ᵀ * G * M4, R) as isometricToRepresentative;
+  Matrix.IsUniversal(R)
+    ∨ (Matrix.RepresentsEveryPositiveExcept(R, 10) ∧ Matrix.IsTruant(R, 10))
+    ∨ (Matrix.RepresentsEveryPositiveExcept(R, 15) ∧ Matrix.IsTruant(R, 15))
+      by Matrix.selectedRankFourNormalForm_outcome(
+        R, selected, threeSquares, tripleSquares, oneTwoThree, oneTwoSix,
+        twoThreeSix, oneTwoFive, detSevenSafe);
+  done by cases {
+    case Matrix.IsUniversal(R) as universal: {
+      Matrix.IsUniversal(M4ᵀ * G * M4)
+          by Matrix.isometric_universal(
+            isometric := isometricToRepresentative, universal := universal)
+          as blockUniversal;
+      take m : ℕ;
+      suppose m ≥ 1 as positive;
+      Matrix.Represents(M4ᵀ * G * M4, (m : ℤ)) by blockUniversal(m, positive);
+      done by Matrix.represents_of_sublattice
+    }
+    case Matrix.RepresentsEveryPositiveExcept(R, 10) ∧ Matrix.IsTruant(R, 10): {
+      Matrix.RepresentsEveryPositiveExcept(R, 10) as representedSet;
+      Matrix.RepresentsEveryPositiveExcept(M4ᵀ * G * M4, 10)
+          by Matrix.isometric_representsEveryPositiveExcept(
+            isometric := isometricToRepresentative, representedSet := representedSet)
+          as blockRepresentedSet;
+      done by Matrix.universal_of_exceptional_sublattice(
+        A := G, E := M4ᵀ * G * M4, M := M4, exception := 10, pullback := done,
+        representedSet := blockRepresentedSet, exceptionRepresented := representsTen)
+    }
+    case Matrix.RepresentsEveryPositiveExcept(R, 15) ∧ Matrix.IsTruant(R, 15): {
+      Matrix.RepresentsEveryPositiveExcept(R, 15) as representedSet;
+      Matrix.RepresentsEveryPositiveExcept(M4ᵀ * G * M4, 15)
+          by Matrix.isometric_representsEveryPositiveExcept(
+            isometric := isometricToRepresentative, representedSet := representedSet)
+          as blockRepresentedSet;
+      done by Matrix.universal_of_exceptional_sublattice(
+        A := G, E := M4ᵀ * G * M4, M := M4, exception := 15, pullback := done,
+        representedSet := blockRepresentedSet, exceptionRepresented := representsFifteen)
+    }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- The Fifteen Theorem: representing every value from 1 through 15 forces
+-- universality.  (The converse is immediate.)
+
+theorem Matrix.fifteen_theorem {ambient : ℕ}
+        (G : Matrix(Integer.commutative_ring_bundle, ambient, ambient))
+        (symmetric : Matrix.IsSymmetric(G))
+        (positiveDefinite : Matrix.IsPositiveDefinite(G))
+        (values : ∀ (s : ℕ). 1 ≤ s → s ≤ 15 → Matrix.Represents(G, (s : ℤ)))
+        (rankThreeExclusion : Matrix.RankThreeEscalatorExclusion)
+        (threeSquares : Matrix.ThreeSquaresConverse)
+        (tripleSquares : Matrix.TripleSquaresConverse)
+        (oneTwoThree : Matrix.OneTwoThreeConverse)
+        (oneTwoSix : Matrix.OneTwoSixConverse)
+        (twoThreeSix : Integer.TwoThreeSixLocalConverse)
+        (oneTwoFive : Matrix.OneTwoFiveConverse)
+        (detSevenSafe : Matrix.DetSevenSafeConverse)
+        : Matrix.IsUniversal(G) :=
+  by Matrix.universal_of_critical_values(
+    G, symmetric, positiveDefinite,
+    values(1, done, done), values(2, done, done), values(3, done, done),
+    values(5, done, done), values(6, done, done), values(7, done, done),
+    values(10, done, done), values(14, done, done), values(15, done, done),
+    rankThreeExclusion, threeSquares, tripleSquares, oneTwoThree, oneTwoSix,
+    twoThreeSix, oneTwoFive, detSevenSafe)
+
+theorem Matrix.universal_represents_values_through_fifteen {ambient : ℕ}
+        (G : Matrix(Integer.commutative_ring_bundle, ambient, ambient))
+        (universal : Matrix.IsUniversal(G))
+        : ∀ (s : ℕ). 1 ≤ s → s ≤ 15 → Matrix.Represents(G, (s : ℤ)) := {
+  take s : ℕ;
+  suppose 1 ≤ s;
+  suppose s ≤ 15;
+  done by universal(s, done)
+}
+
+-- ----------------------------------------------------------------------
+-- The truant census (S3.C1), rank by rank.  Ranks zero through three are
+-- the classified truants 1, 2, {3, 5}, and {6, 7, 10, 14} recorded in
+-- Algebra/critical_truants.  A rank-four escalator is universal or has
+-- truant 10 or 15; escalators of rank five and beyond are universal, so
+-- the truants occurring anywhere in the tree are exactly
+-- {1, 2, 3, 5, 6, 7, 10, 14, 15}.
+
+theorem Matrix.escalator_rank_four_census
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 3, 1 + 3))
+        (escalator : Matrix.IsEscalator(1 + 3, B))
+        (threeSquares : Matrix.ThreeSquaresConverse)
+        (tripleSquares : Matrix.TripleSquaresConverse)
+        (oneTwoThree : Matrix.OneTwoThreeConverse)
+        (oneTwoSix : Matrix.OneTwoSixConverse)
+        (twoThreeSix : Integer.TwoThreeSixLocalConverse)
+        (oneTwoFive : Matrix.OneTwoFiveConverse)
+        (detSevenSafe : Matrix.DetSevenSafeConverse)
+        : Matrix.IsUniversal(B) ∨ Matrix.truant(B) = 10 ∨ Matrix.truant(B) = 15 := {
+  Matrix.IsRankFourEscalatorRepresentative(B)
+      by Matrix.escalator_rank_four(escalator := escalator);
+  choose R such that
+      Matrix.IsSelectedRankFourNormalForm(R) ∧ Matrix.IsIsometric(B, R);
+  Matrix.IsSelectedRankFourNormalForm(R) as selected;
+  Matrix.IsIsometric(B, R) as isometricToRepresentative;
+  Matrix.IsIsometric(R, B)
+      by Matrix.IsIsometric.symmetric(isometric := isometricToRepresentative)
+      as reverseIsometric;
+  Matrix.IsUniversal(R)
+    ∨ (Matrix.RepresentsEveryPositiveExcept(R, 10) ∧ Matrix.IsTruant(R, 10))
+    ∨ (Matrix.RepresentsEveryPositiveExcept(R, 15) ∧ Matrix.IsTruant(R, 15))
+      by Matrix.selectedRankFourNormalForm_outcome(
+        R, selected, threeSquares, tripleSquares, oneTwoThree, oneTwoSix,
+        twoThreeSix, oneTwoFive, detSevenSafe);
+  done by cases {
+    case Matrix.IsUniversal(R) as universal: {
+      Matrix.IsUniversal(B)
+          by Matrix.isometric_universal(
+            isometric := isometricToRepresentative, universal := universal)
+          as ambientUniversal;
+      done by Or.introduceLeft(ambientUniversal)
+    }
+    case Matrix.RepresentsEveryPositiveExcept(R, 10) ∧ Matrix.IsTruant(R, 10) as both: {
+      Matrix.IsTruant(R, 10)
+          by And.right(Matrix.RepresentsEveryPositiveExcept(R, 10),
+            Matrix.IsTruant(R, 10), both) as isTruant;
+      Matrix.IsTruant(B, 10)
+          by Matrix.isometric_isTruant(isometric := reverseIsometric, isTruant := isTruant);
+      Matrix.truant(B) = 10 by Matrix.truant_equals as truantReads;
+      done by Or.introduceRight(Or.introduceLeft(truantReads))
+    }
+    case Matrix.RepresentsEveryPositiveExcept(R, 15) ∧ Matrix.IsTruant(R, 15) as both: {
+      Matrix.IsTruant(R, 15)
+          by And.right(Matrix.RepresentsEveryPositiveExcept(R, 15),
+            Matrix.IsTruant(R, 15), both) as isTruant;
+      Matrix.IsTruant(B, 15)
+          by Matrix.isometric_isTruant(isometric := reverseIsometric, isTruant := isTruant);
+      Matrix.truant(B) = 15 by Matrix.truant_equals as truantReads;
+      done by Or.introduceRight(Or.introduceRight(truantReads))
+    }
+  }
+}
+
+theorem Matrix.escalator_rank_five_universal
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + (1 + 3), 1 + (1 + 3)))
+        (escalator : Matrix.IsEscalator(1 + (1 + 3), B))
+        (threeSquares : Matrix.ThreeSquaresConverse)
+        (tripleSquares : Matrix.TripleSquaresConverse)
+        (oneTwoThree : Matrix.OneTwoThreeConverse)
+        (oneTwoSix : Matrix.OneTwoSixConverse)
+        (twoThreeSix : Integer.TwoThreeSixLocalConverse)
+        (oneTwoFive : Matrix.OneTwoFiveConverse)
+        (detSevenSafe : Matrix.DetSevenSafeConverse)
+        : Matrix.IsUniversal(B) := {
+  choose parent such that
+      Matrix.IsEscalator(1 + 3, parent) ∧ Matrix.IsEscalation(parent, B)
+      from Matrix.escalator_split(B := B, escalator := escalator);
+  Matrix.IsEscalator(1 + 3, parent) as parentEscalator;
+  Matrix.IsEscalation(parent, B);
+  Matrix.IsRankFourEscalatorRepresentative(parent)
+      by Matrix.escalator_rank_four(escalator := parentEscalator);
+  choose R such that
+      Matrix.IsSelectedRankFourNormalForm(R) ∧ Matrix.IsIsometric(parent, R);
+  Matrix.IsSelectedRankFourNormalForm(R) as selected;
+  Matrix.IsIsometric(parent, R) as isometricToRepresentative;
+  Matrix.IsIsometric(R, parent)
+      by Matrix.IsIsometric.symmetric(isometric := isometricToRepresentative)
+      as reverseIsometric;
+  Matrix.IsUniversal(R)
+    ∨ (Matrix.RepresentsEveryPositiveExcept(R, 10) ∧ Matrix.IsTruant(R, 10))
+    ∨ (Matrix.RepresentsEveryPositiveExcept(R, 15) ∧ Matrix.IsTruant(R, 15))
+      by Matrix.selectedRankFourNormalForm_outcome(
+        R, selected, threeSquares, tripleSquares, oneTwoThree, oneTwoSix,
+        twoThreeSix, oneTwoFive, detSevenSafe);
+  done by cases {
+    case Matrix.IsUniversal(R) as universal: {
+      Matrix.IsUniversal(parent)
+          by Matrix.isometric_universal(
+            isometric := isometricToRepresentative, universal := universal);
+      ¬(Matrix.IsUniversal(parent)) by Matrix.IsEscalation.parent_not_universal;
+      done
+    }
+    case Matrix.RepresentsEveryPositiveExcept(R, 10) ∧ Matrix.IsTruant(R, 10) as both: {
+      Matrix.RepresentsEveryPositiveExcept(R, 10)
+          by And.left(Matrix.RepresentsEveryPositiveExcept(R, 10),
+            Matrix.IsTruant(R, 10), both) as representedSet;
+      Matrix.IsTruant(R, 10)
+          by And.right(Matrix.RepresentsEveryPositiveExcept(R, 10),
+            Matrix.IsTruant(R, 10), both) as isTruant;
+      Matrix.RepresentsEveryPositiveExcept(parent, 10)
+          by Matrix.isometric_representsEveryPositiveExcept(
+            isometric := isometricToRepresentative, representedSet := representedSet);
+      Matrix.IsTruant(parent, 10)
+          by Matrix.isometric_isTruant(isometric := reverseIsometric, isTruant := isTruant);
+      Matrix.truant(parent) = 10 by Matrix.truant_equals as truantReads;
+      Matrix.RepresentsEveryPositiveExcept(parent, Matrix.truant(parent))
+          by substituting Equality.symmetry(truantReads);
+      done by Matrix.escalation_universal_of_parent_representsEveryPositiveExceptTruant
+    }
+    case Matrix.RepresentsEveryPositiveExcept(R, 15) ∧ Matrix.IsTruant(R, 15) as both: {
+      Matrix.RepresentsEveryPositiveExcept(R, 15)
+          by And.left(Matrix.RepresentsEveryPositiveExcept(R, 15),
+            Matrix.IsTruant(R, 15), both) as representedSet;
+      Matrix.IsTruant(R, 15)
+          by And.right(Matrix.RepresentsEveryPositiveExcept(R, 15),
+            Matrix.IsTruant(R, 15), both) as isTruant;
+      Matrix.RepresentsEveryPositiveExcept(parent, 15)
+          by Matrix.isometric_representsEveryPositiveExcept(
+            isometric := isometricToRepresentative, representedSet := representedSet);
+      Matrix.IsTruant(parent, 15)
+          by Matrix.isometric_isTruant(isometric := reverseIsometric, isTruant := isTruant);
+      Matrix.truant(parent) = 15 by Matrix.truant_equals as truantReads;
+      Matrix.RepresentsEveryPositiveExcept(parent, Matrix.truant(parent))
+          by substituting Equality.symmetry(truantReads);
+      done by Matrix.escalation_universal_of_parent_representsEveryPositiveExceptTruant
+    }
+  }
+}
+
+theorem Matrix.escalator_beyond_rank_four_universal
+        (k : ℕ)
+        (B : Matrix(Integer.commutative_ring_bundle,
+               1 + (1 + (1 + (1 + (1 + k)))), 1 + (1 + (1 + (1 + (1 + k))))))
+        (escalator : Matrix.IsEscalator(1 + (1 + (1 + (1 + (1 + k)))), B))
+        (threeSquares : Matrix.ThreeSquaresConverse)
+        (tripleSquares : Matrix.TripleSquaresConverse)
+        (oneTwoThree : Matrix.OneTwoThreeConverse)
+        (oneTwoSix : Matrix.OneTwoSixConverse)
+        (twoThreeSix : Integer.TwoThreeSixLocalConverse)
+        (oneTwoFive : Matrix.OneTwoFiveConverse)
+        (detSevenSafe : Matrix.DetSevenSafeConverse)
+        : Matrix.IsUniversal(B) :=
+  by induction on k with IH {
+    case base: done by Matrix.escalator_rank_five_universal(escalator := escalator)
+    case step(j): {
+      choose parent such that
+          Matrix.IsEscalator(1 + (1 + (1 + (1 + (1 + j)))), parent)
+            ∧ Matrix.IsEscalation(parent, B)
+          from Matrix.escalator_split(B := B, escalator := escalator);
+      Matrix.IsEscalator(1 + (1 + (1 + (1 + (1 + j)))), parent);
+      Matrix.IsEscalation(parent, B);
+      Matrix.IsUniversal(parent) by IH;
+      ¬(Matrix.IsUniversal(parent)) by Matrix.IsEscalation.parent_not_universal;
+      done
+    }
+  }
