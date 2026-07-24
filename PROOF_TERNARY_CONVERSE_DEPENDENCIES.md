@@ -32,6 +32,13 @@ rational-to-integral descent is already formalized, so it needs only the
 existence of an admissible rational point. Forcing it through integral genus
 theory would throw away completed work.
 
+The first end-to-end genus proof is now detailed in
+`PROOF_TRIPLE_SQUARES_CONVERSE.md`. It improves the G1 boundary below:
+determinant three does not need a general ternary reduction algorithm.
+A low-dimensional Hermite bound forces a norm-one vector, orthogonal
+splitting reduces the problem to the verified binary pilot, and an explicit
+primitive mod-4 invariant separates the two candidates at \(p=2\).
+
 The determinant-seven safe converse is also not a class-number-one client.
 It needs the same local/genus foundations, but its proof uses two explicitly
 classified small genera and a safe-residue argument to choose the desired
@@ -136,20 +143,25 @@ It then proves that the only possibilities are
 Thus the downstream determinant-three table is tiny. The second lattice is
 even and the first is odd, so a 2-adic parity invariant distinguishes them.
 
-What the pilot deliberately does **not** prove is just as important. To turn
-it into the ternary class-number-one result for \(x^2+y^2+3z^2\), we still
-need:
+`PROOF_TRIPLE_SQUARES_CONVERSE.md` now supplies the missing human proof:
 
-1. a ternary reduction/short-vector theorem producing the relevant binary
-   complement;
-2. proof that the complement has determinant three in the required
-   primitive splitting;
-3. the integral 2-adic parity comparison; and
-4. the theorem passing local representation to representation by a class in
-   the genus.
+1. a two-dimensional Hermite bound and projection argument give
+   \(m^3\le64D/27\), forcing a norm-one vector when \(D=3\);
+2. the norm-one vector splits integrally and leaves a binary complement of
+   determinant three;
+3. the two binary candidates give ternary lattices separated by a primitive
+   norm-divisible-by-four invariant over \(\mathbb Z_2\); and
+4. Hasse--Minkowski, explicit equal-norm reflections, and finite lattice
+   patching prove representation by a class in the genus.
 
-The pilot therefore rules out “the finite table will be enormous” as the
-main risk. It confirms that reduction and local-to-genus are the real cost.
+Thus the finite table and the ternary reduction problem are both removed
+from the determinant-three critical path. The foundational costs are
+\(p\)-adic arithmetic, rational Hasse--Minkowski, local-lattice patching,
+and the elementary Euclidean-lattice geometry used by the short-vector
+bound. Hasse--Minkowski remains a major item: standard explicit proofs over
+\(\mathbb Q\) use Dirichlet's theorem or package comparable work into global
+reciprocity. It is nevertheless shared infrastructure, including with the
+open rational-existence step for three squares.
 
 ## 5. Formalization slices and gates
 
@@ -167,13 +179,15 @@ their source-level or elaborated propositions.
 
 ### G1. Reduction and certified enumeration
 
-- Prove a rank-three positive-reduction theorem with explicit coefficient
-  bounds.
-- Write a deterministic enumerator for the required determinants.
-- Emit kernel-checked certificates for positivity, determinant, reduction,
-  equivalence, and completeness; do not trust the generator as an oracle.
-- Start with determinant three and connect the enumerator to the proved
-  binary pilot.
+- For determinant three, formalize covolume, orthogonal projection, the
+  two-dimensional Hermite bound, and the resulting
+  \(m^3\le64D/27\) ternary bound.
+- Split the resulting norm-one vector and connect its binary complement to
+  the proved classification pilot.
+- Formalize the primitive mod-4 invariant separating the two candidates
+  over \(\mathbb Z_2\).
+- Defer a general rank-three reducer/enumerator until a later determinant
+  actually needs it.
 
 **Gate:** independently reproduce the Jones–Pall one-class result for
 \(x^2+y^2+3z^2\).
@@ -193,9 +207,16 @@ than assuming Dickson's represented-set theorem.
 
 ### G3. Integral local-to-genus theorem
 
-- Prove, for positive integral ternary lattices, that an integer represented
-  over every \(\mathbb Z_p\) and over \(\mathbb R\) is represented by some
-  integral class in the genus.
+- Prove Hasse--Minkowski for the rational form
+  \(x^2+y^2+3z^2-nw^2\), or discharge a guarded general theorem.
+- Budget the required Hilbert reciprocity and prime-existence input
+  explicitly; do not count Hasse--Minkowski as a small wrapper.
+- Formalize the explicit reflection carrying equal nonzero-norm vectors to
+  each other.
+- Patch finitely many altered \(\mathbb Z_p\)-lattices through a finite
+  quotient and the Chinese remainder theorem.
+- Conclude that an integer represented over every \(\mathbb Z_p\) and over
+  \(\mathbb R\) is represented by some integral class in the genus.
 - Keep this separate from every class-number computation.
 
 **Gate:** combine G1–G3 to prove `Matrix.TripleSquaresConverse` with no new
@@ -203,7 +224,9 @@ classical interface.
 
 ### G4. Reuse across the remaining forms
 
-- Run the same reducer/enumerator at determinants \(6,10,12,18,36\).
+- First test whether the determinant-three norm-one splitting generalizes at
+  determinants \(6,10,12,18,36\); introduce a reducer/enumerator only where
+  the small-vector bound leaves more than a binary complement.
 - Prove the exact local predicates already exposed by the library.
 - Discharge the class-one cases.
 - Continue the two index-lattice recovery experiments; if one succeeds with
@@ -227,12 +250,15 @@ parent form.
 
 Pause and reconsider the route if any of these occurs:
 
-- G1 cannot give a small, certificate-producing reducer without a much more
-  general lattice library.
+- G1's covolume/projection proof requires a much more general analytic or
+  Euclidean-lattice library than its elementary paper proof suggests.
 - G2 shows that the exact dyadic predicates require substantially more
   theory than the current forms share.
-- G3 expands into a broad adelic/spinor-genus development rather than the
-  promised rank-three genus theorem.
+- Hasse--Minkowski and its reciprocity/prime-existence dependencies are not
+  reusable enough across three squares and the regular ternary forms to
+  justify their cost.
+- G3 expands beyond Hasse--Minkowski and finite lattice patching into a
+  spinor-genus development not used by the determinant-three proof.
 - Enumeration finds that a target form is not alone in its genus and the
   published regularity proof requires a form-specific argument of comparable
   cost to Mordell.
@@ -255,4 +281,3 @@ the determinant-three G1 slice—not a one-two-five Mordell proof.
   [*A Generalization of Mordell to Ternary Quadratic Forms*](https://arxiv.org/pdf/1508.02694).
   Section 4.1 exhibits the one-two-five Mordell route and its auxiliary
   prime conditions modulo \(1000\).
-

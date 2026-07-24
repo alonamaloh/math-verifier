@@ -156,8 +156,11 @@ those pilots.
 3. The verified determinant-three pilot proves that a reduced binary
    determinant-three complement is one of only
    `[[1,0],[0,3]]` and `[[2,1],[1,2]]`. This makes the finite table cheap and
-   identifies reduction/short-vector theory, dyadic integral equivalence,
-   and local-to-genus representation as the actual risks.
+   identifies short-vector geometry, dyadic integral equivalence, and
+   local-to-genus representation as the actual risks. The complete
+   human-readable proof in `PROOF_TRIPLE_SQUARES_CONVERSE.md` goes further:
+   a Hermite/projection bound forces the required norm-one splitting, so no
+   general ternary reducer is needed for this first target.
 4. A Mordell route shares quadratic-residue, reciprocity, CRT, reduction, and
    class-enumeration machinery across several forms.  However, its required
    prime-in-arithmetic-progression input is a restricted Dirichlet theorem,
@@ -169,8 +172,12 @@ those pilots.
 
 The two index-lattice pilots remain worthwhile because they can remove 15
 clients, but they no longer gate the shared route. The first implementation
-slice is the determinant-three reducer/enumerator and its local eligibility
-proof; Mordell remains a fallback.
+slice follows `PROOF_TRIPLE_SQUARES_CONVERSE.md`: local eligibility,
+Hasse--Minkowski and lattice patching, the low-dimensional Hermite bound,
+the norm-one split, and the 2-adic separation. Hasse--Minkowski is itself a
+large shared input—standard proofs use Dirichlet or equivalent reciprocity
+machinery—so it receives its own gate. Mordell remains a form-specific
+fallback.
 
 ## Execution order
 
@@ -188,10 +195,15 @@ proof; Mordell remains a fallback.
    classification pilot select a bounded shared class-one/genus development.
    See `PROOF_TERNARY_CONVERSE_DEPENDENCIES.md` and
    `Algebra.ternary_genus_determinant_three_pilot`.
-6. Implement G0/G1 from the audit: exact rank-three lattice/equivalence
-   objects, a certificate-producing reducer, and the determinant-three
-   one-class certificate.
-7. Preserve statement-shape guards and independent cold-library verification
+6. **Done:** write the complete determinant-three proof specification in
+   `PROOF_TRIPLE_SQUARES_CONVERSE.md`, including every elementary local,
+   patching, geometry-of-numbers, binary-classification, and 2-adic step.
+   Hasse--Minkowski is the single precisely stated substantial classical
+   input.
+7. Implement that proof end to end. Start with exact rank-three
+   lattice/equivalence objects and the local lemmas; use the Hermite
+   projection argument rather than building a general ternary reducer.
+8. Preserve statement-shape guards and independent cold-library verification
    throughout: all these interfaces feed many conditional clients, so a
    silently weakened converse would have a large blast radius.
 
