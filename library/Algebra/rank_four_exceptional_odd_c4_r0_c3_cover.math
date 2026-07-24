@@ -1,0 +1,173 @@
+-- Algebra/rank_four_exceptional_odd_c4_r0_c3_cover.math
+--
+-- The represented set of
+--
+--   Q(x,y,z,w) = x² + 2y² + 2yz + 4z² + 3w².
+--
+-- Completing the y-square gives
+--
+--   2Q = (2y+z)² + 2x² + 6w² + 7z².
+--
+-- Dickson's converse for x²+2y²+6z² therefore represents every positive
+-- target except 10.  The only failed correction occurs at
+-- 2·10 = 4·5; every other 4-adic obstruction admits one of the two
+-- corrections proved below.
+
+module Algebra.rank_four_exceptional_odd_c4_r0_c3_cover
+
+import Algebra.rank_four_weighted_d3_second_unit_universality
+import Algebra.three_squares_residual_cover_common
+
+definition Matrix.OneTwoSixDoubledTargetCoverExcept
+        (oddCoefficient exception : ℕ) : Proposition :=
+  ∀ (m : ℕ). m ≥ 1 → m ≠ exception →
+    ∃ (residual correction : ℕ).
+      Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(6), (residual : ℤ))
+      ∧ residual + correction * correction * oddCoefficient = 2 * m
+
+theorem Natural.eight_times_plus_six_not_one_two_six_obstruction
+        (b : ℕ) : ¬(Natural.IsOneTwoSixObstruction(8 * b + 6)) :=
+  by Natural.eight_times_plus_nonzero_mod_four_nonfive_not_one_two_six_obstruction(
+      b, 6, 1, 2, done, done, done, done, done)
+
+theorem Natural.seventy_three_not_one_two_six_obstruction
+        : ¬(Natural.IsOneTwoSixObstruction(73)) := {
+  73 = 8 * 9 + 1 by ring as shape;
+  ¬(Natural.IsOneTwoSixObstruction(8 * 9 + 1))
+      by Natural.eight_times_plus_nonzero_mod_four_nonfive_not_one_two_six_obstruction(
+        9, 1, 0, 1, done, done, done, done, done);
+  done by substituting Equality.symmetry(shape)
+}
+
+theorem Matrix.oddC4R0C3_oneTwoSixDoubledTargetCoverExceptTen
+        (converse : Matrix.OneTwoSixConverse)
+        : Matrix.OneTwoSixDoubledTargetCoverExcept(7, 10) := {
+  take m : ℕ;
+  suppose m ≥ 1;
+  suppose m ≠ 10 as notTen;
+  Natural.IsOneTwoSixObstruction(2 * m) ∨ ¬(Natural.IsOneTwoSixObstruction(2 * m))
+      by Logic.excluded_middle(Natural.IsOneTwoSixObstruction(2 * m)) as decision;
+  ¬(Natural.IsOneTwoSixObstruction(2 * m)) ∨ Natural.IsOneTwoSixObstruction(2 * m)
+      by Or.swap(decision);
+  done by cases {
+    case ¬(Natural.IsOneTwoSixObstruction(2 * m)) as admissible: {
+      Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(6), (2 * m : ℤ))
+          by converse(2 * m, admissible) as represented;
+      2 * m + 0 * 0 * 7 = 2 * m by ring as completed;
+      witness 2 * m with witness 0 with And.introduction(represented, completed)
+    }
+    case Natural.IsOneTwoSixObstruction(2 * m) as obstruction: {
+      choose exponent : ℕ, b : ℕ such that
+          2 * m = 4 ^ exponent * (8 * b + 5) as obstructionReads from obstruction;
+      exponent = 0 ∨ ∃ (tail : ℕ). exponent = 1 + tail by Natural.zero_or_one_plus;
+      done by cases {
+        case exponent = 0 as exponentZero: {
+          2 * m + 0
+             = 4 ^ exponent * (8 * b + 5) by obstructionReads
+             = 4 ^ 0 * (8 * b + 5) by substituting exponentZero
+             = 8 * b + 5 by substituting Natural.power_zero(4)
+             = 2 * (4 * b + 2) + 1 by ring
+          as impossible;
+          False by Natural.distinct_affine_residues_not_equal(
+              2, 0, 1, m, 4 * b + 2, done, done, done, impossible) as contradiction;
+          done by False.eliminate_proposition(
+            ∃ (residual correction : ℕ).
+              Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(6), (residual : ℤ))
+              ∧ residual + correction * correction * 7 = 2 * m,
+            contradiction)
+        }
+        case ∃ (tail : ℕ). exponent = 1 + tail: {
+          choose tail : ℕ such that exponent = 1 + tail as exponentReads;
+          b = 0 ∨ ∃ (base : ℕ). b = 1 + base by Natural.zero_or_one_plus;
+          done by cases {
+            case b = 0 as bZero: {
+              tail = 0 ∨ ∃ (later : ℕ). tail = 1 + later by Natural.zero_or_one_plus;
+              done by cases {
+                case tail = 0 as tailZero: {
+                  4 ^ exponent * (8 * b + 5)
+                     = 4 ^ (1 + tail) * (8 * b + 5)
+                         by substituting exponentReads
+                  as exponentExpanded;
+                  2 * m = 4 ^ (1 + tail) * (8 * b + 5)
+                      by Equality.transitivity(obstructionReads, exponentExpanded)
+                      as expandedObstruction;
+                  4 ^ (1 + tail) * (8 * b + 5) = 2 * 10 by {
+                    4 ^ (1 + tail) * (8 * b + 5)
+                       = 4 ^ (1 + 0) * (8 * b + 5) by substituting tailZero
+                       = 4 ^ (1 + 0) * (8 * 0 + 5) by substituting bZero
+                       = (4 * 4 ^ 0) * (8 * 0 + 5) by substituting Natural.power_one_plus(4, 0)
+                       = (4 * 1) * (8 * 0 + 5) by substituting Natural.power_zero(4)
+                       = 2 * 10 by ring;
+                    done
+                  } as evaluates;
+                  2 * m = 2 * 10 by Equality.transitivity(expandedObstruction, evaluates) as doubled;
+                  m = 10 by Natural.multiply_cancel_left(2, m, 10, done, doubled) as equalsTen;
+                  False by notTen(equalsTen) as contradiction;
+                  done by False.eliminate_proposition(
+                    ∃ (residual correction : ℕ).
+                      Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(6), (residual : ℤ))
+                      ∧ residual + correction * correction * 7 = 2 * m,
+                    contradiction)
+                }
+                case ∃ (later : ℕ). tail = 1 + later: {
+                  choose later : ℕ such that tail = 1 + later as tailReads;
+                  let residual : ℕ := 4 ^ later * 73;
+                  let correction : ℕ := 2 ^ later;
+                  ¬(Natural.IsOneTwoSixObstruction(residual))
+                      by Natural.not_one_two_six_obstruction_four_power_times(
+                        later, 73, Natural.seventy_three_not_one_two_six_obstruction)
+                      as residualAdmissible;
+                  Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(6), (residual : ℤ))
+                      by converse(residual, residualAdmissible) as represented;
+                  residual + correction * correction * 7
+                     = 4 ^ later * 73 + (2 ^ later * 2 ^ later) * 7
+                     = 4 ^ later * 73 + 4 ^ later * 7
+                         by Equality.congruence(
+                           (candidate : ℕ) ↦ 4 ^ later * 73 + candidate * 7,
+                           2 ^ later * 2 ^ later, 4 ^ later,
+                           Natural.two_power_square_is_four_power(later))
+                     = (4 * (4 * 4 ^ later)) * 5 by ring
+                     = (4 * 4 ^ (1 + later)) * 5
+                         by substituting Equality.symmetry(Natural.power_one_plus(4, later))
+                     = 4 ^ (1 + (1 + later)) * 5
+                         by substituting Equality.symmetry(Natural.power_one_plus(4, 1 + later))
+                     = 4 ^ (1 + tail) * (8 * 0 + 5) by substituting Equality.symmetry(tailReads)
+                     = 4 ^ exponent * (8 * 0 + 5) by substituting Equality.symmetry(exponentReads)
+                     = 4 ^ exponent * (8 * b + 5) by substituting Equality.symmetry(bZero)
+                     = 2 * m by Equality.symmetry(obstructionReads)
+                  as completed;
+                  witness residual with witness correction with And.introduction(represented, completed)
+                }
+              }
+            }
+            case ∃ (base : ℕ). b = 1 + base: {
+              choose base : ℕ such that b = 1 + base as bReads;
+              let residual : ℕ := 4 ^ (1 + tail) * (8 * base + 6);
+              let correction : ℕ := 2 ^ (1 + tail);
+              ¬(Natural.IsOneTwoSixObstruction(residual))
+                  by Natural.not_one_two_six_obstruction_four_power_times(
+                    1 + tail, 8 * base + 6,
+                    Natural.eight_times_plus_six_not_one_two_six_obstruction(base))
+                  as residualAdmissible;
+              Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(6), (residual : ℤ))
+                  by converse(residual, residualAdmissible) as represented;
+              residual + correction * correction * 7
+                 = 4 ^ (1 + tail) * (8 * base + 6) + (2 ^ (1 + tail) * 2 ^ (1 + tail)) * 7
+                 = 4 ^ (1 + tail) * (8 * base + 6) + 4 ^ (1 + tail) * 7
+                     by Equality.congruence(
+                       (candidate : ℕ) ↦ 4 ^ (1 + tail) * (8 * base + 6) + candidate * 7,
+                       2 ^ (1 + tail) * 2 ^ (1 + tail), 4 ^ (1 + tail),
+                       Natural.two_power_square_is_four_power(1 + tail))
+                 = 4 ^ (1 + tail) * (8 * (1 + base) + 5) by ring
+                 = 4 ^ exponent * (8 * (1 + base) + 5) by substituting Equality.symmetry(exponentReads)
+                 = 4 ^ exponent * (8 * b + 5) by substituting Equality.symmetry(bReads)
+                 = 2 * m by Equality.symmetry(obstructionReads)
+              as completed;
+              witness residual with witness correction with And.introduction(represented, completed)
+            }
+          }
+        }
+      }
+    }
+  }
+}

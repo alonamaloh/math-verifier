@@ -1,0 +1,85 @@
+-- Algebra/exceptional_representation.math
+--
+-- A small represented-set interface for the exceptional rank-four forms.
+-- Such a form represents every positive integer except its truant.  Once
+-- this fact is known, every genuine escalation is universal: the leading
+-- block represents all other targets, while the new basis vector represents
+-- the truant.
+
+module Algebra.exceptional_representation
+
+import Algebra.escalation
+
+definition Matrix.RepresentsEveryPositiveExcept {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) (exception : ℕ) : Proposition :=
+  ∀ (m : ℕ). m ≥ 1 → m ≠ exception → Matrix.Represents(A, (m : ℤ))
+
+theorem Matrix.isometric_representsEveryPositiveExcept {n : ℕ}
+        (A B : Matrix(Integer.commutative_ring_bundle, n, n)) (exception : ℕ)
+        (isometric : Matrix.IsIsometric(A, B))
+        (representedSet : Matrix.RepresentsEveryPositiveExcept(B, exception))
+        : Matrix.RepresentsEveryPositiveExcept(A, exception) := {
+  take m : ℕ;
+  suppose m ≥ 1;
+  suppose m ≠ exception;
+  Matrix.Represents(B, (m : ℤ)) by representedSet(m, done, done);
+  done by Matrix.isometric_represents(isometric := isometric)
+}
+
+theorem Matrix.universal_of_exceptional_sublattice {n k : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (E : Matrix(Integer.commutative_ring_bundle, k, k))
+        (M : Matrix(Integer.commutative_ring_bundle, n, k))
+        (exception : ℕ)
+        (pullback : Mᵀ * A * M = E)
+        (representedSet : Matrix.RepresentsEveryPositiveExcept(E, exception))
+        (exceptionRepresented : Matrix.Represents(A, (exception : ℤ)))
+        : Matrix.IsUniversal(A) := {
+  take m : ℕ;
+  suppose m ≥ 1 as positive;
+  m = exception ∨ m ≠ exception by Logic.excluded_middle(m = exception);
+  done by cases {
+    case m = exception as isException: {
+      Matrix.Represents(A, (exception : ℤ)) by exceptionRepresented;
+      done by substituting Equality.symmetry(isException)
+    }
+    case m ≠ exception as isNotException: {
+      Matrix.Represents(E, (m : ℤ)) by representedSet(m, positive, isNotException);
+      Matrix.Represents(Mᵀ * A * M, (m : ℤ)) by substituting Equality.symmetry(pullback)
+          as pullbackRepresents;
+      done by Matrix.represents_of_sublattice(A, M, (m : ℤ), pullbackRepresents)
+    }
+  }
+}
+
+theorem Matrix.escalation_universal_of_parent_representsEveryPositiveExceptTruant {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + n, 1 + n))
+        (escalation : Matrix.IsEscalation(A, B))
+        (representedSet : Matrix.RepresentsEveryPositiveExcept(A, Matrix.truant(A)))
+        : Matrix.IsUniversal(B) := {
+  take m : ℕ;
+  suppose m ≥ 1 as positive;
+  m = Matrix.truant(A) ∨ m ≠ Matrix.truant(A) by Logic.excluded_middle(m = Matrix.truant(A));
+  done by cases {
+    case m = Matrix.truant(A) as isTruant: {
+      Matrix.Represents(B, (Matrix.truant(A) : ℤ))
+          by Matrix.escalation_represents_truant(A, B, escalation);
+      done by substituting isTruant
+    }
+    case m ≠ Matrix.truant(A) as isNotTruant: {
+      Matrix.Represents(A, (m : ℤ)) by representedSet(m, positive, isNotTruant)
+          as parentRepresents;
+      choose y : RingVector(Integer.commutative_ring_bundle, n) such that
+          Matrix.quadraticForm(A, y) = (m : ℤ) as parentValue from parentRepresents;
+      Matrix.leadingBlock(B) = A by Matrix.IsEscalation.block(A, B, escalation) as blockReads;
+      Matrix.quadraticForm(B, RingVector.extend(y))
+         = Matrix.quadraticForm(Matrix.leadingBlock(B), y)
+             by Equality.symmetry(Matrix.quadraticForm_submatrix(
+               B, NaturalsBelow.inclusion(n), y))
+         = Matrix.quadraticForm(A, y) by substituting blockReads
+         = (m : ℤ) by parentValue;
+      witness RingVector.extend(y) with done
+    }
+  }
+}

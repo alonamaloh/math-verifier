@@ -1,0 +1,370 @@
+-- Algebra/one_three_six_converse_reduction.math
+--
+-- The exact local converse for x²+3y²+6z² is not an independent
+-- classical input.  Doubling the target converts its 4-adic obstruction
+-- into Legendre's three-square obstruction.  A representation of 2n by
+-- three squares descends to
+--
+--   n = a² + b² + 2c².
+--
+-- If n is a square modulo three, one of a²,b² agrees with c² modulo
+-- three.  After a sign change, write that coordinate as c+3z; then
+--
+--   (c+3z)² + 2c² = 3(c+z)² + 6z².
+
+module Algebra.one_three_six_converse_reduction
+
+import Algebra.odd_five_converse_reduction
+import Algebra.rank_four_weighted_d3_third_unit_universality
+import IntegerMod.wilson
+
+theorem IntegerMod.insert_zero_product_right
+        (x coefficient : IntegerMod(3))
+        : x = x + coefficient * IntegerMod.zero(3) := {
+  x
+     = x + IntegerMod.zero(3)
+         by Equality.symmetry(IntegerMod.add_identity_right(3, x))
+     = x + coefficient * IntegerMod.zero(3)
+         by substituting Equality.symmetry(IntegerMod.multiply_zero(3, coefficient));
+  done
+}
+
+theorem IntegerMod.insert_two_additive_zeros
+        (x : IntegerMod(3))
+        : x = IntegerMod.zero(3) + IntegerMod.zero(3) + x := {
+  x
+     = IntegerMod.zero(3) + x
+         by Equality.symmetry(IntegerMod.add_identity_left(3, x))
+     = (IntegerMod.zero(3) + IntegerMod.zero(3)) + x
+         by substituting Equality.symmetry(
+           IntegerMod.add_identity_left(3, IntegerMod.zero(3)));
+  done
+}
+
+theorem IntegerMod.square_pair_matches_weighted_square_mod_three
+        (a b c w : IntegerMod(3))
+        (valueReads : a * a + b * b + IntegerMod.residue(3, 2) * (c * c) = w * w)
+        : a * a = c * c ∨ b * b = c * c := {
+  a * a = IntegerMod.zero(3) ∨ a * a = IntegerMod.one(3)
+      by IntegerMod.square_mod_three(a);
+  b * b = IntegerMod.zero(3) ∨ b * b = IntegerMod.one(3)
+      by IntegerMod.square_mod_three(b);
+  c * c = IntegerMod.zero(3) ∨ c * c = IntegerMod.one(3)
+      by IntegerMod.square_mod_three(c);
+  w * w = IntegerMod.zero(3) ∨ w * w = IntegerMod.one(3)
+      by IntegerMod.square_mod_three(w);
+  done by cases {
+    case c * c = IntegerMod.zero(3) as cZero: done by cases {
+      case a * a = IntegerMod.zero(3) as aZero: {
+        a * a = c * c by {
+          a * a = IntegerMod.zero(3) by aZero
+              = c * c by Equality.symmetry(cZero)
+        } as matching;
+        done by Or.introduceLeft(matching)
+      }
+      case a * a = IntegerMod.one(3) as aOne: done by cases {
+        case b * b = IntegerMod.zero(3) as bZero: {
+          b * b = c * c by {
+            b * b = IntegerMod.zero(3) by bZero
+                = c * c by Equality.symmetry(cZero)
+          } as matching;
+          done by Or.introduceRight(matching)
+        }
+        case b * b = IntegerMod.one(3) as bOne: done by cases {
+          case w * w = IntegerMod.zero(3) as wZero: {
+            IntegerMod.residue(3, 2)
+               = IntegerMod.one(3) + IntegerMod.one(3)
+                   by Equality.symmetry(
+                     IntegerMod.make_equal_of_difference_multiple(3, 2, 2, 0, done))
+               = a * a + b * b + IntegerMod.residue(3, 2) * (c * c)
+                   by {
+                     IntegerMod.one(3) + IntegerMod.one(3)
+                        = a * a + IntegerMod.one(3) by substituting Equality.symmetry(aOne)
+                        = a * a + b * b by substituting Equality.symmetry(bOne)
+                        = a * a + b * b + IntegerMod.residue(3, 2) * IntegerMod.zero(3)
+                            by IntegerMod.insert_zero_product_right(
+                              a * a + b * b, IntegerMod.residue(3, 2))
+                        = a * a + b * b + IntegerMod.residue(3, 2) * (c * c)
+                            by substituting Equality.symmetry(cZero);
+                     done
+                   }
+               = w * w by valueReads
+               = IntegerMod.zero(3) by wZero
+            as impossible;
+            False by IntegerMod.residue_distinct_below_modulus(
+                3, 2, 0, done, done, done, impossible);
+            done
+          }
+          case w * w = IntegerMod.one(3) as wOne: {
+            IntegerMod.residue(3, 2)
+               = IntegerMod.one(3) + IntegerMod.one(3)
+                   by Equality.symmetry(
+                     IntegerMod.make_equal_of_difference_multiple(3, 2, 2, 0, done))
+               = a * a + b * b + IntegerMod.residue(3, 2) * (c * c)
+                   by {
+                     IntegerMod.one(3) + IntegerMod.one(3)
+                        = a * a + IntegerMod.one(3) by substituting Equality.symmetry(aOne)
+                        = a * a + b * b by substituting Equality.symmetry(bOne)
+                        = a * a + b * b + IntegerMod.residue(3, 2) * IntegerMod.zero(3)
+                            by IntegerMod.insert_zero_product_right(
+                              a * a + b * b, IntegerMod.residue(3, 2))
+                        = a * a + b * b + IntegerMod.residue(3, 2) * (c * c)
+                            by substituting Equality.symmetry(cZero);
+                     done
+                   }
+               = w * w by valueReads
+               = IntegerMod.one(3) by wOne
+            as impossible;
+            False by IntegerMod.residue_distinct_below_modulus(
+                3, 2, 1, done, done, done, impossible);
+            done
+          }
+        }
+      }
+    }
+    case c * c = IntegerMod.one(3) as cOne: done by cases {
+      case a * a = IntegerMod.zero(3) as aZero: done by cases {
+        case b * b = IntegerMod.zero(3) as bZero: done by cases {
+          case w * w = IntegerMod.zero(3) as wZero: {
+            IntegerMod.residue(3, 2)
+               = IntegerMod.residue(3, 2) * IntegerMod.one(3)
+                   by Equality.symmetry(
+                     IntegerMod.multiply_identity_right(3, IntegerMod.residue(3, 2)))
+               = a * a + b * b + IntegerMod.residue(3, 2) * (c * c)
+                   by {
+                     IntegerMod.residue(3, 2) * IntegerMod.one(3)
+                        = IntegerMod.zero(3) + IntegerMod.zero(3)
+                          + IntegerMod.residue(3, 2) * IntegerMod.one(3)
+                            by IntegerMod.insert_two_additive_zeros(
+                              IntegerMod.residue(3, 2) * IntegerMod.one(3))
+                        = a * a + IntegerMod.zero(3)
+                          + IntegerMod.residue(3, 2) * IntegerMod.one(3)
+                            by substituting Equality.symmetry(aZero)
+                        = a * a + b * b
+                          + IntegerMod.residue(3, 2) * IntegerMod.one(3)
+                            by substituting Equality.symmetry(bZero)
+                        = a * a + b * b + IntegerMod.residue(3, 2) * (c * c)
+                            by substituting Equality.symmetry(cOne);
+                     done
+                   }
+               = w * w by valueReads
+               = IntegerMod.zero(3) by wZero
+            as impossible;
+            False by IntegerMod.residue_distinct_below_modulus(
+                3, 2, 0, done, done, done, impossible);
+            done
+          }
+          case w * w = IntegerMod.one(3) as wOne: {
+            IntegerMod.residue(3, 2)
+               = IntegerMod.residue(3, 2) * IntegerMod.one(3)
+                   by Equality.symmetry(
+                     IntegerMod.multiply_identity_right(3, IntegerMod.residue(3, 2)))
+               = a * a + b * b + IntegerMod.residue(3, 2) * (c * c)
+                   by {
+                     IntegerMod.residue(3, 2) * IntegerMod.one(3)
+                        = IntegerMod.zero(3) + IntegerMod.zero(3)
+                          + IntegerMod.residue(3, 2) * IntegerMod.one(3)
+                            by IntegerMod.insert_two_additive_zeros(
+                              IntegerMod.residue(3, 2) * IntegerMod.one(3))
+                        = a * a + IntegerMod.zero(3)
+                          + IntegerMod.residue(3, 2) * IntegerMod.one(3)
+                            by substituting Equality.symmetry(aZero)
+                        = a * a + b * b
+                          + IntegerMod.residue(3, 2) * IntegerMod.one(3)
+                            by substituting Equality.symmetry(bZero)
+                        = a * a + b * b + IntegerMod.residue(3, 2) * (c * c)
+                            by substituting Equality.symmetry(cOne);
+                     done
+                   }
+               = w * w by valueReads
+               = IntegerMod.one(3) by wOne
+            as impossible;
+            False by IntegerMod.residue_distinct_below_modulus(
+                3, 2, 1, done, done, done, impossible);
+            done
+          }
+        }
+        case b * b = IntegerMod.one(3) as bOne: {
+          b * b = c * c by {
+            b * b = IntegerMod.one(3) by bOne
+                = c * c by Equality.symmetry(cOne)
+          } as matching;
+          done by Or.introduceRight(matching)
+        }
+      }
+      case a * a = IntegerMod.one(3) as aOne: {
+        a * a = c * c by {
+          a * a = IntegerMod.one(3) by aOne
+              = c * c by Equality.symmetry(cOne)
+        } as matching;
+        done by Or.introduceLeft(matching)
+      }
+    }
+  }
+}
+
+theorem Integer.square_pair_matches_weighted_square_mod_three
+        (a b c n w : ℤ)
+        (valueReads : a * a + b * b + 2 * (c * c) = n)
+        (targetSquare : IntegerMod.make(3, n) = IntegerMod.make(3, w * w))
+        : Integer.divides(3, a * a - c * c)
+          ∨ Integer.divides(3, b * b - c * c) := {
+  let aMod : IntegerMod(3) := IntegerMod.make(3, a);
+  let bMod : IntegerMod(3) := IntegerMod.make(3, b);
+  let cMod : IntegerMod(3) := IntegerMod.make(3, c);
+  let wMod : IntegerMod(3) := IntegerMod.make(3, w);
+  aMod * aMod + bMod * bMod + IntegerMod.residue(3, 2) * (cMod * cMod)
+     = IntegerMod.make(3, a * a + b * b + 2 * (c * c))
+     = IntegerMod.make(3, n) by substituting valueReads
+     = IntegerMod.make(3, w * w) by targetSquare
+     = wMod * wMod
+  as modularValue;
+  aMod * aMod = cMod * cMod ∨ bMod * bMod = cMod * cMod
+      by IntegerMod.square_pair_matches_weighted_square_mod_three(
+          aMod, bMod, cMod, wMod, modularValue);
+  done by cases {
+    case aMod * aMod = cMod * cMod as matching: {
+      IntegerMod.make(3, a * a) = IntegerMod.make(3, c * c) by {
+        IntegerMod.make(3, a * a)
+           = aMod * aMod
+           = cMod * cMod by matching
+           = IntegerMod.make(3, c * c)
+      } as congruent;
+      Integer.CongruentModulo(3, a * a, c * c)
+          by Quotient.equal_implies_equivalent(a * a, c * c, congruent);
+      done by Or.introduceLeft(done)
+    }
+    case bMod * bMod = cMod * cMod as matching: {
+      IntegerMod.make(3, b * b) = IntegerMod.make(3, c * c) by {
+        IntegerMod.make(3, b * b)
+           = bMod * bMod
+           = cMod * cMod by matching
+           = IntegerMod.make(3, c * c)
+      } as congruent;
+      Integer.CongruentModulo(3, b * b, c * c)
+          by Quotient.equal_implies_equivalent(b * b, c * c, congruent);
+      done by Or.introduceRight(done)
+    }
+  }
+}
+
+theorem Integer.one_three_six_representation_of_square_square_double
+        (a b c n w : ℤ)
+        (valueReads : a * a + b * b + 2 * (c * c) = n)
+        (targetSquare : IntegerMod.make(3, n) = IntegerMod.make(3, w * w))
+        : ∃ (x y z : ℤ). x * x + 3 * (y * y) + 6 * (z * z) = n := {
+  Integer.divides(3, a * a - c * c)
+      ∨ Integer.divides(3, b * b - c * c)
+      by Integer.square_pair_matches_weighted_square_mod_three(
+          a, b, c, n, w, valueReads, targetSquare);
+  done by cases {
+    case Integer.divides(3, a * a - c * c) as matching: {
+      choose signed : ℤ, z : ℤ such that
+          (signed = a ∨ signed = -a) ∧ signed = 3 * z + c
+          as signedChoice from Integer.choose_sign_congruent_mod_three(a, c, matching);
+      signed = a ∨ signed = -a
+          by And.left(signed = a ∨ signed = -a, signed = 3 * z + c, signedChoice)
+          as signReads;
+      signed = 3 * z + c
+          by And.right(signed = a ∨ signed = -a, signed = 3 * z + c, signedChoice)
+          as signedReads;
+      signed * signed = a * a by Or.eliminate(
+        signed = a, signed = -a, signed * signed = a * a,
+        (signedEquals : signed = a) ↦ {
+          signed * signed = a * a by substituting signedEquals;
+          done
+        },
+        (signedEquals : signed = -a) ↦ {
+          signed * signed
+             = (-a) * (-a) by substituting signedEquals
+             = a * a by Ring.negate_multiply_negate(
+               ℤ, Integer.add, Integer.zero, Integer.negate, Integer.multiply, Integer.one,
+               Integer.is_ring, a, a);
+          done
+        },
+        signReads)
+      as signedSquare;
+      witness b with witness c + z with witness z with
+        b * b + 3 * ((c + z) * (c + z)) + 6 * (z * z)
+           = b * b + (3 * z + c) * (3 * z + c) + 2 * (c * c) by ring
+           = b * b + signed * signed + 2 * (c * c)
+               by substituting Equality.symmetry(signedReads)
+           = b * b + a * a + 2 * (c * c) by substituting signedSquare
+           = a * a + b * b + 2 * (c * c) by ring
+           = n by valueReads
+    }
+    case Integer.divides(3, b * b - c * c) as matching: {
+      choose signed : ℤ, z : ℤ such that
+          (signed = b ∨ signed = -b) ∧ signed = 3 * z + c
+          as signedChoice from Integer.choose_sign_congruent_mod_three(b, c, matching);
+      signed = b ∨ signed = -b
+          by And.left(signed = b ∨ signed = -b, signed = 3 * z + c, signedChoice)
+          as signReads;
+      signed = 3 * z + c
+          by And.right(signed = b ∨ signed = -b, signed = 3 * z + c, signedChoice)
+          as signedReads;
+      signed * signed = b * b by Or.eliminate(
+        signed = b, signed = -b, signed * signed = b * b,
+        (signedEquals : signed = b) ↦ {
+          signed * signed = b * b by substituting signedEquals;
+          done
+        },
+        (signedEquals : signed = -b) ↦ {
+          signed * signed
+             = (-b) * (-b) by substituting signedEquals
+             = b * b by Ring.negate_multiply_negate(
+               ℤ, Integer.add, Integer.zero, Integer.negate, Integer.multiply, Integer.one,
+               Integer.is_ring, b, b);
+          done
+        },
+        signReads)
+      as signedSquare;
+      witness a with witness c + z with witness z with
+        a * a + 3 * ((c + z) * (c + z)) + 6 * (z * z)
+           = a * a + (3 * z + c) * (3 * z + c) + 2 * (c * c) by ring
+           = a * a + signed * signed + 2 * (c * c)
+               by substituting Equality.symmetry(signedReads)
+           = a * a + b * b + 2 * (c * c) by substituting signedSquare
+           = n by valueReads
+    }
+  }
+}
+
+theorem Matrix.one_three_six_local_converse_of_three_squares
+        (converse : Matrix.ThreeSquaresConverse)
+        : Matrix.OneThreeSixLocalConverse := {
+  take n : ℕ;
+  take w : ℤ;
+  suppose IntegerMod.make(3, (n : ℤ)) = IntegerMod.make(3, w * w)
+      as targetSquare;
+  suppose ¬(Natural.IsOneThreeSixFourObstruction(n)) as admissible;
+  ¬(Natural.IsThreeSquareObstruction(2 * n))
+      by Natural.double_not_three_square_obstruction_of_not_one_three_six_four_obstruction(
+          n, admissible) as doubledAdmissible;
+  Integer.ThreeSquaresConverse
+      by Integer.three_squares_converse_of_matrix(converse) as integerConverse;
+  Integer.ThreeSquareRepresentation(((2 * n : ℕ) : ℤ))
+      by integerConverse(2 * n, doubledAdmissible);
+  ((2 * n : ℕ) : ℤ) = 2 * (n : ℤ)
+      by Natural.to_integer.multiply_preserves as doubleCast;
+  Integer.ThreeSquareRepresentation(2 * (n : ℤ))
+      by substituting Equality.symmetry(doubleCast) as representedDouble;
+  choose a : ℤ, b : ℤ, c : ℤ such that
+      a * a + b * b + 2 * (c * c) = (n : ℤ)
+      as squareSquareDouble
+      from Integer.three_square_representation_of_double_to_square_square_double(
+          (n : ℤ), representedDouble);
+  choose x : ℤ, y : ℤ, z : ℤ such that
+      x * x + 3 * (y * y) + 6 * (z * z) = (n : ℤ)
+      as scalarComputation
+      from Integer.one_three_six_representation_of_square_square_double(
+          a, b, c, (n : ℤ), w, squareSquareDouble, targetSquare);
+  done by Matrix.represents_by_witness(
+      Matrix.oneThreeSixForm, target := (n : ℤ), vector := ⟨x, y, z⟩,
+      computes := {
+        Matrix.quadraticForm(Matrix.oneThreeSixForm, ⟨x, y, z⟩)
+           = x * x + 3 * (y * y) + 6 * (z * z)
+               by Matrix.oneThreeSixForm_coordinateTuple_value
+           = (n : ℤ) by scalarComputation
+      })
+}

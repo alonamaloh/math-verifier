@@ -1,0 +1,139 @@
+-- Algebra/rank_four_exceptional_odd_c4_r0_c3.math
+--
+-- Lift the one-two-six residual cover to the exceptional rank-four form
+--
+--   Q(x,y,z,w) = x² + 2y² + 2yz + 4z² + 3w²,
+--
+-- and discharge all of its further escalations.
+
+module Algebra.rank_four_exceptional_odd_c4_r0_c3
+
+import Algebra.exceptional_representation
+import Algebra.rank_four_exceptional_truants
+import Algebra.rank_four_exceptional_odd_c4_r0_c3_cover
+
+theorem Matrix.oddC4R0C3_representsEveryPositiveExceptTen_of_cover
+        (cover : Matrix.OneTwoSixDoubledTargetCoverExcept(7, 10))
+        : Matrix.RepresentsEveryPositiveExcept(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 0, 3), 10) := {
+  take m : ℕ;
+  suppose m ≥ 1 as positive;
+  suppose m ≠ 10 as notTen;
+  choose residual : ℕ, correction : ℕ such that
+      Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(6), (residual : ℤ))
+      ∧ residual + correction * correction * 7 = 2 * m as covered from cover(m, positive, notTen);
+  Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(6), (residual : ℤ))
+      by And.left(
+        Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(6), (residual : ℤ)),
+        residual + correction * correction * 7 = 2 * m, covered)
+      as residualRepresented;
+  residual + correction * correction * 7 = 2 * m
+      by And.right(
+        Matrix.Represents(Matrix.squarePlusDoublePlusScaledSquareForm(6), (residual : ℤ)),
+        residual + correction * correction * 7 = 2 * m, covered)
+      as naturalCompleted;
+  choose vector : RingVector(Integer.commutative_ring_bundle, 3) such that
+      Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(6), vector) = (residual : ℤ)
+      as residualValue from residualRepresented;
+  let u : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.firstOfTwo));
+  let x : ℤ := vector(NaturalsBelow.inclusion(2, NaturalsBelow.secondOfTwo));
+  let w : ℤ := vector(NaturalsBelow.top(2));
+  vector = (⟨u, x, w⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+      by RingVector.eq_threeCoordinates(vector) as vectorReads;
+  u * u + 2 * (x * x) + 6 * (w * w)
+     = Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(6), ⟨u, x, w⟩)
+         by Equality.symmetry(Matrix.squarePlusDoublePlusScaledSquareForm_coordinateTuple_value(6, u, x, w))
+     = Matrix.quadraticForm(Matrix.squarePlusDoublePlusScaledSquareForm(6), vector)
+         by substituting Equality.symmetry(vectorReads)
+     = (residual : ℤ) by residualValue
+  as residualReads;
+  Natural.to_integer(residual + correction * correction * 7)
+     = Natural.to_integer(2 * m)
+      by Equality.congruence(
+        (value : ℕ) ↦ Natural.to_integer(value),
+        residual + correction * correction * 7, 2 * m, naturalCompleted)
+  as embeddedNaturalCompleted;
+  Natural.to_integer(residual + correction * correction * 7)
+     = (residual : ℤ) + (correction : ℤ) * (correction : ℤ) * 7 by {
+       Natural.to_integer(residual + correction * correction * 7)
+          = (residual : ℤ) + Natural.to_integer(correction * correction * 7)
+              by Natural.to_integer.add_preserves
+          = (residual : ℤ) + Natural.to_integer(correction * correction) * Natural.to_integer(7)
+              by substituting Natural.to_integer.multiply_preserves(correction * correction, 7)
+          = (residual : ℤ) + ((correction : ℤ) * (correction : ℤ)) * 7
+              by substituting Natural.to_integer.multiply_preserves(correction, correction);
+       done
+     }
+  as expandedNaturalLeft;
+  (residual : ℤ) + (correction : ℤ) * (correction : ℤ) * 7
+     = Natural.to_integer(residual + correction * correction * 7)
+         by Equality.symmetry(expandedNaturalLeft)
+     = Natural.to_integer(2 * m) by embeddedNaturalCompleted
+     = 2 * (m : ℤ) by Natural.to_integer.multiply_preserves
+  as castCompleted;
+  u * u + 2 * (x * x) + 6 * (w * w) + 7 * ((correction : ℤ) * (correction : ℤ))
+     = (u * u + 2 * (x * x) + 6 * (w * w))
+       + (correction : ℤ) * (correction : ℤ) * 7 by ring
+     = (residual : ℤ) + (correction : ℤ) * (correction : ℤ) * 7 by substituting residualReads
+     = 2 * (m : ℤ) by castCompleted
+  as completed;
+  Integer.divides(2, u - (correction : ℤ))
+      by Integer.weightedD3_second_unit_compatible(
+        u, x, w, (correction : ℤ), (m : ℤ), 3, completed)
+      as compatible;
+  choose y : ℤ such that u - (correction : ℤ) = 2 * y as differenceReads from compatible;
+  u = 2 * y + (correction : ℤ) by linear_combination(differenceReads) as uReads;
+  2 * (x * x + 2 * (y * y) + 2 * y * (correction : ℤ) + 4 * ((correction : ℤ) * (correction : ℤ))
+      + 3 * (w * w))
+     = (2 * y + (correction : ℤ)) * (2 * y + (correction : ℤ)) + 2 * (x * x)
+       + 6 * (w * w) + 7 * ((correction : ℤ) * (correction : ℤ)) by ring
+     = u * u + 2 * (x * x) + 6 * (w * w) + 7 * ((correction : ℤ) * (correction : ℤ))
+         by substituting Equality.symmetry(uReads)
+     = 2 * (m : ℤ) by completed
+  as doubledScalar;
+  x * x + 2 * (y * y) + 2 * y * (correction : ℤ) + 4 * ((correction : ℤ) * (correction : ℤ))
+      + 3 * (w * w) = (m : ℤ)
+      by Integer.multiply_cancel_left_by_nonzero(
+        x * x + 2 * (y * y) + 2 * y * (correction : ℤ) + 4 * ((correction : ℤ) * (correction : ℤ))
+          + 3 * (w * w), (m : ℤ), 2, done, doubledScalar)
+      as scalarCore;
+  x * x + 2 * (y * y) + 2 * y * (correction : ℤ) + 4 * ((correction : ℤ) * (correction : ℤ))
+      + 2 * 0 * y * w + 3 * (w * w) = (m : ℤ) by {
+    x * x + 2 * (y * y) + 2 * y * (correction : ℤ) + 4 * ((correction : ℤ) * (correction : ℤ))
+        + 2 * 0 * y * w + 3 * (w * w)
+       = x * x + 2 * (y * y) + 2 * y * (correction : ℤ) + 4 * ((correction : ℤ) * (correction : ℤ))
+         + 3 * (w * w) by ring
+       = (m : ℤ) by scalarCore;
+    done
+  } as scalarComputation;
+  done by Matrix.represents_by_witness(
+    Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 0, 3),
+    target := m, vector := ⟨x, y, (correction : ℤ), w⟩,
+    computes := Matrix.squarePlusDoubleSquareOddRankFourRepresentative_coordinateTuple_computes(
+      scalarComputation := scalarComputation))
+}
+
+theorem Matrix.oddC4R0C3_representsEveryPositiveExceptTen
+        (converse : Matrix.OneTwoSixConverse)
+        : Matrix.RepresentsEveryPositiveExcept(
+            Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 0, 3), 10) :=
+  by Matrix.oddC4R0C3_representsEveryPositiveExceptTen_of_cover(
+    Matrix.oddC4R0C3_oneTwoSixDoubledTargetCoverExceptTen(converse))
+
+theorem Matrix.oddC4R0C3_escalation_universal
+        (B : Matrix(Integer.commutative_ring_bundle, 1 + 4, 1 + 4))
+        (escalation : Matrix.IsEscalation(
+          Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 0, 3), B))
+        (converse : Matrix.OneTwoSixConverse)
+        : Matrix.IsUniversal(B) := {
+  let A : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+      Matrix.squarePlusDoubleSquareOddRankFourRepresentative(4, 0, 3);
+  Matrix.truant(A) = 10 by Matrix.truant_equals(
+      isTruant := Matrix.oddC4R0C3_truant_ten) as truantReads;
+  Matrix.RepresentsEveryPositiveExcept(A, 10)
+      by Matrix.oddC4R0C3_representsEveryPositiveExceptTen(converse);
+  Matrix.RepresentsEveryPositiveExcept(A, Matrix.truant(A)) by substituting truantReads
+      as representedExceptTruant;
+  done by Matrix.escalation_universal_of_parent_representsEveryPositiveExceptTruant(
+    A, B, escalation, representedExceptTruant)
+}
