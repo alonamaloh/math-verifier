@@ -250,7 +250,10 @@ rank-four escalator by 207 selected normal forms are.
   unscaled quotients for `c=5` and the first two 4-adic scales for `c=9`
   before reaching their uniform residual cores.  The import-only
   `Algebra/rank_four_weighted_d3_third_unit_covers` collects these results,
-  raises the selected conditional total to 78.
+  raises the selected conditional total to 78. The exact local converse is
+  no longer an independent assumption:
+  `Algebra/one_three_six_converse_reduction` derives it from
+  `Matrix.ThreeSquaresConverse` by the integral index-three recovery.
 
 The next weighted-`d=3` family has both reduced border residues equal to one.
 Completing both coordinates gives

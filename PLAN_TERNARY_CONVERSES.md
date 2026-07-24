@@ -31,7 +31,7 @@ forms.  Thus the universality target is 201 forms.
 | `x²+y²+3z²` | 3 | 2, 3 | not `9^a(9b+6)` | 9 | Published regular form. Keep `Matrix.TripleSquaresConverse` explicit until the shared deep route is chosen. |
 | `x²+2y²+3z²` | 6 | 2, 3 | not `4^a(16b+10)` | 8 | Published regular form; `Matrix.OneTwoThreeConverse` remains deep. |
 | `x²+2y²+6z²` | 12 | 2, 3 | not `4^a(8b+5)` | 7 | Published regular form; `Matrix.OneTwoSixConverse` remains deep. No elementary reduction is currently known. |
-| `x²+3y²+6z²` | 18 | 2, 3 | square mod 3 and not `4^a(16b+14)` | 8 | The index-three recovery is proved in `PROOF_REMAINING_TERNARY_CONVERSES.md`, Section 6: reduce to `x²+u²+2v²`, then use the mod-3 square condition to arrange `u ≡ v`. No independent genus input remains. |
+| `x²+3y²+6z²` | 18 | 2, 3 | square mod 3 and not `4^a(16b+14)` | 8 | **Proved reduction.** `Matrix.one_three_six_local_converse_of_three_squares` implements the Section 6 index-three recovery. No independent genus input remains. |
 | `2x²+3y²+6z²` | 36 | 2, 3 | twice a square mod 3 and not `4^a(8b+7)` | 7 | Published regular form. It embeds as an index-six sublattice of three squares; integral recovery is not yet proved. |
 | `x²+2y²+4z²` | 8 | 2 | not `4^a(16b+14)` | included in the 103 | **Proved reduction.** `Matrix.one_two_four_converse_of_three_squares` derives it from three squares. |
 | `x²+2y²+5z²` | 10 | 2, 5 | not `25^a(25b+10)` or `25^a(25b+15)` | 33 | Genuine deep input. The form is alone in its genus, so a genus route is valid; a specialized Mordell route is also known. See `PLAN_ONE_TWO_FIVE_CONVERSE.md`. |
@@ -111,7 +111,7 @@ The generator records 586 explicit base witnesses below the uniform tails,
 split at 20 rows per theorem.  All 12 selected forms are now conditionally
 universal from `Matrix.ThreeSquaresConverse`.
 
-### Completed mathematically: one-three-six; remaining candidate: two-three-six
+### Completed in the kernel: one-three-six; remaining candidate: two-three-six
 
 The two useful identities are:
 
@@ -126,13 +126,14 @@ x² + 3y² + 6z²
 For the first identity, the image lattice has index six; its simultaneous
 modulo-two and modulo-three recovery is still a pilot.
 
-For the second, the recovery is complete in
-`PROOF_REMAINING_TERNARY_CONVERSES.md`, Section 6.  A representation by
+For the second, the recovery from
+`PROOF_REMAINING_TERNARY_CONVERSES.md`, Section 6 is implemented in
+`Algebra/one_three_six_converse_reduction`. A representation by
 `x²+u²+2v²` is obtained from three squares after doubling the target.  The
 square-modulo-three hypothesis lets us exchange and sign the two
 coefficient-one roots so that `u ≡ v (mod 3)`, giving integral inverse
 coordinates.  This removes the independent one-three-six genus input
-mathematically; the `.math` theorem remains to be implemented.
+from both the mathematical and kernel dependency ledgers.
 
 No elementary reduction for `x²+2y²+6z²` is currently known, and none is
 claimed by this plan.

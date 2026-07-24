@@ -229,9 +229,9 @@ classical interface.
   the small-vector bound leaves more than a binary complement.
 - Prove the exact local predicates already exposed by the library.
 - Discharge the class-one cases.
-- Implement the completed one-three-six recovery, and continue the
-  two-three-six index-lattice experiment; if the latter succeeds with only
-  elementary transformations, delete its deep client.
+- Reuse the completed `Matrix.one_three_six_local_converse_of_three_squares`
+  reduction, and continue the two-three-six index-lattice experiment; if the
+  latter succeeds with only elementary transformations, delete its deep client.
 
 **Gate:** discharge the remaining regular-form interfaces, or record a precise
 counterexample to the class-one route and use the published specialized
