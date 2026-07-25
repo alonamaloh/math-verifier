@@ -5,13 +5,32 @@
 -- the form can only absorb by dividing every coordinate, and the quotient
 -- form lands on a value it visibly misses.
 --
---   x² + y² + 3z² misses 54, because 54 = 9·6 and descending by three
---   twice leaves 3x² + 3y² + z² = 2.
+--   x² + y² + 3z²  misses   54, because 54 = 9·6 and descending by three
+--                                twice leaves 3x² + 3y² + z² = 2;
+--   x² + 2y² + 5z² misses 1000, because 1000 = 25·40 and descending by
+--                                five leaves z² ≡ 3 modulo five.
 
 module Algebra.rank_three_exclusion_descents
 
 import Algebra.rank_three_exclusion_reductions
+import Algebra.residue_arithmetic_generated
 import Algebra.triple_squares_one_three_three
+
+-- ----------------------------------------------------------------------
+-- A class of zero is a divisibility.
+
+theorem Integer.divides_of_class_zero (modulus : ℕ) (value : ℤ)
+        (classZero : IntegerMod.make(modulus, value) = IntegerMod.residue(modulus, 0))
+        : Integer.divides((modulus : ℤ), value) := {
+  IntegerMod.make(modulus, value)
+     = IntegerMod.residue(modulus, 0) by classZero
+     = IntegerMod.make(modulus, 0)
+         by IntegerMod.make_equal_of_difference_multiple(multiple := 0)
+  as makeZero;
+  Integer.CongruentModulo(modulus, value, 0)
+      by Quotient.equal_implies_equivalent(value, 0, makeZero) as congruent;
+  done by Integer.divides_of_congruent_zero(modulus, value, congruent)
+}
 
 -- ----------------------------------------------------------------------
 -- Divisibility by three, read off a residue.
@@ -175,4 +194,370 @@ theorem Matrix.sumOfTwoSquaresPlusTripleSquareForm_not_represents_fifty_four
   ∃ (x y z : ℤ). x * x + y * y + 3 * (z * z) = 6
       by Integer.two_squares_plus_triple_square_descent(a, b, c, 6, nineMultiple);
   done by Integer.two_squares_plus_triple_square_not_six
+}
+
+-- ----------------------------------------------------------------------
+-- Divisibility by five, read off a residue.
+
+theorem Integer.five_divides_of_square_plus_double_square_multiple
+        (a b multiple : ℤ) (sumReads : a * a + 2 * (b * b) = 5 * multiple)
+        : Integer.divides(5, a) ∧ Integer.divides(5, b) := {
+  let aMod : IntegerMod(5) := IntegerMod.make(5, a);
+  let bMod : IntegerMod(5) := IntegerMod.make(5, b);
+  aMod * aMod + IntegerMod.make(5, (2 : ℤ)) * (bMod * bMod)
+     = IntegerMod.make(5, a * a + 2 * (b * b))
+     = IntegerMod.make(5, 5 * multiple) by substituting sumReads
+     = IntegerMod.residue(5, 0)
+         by IntegerMod.make_equal_of_difference_multiple(5, 5 * multiple, 0, multiple, done by ring)
+  as sumZero;
+  aMod * aMod = IntegerMod.residue(5, 0) ∧ bMod * bMod = IntegerMod.residue(5, 0)
+      by IntegerMod.square_plus_double_square_zero_mod_five_classes(aMod, bMod, sumZero);
+  aMod * aMod = IntegerMod.residue(5, 0) as aSquareZero;
+  bMod * bMod = IntegerMod.residue(5, 0) as bSquareZero;
+  aMod = IntegerMod.residue(5, 0)
+      by IntegerMod.square_zero_mod_five_forces_zero(aMod, aSquareZero) as aZero;
+  bMod = IntegerMod.residue(5, 0)
+      by IntegerMod.square_zero_mod_five_forces_zero(bMod, bSquareZero) as bZero;
+  Integer.divides(5, a) by Integer.divides_of_class_zero(5, a, aZero) as fiveDividesA;
+  Integer.divides(5, b) by Integer.divides_of_class_zero(5, b, bZero) as fiveDividesB;
+  done by And.introduction(fiveDividesA, fiveDividesB)
+}
+
+theorem Integer.five_divides_of_square_multiple
+        (c multiple : ℤ) (squareReads : c * c = 5 * multiple)
+        : Integer.divides(5, c) := {
+  c * c + 2 * (0 * 0) = 5 * multiple by linear_combination(squareReads) as paddedReads;
+  Integer.divides(5, c) ∧ Integer.divides(5, (0 : ℤ))
+      by Integer.five_divides_of_square_plus_double_square_multiple(c, 0, multiple, paddedReads);
+  done
+}
+
+theorem Integer.square_not_three_modulo_five (c multiple : ℤ)
+        (squareReads : c * c = 5 * multiple + 3)
+        : False := {
+  let cMod : IntegerMod(5) := IntegerMod.make(5, c);
+  cMod * cMod
+     = IntegerMod.make(5, c * c)
+     = IntegerMod.make(5, 5 * multiple + 3) by substituting squareReads
+     = IntegerMod.residue(5, 3)
+         by IntegerMod.make_equal_of_difference_multiple(5, 5 * multiple + 3, 3, multiple, done by ring)
+  as squareIsThree;
+  done by IntegerMod.square_not_three_mod_five(cMod, squareIsThree)
+}
+
+-- ----------------------------------------------------------------------
+-- x² + 2y² + 5z² reaches a multiple of twenty-five only through three
+-- coordinates that are themselves divisible by five.
+
+theorem Integer.square_plus_double_plus_quintuple_square_descent
+        (a b c n : ℤ) (valueReads : a * a + 2 * (b * b) + 5 * (c * c) = 25 * n)
+        : ∃ (x y z : ℤ). x * x + 2 * (y * y) + 5 * (z * z) = n := {
+  (5 : ℤ) ≠ Integer.zero as fiveNonzero;
+  a * a + 2 * (b * b) = 5 * (5 * n - c * c) by linear_combination(valueReads) as pairMultiple;
+  Integer.divides(5, a) ∧ Integer.divides(5, b)
+      by Integer.five_divides_of_square_plus_double_square_multiple(a, b, 5 * n - c * c, pairMultiple);
+  Integer.divides(5, a) as fiveDividesA;
+  Integer.divides(5, b) as fiveDividesB;
+  choose x : ℤ such that a = 5 * x as aReads from fiveDividesA;
+  choose y : ℤ such that b = 5 * y as bReads from fiveDividesB;
+  5 * (5 * (x * x) + 10 * (y * y) + c * c)
+     = (5 * x) * (5 * x) + 2 * ((5 * y) * (5 * y)) + 5 * (c * c) by ring
+     = a * a + 2 * ((5 * y) * (5 * y)) + 5 * (c * c) by substituting Equality.symmetry(aReads)
+     = a * a + 2 * (b * b) + 5 * (c * c) by substituting Equality.symmetry(bReads)
+     = 25 * n by valueReads
+     = 5 * (5 * n) by ring
+  as scaledSum;
+  5 * (x * x) + 10 * (y * y) + c * c = 5 * n
+      by Integer.multiply_cancel_left_by_nonzero(
+        5 * (x * x) + 10 * (y * y) + c * c, 5 * n, 5, fiveNonzero, scaledSum)
+  as reducedSum;
+  c * c = 5 * (n - x * x - 2 * (y * y)) by linear_combination(reducedSum) as squareMultiple;
+  Integer.divides(5, c)
+      by Integer.five_divides_of_square_multiple(c, n - x * x - 2 * (y * y), squareMultiple)
+      as fiveDividesC;
+  choose z : ℤ such that c = 5 * z as cReads from fiveDividesC;
+  5 * (x * x + 2 * (y * y) + 5 * (z * z))
+     = 5 * (x * x) + 10 * (y * y) + (5 * z) * (5 * z) by ring
+     = 5 * (x * x) + 10 * (y * y) + c * c by substituting Equality.symmetry(cReads)
+     = 5 * n by reducedSum
+  as scaledQuotient;
+  x * x + 2 * (y * y) + 5 * (z * z) = n
+      by Integer.multiply_cancel_left_by_nonzero(
+        x * x + 2 * (y * y) + 5 * (z * z), n, 5, fiveNonzero, scaledQuotient)
+  as quotientValue;
+  witness x with witness y with witness z with quotientValue
+}
+
+-- ----------------------------------------------------------------------
+-- Forty is missed, so a thousand is missed.
+
+theorem Integer.square_plus_double_plus_quintuple_square_not_forty
+        : ¬(∃ (x y z : ℤ). x * x + 2 * (y * y) + 5 * (z * z) = 40) := {
+  (5 : ℤ) ≠ Integer.zero as fiveNonzero;
+  suppose ∃ (x y z : ℤ). x * x + 2 * (y * y) + 5 * (z * z) = 40 as represented;
+  choose a : ℤ, b : ℤ, c : ℤ such that a * a + 2 * (b * b) + 5 * (c * c) = 40
+      as valueReads from represented;
+  a * a + 2 * (b * b) = 5 * (8 - c * c) by linear_combination(valueReads) as pairMultiple;
+  Integer.divides(5, a) ∧ Integer.divides(5, b)
+      by Integer.five_divides_of_square_plus_double_square_multiple(a, b, 8 - c * c, pairMultiple);
+  Integer.divides(5, a) as fiveDividesA;
+  Integer.divides(5, b) as fiveDividesB;
+  choose x : ℤ such that a = 5 * x as aReads from fiveDividesA;
+  choose y : ℤ such that b = 5 * y as bReads from fiveDividesB;
+  5 * (5 * (x * x) + 10 * (y * y) + c * c)
+     = (5 * x) * (5 * x) + 2 * ((5 * y) * (5 * y)) + 5 * (c * c) by ring
+     = a * a + 2 * ((5 * y) * (5 * y)) + 5 * (c * c) by substituting Equality.symmetry(aReads)
+     = a * a + 2 * (b * b) + 5 * (c * c) by substituting Equality.symmetry(bReads)
+     = 40 by valueReads
+     = 5 * 8 by ring
+  as scaledSum;
+  5 * (x * x) + 10 * (y * y) + c * c = 8
+      by Integer.multiply_cancel_left_by_nonzero(
+        5 * (x * x) + 10 * (y * y) + c * c, 8, 5, fiveNonzero, scaledSum)
+  as reducedSum;
+  c * c = 5 * (1 - x * x - 2 * (y * y)) + 3 by linear_combination(reducedSum) as squareIsThree;
+  done by Integer.square_not_three_modulo_five(c, 1 - x * x - 2 * (y * y), squareIsThree)
+}
+
+theorem Matrix.squarePlusDoubleSquareDiagonalForm_five_not_represents_one_thousand
+        : ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareDiagonalForm(5), (1000 : ℤ))) := {
+  suppose Matrix.Represents(Matrix.squarePlusDoubleSquareDiagonalForm(5), (1000 : ℤ))
+      as represented;
+  ∃ (x y z : ℤ). x * x + 2 * (y * y) + 5 * (z * z) = (1000 : ℤ)
+      by Matrix.squarePlusDoubleSquareDiagonalForm_represents_only_values;
+  choose a : ℤ, b : ℤ, c : ℤ such that a * a + 2 * (b * b) + 5 * (c * c) = (1000 : ℤ)
+      as valueReads;
+  a * a + 2 * (b * b) + 5 * (c * c) = 25 * 40 by linear_combination(valueReads) as squareMultiple;
+  ∃ (x y z : ℤ). x * x + 2 * (y * y) + 5 * (z * z) = 40
+      by Integer.square_plus_double_plus_quintuple_square_descent(a, b, c, 40, squareMultiple);
+  done by Integer.square_plus_double_plus_quintuple_square_not_forty
+}
+
+-- ----------------------------------------------------------------------
+-- An even class at an even modulus is an even value.
+
+theorem Integer.two_divides_of_even_class (modulus remainder : ℕ) (value : ℤ)
+        (modulusHalf remainderHalf : ℤ)
+        (modulusEven : (modulus : ℤ) = 2 * modulusHalf)
+        (remainderEven : (remainder : ℤ) = 2 * remainderHalf)
+        (classReads : IntegerMod.make(modulus, value) = IntegerMod.residue(modulus, remainder))
+        : Integer.divides(2, value) := {
+  Integer.CongruentModulo(modulus, value, (remainder : ℤ))
+      by Quotient.equal_implies_equivalent(value, (remainder : ℤ), classReads) as congruent;
+  choose quotient : ℤ such that value - (remainder : ℤ) = (modulus : ℤ) * quotient
+      as valueReads from congruent;
+  value = 2 * (modulusHalf * quotient + remainderHalf)
+      by linear_combination(valueReads + quotient * modulusEven + remainderEven)
+      as halved;
+  witness modulusHalf * quotient + remainderHalf with halved
+}
+
+theorem Integer.two_divides_of_square_class_modulo_sixteen (value : ℤ)
+        (classReads : IntegerMod.make(16, value * value) = IntegerMod.residue(16, 0)
+                      ∨ IntegerMod.make(16, value * value) = IntegerMod.residue(16, 4))
+        : Integer.divides(2, value) := {
+  Integer.divides(2, value * value) by cases {
+    case IntegerMod.make(16, value * value) = IntegerMod.residue(16, 0) as squareClass:
+      done by Integer.two_divides_of_even_class(16, 0, value * value, 8, 0, done, done, squareClass)
+    case IntegerMod.make(16, value * value) = IntegerMod.residue(16, 4) as squareClass:
+      done by Integer.two_divides_of_even_class(16, 4, value * value, 8, 2, done, done, squareClass)
+  };
+  done by Integer.two_divides_of_two_divides_square
+}
+
+-- ----------------------------------------------------------------------
+-- x² + 2y² + 3z² reaches 360 only through three even coordinates, and the
+-- quarter it descends to is 90, which the classes modulo sixteen refuse.
+
+theorem Integer.square_plus_double_plus_triple_square_not_ninety
+        : ¬(∃ (x y z : ℤ). x * x + 2 * (y * y) + 3 * (z * z) = 90) := {
+  suppose ∃ (x y z : ℤ). x * x + 2 * (y * y) + 3 * (z * z) = 90 as represented;
+  choose a : ℤ, b : ℤ, c : ℤ such that a * a + 2 * (b * b) + 3 * (c * c) = 90
+      as valueReads from represented;
+  let aMod : IntegerMod(16) := IntegerMod.make(16, a);
+  let bMod : IntegerMod(16) := IntegerMod.make(16, b);
+  let cMod : IntegerMod(16) := IntegerMod.make(16, c);
+  aMod * aMod + IntegerMod.make(16, (2 : ℤ)) * (bMod * bMod)
+      + IntegerMod.make(16, (3 : ℤ)) * (cMod * cMod)
+     = IntegerMod.make(16, a * a + 2 * (b * b) + 3 * (c * c))
+     = IntegerMod.make(16, 90) by substituting valueReads
+     = IntegerMod.residue(16, 10)
+         by IntegerMod.make_equal_of_difference_multiple(multiple := 5)
+  as formValue;
+  done by IntegerMod.square_plus_double_plus_triple_square_not_ten_mod_sixteen(
+      aMod, bMod, cMod, formValue)
+}
+
+theorem Matrix.squarePlusDoubleSquareDiagonalForm_three_not_represents_three_hundred_sixty
+        : ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareDiagonalForm(3), (360 : ℤ))) := {
+  (4 : ℤ) ≠ Integer.zero as fourNonzero;
+  suppose Matrix.Represents(Matrix.squarePlusDoubleSquareDiagonalForm(3), (360 : ℤ))
+      as represented;
+  ∃ (x y z : ℤ). x * x + 2 * (y * y) + 3 * (z * z) = (360 : ℤ)
+      by Matrix.squarePlusDoubleSquareDiagonalForm_represents_only_values;
+  choose a : ℤ, b : ℤ, c : ℤ such that a * a + 2 * (b * b) + 3 * (c * c) = (360 : ℤ)
+      as valueReads;
+  let aMod : IntegerMod(16) := IntegerMod.make(16, a);
+  let bMod : IntegerMod(16) := IntegerMod.make(16, b);
+  let cMod : IntegerMod(16) := IntegerMod.make(16, c);
+  aMod * aMod + IntegerMod.make(16, (2 : ℤ)) * (bMod * bMod)
+      + IntegerMod.make(16, (3 : ℤ)) * (cMod * cMod)
+     = IntegerMod.make(16, a * a + 2 * (b * b) + 3 * (c * c))
+     = IntegerMod.make(16, (360 : ℤ)) by substituting valueReads
+     = IntegerMod.residue(16, 8)
+         by IntegerMod.make_equal_of_difference_multiple(multiple := 22)
+  as formValue;
+  (aMod * aMod = IntegerMod.residue(16, 0) ∨ aMod * aMod = IntegerMod.residue(16, 4))
+    ∧ bMod * bMod = IntegerMod.residue(16, 4)
+    ∧ (cMod * cMod = IntegerMod.residue(16, 0) ∨ cMod * cMod = IntegerMod.residue(16, 4))
+      by IntegerMod.square_plus_double_plus_triple_square_eight_mod_sixteen_classes(
+        aMod, bMod, cMod, formValue);
+  aMod * aMod = IntegerMod.residue(16, 0) ∨ aMod * aMod = IntegerMod.residue(16, 4)
+      as aSquareClass;
+  bMod * bMod = IntegerMod.residue(16, 4) as bSquareClass;
+  cMod * cMod = IntegerMod.residue(16, 0) ∨ cMod * cMod = IntegerMod.residue(16, 4)
+      as cSquareClass;
+  Integer.divides(2, a)
+      by Integer.two_divides_of_square_class_modulo_sixteen(a, aSquareClass) as twoDividesA;
+  Integer.divides(2, b)
+      by Integer.two_divides_of_square_class_modulo_sixteen(b, Or.introduceRight(bSquareClass))
+      as twoDividesB;
+  Integer.divides(2, c)
+      by Integer.two_divides_of_square_class_modulo_sixteen(c, cSquareClass) as twoDividesC;
+  choose x : ℤ such that a = 2 * x as aReads from twoDividesA;
+  choose y : ℤ such that b = 2 * y as bReads from twoDividesB;
+  choose z : ℤ such that c = 2 * z as cReads from twoDividesC;
+  4 * (x * x + 2 * (y * y) + 3 * (z * z))
+     = (2 * x) * (2 * x) + 2 * ((2 * y) * (2 * y)) + 3 * ((2 * z) * (2 * z)) by ring
+     = a * a + 2 * ((2 * y) * (2 * y)) + 3 * ((2 * z) * (2 * z))
+         by substituting Equality.symmetry(aReads)
+     = a * a + 2 * (b * b) + 3 * ((2 * z) * (2 * z)) by substituting Equality.symmetry(bReads)
+     = a * a + 2 * (b * b) + 3 * (c * c) by substituting Equality.symmetry(cReads)
+     = (360 : ℤ) by valueReads
+     = 4 * 90 by ring
+  as scaledSum;
+  x * x + 2 * (y * y) + 3 * (z * z) = 90
+      by Integer.multiply_cancel_left_by_nonzero(
+        x * x + 2 * (y * y) + 3 * (z * z), 90, 4, fourNonzero, scaledSum)
+  as quarterValue;
+  ∃ (x y z : ℤ). x * x + 2 * (y * y) + 3 * (z * z) = 90 by {
+    witness x with witness y with witness z with quarterValue
+  };
+  done by Integer.square_plus_double_plus_triple_square_not_ninety
+}
+
+-- ----------------------------------------------------------------------
+-- Divisibility by seven, read off a residue.  The odd border completes the
+-- square only after doubling: 2·(x² + 2y² + 2yz + 4z²) = 2x² + (2y+z)² + 7z².
+
+theorem Integer.seven_divides_of_double_square_plus_square_multiple
+        (a b multiple : ℤ) (sumReads : 2 * (a * a) + b * b = 7 * multiple)
+        : Integer.divides(7, a) ∧ Integer.divides(7, b) := {
+  let aMod : IntegerMod(7) := IntegerMod.make(7, a);
+  let bMod : IntegerMod(7) := IntegerMod.make(7, b);
+  IntegerMod.make(7, (2 : ℤ)) * (aMod * aMod) + bMod * bMod
+     = IntegerMod.make(7, 2 * (a * a) + b * b)
+     = IntegerMod.make(7, 7 * multiple) by substituting sumReads
+     = IntegerMod.residue(7, 0)
+         by IntegerMod.make_equal_of_difference_multiple(7, 7 * multiple, 0, multiple, done by ring)
+  as sumZero;
+  aMod * aMod = IntegerMod.residue(7, 0) ∧ bMod * bMod = IntegerMod.residue(7, 0)
+      by IntegerMod.double_square_plus_square_zero_mod_seven_classes(aMod, bMod, sumZero);
+  aMod * aMod = IntegerMod.residue(7, 0) as aSquareZero;
+  bMod * bMod = IntegerMod.residue(7, 0) as bSquareZero;
+  aMod = IntegerMod.residue(7, 0)
+      by IntegerMod.square_zero_mod_seven_forces_zero(aMod, aSquareZero) as aZero;
+  bMod = IntegerMod.residue(7, 0)
+      by IntegerMod.square_zero_mod_seven_forces_zero(bMod, bSquareZero) as bZero;
+  Integer.divides(7, a) by Integer.divides_of_class_zero(7, a, aZero) as sevenDividesA;
+  Integer.divides(7, b) by Integer.divides_of_class_zero(7, b, bZero) as sevenDividesB;
+  done by And.introduction(sevenDividesA, sevenDividesB)
+}
+
+theorem Integer.seven_divides_of_square_multiple
+        (c multiple : ℤ) (squareReads : c * c = 7 * multiple)
+        : Integer.divides(7, c) := {
+  2 * (0 * 0) + c * c = 7 * multiple by linear_combination(squareReads) as paddedReads;
+  Integer.divides(7, (0 : ℤ)) ∧ Integer.divides(7, c)
+      by Integer.seven_divides_of_double_square_plus_square_multiple(0, c, multiple, paddedReads);
+  done
+}
+
+-- An odd prime divides a doubled value only by dividing the value.
+theorem Integer.seven_divides_of_seven_divides_double (y : ℤ)
+        (dividesDouble : Integer.divides(7, 2 * y))
+        : Integer.divides(7, y) := {
+  (2 : ℤ) ≠ Integer.zero as twoNonzero;
+  choose multiple : ℤ such that 2 * y = 7 * multiple as doubleReads from dividesDouble;
+  2 * (7 * (y - 3 * multiple)) = 2 * y by linear_combination((6 : ℤ) * doubleReads) as scaledValue;
+  7 * (y - 3 * multiple) = y
+      by Integer.multiply_cancel_left_by_nonzero(
+        7 * (y - 3 * multiple), y, 2, twoNonzero, scaledValue) as quotientValue;
+  witness y - 3 * multiple with Equality.symmetry(quotientValue)
+}
+
+-- ----------------------------------------------------------------------
+-- The odd determinant-seven border misses 343: seven divides every
+-- coordinate, and the quotient form lands on its own truant.
+
+theorem Matrix.squarePlusDoubleSquareOddForm_four_not_represents_three_hundred_forty_three
+        : ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareOddForm(4), (343 : ℤ))) := {
+  (49 : ℤ) ≠ Integer.zero as fortyNineNonzero;
+  suppose Matrix.Represents(Matrix.squarePlusDoubleSquareOddForm(4), (343 : ℤ))
+      as represented;
+  ∃ (x y z : ℤ). x * x + 2 * (y * y) + 2 * y * z + 4 * (z * z) = (343 : ℤ)
+      by Matrix.squarePlusDoubleSquareOddForm_represents_only_values;
+  choose a : ℤ, b : ℤ, c : ℤ such that a * a + 2 * (b * b) + 2 * b * c + 4 * (c * c) = (343 : ℤ)
+      as valueReads;
+  2 * (a * a) + (2 * b + c) * (2 * b + c) = 7 * (98 - c * c)
+      by linear_combination((2 : ℤ) * valueReads) as sevenMultiple;
+  Integer.divides(7, a) ∧ Integer.divides(7, 2 * b + c)
+      by Integer.seven_divides_of_double_square_plus_square_multiple(
+        a, 2 * b + c, 98 - c * c, sevenMultiple);
+  Integer.divides(7, a) as sevenDividesA;
+  Integer.divides(7, 2 * b + c) as sevenDividesShear;
+  choose x : ℤ such that a = 7 * x as aReads from sevenDividesA;
+  choose shear : ℤ such that 2 * b + c = 7 * shear as shearReads from sevenDividesShear;
+  (7 : ℤ) ≠ Integer.zero as sevenNonzero;
+  7 * (c * c) = 7 * (7 * (14 - 2 * (x * x) - shear * shear))
+      by linear_combination((2 : ℤ) * valueReads - (2 : ℤ) * (a + (7 : ℤ) * x) * aReads
+        - ((2 : ℤ) * b + c + (7 : ℤ) * shear) * shearReads) as scaledSquare;
+  c * c = 7 * (14 - 2 * (x * x) - shear * shear)
+      by Integer.multiply_cancel_left_by_nonzero(
+        c * c, 7 * (14 - 2 * (x * x) - shear * shear), 7, sevenNonzero, scaledSquare)
+      as squareMultiple;
+  Integer.divides(7, c)
+      by Integer.seven_divides_of_square_multiple(c, 14 - 2 * (x * x) - shear * shear,
+        squareMultiple) as sevenDividesC;
+  choose z : ℤ such that c = 7 * z as cReads from sevenDividesC;
+  Integer.divides(7, 2 * b) by {
+    2 * b = 7 * (shear - z) by linear_combination(shearReads - cReads);
+    witness shear - z with done
+  } as sevenDividesDouble;
+  Integer.divides(7, b)
+      by Integer.seven_divides_of_seven_divides_double(b, sevenDividesDouble) as sevenDividesB;
+  choose y : ℤ such that b = 7 * y as bReads from sevenDividesB;
+  49 * (x * x + 2 * (y * y) + 2 * y * z + 4 * (z * z))
+     = (7 * x) * (7 * x) + 2 * ((7 * y) * (7 * y)) + 2 * (7 * y) * (7 * z)
+       + 4 * ((7 * z) * (7 * z)) by ring
+     = a * a + 2 * ((7 * y) * (7 * y)) + 2 * (7 * y) * (7 * z) + 4 * ((7 * z) * (7 * z))
+         by substituting Equality.symmetry(aReads)
+     = a * a + 2 * (b * b) + 2 * b * (7 * z) + 4 * ((7 * z) * (7 * z))
+         by substituting Equality.symmetry(bReads)
+     = a * a + 2 * (b * b) + 2 * b * c + 4 * (c * c)
+         by substituting Equality.symmetry(cReads)
+     = (343 : ℤ) by valueReads
+     = 49 * 7 by ring
+  as scaledSum;
+  x * x + 2 * (y * y) + 2 * y * z + 4 * (z * z) = 7
+      by Integer.multiply_cancel_left_by_nonzero(
+        x * x + 2 * (y * y) + 2 * y * z + 4 * (z * z), 7, 49, fortyNineNonzero, scaledSum)
+  as quotientValue;
+  Matrix.Represents(Matrix.squarePlusDoubleSquareOddForm(4), (7 : ℤ))
+      by Matrix.represents_by_witness(
+        Matrix.squarePlusDoubleSquareOddForm(4), 7,
+        (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+        Matrix.squarePlusDoubleSquareOddForm_four_coordinateTuple_computes(
+          x, y, z, 7, quotientValue));
+  done by Matrix.IsTruant.missed(isTruant := Matrix.squarePlusDoubleSquareOddForm_four_truant_seven)
 }
