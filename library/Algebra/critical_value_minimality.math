@@ -1,0 +1,816 @@
+-- Algebra/critical_value_minimality.math
+--
+-- Weak minimality of the fifteen theorem's nine critical values: no eight of
+-- them force universality.  For each critical value v there is a symmetric
+-- positive-definite rank-four form that represents the other eight and misses
+-- v — so v cannot be dropped from the hypotheses of
+-- `Matrix.universal_of_critical_values`.
+--
+-- Eight of the nine witnesses are diagonal forms of the same shape: a form
+-- that misses v, extended by a coefficient larger than v, which therefore
+-- cannot help reach v.  The ninth, for v = 15, is diag(1,2,5,5) — the
+-- exceptional rank-four form of exact truant 15, in its diagonal spelling.
+
+module Algebra.critical_value_minimality
+
+import Algebra.diagonal_forms
+import Algebra.rank_four_exceptional_truants_chunk0_generated
+
+-- The nine values the fifteen theorem tests.
+definition Matrix.IsCriticalValue (v : ℕ) : Proposition :=
+  v = 1 ∨ v = 2 ∨ v = 3 ∨ v = 5 ∨ v = 6 ∨ v = 7 ∨ v = 10 ∨ v = 14 ∨ v = 15
+
+-- Representing every critical value except one, checked value by value.
+theorem Matrix.represents_critical_values_except {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) (v : ℕ)
+        (one : v = 1 ∨ Matrix.Represents(A, (1 : ℤ)))
+        (two : v = 2 ∨ Matrix.Represents(A, (2 : ℤ)))
+        (three : v = 3 ∨ Matrix.Represents(A, (3 : ℤ)))
+        (five : v = 5 ∨ Matrix.Represents(A, (5 : ℤ)))
+        (six : v = 6 ∨ Matrix.Represents(A, (6 : ℤ)))
+        (seven : v = 7 ∨ Matrix.Represents(A, (7 : ℤ)))
+        (ten : v = 10 ∨ Matrix.Represents(A, (10 : ℤ)))
+        (fourteen : v = 14 ∨ Matrix.Represents(A, (14 : ℤ)))
+        (fifteen : v = 15 ∨ Matrix.Represents(A, (15 : ℤ)))
+        : ∀ (u : ℕ). Matrix.IsCriticalValue(u) → ¬(u = v)
+            → Matrix.Represents(A, (u : ℤ)) := {
+  take u : ℕ;
+  suppose Matrix.IsCriticalValue(u) as critical;
+  suppose ¬(u = v) as distinct;
+  u = 1 ∨ u = 2 ∨ u = 3 ∨ u = 5 ∨ u = 6 ∨ u = 7 ∨ u = 10 ∨ u = 14 ∨ u = 15 by critical;
+  done by cases {
+    case u = 1 as value: done by cases {
+        case v = 1 as excluded: {
+            u = 1 by value = v by excluded;
+            done
+          }
+        case Matrix.Represents(A, (1 : ℤ)): done by substituting value
+      }
+    case u = 2 as value: done by cases {
+        case v = 2 as excluded: {
+            u = 2 by value = v by excluded;
+            done
+          }
+        case Matrix.Represents(A, (2 : ℤ)): done by substituting value
+      }
+    case u = 3 as value: done by cases {
+        case v = 3 as excluded: {
+            u = 3 by value = v by excluded;
+            done
+          }
+        case Matrix.Represents(A, (3 : ℤ)): done by substituting value
+      }
+    case u = 5 as value: done by cases {
+        case v = 5 as excluded: {
+            u = 5 by value = v by excluded;
+            done
+          }
+        case Matrix.Represents(A, (5 : ℤ)): done by substituting value
+      }
+    case u = 6 as value: done by cases {
+        case v = 6 as excluded: {
+            u = 6 by value = v by excluded;
+            done
+          }
+        case Matrix.Represents(A, (6 : ℤ)): done by substituting value
+      }
+    case u = 7 as value: done by cases {
+        case v = 7 as excluded: {
+            u = 7 by value = v by excluded;
+            done
+          }
+        case Matrix.Represents(A, (7 : ℤ)): done by substituting value
+      }
+    case u = 10 as value: done by cases {
+        case v = 10 as excluded: {
+            u = 10 by value = v by excluded;
+            done
+          }
+        case Matrix.Represents(A, (10 : ℤ)): done by substituting value
+      }
+    case u = 14 as value: done by cases {
+        case v = 14 as excluded: {
+            u = 14 by value = v by excluded;
+            done
+          }
+        case Matrix.Represents(A, (14 : ℤ)): done by substituting value
+      }
+    case u = 15 as value: done by cases {
+        case v = 15 as excluded: {
+            u = 15 by value = v by excluded;
+            done
+          }
+        case Matrix.Represents(A, (15 : ℤ)): done by substituting value
+      }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- What the low-rank diagonal forms miss, in the diagonal spelling.
+
+theorem Matrix.diagonalUnaryForm_one_not_represents_two
+        : ¬(Matrix.Represents(Matrix.diagonalUnaryForm(1), (2 : ℤ))) := {
+  suppose Matrix.Represents(Matrix.diagonalUnaryForm(1), (2 : ℤ)) as represented;
+  Matrix.Represents(Matrix.squareForm, (2 : ℤ))
+      by substituting Matrix.squareForm_is_diagonal;
+  ¬(Matrix.Represents(Matrix.squareForm, (2 : ℤ)))
+      by Matrix.IsTruant.missed(isTruant := Matrix.squareForm_truant_two);
+  done
+}
+
+theorem Matrix.diagonalBinaryForm_one_one_not_represents_three
+        : ¬(Matrix.Represents(Matrix.diagonalBinaryForm(1, 1), (3 : ℤ))) := {
+  suppose Matrix.Represents(Matrix.diagonalBinaryForm(1, 1), (3 : ℤ)) as represented;
+  Matrix.Represents(Matrix.sumOfTwoSquaresForm, (3 : ℤ))
+      by substituting Matrix.sumOfTwoSquaresForm_is_diagonal;
+  ¬(Matrix.Represents(Matrix.sumOfTwoSquaresForm, (3 : ℤ)))
+      by Matrix.sumOfTwoSquaresForm_not_represents_three;
+  done
+}
+
+theorem Matrix.diagonalBinaryForm_one_two_not_represents_five
+        : ¬(Matrix.Represents(Matrix.diagonalBinaryForm(1, 2), (5 : ℤ))) := {
+  suppose Matrix.Represents(Matrix.diagonalBinaryForm(1, 2), (5 : ℤ)) as represented;
+  Matrix.Represents(Matrix.squarePlusDoubleSquareForm, (5 : ℤ))
+      by substituting Matrix.squarePlusDoubleSquareForm_is_diagonal;
+  ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareForm, (5 : ℤ)))
+      by Matrix.squarePlusDoubleSquareForm_not_represents_five;
+  done
+}
+
+theorem Matrix.diagonalTernaryForm_one_one_three_not_represents_six
+        : ¬(Matrix.Represents(Matrix.diagonalTernaryForm(1, 1, 3), (6 : ℤ))) := {
+  suppose Matrix.Represents(Matrix.diagonalTernaryForm(1, 1, 3), (6 : ℤ)) as represented;
+  Matrix.Represents(Matrix.sumOfTwoSquaresPlusTripleSquareForm, (6 : ℤ))
+      by substituting Matrix.sumOfTwoSquaresPlusTripleSquareForm_is_diagonal;
+  ¬(Matrix.Represents(Matrix.sumOfTwoSquaresPlusTripleSquareForm, (6 : ℤ)))
+      by Matrix.sumOfTwoSquaresPlusTripleSquareForm_not_represents_six;
+  done
+}
+
+theorem Matrix.diagonalTernaryForm_one_one_one_not_represents_seven
+        : ¬(Matrix.Represents(Matrix.diagonalTernaryForm(1, 1, 1), (7 : ℤ))) := {
+  suppose Matrix.Represents(Matrix.diagonalTernaryForm(1, 1, 1), (7 : ℤ)) as represented;
+  Matrix.Represents(Matrix.sumOfThreeSquaresForm, (7 : ℤ))
+      by substituting Matrix.sumOfThreeSquaresForm_is_diagonal;
+  ¬(Matrix.Represents(Matrix.sumOfThreeSquaresForm, (7 : ℤ)))
+      by Matrix.sumOfThreeSquaresForm_not_represents_seven;
+  done
+}
+
+theorem Matrix.diagonalTernaryForm_one_two_three_not_represents_ten
+        : ¬(Matrix.Represents(Matrix.diagonalTernaryForm(1, 2, 3), (10 : ℤ))) := {
+  suppose Matrix.Represents(Matrix.diagonalTernaryForm(1, 2, 3), (10 : ℤ)) as represented;
+  Matrix.Represents(Matrix.squarePlusDoubleSquarePlusTripleSquareForm, (10 : ℤ))
+      by substituting Matrix.squarePlusDoubleSquarePlusTripleSquareForm_is_diagonal;
+  ¬(Matrix.Represents(Matrix.squarePlusDoubleSquarePlusTripleSquareForm, (10 : ℤ)))
+      by Matrix.squarePlusDoubleSquarePlusTripleSquareForm_not_represents_ten;
+  done
+}
+
+theorem Matrix.diagonalTernaryForm_one_one_two_not_represents_fourteen
+        : ¬(Matrix.Represents(Matrix.diagonalTernaryForm(1, 1, 2), (14 : ℤ))) := {
+  suppose Matrix.Represents(Matrix.diagonalTernaryForm(1, 1, 2), (14 : ℤ)) as represented;
+  Matrix.Represents(Matrix.sumOfTwoSquaresPlusDoubleSquareForm, (14 : ℤ))
+      by substituting Matrix.sumOfTwoSquaresPlusDoubleSquareForm_is_diagonal;
+  ¬(Matrix.Represents(Matrix.sumOfTwoSquaresPlusDoubleSquareForm, (14 : ℤ)))
+      by Matrix.sumOfTwoSquaresPlusDoubleSquareForm_not_represents_fourteen;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- 1 is needed: every coefficient of 2x²+2y²+3z²+4w² exceeds 1.
+
+theorem Matrix.critical_one_witness_misses_one
+        : ¬(Matrix.Represents(Matrix.diagonalQuaternaryForm(2, 2, 3, 4), (1 : ℤ))) := {
+  ¬(Matrix.Represents(Matrix.diagonalUnaryForm(2), (1 : ℤ)))
+      by Matrix.diagonalUnaryForm_not_represents_below_coefficient(
+          targetPositive := done, coefficientExceeds := done) as unaryMisses;
+  ¬(Matrix.Represents(Matrix.diagonalBinaryForm(2, 2), (1 : ℤ)))
+      by Matrix.diagonalBinaryForm_not_represents_below_coefficient(
+          aPositive := done, targetNonneg := done, coefficientExceeds := done,
+          blockMisses := unaryMisses) as binaryMisses;
+  ¬(Matrix.Represents(Matrix.diagonalTernaryForm(2, 2, 3), (1 : ℤ)))
+      by Matrix.diagonalTernaryForm_not_represents_below_coefficient(
+          aPositive := done, bPositive := done, targetNonneg := done, coefficientExceeds := done,
+          blockMisses := binaryMisses) as ternaryMisses;
+  done by Matrix.diagonalQuaternaryForm_not_represents_below_coefficient(
+      aPositive := done, bPositive := done, cPositive := done,
+      targetNonneg := done, coefficientExceeds := done, blockMisses := ternaryMisses)
+}
+
+theorem Matrix.critical_one_witness_represents_others
+        : ∀ (u : ℕ). Matrix.IsCriticalValue(u) → ¬(u = 1)
+            → Matrix.Represents(Matrix.diagonalQuaternaryForm(2, 2, 3, 4), (u : ℤ)) :=
+  by Matrix.represents_critical_values_except(
+      A := Matrix.diagonalQuaternaryForm(2, 2, 3, 4),
+      v := 1,
+      one := Or.introduceLeft(done),
+      two := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 0, z := 0, w := 0, value := done)),
+      three := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 0, y := 0, z := 1, w := 0, value := done)),
+      five := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 0, z := 1, w := 0, value := done)),
+      six := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 0, z := 0, w := 1, value := done)),
+      seven := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 0, y := 0, z := 1, w := 1, value := done)),
+      ten := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 2, z := 0, w := 0, value := done)),
+      fourteen := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 2, z := 0, w := 1, value := done)),
+      fifteen := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 2, y := 0, z := 1, w := 1, value := done)))
+
+-- ----------------------------------------------------------------------
+-- 2 is needed: x² misses 2, and 3y²+3z²+5w² cannot reach it.
+
+theorem Matrix.critical_two_witness_misses_two
+        : ¬(Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 3, 3, 5), (2 : ℤ))) := {
+  ¬(Matrix.Represents(Matrix.diagonalBinaryForm(1, 3), (2 : ℤ)))
+      by Matrix.diagonalBinaryForm_not_represents_below_coefficient(
+          aPositive := done, targetNonneg := done, coefficientExceeds := done,
+          blockMisses := Matrix.diagonalUnaryForm_one_not_represents_two) as binaryMisses;
+  ¬(Matrix.Represents(Matrix.diagonalTernaryForm(1, 3, 3), (2 : ℤ)))
+      by Matrix.diagonalTernaryForm_not_represents_below_coefficient(
+          aPositive := done, bPositive := done, targetNonneg := done, coefficientExceeds := done,
+          blockMisses := binaryMisses) as ternaryMisses;
+  done by Matrix.diagonalQuaternaryForm_not_represents_below_coefficient(
+      aPositive := done, bPositive := done, cPositive := done,
+      targetNonneg := done, coefficientExceeds := done, blockMisses := ternaryMisses)
+}
+
+theorem Matrix.critical_two_witness_represents_others
+        : ∀ (u : ℕ). Matrix.IsCriticalValue(u) → ¬(u = 2)
+            → Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 3, 3, 5), (u : ℤ)) :=
+  by Matrix.represents_critical_values_except(
+      A := Matrix.diagonalQuaternaryForm(1, 3, 3, 5),
+      v := 2,
+      one := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 0, z := 0, w := 0, value := done)),
+      two := Or.introduceLeft(done),
+      three := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 0, y := 1, z := 0, w := 0, value := done)),
+      five := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 0, y := 0, z := 0, w := 1, value := done)),
+      six := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 0, y := 1, z := 1, w := 0, value := done)),
+      seven := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 1, z := 1, w := 0, value := done)),
+      ten := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 2, y := 1, z := 1, w := 0, value := done)),
+      fourteen := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 3, y := 0, z := 0, w := 1, value := done)),
+      fifteen := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 0, y := 1, z := 2, w := 0, value := done)))
+
+-- ----------------------------------------------------------------------
+-- 3 is needed: x²+y² misses 3, and 4z²+5w² cannot reach it.
+
+theorem Matrix.critical_three_witness_misses_three
+        : ¬(Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 1, 4, 5), (3 : ℤ))) := {
+  ¬(Matrix.Represents(Matrix.diagonalTernaryForm(1, 1, 4), (3 : ℤ)))
+      by Matrix.diagonalTernaryForm_not_represents_below_coefficient(
+          aPositive := done, bPositive := done, targetNonneg := done, coefficientExceeds := done,
+          blockMisses := Matrix.diagonalBinaryForm_one_one_not_represents_three) as ternaryMisses;
+  done by Matrix.diagonalQuaternaryForm_not_represents_below_coefficient(
+      aPositive := done, bPositive := done, cPositive := done,
+      targetNonneg := done, coefficientExceeds := done, blockMisses := ternaryMisses)
+}
+
+theorem Matrix.critical_three_witness_represents_others
+        : ∀ (u : ℕ). Matrix.IsCriticalValue(u) → ¬(u = 3)
+            → Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 1, 4, 5), (u : ℤ)) :=
+  by Matrix.represents_critical_values_except(
+      A := Matrix.diagonalQuaternaryForm(1, 1, 4, 5),
+      v := 3,
+      one := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 0, z := 0, w := 0, value := done)),
+      two := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 1, z := 0, w := 0, value := done)),
+      three := Or.introduceLeft(done),
+      five := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 0, z := 1, w := 0, value := done)),
+      six := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 1, z := 1, w := 0, value := done)),
+      seven := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 1, z := 0, w := 1, value := done)),
+      ten := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 0, z := 1, w := 1, value := done)),
+      fourteen := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 2, z := 1, w := 1, value := done)),
+      fifteen := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 3, z := 0, w := 1, value := done)))
+
+-- ----------------------------------------------------------------------
+-- 5 is needed: x²+2y² misses 5, and 6z²+6w² cannot reach it.
+
+theorem Matrix.critical_five_witness_misses_five
+        : ¬(Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 2, 6, 6), (5 : ℤ))) := {
+  ¬(Matrix.Represents(Matrix.diagonalTernaryForm(1, 2, 6), (5 : ℤ)))
+      by Matrix.diagonalTernaryForm_not_represents_below_coefficient(
+          aPositive := done, bPositive := done, targetNonneg := done, coefficientExceeds := done,
+          blockMisses := Matrix.diagonalBinaryForm_one_two_not_represents_five) as ternaryMisses;
+  done by Matrix.diagonalQuaternaryForm_not_represents_below_coefficient(
+      aPositive := done, bPositive := done, cPositive := done,
+      targetNonneg := done, coefficientExceeds := done, blockMisses := ternaryMisses)
+}
+
+theorem Matrix.critical_five_witness_represents_others
+        : ∀ (u : ℕ). Matrix.IsCriticalValue(u) → ¬(u = 5)
+            → Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 2, 6, 6), (u : ℤ)) :=
+  by Matrix.represents_critical_values_except(
+      A := Matrix.diagonalQuaternaryForm(1, 2, 6, 6),
+      v := 5,
+      one := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 0, z := 0, w := 0, value := done)),
+      two := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 0, y := 1, z := 0, w := 0, value := done)),
+      three := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 1, z := 0, w := 0, value := done)),
+      five := Or.introduceLeft(done),
+      six := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 0, y := 0, z := 1, w := 0, value := done)),
+      seven := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 0, z := 1, w := 0, value := done)),
+      ten := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 2, y := 0, z := 1, w := 0, value := done)),
+      fourteen := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 0, y := 1, z := 1, w := 1, value := done)),
+      fifteen := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 2, z := 1, w := 0, value := done)))
+
+-- ----------------------------------------------------------------------
+-- 6 is needed: x²+y²+3z² misses 6, and 7w² cannot reach it.
+
+theorem Matrix.critical_six_witness_misses_six
+        : ¬(Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 1, 3, 7), (6 : ℤ))) :=
+  by Matrix.diagonalQuaternaryForm_not_represents_below_coefficient(
+      aPositive := done, bPositive := done, cPositive := done,
+      targetNonneg := done, coefficientExceeds := done,
+      blockMisses := Matrix.diagonalTernaryForm_one_one_three_not_represents_six)
+
+theorem Matrix.critical_six_witness_represents_others
+        : ∀ (u : ℕ). Matrix.IsCriticalValue(u) → ¬(u = 6)
+            → Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 1, 3, 7), (u : ℤ)) :=
+  by Matrix.represents_critical_values_except(
+      A := Matrix.diagonalQuaternaryForm(1, 1, 3, 7),
+      v := 6,
+      one := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 0, z := 0, w := 0, value := done)),
+      two := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 1, z := 0, w := 0, value := done)),
+      three := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 0, y := 0, z := 1, w := 0, value := done)),
+      five := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 1, z := 1, w := 0, value := done)),
+      six := Or.introduceLeft(done),
+      seven := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 0, y := 0, z := 0, w := 1, value := done)),
+      ten := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 3, y := 1, z := 0, w := 0, value := done)),
+      fourteen := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 2, y := 0, z := 1, w := 1, value := done)),
+      fifteen := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 2, y := 1, z := 1, w := 1, value := done)))
+
+-- ----------------------------------------------------------------------
+-- 7 is needed: x²+y²+z² misses 7, and 9w² cannot reach it.
+
+theorem Matrix.critical_seven_witness_misses_seven
+        : ¬(Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 1, 1, 9), (7 : ℤ))) :=
+  by Matrix.diagonalQuaternaryForm_not_represents_below_coefficient(
+      aPositive := done, bPositive := done, cPositive := done,
+      targetNonneg := done, coefficientExceeds := done,
+      blockMisses := Matrix.diagonalTernaryForm_one_one_one_not_represents_seven)
+
+theorem Matrix.critical_seven_witness_represents_others
+        : ∀ (u : ℕ). Matrix.IsCriticalValue(u) → ¬(u = 7)
+            → Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 1, 1, 9), (u : ℤ)) :=
+  by Matrix.represents_critical_values_except(
+      A := Matrix.diagonalQuaternaryForm(1, 1, 1, 9),
+      v := 7,
+      one := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 0, z := 0, w := 0, value := done)),
+      two := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 1, z := 0, w := 0, value := done)),
+      three := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 1, z := 1, w := 0, value := done)),
+      five := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 2, y := 1, z := 0, w := 0, value := done)),
+      six := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 2, y := 1, z := 1, w := 0, value := done)),
+      seven := Or.introduceLeft(done),
+      ten := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 3, y := 1, z := 0, w := 0, value := done)),
+      fourteen := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 3, y := 2, z := 1, w := 0, value := done)),
+      fifteen := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 2, y := 1, z := 1, w := 1, value := done)))
+
+-- ----------------------------------------------------------------------
+-- 10 is needed: x²+2y²+3z² misses 10, and 11w² cannot reach it.
+
+theorem Matrix.critical_ten_witness_misses_ten
+        : ¬(Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 2, 3, 11), (10 : ℤ))) :=
+  by Matrix.diagonalQuaternaryForm_not_represents_below_coefficient(
+      aPositive := done, bPositive := done, cPositive := done,
+      targetNonneg := done, coefficientExceeds := done,
+      blockMisses := Matrix.diagonalTernaryForm_one_two_three_not_represents_ten)
+
+theorem Matrix.critical_ten_witness_represents_others
+        : ∀ (u : ℕ). Matrix.IsCriticalValue(u) → ¬(u = 10)
+            → Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 2, 3, 11), (u : ℤ)) :=
+  by Matrix.represents_critical_values_except(
+      A := Matrix.diagonalQuaternaryForm(1, 2, 3, 11),
+      v := 10,
+      one := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 0, z := 0, w := 0, value := done)),
+      two := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 0, y := 1, z := 0, w := 0, value := done)),
+      three := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 0, y := 0, z := 1, w := 0, value := done)),
+      five := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 0, y := 1, z := 1, w := 0, value := done)),
+      six := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 1, z := 1, w := 0, value := done)),
+      seven := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 2, y := 0, z := 1, w := 0, value := done)),
+      ten := Or.introduceLeft(done),
+      fourteen := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 3, y := 1, z := 1, w := 0, value := done)),
+      fifteen := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 2, y := 2, z := 1, w := 0, value := done)))
+
+-- ----------------------------------------------------------------------
+-- 14 is needed: x²+y²+2z² misses 14, and 15w² cannot reach it.
+
+theorem Matrix.critical_fourteen_witness_misses_fourteen
+        : ¬(Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 1, 2, 15), (14 : ℤ))) :=
+  by Matrix.diagonalQuaternaryForm_not_represents_below_coefficient(
+      aPositive := done, bPositive := done, cPositive := done,
+      targetNonneg := done, coefficientExceeds := done,
+      blockMisses := Matrix.diagonalTernaryForm_one_one_two_not_represents_fourteen)
+
+theorem Matrix.critical_fourteen_witness_represents_others
+        : ∀ (u : ℕ). Matrix.IsCriticalValue(u) → ¬(u = 14)
+            → Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 1, 2, 15), (u : ℤ)) :=
+  by Matrix.represents_critical_values_except(
+      A := Matrix.diagonalQuaternaryForm(1, 1, 2, 15),
+      v := 14,
+      one := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 0, z := 0, w := 0, value := done)),
+      two := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 1, z := 0, w := 0, value := done)),
+      three := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 0, z := 1, w := 0, value := done)),
+      five := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 2, y := 1, z := 0, w := 0, value := done)),
+      six := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 2, y := 0, z := 1, w := 0, value := done)),
+      seven := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 2, z := 1, w := 0, value := done)),
+      ten := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 3, y := 1, z := 0, w := 0, value := done)),
+      fourteen := Or.introduceLeft(done),
+      fifteen := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 0, y := 0, z := 0, w := 1, value := done)))
+
+-- ----------------------------------------------------------------------
+-- 15 is needed: diag(1,2,5,5) is the exceptional form of exact truant 15,
+-- whose classification is the zero-border representative above x²+2y²+5z².
+
+theorem Matrix.diagonalQuaternaryForm_one_two_five_five_isometric_representative
+        : Matrix.IsIsometric(
+            Matrix.diagonalQuaternaryForm(1, 2, 5, 5),
+            Matrix.squarePlusDoublePlusScaledRankFourRepresentative(5, 0, 0, 5)) := {
+  Matrix.squarePlusDoublePlusScaledSquareForm(5)
+      · (⟨0, 0, 0⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+     = (⟨0, 2 * 0, 5 * 0⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+         by Matrix.squarePlusDoublePlusScaledSquareForm_apply_coordinateTuple
+     = (⟨0, 0, 0⟩ : RingVector(Integer.commutative_ring_bundle, 3))
+  as actionReads;
+  Matrix.quadraticForm(
+      Matrix.squarePlusDoublePlusScaledSquareForm(5),
+      (⟨0, 0, 0⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+     = (0 : ℤ) * 0 + (2 : ℤ) * ((0 : ℤ) * 0) + (5 : ℤ) * ((0 : ℤ) * 0)
+         by Matrix.squarePlusDoublePlusScaledSquareForm_coordinateTuple_value(
+             d := 5, x := 0, y := 0, z := 0)
+     = (0 : ℤ) by ring
+  as valueReads;
+  Matrix.IsIsometric(
+      Matrix.diagonalExtension(Matrix.squarePlusDoublePlusScaledSquareForm(5), (5 : ℤ)),
+      Matrix.borderedAssembly(
+          Matrix.squarePlusDoublePlusScaledSquareForm(5),
+          Matrix.squarePlusDoublePlusScaledSquareForm(5)
+              · (⟨0, 0, 0⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+          (5 : ℤ) + Matrix.quadraticForm(
+              Matrix.squarePlusDoublePlusScaledSquareForm(5),
+              (⟨0, 0, 0⟩ : RingVector(Integer.commutative_ring_bundle, 3)))))
+      by Matrix.diagonalExtension_isometric_borderedAssembly(
+          symmetric := Matrix.squarePlusDoublePlusScaledSquareForm_symmetric);
+  Matrix.diagonalQuaternaryForm(1, 2, 5, 5)
+     = Matrix.diagonalExtension(Matrix.diagonalTernaryForm(1, 2, 5), (5 : ℤ))
+     = Matrix.diagonalExtension(Matrix.squarePlusDoublePlusScaledSquareForm(5), (5 : ℤ))
+         by substituting Matrix.squarePlusDoublePlusScaledSquareForm_is_diagonal
+  as sourceReads;
+  Matrix.squarePlusDoublePlusScaledRankFourRepresentative(5, 0, 0, 5)
+     = Matrix.borderedAssembly(
+           Matrix.squarePlusDoublePlusScaledSquareForm(5),
+           (⟨0, 0, 0⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+           (5 : ℤ) + Matrix.quadraticForm(
+               Matrix.squarePlusDoublePlusScaledSquareForm(5),
+               (⟨0, 0, 0⟩ : RingVector(Integer.commutative_ring_bundle, 3))))
+         by substituting valueReads
+     = Matrix.borderedAssembly(
+           Matrix.squarePlusDoublePlusScaledSquareForm(5),
+           Matrix.squarePlusDoublePlusScaledSquareForm(5)
+               · (⟨0, 0, 0⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+           (5 : ℤ) + Matrix.quadraticForm(
+               Matrix.squarePlusDoublePlusScaledSquareForm(5),
+               (⟨0, 0, 0⟩ : RingVector(Integer.commutative_ring_bundle, 3))))
+         by substituting actionReads
+  as targetReads;
+  Matrix.IsIsometric(
+      Matrix.diagonalQuaternaryForm(1, 2, 5, 5),
+      Matrix.borderedAssembly(
+          Matrix.squarePlusDoublePlusScaledSquareForm(5),
+          Matrix.squarePlusDoublePlusScaledSquareForm(5)
+              · (⟨0, 0, 0⟩ : RingVector(Integer.commutative_ring_bundle, 3)),
+          (5 : ℤ) + Matrix.quadraticForm(
+              Matrix.squarePlusDoublePlusScaledSquareForm(5),
+              (⟨0, 0, 0⟩ : RingVector(Integer.commutative_ring_bundle, 3)))))
+      by substituting sourceReads;
+  done by substituting targetReads
+}
+
+theorem Matrix.critical_fifteen_witness_misses_fifteen
+        : ¬(Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 2, 5, 5), (15 : ℤ))) := {
+  suppose Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 2, 5, 5), (15 : ℤ)) as represented;
+  Matrix.IsIsometric(
+      Matrix.squarePlusDoublePlusScaledRankFourRepresentative(5, 0, 0, 5),
+      Matrix.diagonalQuaternaryForm(1, 2, 5, 5))
+      by Matrix.IsIsometric.symmetric(
+          isometric := Matrix.diagonalQuaternaryForm_one_two_five_five_isometric_representative)
+      as reverse;
+  Matrix.Represents(Matrix.squarePlusDoublePlusScaledRankFourRepresentative(5, 0, 0, 5), (15 : ℤ))
+      by Matrix.isometric_represents(isometric := reverse, represented := represented);
+  ¬(Matrix.Represents(
+        Matrix.squarePlusDoublePlusScaledRankFourRepresentative(5, 0, 0, 5), (15 : ℤ)))
+      by Matrix.weightedD5S0R0C5_not_represents_fifteen;
+  done
+}
+
+theorem Matrix.critical_fifteen_witness_represents_others
+        : ∀ (u : ℕ). Matrix.IsCriticalValue(u) → ¬(u = 15)
+            → Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 2, 5, 5), (u : ℤ)) :=
+  by Matrix.represents_critical_values_except(
+      A := Matrix.diagonalQuaternaryForm(1, 2, 5, 5),
+      v := 15,
+      one := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 0, z := 0, w := 0, value := done)),
+      two := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 0, y := 1, z := 0, w := 0, value := done)),
+      three := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 1, z := 0, w := 0, value := done)),
+      five := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 0, y := 0, z := 1, w := 0, value := done)),
+      six := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 2, y := 1, z := 0, w := 0, value := done)),
+      seven := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 0, y := 1, z := 1, w := 0, value := done)),
+      ten := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 0, y := 0, z := 1, w := 1, value := done)),
+      fourteen := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 2, y := 0, z := 1, w := 1, value := done)),
+      fifteen := Or.introduceLeft(done))
+
+-- ----------------------------------------------------------------------
+-- The nine witnesses, packaged: a critical value is needed when some
+-- symmetric positive-definite rank-four form represents all the others and
+-- misses it.
+
+definition Matrix.CriticalValueIsNeeded (v : ℕ) : Proposition :=
+  ∃ (A : Matrix(Integer.commutative_ring_bundle, 4, 4)).
+      Matrix.IsSymmetric(A)
+      ∧ Matrix.IsPositiveDefinite(A)
+      ∧ (∀ (u : ℕ). Matrix.IsCriticalValue(u) → ¬(u = v) → Matrix.Represents(A, (u : ℤ)))
+      ∧ ¬(Matrix.Represents(A, (v : ℤ)))
+
+theorem Matrix.critical_one_is_needed : Matrix.CriticalValueIsNeeded(1) := {
+  Matrix.IsSymmetric(Matrix.diagonalQuaternaryForm(2, 2, 3, 4))
+      by Matrix.diagonalQuaternaryForm_symmetric;
+  Matrix.IsPositiveDefinite(Matrix.diagonalQuaternaryForm(2, 2, 3, 4))
+      by Matrix.diagonalQuaternaryForm_positive_definite(
+          aPositive := done, bPositive := done, cPositive := done, dPositive := done);
+  ∀ (u : ℕ). Matrix.IsCriticalValue(u) → ¬(u = 1)
+      → Matrix.Represents(Matrix.diagonalQuaternaryForm(2, 2, 3, 4), (u : ℤ))
+      by Matrix.critical_one_witness_represents_others;
+  ¬(Matrix.Represents(Matrix.diagonalQuaternaryForm(2, 2, 3, 4), (1 : ℤ)))
+      by Matrix.critical_one_witness_misses_one;
+  witness Matrix.diagonalQuaternaryForm(2, 2, 3, 4) with done
+}
+
+theorem Matrix.critical_two_is_needed : Matrix.CriticalValueIsNeeded(2) := {
+  Matrix.IsSymmetric(Matrix.diagonalQuaternaryForm(1, 3, 3, 5))
+      by Matrix.diagonalQuaternaryForm_symmetric;
+  Matrix.IsPositiveDefinite(Matrix.diagonalQuaternaryForm(1, 3, 3, 5))
+      by Matrix.diagonalQuaternaryForm_positive_definite(
+          aPositive := done, bPositive := done, cPositive := done, dPositive := done);
+  ∀ (u : ℕ). Matrix.IsCriticalValue(u) → ¬(u = 2)
+      → Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 3, 3, 5), (u : ℤ))
+      by Matrix.critical_two_witness_represents_others;
+  ¬(Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 3, 3, 5), (2 : ℤ)))
+      by Matrix.critical_two_witness_misses_two;
+  witness Matrix.diagonalQuaternaryForm(1, 3, 3, 5) with done
+}
+
+theorem Matrix.critical_three_is_needed : Matrix.CriticalValueIsNeeded(3) := {
+  Matrix.IsSymmetric(Matrix.diagonalQuaternaryForm(1, 1, 4, 5))
+      by Matrix.diagonalQuaternaryForm_symmetric;
+  Matrix.IsPositiveDefinite(Matrix.diagonalQuaternaryForm(1, 1, 4, 5))
+      by Matrix.diagonalQuaternaryForm_positive_definite(
+          aPositive := done, bPositive := done, cPositive := done, dPositive := done);
+  ∀ (u : ℕ). Matrix.IsCriticalValue(u) → ¬(u = 3)
+      → Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 1, 4, 5), (u : ℤ))
+      by Matrix.critical_three_witness_represents_others;
+  ¬(Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 1, 4, 5), (3 : ℤ)))
+      by Matrix.critical_three_witness_misses_three;
+  witness Matrix.diagonalQuaternaryForm(1, 1, 4, 5) with done
+}
+
+theorem Matrix.critical_five_is_needed : Matrix.CriticalValueIsNeeded(5) := {
+  Matrix.IsSymmetric(Matrix.diagonalQuaternaryForm(1, 2, 6, 6))
+      by Matrix.diagonalQuaternaryForm_symmetric;
+  Matrix.IsPositiveDefinite(Matrix.diagonalQuaternaryForm(1, 2, 6, 6))
+      by Matrix.diagonalQuaternaryForm_positive_definite(
+          aPositive := done, bPositive := done, cPositive := done, dPositive := done);
+  ∀ (u : ℕ). Matrix.IsCriticalValue(u) → ¬(u = 5)
+      → Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 2, 6, 6), (u : ℤ))
+      by Matrix.critical_five_witness_represents_others;
+  ¬(Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 2, 6, 6), (5 : ℤ)))
+      by Matrix.critical_five_witness_misses_five;
+  witness Matrix.diagonalQuaternaryForm(1, 2, 6, 6) with done
+}
+
+theorem Matrix.critical_six_is_needed : Matrix.CriticalValueIsNeeded(6) := {
+  Matrix.IsSymmetric(Matrix.diagonalQuaternaryForm(1, 1, 3, 7))
+      by Matrix.diagonalQuaternaryForm_symmetric;
+  Matrix.IsPositiveDefinite(Matrix.diagonalQuaternaryForm(1, 1, 3, 7))
+      by Matrix.diagonalQuaternaryForm_positive_definite(
+          aPositive := done, bPositive := done, cPositive := done, dPositive := done);
+  ∀ (u : ℕ). Matrix.IsCriticalValue(u) → ¬(u = 6)
+      → Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 1, 3, 7), (u : ℤ))
+      by Matrix.critical_six_witness_represents_others;
+  ¬(Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 1, 3, 7), (6 : ℤ)))
+      by Matrix.critical_six_witness_misses_six;
+  witness Matrix.diagonalQuaternaryForm(1, 1, 3, 7) with done
+}
+
+theorem Matrix.critical_seven_is_needed : Matrix.CriticalValueIsNeeded(7) := {
+  Matrix.IsSymmetric(Matrix.diagonalQuaternaryForm(1, 1, 1, 9))
+      by Matrix.diagonalQuaternaryForm_symmetric;
+  Matrix.IsPositiveDefinite(Matrix.diagonalQuaternaryForm(1, 1, 1, 9))
+      by Matrix.diagonalQuaternaryForm_positive_definite(
+          aPositive := done, bPositive := done, cPositive := done, dPositive := done);
+  ∀ (u : ℕ). Matrix.IsCriticalValue(u) → ¬(u = 7)
+      → Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 1, 1, 9), (u : ℤ))
+      by Matrix.critical_seven_witness_represents_others;
+  ¬(Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 1, 1, 9), (7 : ℤ)))
+      by Matrix.critical_seven_witness_misses_seven;
+  witness Matrix.diagonalQuaternaryForm(1, 1, 1, 9) with done
+}
+
+theorem Matrix.critical_ten_is_needed : Matrix.CriticalValueIsNeeded(10) := {
+  Matrix.IsSymmetric(Matrix.diagonalQuaternaryForm(1, 2, 3, 11))
+      by Matrix.diagonalQuaternaryForm_symmetric;
+  Matrix.IsPositiveDefinite(Matrix.diagonalQuaternaryForm(1, 2, 3, 11))
+      by Matrix.diagonalQuaternaryForm_positive_definite(
+          aPositive := done, bPositive := done, cPositive := done, dPositive := done);
+  ∀ (u : ℕ). Matrix.IsCriticalValue(u) → ¬(u = 10)
+      → Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 2, 3, 11), (u : ℤ))
+      by Matrix.critical_ten_witness_represents_others;
+  ¬(Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 2, 3, 11), (10 : ℤ)))
+      by Matrix.critical_ten_witness_misses_ten;
+  witness Matrix.diagonalQuaternaryForm(1, 2, 3, 11) with done
+}
+
+theorem Matrix.critical_fourteen_is_needed : Matrix.CriticalValueIsNeeded(14) := {
+  Matrix.IsSymmetric(Matrix.diagonalQuaternaryForm(1, 1, 2, 15))
+      by Matrix.diagonalQuaternaryForm_symmetric;
+  Matrix.IsPositiveDefinite(Matrix.diagonalQuaternaryForm(1, 1, 2, 15))
+      by Matrix.diagonalQuaternaryForm_positive_definite(
+          aPositive := done, bPositive := done, cPositive := done, dPositive := done);
+  ∀ (u : ℕ). Matrix.IsCriticalValue(u) → ¬(u = 14)
+      → Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 1, 2, 15), (u : ℤ))
+      by Matrix.critical_fourteen_witness_represents_others;
+  ¬(Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 1, 2, 15), (14 : ℤ)))
+      by Matrix.critical_fourteen_witness_misses_fourteen;
+  witness Matrix.diagonalQuaternaryForm(1, 1, 2, 15) with done
+}
+
+theorem Matrix.critical_fifteen_is_needed : Matrix.CriticalValueIsNeeded(15) := {
+  Matrix.IsSymmetric(Matrix.diagonalQuaternaryForm(1, 2, 5, 5))
+      by Matrix.diagonalQuaternaryForm_symmetric;
+  Matrix.IsPositiveDefinite(Matrix.diagonalQuaternaryForm(1, 2, 5, 5))
+      by Matrix.diagonalQuaternaryForm_positive_definite(
+          aPositive := done, bPositive := done, cPositive := done, dPositive := done);
+  ∀ (u : ℕ). Matrix.IsCriticalValue(u) → ¬(u = 15)
+      → Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 2, 5, 5), (u : ℤ))
+      by Matrix.critical_fifteen_witness_represents_others;
+  ¬(Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 2, 5, 5), (15 : ℤ)))
+      by Matrix.critical_fifteen_witness_misses_fifteen;
+  witness Matrix.diagonalQuaternaryForm(1, 2, 5, 5) with done
+}
+
+-- ----------------------------------------------------------------------
+-- Weak minimality: every one of the nine critical values is needed.
+
+theorem Matrix.critical_values_minimal (v : ℕ) (critical : Matrix.IsCriticalValue(v))
+        : Matrix.CriticalValueIsNeeded(v) := {
+  v = 1 ∨ v = 2 ∨ v = 3 ∨ v = 5 ∨ v = 6 ∨ v = 7 ∨ v = 10 ∨ v = 14 ∨ v = 15 by critical;
+  done by cases {
+    case v = 1 as value: {
+        Matrix.CriticalValueIsNeeded(1) by Matrix.critical_one_is_needed;
+        done by substituting value
+      }
+    case v = 2 as value: {
+        Matrix.CriticalValueIsNeeded(2) by Matrix.critical_two_is_needed;
+        done by substituting value
+      }
+    case v = 3 as value: {
+        Matrix.CriticalValueIsNeeded(3) by Matrix.critical_three_is_needed;
+        done by substituting value
+      }
+    case v = 5 as value: {
+        Matrix.CriticalValueIsNeeded(5) by Matrix.critical_five_is_needed;
+        done by substituting value
+      }
+    case v = 6 as value: {
+        Matrix.CriticalValueIsNeeded(6) by Matrix.critical_six_is_needed;
+        done by substituting value
+      }
+    case v = 7 as value: {
+        Matrix.CriticalValueIsNeeded(7) by Matrix.critical_seven_is_needed;
+        done by substituting value
+      }
+    case v = 10 as value: {
+        Matrix.CriticalValueIsNeeded(10) by Matrix.critical_ten_is_needed;
+        done by substituting value
+      }
+    case v = 14 as value: {
+        Matrix.CriticalValueIsNeeded(14) by Matrix.critical_fourteen_is_needed;
+        done by substituting value
+      }
+    case v = 15 as value: {
+        Matrix.CriticalValueIsNeeded(15) by Matrix.critical_fifteen_is_needed;
+        done by substituting value
+      }
+  }
+}
+
+theorem Matrix.IsCriticalValue.positive (v : ℕ) (critical : Matrix.IsCriticalValue(v))
+        : v ≥ 1 := {
+  v = 1 ∨ v = 2 ∨ v = 3 ∨ v = 5 ∨ v = 6 ∨ v = 7 ∨ v = 10 ∨ v = 14 ∨ v = 15 by critical;
+  done by cases {
+    case v = 1 as value: done by substituting value
+    case v = 2 as value: done by substituting value
+    case v = 3 as value: done by substituting value
+    case v = 5 as value: done by substituting value
+    case v = 6 as value: done by substituting value
+    case v = 7 as value: done by substituting value
+    case v = 10 as value: done by substituting value
+    case v = 14 as value: done by substituting value
+    case v = 15 as value: done by substituting value
+  }
+}
+
+-- Dropping any one of the nine hypotheses of the fifteen theorem breaks it:
+-- the remaining eight critical values leave a symmetric positive-definite
+-- form that is not universal.
+theorem Matrix.critical_values_do_not_force_universality (v : ℕ)
+        (critical : Matrix.IsCriticalValue(v))
+        : ∃ (A : Matrix(Integer.commutative_ring_bundle, 4, 4)).
+            Matrix.IsSymmetric(A)
+            ∧ Matrix.IsPositiveDefinite(A)
+            ∧ (∀ (u : ℕ). Matrix.IsCriticalValue(u) → ¬(u = v) → Matrix.Represents(A, (u : ℤ)))
+            ∧ ¬(Matrix.IsUniversal(A)) := {
+  Matrix.CriticalValueIsNeeded(v) by Matrix.critical_values_minimal as needed;
+  choose A : Matrix(Integer.commutative_ring_bundle, 4, 4) such that
+      Matrix.IsSymmetric(A)
+      ∧ Matrix.IsPositiveDefinite(A)
+      ∧ (∀ (u : ℕ). Matrix.IsCriticalValue(u) → ¬(u = v) → Matrix.Represents(A, (u : ℤ)))
+      ∧ ¬(Matrix.Represents(A, (v : ℤ))) from needed;
+  Matrix.IsSymmetric(A);
+  Matrix.IsPositiveDefinite(A);
+  ∀ (u : ℕ). Matrix.IsCriticalValue(u) → ¬(u = v) → Matrix.Represents(A, (u : ℤ));
+  ¬(Matrix.Represents(A, (v : ℤ)));
+  ¬(Matrix.IsUniversal(A)) by {
+    suppose Matrix.IsUniversal(A) as universal;
+    v ≥ 1 by Matrix.IsCriticalValue.positive;
+    Matrix.Represents(A, (v : ℤ)) by universal;
+    done
+  };
+  witness A with done
+}

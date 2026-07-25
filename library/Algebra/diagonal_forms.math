@@ -342,3 +342,97 @@ theorem Matrix.squarePlusDoubleSquarePlusTripleSquareForm_is_diagonal
      = Matrix.squarePlusDoubleSquarePlusTripleSquareForm;
   done
 }
+
+-- ----------------------------------------------------------------------
+-- Climbing the ladder with a missed value.  The rank-zero form represents
+-- only 0, and each further coefficient is too large to reach the target.
+
+theorem Matrix.diagonalUnaryForm_not_represents_below_coefficient (a target : ℤ)
+        (targetPositive : target > (0 : ℤ))
+        (coefficientExceeds : a > target)
+        : ¬(Matrix.Represents(Matrix.diagonalUnaryForm(a), target)) := {
+  ¬(Matrix.Represents(Matrix.identity(Integer.commutative_ring_bundle, 0), target)) by {
+    suppose Matrix.Represents(
+        Matrix.identity(Integer.commutative_ring_bundle, 0), target) as represented;
+    target = (0 : ℤ) by Matrix.zero_dimension_represents;
+    ¬((0 : ℤ) = target) by Integer.LessThan.distinct;
+    done
+  }
+  as blockMisses;
+  done by Matrix.diagonalExtension_not_represents_below_corner(
+      symmetric := Matrix.zero_dimension_symmetric(
+          A := Matrix.identity(Integer.commutative_ring_bundle, 0)),
+      positiveDefinite := Matrix.zero_dimension_positive_definite(
+          A := Matrix.identity(Integer.commutative_ring_bundle, 0)),
+      targetNonneg := Integer.LessThan.weaken(a := (0 : ℤ), b := target, aLessThanB := targetPositive),
+      cornerExceeds := coefficientExceeds,
+      blockMisses := blockMisses)
+}
+
+theorem Matrix.diagonalBinaryForm_not_represents_below_coefficient (a b target : ℤ)
+        (aPositive : a > (0 : ℤ))
+        (targetNonneg : target ≥ (0 : ℤ))
+        (coefficientExceeds : b > target)
+        (blockMisses : ¬(Matrix.Represents(Matrix.diagonalUnaryForm(a), target)))
+        : ¬(Matrix.Represents(Matrix.diagonalBinaryForm(a, b), target)) :=
+  by Matrix.diagonalExtension_not_represents_below_corner(
+      symmetric := Matrix.diagonalUnaryForm_symmetric,
+      positiveDefinite := Matrix.diagonalUnaryForm_positive_definite(aPositive := aPositive),
+      targetNonneg := targetNonneg,
+      cornerExceeds := coefficientExceeds,
+      blockMisses := blockMisses)
+
+theorem Matrix.diagonalTernaryForm_not_represents_below_coefficient (a b c target : ℤ)
+        (aPositive : a > (0 : ℤ)) (bPositive : b > (0 : ℤ))
+        (targetNonneg : target ≥ (0 : ℤ))
+        (coefficientExceeds : c > target)
+        (blockMisses : ¬(Matrix.Represents(Matrix.diagonalBinaryForm(a, b), target)))
+        : ¬(Matrix.Represents(Matrix.diagonalTernaryForm(a, b, c), target)) :=
+  by Matrix.diagonalExtension_not_represents_below_corner(
+      symmetric := Matrix.diagonalBinaryForm_symmetric,
+      positiveDefinite := Matrix.diagonalBinaryForm_positive_definite(
+          aPositive := aPositive, bPositive := bPositive),
+      targetNonneg := targetNonneg,
+      cornerExceeds := coefficientExceeds,
+      blockMisses := blockMisses)
+
+theorem Matrix.diagonalQuaternaryForm_not_represents_below_coefficient (a b c d target : ℤ)
+        (aPositive : a > (0 : ℤ)) (bPositive : b > (0 : ℤ)) (cPositive : c > (0 : ℤ))
+        (targetNonneg : target ≥ (0 : ℤ))
+        (coefficientExceeds : d > target)
+        (blockMisses : ¬(Matrix.Represents(Matrix.diagonalTernaryForm(a, b, c), target)))
+        : ¬(Matrix.Represents(Matrix.diagonalQuaternaryForm(a, b, c, d), target)) :=
+  by Matrix.diagonalExtension_not_represents_below_corner(
+      symmetric := Matrix.diagonalTernaryForm_symmetric,
+      positiveDefinite := Matrix.diagonalTernaryForm_positive_definite(
+          aPositive := aPositive, bPositive := bPositive, cPositive := cPositive),
+      targetNonneg := targetNonneg,
+      cornerExceeds := coefficientExceeds,
+      blockMisses := blockMisses)
+
+-- ----------------------------------------------------------------------
+-- Exhibiting a represented value is arithmetic in the four coordinates.
+
+theorem Matrix.diagonalQuaternaryForm_represents (a b c d x y z w target : ℤ)
+        (value : a * (x * x) + b * (y * y) + c * (z * z) + d * (w * w) = target)
+        : Matrix.Represents(Matrix.diagonalQuaternaryForm(a, b, c, d), target) := {
+  Matrix.quadraticForm(
+      Matrix.diagonalQuaternaryForm(a, b, c, d),
+      (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4)))
+     = a * (x * x) + b * (y * y) + c * (z * z) + d * (w * w)
+         by Matrix.diagonalQuaternaryForm_coordinateTuple_value
+     = target by value
+  as computes;
+  witness (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4)) with computes
+}
+
+theorem Matrix.squarePlusDoublePlusScaledSquareForm_is_diagonal (d : ℤ)
+        : Matrix.squarePlusDoublePlusScaledSquareForm(d) = Matrix.diagonalTernaryForm(1, 2, d) := {
+  Matrix.diagonalTernaryForm(1, 2, d)
+     = Matrix.diagonalExtension(Matrix.squarePlusDoubleSquareForm, d)
+         by substituting Matrix.squarePlusDoubleSquareForm_is_diagonal
+     = Matrix.diagonalExtension(Matrix.diagonalExtension(Matrix.squareForm, 2), d)
+         by substituting Matrix.squarePlusDoubleSquareForm_is_nested_diagonal
+     = Matrix.squarePlusDoublePlusScaledSquareForm(d);
+  done
+}
