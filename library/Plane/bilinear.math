@@ -1,0 +1,165 @@
+-- Plane/bilinear.math
+--
+-- The two bilinear forms on the plane and the right-angle turn that
+-- links them.
+--
+-- The inner product measures how far two vectors point the same way;
+-- the determinant measures how far they point differently, and its SIGN
+-- is the orientation predicate — Sedgewick's `ccw`. The Jordan–Schönflies
+-- development uses the determinant in place of angles throughout: the
+-- vertex bookkeeping in the two-sided strip lemma is a statement about
+-- the signs of `Plane.Vector.determinant`, and needs no trigonometry
+-- because of it.
+--
+-- `Plane.Vector.innerProduct(v, v)` is the squared length. No square
+-- root is taken anywhere in this file, and none is needed until distances
+-- are compared.
+
+module Plane.bilinear
+
+import Logic.basics
+import Equality.basics
+import Real.interface
+import Plane.vector
+
+-- ----------------------------------------------------------------------
+-- The two forms.
+
+definition Plane.Vector.innerProduct (u v : Plane.Vector) : ℝ :=
+  Plane.Vector.first(u) * Plane.Vector.first(v)
+      + Plane.Vector.second(u) * Plane.Vector.second(v)
+
+definition Plane.Vector.determinant (u v : Plane.Vector) : ℝ :=
+  Plane.Vector.first(u) * Plane.Vector.second(v)
+      - Plane.Vector.second(u) * Plane.Vector.first(v)
+
+-- ----------------------------------------------------------------------
+-- The inner product.
+
+theorem Plane.Vector.innerProduct_symmetric (u v : Plane.Vector)
+        : Plane.Vector.innerProduct(u, v) = Plane.Vector.innerProduct(v, u) :=
+  Plane.Vector.first(u) * Plane.Vector.first(v)
+        + Plane.Vector.second(u) * Plane.Vector.second(v)
+      = Plane.Vector.first(v) * Plane.Vector.first(u)
+        + Plane.Vector.second(v) * Plane.Vector.second(u) by ring
+
+theorem Plane.Vector.innerProduct_add_left (u v w : Plane.Vector)
+        : Plane.Vector.innerProduct(u + v, w)
+              = Plane.Vector.innerProduct(u, w) + Plane.Vector.innerProduct(v, w) :=
+  Plane.Vector.first(u + v) * Plane.Vector.first(w)
+        + Plane.Vector.second(u + v) * Plane.Vector.second(w)
+      = (Plane.Vector.first(u) + Plane.Vector.first(v)) * Plane.Vector.first(w)
+        + (Plane.Vector.second(u) + Plane.Vector.second(v)) * Plane.Vector.second(w)
+      = (Plane.Vector.first(u) * Plane.Vector.first(w)
+             + Plane.Vector.second(u) * Plane.Vector.second(w))
+        + (Plane.Vector.first(v) * Plane.Vector.first(w)
+             + Plane.Vector.second(v) * Plane.Vector.second(w)) by ring
+
+theorem Plane.Vector.innerProduct_scale_left (factor : ℝ) (u v : Plane.Vector)
+        : Plane.Vector.innerProduct(factor * u, v)
+              = factor * Plane.Vector.innerProduct(u, v) :=
+  Plane.Vector.first(factor * u) * Plane.Vector.first(v)
+        + Plane.Vector.second(factor * u) * Plane.Vector.second(v)
+      = (factor * Plane.Vector.first(u)) * Plane.Vector.first(v)
+        + (factor * Plane.Vector.second(u)) * Plane.Vector.second(v)
+      = factor * (Plane.Vector.first(u) * Plane.Vector.first(v)
+             + Plane.Vector.second(u) * Plane.Vector.second(v)) by ring
+
+-- The squared length is never negative: it is a sum of two squares.
+theorem Plane.Vector.innerProduct_self_nonneg (v : Plane.Vector)
+        : 0 ≤ Plane.Vector.innerProduct(v, v) := {
+  0 ≤ Plane.Vector.first(v) * Plane.Vector.first(v)
+        + Plane.Vector.second(v) * Plane.Vector.second(v);
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The determinant, whose sign is the orientation of the pair.
+
+theorem Plane.Vector.determinant_antisymmetric (u v : Plane.Vector)
+        : Plane.Vector.determinant(u, v) = -Plane.Vector.determinant(v, u) :=
+  Plane.Vector.first(u) * Plane.Vector.second(v)
+        - Plane.Vector.second(u) * Plane.Vector.first(v)
+      = -(Plane.Vector.first(v) * Plane.Vector.second(u)
+             - Plane.Vector.second(v) * Plane.Vector.first(u)) by ring
+
+-- A vector spans no area with itself.
+theorem Plane.Vector.determinant_self (v : Plane.Vector)
+        : Plane.Vector.determinant(v, v) = 0 :=
+  Plane.Vector.first(v) * Plane.Vector.second(v)
+        - Plane.Vector.second(v) * Plane.Vector.first(v)
+      = 0 by ring
+
+theorem Plane.Vector.determinant_add_left (u v w : Plane.Vector)
+        : Plane.Vector.determinant(u + v, w)
+              = Plane.Vector.determinant(u, w) + Plane.Vector.determinant(v, w) :=
+  Plane.Vector.first(u + v) * Plane.Vector.second(w)
+        - Plane.Vector.second(u + v) * Plane.Vector.first(w)
+      = (Plane.Vector.first(u) + Plane.Vector.first(v)) * Plane.Vector.second(w)
+        - (Plane.Vector.second(u) + Plane.Vector.second(v)) * Plane.Vector.first(w)
+      = (Plane.Vector.first(u) * Plane.Vector.second(w)
+             - Plane.Vector.second(u) * Plane.Vector.first(w))
+        + (Plane.Vector.first(v) * Plane.Vector.second(w)
+             - Plane.Vector.second(v) * Plane.Vector.first(w)) by ring
+
+theorem Plane.Vector.determinant_scale_left (factor : ℝ) (u v : Plane.Vector)
+        : Plane.Vector.determinant(factor * u, v)
+              = factor * Plane.Vector.determinant(u, v) :=
+  Plane.Vector.first(factor * u) * Plane.Vector.second(v)
+        - Plane.Vector.second(factor * u) * Plane.Vector.first(v)
+      = (factor * Plane.Vector.first(u)) * Plane.Vector.second(v)
+        - (factor * Plane.Vector.second(u)) * Plane.Vector.first(v)
+      = factor * (Plane.Vector.first(u) * Plane.Vector.second(v)
+             - Plane.Vector.second(u) * Plane.Vector.first(v)) by ring
+
+-- ----------------------------------------------------------------------
+-- The right-angle turn.
+
+definition Plane.Vector.perpendicular (v : Plane.Vector) : Plane.Vector :=
+  Plane.Vector.make(-Plane.Vector.second(v), Plane.Vector.first(v))
+
+theorem Plane.Vector.first_perpendicular (v : Plane.Vector)
+        : Plane.Vector.first(Plane.Vector.perpendicular(v))
+              = -Plane.Vector.second(v) :=
+  reflexivity(ℝ, -Plane.Vector.second(v))
+
+theorem Plane.Vector.second_perpendicular (v : Plane.Vector)
+        : Plane.Vector.second(Plane.Vector.perpendicular(v))
+              = Plane.Vector.first(v) :=
+  reflexivity(ℝ, Plane.Vector.first(v))
+
+-- The turn is a right angle: the two directions are orthogonal.
+theorem Plane.Vector.innerProduct_perpendicular (v : Plane.Vector)
+        : Plane.Vector.innerProduct(v, Plane.Vector.perpendicular(v)) = 0 :=
+  Plane.Vector.first(v) * Plane.Vector.first(Plane.Vector.perpendicular(v))
+        + Plane.Vector.second(v) * Plane.Vector.second(Plane.Vector.perpendicular(v))
+      = Plane.Vector.first(v) * (-Plane.Vector.second(v))
+        + Plane.Vector.second(v) * Plane.Vector.first(v)
+      = 0 by ring
+
+-- The identity the strip lemma runs on: turning left spans a positive
+-- area, of exactly the squared length. For a unit vector this is 1, which
+-- is what pins the sign of every germ at a vertex.
+theorem Plane.Vector.determinant_perpendicular (v : Plane.Vector)
+        : Plane.Vector.determinant(v, Plane.Vector.perpendicular(v))
+              = Plane.Vector.innerProduct(v, v) :=
+  Plane.Vector.first(v) * Plane.Vector.second(Plane.Vector.perpendicular(v))
+        - Plane.Vector.second(v) * Plane.Vector.first(Plane.Vector.perpendicular(v))
+      = Plane.Vector.first(v) * Plane.Vector.first(v)
+        - Plane.Vector.second(v) * (-Plane.Vector.second(v))
+      = Plane.Vector.first(v) * Plane.Vector.first(v)
+        + Plane.Vector.second(v) * Plane.Vector.second(v) by ring
+
+-- Turning left twice reverses the vector.
+theorem Plane.Vector.perpendicular_perpendicular (v : Plane.Vector)
+        : Plane.Vector.perpendicular(Plane.Vector.perpendicular(v)) = -v := {
+  Plane.Vector.first(Plane.Vector.perpendicular(Plane.Vector.perpendicular(v)))
+      = -Plane.Vector.second(Plane.Vector.perpendicular(v))
+      = -Plane.Vector.first(v)
+      = Plane.Vector.first(-v);
+  Plane.Vector.second(Plane.Vector.perpendicular(Plane.Vector.perpendicular(v)))
+      = Plane.Vector.first(Plane.Vector.perpendicular(v))
+      = -Plane.Vector.second(v)
+      = Plane.Vector.second(-v);
+  done by Plane.Vector.equal_of_coordinates
+}

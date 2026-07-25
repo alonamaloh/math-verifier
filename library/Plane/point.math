@@ -1,0 +1,121 @@
+-- Plane/point.math
+--
+-- Locations in the plane. A point is not a vector: vectors add to each
+-- other, points do not add at all. What a point admits is translation by
+-- a vector, and subtraction of another point to give the vector between
+-- them. That is the affine structure the blueprint already writes in —
+-- inversion is `a + (x - a)/‖x - a‖²`, a point plus a scaled vector.
+--
+-- The construction picks an origin and represents a point by its
+-- displacement from it. Nothing outside this file should mention
+-- `Plane.Point.fromOrigin`: consumers use `+`, `-`, and the laws below,
+-- which never refer to the choice.
+
+module Plane.point
+
+import Logic.basics
+import Equality.basics
+import Real.interface
+import Plane.vector
+
+-- ----------------------------------------------------------------------
+-- The carrier.
+
+inductive Plane.Point : Type(0) where
+  | Plane.Point.fromOrigin : Plane.Vector → Plane.Point
+
+definition Plane.Point.position : Plane.Point → Plane.Vector
+  | Plane.Point.fromOrigin(displacement) => displacement
+
+theorem Plane.Point.position_fromOrigin (displacement : Plane.Vector)
+        : Plane.Point.position(Plane.Point.fromOrigin(displacement))
+              = displacement :=
+  reflexivity(Plane.Vector, displacement)
+
+-- A point is its own displacement, replaced.
+theorem Plane.Point.fromOrigin_position (point : Plane.Point)
+        : Plane.Point.fromOrigin(Plane.Point.position(point)) = point :=
+  by induction on point {
+    case Plane.Point.fromOrigin(displacement):
+        reflexivity(Plane.Point, Plane.Point.fromOrigin(displacement))
+  }
+
+theorem Plane.Point.equal_of_position (p q : Plane.Point)
+        (positionEqual : Plane.Point.position(p) = Plane.Point.position(q))
+        : p = q :=
+  p = Plane.Point.fromOrigin(Plane.Point.position(p))
+        by Plane.Point.fromOrigin_position
+    = Plane.Point.fromOrigin(Plane.Point.position(q))
+    = q by Plane.Point.fromOrigin_position
+
+-- ----------------------------------------------------------------------
+-- Translation and difference.
+
+definition Plane.Point.translate (point : Plane.Point) (displacement : Plane.Vector)
+        : Plane.Point :=
+  Plane.Point.fromOrigin(Plane.Point.position(point) + displacement)
+
+definition Plane.Point.difference (p q : Plane.Point) : Plane.Vector :=
+  Plane.Point.position(p) - Plane.Point.position(q)
+
+operator (+) on (Plane.Point, Plane.Vector) := Plane.Point.translate
+operator (-) on (Plane.Point, Plane.Point) := Plane.Point.difference
+
+theorem Plane.Point.position_translate (point : Plane.Point) (displacement : Plane.Vector)
+        : Plane.Point.position(point + displacement)
+              = Plane.Point.position(point) + displacement :=
+  reflexivity(Plane.Vector, Plane.Point.position(point) + displacement)
+
+-- ----------------------------------------------------------------------
+-- The affine laws. Together they say that the vectors act freely and
+-- transitively on the points: translating by nothing does nothing,
+-- translations compose, and any two points differ by exactly one vector.
+
+theorem Plane.Point.translate_zero (point : Plane.Point)
+        : point + Plane.Vector.zero = point := {
+  Plane.Point.position(point + Plane.Vector.zero)
+      = Plane.Point.position(point) + Plane.Vector.zero
+      = Plane.Point.position(point) by Plane.Vector.add_zero;
+  done by Plane.Point.equal_of_position
+}
+
+theorem Plane.Point.translate_translate
+        (point : Plane.Point) (v w : Plane.Vector)
+        : (point + v) + w = point + (v + w) := {
+  Plane.Point.position((point + v) + w)
+      = (Plane.Point.position(point) + v) + w
+      = Plane.Point.position(point) + (v + w) by Plane.Vector.add_associative
+      = Plane.Point.position(point + (v + w));
+  done by Plane.Point.equal_of_position
+}
+
+-- Translating by the difference lands on the target: the action is
+-- transitive.
+theorem Plane.Point.translate_difference (p q : Plane.Point)
+        : p + (q - p) = q := {
+  Plane.Point.position(p + (q - p))
+      = Plane.Point.position(p)
+            + (Plane.Point.position(q) - Plane.Point.position(p))
+      = Plane.Point.position(q) by Plane.Vector.add_subtract_left;
+  done by Plane.Point.equal_of_position
+}
+
+-- Reading the translation back off: the action is free.
+theorem Plane.Point.difference_translate (point : Plane.Point) (v : Plane.Vector)
+        : (point + v) - point = v :=
+  (point + v) - point
+      = (Plane.Point.position(point) + v) - Plane.Point.position(point)
+      = v by Plane.Vector.add_subtract_cancel
+
+theorem Plane.Point.translate_injective (point : Plane.Point) (v w : Plane.Vector)
+        (translatesEqual : point + v = point + w)
+        : v = w :=
+  v = (point + v) - point by Plane.Point.difference_translate
+    = (point + w) - point by translatesEqual
+    = w by Plane.Point.difference_translate
+
+theorem Plane.Point.difference_self (point : Plane.Point)
+        : point - point = Plane.Vector.zero :=
+  point - point
+      = Plane.Point.position(point) - Plane.Point.position(point)
+      = Plane.Vector.zero by Plane.Vector.subtract_self

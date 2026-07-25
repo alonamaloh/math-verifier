@@ -5,8 +5,7 @@ The Euclidean plane, built for the Jordan–Schönflies development
 
 - **`Plane.Vector`** — a displacement. Carries the linear structure.
 - **`Plane.Point`** — a location. Acted on by vectors, so `p + v` is a
-  point and `q - p` is a vector. *(Not yet built; `vector.math` is the
-  first file.)*
+  point and `q - p` is a vector.
 
 Keeping them distinct is what makes `p + q` unwritable. The blueprint
 already speaks this way — inversion is `a + (x - a)/‖x - a‖²` — and the
@@ -25,22 +24,47 @@ instances need — and nothing else. A warm run is about two seconds.
 
 ## Main definitions
 
-- `Plane.Vector` and its coordinates `Plane.Vector.first` /
-  `Plane.Vector.second`, in [vector.math](vector.math)
-- `Plane.Vector.make`, `Plane.Vector.zero`, and the operators `+`, `-`
-  (binary and unary), and `*` for scaling by a real
+- `Plane.Vector`, its coordinates `first` / `second`, `make`, `zero`, and
+  the operators `+`, `-` (binary and unary), `*` for scaling by a real —
+  [vector.math](vector.math)
+- `Plane.Point`, `Plane.Point.position`, and the operators `+`
+  (`Point + Vector → Point`) and `-` (`Point - Point → Vector`) —
+  [point.math](point.math)
+- `Plane.Vector.innerProduct`, `Plane.Vector.determinant`, and
+  `Plane.Vector.perpendicular` — [bilinear.math](bilinear.math)
 
 ## Main theorems
 
-- `Plane.Vector.equal_of_coordinates` — the bridge from coordinate
-  arithmetic to vector equations. **Every law goes through it**, and
-  consumers should reach for it rather than unfolding to `Product`.
-- The coordinate-reduction lemmas `Plane.Vector.first_add`,
-  `first_negate`, `first_scale`, `first_subtract`, `first_zero` and their
-  `second_` counterparts
-- The vector-space laws: `add_commutative`, `add_associative`,
-  `add_zero`, `add_negate`, `subtract_add`, `scale_add`, `scale_scale`,
-  `scale_one`
+- `Plane.Vector.equal_of_coordinates` and `Plane.Point.equal_of_position`
+  — the bridges from coordinates to equations. **Every law goes through
+  one of them**; reach for these rather than unfolding the construction.
+- The coordinate-reduction lemmas `first_add`, `first_negate`,
+  `first_scale`, `first_subtract`, `first_zero`, `first_perpendicular`
+  and their `second_` counterparts
+- Vector-space laws: `add_commutative`, `add_associative`, `add_zero`,
+  `add_negate`, `subtract_add`, `subtract_self`, `add_subtract_left`,
+  `add_subtract_cancel`, `scale_add`, `scale_scale`, `scale_one`
+- Affine laws: `translate_zero`, `translate_translate`,
+  `translate_difference` (the action is transitive),
+  `difference_translate` and `translate_injective` (it is free),
+  `difference_self`
+- Bilinear forms: `innerProduct_symmetric`, `innerProduct_add_left`,
+  `innerProduct_scale_left`, `innerProduct_self_nonneg`;
+  `determinant_antisymmetric`, `determinant_self`, `determinant_add_left`,
+  `determinant_scale_left`
+- The right-angle turn: `innerProduct_perpendicular` (it is a right
+  angle), `perpendicular_perpendicular` (twice reverses), and
+  **`determinant_perpendicular`** — `det(v, v⊥) = ⟨v, v⟩`, the identity
+  the strip lemma runs on
+
+## Orientation instead of angles
+
+`Plane.Vector.determinant(u, v) = u₁v₂ - u₂v₁`, and its **sign** is the
+orientation of the pair — Sedgewick's `ccw`. The Jordan–Schönflies
+development uses it wherever a textbook would use an angle, which is why
+nothing here needs trigonometry: the library has sine and cosine only as
+power series, with no π and no periodicity. `innerProduct(v, v)` serves
+as the squared length; no square root is taken.
 
 ## How proofs here go
 
@@ -66,6 +90,22 @@ have to guess.
 **Do not** state a coordinate goal in unreduced form and hope `ring`
 will close it: `ring` treats `Plane.Vector.first(u + v)` as an opaque
 atom. Expand first — that is what the chain above is for.
+
+## Which `by` to keep
+
+The redundancy checker flags every citation the auto-prover could have
+found itself. The line taken here: **keep the citation when it names a
+theorem, drop it when it names a computation.**
+
+So the coordinate expansions and the real arithmetic in `vector.math` are
+bare — a mathematician writing "the first coordinate of `u + v` is
+`u₁ + v₁`" cites nothing. But `point.math` keeps nearly all of its
+citations, because each one names the vector law being transported to
+points: translations compose *because* vector addition is associative,
+and saying so is the content of the lemma. Every `done by
+equal_of_coordinates` / `equal_of_position` stays too — how two
+coordinate equations become one vector equation is the step a reader
+should not have to reconstruct.
 
 ## Friction worth removing
 
