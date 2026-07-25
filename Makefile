@@ -156,7 +156,7 @@ TEST_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(TEST_MATH_FILES))
 LIBRARY_MATHV_IFACE_FILES := $(LIBRARY_MATHV_FILES:.mathv=.mathv.iface)
 TEST_MATHV_IFACE_FILES := $(TEST_MATHV_FILES:.mathv=.mathv.iface)
 
-.PHONY: library library-clean tests error-tests checker-tests \
+.PHONY: library library-clean plane tests error-tests checker-tests \
         clean-check clean-status
 
 # Bare `make` VERIFIES THE LIBRARY — not just builds the kernel binary. The
@@ -169,6 +169,17 @@ TEST_MATHV_IFACE_FILES := $(TEST_MATHV_FILES:.mathv=.mathv.iface)
 .DEFAULT_GOAL := library
 
 library: $(LIBRARY_MATHV_FILES) $(LIBRARY_MATHV_IFACE_FILES)
+
+# A narrow inner loop for the Plane/ development (PLAN_JORDAN_SCHOENFLIES.md).
+# Names only the Plane/ files; the generated dependency file then pulls in
+# exactly their transitive imports, so the Algebra/ fifteen-theorem material —
+# which dominates the wall-clock time of a full `make library` — is never
+# touched. Use this while working in Plane/, and `make -j 16 library` only
+# before committing.
+PLANE_MATH_FILES := $(filter library/Plane/%,$(LIBRARY_MATH_FILES))
+PLANE_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(PLANE_MATH_FILES))
+
+plane: $(PLANE_MATHV_FILES) $(PLANE_MATHV_FILES:.mathv=.mathv.iface)
 
 tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES) checker-tests \
 	carrier-normal-form-check matrix-ergonomics-statement-check rank-four-generated-check \

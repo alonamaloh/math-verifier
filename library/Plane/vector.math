@@ -1,0 +1,254 @@
+-- Plane/vector.math
+--
+-- Displacements of the plane. A vector is a pair of reals under
+-- componentwise addition; points are a separate type, acted on by these
+-- vectors, so that `p + v` is a point and `p + q` is not written at all.
+--
+-- Every law here is proved the same way: state the two coordinate
+-- equations, close each by `ring`, and hand them to
+-- `Plane.Vector.equal_of_coordinates`.
+
+module Plane.vector
+
+import Logic.basics
+import Logic.product
+import Equality.basics
+import Real.interface
+
+-- ----------------------------------------------------------------------
+-- The carrier and its coordinates.
+
+definition Plane.Vector : Type(0) := Pair(ℝ, ℝ)
+
+definition Plane.Vector.make (first second : ℝ) : Plane.Vector :=
+  Product.make(first, second)
+
+definition Plane.Vector.first (vector : Plane.Vector) : ℝ :=
+  Product.first(vector)
+
+definition Plane.Vector.second (vector : Plane.Vector) : ℝ :=
+  Product.second(vector)
+
+theorem Plane.Vector.first_make (first second : ℝ)
+        : Plane.Vector.first(Plane.Vector.make(first, second)) = first :=
+  reflexivity(ℝ, first)
+
+theorem Plane.Vector.second_make (first second : ℝ)
+        : Plane.Vector.second(Plane.Vector.make(first, second)) = second :=
+  reflexivity(ℝ, second)
+
+-- A vector is its own coordinates reassembled.
+theorem Plane.Vector.make_coordinates (vector : Plane.Vector)
+        : Plane.Vector.make(
+              Plane.Vector.first(vector),
+              Plane.Vector.second(vector)) = vector :=
+  vector = Product.make(Product.first(vector), Product.second(vector))
+             by Product.eta
+
+-- Two vectors agree exactly when their coordinates do. This is the only
+-- route from coordinate arithmetic to vector equations, and every law
+-- below goes through it.
+theorem Plane.Vector.equal_of_coordinates (u v : Plane.Vector)
+        (firstEqual : Plane.Vector.first(u) = Plane.Vector.first(v))
+        (secondEqual : Plane.Vector.second(u) = Plane.Vector.second(v))
+        : u = v :=
+  u = Plane.Vector.make(Plane.Vector.first(u), Plane.Vector.second(u))
+        by Plane.Vector.make_coordinates
+    = Plane.Vector.make(Plane.Vector.first(v), Plane.Vector.second(v))
+    = v by Plane.Vector.make_coordinates
+
+-- ----------------------------------------------------------------------
+-- The operations.
+
+definition Plane.Vector.zero : Plane.Vector :=
+  Plane.Vector.make(0, 0)
+
+definition Plane.Vector.add (u v : Plane.Vector) : Plane.Vector :=
+  Plane.Vector.make(
+      Plane.Vector.first(u) + Plane.Vector.first(v),
+      Plane.Vector.second(u) + Plane.Vector.second(v))
+
+definition Plane.Vector.negate (v : Plane.Vector) : Plane.Vector :=
+  Plane.Vector.make(
+      -Plane.Vector.first(v),
+      -Plane.Vector.second(v))
+
+definition Plane.Vector.subtract (u v : Plane.Vector) : Plane.Vector :=
+  Plane.Vector.add(u, Plane.Vector.negate(v))
+
+definition Plane.Vector.scale (factor : ℝ) (v : Plane.Vector) : Plane.Vector :=
+  Plane.Vector.make(
+      factor * Plane.Vector.first(v),
+      factor * Plane.Vector.second(v))
+
+operator (+) on (Plane.Vector, Plane.Vector) := Plane.Vector.add
+operator (-) on (Plane.Vector, Plane.Vector) := Plane.Vector.subtract
+operator (-) on (Plane.Vector) := Plane.Vector.negate
+operator (*) on (Real, Plane.Vector) := Plane.Vector.scale
+
+-- ----------------------------------------------------------------------
+-- Reading a coordinate through an operation. Each holds by computation;
+-- together they are what lets `ring` do the work in every law below.
+
+theorem Plane.Vector.first_add (u v : Plane.Vector)
+        : Plane.Vector.first(u + v)
+              = Plane.Vector.first(u) + Plane.Vector.first(v) :=
+  reflexivity(ℝ, Plane.Vector.first(u) + Plane.Vector.first(v))
+
+theorem Plane.Vector.second_add (u v : Plane.Vector)
+        : Plane.Vector.second(u + v)
+              = Plane.Vector.second(u) + Plane.Vector.second(v) :=
+  reflexivity(ℝ, Plane.Vector.second(u) + Plane.Vector.second(v))
+
+theorem Plane.Vector.first_negate (v : Plane.Vector)
+        : Plane.Vector.first(-v) = -Plane.Vector.first(v) :=
+  reflexivity(ℝ, -Plane.Vector.first(v))
+
+theorem Plane.Vector.second_negate (v : Plane.Vector)
+        : Plane.Vector.second(-v) = -Plane.Vector.second(v) :=
+  reflexivity(ℝ, -Plane.Vector.second(v))
+
+theorem Plane.Vector.first_scale (factor : ℝ) (v : Plane.Vector)
+        : Plane.Vector.first(factor * v)
+              = factor * Plane.Vector.first(v) :=
+  reflexivity(ℝ, factor * Plane.Vector.first(v))
+
+theorem Plane.Vector.second_scale (factor : ℝ) (v : Plane.Vector)
+        : Plane.Vector.second(factor * v)
+              = factor * Plane.Vector.second(v) :=
+  reflexivity(ℝ, factor * Plane.Vector.second(v))
+
+theorem Plane.Vector.first_subtract (u v : Plane.Vector)
+        : Plane.Vector.first(u - v)
+              = Plane.Vector.first(u) + (-Plane.Vector.first(v)) :=
+  done
+
+theorem Plane.Vector.second_subtract (u v : Plane.Vector)
+        : Plane.Vector.second(u - v)
+              = Plane.Vector.second(u) + (-Plane.Vector.second(v)) :=
+  done
+
+theorem Plane.Vector.first_zero
+        : Plane.Vector.first(Plane.Vector.zero) = 0 :=
+  done
+
+theorem Plane.Vector.second_zero
+        : Plane.Vector.second(Plane.Vector.zero) = 0 :=
+  done
+
+-- ----------------------------------------------------------------------
+-- The vector-space laws.
+
+theorem Plane.Vector.add_commutative (u v : Plane.Vector)
+        : u + v = v + u := {
+  Plane.Vector.first(u + v)
+      = Plane.Vector.first(u) + Plane.Vector.first(v)
+      = Plane.Vector.first(v) + Plane.Vector.first(u)
+      = Plane.Vector.first(v + u);
+  Plane.Vector.second(u + v)
+      = Plane.Vector.second(u) + Plane.Vector.second(v)
+      = Plane.Vector.second(v) + Plane.Vector.second(u)
+      = Plane.Vector.second(v + u);
+  done by Plane.Vector.equal_of_coordinates
+}
+
+theorem Plane.Vector.add_associative (u v w : Plane.Vector)
+        : (u + v) + w = u + (v + w) := {
+  Plane.Vector.first((u + v) + w)
+      = Plane.Vector.first(u + v) + Plane.Vector.first(w)
+      = (Plane.Vector.first(u) + Plane.Vector.first(v)) + Plane.Vector.first(w)
+      = Plane.Vector.first(u) + (Plane.Vector.first(v) + Plane.Vector.first(w))
+      = Plane.Vector.first(u) + Plane.Vector.first(v + w)
+      = Plane.Vector.first(u + (v + w));
+  Plane.Vector.second((u + v) + w)
+      = Plane.Vector.second(u + v) + Plane.Vector.second(w)
+      = (Plane.Vector.second(u) + Plane.Vector.second(v)) + Plane.Vector.second(w)
+      = Plane.Vector.second(u) + (Plane.Vector.second(v) + Plane.Vector.second(w))
+      = Plane.Vector.second(u) + Plane.Vector.second(v + w)
+      = Plane.Vector.second(u + (v + w));
+  done by Plane.Vector.equal_of_coordinates
+}
+
+theorem Plane.Vector.add_zero (v : Plane.Vector)
+        : v + Plane.Vector.zero = v := {
+  Plane.Vector.first(v + Plane.Vector.zero)
+      = Plane.Vector.first(v) + Plane.Vector.first(Plane.Vector.zero)
+      = Plane.Vector.first(v) + 0
+      = Plane.Vector.first(v);
+  Plane.Vector.second(v + Plane.Vector.zero)
+      = Plane.Vector.second(v) + Plane.Vector.second(Plane.Vector.zero)
+      = Plane.Vector.second(v) + 0
+      = Plane.Vector.second(v);
+  done by Plane.Vector.equal_of_coordinates
+}
+
+theorem Plane.Vector.add_negate (v : Plane.Vector)
+        : v + (-v) = Plane.Vector.zero := {
+  Plane.Vector.first(v + (-v))
+      = Plane.Vector.first(v) + Plane.Vector.first(-v)
+      = Plane.Vector.first(v) + (-Plane.Vector.first(v))
+      = 0
+      = Plane.Vector.first(Plane.Vector.zero);
+  Plane.Vector.second(v + (-v))
+      = Plane.Vector.second(v) + Plane.Vector.second(-v)
+      = Plane.Vector.second(v) + (-Plane.Vector.second(v))
+      = 0
+      = Plane.Vector.second(Plane.Vector.zero);
+  done by Plane.Vector.equal_of_coordinates
+}
+
+theorem Plane.Vector.subtract_add (u v : Plane.Vector)
+        : (u - v) + v = u := {
+  Plane.Vector.first((u - v) + v)
+      = Plane.Vector.first(u - v) + Plane.Vector.first(v)
+      = (Plane.Vector.first(u) + (-Plane.Vector.first(v))) + Plane.Vector.first(v)
+      = Plane.Vector.first(u);
+  Plane.Vector.second((u - v) + v)
+      = Plane.Vector.second(u - v) + Plane.Vector.second(v)
+      = (Plane.Vector.second(u) + (-Plane.Vector.second(v))) + Plane.Vector.second(v)
+      = Plane.Vector.second(u);
+  done by Plane.Vector.equal_of_coordinates
+}
+
+theorem Plane.Vector.scale_add (factor : ℝ) (u v : Plane.Vector)
+        : factor * (u + v) = factor * u + factor * v := {
+  Plane.Vector.first(factor * (u + v))
+      = factor * Plane.Vector.first(u + v)
+      = factor * (Plane.Vector.first(u) + Plane.Vector.first(v))
+      = factor * Plane.Vector.first(u) + factor * Plane.Vector.first(v)
+      = Plane.Vector.first(factor * u) + Plane.Vector.first(factor * v)
+      = Plane.Vector.first(factor * u + factor * v);
+  Plane.Vector.second(factor * (u + v))
+      = factor * Plane.Vector.second(u + v)
+      = factor * (Plane.Vector.second(u) + Plane.Vector.second(v))
+      = factor * Plane.Vector.second(u) + factor * Plane.Vector.second(v)
+      = Plane.Vector.second(factor * u) + Plane.Vector.second(factor * v)
+      = Plane.Vector.second(factor * u + factor * v);
+  done by Plane.Vector.equal_of_coordinates
+}
+
+theorem Plane.Vector.scale_scale (a b : ℝ) (v : Plane.Vector)
+        : a * (b * v) = (a * b) * v := {
+  Plane.Vector.first(a * (b * v))
+      = a * Plane.Vector.first(b * v)
+      = a * (b * Plane.Vector.first(v))
+      = (a * b) * Plane.Vector.first(v)
+      = Plane.Vector.first((a * b) * v);
+  Plane.Vector.second(a * (b * v))
+      = a * Plane.Vector.second(b * v)
+      = a * (b * Plane.Vector.second(v))
+      = (a * b) * Plane.Vector.second(v)
+      = Plane.Vector.second((a * b) * v);
+  done by Plane.Vector.equal_of_coordinates
+}
+
+theorem Plane.Vector.scale_one (v : Plane.Vector)
+        : (1 : ℝ) * v = v := {
+  Plane.Vector.first((1 : ℝ) * v)
+      = 1 * Plane.Vector.first(v)
+      = Plane.Vector.first(v);
+  Plane.Vector.second((1 : ℝ) * v)
+      = 1 * Plane.Vector.second(v)
+      = Plane.Vector.second(v);
+  done by Plane.Vector.equal_of_coordinates
+}
