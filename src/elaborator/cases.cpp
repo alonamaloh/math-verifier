@@ -253,6 +253,20 @@ ExpressionPointer Elaborator::elaborateAnonymousTuple(
         int line, int column) {
 
         if (!expectedType) {
+            // A `witness E with P` whose P is a ONE-step relation chain
+            // swallows only `E`'s left-hand side: the trailing `= … by …`
+            // binds to the enclosing statement, which turns the whole
+            // `witness` into a claim and strips its expected type. Say so —
+            // the bare "needs an expected type" reads as a goal problem.
+            if (!tuple.userWritten) {
+                throw ElaborateError(
+                    "`witness E with P` lost its expected type — P is a "
+                    "one-step relation chain, so its `= … by …` was read as "
+                    "the enclosing statement's, not as the witness proof; "
+                    "the proof position takes a term, a `{ … }` block, or a "
+                    "chain of TWO or more steps (line "
+                    + std::to_string(line) + ")");
+            }
             throw ElaborateError(
                 "anonymous tuple '⟨...⟩' needs an expected type from "
                 "context (line " + std::to_string(line) + ")");

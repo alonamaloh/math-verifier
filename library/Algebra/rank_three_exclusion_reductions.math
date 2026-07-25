@@ -1,0 +1,187 @@
+-- Algebra/rank_three_exclusion_reductions.math
+--
+-- Five of the nine rank-three escalator exclusion certificates need no new
+-- arithmetic.  Each asks that a ternary representative miss its own
+-- det²·truant value, and in these five cases the parity identities already
+-- in the library carry the value to Legendre's obstruction 4^a(8b+7):
+--
+--   x² + y² + z²         misses    7   -- its truant
+--   x² + y² + 2z²        misses   56   -- because 2·56 = 112 = 4²·7
+--   x² + 2y² + 2z²       misses  112   -- same represented set as three squares
+--   x² + 2y² + 4z²       misses  896   -- a x²+y²+2z² value, and 2·896 = 1792 = 4⁴·7
+--   x² + 2y² + 2yz + 5z² misses  567   -- same represented set, 567 = 8·70 + 7
+
+module Algebra.rank_three_exclusion_reductions
+
+import Algebra.odd_five_converse_reduction
+import Algebra.three_squares_parity_transforms
+import Algebra.three_squares_theorem
+
+-- ----------------------------------------------------------------------
+-- Reading scalar coordinates off a representation.
+
+theorem Matrix.sumOfTwoSquaresPlusScaledSquareForm_represents_only_values
+        (d target : ℤ)
+        (represented : Matrix.Represents(Matrix.sumOfTwoSquaresPlusScaledSquareForm(d), target))
+        : ∃ (x y z : ℤ). x * x + y * y + d * (z * z) = target := {
+  choose v : RingVector(Integer.commutative_ring_bundle, 3) such that
+      Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusScaledSquareForm(d), v) = target
+      as valueReads from represented;
+  let pair : RingVector(Integer.commutative_ring_bundle, 2) := RingVector.restrict(v);
+  let z : ℤ := v(NaturalsBelow.top(2));
+  let q : ℤ := Matrix.quadraticForm(Matrix.sumOfTwoSquaresForm, pair);
+  Matrix.quadraticForm(Matrix.sumOfTwoSquaresPlusScaledSquareForm(d), v) = q + z * z * d
+      by Matrix.diagonalExtension_quadraticForm(symmetric := Matrix.sumOfTwoSquaresForm_symmetric)
+      as splitReads;
+  Matrix.Represents(Matrix.sumOfTwoSquaresForm, q) by { witness pair with done };
+  ∃ (a b : ℤ). q = a * a + b * b by Matrix.sumOfTwoSquaresForm_represents_only_squares;
+  choose a : ℤ, b : ℤ such that q = a * a + b * b as pairReads;
+  a * a + b * b + d * (z * z) = target
+      by linear_combination(valueReads - pairReads - splitReads) as coordinateValue;
+  witness a with witness b with witness z with coordinateValue
+}
+
+theorem Matrix.squarePlusDoubleSquareDiagonalForm_represents_only_values
+        (corner target : ℤ)
+        (represented : Matrix.Represents(Matrix.squarePlusDoubleSquareDiagonalForm(corner), target))
+        : ∃ (x y z : ℤ). x * x + 2 * (y * y) + corner * (z * z) = target := {
+  choose v : RingVector(Integer.commutative_ring_bundle, 3) such that
+      Matrix.quadraticForm(Matrix.squarePlusDoubleSquareDiagonalForm(corner), v) = target
+      as valueReads from represented;
+  let pair : RingVector(Integer.commutative_ring_bundle, 2) := RingVector.restrict(v);
+  let z : ℤ := v(NaturalsBelow.top(2));
+  let q : ℤ := Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm, pair);
+  Matrix.quadraticForm(Matrix.squarePlusDoubleSquareDiagonalForm(corner), v) = q + z * z * corner
+      by Matrix.squarePlusDoubleSquareDiagonalForm_value as splitReads;
+  Matrix.Represents(Matrix.squarePlusDoubleSquareForm, q) by { witness pair with done };
+  ∃ (a b : ℤ). q = a * a + 2 * (b * b)
+      by Matrix.squarePlusDoubleSquareForm_represents_only_squares;
+  choose a : ℤ, b : ℤ such that q = a * a + 2 * (b * b) as pairReads;
+  a * a + 2 * (b * b) + corner * (z * z) = target
+      by linear_combination(valueReads - pairReads - splitReads) as coordinateValue;
+  witness a with witness b with witness z with coordinateValue
+}
+
+theorem Matrix.squarePlusDoubleSquareOddForm_represents_only_values
+        (corner target : ℤ)
+        (represented : Matrix.Represents(Matrix.squarePlusDoubleSquareOddForm(corner), target))
+        : ∃ (x y z : ℤ). x * x + 2 * (y * y) + 2 * y * z + corner * (z * z) = target := {
+  choose v : RingVector(Integer.commutative_ring_bundle, 3) such that
+      Matrix.quadraticForm(Matrix.squarePlusDoubleSquareOddForm(corner), v) = target
+      as valueReads from represented;
+  let pair : RingVector(Integer.commutative_ring_bundle, 2) := RingVector.restrict(v);
+  let a : ℤ := pair(NaturalsBelow.firstOfTwo);
+  let b : ℤ := pair(NaturalsBelow.secondOfTwo);
+  let z : ℤ := v(NaturalsBelow.top(2));
+  pair = RingVector.twoCoordinates(a, b) by RingVector.eq_twoCoordinates as pairReads;
+  Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm, pair) = a * a + 2 * (b * b) by {
+    Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm, pair)
+       = Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm, RingVector.twoCoordinates(a, b))
+           by substituting pairReads
+       = a * a + 2 * (b * b) by Matrix.squarePlusDoubleSquareForm_twoCoordinates_value;
+    done
+  }
+  as blockReads;
+  Matrix.quadraticForm(Matrix.squarePlusDoubleSquareOddForm(corner), v)
+      = Matrix.quadraticForm(Matrix.squarePlusDoubleSquareForm, pair) + 2 * b * z + corner * (z * z)
+      by Matrix.squarePlusDoubleSquareOddForm_value as splitReads;
+  a * a + 2 * (b * b) + 2 * b * z + corner * (z * z) = target
+      by linear_combination(valueReads - blockReads - splitReads) as coordinateValue;
+  witness a with witness b with witness z with coordinateValue
+}
+
+-- ----------------------------------------------------------------------
+-- Legendre's obstruction, phrased for a bare three-square representation.
+
+theorem Integer.not_three_square_representation_of_obstruction
+        (n : ℤ) (exponent : ℕ) (b : ℤ)
+        (obstructed : n = ((4 ^ exponent : ℕ) : ℤ) * (8 * b + 7))
+        : ¬(Integer.ThreeSquareRepresentation(n)) := {
+  suppose Integer.ThreeSquareRepresentation(n) as represented;
+  choose x : ℤ, y : ℤ, z : ℤ such that x * x + y * y + z * z = n
+      as valueReads from represented;
+  x * x + y * y + z * z
+     = n by valueReads
+     = ((4 ^ exponent : ℕ) : ℤ) * (8 * b + 7) by obstructed;
+  done by Integer.four_power_times_eight_plus_seven_not_three_squares
+}
+
+theorem Integer.one_hundred_twelve_is_obstructed
+        : (112 : ℤ) = ((4 ^ 2 : ℕ) : ℤ) * (8 * 0 + 7) := done
+
+theorem Integer.one_thousand_seven_hundred_ninety_two_is_obstructed
+        : (1792 : ℤ) = ((4 ^ 4 : ℕ) : ℤ) * (8 * 0 + 7) := done
+
+theorem Integer.five_hundred_sixty_seven_is_obstructed
+        : (567 : ℤ) = ((4 ^ 0 : ℕ) : ℤ) * (8 * 70 + 7) := done
+
+-- ----------------------------------------------------------------------
+-- The five certificates.
+
+theorem Matrix.sumOfThreeSquaresForm_not_represents_seven_squared
+        : ¬(Matrix.Represents(Matrix.sumOfThreeSquaresForm, (7 : ℤ))) :=
+  by Matrix.IsTruant.missed(isTruant := Matrix.sumOfThreeSquaresForm_truant_seven)
+
+theorem Matrix.sumOfTwoSquaresPlusDoubleSquareForm_not_represents_fifty_six
+        : ¬(Matrix.Represents(Matrix.sumOfTwoSquaresPlusDoubleSquareForm, (56 : ℤ))) := {
+  Matrix.sumOfTwoSquaresPlusDoubleSquareForm = Matrix.sumOfTwoSquaresPlusScaledSquareForm(2)
+      as scaledReads;
+  suppose Matrix.Represents(Matrix.sumOfTwoSquaresPlusDoubleSquareForm, (56 : ℤ)) as represented;
+  Matrix.Represents(Matrix.sumOfTwoSquaresPlusScaledSquareForm(2), (56 : ℤ))
+      by substituting scaledReads;
+  ∃ (x y z : ℤ). x * x + y * y + 2 * (z * z) = (56 : ℤ)
+      by Matrix.sumOfTwoSquaresPlusScaledSquareForm_represents_only_values;
+  Integer.ThreeSquareRepresentation(2 * (56 : ℤ))
+      by Integer.square_square_double_representation_to_three_square_of_double;
+  (2 : ℤ) * 56 = 112 by ring;
+  Integer.ThreeSquareRepresentation((112 : ℤ)) by substituting ((2 : ℤ) * 56 = 112);
+  done by Integer.not_three_square_representation_of_obstruction(
+      obstructed := Integer.one_hundred_twelve_is_obstructed)
+}
+
+theorem Matrix.squarePlusDoubleSquareDiagonalForm_two_not_represents_one_hundred_twelve
+        : ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareDiagonalForm(2), (112 : ℤ))) := {
+  suppose Matrix.Represents(Matrix.squarePlusDoubleSquareDiagonalForm(2), (112 : ℤ))
+      as represented;
+  ∃ (x y z : ℤ). x * x + 2 * (y * y) + 2 * (z * z) = (112 : ℤ)
+      by Matrix.squarePlusDoubleSquareDiagonalForm_represents_only_values;
+  Integer.ThreeSquareRepresentation((112 : ℤ))
+      by Integer.square_double_double_representation_to_three_square;
+  done by Integer.not_three_square_representation_of_obstruction(
+      obstructed := Integer.one_hundred_twelve_is_obstructed)
+}
+
+theorem Matrix.squarePlusDoubleSquareDiagonalForm_four_not_represents_eight_hundred_ninety_six
+        : ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareDiagonalForm(4), (896 : ℤ))) := {
+  suppose Matrix.Represents(Matrix.squarePlusDoubleSquareDiagonalForm(4), (896 : ℤ))
+      as represented;
+  ∃ (x y z : ℤ). x * x + 2 * (y * y) + 4 * (z * z) = (896 : ℤ)
+      by Matrix.squarePlusDoubleSquareDiagonalForm_represents_only_values;
+  choose x : ℤ, y : ℤ, z : ℤ such that x * x + 2 * (y * y) + 4 * (z * z) = (896 : ℤ)
+      as valueReads;
+  ∃ (a b c : ℤ). a * a + b * b + 2 * (c * c) = (896 : ℤ) by {
+    witness x with witness 2 * z with witness y with
+      x * x + (2 * z) * (2 * z) + 2 * (y * y)
+         = x * x + 2 * (y * y) + 4 * (z * z) by ring
+         = (896 : ℤ) by valueReads
+  };
+  Integer.ThreeSquareRepresentation(2 * (896 : ℤ))
+      by Integer.square_square_double_representation_to_three_square_of_double;
+  (2 : ℤ) * 896 = 1792 by ring;
+  Integer.ThreeSquareRepresentation((1792 : ℤ)) by substituting ((2 : ℤ) * 896 = 1792);
+  done by Integer.not_three_square_representation_of_obstruction(
+      obstructed := Integer.one_thousand_seven_hundred_ninety_two_is_obstructed)
+}
+
+theorem Matrix.squarePlusDoubleSquareOddForm_five_not_represents_five_hundred_sixty_seven
+        : ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareOddForm(5), (567 : ℤ))) := {
+  suppose Matrix.Represents(Matrix.squarePlusDoubleSquareOddForm(5), (567 : ℤ))
+      as represented;
+  ∃ (x y z : ℤ). x * x + 2 * (y * y) + 2 * y * z + 5 * (z * z) = (567 : ℤ)
+      by Matrix.squarePlusDoubleSquareOddForm_represents_only_values;
+  Integer.OddFiveRepresentation((567 : ℤ));
+  Integer.ThreeSquareRepresentation((567 : ℤ))
+      by Integer.odd_five_representation_gives_three_squares;
+  done by Integer.not_three_square_representation_of_obstruction(
+      obstructed := Integer.five_hundred_sixty_seven_is_obstructed)
+}
