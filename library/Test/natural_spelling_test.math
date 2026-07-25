@@ -1,0 +1,85 @@
+-- Test/natural_spelling_test.math
+--
+-- Spellings a mathematician writes without ceremony.  Each of these once
+-- needed an ascription, an explicitly spelled argument, or a hand-split
+-- step; the elaborator fixes they lock are named per theorem.
+
+module Test.natural_spelling_test
+
+import Algebra.critical_value_minimality
+import Real.division
+
+-- A coordinate tuple needs no ascription where the expected type is known.
+theorem Test.tuple_without_ascription (a b c d x y z w : ℤ)
+        : Matrix.quadraticForm(Matrix.diagonalQuaternaryForm(a, b, c, d), ⟨x, y, z, w⟩)
+          = a * (x * x) + b * (y * y) + c * (z * z) + d * (w * w) :=
+  by Matrix.diagonalQuaternaryForm_coordinateTuple_value
+
+-- A bare `0` in a signature, and a bare-spelled goal citing an ascribed lemma.
+theorem Test.bare_zero_in_signature (target : ℤ) (nonneg : target ≥ 0)
+        : target + 1 ≥ 1 := {
+  target + 1 ≥ 0 + 1 by Integer.add_preserves_less_or_equal;
+  done
+}
+
+theorem Test.bare_zero_cites_ascribed_lemma
+        (A : Matrix(Integer.commutative_ring_bundle, 3, 3))
+        (x : RingVector(Integer.commutative_ring_bundle, 3))
+        (positiveDefinite : Matrix.IsPositiveDefinite(A))
+        : Matrix.quadraticForm(A, x) ≥ 0 :=
+  by Matrix.quadraticForm_nonneg
+
+-- `x ≠ 0` at Real: the numeral and the carrier's own zero are interchangeable
+-- for the automatic-lemma scan, in both spellings of the negation.
+theorem Test.nonzero_spellings (x : ℝ) (positive : x > 0) : ¬(x = Real.zero) := {
+  x ≠ 0;
+  ¬(x = 0);
+  done
+}
+
+-- A goal spelled through a `let` abbreviation still infers a citation's
+-- arguments (the hole solver's ζ rung).
+theorem Test.citation_through_a_let {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (c : CommutativeRing.carrier(r))
+        (symmetric : Matrix.IsSymmetric(A))
+        : Matrix.IsSymmetric(Matrix.diagonalExtension(A, c)) := {
+  let extended : Matrix(r, 1 + n, 1 + n) := Matrix.diagonalExtension(A, c);
+  Matrix.IsSymmetric(extended) by Matrix.diagonalExtension_symmetric;
+  done
+}
+
+-- Bare numerals inside a `linear_combination` coefficient are ring
+-- coefficients, not opaque atoms.
+theorem Test.linear_combination_bare_numeral_coefficient (b c h shear : ℤ)
+        (hypothesis : h = 0)
+        : (2 * b + c + 7 * shear) * h = 0 :=
+  by linear_combination((2 * b + c + 7 * shear) * hypothesis)
+
+-- A citation may supply only its premises: the data parameters come from the
+-- goal, including the ones a premise argument's own citation needs.
+theorem Test.premises_only_citation
+        : Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 1, 3, 7), (1 : ℤ)) :=
+  by Matrix.diagonalQuaternaryForm_represents(
+      x := 1, y := 0, z := 0, w := 0, value := done)
+
+theorem Test.nested_citation_takes_its_data_from_the_goal
+        : ∀ (u : ℕ). Matrix.IsCriticalValue(u) → ¬(u = 6)
+            → Matrix.Represents(Matrix.diagonalQuaternaryForm(1, 1, 3, 7), (u : ℤ)) :=
+  by Matrix.represents_critical_values_except(
+      one := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 0, z := 0, w := 0, value := done)),
+      two := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 1, z := 0, w := 0, value := done)),
+      three := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 0, y := 0, z := 1, w := 0, value := done)),
+      five := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 1, y := 1, z := 1, w := 0, value := done)),
+      six := Or.introduceLeft(done),
+      seven := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 0, y := 0, z := 0, w := 1, value := done)),
+      ten := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 3, y := 1, z := 0, w := 0, value := done)),
+      fourteen := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 2, y := 0, z := 1, w := 1, value := done)),
+      fifteen := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+          x := 2, y := 1, z := 1, w := 1, value := done)))

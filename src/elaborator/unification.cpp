@@ -42,6 +42,73 @@ bool Elaborator::containsValueArgumentFreeVar(ExpressionPointer expression) {
         return false;
     }
 
+ExpressionPointer Elaborator::zetaUnfoldLetBindersCached(
+        ExpressionPointer term,
+        const std::vector<LocalBinder>& localBinders) {
+        // Fingerprint the let-valued binders: their VALUES (by address) and
+        // positions are exactly what the unfolding reads. A binder stack
+        // that differs anywhere in that data hashes differently, so a hit
+        // means "this same term under this same let assignment".
+        uint64_t letHash = 1469598103934665603ull;
+        bool anyLet = false;
+        for (size_t i = 0; i < localBinders.size(); ++i) {
+            if (!localBinders[i].value) continue;
+            anyLet = true;
+            letHash ^= reinterpret_cast<uintptr_t>(
+                localBinders[i].value.get());
+            letHash *= 1099511628211ull;
+            letHash ^= i;
+            letHash *= 1099511628211ull;
+        }
+        if (!anyLet) return term;
+        letHash ^= localBinders.size();
+        auto key = std::make_pair(term.get(), letHash);
+        auto found = zetaUnfoldCache_.find(key);
+        if (found != zetaUnfoldCache_.end()) return found->second.second;
+        ExpressionPointer unfolded =
+            zetaUnfoldLetBinders(term, localBinders);
+        // Bounded: one declaration's scan is the working set; a whole
+        // module's would just grow. Clearing wholesale is fine — the entries
+        // are pure recomputation.
+        if (zetaUnfoldCache_.size() > 50000) zetaUnfoldCache_.clear();
+        zetaUnfoldCache_.emplace(key, std::make_pair(term, unfolded));
+        return unfolded;
+    }
+
+bool Elaborator::containsUnsolvedCallHoleFreeVar(
+        ExpressionPointer expression) {
+        if (auto* freeVariable =
+                std::get_if<FreeVariable>(&expression->node)) {
+            if (freeVariable->origin != FreeVariableOrigin::Internal) {
+                return false;
+            }
+            static const char* prefix = "_hole_";
+            const std::string& name = freeVariable->name;
+            size_t length = std::char_traits<char>::length(prefix);
+            return name.size() >= length
+                && name.compare(0, length, prefix) == 0;
+        }
+        if (auto* pi = std::get_if<Pi>(&expression->node)) {
+            return containsUnsolvedCallHoleFreeVar(pi->domain)
+                || containsUnsolvedCallHoleFreeVar(pi->codomain);
+        }
+        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+            return containsUnsolvedCallHoleFreeVar(lambda->domain)
+                || containsUnsolvedCallHoleFreeVar(lambda->body);
+        }
+        if (auto* application =
+                std::get_if<Application>(&expression->node)) {
+            return containsUnsolvedCallHoleFreeVar(application->function)
+                || containsUnsolvedCallHoleFreeVar(application->argument);
+        }
+        if (auto* let = std::get_if<Let>(&expression->node)) {
+            return containsUnsolvedCallHoleFreeVar(let->type)
+                || containsUnsolvedCallHoleFreeVar(let->value)
+                || containsUnsolvedCallHoleFreeVar(let->body);
+        }
+        return false;
+    }
+
 ExpressionPointer Elaborator::unfoldHeadConstantOneStep(ExpressionPointer expr) {
         std::vector<ExpressionPointer> args;
         ExpressionPointer head = expr;

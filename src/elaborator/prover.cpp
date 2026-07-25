@@ -2692,6 +2692,28 @@ ExpressionPointer Elaborator::autoProveClaim(
         if (autoProveDepth_ > 64) {
             return nullptr;
         }
+        // A goal that still mentions an unsolved call hole (`@_hole_…`) is
+        // not a goal anyone wrote: it is a lemma's premise slot elaborated
+        // before a sibling argument or the enclosing goal pinned the
+        // metavariable (`Lemma(premise := Other(x := 1, value := done))`,
+        // where `Other`'s data parameters come from `Lemma`'s still-unknown
+        // ones). Searching cannot close it — no tactic assigns
+        // metavariables — and the search's budget exhaustion is
+        // deliberately non-recoverable, so it would kill the goal-directed
+        // retry that does succeed. Report "not proved" and let the citation
+        // path retry.
+        if (containsUnsolvedCallHoleFreeVar(goalClosed)) {
+            // Throw (an ordinary, RECOVERABLE ElaborateError) rather than
+            // return null: `done`'s own path returns the prover's result
+            // straight into the proof term, and callers that treat null as
+            // "not proved" all catch ElaborateError anyway.
+            throwElaborate(
+                "this goal still mentions an unsolved argument of the "
+                "citation being elaborated, so there is nothing to prove "
+                "yet — the enclosing lemma's data parameters are not "
+                "determined at this point. Supply them by name, or state "
+                "the premise as its own claim first.");
+        }
 
         // Arm the effort budget on the OUTERMOST claim (depth 0 -> 1) and
         // disarm it (and reset the trip flag) when that call unwinds, so

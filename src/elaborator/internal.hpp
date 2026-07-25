@@ -102,6 +102,18 @@ inline uint64_t spineHash(ExpressionPointer expression) {
     return subtree_hash::mix(h, kTagWildcard);
 }
 
+// Hash for the ζ-unfold memo's (term address, let-stack fingerprint) key.
+struct ZetaUnfoldCacheKeyHash {
+    size_t operator()(
+            const std::pair<const Expression*, uint64_t>& key) const {
+        uint64_t mixed =
+            reinterpret_cast<uintptr_t>(key.first) * 1099511628211ull;
+        mixed ^= key.second + 0x9e3779b97f4a7c15ull + (mixed << 6)
+                 + (mixed >> 2);
+        return static_cast<size_t>(mixed);
+    }
+};
+
 class Elaborator {
 public:
     Elaborator(Environment& environment,
@@ -791,6 +803,16 @@ private:
     // a genuine ambiguity (two incomparable least upper bounds).
     std::optional<CombineResult> combineOperands(
         const std::string& leftHead, const std::string& rightHead,
+        ExpressionPointer leftTypeClosed,
+        ExpressionPointer rightTypeClosed);
+
+    // `combineOperands` keyed on the types themselves, tolerating a
+    // carrier spelled as a closed bundle projection
+    // (`CommutativeRing.carrier(Integer.commutative_ring_bundle)`, whose
+    // raw head is not the `Integer` the coercion registry is keyed on).
+    // The raw head pair is tried first — wherever it already resolves the
+    // behavior is unchanged — then the normalized candidate pairs.
+    std::optional<CombineResult> combineOperandTypes(
         ExpressionPointer leftTypeClosed,
         ExpressionPointer rightTypeClosed);
 
@@ -6179,6 +6201,27 @@ private:
 
     bool containsValueArgumentFreeVar(ExpressionPointer expression);
 
+    // `zetaUnfoldLetBinders` memoized on (term, let-stack). The
+    // context-fact scan ζ-unfolds the SAME goal once per candidate — 40k
+    // unfolds of the same handful of terms, 28% of the fifteen-theorem's
+    // heaviest proof, all of it recomputation. The key carries a hash of
+    // the let-valued binders' values (and their positions), so a changed
+    // binder stack never reads a stale entry; the cached ExpressionPointer
+    // keeps the key's term alive, so its address cannot be recycled.
+    ExpressionPointer zetaUnfoldLetBindersCached(
+        ExpressionPointer term,
+        const std::vector<LocalBinder>& localBinders);
+    std::unordered_map<std::pair<const Expression*, uint64_t>,
+                       std::pair<ExpressionPointer, ExpressionPointer>,
+                       ZetaUnfoldCacheKeyHash> zetaUnfoldCache_;
+
+    // True when `expression` mentions an UNSOLVED call hole — the
+    // `_hole_<i>_<lemma>` metavariable `inferCallWithHoles` allocates for a
+    // `?`/unsupplied argument. Such a term is not a goal the author wrote:
+    // it is a lemma's premise slot seen before a sibling argument (or the
+    // enclosing goal) pinned the metavariable.
+    bool containsUnsolvedCallHoleFreeVar(ExpressionPointer expression);
+
     // Walks `pattern` and `target` in parallel. Whenever pattern is a
     // FreeVariable whose name is in `metavariableNames` (and isn't yet
     // assigned), records `assignment[name] = target`. For Pi/Lambda/
@@ -6384,6 +6427,14 @@ private:
     // Both 5d and 5e are also gated to autoProveDepth_==0 (never fire inside
     // an auto-proof). See inferCallWithHoles.
     int backwardChainingDepth_ = 0;
+    // Recursion guard for the goal-directed re-elaboration of an
+    // argument-bearing citation (recoverClaimHint): the retry elaborates the
+    // SAME hint again, whose own inner claims can fail and re-enter the
+    // recovery — unguarded that is an infinite descent. Keyed on (hint, goal)
+    // so a NESTED citation (a different hint, or the same hint at a different
+    // goal) still gets its own retry.
+    std::vector<std::pair<const SurfaceExpression*, const Expression*>>
+        goalDirectedCitationRetries_;
     // Recursion guard for the symmetry-flip tactic: proving `x = y` by
     // proving `y = x` and wrapping in symmetry must not flip back to
     // `x = y`. Allowed only at depth 0.

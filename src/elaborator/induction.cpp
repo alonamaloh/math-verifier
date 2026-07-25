@@ -1249,8 +1249,18 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
                     // fall through to the ordinary auto-prove path
                 }
             }
-            return autoProveClaim(
+            ExpressionPointer proved = autoProveClaim(
                 goalClosed, localBinders, line);
+            if (!proved) {
+                // The prover declines by returning null on its guard paths
+                // (recursion cap, a goal that still carries an unsolved
+                // citation hole). A null must never travel on as a proof
+                // term — every downstream `inferType` would dereference it.
+                throwElaborate(
+                    "the auto-prover declined this goal without a reason it "
+                    "could name — add `by <lemma>` to say how it closes");
+            }
+            return proved;
         }
 
         // `claim P by substitution` (no eq supplied) — call the
@@ -1675,10 +1685,15 @@ ExpressionPointer Elaborator::autoFillHintForClaim(
         } catch (const TypeError&) {
             firstError = std::current_exception();
         }
-        ExpressionPointer goalUnfolded =
-            zetaUnfoldLetBinders(goalClosed, localBinders);
-        ExpressionPointer hintTypeUnfolded =
-            zetaUnfoldLetBinders(hintType, localBinders);
+        ExpressionPointer goalUnfolded;
+        ExpressionPointer hintTypeUnfolded;
+        {
+            TimedScope _unfoldScope(*this, "  zetaRetry:unfold");
+            goalUnfolded =
+                zetaUnfoldLetBindersCached(goalClosed, localBinders);
+            hintTypeUnfolded =
+                zetaUnfoldLetBindersCached(hintType, localBinders);
+        }
         if (structurallyEqual(goalUnfolded, goalClosed)
             && structurallyEqual(hintTypeUnfolded, hintType)) {
             // No lets to see through: the ζ-unfolded retry would re-run the
@@ -1689,8 +1704,11 @@ ExpressionPointer Elaborator::autoFillHintForClaim(
             return autoFillHintForClaimCore(
                 hintTerm, hintType, goalClosed, localBinders, line);
         }
-        return autoFillHintForClaimCore(
-            hintTerm, hintTypeUnfolded, goalUnfolded, localBinders, line);
+        {
+            TimedScope _retryScope(*this, "  zetaRetry:core");
+            return autoFillHintForClaimCore(
+                hintTerm, hintTypeUnfolded, goalUnfolded, localBinders, line);
+        }
     }
 
 ExpressionPointer Elaborator::autoFillHintForClaimCore(

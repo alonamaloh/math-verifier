@@ -65,6 +65,43 @@ ExpressionPointer Elaborator::coerceToExpectedTypeViaRegistry(
         }
     }
 
+std::optional<Elaborator::CombineResult> Elaborator::combineOperandTypes(
+        ExpressionPointer leftTypeClosed,
+        ExpressionPointer rightTypeClosed) {
+        const std::string leftHead = headConstantName(leftTypeClosed);
+        const std::string rightHead = headConstantName(rightTypeClosed);
+        if (leftHead != rightHead) {
+            if (auto combined = combineOperands(
+                    leftHead, rightHead, leftTypeClosed, rightTypeClosed)) {
+                return combined;
+            }
+        }
+        // A bundle projection hides its concrete carrier from the registry
+        // keys, so retry over the normalized candidate heads. Candidate
+        // pairs that agree mean the two types are the same carrier under
+        // two spellings — nothing to coerce, and no later pair can join.
+        for (const auto& candidateLeft :
+                 carrierHeadCandidates(leftTypeClosed)) {
+            for (const auto& candidateRight :
+                     carrierHeadCandidates(rightTypeClosed)) {
+                if (candidateLeft == candidateRight) continue;
+                std::optional<CombineResult> combined;
+                try {
+                    combined = combineOperands(
+                        candidateLeft, candidateRight,
+                        leftTypeClosed, rightTypeClosed);
+                } catch (const ElaborateError&) {
+                    // An ambiguity exposed only by a normalized candidate
+                    // must not pre-empt the remaining pairs; raw ambiguity
+                    // was already authoritative above.
+                    continue;
+                }
+                if (combined) return combined;
+            }
+        }
+        return std::nullopt;
+    }
+
 [[noreturn]] void Elaborator::throwCarrierReconciliationError(
         const std::string& operatorSymbol,
         ExpressionPointer leftTypeClosed,

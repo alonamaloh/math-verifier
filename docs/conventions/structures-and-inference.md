@@ -211,6 +211,30 @@ that aren't local hypotheses. A partial call leaves the rest as holes:
 Named and anonymous stated propositions elaborate through the same path, so
 the inference behavior is identical with or without `as name`.
 
+**Supply only the premises.** `by Lemma(premise := …)` with the data
+parameters left out works even when a premise argument is ITSELF a citation
+whose own arguments come from those data parameters — the argument is
+deferred and retried once the goal (and the context discharge) have pinned
+them:
+
+```math
+by Matrix.represents_critical_values_except(
+    one := Or.introduceRight(Matrix.diagonalQuaternaryForm_represents(
+        x := 1, y := 0, z := 0, w := 0, value := done)),
+    …)
+```
+
+Two things this does NOT do: a parameter the goal, a premise and the context
+all leave open still has to be named (it is genuinely undetermined), and a
+lemma whose own conclusion binders (`∀ (u : ℕ). …`) mention a parameter
+nowhere else cannot recover it either.
+
+**A `let`-spelled goal is no obstacle.** `let extended := …;
+Matrix.IsSymmetric(extended) by Matrix.diagonalExtension_symmetric` reads
+the lemma's arguments off the let's VALUE (the hole solver ζ-unfolds as a
+fallback), so abbreviating a long term with a `let` no longer costs you
+argument-free citation.
+
 ## Citing a fact (a proposition) where a proof is expected
 
 A parenthesised **proposition** written where a proof is expected — e.g.

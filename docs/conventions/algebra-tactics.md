@@ -79,9 +79,12 @@ real limitation:
   operator-operand or function-argument position against a higher-tower
   operand it **does** coerce now: `x + 2` for `x : Real` lifts `2` to
   `(2 : Real)` via the coercion-join, and `Real.power(2, m)` lifts the
-  base. But as a `linear_combination` **coefficient** it does not —
-  write the carrier explicitly there, `(2 : Integer) * h`, never bare
-  `2`. And mind that `1 + 1`, `Real.one + Real.one`, and `(2 : Real)`
+  base. As a `linear_combination` **coefficient** it now coerces too —
+  the tactic lifts a scalar leaf to the goal's carrier, at any nesting
+  depth (`(2 * b + c + 7 * shear) * h` is fine; before 2026-07-25 a bare
+  numeral there became an opaque ATOM and the tactic reported the true
+  identity as "FALSE as a polynomial"). And mind that `1 + 1`,
+  `Real.one + Real.one`, and `(2 : Real)`
   (the tower) are three *different terms* — all ring-equal, but they do
   NOT match structurally, so don't mix them across a `≤`-step or a lemma
   citation (the `2`-vs-`1+1` rule in `numerals-and-naming.md`).

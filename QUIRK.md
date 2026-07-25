@@ -418,3 +418,106 @@ flex-applied hole appears only under the solved head
 (`Test/citation_delta_alignment_test.math`'s second probe is the
 end-to-end shape; it currently passes through the citation ladder's
 other rungs).
+
+## Q11 — CLOSED 2026-07-25: chain endpoints at a BUNDLE carrier didn't lift numerals
+
+**Symptom.** Inside a relation chain whose carrier is a concrete bundle's
+carrier — `CommutativeRing.carrier(Integer.commutative_ring_bundle)`, the
+type of every `Matrix.quadraticForm` value — a step endpoint written with
+bare numerals (`= 0 * 0 + 2 * (0 * 0) + 5 * (0 * 0)`) stayed at Natural.
+The step was then ill-typed, and the failure surfaced as a citation
+mismatch printing two spellings that look identical (`2 * (y * y)` vs
+`(Natural.to_integer 2) * (y * y)`) — recipe (d)/(h) of the fifteen-theorem
+memory, which cost two sessions' worth of ascription noise
+(`(0 : ℤ) * 0 + (2 : ℤ) * …`) and explicit-argument citations.
+
+**Root cause.** `calc.cpp`'s endpoint reconciliation asked
+`combineOperands(nextHead, carrierTypeName, …)` with RAW head names. A
+bundle projection's raw head is `CommutativeRing.carrier`, which the
+coercion registry knows nothing about, so no join was found and the
+endpoint was left alone. The `=`-desugaring path (dispatch.cpp) already
+handled this by retrying over `carrierHeadCandidates`; the chain path
+never got the same treatment.
+
+**Fix.** `Elaborator::combineOperandTypes(leftType, rightType)` —
+`combineOperands` keyed on the TYPES, raw heads first and normalized
+carrier candidates second — now backs both chain sites (the leading-term
+probe and each step's endpoint). Lock:
+`Test/chain_numeral_bundle_carrier_test.math`; the whole
+`Algebra/critical_value_minimality` + `Algebra/diagonal_forms` pair is now
+written with bare numerals (114 ascriptions deleted).
+
+## Q12 — CLOSED 2026-07-25: a `let`-spelled goal blocked citation argument inference
+
+**Symptom.** `let extended := Matrix.diagonalExtension(A, c); …
+Matrix.IsSymmetric(extended) by Matrix.diagonalExtension_symmetric` failed
+with "could not infer hole(s) at position 3" — the goal's let name hides
+the structure the conclusion pattern reads `A` and `c` off. Every such
+site had to spell the arguments by name.
+
+**Root cause.** `autoFillHintForClaim` retries ζ-unfolded, but the HOLE
+SOLVER (`inferCallWithHoles` Step 2) had no ζ rung: its ladder was raw →
+WHNF-both → equality-endpoint reduction → class-equality relaxation.
+
+**Fix.** A final ζ rung in Step 2 (fallback-only; the produced term is
+still checked against the ORIGINAL goal, so a ζ step cannot admit a wrong
+proof). Lock: `Test/natural_spelling_test.math`'s
+`citation_through_a_let`, and the `let block` / `let zero` spelling of
+`Matrix.diagonalQuaternaryForm_one_two_five_five_isometric_representative`.
+
+## Q13 — CLOSED 2026-07-25: a premise argument couldn't be a citation of its own
+
+**Symptom.** `Lemma(premise := Other(x := 1, value := done))` failed with
+`@_hole_N` goals: `Other`'s data parameters come from `Lemma`'s, which were
+still unsolved when the argument was elaborated. Fixing it meant passing
+`Lemma`'s data parameters by hand (`A := …, v := …`) even though the goal
+determines them — 18 lines of that in the minimality file alone.
+
+**Root cause, two halves.** (a) A `by <application>` hint is deliberately
+elaborated with NO expected type first (so a partial application can peel
+its Pi chain), so the outer lemma's parameters are unsolved holes; the
+inner citation then has nothing to infer from. (b) The failure inside that
+speculative attempt was an `AutoProverBudgetError`, which is deliberately
+NOT an `ElaborateError` so its rich message survives speculative catches —
+so it escaped the recovery instead of falling back.
+
+**Fix.** `autoProveClaim` now declines a goal that still mentions an
+unsolved call hole (`containsUnsolvedCallHoleFreeVar`) — no tactic can
+assign metavariables, so the search was pure waste — and `recoverClaimHint`
+re-elaborates an argument-bearing citation WITH the goal as the expected
+type. Lock: `Test/natural_spelling_test.math`'s
+`nested_citation_takes_its_data_from_the_goal`.
+
+## Q14 — CLOSED 2026-07-25: `linear_combination` treated a bare numeral coefficient as an atom
+
+**Symptom.** `linear_combination((2 * b + c + 7 * shear) * hypothesis)`
+reported "the identity is FALSE as a polynomial" — sending the author after
+a mathematical error that does not exist. Ascribing every numeral
+(`((2 : ℤ) * b + …)`) fixed it. The docs warned about the top-level
+coefficient only, not nested ones.
+
+**Root cause.** The combination tree elaborates each leaf WITHOUT an
+expected type (a leaf may be a hypothesis, i.e. a proof), so a bare numeral
+landed at Natural; the normaliser then treated the Natural literal as an
+opaque ATOM and the combination denoted a different polynomial.
+
+**Fix.** A scalar leaf is lifted to the goal's carrier through the coercion
+registry — exactly what the ascription did. Lock:
+`Test/natural_spelling_test.math`'s
+`linear_combination_bare_numeral_coefficient`.
+
+**Q13 addendum (same day).** The first fix (goal as expected type for a
+named-argument citation) was not enough on its own: with a ∀-shaped goal the
+conclusion pattern is OVER-APPLIED — the lemma's own conclusion binders
+(`∀ (u : ℕ)`, and each premise arrow of the conclusion) are consumed as
+argument positions, so the pattern no longer matches the ∀-goal and NOTHING is
+pinned. `citePiGoalByIntroduction` then retries at the introduced inner goal
+and does pin the data parameters — but a parameter that only a CONTEXT
+hypothesis determines (`v` in `¬(u = v)`, matched against the introduced
+`¬(u = 1)`) is pinned by the context discharge, which runs AFTER argument
+elaboration. Hence part (b): defer an argument whose first elaboration fails
+against a hole-bearing domain, and retry it after the discharge. Deferring
+UNCONDITIONALLY (on the domain's shape rather than on a failure) regresses
+`Polynomial.ExtensionallyEqual.transitive`, whose `Equality.transitivity(?, ?,
+?, first, second)` pins its holes precisely BY elaborating those arguments —
+forward inference is the reason the domain-shape test is the wrong gate.

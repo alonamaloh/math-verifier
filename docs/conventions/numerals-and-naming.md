@@ -67,6 +67,15 @@ annotation at that boundary.
   prefer real division `(x + y) / 2` over
   `(x + y) * (Rational.one_half : Real)` — it reads as the mathematics, and
   `field` proves identities over it directly (see `algebra-tactics.md`).
+- **A bundle's carrier counts as concrete.** A chain or claim whose carrier is
+  `CommutativeRing.carrier(Integer.commutative_ring_bundle)` — the type of
+  every `Matrix.quadraticForm` value, and of every entry of a concrete
+  `Matrix(Integer.commutative_ring_bundle, …)` — lifts bare numerals exactly
+  as one spelled `Integer` does, in step endpoints and in argument slots
+  alike. So `Matrix.Represents(A, 6)`, `Matrix.diagonalExtension(A, 5)` and
+  `… = 0 * 0 + 2 * (0 * 0) + 5 * (0 * 0)` are the preferred spellings; the
+  `(6 : ℤ)` ceremony older files carry is no longer needed (the join reads
+  the concrete carrier out of the bundle projection, 2026-07-25).
 - **All-numeral chain heads do not.** A chain beginning `0 = 0 + 0 ≤ …`
   can't pin a carrier from `0 = 0 + 0`, so it defaults to `Natural`; seed it
   with one cast—`(0 : Real) = 0 + 0 ≤ …`. A first relation with a non-numeral

@@ -1497,6 +1497,43 @@ ExpressionPointer Elaborator::recoverClaimHint(
                 }
             }
         }
+        // Goal-directed re-elaboration of an argument-bearing citation. The
+        // first attempt elaborates `by Lemma(x := …)` with NO expected type
+        // (so a genuinely partial application can still peel its Pi chain),
+        // which leaves the lemma's other parameters unsolved — and an
+        // argument that is itself a citation then has nothing to infer ITS
+        // arguments from ("could not infer hole(s)", or a premise `done`
+        // asked to prove a hole-bearing equation). Retrying with the goal as
+        // the expected type pins the data parameters first, exactly as
+        // spelling them out by hand would. Cold path: only reached once the
+        // written form has already failed.
+        bool retryInFlight = false;
+        for (const auto& entry : goalDirectedCitationRetries_) {
+            if (entry.first == &byHint && entry.second == goalClosed.get()) {
+                retryInFlight = true;
+                break;
+            }
+        }
+        if (std::get_if<SurfaceApplication>(&byHint.node) && !retryInFlight
+            && !inSpeculativeContextScan_) {
+            goalDirectedCitationRetries_.push_back(
+                {&byHint, goalClosed.get()});
+            struct RetryGuard {
+                std::vector<std::pair<const SurfaceExpression*,
+                                      const Expression*>>& stack;
+                ~RetryGuard() { stack.pop_back(); }
+            } retryGuard{goalDirectedCitationRetries_};
+            try {
+                ExpressionPointer filled = elaborateExpression(
+                    byHint, localBinders, goalClosed);
+                if (filled
+                    && bridgedResultProvesGoal(
+                           filled, goalClosed, localBinders)) {
+                    return filled;
+                }
+            } catch (const ElaborateError&) {
+            } catch (const TypeError&) {}
+        }
         // All-holes re-citation: a bare `by Lemma` whose structural match
         // failed is retried as the explicit spelling `Lemma(?, …, ?)` the
         // author could write by hand. That form routes through the ordinary
@@ -2155,6 +2192,49 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                         metavariableNames, assignment);
                 }
             }
+            // Last rung: ζ-unfold the goal's let-bound names. A goal spelled
+            // through a `let` abbreviation (`let extended := diagonalExtension(A, c);`
+            // … `IsSymmetric(extended)`) hides the very structure the
+            // conclusion pattern reads its arguments off, so no amount of
+            // δ/WHNF work on the folded form can pin them — the citation
+            // fails with "could not infer hole(s)" and the author has to
+            // spell every argument by name. The claim-level hint path
+            // already retries ζ-unfolded (autoFillHintForClaim); this brings
+            // the hole solver in line. Fallback-only, and the produced term
+            // is re-checked against the ORIGINAL goal, so a ζ step can never
+            // let a wrong term through.
+            anyUnassigned = false;
+            for (const auto& name : metavariableNames) {
+                if (!assignment.count(name)) { anyUnassigned = true; break; }
+            }
+            // Not inside the speculative context-fact scan: there this rung
+            // fires on EVERY failing candidate of every claim (a proof whose
+            // context is all `let`s pays two extra unifications per
+            // candidate — measured at +30% on the fifteen-theorem's heaviest
+            // exclusion proof). A citation the author actually wrote gets it;
+            // a scan that is about to discard the attempt does not.
+            if (anyUnassigned && !inSpeculativeContextScan_) {
+                ExpressionPointer expectedZeta =
+                    zetaUnfoldLetBinders(expectedType, localBinders);
+                if (!structurallyEqual(expectedZeta, expectedType)) {
+                    unifyConstructorParameters(
+                        resultTypePattern, expectedZeta,
+                        metavariableNames, assignment);
+                    bool stillUnassigned = false;
+                    for (const auto& name : metavariableNames) {
+                        if (!assignment.count(name)) {
+                            stillUnassigned = true; break;
+                        }
+                    }
+                    if (stillUnassigned) {
+                        unifyConstructorParameters(
+                            weakHeadNormalForm(
+                                environment_, resultTypePattern),
+                            weakHeadNormalForm(environment_, expectedZeta),
+                            metavariableNames, assignment);
+                    }
+                }
+            }
         }
 
         // Step 3: forward inference. For each non-hole arg, elaborate it
@@ -2164,10 +2244,18 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
         // subsequent domains substitute correctly.
         std::vector<ExpressionPointer> elaboratedArgs(surfaceArgs.size(),
                                                        nullptr);
-        for (size_t i = 0; i < surfaceArgs.size(); ++i) {
+        // An argument whose domain still mentions an unresolved hole is
+        // elaborated LAST (Step 3b), after the remaining arguments, the final
+        // backward unification and the context discharge have had their turn
+        // at that hole. Otherwise a premise written as its own citation —
+        // `six := Or.introduceLeft(done)`, whose disjunct is `?v = 6` — is
+        // asked to prove a goal that still has a metavariable in it, and the
+        // whole call fails even though the goal (or a hypothesis) determines
+        // `?v`. Order-independence of named arguments is the point.
+        std::vector<size_t> deferredArguments;
+        auto elaborateArgumentAt = [&](size_t i) {
             ExpressionPointer expectedDomain =
                 substituteFreeVariables(piDomains[i], assignment);
-            if (isHole[i]) continue;
             ExpressionPointer kernelArg = elaborateExpression(
                 *surfaceArgs[i], localBinders, expectedDomain);
             // Bare-proposition-as-proof (and the other diff coercions): the
@@ -2229,6 +2317,27 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
             // (and the final result pattern unification) see the actual
             // value rather than the FV placeholder.
             assignment[argFreshNames[i]] = kernelArg;
+        };
+        for (size_t i = 0; i < surfaceArgs.size(); ++i) {
+            if (isHole[i]) continue;
+            if (containsNamedFreeVariable(
+                    substituteFreeVariables(piDomains[i], assignment),
+                    metavariableNames)) {
+                // The domain still carries an unresolved hole. Elaborating the
+                // argument may still SUCCEED and pin it by forward inference
+                // (`Equality.transitivity(?, ?, ?, first, second)` works that
+                // way), so try — but a failure here is not final: retry in
+                // Step 3b once the siblings, the final unification and the
+                // context discharge have had their turn at the hole.
+                try {
+                    elaborateArgumentAt(i);
+                    continue;
+                } catch (const ElaborateError&) {
+                } catch (const TypeError&) {}
+                deferredArguments.push_back(i);
+                continue;
+            }
+            elaborateArgumentAt(i);
         }
 
         // Step 4: final backward unification — any holes still
@@ -3011,6 +3120,15 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                 }
             }
             unresolved = std::move(stillUnresolved);
+        }
+        // Step 3b: the arguments whose first elaboration failed against a
+        // hole-bearing domain. Everything that can pin a metavariable — the
+        // sibling arguments, the final backward unification, the context
+        // discharge — has now run, so their domains are as determined as they
+        // will get. Errors propagate this time: if a hole survives, the
+        // argument's own error is the informative one.
+        for (size_t i : deferredArguments) {
+            elaborateArgumentAt(i);
         }
         // Propagate any of the CALLER's holes this call solved (backward
         // chaining: a leaf unification here may have pinned an inherited

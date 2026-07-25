@@ -1925,3 +1925,73 @@ overreach beyond the two individual findings, and I first "confirmed" it
 with a single-file verify judged only by grepping for "warning" — the
 failure text contains neither "error" nor "warning", so always check the
 verify exit code.
+
+## 2026-07-25 — friction-reduction session: five elaborator fixes, four locks
+
+Driven by the frictions the weak-minimality build had just filed (recipes
+(d)/(f)/(g)/(h) of the fifteen-theorem memory). Each fix is at source, with a
+`Test/` or `ErrorTest/` lock; the two files the frictions came from were then
+rewritten in the natural spelling (114 numeral ascriptions and 18 spelled-out
+argument lines deleted) as the acceptance test.
+
+**FIXED — a chain at a BUNDLE carrier didn't lift bare numerals** (QUIRK Q11).
+`combineOperands` was called with RAW head names, and a bundle projection's raw
+head (`CommutativeRing.carrier`) is not a coercion-registry key, so a step
+endpoint written `= 0 * 0 + 2 * (0 * 0)` stayed at Natural. New
+`Elaborator::combineOperandTypes` (raw pair first, then normalized carrier
+candidates — the treatment `=`-desugaring already had) backs both chain sites.
+Lock: `Test/chain_numeral_bundle_carrier_test.math`.
+
+**FIXED — a `let`-spelled goal blocked citation argument inference** (Q12). The
+hole solver's Step-2 ladder gained a final ζ rung, matching the retry
+`autoFillHintForClaim` already did for claim hints. Lock:
+`Test/natural_spelling_test.math::citation_through_a_let`.
+
+**FIXED — a premise argument could not be a citation of its own** (Q13). Three
+parts: (a) a named-argument citation now gets the goal as its expected type on
+the FIRST attempt (a named-argument call is always filled to full arity, so it
+is never the Pi-typed partial application the no-expected-type path protects);
+(b) an argument whose first elaboration fails against a hole-bearing domain is
+DEFERRED and retried after the sibling arguments, the final backward
+unification and the context discharge have run — that is what pins a `v` that
+only a context hypothesis determines; (c) `recoverClaimHint` re-elaborates an
+argument-bearing citation against the goal as a last resort, guarded by an
+(hint, goal) in-flight stack so it cannot descend into itself.
+Lock: `Test/natural_spelling_test.math::nested_citation_takes_its_data_from_the_goal`.
+
+**FIXED — `linear_combination` treated a bare numeral coefficient as an atom**
+(Q14). A scalar leaf is now lifted to the goal's carrier through the coercion
+registry. The old failure mode was the worst kind: "the identity is FALSE as a
+polynomial" on a TRUE identity. Lock:
+`Test/natural_spelling_test.math::linear_combination_bare_numeral_coefficient`.
+
+**FIXED (message) — an uninstantiated citation on a calc step printed as "a
+different relation".** The step's relation was printed beside the cited
+lemma's ∀-STATEMENT, which reads as a mathematical difference between two
+things that are not comparable (this is what sent the previous session hunting
+a numeral mismatch). A Pi-typed step proof is now reported as "a lemma that
+was never instantiated — its arguments could not be inferred from the step".
+Lock: `ErrorTest/calc_citation_not_instantiated`.
+
+**FIXED (latent crash) — a null proof term from the prover's guard paths.**
+`autoProveClaim` returns null on its recursion cap; the bare-claim path
+returned that straight into the proof term, and the first `inferType` on it
+SEGFAULTED (found while adding the hole guard below). The bare-claim path now
+turns a declined proof into an error, and the new guard throws rather than
+returning null.
+
+**NEW GUARD — the prover declines a goal that still mentions an unsolved call
+hole** (`@_hole_…`). No tactic assigns metavariables, so the search could only
+waste its budget; worse, the budget error is deliberately non-recoverable, so
+it killed the goal-directed retry that would have succeeded.
+
+**STILL OPEN (design question, not a bug) — `by substituting eq1, eq2`.** The
+parser rejects it with an actionable message (split into steps). The natural
+spelling is "by substituting A and B"; supporting it means threading a list
+through the surface AST and the substitution path. Deferred deliberately: the
+split form shows the intermediate spelling, which the style guide prefers.
+
+**STILL OPEN — Q4's universe-polymorphic `automatic` lemma.** Unchanged: the
+index has no level story, so such a declaration silently degrades to
+citation-only. The audit says no current declaration is affected; the cheap
+guard (warn at declaration time) is still unwritten.

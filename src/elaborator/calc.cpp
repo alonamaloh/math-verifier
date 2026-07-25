@@ -57,14 +57,12 @@ ExpressionPointer Elaborator::elaborateCalc(
                 firstRightTypeOpen = nullptr;
             }
             if (firstRightTypeOpen
-                && !leadingHead.empty() && !firstRightHead.empty()
-                && leadingHead != firstRightHead) {
+                && !leadingHead.empty() && !firstRightHead.empty()) {
                 ExpressionPointer leadingTypeClosed = closeOverLocalBinders(
                     carrierTypeOpen, localBinders, localBinders.size());
                 ExpressionPointer firstRightTypeClosed = closeOverLocalBinders(
                     firstRightTypeOpen, localBinders, localBinders.size());
-                if (auto combined = combineOperands(
-                        leadingHead, firstRightHead,
+                if (auto combined = combineOperandTypes(
                         leadingTypeClosed, firstRightTypeClosed)) {
                     if (!combined->coerceLeft.empty()) {
                         previousKernel = applyCoercionChain(
@@ -324,11 +322,10 @@ ExpressionPointer Elaborator::elaborateCalc(
                 ExpressionPointer nextTypeRaw =
                     inferTypeInLocalContext(localBinders, nextKernel);
                 std::string nextHead = headConstantName(nextTypeRaw);
-                if (!nextHead.empty() && nextHead != carrierTypeName) {
+                if (!nextHead.empty()) {
                     ExpressionPointer nextTypeClosed = closeOverLocalBinders(
                         nextTypeRaw, localBinders, localBinders.size());
-                    if (auto combined = combineOperands(
-                            nextHead, carrierTypeName,
+                    if (auto combined = combineOperandTypes(
                             nextTypeClosed, carrierType)) {
                         if (!combined->coerceLeft.empty()) {
                             nextKernel = applyCoercionChain(
@@ -1101,13 +1098,38 @@ ExpressionPointer Elaborator::elaborateCalc(
                 // isDefinitionallyEqual above) — so it owns the message.
                 // Report it as mathematics rather than laundering it
                 // through rethrowKernelError's "kernel: " path (WS1).
-                std::string mismatchMessage =
-                    "this step's justification proves a different relation "
-                    "than the step claims\n"
-                    "    this step claims:    "
-                    + prettyPrintForDisplay(stepRelationTypeOpened) + "\n"
-                    "    but its proof shows: "
-                    + prettyPrintForDisplay(stepProofType);
+                // A Pi-typed "proof" is not a different relation at all: it
+                // is the cited lemma UNAPPLIED, because its arguments could
+                // not be read off this step. Printing the ∀-statement beside
+                // the step's relation invites a hunt for a mathematical
+                // difference between two things that are not comparable —
+                // say what actually happened.
+                bool proofIsUnapplied =
+                    std::get_if<Pi>(&weakHeadNormalForm(
+                        environment_, stepProofType)->node) != nullptr;
+                std::string mismatchMessage;
+                if (proofIsUnapplied) {
+                    mismatchMessage =
+                        "this step's justification is a lemma that was never "
+                        "instantiated — its arguments could not be inferred "
+                        "from the step\n"
+                        "    this step claims:      "
+                        + prettyPrintForDisplay(stepRelationTypeOpened) + "\n"
+                        "    the cited statement:   "
+                        + prettyPrintForDisplay(stepProofType) + "\n"
+                        "  supply the un-inferable argument(s) by name "
+                        "(`by Lemma(d := 5)`), or make the step's spelling "
+                        "match the lemma's conclusion so they can be read "
+                        "off it";
+                } else {
+                    mismatchMessage =
+                        "this step's justification proves a different relation "
+                        "than the step claims\n"
+                        "    this step claims:    "
+                        + prettyPrintForDisplay(stepRelationTypeOpened) + "\n"
+                        "    but its proof shows: "
+                        + prettyPrintForDisplay(stepProofType);
+                }
                 // When the step involves subtraction, a common cause is that
                 // the two sides express it differently — `a - b` on one side,
                 // `a + -b` on the other. These print ALIKE and are ring-equal,

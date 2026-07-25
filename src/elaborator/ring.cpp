@@ -614,6 +614,25 @@ Elaborator::CombinationEquation Elaborator::evalLinearCombinationTree(
                 leafType, "linear_combination hypothesis", line);
             return {eq.leftEndpoint, eq.rightEndpoint, leaf};
         } catch (const ElaborateError&) {
+            // A scalar coefficient is elaborated without an expected type
+            // (the leaf may be a hypothesis), so a bare numeral lands at
+            // Natural even at an Integer/Real goal. Lift it to the goal's
+            // carrier exactly as an `(2 : ℤ)` ascription would: left
+            // unlifted, the normaliser treats the Natural literal as an
+            // opaque ATOM, the combination silently denotes a DIFFERENT
+            // polynomial, and the failure surfaces as "the identity is
+            // FALSE as a polynomial" — sending the author after a
+            // mathematical error that isn't there. Nested coefficients
+            // (`(2*b + c) * h`) reach this leaf one numeral at a time, so
+            // the fix covers them too.
+            ExpressionPointer carrierTypeClosed = closeOverLocalBinders(
+                carrierType, localBinders, binderCount);
+            ExpressionPointer liftedClosed = coerceToExpectedTypeViaRegistry(
+                localBinders, leafClosed, carrierTypeClosed);
+            if (liftedClosed != leafClosed) {
+                leaf = openOverLocalBinders(
+                    liftedClosed, localBinders, binderCount);
+            }
             ExpressionPointer reflexivityProof = makeApplication(
                 makeApplication(
                     makeConstant("reflexivity", {carrierLevel}),
