@@ -1,0 +1,344 @@
+-- Algebra/diagonal_forms.math
+--
+-- The general diagonal forms of rank one through four — a x², a x² + b y²,
+-- a x² + b y² + c z², and a x² + b y² + c z² + d w² — built by iterated
+-- diagonal extension from the rank-zero form.  Every escalation-tree form
+-- named so far is a special case, and the minimality witnesses of the
+-- fifteen theorem are rank-four diagonal forms.
+--
+-- Two facts carry the weight.  The coordinate value law evaluates the form
+-- on an explicit tuple, so exhibiting a represented value is arithmetic.
+-- And a diagonal coordinate whose coefficient exceeds a target cannot help
+-- represent it, so missing a value passes from a form to every diagonal
+-- extension of it by a larger coefficient.
+
+module Algebra.diagonal_forms
+
+import Algebra.rank_four_weighted_diagonal_family
+
+-- ----------------------------------------------------------------------
+-- The two general laws of a diagonal extension: its value on a vector
+-- with a named last coordinate, and what it misses below its corner.
+
+theorem Matrix.diagonalExtension_appendCoordinate_value {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) (c : ℤ)
+        (symmetric : Matrix.IsSymmetric(A))
+        (u : RingVector(Integer.commutative_ring_bundle, n)) (t : ℤ)
+        : Matrix.quadraticForm(
+              Matrix.diagonalExtension(A, c), RingVector.appendCoordinate(u, t))
+          = Matrix.quadraticForm(A, u) + t * t * c := {
+  let x : RingVector(Integer.commutative_ring_bundle, 1 + n) :=
+      RingVector.appendCoordinate(u, t);
+  RingVector.restrict(x) = u by RingVector.restrict_appendCoordinate as restrictReads;
+  x(NaturalsBelow.top(n)) = t by RingVector.appendCoordinate_top as topReads;
+  Matrix.quadraticForm(Matrix.diagonalExtension(A, c), x)
+     = Matrix.quadraticForm(A, RingVector.restrict(x))
+       + x(NaturalsBelow.top(n)) * x(NaturalsBelow.top(n)) * c
+         by Matrix.diagonalExtension_quadraticForm
+     = Matrix.quadraticForm(A, u)
+       + x(NaturalsBelow.top(n)) * x(NaturalsBelow.top(n)) * c
+         by substituting restrictReads
+     = Matrix.quadraticForm(A, u) + t * t * c by substituting topReads;
+  done
+}
+
+theorem Matrix.diagonalExtension_not_represents_below_corner {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) (c target : ℤ)
+        (symmetric : Matrix.IsSymmetric(A))
+        (positiveDefinite : Matrix.IsPositiveDefinite(A))
+        (targetNonneg : target ≥ (0 : ℤ))
+        (cornerExceeds : c > target)
+        (blockMisses : ¬(Matrix.Represents(A, target)))
+        : ¬(Matrix.Represents(Matrix.diagonalExtension(A, c), target)) := {
+  suppose Matrix.Represents(Matrix.diagonalExtension(A, c), target) as represented;
+  choose x such that
+      Matrix.quadraticForm(Matrix.diagonalExtension(A, c), x) = target from represented;
+  let y : RingVector(Integer.commutative_ring_bundle, n) := RingVector.restrict(x);
+  let t : ℤ := x(NaturalsBelow.top(n));
+  let blockValue : ℤ := Matrix.quadraticForm(A, y);
+  blockValue + t * t * c
+     = Matrix.quadraticForm(Matrix.diagonalExtension(A, c), x)
+         by Matrix.diagonalExtension_quadraticForm
+     = target
+  as valueSplits;
+  blockValue ≥ (0 : ℤ) by Matrix.quadraticForm_nonneg;
+  c ≥ (0 : ℤ) by Integer.LessThan.weaken;
+  t = 0 ∨ ¬(t = 0);
+  done by cases {
+    case t = 0 as vanishes: {
+        blockValue = target by {
+          blockValue + 0 * 0 * c = target by substituting vanishes as specialized;
+          done by linear_combination(specialized)
+        }
+        as blockRepresents;
+        Matrix.Represents(A, target) by { witness y with blockRepresents };
+        done
+      }
+    case ¬(t = 0) as nonzero: {
+        t * t > (0 : ℤ) by Integer.square_positive_of_nonzero;
+        t * t ≥ (1 : ℤ);
+        c ≤ t * t * c by Integer.le_multiply_by_at_least_one;
+        target
+           < c by cornerExceeds
+           = (0 : ℤ) + c
+           ≤ blockValue + c by Integer.add_preserves_less_or_equal
+           = c + blockValue
+           ≤ t * t * c + blockValue by Integer.add_preserves_less_or_equal
+           = blockValue + t * t * c
+           = target by valueSplits;
+        target ≠ target by Integer.LessThan.distinct;
+        done
+      }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- The ladder of diagonal forms.  The rank-zero form is the empty identity.
+
+definition Matrix.diagonalUnaryForm (a : ℤ)
+        : Matrix(Integer.commutative_ring_bundle, 1, 1) :=
+  Matrix.diagonalExtension(Matrix.identity(Integer.commutative_ring_bundle, 0), a)
+
+definition Matrix.diagonalBinaryForm (a b : ℤ)
+        : Matrix(Integer.commutative_ring_bundle, 2, 2) :=
+  Matrix.diagonalExtension(Matrix.diagonalUnaryForm(a), b)
+
+definition Matrix.diagonalTernaryForm (a b c : ℤ)
+        : Matrix(Integer.commutative_ring_bundle, 3, 3) :=
+  Matrix.diagonalExtension(Matrix.diagonalBinaryForm(a, b), c)
+
+definition Matrix.diagonalQuaternaryForm (a b c d : ℤ)
+        : Matrix(Integer.commutative_ring_bundle, 4, 4) :=
+  Matrix.diagonalExtension(Matrix.diagonalTernaryForm(a, b, c), d)
+
+theorem Matrix.diagonalUnaryForm_symmetric (a : ℤ)
+        : Matrix.IsSymmetric(Matrix.diagonalUnaryForm(a)) :=
+  by Matrix.diagonalExtension_symmetric(symmetric := Matrix.zero_dimension_symmetric)
+
+theorem Matrix.diagonalBinaryForm_symmetric (a b : ℤ)
+        : Matrix.IsSymmetric(Matrix.diagonalBinaryForm(a, b)) :=
+  by Matrix.diagonalExtension_symmetric(symmetric := Matrix.diagonalUnaryForm_symmetric)
+
+theorem Matrix.diagonalTernaryForm_symmetric (a b c : ℤ)
+        : Matrix.IsSymmetric(Matrix.diagonalTernaryForm(a, b, c)) :=
+  by Matrix.diagonalExtension_symmetric(symmetric := Matrix.diagonalBinaryForm_symmetric)
+
+theorem Matrix.diagonalQuaternaryForm_symmetric (a b c d : ℤ)
+        : Matrix.IsSymmetric(Matrix.diagonalQuaternaryForm(a, b, c, d)) :=
+  by Matrix.diagonalExtension_symmetric(symmetric := Matrix.diagonalTernaryForm_symmetric)
+
+theorem Matrix.diagonalUnaryForm_positive_definite (a : ℤ) (aPositive : a > (0 : ℤ))
+        : Matrix.IsPositiveDefinite(Matrix.diagonalUnaryForm(a)) :=
+  by Matrix.diagonalExtension_positive_definite(
+      symmetric := Matrix.zero_dimension_symmetric(
+          A := Matrix.identity(Integer.commutative_ring_bundle, 0)),
+      positiveDefinite := Matrix.zero_dimension_positive_definite(
+          A := Matrix.identity(Integer.commutative_ring_bundle, 0)),
+      cornerPositive := aPositive)
+
+theorem Matrix.diagonalBinaryForm_positive_definite (a b : ℤ)
+        (aPositive : a > (0 : ℤ)) (bPositive : b > (0 : ℤ))
+        : Matrix.IsPositiveDefinite(Matrix.diagonalBinaryForm(a, b)) :=
+  by Matrix.diagonalExtension_positive_definite(
+      symmetric := Matrix.diagonalUnaryForm_symmetric,
+      positiveDefinite := Matrix.diagonalUnaryForm_positive_definite(aPositive := aPositive),
+      cornerPositive := bPositive)
+
+theorem Matrix.diagonalTernaryForm_positive_definite (a b c : ℤ)
+        (aPositive : a > (0 : ℤ)) (bPositive : b > (0 : ℤ)) (cPositive : c > (0 : ℤ))
+        : Matrix.IsPositiveDefinite(Matrix.diagonalTernaryForm(a, b, c)) :=
+  by Matrix.diagonalExtension_positive_definite(
+      symmetric := Matrix.diagonalBinaryForm_symmetric,
+      positiveDefinite := Matrix.diagonalBinaryForm_positive_definite(
+          aPositive := aPositive, bPositive := bPositive),
+      cornerPositive := cPositive)
+
+theorem Matrix.diagonalQuaternaryForm_positive_definite (a b c d : ℤ)
+        (aPositive : a > (0 : ℤ)) (bPositive : b > (0 : ℤ))
+        (cPositive : c > (0 : ℤ)) (dPositive : d > (0 : ℤ))
+        : Matrix.IsPositiveDefinite(Matrix.diagonalQuaternaryForm(a, b, c, d)) :=
+  by Matrix.diagonalExtension_positive_definite(
+      symmetric := Matrix.diagonalTernaryForm_symmetric,
+      positiveDefinite := Matrix.diagonalTernaryForm_positive_definite(
+          aPositive := aPositive, bPositive := bPositive, cPositive := cPositive),
+      cornerPositive := dPositive)
+
+-- ----------------------------------------------------------------------
+-- The coordinate value laws.
+
+theorem Matrix.diagonalUnaryForm_coordinateTuple_value (a x : ℤ)
+        : Matrix.quadraticForm(
+              Matrix.diagonalUnaryForm(a),
+              (⟨x⟩ : RingVector(Integer.commutative_ring_bundle, 1)))
+          = a * (x * x) := {
+  let vector : RingVector(Integer.commutative_ring_bundle, 1) := ⟨x⟩;
+  Matrix.quadraticForm(
+      Matrix.identity(Integer.commutative_ring_bundle, 0), RingVector.restrict(vector))
+      = (0 : ℤ) by Matrix.zero_dimension_quadraticForm as emptyValue;
+  vector(NaturalsBelow.top(0)) = x by RingVector.oneCoordinate_at as topReads;
+  Matrix.quadraticForm(Matrix.diagonalUnaryForm(a), vector)
+     = Matrix.quadraticForm(
+           Matrix.identity(Integer.commutative_ring_bundle, 0), RingVector.restrict(vector))
+       + vector(NaturalsBelow.top(0)) * vector(NaturalsBelow.top(0)) * a
+         by Matrix.diagonalExtension_quadraticForm(symmetric := Matrix.zero_dimension_symmetric)
+     = (0 : ℤ) + vector(NaturalsBelow.top(0)) * vector(NaturalsBelow.top(0)) * a
+         by substituting emptyValue
+     = (0 : ℤ) + x * x * a by substituting topReads
+     = a * (x * x) by ring;
+  done
+}
+
+theorem Matrix.diagonalBinaryForm_coordinateTuple_value (a b x y : ℤ)
+        : Matrix.quadraticForm(
+              Matrix.diagonalBinaryForm(a, b),
+              (⟨x, y⟩ : RingVector(Integer.commutative_ring_bundle, 2)))
+          = a * (x * x) + b * (y * y) := {
+  Matrix.quadraticForm(
+      Matrix.diagonalBinaryForm(a, b),
+      (⟨x, y⟩ : RingVector(Integer.commutative_ring_bundle, 2)))
+     = Matrix.quadraticForm(
+           Matrix.diagonalUnaryForm(a),
+           (⟨x⟩ : RingVector(Integer.commutative_ring_bundle, 1))) + y * y * b
+         by Matrix.diagonalExtension_appendCoordinate_value(
+             symmetric := Matrix.diagonalUnaryForm_symmetric)
+     = a * (x * x) + y * y * b
+         by substituting Matrix.diagonalUnaryForm_coordinateTuple_value
+     = a * (x * x) + b * (y * y) by ring;
+  done
+}
+
+theorem Matrix.diagonalTernaryForm_coordinateTuple_value (a b c x y z : ℤ)
+        : Matrix.quadraticForm(
+              Matrix.diagonalTernaryForm(a, b, c),
+              (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+          = a * (x * x) + b * (y * y) + c * (z * z) := {
+  Matrix.quadraticForm(
+      Matrix.diagonalTernaryForm(a, b, c),
+      (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3)))
+     = Matrix.quadraticForm(
+           Matrix.diagonalBinaryForm(a, b),
+           (⟨x, y⟩ : RingVector(Integer.commutative_ring_bundle, 2))) + z * z * c
+         by Matrix.diagonalExtension_appendCoordinate_value(
+             symmetric := Matrix.diagonalBinaryForm_symmetric)
+     = a * (x * x) + b * (y * y) + z * z * c
+         by substituting Matrix.diagonalBinaryForm_coordinateTuple_value
+     = a * (x * x) + b * (y * y) + c * (z * z) by ring;
+  done
+}
+
+theorem Matrix.diagonalQuaternaryForm_coordinateTuple_value (a b c d x y z w : ℤ)
+        : Matrix.quadraticForm(
+              Matrix.diagonalQuaternaryForm(a, b, c, d),
+              (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4)))
+          = a * (x * x) + b * (y * y) + c * (z * z) + d * (w * w) := {
+  Matrix.quadraticForm(
+      Matrix.diagonalQuaternaryForm(a, b, c, d),
+      (⟨x, y, z, w⟩ : RingVector(Integer.commutative_ring_bundle, 4)))
+     = Matrix.quadraticForm(
+           Matrix.diagonalTernaryForm(a, b, c),
+           (⟨x, y, z⟩ : RingVector(Integer.commutative_ring_bundle, 3))) + w * w * d
+         by Matrix.diagonalExtension_appendCoordinate_value(
+             symmetric := Matrix.diagonalTernaryForm_symmetric)
+     = a * (x * x) + b * (y * y) + c * (z * z) + w * w * d
+         by substituting Matrix.diagonalTernaryForm_coordinateTuple_value
+     = a * (x * x) + b * (y * y) + c * (z * z) + d * (w * w) by ring;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The named forms of the escalation tree, as diagonal forms.
+
+theorem Matrix.diagonalExtension_identity {r : CommutativeRing} {n : ℕ}
+        : Matrix.diagonalExtension(Matrix.identity(r, n), CommutativeRing.one(r))
+          = Matrix.identity(r, 1 + n) := {
+  let extended : Matrix(r, 1 + n, 1 + n) :=
+      Matrix.diagonalExtension(Matrix.identity(r, n), CommutativeRing.one(r));
+  Matrix.leadingBlock(extended)
+     = Matrix.identity(r, n) by Matrix.diagonalExtension_leadingBlock
+     = Matrix.leadingBlock(Matrix.identity(r, 1 + n)) by Matrix.identity_leadingBlock
+  as blocks;
+  Matrix.borderColumn(extended)
+     = RingVector.zero(r, n) by Matrix.diagonalExtension_borderColumn
+     = Matrix.borderColumn(Matrix.identity(r, 1 + n)) by Matrix.identity_borderColumn
+  as borders;
+  Matrix.corner(extended)
+     = CommutativeRing.one(r) by Matrix.diagonalExtension_corner
+     = Matrix.corner(Matrix.identity(r, 1 + n)) by Matrix.identity_corner
+  as corners;
+  Matrix.IsSymmetric(Matrix.identity(r, n)) by Matrix.transpose_identity as blockSymmetric;
+  Matrix.IsSymmetric(extended)
+      by Matrix.diagonalExtension_symmetric(
+          A := Matrix.identity(r, n), c := CommutativeRing.one(r), symmetric := blockSymmetric)
+      as extendedSymmetric;
+  Matrix.IsSymmetric(Matrix.identity(r, 1 + n)) by Matrix.transpose_identity as identitySymmetric;
+  done by Matrix.symmetric_bordered_extensionality(
+      symmetricB := extendedSymmetric,
+      symmetricC := identitySymmetric,
+      blocks := blocks,
+      borderColumns := borders,
+      corners := corners)
+}
+
+theorem Matrix.squareForm_is_diagonal
+        : Matrix.squareForm = Matrix.diagonalUnaryForm(1) := {
+  Matrix.diagonalUnaryForm(1)
+     = Matrix.identity(Integer.commutative_ring_bundle, 1) by Matrix.diagonalExtension_identity
+     = Matrix.squareForm;
+  done
+}
+
+theorem Matrix.sumOfTwoSquaresForm_is_diagonal
+        : Matrix.sumOfTwoSquaresForm = Matrix.diagonalBinaryForm(1, 1) := {
+  Matrix.diagonalBinaryForm(1, 1)
+     = Matrix.diagonalExtension(Matrix.squareForm, 1)
+         by substituting Matrix.squareForm_is_diagonal
+     = Matrix.identity(Integer.commutative_ring_bundle, 2) by Matrix.diagonalExtension_identity
+     = Matrix.sumOfTwoSquaresForm by Matrix.sumOfTwoSquaresForm_is_identity;
+  done
+}
+
+theorem Matrix.squarePlusDoubleSquareForm_is_diagonal
+        : Matrix.squarePlusDoubleSquareForm = Matrix.diagonalBinaryForm(1, 2) := {
+  Matrix.diagonalBinaryForm(1, 2)
+     = Matrix.diagonalExtension(Matrix.squareForm, 2)
+         by substituting Matrix.squareForm_is_diagonal
+     = Matrix.squarePlusDoubleSquareForm
+         by Matrix.squarePlusDoubleSquareForm_is_nested_diagonal;
+  done
+}
+
+theorem Matrix.sumOfThreeSquaresForm_is_diagonal
+        : Matrix.sumOfThreeSquaresForm = Matrix.diagonalTernaryForm(1, 1, 1) := {
+  Matrix.diagonalTernaryForm(1, 1, 1)
+     = Matrix.diagonalExtension(Matrix.sumOfTwoSquaresForm, 1)
+         by substituting Matrix.sumOfTwoSquaresForm_is_diagonal
+     = Matrix.sumOfThreeSquaresForm;
+  done
+}
+
+theorem Matrix.sumOfTwoSquaresPlusDoubleSquareForm_is_diagonal
+        : Matrix.sumOfTwoSquaresPlusDoubleSquareForm = Matrix.diagonalTernaryForm(1, 1, 2) := {
+  Matrix.diagonalTernaryForm(1, 1, 2)
+     = Matrix.diagonalExtension(Matrix.sumOfTwoSquaresForm, 2)
+         by substituting Matrix.sumOfTwoSquaresForm_is_diagonal
+     = Matrix.sumOfTwoSquaresPlusDoubleSquareForm;
+  done
+}
+
+theorem Matrix.sumOfTwoSquaresPlusTripleSquareForm_is_diagonal
+        : Matrix.sumOfTwoSquaresPlusTripleSquareForm = Matrix.diagonalTernaryForm(1, 1, 3) := {
+  Matrix.diagonalTernaryForm(1, 1, 3)
+     = Matrix.diagonalExtension(Matrix.sumOfTwoSquaresForm, 3)
+         by substituting Matrix.sumOfTwoSquaresForm_is_diagonal
+     = Matrix.sumOfTwoSquaresPlusTripleSquareForm;
+  done
+}
+
+theorem Matrix.squarePlusDoubleSquarePlusTripleSquareForm_is_diagonal
+        : Matrix.squarePlusDoubleSquarePlusTripleSquareForm = Matrix.diagonalTernaryForm(1, 2, 3) := {
+  Matrix.diagonalTernaryForm(1, 2, 3)
+     = Matrix.diagonalExtension(Matrix.squarePlusDoubleSquareForm, 3)
+         by substituting Matrix.squarePlusDoubleSquareForm_is_diagonal
+     = Matrix.squarePlusDoubleSquarePlusTripleSquareForm;
+  done
+}
