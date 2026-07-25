@@ -468,4 +468,25 @@ with the census: `escalator_rank_four_census` (universal or truant
 10/15), `escalator_rank_five_universal`, and
 `escalator_beyond_rank_four_universal`.
 
+None of the nine test values can be dropped.  `Algebra/diagonal_forms`
+builds the general diagonal forms `Matrix.diagonalUnaryForm` through
+`Matrix.diagonalQuaternaryForm` by iterated diagonal extension, with
+symmetry, positive-definiteness, and the coordinate value law
+`Matrix.diagonalQuaternaryForm_coordinateTuple_value` at each rank; its
+two working laws are
+`Matrix.diagonalExtension_appendCoordinate_value` (the value splits off
+the last coordinate's term) and
+`Matrix.diagonalExtension_not_represents_below_corner` (a coefficient
+larger than the target cannot help reach it).  `Matrix.squareForm`,
+`Matrix.sumOfTwoSquaresForm`, `Matrix.sumOfThreeSquaresForm` and the
+other named escalation-tree forms are identified with their diagonal
+spellings there.  `Algebra/critical_value_minimality` then exhibits, for
+each critical value, a symmetric positive-definite rank-four form that
+represents the other eight and misses it —
+`Matrix.critical_values_minimal`, and
+`Matrix.critical_values_do_not_force_universality` for the non-universal
+reading.  Eight witnesses are an escalator that misses the value extended
+by a larger coefficient; the ninth, for 15, is `diag(1,2,5,5)`, the
+exceptional truant-15 form in its diagonal spelling.
+
 `PLAN_15_THEOREM.md` records unfinished stages.
