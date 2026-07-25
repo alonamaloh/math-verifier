@@ -1,0 +1,190 @@
+-- Plane/direction.math
+--
+-- Nonzero vectors, the rays they point along, and the counterclockwise
+-- cyclic order on them.
+--
+-- This is the file that replaces angles. `Counterclockwise(a, b, c)`
+-- says that going counterclockwise from `a` one meets `b` before `c`,
+-- and it is defined by the SIGNS of three determinants — Sedgewick's
+-- `ccw`, with no angle, no π, and no trigonometry. The definition reads
+-- "at least two of the three consecutive determinants are positive",
+-- which is manifestly invariant under rotating the triple, so the cyclic
+-- law below is almost a restatement.
+
+module Plane.direction
+
+import Logic.basics
+import Equality.basics
+import Real.interface
+import Plane.vector
+import Plane.bilinear
+
+-- ----------------------------------------------------------------------
+-- Nonzero vectors.
+
+definition Plane.Vector.IsNonzero (v : Plane.Vector) : Proposition :=
+  ¬(v = Plane.Vector.zero)
+
+theorem Plane.Vector.zero_of_coordinates_zero (v : Plane.Vector)
+        (firstZero : Plane.Vector.first(v) = 0)
+        (secondZero : Plane.Vector.second(v) = 0)
+        : v = Plane.Vector.zero := {
+  Plane.Vector.first(v) = 0 = Plane.Vector.first(Plane.Vector.zero);
+  Plane.Vector.second(v) = 0 = Plane.Vector.second(Plane.Vector.zero);
+  done by Plane.Vector.equal_of_coordinates
+}
+
+-- A real whose square vanishes is zero: otherwise the product of two
+-- nonzero reals would vanish.
+theorem Real.zero_of_square_zero (x : ℝ) (squareZero : x * x = 0) : x = 0 :=
+  done by cases {
+    case x = 0: done
+    otherwise as nonzero: {
+      x * x ≠ 0 by Real.multiply_nonzero;
+      False;
+      done
+    }
+  }
+
+-- A sum of two nonnegative reals vanishes only when both do: each is
+-- squeezed between zero and the sum.
+theorem Real.zero_of_nonneg_sum_zero (a b : ℝ)
+        (aNonneg : 0 ≤ a) (bNonneg : 0 ≤ b) (sumZero : a + b = 0)
+        : a = 0 := {
+  a ≤ a + b by Real.less_or_equal_add_of_nonneg
+    = 0;
+  done by Real.LessOrEqual.antisymmetric
+}
+
+-- The squared length vanishes only at the zero vector: it is a sum of
+-- two squares, so each must vanish separately.
+theorem Plane.Vector.zero_of_innerProduct_self_zero (v : Plane.Vector)
+        (selfZero : Plane.Vector.innerProduct(v, v) = 0)
+        : v = Plane.Vector.zero := {
+  0 ≤ Plane.Vector.first(v) * Plane.Vector.first(v);
+  0 ≤ Plane.Vector.second(v) * Plane.Vector.second(v);
+  Plane.Vector.first(v) * Plane.Vector.first(v)
+      + Plane.Vector.second(v) * Plane.Vector.second(v) = 0;
+  Plane.Vector.first(v) * Plane.Vector.first(v) = 0
+      by Real.zero_of_nonneg_sum_zero;
+  Plane.Vector.second(v) * Plane.Vector.second(v)
+      + Plane.Vector.first(v) * Plane.Vector.first(v) = 0;
+  Plane.Vector.second(v) * Plane.Vector.second(v) = 0
+      by Real.zero_of_nonneg_sum_zero;
+  Plane.Vector.first(v) = 0 by Real.zero_of_square_zero;
+  Plane.Vector.second(v) = 0 by Real.zero_of_square_zero;
+  done by Plane.Vector.zero_of_coordinates_zero
+}
+
+theorem Plane.Vector.innerProduct_self_positive (v : Plane.Vector)
+        (nonzero : Plane.Vector.IsNonzero(v))
+        : 0 < Plane.Vector.innerProduct(v, v) :=
+  done by cases {
+    case Plane.Vector.innerProduct(v, v) = 0 as selfZero: {
+      v = Plane.Vector.zero by Plane.Vector.zero_of_innerProduct_self_zero;
+      False;
+      done
+    }
+    otherwise: {
+      0 ≤ Plane.Vector.innerProduct(v, v) by Plane.Vector.innerProduct_self_nonneg;
+      done by Real.positive_of_nonneg_nonzero
+    }
+  }
+
+-- ----------------------------------------------------------------------
+-- Rays. Two nonzero vectors are parallel when they span no area, and
+-- point along the same ray when they additionally agree in direction.
+
+definition Plane.Vector.Parallel (a b : Plane.Vector) : Proposition :=
+  Plane.Vector.determinant(a, b) = 0
+
+definition Plane.Vector.SameRay (a b : Plane.Vector) : Proposition :=
+  Plane.Vector.determinant(a, b) = 0 ∧ 0 < Plane.Vector.innerProduct(a, b)
+
+definition Plane.Vector.OppositeRay (a b : Plane.Vector) : Proposition :=
+  Plane.Vector.determinant(a, b) = 0 ∧ Plane.Vector.innerProduct(a, b) < 0
+
+theorem Plane.Vector.parallel_symmetric (a b : Plane.Vector)
+        (parallel : Plane.Vector.Parallel(a, b))
+        : Plane.Vector.Parallel(b, a) :=
+  Plane.Vector.determinant(b, a)
+      = -Plane.Vector.determinant(a, b) by Plane.Vector.determinant_antisymmetric
+      = -0
+      = 0
+
+theorem Plane.Vector.parallel_self (v : Plane.Vector)
+        : Plane.Vector.Parallel(v, v) :=
+  Plane.Vector.determinant(v, v) = 0 by Plane.Vector.determinant_self
+
+-- A nonzero vector points along its own ray.
+theorem Plane.Vector.sameRay_self (v : Plane.Vector)
+        (nonzero : Plane.Vector.IsNonzero(v))
+        : Plane.Vector.SameRay(v, v) := {
+  Plane.Vector.determinant(v, v) = 0 by Plane.Vector.determinant_self;
+  0 < Plane.Vector.innerProduct(v, v) by Plane.Vector.innerProduct_self_positive;
+  done
+}
+
+-- Turning a nonzero vector through a right angle leaves its own ray.
+theorem Plane.Vector.perpendicular_not_parallel (v : Plane.Vector)
+        (nonzero : Plane.Vector.IsNonzero(v))
+        : ¬Plane.Vector.Parallel(v, Plane.Vector.perpendicular(v)) := {
+  suppose Plane.Vector.Parallel(v, Plane.Vector.perpendicular(v)) as parallel;
+  0 < Plane.Vector.innerProduct(v, v) by Plane.Vector.innerProduct_self_positive;
+  Plane.Vector.innerProduct(v, v)
+      = Plane.Vector.determinant(v, Plane.Vector.perpendicular(v))
+            by Plane.Vector.determinant_perpendicular
+      = 0 by parallel;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The counterclockwise cyclic order.
+--
+-- `Counterclockwise(a, b, c)` holds when at least two of the three
+-- consecutive determinants are positive. For a triple in general
+-- position exactly one of `Counterclockwise(a, b, c)` and
+-- `Counterclockwise(a, c, b)` holds, which is what makes this an order
+-- rather than merely a predicate.
+
+definition Plane.Vector.Counterclockwise (a b c : Plane.Vector) : Proposition :=
+  (0 < Plane.Vector.determinant(a, b) ∧ 0 < Plane.Vector.determinant(b, c))
+  ∨ (0 < Plane.Vector.determinant(b, c) ∧ 0 < Plane.Vector.determinant(c, a))
+  ∨ (0 < Plane.Vector.determinant(c, a) ∧ 0 < Plane.Vector.determinant(a, b))
+
+-- The introduction rule the geometry actually uses: if `b` is
+-- counterclockwise of `a` and `c` is counterclockwise of `b`, the triple
+-- is in counterclockwise order. This is the case where the arc from `a`
+-- to `c` is less than a half-turn.
+theorem Plane.Vector.counterclockwise_of_steps (a b c : Plane.Vector)
+        (firstStep : 0 < Plane.Vector.determinant(a, b))
+        (secondStep : 0 < Plane.Vector.determinant(b, c))
+        : Plane.Vector.Counterclockwise(a, b, c) := {
+  0 < Plane.Vector.determinant(a, b) ∧ 0 < Plane.Vector.determinant(b, c);
+  done
+}
+
+-- Rotating the triple does not change the order. The three disjuncts of
+-- the definition are cyclic shifts of one another, so this is a
+-- rearrangement: each arm's hypothesis IS one of the goal's disjuncts.
+--
+-- FRICTION: the three arms should read `firstPair` / `secondPair` /
+-- `thirdPair` bare, letting the disjunction-injection coercion wrap them.
+-- The coercion does not fire on a `by cases` arm body — for any disjunct
+-- position, including the first — though it does fire in an ordinary
+-- proof body (see `counterclockwise_of_steps` just above). The explicit
+-- constructors below are a placeholder; revert them once that is fixed.
+theorem Plane.Vector.counterclockwise_cyclic (a b c : Plane.Vector)
+        (ordered : Plane.Vector.Counterclockwise(a, b, c))
+        : Plane.Vector.Counterclockwise(b, c, a) :=
+  done by cases {
+    case 0 < Plane.Vector.determinant(a, b)
+             ∧ 0 < Plane.Vector.determinant(b, c) as firstPair:
+        Or.introduceRight(Or.introduceRight(firstPair))
+    case 0 < Plane.Vector.determinant(b, c)
+             ∧ 0 < Plane.Vector.determinant(c, a) as secondPair:
+        Or.introduceLeft(secondPair)
+    case 0 < Plane.Vector.determinant(c, a)
+             ∧ 0 < Plane.Vector.determinant(a, b) as thirdPair:
+        Or.introduceRight(Or.introduceLeft(thirdPair))
+  }
