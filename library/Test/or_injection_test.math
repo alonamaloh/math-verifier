@@ -1,0 +1,67 @@
+-- Test/or_injection_test.math
+--
+-- The disjunction-injection coercion: a term proving ONE disjunct of an
+-- `Or` goal is wrapped in the matching `Or.introduce*` automatically, so
+-- a proof can state the side it establishes and stop.
+--
+-- Two shapes used to fail and are locked here.
+--
+--   * A chain `A ∨ B ∨ C` is `Or(A, Or(B, C))`, so a proof of `B` or `C`
+--     matches NEITHER top-level argument of the outer `Or`. The coercion
+--     now recurses down the right spine.
+--   * A goal that is a DEFINITION unfolding to `Or` has the definition's
+--     own name as its head, which the structural prefilter missed.
+--
+-- Both surfaced writing `Plane.Vector.counterclockwise_cyclic`, whose
+-- goal is a three-way disjunction behind a name and whose proof arms each
+-- establish one disjunct.
+
+module Test.or_injection_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.order
+
+-- ----------------------------------------------------------------------
+-- Every position of a chain is reachable, not just the first.
+
+theorem Test.orInjection.chainFirst (a b c : ℕ) (side : a ≤ b)
+        : a ≤ b ∨ b ≤ c ∨ c ≤ a :=
+  side
+
+theorem Test.orInjection.chainMiddle (a b c : ℕ) (side : b ≤ c)
+        : a ≤ b ∨ b ≤ c ∨ c ≤ a :=
+  side
+
+theorem Test.orInjection.chainLast (a b c : ℕ) (side : c ≤ a)
+        : a ≤ b ∨ b ≤ c ∨ c ≤ a :=
+  side
+
+theorem Test.orInjection.chainOfFour (a b c : ℕ) (side : c ≤ a)
+        : a ≤ b ∨ b ≤ c ∨ c ≤ a ∨ a = b :=
+  side
+
+-- ----------------------------------------------------------------------
+-- The goal may be a named proposition that unfolds to the disjunction.
+
+definition Test.orInjection.Cyclic (a b c : ℕ) : Proposition :=
+  (a ≤ b ∧ b ≤ c) ∨ (b ≤ c ∧ c ≤ a) ∨ (c ≤ a ∧ a ≤ b)
+
+theorem Test.orInjection.behindDefinition (a b c : ℕ)
+        (pair : c ≤ a ∧ a ≤ b)
+        : Test.orInjection.Cyclic(a, b, c) :=
+  pair
+
+-- ----------------------------------------------------------------------
+-- Both together, inside `by cases` arms: the shape the geometry needs.
+-- Each arm's hypothesis is one disjunct of the rotated goal.
+
+theorem Test.orInjection.rotatedThroughCases (a b c : ℕ)
+        (ordered : Test.orInjection.Cyclic(a, b, c))
+        : Test.orInjection.Cyclic(b, c, a) :=
+  done by cases {
+    case a ≤ b ∧ b ≤ c as firstPair:  firstPair
+    case b ≤ c ∧ c ≤ a as secondPair: secondPair
+    case c ≤ a ∧ a ≤ b as thirdPair:  thirdPair
+  }

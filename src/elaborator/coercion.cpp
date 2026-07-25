@@ -260,6 +260,17 @@ ExpressionPointer Elaborator::coerceToExpectedTypeViaDiff(
         // Disjunction-injection prefilter: a proof of one disjunct where
         // `Or(A, B)` is expected wraps with the matching Or.introduce*.
         bool expectedIsOr = headConstantName(expectedTypeClosed) == "Or";
+        if (!expectedIsOr && !headConstantName(expectedTypeClosed).empty()) {
+            // A DEFINITION may unfold to `Or` (`Counterclockwise(a, b, c)`
+            // above is a three-way disjunction behind a name), and its raw
+            // head is the definition's own name, so the structural check
+            // above misses it. Peel once. Guarded on the head being a
+            // constant at all: a Pi or a lambda can never unfold to `Or`,
+            // and those are the shapes where this prefilter must stay free.
+            expectedIsOr =
+                headConstantName(weakHeadNormalForm(
+                    environment_, expectedTypeClosed)) == "Or";
+        }
         // Strategy (e) prefilter (ring rearrangement): the expected type is an
         // ORDER relation — `<T>.LessOrEqual` / `<T>.LessThan` for ANY carrier
         // `T`, not just Natural — whose operands mention a ring operation
@@ -345,26 +356,62 @@ ExpressionPointer Elaborator::coerceToExpectedTypeViaDiff(
                     std::reverse(args.begin(), args.end());
                     return args;
                 };
-            std::vector<ExpressionPointer> closedDisjuncts =
-                disjuncts(expectedTypeClosed);
-            std::vector<ExpressionPointer> openedDisjuncts =
-                disjuncts(expectedOpened);
-            if (closedDisjuncts.size() == 2 && openedDisjuncts.size() == 2) {
-                const char* constructorName = nullptr;
-                if (isDefinitionallyEqual(environment_, openedContext,
-                        termTypeOpened, openedDisjuncts[0])) {
-                    constructorName = "Or.introduceLeft";
-                } else if (isDefinitionallyEqual(environment_, openedContext,
-                        termTypeOpened, openedDisjuncts[1])) {
-                    constructorName = "Or.introduceRight";
-                }
-                if (constructorName) {
-                    ExpressionPointer injected = makeApplication(
-                        makeApplication(
-                            makeApplication(makeConstant(constructorName),
-                                            closedDisjuncts[0]),
-                            closedDisjuncts[1]),
-                        term);
+            auto wrap = [&](const char* constructorName,
+                            const ExpressionPointer& leftType,
+                            const ExpressionPointer& rightType,
+                            const ExpressionPointer& proof) {
+                return makeApplication(
+                    makeApplication(
+                        makeApplication(makeConstant(constructorName),
+                                        leftType),
+                        rightType),
+                    proof);
+            };
+            // `A ∨ B ∨ C` is `Or(A, Or(B, C))`, so a term proving `B` or `C`
+            // matches NEITHER top-level argument. Recurse down the right
+            // spine, wrapping an `Or.introduceRight` per level, so every
+            // disjunct of a chain is reachable — not just the first.
+            std::function<ExpressionPointer(ExpressionPointer,
+                                            ExpressionPointer)> inject =
+                [&](ExpressionPointer closedOr,
+                    ExpressionPointer openedOr) -> ExpressionPointer {
+                    std::vector<ExpressionPointer> closedDisjuncts =
+                        disjuncts(closedOr);
+                    std::vector<ExpressionPointer> openedDisjuncts =
+                        disjuncts(openedOr);
+                    if (closedDisjuncts.size() != 2
+                        || openedDisjuncts.size() != 2) {
+                        return nullptr;
+                    }
+                    if (isDefinitionallyEqual(environment_, openedContext,
+                            termTypeOpened, openedDisjuncts[0])) {
+                        return wrap("Or.introduceLeft", closedDisjuncts[0],
+                                    closedDisjuncts[1], term);
+                    }
+                    if (isDefinitionallyEqual(environment_, openedContext,
+                            termTypeOpened, openedDisjuncts[1])) {
+                        return wrap("Or.introduceRight", closedDisjuncts[0],
+                                    closedDisjuncts[1], term);
+                    }
+                    ExpressionPointer openedRight = weakHeadNormalForm(
+                        environment_, openedDisjuncts[1]);
+                    if (headConstantName(openedRight) != "Or") {
+                        return nullptr;
+                    }
+                    ExpressionPointer closedRight = weakHeadNormalForm(
+                        environment_, closedDisjuncts[1]);
+                    ExpressionPointer inner = inject(closedRight, openedRight);
+                    if (!inner) {
+                        return nullptr;
+                    }
+                    return wrap("Or.introduceRight", closedDisjuncts[0],
+                                closedDisjuncts[1], inner);
+                };
+            {
+                ExpressionPointer injected = inject(
+                    weakHeadNormalForm(environment_, expectedTypeClosed),
+                    weakHeadNormalForm(environment_, expectedOpened));
+                if (injected) {
                     if (auto ok = acceptCoercionIfClosed(
                             injected, localBinders, "or-injection")) {
                         return ok;
