@@ -1,0 +1,410 @@
+-- Algebra/rank_three_exclusion.math
+--
+-- The rank-three half of the escalator exclusion: every rank-three
+-- escalator misses its own det²·truant value.  The nine certificates are
+-- proved at the classified representatives; this file supplies the
+-- determinants that turn each numeral into that value, and dispatches
+-- along the classification.
+
+module Algebra.rank_three_exclusion
+
+import Algebra.rank_three_exclusion_descents
+import Algebra.rank_three_global_classification
+import Algebra.escalator_exclusion
+
+-- ----------------------------------------------------------------------
+-- Determinants of the seven diagonal representatives.
+
+theorem Matrix.sumOfThreeSquaresForm_determinant
+        : Matrix.determinant(Matrix.sumOfThreeSquaresForm) = (1 : ℤ) := {
+  Matrix.sumOfThreeSquaresForm = Matrix.sumOfTwoSquaresPlusScaledSquareForm(1) as scaledReads;
+  Matrix.determinant(Matrix.sumOfThreeSquaresForm)
+     = Matrix.determinant(Matrix.sumOfTwoSquaresPlusScaledSquareForm(1))
+         by substituting scaledReads
+     = (1 : ℤ) by Matrix.sumOfTwoSquaresPlusScaledSquareForm_determinant;
+  done
+}
+
+theorem Matrix.sumOfTwoSquaresPlusDoubleSquareForm_determinant
+        : Matrix.determinant(Matrix.sumOfTwoSquaresPlusDoubleSquareForm) = (2 : ℤ) := {
+  Matrix.sumOfTwoSquaresPlusDoubleSquareForm = Matrix.sumOfTwoSquaresPlusScaledSquareForm(2)
+      as scaledReads;
+  Matrix.determinant(Matrix.sumOfTwoSquaresPlusDoubleSquareForm)
+     = Matrix.determinant(Matrix.sumOfTwoSquaresPlusScaledSquareForm(2))
+         by substituting scaledReads
+     = (2 : ℤ) by Matrix.sumOfTwoSquaresPlusScaledSquareForm_determinant;
+  done
+}
+
+theorem Matrix.sumOfTwoSquaresPlusTripleSquareForm_determinant
+        : Matrix.determinant(Matrix.sumOfTwoSquaresPlusTripleSquareForm) = (3 : ℤ) := {
+  Matrix.sumOfTwoSquaresPlusTripleSquareForm = Matrix.sumOfTwoSquaresPlusScaledSquareForm(3)
+      as scaledReads;
+  Matrix.determinant(Matrix.sumOfTwoSquaresPlusTripleSquareForm)
+     = Matrix.determinant(Matrix.sumOfTwoSquaresPlusScaledSquareForm(3))
+         by substituting scaledReads
+     = (3 : ℤ) by Matrix.sumOfTwoSquaresPlusScaledSquareForm_determinant;
+  done
+}
+
+theorem Matrix.squarePlusDoubleSquareDiagonalForm_determinant (corner : ℤ)
+        : Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(corner))
+          = 2 * corner := {
+  Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(corner))
+     = Matrix.determinant(Matrix.squarePlusDoubleSquareForm) * corner
+         by Matrix.diagonalExtension_determinant
+     = (2 : ℤ) * corner by substituting Matrix.squarePlusDoubleSquareForm_determinant;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The odd border has determinant 2c − 1.  Its Schur complement asks for
+-- the pairing of the adjugate's action on the border with the border, and
+-- that scalar is pinned without ever computing the adjugate: the adjoint
+-- law moves the block across the pairing, and its action doubles the one
+-- coordinate the border occupies.
+
+theorem Matrix.squarePlusDoubleSquareForm_adjugate_border_pairing
+        : RingVector.innerProduct(
+            Matrix.adjugate(Matrix.squarePlusDoubleSquareForm)
+              · (RingVector.twoCoordinates((0 : ℤ), 1)
+                  : RingVector(Integer.commutative_ring_bundle, 2)),
+            (RingVector.twoCoordinates((0 : ℤ), 1)
+                : RingVector(Integer.commutative_ring_bundle, 2)))
+          = (1 : ℤ) := {
+  (2 : ℤ) ≠ Integer.zero as twoNonzero;
+  let border : RingVector(Integer.commutative_ring_bundle, 2) :=
+      RingVector.twoCoordinates((0 : ℤ), 1);
+  let w : RingVector(Integer.commutative_ring_bundle, 2) :=
+      Matrix.adjugate(Matrix.squarePlusDoubleSquareForm) · border;
+  let first : ℤ := w(NaturalsBelow.firstOfTwo);
+  let second : ℤ := w(NaturalsBelow.secondOfTwo);
+  w = RingVector.twoCoordinates(first, second) by RingVector.eq_twoCoordinates as wReads;
+  Matrix.squarePlusDoubleSquareForm · w
+     = Matrix.determinant(Matrix.squarePlusDoubleSquareForm) • border
+         by Matrix.applyVector_adjugate
+  as adjugateAction;
+  RingVector.innerProduct(Matrix.squarePlusDoubleSquareForm · w, border)
+     = RingVector.innerProduct(
+         Matrix.determinant(Matrix.squarePlusDoubleSquareForm) • border, border)
+         by substituting adjugateAction
+     = RingVector.innerProduct(
+         border, Matrix.determinant(Matrix.squarePlusDoubleSquareForm) • border)
+         by RingVector.innerProduct_symmetric
+     = Matrix.determinant(Matrix.squarePlusDoubleSquareForm)
+         * RingVector.innerProduct(border, border)
+         by RingVector.innerProduct_scale_right
+     = (2 : ℤ) * RingVector.innerProduct(border, border)
+         by substituting Matrix.squarePlusDoubleSquareForm_determinant
+     = (2 : ℤ) * ((0 : ℤ) * 0 + 1 * 1) by substituting RingVector.innerProduct_twoCoordinates
+     = (2 : ℤ) * 1 by ring
+  as scaledPairing;
+  RingVector.innerProduct(Matrix.squarePlusDoubleSquareForm · w, border)
+     = RingVector.innerProduct(
+         Matrix.squarePlusDoubleSquareForm
+           · (RingVector.twoCoordinates(first, second)
+               : RingVector(Integer.commutative_ring_bundle, 2)),
+         border)
+         by substituting wReads
+     = RingVector.innerProduct(
+         (RingVector.twoCoordinates(first, 2 * second)
+             : RingVector(Integer.commutative_ring_bundle, 2)),
+         (RingVector.twoCoordinates((0 : ℤ), 1)
+             : RingVector(Integer.commutative_ring_bundle, 2)))
+         by substituting Matrix.squarePlusDoubleSquareForm_apply_twoCoordinates(first, second)
+     = first * 0 + 2 * second * 1
+         by RingVector.innerProduct_twoCoordinates(first, 2 * second, 0, 1)
+     = (2 : ℤ) * second by ring
+  as coordinatePairing;
+  (2 : ℤ) * second = (2 : ℤ) * 1
+      by linear_combination(scaledPairing - coordinatePairing) as scaledSecond;
+  second = (1 : ℤ)
+      by Integer.multiply_cancel_left_by_nonzero(second, 1, 2, twoNonzero, scaledSecond)
+      as secondReads;
+  RingVector.innerProduct(w, border)
+     = RingVector.innerProduct(
+         (RingVector.twoCoordinates(first, second)
+             : RingVector(Integer.commutative_ring_bundle, 2)),
+         (RingVector.twoCoordinates((0 : ℤ), 1)
+             : RingVector(Integer.commutative_ring_bundle, 2)))
+         by substituting wReads
+     = first * 0 + second * 1 by RingVector.innerProduct_twoCoordinates(first, second, 0, 1)
+     = second by ring
+     = (1 : ℤ) by secondReads;
+  done
+}
+
+theorem Matrix.squarePlusDoubleSquareOddForm_determinant (corner : ℤ)
+        : Matrix.determinant(Matrix.squarePlusDoubleSquareOddForm(corner))
+          = 2 * corner - 1 := {
+  (2 : ℤ) ≠ Integer.zero as twoNonzero;
+  let B : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2) :=
+      Matrix.squarePlusDoubleSquareOddForm(corner);
+  Matrix.leadingBlock(B) = Matrix.squarePlusDoubleSquareForm
+      by Matrix.borderedAssembly_leadingBlock as blockReads;
+  Matrix.borderColumn(B)
+      = (RingVector.twoCoordinates((0 : ℤ), 1)
+          : RingVector(Integer.commutative_ring_bundle, 2))
+      by Matrix.borderedAssembly_borderColumn as borderReads;
+  Matrix.corner(B) = corner by Matrix.borderedAssembly_corner as cornerReads;
+  Matrix.schurComplement(B)
+       = Matrix.determinant(Matrix.leadingBlock(B)) * Matrix.corner(B)
+         - RingVector.innerProduct(
+             Matrix.adjugate(Matrix.leadingBlock(B)) · Matrix.borderColumn(B),
+             Matrix.borderColumn(B))
+       = Matrix.determinant(Matrix.squarePlusDoubleSquareForm) * Matrix.corner(B)
+         - RingVector.innerProduct(
+             Matrix.adjugate(Matrix.squarePlusDoubleSquareForm) · Matrix.borderColumn(B),
+             Matrix.borderColumn(B))
+           by substituting blockReads
+       = Matrix.determinant(Matrix.squarePlusDoubleSquareForm) * Matrix.corner(B)
+         - RingVector.innerProduct(
+             Matrix.adjugate(Matrix.squarePlusDoubleSquareForm)
+               · (RingVector.twoCoordinates((0 : ℤ), 1)
+                   : RingVector(Integer.commutative_ring_bundle, 2)),
+             (RingVector.twoCoordinates((0 : ℤ), 1)
+                 : RingVector(Integer.commutative_ring_bundle, 2)))
+           by substituting borderReads
+       = Matrix.determinant(Matrix.squarePlusDoubleSquareForm) * Matrix.corner(B) - 1
+           by substituting Matrix.squarePlusDoubleSquareForm_adjugate_border_pairing
+       = (2 : ℤ) * Matrix.corner(B) - 1
+           by substituting Matrix.squarePlusDoubleSquareForm_determinant
+       = (2 : ℤ) * corner - 1 by substituting cornerReads
+  as schurReads;
+  (2 : ℤ) * Matrix.determinant(B)
+       = Matrix.determinant(Matrix.squarePlusDoubleSquareForm) * Matrix.determinant(B)
+           by substituting Matrix.squarePlusDoubleSquareForm_determinant
+       = Matrix.determinant(Matrix.leadingBlock(B)) * Matrix.determinant(B)
+           by substituting blockReads
+       = Matrix.determinant(Matrix.leadingBlock(B)) * Matrix.schurComplement(B)
+           by Matrix.determinant_schurComplement(
+             symmetric := Matrix.squarePlusDoubleSquareOddForm_symmetric(corner := corner))
+       = Matrix.determinant(Matrix.squarePlusDoubleSquareForm) * Matrix.schurComplement(B)
+           by substituting blockReads
+       = (2 : ℤ) * Matrix.schurComplement(B)
+           by substituting Matrix.squarePlusDoubleSquareForm_determinant
+       = (2 : ℤ) * ((2 : ℤ) * corner - 1) by substituting schurReads
+  as scaledDeterminant;
+  done by Integer.multiply_cancel_left_by_nonzero(
+      Matrix.determinant(B), (2 : ℤ) * corner - 1, 2, twoNonzero, scaledDeterminant)
+}
+
+theorem Matrix.squarePlusDoubleSquareOddForm_four_determinant
+        : Matrix.determinant(Matrix.squarePlusDoubleSquareOddForm(4)) = (7 : ℤ) := {
+  Matrix.determinant(Matrix.squarePlusDoubleSquareOddForm(4))
+     = (2 : ℤ) * 4 - 1 by Matrix.squarePlusDoubleSquareOddForm_determinant(4)
+     = (7 : ℤ) by ring;
+  done
+}
+
+theorem Matrix.squarePlusDoubleSquareOddForm_five_determinant
+        : Matrix.determinant(Matrix.squarePlusDoubleSquareOddForm(5)) = (9 : ℤ) := {
+  Matrix.determinant(Matrix.squarePlusDoubleSquareOddForm(5))
+     = (2 : ℤ) * 5 - 1 by Matrix.squarePlusDoubleSquareOddForm_determinant(5)
+     = (9 : ℤ) by ring;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The nine certificates, each at its own det²·truant value.
+
+theorem Matrix.sumOfThreeSquaresForm_exclusion
+        : ¬(Matrix.Represents(Matrix.sumOfThreeSquaresForm,
+            (Matrix.determinant(Matrix.sumOfThreeSquaresForm)
+              * Matrix.determinant(Matrix.sumOfThreeSquaresForm)) * (7 : ℤ))) := {
+  (Matrix.determinant(Matrix.sumOfThreeSquaresForm)
+      * Matrix.determinant(Matrix.sumOfThreeSquaresForm)) * (7 : ℤ)
+     = ((1 : ℤ) * (1 : ℤ)) * (7 : ℤ) by substituting Matrix.sumOfThreeSquaresForm_determinant
+     = (7 : ℤ) by ring
+  as valueReads;
+  suppose Matrix.Represents(Matrix.sumOfThreeSquaresForm,
+      (Matrix.determinant(Matrix.sumOfThreeSquaresForm)
+        * Matrix.determinant(Matrix.sumOfThreeSquaresForm)) * (7 : ℤ)) as represented;
+  Matrix.Represents(Matrix.sumOfThreeSquaresForm, (7 : ℤ)) by substituting valueReads;
+  done by Matrix.sumOfThreeSquaresForm_not_represents_seven_squared
+}
+
+theorem Matrix.sumOfTwoSquaresPlusTripleSquareForm_exclusion
+        : ¬(Matrix.Represents(Matrix.sumOfTwoSquaresPlusTripleSquareForm,
+            (Matrix.determinant(Matrix.sumOfTwoSquaresPlusTripleSquareForm)
+              * Matrix.determinant(Matrix.sumOfTwoSquaresPlusTripleSquareForm)) * (6 : ℤ))) := {
+  (Matrix.determinant(Matrix.sumOfTwoSquaresPlusTripleSquareForm)
+      * Matrix.determinant(Matrix.sumOfTwoSquaresPlusTripleSquareForm)) * (6 : ℤ)
+     = ((3 : ℤ) * (3 : ℤ)) * (6 : ℤ) by substituting Matrix.sumOfTwoSquaresPlusTripleSquareForm_determinant
+     = (54 : ℤ) by ring
+  as valueReads;
+  suppose Matrix.Represents(Matrix.sumOfTwoSquaresPlusTripleSquareForm,
+      (Matrix.determinant(Matrix.sumOfTwoSquaresPlusTripleSquareForm)
+        * Matrix.determinant(Matrix.sumOfTwoSquaresPlusTripleSquareForm)) * (6 : ℤ)) as represented;
+  Matrix.Represents(Matrix.sumOfTwoSquaresPlusTripleSquareForm, (54 : ℤ)) by substituting valueReads;
+  done by Matrix.sumOfTwoSquaresPlusTripleSquareForm_not_represents_fifty_four
+}
+
+theorem Matrix.sumOfTwoSquaresPlusDoubleSquareForm_exclusion
+        : ¬(Matrix.Represents(Matrix.sumOfTwoSquaresPlusDoubleSquareForm,
+            (Matrix.determinant(Matrix.sumOfTwoSquaresPlusDoubleSquareForm)
+              * Matrix.determinant(Matrix.sumOfTwoSquaresPlusDoubleSquareForm)) * (14 : ℤ))) := {
+  (Matrix.determinant(Matrix.sumOfTwoSquaresPlusDoubleSquareForm)
+      * Matrix.determinant(Matrix.sumOfTwoSquaresPlusDoubleSquareForm)) * (14 : ℤ)
+     = ((2 : ℤ) * (2 : ℤ)) * (14 : ℤ) by substituting Matrix.sumOfTwoSquaresPlusDoubleSquareForm_determinant
+     = (56 : ℤ) by ring
+  as valueReads;
+  suppose Matrix.Represents(Matrix.sumOfTwoSquaresPlusDoubleSquareForm,
+      (Matrix.determinant(Matrix.sumOfTwoSquaresPlusDoubleSquareForm)
+        * Matrix.determinant(Matrix.sumOfTwoSquaresPlusDoubleSquareForm)) * (14 : ℤ)) as represented;
+  Matrix.Represents(Matrix.sumOfTwoSquaresPlusDoubleSquareForm, (56 : ℤ)) by substituting valueReads;
+  done by Matrix.sumOfTwoSquaresPlusDoubleSquareForm_not_represents_fifty_six
+}
+
+theorem Matrix.squarePlusDoubleSquareDiagonalForm_two_exclusion
+        : ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareDiagonalForm(2),
+            (Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(2))
+              * Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(2))) * (7 : ℤ))) := {
+  (Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(2))
+      * Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(2))) * (7 : ℤ)
+     = ((4 : ℤ) * (4 : ℤ)) * (7 : ℤ) by substituting Matrix.squarePlusDoubleSquareDiagonalForm_determinant(2)
+     = (112 : ℤ) by ring
+  as valueReads;
+  suppose Matrix.Represents(Matrix.squarePlusDoubleSquareDiagonalForm(2),
+      (Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(2))
+        * Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(2))) * (7 : ℤ)) as represented;
+  Matrix.Represents(Matrix.squarePlusDoubleSquareDiagonalForm(2), (112 : ℤ)) by substituting valueReads;
+  done by Matrix.squarePlusDoubleSquareDiagonalForm_two_not_represents_one_hundred_twelve
+}
+
+theorem Matrix.squarePlusDoubleSquareDiagonalForm_three_exclusion
+        : ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareDiagonalForm(3),
+            (Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(3))
+              * Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(3))) * (10 : ℤ))) := {
+  (Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(3))
+      * Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(3))) * (10 : ℤ)
+     = ((6 : ℤ) * (6 : ℤ)) * (10 : ℤ) by substituting Matrix.squarePlusDoubleSquareDiagonalForm_determinant(3)
+     = (360 : ℤ) by ring
+  as valueReads;
+  suppose Matrix.Represents(Matrix.squarePlusDoubleSquareDiagonalForm(3),
+      (Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(3))
+        * Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(3))) * (10 : ℤ)) as represented;
+  Matrix.Represents(Matrix.squarePlusDoubleSquareDiagonalForm(3), (360 : ℤ)) by substituting valueReads;
+  done by Matrix.squarePlusDoubleSquareDiagonalForm_three_not_represents_three_hundred_sixty
+}
+
+theorem Matrix.squarePlusDoubleSquareDiagonalForm_four_exclusion
+        : ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareDiagonalForm(4),
+            (Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(4))
+              * Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(4))) * (14 : ℤ))) := {
+  (Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(4))
+      * Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(4))) * (14 : ℤ)
+     = ((8 : ℤ) * (8 : ℤ)) * (14 : ℤ) by substituting Matrix.squarePlusDoubleSquareDiagonalForm_determinant(4)
+     = (896 : ℤ) by ring
+  as valueReads;
+  suppose Matrix.Represents(Matrix.squarePlusDoubleSquareDiagonalForm(4),
+      (Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(4))
+        * Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(4))) * (14 : ℤ)) as represented;
+  Matrix.Represents(Matrix.squarePlusDoubleSquareDiagonalForm(4), (896 : ℤ)) by substituting valueReads;
+  done by Matrix.squarePlusDoubleSquareDiagonalForm_four_not_represents_eight_hundred_ninety_six
+}
+
+theorem Matrix.squarePlusDoubleSquareDiagonalForm_five_exclusion
+        : ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareDiagonalForm(5),
+            (Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(5))
+              * Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(5))) * (10 : ℤ))) := {
+  (Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(5))
+      * Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(5))) * (10 : ℤ)
+     = ((10 : ℤ) * (10 : ℤ)) * (10 : ℤ) by substituting Matrix.squarePlusDoubleSquareDiagonalForm_determinant(5)
+     = (1000 : ℤ) by ring
+  as valueReads;
+  suppose Matrix.Represents(Matrix.squarePlusDoubleSquareDiagonalForm(5),
+      (Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(5))
+        * Matrix.determinant(Matrix.squarePlusDoubleSquareDiagonalForm(5))) * (10 : ℤ)) as represented;
+  Matrix.Represents(Matrix.squarePlusDoubleSquareDiagonalForm(5), (1000 : ℤ)) by substituting valueReads;
+  done by Matrix.squarePlusDoubleSquareDiagonalForm_five_not_represents_one_thousand
+}
+
+theorem Matrix.squarePlusDoubleSquareOddForm_four_exclusion
+        : ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareOddForm(4),
+            (Matrix.determinant(Matrix.squarePlusDoubleSquareOddForm(4))
+              * Matrix.determinant(Matrix.squarePlusDoubleSquareOddForm(4))) * (7 : ℤ))) := {
+  (Matrix.determinant(Matrix.squarePlusDoubleSquareOddForm(4))
+      * Matrix.determinant(Matrix.squarePlusDoubleSquareOddForm(4))) * (7 : ℤ)
+     = ((7 : ℤ) * (7 : ℤ)) * (7 : ℤ) by substituting Matrix.squarePlusDoubleSquareOddForm_four_determinant
+     = (343 : ℤ) by ring
+  as valueReads;
+  suppose Matrix.Represents(Matrix.squarePlusDoubleSquareOddForm(4),
+      (Matrix.determinant(Matrix.squarePlusDoubleSquareOddForm(4))
+        * Matrix.determinant(Matrix.squarePlusDoubleSquareOddForm(4))) * (7 : ℤ)) as represented;
+  Matrix.Represents(Matrix.squarePlusDoubleSquareOddForm(4), (343 : ℤ)) by substituting valueReads;
+  done by Matrix.squarePlusDoubleSquareOddForm_four_not_represents_three_hundred_forty_three
+}
+
+theorem Matrix.squarePlusDoubleSquareOddForm_five_exclusion
+        : ¬(Matrix.Represents(Matrix.squarePlusDoubleSquareOddForm(5),
+            (Matrix.determinant(Matrix.squarePlusDoubleSquareOddForm(5))
+              * Matrix.determinant(Matrix.squarePlusDoubleSquareOddForm(5))) * (7 : ℤ))) := {
+  (Matrix.determinant(Matrix.squarePlusDoubleSquareOddForm(5))
+      * Matrix.determinant(Matrix.squarePlusDoubleSquareOddForm(5))) * (7 : ℤ)
+     = ((9 : ℤ) * (9 : ℤ)) * (7 : ℤ) by substituting Matrix.squarePlusDoubleSquareOddForm_five_determinant
+     = (567 : ℤ) by ring
+  as valueReads;
+  suppose Matrix.Represents(Matrix.squarePlusDoubleSquareOddForm(5),
+      (Matrix.determinant(Matrix.squarePlusDoubleSquareOddForm(5))
+        * Matrix.determinant(Matrix.squarePlusDoubleSquareOddForm(5))) * (7 : ℤ)) as represented;
+  Matrix.Represents(Matrix.squarePlusDoubleSquareOddForm(5), (567 : ℤ)) by substituting valueReads;
+  done by Matrix.squarePlusDoubleSquareOddForm_five_not_represents_five_hundred_sixty_seven
+}
+
+
+-- ----------------------------------------------------------------------
+-- Dispatch along the classification, exactly as rank two does.
+
+theorem Matrix.escalator_rank_three_exclusion
+        (E : Matrix(Integer.commutative_ring_bundle, 1 + 2, 1 + 2))
+        (escalator : Matrix.IsEscalator(1 + 2, E))
+        : ¬(Matrix.Represents(E,
+            (Matrix.determinant(E) * Matrix.determinant(E))
+              * (Matrix.truant(E) : ℤ))) := {
+  Matrix.IsRankThreeEscalatorRepresentative(E)
+      by Matrix.escalator_rank_three(escalator := escalator);
+  done by cases {
+    case Matrix.IsIsometric(E, Matrix.sumOfThreeSquaresForm) as isometric: done by Matrix.exclusion_of_isometric_representative(
+        isometric := isometric, isTruant := Matrix.sumOfThreeSquaresForm_truant_seven,
+        notRepresented := Matrix.sumOfThreeSquaresForm_exclusion)
+    case Matrix.IsIsometric(E, Matrix.sumOfTwoSquaresPlusTripleSquareForm) ∨ Matrix.IsIsometric(E, Matrix.sumOfTwoSquaresPlusDoubleSquareForm) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareDiagonalForm(2)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareDiagonalForm(3)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareDiagonalForm(4)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareDiagonalForm(5)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareOddForm(4)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareOddForm(5)): done by cases {
+      case Matrix.IsIsometric(E, Matrix.sumOfTwoSquaresPlusTripleSquareForm) as isometric: done by Matrix.exclusion_of_isometric_representative(
+        isometric := isometric, isTruant := Matrix.sumOfTwoSquaresPlusTripleSquareForm_truant_six,
+        notRepresented := Matrix.sumOfTwoSquaresPlusTripleSquareForm_exclusion)
+      case Matrix.IsIsometric(E, Matrix.sumOfTwoSquaresPlusDoubleSquareForm) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareDiagonalForm(2)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareDiagonalForm(3)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareDiagonalForm(4)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareDiagonalForm(5)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareOddForm(4)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareOddForm(5)): done by cases {
+        case Matrix.IsIsometric(E, Matrix.sumOfTwoSquaresPlusDoubleSquareForm) as isometric: done by Matrix.exclusion_of_isometric_representative(
+        isometric := isometric, isTruant := Matrix.sumOfTwoSquaresPlusDoubleSquareForm_truant_fourteen,
+        notRepresented := Matrix.sumOfTwoSquaresPlusDoubleSquareForm_exclusion)
+        case Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareDiagonalForm(2)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareDiagonalForm(3)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareDiagonalForm(4)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareDiagonalForm(5)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareOddForm(4)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareOddForm(5)): done by cases {
+          case Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareDiagonalForm(2)) as isometric: done by Matrix.exclusion_of_isometric_representative(
+        isometric := isometric, isTruant := Matrix.squarePlusDoubleSquareDiagonalForm_two_truant_seven,
+        notRepresented := Matrix.squarePlusDoubleSquareDiagonalForm_two_exclusion)
+          case Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareDiagonalForm(3)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareDiagonalForm(4)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareDiagonalForm(5)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareOddForm(4)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareOddForm(5)): done by cases {
+            case Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareDiagonalForm(3)) as isometric: done by Matrix.exclusion_of_isometric_representative(
+        isometric := isometric, isTruant := Matrix.squarePlusDoubleSquareDiagonalForm_three_truant_ten,
+        notRepresented := Matrix.squarePlusDoubleSquareDiagonalForm_three_exclusion)
+            case Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareDiagonalForm(4)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareDiagonalForm(5)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareOddForm(4)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareOddForm(5)): done by cases {
+              case Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareDiagonalForm(4)) as isometric: done by Matrix.exclusion_of_isometric_representative(
+        isometric := isometric, isTruant := Matrix.squarePlusDoubleSquareDiagonalForm_four_truant_fourteen,
+        notRepresented := Matrix.squarePlusDoubleSquareDiagonalForm_four_exclusion)
+              case Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareDiagonalForm(5)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareOddForm(4)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareOddForm(5)): done by cases {
+                case Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareDiagonalForm(5)) as isometric: done by Matrix.exclusion_of_isometric_representative(
+        isometric := isometric, isTruant := Matrix.squarePlusDoubleSquareDiagonalForm_five_truant_ten,
+        notRepresented := Matrix.squarePlusDoubleSquareDiagonalForm_five_exclusion)
+                case Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareOddForm(4)) ∨ Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareOddForm(5)): done by cases {
+                  case Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareOddForm(4)) as isometric: done by Matrix.exclusion_of_isometric_representative(
+        isometric := isometric, isTruant := Matrix.squarePlusDoubleSquareOddForm_four_truant_seven,
+        notRepresented := Matrix.squarePlusDoubleSquareOddForm_four_exclusion)
+                  case Matrix.IsIsometric(E, Matrix.squarePlusDoubleSquareOddForm(5)) as isometric: done by Matrix.exclusion_of_isometric_representative(
+        isometric := isometric, isTruant := Matrix.squarePlusDoubleSquareOddForm_five_truant_seven,
+        notRepresented := Matrix.squarePlusDoubleSquareOddForm_five_exclusion)
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
