@@ -521,3 +521,27 @@ UNCONDITIONALLY (on the domain's shape rather than on a failure) regresses
 `Polynomial.ExtensionallyEqual.transitive`, whose `Equality.transitivity(?, ?,
 ?, first, second)` pins its holes precisely BY elaborating those arguments —
 forward inference is the reason the domain-shape test is the wrong gate.
+
+## Q15 — PERF, PARTLY CLOSED 2026-07-25: the context-fact scan ζ-unfolded the same terms 40,000 times
+
+**Symptom.** `Algebra/rank_four_exceptional_truants` takes ~10 minutes to
+verify, of which ONE theorem (`Matrix.oddC4R2C7_not_represents_ten`) is 413 s.
+
+**Measured.** `contextFactMatch` 84% of the module, ~1.1 s per invocation; the
+temporary `zetaRetry:*` buckets showed **174 s in ζ-unfolding alone** over
+40,169 calls — the same goal (and the same context-fact types) re-expanded
+once per candidate.
+
+**Fixed.** `zetaUnfoldLetBindersCached` memoizes the unfold on (term address,
+let-stack fingerprint). Theorem 413→255 s, module ~615→261 s, no proof
+changes. Do NOT "fix" it by skipping the ζ retry inside the scan: that is
+faster still but breaks `Matrix.weightedD5S0R0C5_represents_below_fifteen`,
+whose `let A := …` witness rows need ζ inside the scan.
+
+**Still open.** `contextFactMatch` remains 141 s at 349 ms/invocation there —
+the candidate walk over a context that grows to dozens of facts inside nested
+`by cases` arms. Levers, in order of expected value: a cheap structural
+prefilter before the full matcher; explicit `by` on the proof's bare claims;
+a ground fast path in `ring` (the generated tables carry ~23k `by ring` calls
+on CLOSED ground equations, and `ring` runs the full AC normaliser on each
+while the ground-relation tier already builds a compact certificate).
