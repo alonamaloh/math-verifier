@@ -446,9 +446,14 @@ any ambient vector whose norm is the current truant.  Bhargava's
 same-rank escalation case is refuted outright: a rational dependence
 scales through the adjugate to an integer vector on which the escalator
 takes the value `det²·truant`, and the per-representative exclusion
-certificates (`Algebra/escalator_exclusion`) forbid that value.  The
-rank-one and rank-two certificates are proved; the nine rank-three ones
-are collected behind `Matrix.RankThreeEscalatorExclusion`.
+certificates (`Algebra/escalator_exclusion`) forbid that value.  All of
+them are proved.  Rank three dispatches along the ternary classification
+in `Algebra/rank_three_exclusion`: five of its nine representatives reach
+Legendre's obstruction through the parity identities
+(`Algebra/rank_three_exclusion_reductions`), and the other four descend by
+a prime the form can only absorb coordinatewise
+(`Algebra/rank_three_exclusion_descents`, over the residue arithmetic of
+`Algebra/residue_arithmetic_generated`).
 
 `Algebra/rank_four_outcome_dispatch_generated` (from
 `scripts/generate_rank_four_outcome_dispatch.py`) proves the 207-way
