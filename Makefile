@@ -172,7 +172,8 @@ library: $(LIBRARY_MATHV_FILES) $(LIBRARY_MATHV_IFACE_FILES)
 
 tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES) checker-tests \
 	carrier-normal-form-check matrix-ergonomics-statement-check rank-four-generated-check \
-	three-squares-generated-check det-seven-residual-generated-check det-seven-finite-generated-check \
+	three-squares-generated-check residue-arithmetic-generated-check \
+	det-seven-residual-generated-check det-seven-finite-generated-check \
 	det-seven-statement-shape-check
 
 # ----------------------------------------------------------------------
@@ -356,6 +357,9 @@ rank-four-generated-check:
 
 three-squares-generated-check:
 	@python3 scripts/generate_three_squares_mod_eight.py --check
+
+residue-arithmetic-generated-check:
+	@python3 scripts/generate_residue_arithmetic.py --check
 
 det-seven-residual-generated-check:
 	@python3 scripts/generate_det_seven_residual_covers.py --check

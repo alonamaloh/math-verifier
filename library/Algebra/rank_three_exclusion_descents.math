@@ -1,0 +1,178 @@
+-- Algebra/rank_three_exclusion_descents.math
+--
+-- The rank-three exclusion certificates that Legendre's obstruction does
+-- not reach.  Each is a descent: the det²·truant value carries a prime
+-- the form can only absorb by dividing every coordinate, and the quotient
+-- form lands on a value it visibly misses.
+--
+--   x² + y² + 3z² misses 54, because 54 = 9·6 and descending by three
+--   twice leaves 3x² + 3y² + z² = 2.
+
+module Algebra.rank_three_exclusion_descents
+
+import Algebra.rank_three_exclusion_reductions
+import Algebra.triple_squares_one_three_three
+
+-- ----------------------------------------------------------------------
+-- Divisibility by three, read off a residue.
+
+theorem Integer.three_divides_of_two_squares_multiple
+        (a b multiple : ℤ) (sumReads : a * a + b * b = 3 * multiple)
+        : Integer.divides(3, a) ∧ Integer.divides(3, b) := {
+  let aMod : IntegerMod(3) := IntegerMod.make(3, a);
+  let bMod : IntegerMod(3) := IntegerMod.make(3, b);
+  aMod * aMod + bMod * bMod
+     = IntegerMod.make(3, a * a + b * b)
+     = IntegerMod.make(3, 3 * multiple) by substituting sumReads
+     = IntegerMod.zero(3)
+         by IntegerMod.make_equal_of_difference_multiple(3, 3 * multiple, 0, multiple, done by ring)
+  as sumZero;
+  aMod = IntegerMod.zero(3) ∧ bMod = IntegerMod.zero(3)
+      by IntegerMod.two_squares_zero_mod_three_forces_each_zero(aMod, bMod, sumZero);
+  aMod = IntegerMod.zero(3) as aZero;
+  bMod = IntegerMod.zero(3) as bZero;
+  Integer.CongruentModulo(3, a, 0) by Quotient.equal_implies_equivalent(a, 0, aZero) as aCongruent;
+  Integer.CongruentModulo(3, b, 0) by Quotient.equal_implies_equivalent(b, 0, bZero) as bCongruent;
+  Integer.divides(3, a) by Integer.divides_of_congruent_zero(3, a, aCongruent) as threeDividesA;
+  Integer.divides(3, b) by Integer.divides_of_congruent_zero(3, b, bCongruent) as threeDividesB;
+  done by And.introduction(threeDividesA, threeDividesB)
+}
+
+theorem Integer.square_not_two_modulo_three (c multiple : ℤ)
+        (squareReads : c * c = 3 * multiple + 2)
+        : False := {
+  let cMod : IntegerMod(3) := IntegerMod.make(3, c);
+  IntegerMod.residue(3, 2) ≠ IntegerMod.residue(3, 0)
+      by IntegerMod.residue_distinct_below_modulus(3, 2, 0, done, done, done) as twoNotZero;
+  IntegerMod.residue(3, 2) ≠ IntegerMod.residue(3, 1)
+      by IntegerMod.residue_distinct_below_modulus(3, 2, 1, done, done, done) as twoNotOne;
+  cMod * cMod
+     = IntegerMod.make(3, c * c)
+     = IntegerMod.make(3, 3 * multiple + 2) by substituting squareReads
+     = IntegerMod.residue(3, 2)
+         by IntegerMod.make_equal_of_difference_multiple(3, 3 * multiple + 2, 2, multiple, done by ring)
+  as squareIsTwo;
+  cMod * cMod = IntegerMod.zero(3) ∨ cMod * cMod = IntegerMod.one(3)
+      by IntegerMod.square_mod_three(cMod);
+  done by cases {
+    case cMod * cMod = IntegerMod.zero(3) as squareZero: {
+      IntegerMod.residue(3, 2)
+         = cMod * cMod by Equality.symmetry(squareIsTwo)
+         = IntegerMod.zero(3) by squareZero;
+      done by twoNotZero
+    }
+    case cMod * cMod = IntegerMod.one(3) as squareOne: {
+      IntegerMod.residue(3, 2)
+         = cMod * cMod by Equality.symmetry(squareIsTwo)
+         = IntegerMod.one(3) by squareOne;
+      done by twoNotOne
+    }
+  }
+}
+
+theorem Integer.three_divides_of_square_multiple
+        (c multiple : ℤ) (squareReads : c * c = 3 * multiple)
+        : Integer.divides(3, c) := {
+  let cMod : IntegerMod(3) := IntegerMod.make(3, c);
+  cMod * cMod
+     = IntegerMod.make(3, c * c)
+     = IntegerMod.make(3, 3 * multiple) by substituting squareReads
+     = IntegerMod.zero(3)
+         by IntegerMod.make_equal_of_difference_multiple(3, 3 * multiple, 0, multiple, done by ring)
+  as squareZero;
+  cMod = IntegerMod.zero(3)
+      by IntegerMod.square_zero_mod_three_forces_zero(cMod, squareZero) as cZero;
+  Integer.CongruentModulo(3, c, 0) by Quotient.equal_implies_equivalent(c, 0, cZero) as cCongruent;
+  done by Integer.divides_of_congruent_zero(3, c, cCongruent)
+}
+
+-- ----------------------------------------------------------------------
+-- x² + y² + 3z² reaches a multiple of nine only through three coordinates
+-- that are themselves divisible by three.
+
+theorem Integer.two_squares_plus_triple_square_descent
+        (a b c n : ℤ) (valueReads : a * a + b * b + 3 * (c * c) = 9 * n)
+        : ∃ (x y z : ℤ). x * x + y * y + 3 * (z * z) = n := {
+  (3 : ℤ) ≠ Integer.zero as threeNonzero;
+  a * a + b * b = 3 * (3 * n - c * c) by linear_combination(valueReads) as pairMultiple;
+  Integer.divides(3, a) ∧ Integer.divides(3, b)
+      by Integer.three_divides_of_two_squares_multiple(a, b, 3 * n - c * c, pairMultiple);
+  Integer.divides(3, a) as threeDividesA;
+  Integer.divides(3, b) as threeDividesB;
+  choose x : ℤ such that a = 3 * x as aReads from threeDividesA;
+  choose y : ℤ such that b = 3 * y as bReads from threeDividesB;
+  3 * (3 * (x * x) + 3 * (y * y) + c * c)
+     = (3 * x) * (3 * x) + (3 * y) * (3 * y) + 3 * (c * c) by ring
+     = a * a + (3 * y) * (3 * y) + 3 * (c * c) by substituting Equality.symmetry(aReads)
+     = a * a + b * b + 3 * (c * c) by substituting Equality.symmetry(bReads)
+     = 9 * n by valueReads
+     = 3 * (3 * n) by ring
+  as tripledSum;
+  3 * (x * x) + 3 * (y * y) + c * c = 3 * n
+      by Integer.multiply_cancel_left_by_nonzero(
+        3 * (x * x) + 3 * (y * y) + c * c, 3 * n, 3, threeNonzero, tripledSum)
+  as reducedSum;
+  c * c = 3 * (n - x * x - y * y) by linear_combination(reducedSum) as squareMultiple;
+  Integer.divides(3, c)
+      by Integer.three_divides_of_square_multiple(c, n - x * x - y * y, squareMultiple)
+      as threeDividesC;
+  choose z : ℤ such that c = 3 * z as cReads from threeDividesC;
+  3 * (x * x + y * y + 3 * (z * z))
+     = 3 * (x * x) + 3 * (y * y) + (3 * z) * (3 * z) by ring
+     = 3 * (x * x) + 3 * (y * y) + c * c by substituting Equality.symmetry(cReads)
+     = 3 * n by reducedSum
+  as tripledQuotient;
+  x * x + y * y + 3 * (z * z) = n
+      by Integer.multiply_cancel_left_by_nonzero(
+        x * x + y * y + 3 * (z * z), n, 3, threeNonzero, tripledQuotient)
+  as quotientValue;
+  witness x with witness y with witness z with quotientValue
+}
+
+-- ----------------------------------------------------------------------
+-- Six is missed, so fifty-four is missed.
+
+theorem Integer.two_squares_plus_triple_square_not_six
+        : ¬(∃ (x y z : ℤ). x * x + y * y + 3 * (z * z) = 6) := {
+  (3 : ℤ) ≠ Integer.zero as threeNonzero;
+  suppose ∃ (x y z : ℤ). x * x + y * y + 3 * (z * z) = 6 as represented;
+  choose a : ℤ, b : ℤ, c : ℤ such that a * a + b * b + 3 * (c * c) = 6
+      as valueReads from represented;
+  a * a + b * b = 3 * (2 - c * c) by linear_combination(valueReads) as pairMultiple;
+  Integer.divides(3, a) ∧ Integer.divides(3, b)
+      by Integer.three_divides_of_two_squares_multiple(a, b, 2 - c * c, pairMultiple);
+  Integer.divides(3, a) as threeDividesA;
+  Integer.divides(3, b) as threeDividesB;
+  choose x : ℤ such that a = 3 * x as aReads from threeDividesA;
+  choose y : ℤ such that b = 3 * y as bReads from threeDividesB;
+  3 * (3 * (x * x) + 3 * (y * y) + c * c)
+     = (3 * x) * (3 * x) + (3 * y) * (3 * y) + 3 * (c * c) by ring
+     = a * a + (3 * y) * (3 * y) + 3 * (c * c) by substituting Equality.symmetry(aReads)
+     = a * a + b * b + 3 * (c * c) by substituting Equality.symmetry(bReads)
+     = 6 by valueReads
+     = 3 * 2 by ring
+  as tripledSum;
+  3 * (x * x) + 3 * (y * y) + c * c = 2
+      by Integer.multiply_cancel_left_by_nonzero(
+        3 * (x * x) + 3 * (y * y) + c * c, 2, 3, threeNonzero, tripledSum)
+  as reducedSum;
+  c * c = 3 * (-(x * x) - y * y) + 2 by linear_combination(reducedSum) as squareIsTwoModuloThree;
+  done by Integer.square_not_two_modulo_three(c, -(x * x) - y * y, squareIsTwoModuloThree)
+}
+
+theorem Matrix.sumOfTwoSquaresPlusTripleSquareForm_not_represents_fifty_four
+        : ¬(Matrix.Represents(Matrix.sumOfTwoSquaresPlusTripleSquareForm, (54 : ℤ))) := {
+  Matrix.sumOfTwoSquaresPlusTripleSquareForm = Matrix.sumOfTwoSquaresPlusScaledSquareForm(3)
+      as scaledReads;
+  suppose Matrix.Represents(Matrix.sumOfTwoSquaresPlusTripleSquareForm, (54 : ℤ)) as represented;
+  Matrix.Represents(Matrix.sumOfTwoSquaresPlusScaledSquareForm(3), (54 : ℤ))
+      by substituting scaledReads;
+  ∃ (x y z : ℤ). x * x + y * y + 3 * (z * z) = (54 : ℤ)
+      by Matrix.sumOfTwoSquaresPlusScaledSquareForm_represents_only_values;
+  choose a : ℤ, b : ℤ, c : ℤ such that a * a + b * b + 3 * (c * c) = (54 : ℤ)
+      as valueReads;
+  a * a + b * b + 3 * (c * c) = 9 * 6 by linear_combination(valueReads) as nineMultiple;
+  ∃ (x y z : ℤ). x * x + y * y + 3 * (z * z) = 6
+      by Integer.two_squares_plus_triple_square_descent(a, b, c, 6, nineMultiple);
+  done by Integer.two_squares_plus_triple_square_not_six
+}
