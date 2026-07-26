@@ -43,6 +43,9 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
   `Plane.supDistance` — [norm.math](norm.math)
 - `Plane.between`, `Plane.segment`, `Plane.IsConvex`, `Plane.Ball`, and
   `Plane.supBall` — [segment.math](segment.math)
+- `Plane.OpenIn`, `Plane.IsOpen`, `Plane.ClosedIn` —
+  [topology.math](topology.math). **Relative to a carrier from the
+  start**; the absolute notions are the `carrier = universe` case.
 
 ## Main theorems
 

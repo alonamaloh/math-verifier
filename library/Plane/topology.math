@@ -1,0 +1,202 @@
+-- Plane/topology.math
+--
+-- Relative topology of the plane. Layer 1 of the Jordan–Schönflies
+-- foundation.
+--
+-- Everything here is stated RELATIVE to a carrier set from the start,
+-- and the absolute notions are the `carrier = universe` case. That is a
+-- deliberate choice, settled in PLAN_JORDAN_SCHOENFLIES.md: connectedness
+-- gets applied to arcs and curves as subspaces, and the model-curve
+-- parametrization needs compact→Hausdorff on a subspace, so retrofitting
+-- relativisation across Layers 1–3 would cost more than paying for it
+-- once here.
+--
+-- `Plane.OpenIn(subset, carrier)` does not require `subset ⊆ carrier` —
+-- the ε-ball condition is meaningful without it, and demanding it would
+-- add a proof obligation at every use. Consumers that need the inclusion
+-- carry it separately.
+
+module Plane.topology
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Set.algebra
+import Real.interface
+import Real.minimum
+import Plane.vector
+import Plane.point
+import Plane.norm
+import Plane.segment
+
+-- ----------------------------------------------------------------------
+-- Open sets, relative to a carrier.
+
+definition Plane.OpenIn (subset carrier : Set(Plane.Point)) : Proposition :=
+  ∀ (x : Plane.Point). x ∈ subset →
+    ∃ (radius : ℝ). 0 < radius ∧
+      ∀ (y : Plane.Point). y ∈ carrier →
+        Plane.distance(x, y) < radius → y ∈ subset
+
+definition Plane.IsOpen (subset : Set(Plane.Point)) : Proposition :=
+  Plane.OpenIn(subset, Set.universe(Plane.Point))
+
+definition Plane.ClosedIn (subset carrier : Set(Plane.Point)) : Proposition :=
+  Plane.OpenIn(Set.difference(carrier, subset), carrier)
+
+-- ----------------------------------------------------------------------
+-- The lattice laws. Each is the ε-ball argument a textbook gives.
+
+theorem Plane.OpenIn.universe (carrier : Set(Plane.Point))
+        : Plane.OpenIn(Set.universe(Plane.Point), carrier) := {
+  take x : Plane.Point;
+  suppose x ∈ Set.universe(Plane.Point);
+  witness (1 : ℝ) with {
+    (0 : ℝ) < 1;
+    ∀ (y : Plane.Point). y ∈ carrier →
+        Plane.distance(x, y) < 1 → y ∈ Set.universe(Plane.Point)
+        by (y : Plane.Point) (yInCarrier : y ∈ carrier)
+           (yClose : Plane.distance(x, y) < 1) ↦
+             Set.member_universe(y);
+    done
+  }
+}
+
+theorem Plane.OpenIn.empty (carrier : Set(Plane.Point))
+        : Plane.OpenIn(Set.empty(Plane.Point), carrier) := {
+  take x : Plane.Point;
+  suppose x ∈ Set.empty(Plane.Point) as inEmpty;
+  False by Set.not_member_empty;
+  done
+}
+
+-- A finite intersection of relatively open sets is relatively open: take
+-- the smaller of the two radii.
+theorem Plane.OpenIn.intersection
+        (left right carrier : Set(Plane.Point))
+        (leftOpen : Plane.OpenIn(left, carrier))
+        (rightOpen : Plane.OpenIn(right, carrier))
+        : Plane.OpenIn(left ∩ right, carrier) := {
+  take x : Plane.Point;
+  suppose x ∈ left ∩ right as inBoth;
+  x ∈ left by Set.intersection_member_left as inLeft;
+  x ∈ right by Set.intersection_member_right as inRight;
+  choose leftRadius such that
+      0 < leftRadius ∧
+        ∀ (y : Plane.Point). y ∈ carrier →
+          Plane.distance(x, y) < leftRadius → y ∈ left
+      from leftOpen(x, inLeft);
+  choose rightRadius such that
+      0 < rightRadius ∧
+        ∀ (y : Plane.Point). y ∈ carrier →
+          Plane.distance(x, y) < rightRadius → y ∈ right
+      from rightOpen(x, inRight);
+  0 < leftRadius;
+  0 < rightRadius;
+  ∀ (y : Plane.Point). y ∈ carrier →
+      Plane.distance(x, y) < leftRadius → y ∈ left as leftBall;
+  ∀ (y : Plane.Point). y ∈ carrier →
+      Plane.distance(x, y) < rightRadius → y ∈ right as rightBall;
+  witness min(leftRadius, rightRadius) with {
+    0 < min(leftRadius, rightRadius) by Real.minimum_positive;
+    ∀ (y : Plane.Point). y ∈ carrier →
+        Plane.distance(x, y) < min(leftRadius, rightRadius) → y ∈ left ∩ right
+        by (y : Plane.Point) (yInCarrier : y ∈ carrier)
+           (yClose : Plane.distance(x, y) < min(leftRadius, rightRadius)) ↦ {
+             Plane.distance(x, y)
+                < min(leftRadius, rightRadius)
+                ≤ leftRadius by Real.minimum_LessOrEqual_left;
+             Plane.distance(x, y)
+                < min(leftRadius, rightRadius)
+                ≤ rightRadius by Real.minimum_LessOrEqual_right;
+             y ∈ left by leftBall;
+             y ∈ right by rightBall;
+             done by Set.member_intersection
+           };
+    done
+  }
+}
+
+-- A union of two relatively open sets is relatively open: whichever side
+-- the point came from supplies the radius.
+theorem Plane.OpenIn.union
+        (left right carrier : Set(Plane.Point))
+        (leftOpen : Plane.OpenIn(left, carrier))
+        (rightOpen : Plane.OpenIn(right, carrier))
+        : Plane.OpenIn(left ∪ right, carrier) := {
+  take x : Plane.Point;
+  suppose x ∈ left ∪ right as inEither;
+  done by cases {
+    case x ∈ left as inLeft: {
+        choose radius such that
+            0 < radius ∧
+              ∀ (y : Plane.Point). y ∈ carrier →
+                Plane.distance(x, y) < radius → y ∈ left
+            from leftOpen(x, inLeft);
+        0 < radius;
+        ∀ (y : Plane.Point). y ∈ carrier →
+            Plane.distance(x, y) < radius → y ∈ left as leftBall;
+        witness radius with {
+          0 < radius;
+          ∀ (y : Plane.Point). y ∈ carrier →
+              Plane.distance(x, y) < radius → y ∈ left ∪ right
+              by (y : Plane.Point) (yInCarrier : y ∈ carrier)
+                 (yClose : Plane.distance(x, y) < radius) ↦ {
+                   y ∈ left by leftBall;
+                   done by Set.subset_union_left
+                 };
+          done
+        }
+      }
+    case x ∈ right as inRight: {
+        choose radius such that
+            0 < radius ∧
+              ∀ (y : Plane.Point). y ∈ carrier →
+                Plane.distance(x, y) < radius → y ∈ right
+            from rightOpen(x, inRight);
+        0 < radius;
+        ∀ (y : Plane.Point). y ∈ carrier →
+            Plane.distance(x, y) < radius → y ∈ right as rightBall;
+        witness radius with {
+          0 < radius;
+          ∀ (y : Plane.Point). y ∈ carrier →
+              Plane.distance(x, y) < radius → y ∈ left ∪ right
+              by (y : Plane.Point) (yInCarrier : y ∈ carrier)
+                 (yClose : Plane.distance(x, y) < radius) ↦ {
+                   y ∈ right by rightBall;
+                   done by Set.subset_union_right
+                 };
+          done
+        }
+      }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- Balls are open, which is what makes the definition worth having.
+
+theorem Plane.Ball_IsOpen (center : Plane.Point) (radius : ℝ)
+        : Plane.IsOpen(Plane.Ball(center, radius)) := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.Ball(center, radius) as xInside;
+  Plane.distance(center, x) < radius;
+  0 < radius - Plane.distance(center, x);
+  witness radius - Plane.distance(center, x) with {
+    0 < radius - Plane.distance(center, x);
+    ∀ (y : Plane.Point). y ∈ Set.universe(Plane.Point) →
+        Plane.distance(x, y) < radius - Plane.distance(center, x) →
+          y ∈ Plane.Ball(center, radius)
+        by (y : Plane.Point) (yAnywhere : y ∈ Set.universe(Plane.Point))
+           (yClose : Plane.distance(x, y) < radius - Plane.distance(center, x)) ↦ {
+             Plane.distance(center, y)
+                ≤ Plane.distance(center, x) + Plane.distance(x, y)
+                      by Plane.distance_triangle
+                < Plane.distance(center, x)
+                      + (radius - Plane.distance(center, x))
+                = radius;
+             done
+           };
+    done
+  }
+}

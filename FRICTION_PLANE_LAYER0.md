@@ -80,9 +80,12 @@ are weaker" nor the converse is the right summary.
 - ~~`-x ≤ c` from `-c ≤ x` needs `Real.LessOrEqual.negate` cited.~~
   **Fixed:** `Real.LessOrEqual.negate` is now `automatic`, matching its
   strict twin.
-- `0 < c - a` from `a < c` is **not** automatic, while `0 ≤ c - a` from
-  `a ≤ c` **is**. Bit `Real.maximum_LessThan`. Workaround: bridge
-  through `0 = a - a < c - a`.
+- ~~`0 < c - a` from `a < c` is **not** automatic, while `0 ≤ c - a` from
+  `a ≤ c` **is**.~~ **Fixed 2026-07-25 (second pass):** it bit a *second*
+  independent site — `Plane.Ball_IsOpen` — which is what earned it a
+  lemma rather than another hand-bridge.
+  `Real.subtract_positive_of_LessThan`, `automatic`, in
+  `Real/order.math`; both bridges retired.
 
 ### I3 — CLOSED 2026-07-25 — adding two inequalities is not a step
 
