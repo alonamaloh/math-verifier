@@ -23,7 +23,7 @@ from generate_rank_four_global_classification import (  # noqa: E402
 from generate_rank_four_isometry_certificates import form_expression  # noqa: E402
 
 
-OUTPUT = ROOT / "library/Algebra/rank_four_short_values_generated.math"
+OUTPUT = ROOT / "projects/FifteenTheorem/Algebra/rank_four_short_values_generated.math"
 TABLE_GLOB = "rank_four_short_values_*_chunk*_generated.math"
 EXCEPTIONAL_NAMES = (
     "odd.c4.r0.c3",
@@ -149,7 +149,7 @@ def table_module_name(family: str, index: int) -> str:
 
 
 def table_output(family: str, index: int) -> Path:
-    return ROOT / "library/Algebra" / f"rank_four_short_values_{safe_name(family)}_chunk{index}_generated.math"
+    return ROOT / "projects/FifteenTheorem/Algebra" / f"rank_four_short_values_{safe_name(family)}_chunk{index}_generated.math"
 
 
 def render_table_module(family: str, index: int, chunk: list[NamedForm]) -> str:
@@ -330,7 +330,7 @@ def main() -> int:
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
     expected = render_outputs()
-    actual_table_paths = set((ROOT / "library/Algebra").glob(TABLE_GLOB))
+    actual_table_paths = set((ROOT / "projects/FifteenTheorem/Algebra").glob(TABLE_GLOB))
     expected_table_paths = set(expected) - {OUTPUT}
     if args.check:
         stale = [path for path, contents in expected.items() if not path.exists() or path.read_text() != contents]

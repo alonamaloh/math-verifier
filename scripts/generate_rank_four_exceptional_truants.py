@@ -16,7 +16,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT = ROOT / "library/Algebra/rank_four_exceptional_truants_generated.math"
+OUTPUT = ROOT / "projects/FifteenTheorem/Algebra/rank_four_exceptional_truants_generated.math"
 CHUNK_GLOB = "rank_four_exceptional_truants_chunk*_generated.math"
 
 
@@ -140,7 +140,7 @@ theorem Matrix.{form.stem}_truant
 
 
 def chunk_output(index: int) -> Path:
-    return ROOT / "library/Algebra" / f"rank_four_exceptional_truants_chunk{index}_generated.math"
+    return ROOT / "projects/FifteenTheorem/Algebra" / f"rank_four_exceptional_truants_chunk{index}_generated.math"
 
 
 def chunk_module(index: int) -> str:
@@ -180,7 +180,7 @@ def main() -> int:
     expected_files.update({chunk_output(index): render_chunk(index, form) for index, form in enumerate(FORMS)})
     if args.check:
         stale = [path for path, expected in expected_files.items() if not path.exists() or path.read_text() != expected]
-        extras = sorted(set((ROOT / "library/Algebra").glob(CHUNK_GLOB)) - set(expected_files))
+        extras = sorted(set((ROOT / "projects/FifteenTheorem/Algebra").glob(CHUNK_GLOB)) - set(expected_files))
         if stale or extras:
             for path in stale:
                 print(f"stale generated file: {path}")

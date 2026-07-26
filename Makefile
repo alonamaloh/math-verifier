@@ -140,15 +140,28 @@ BUILD_DIR := build
 # ErrorTest/ holds intentionally-broken proofs for the error-message
 # harness (`make error-tests`); they MUST fail to verify, so exclude them
 # from the normal build/test globs.
-MATH_FILES := $(shell find library -name '*.math' -not -path 'library/ErrorTest/*' | sort)
-# Split: `library` verifies math content; `tests` verifies the elaborator-
-# feature exercises under library/Test/. `library` is the inner loop —
-# keep it fast and noise-free (the test files use `sorry` deliberately,
-# which produces warnings at every build).
-LIBRARY_MATH_FILES := $(filter-out library/Test/%,$(MATH_FILES))
+MATH_FILES := $(shell find library projects -name '*.math' -not -path 'library/ErrorTest/*' | sort)
+# Three tiers.
+#
+#   library/         reusable mathematics — `make library`, the inner loop.
+#   library/Test/    elaborator-feature exercises — `make tests`. Kept out of
+#                    `library` so the inner loop stays fast and noise-free
+#                    (test files use `sorry` deliberately, which warns at
+#                    every build).
+#   projects/<Name>/ a development that USES the library without being part
+#                    of it — `make projects`. The fifteen theorem lives here:
+#                    it is ~320k lines, three quarters of them machine-
+#                    generated case tables, and re-verifying it after every
+#                    elaborator change dominated the wall clock while
+#                    teaching the library nothing. A project imports the
+#                    library (its `--source-root library/` below); the
+#                    library never imports a project.
+LIBRARY_MATH_FILES := $(filter-out library/Test/% projects/%,$(MATH_FILES))
 TEST_MATH_FILES := $(filter library/Test/%,$(MATH_FILES))
+PROJECT_MATH_FILES := $(filter projects/%,$(MATH_FILES))
 LIBRARY_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(LIBRARY_MATH_FILES))
 TEST_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(TEST_MATH_FILES))
+PROJECT_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(PROJECT_MATH_FILES))
 # Interface caches (stage 1). Named as explicit goals so `make` treats them
 # as persisted build products rather than throwaway intermediates it deletes
 # at the end of a build (which would force a full rebuild next time). Listing
@@ -156,9 +169,10 @@ TEST_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(TEST_MATH_FILES))
 # pathological implicit-rule-chain search that makes even `make -n` hang.
 LIBRARY_MATHV_IFACE_FILES := $(LIBRARY_MATHV_FILES:.mathv=.mathv.iface)
 TEST_MATHV_IFACE_FILES := $(TEST_MATHV_FILES:.mathv=.mathv.iface)
+PROJECT_MATHV_IFACE_FILES := $(PROJECT_MATHV_FILES:.mathv=.mathv.iface)
 
 .PHONY: library library-clean plane tests error-tests checker-tests \
-        clean-check clean-status
+        clean-check clean-status projects projects-clean project-tests all
 
 # Bare `make` VERIFIES THE LIBRARY — not just builds the kernel binary. The
 # first target in this file is `kernel` (the C++ build), so without this line
@@ -171,12 +185,30 @@ TEST_MATHV_IFACE_FILES := $(TEST_MATHV_FILES:.mathv=.mathv.iface)
 
 library: $(LIBRARY_MATHV_FILES) $(LIBRARY_MATHV_IFACE_FILES)
 
+# Everything under projects/, and `all` for the two together. A project's
+# imports resolve against its own root first and `library/` second (the
+# `--source-root` below), so `projects` needs the library's caches present.
+projects: library $(PROJECT_MATHV_FILES) $(PROJECT_MATHV_IFACE_FILES)
+
+all: library projects
+
+# `make project-FifteenTheorem` — one project's files only.
+project-%: $(BUILD_DIR)/library-depends.mk
+	@$(MAKE) --no-print-directory library
+	@$(MAKE) --no-print-directory \
+	    $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(filter projects/$*/%,$(PROJECT_MATH_FILES))) \
+	    $(patsubst %.math,$(BUILD_DIR)/%.mathv.iface,$(filter projects/$*/%,$(PROJECT_MATH_FILES)))
+
+projects-clean:
+	rm -rf $(BUILD_DIR)/projects
+
 # A narrow inner loop for the Plane/ development (PLAN_JORDAN_SCHOENFLIES.md).
 # Names only the Plane/ files; the generated dependency file then pulls in
-# exactly their transitive imports, so the Algebra/ fifteen-theorem material —
-# which dominates the wall-clock time of a full `make library` — is never
+# exactly their transitive imports, so the rest of the library is never
 # touched. Use this while working in Plane/, and `make -j 16 library` only
-# before committing.
+# before committing. (This mattered far more when the fifteen theorem was
+# still in `library/` and dominated a full build; it now lives under
+# `projects/` and no library target reaches it at all.)
 PLANE_MATH_FILES := $(filter library/Plane/%,$(LIBRARY_MATH_FILES))
 PLANE_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(PLANE_MATH_FILES))
 # Stage 2 (`X.mathv`) depends on its imports' INTERFACES, not their proofs —
@@ -193,8 +225,14 @@ plane: $(PLANE_MATHV_FILES) $(PLANE_MATHV_FILES:.mathv=.mathv.iface) \
        $(PLANE_CONE_MATHV)
 
 tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES) checker-tests \
-	carrier-normal-form-check matrix-ergonomics-statement-check rank-four-generated-check \
-	three-squares-generated-check residue-arithmetic-generated-check \
+	carrier-normal-form-check matrix-ergonomics-statement-check \
+	three-squares-generated-check
+
+# The fifteen theorem's own gates. Separate from `tests` for the same reason
+# its proofs are separate from `library`: they re-render ~290k lines of
+# generated case tables and say nothing about the elaborator.
+project-tests: projects rank-four-generated-check \
+	residue-arithmetic-generated-check \
 	det-seven-residual-generated-check det-seven-finite-generated-check \
 	det-seven-statement-shape-check
 
@@ -340,22 +378,22 @@ matrix-ergonomics-statement-check: $(BUILD_DIR)/library/Test/matrix_ergonomics_t
 	@bash scripts/check_matrix_ergonomics_statements.sh ./kernel $<
 
 det-seven-statement-shape-check: \
-		$(BUILD_DIR)/library/Test/det_seven_safe_converse_test.mathv \
-		$(BUILD_DIR)/library/Algebra/truant_squarefree.mathv \
-		$(BUILD_DIR)/library/Algebra/det_seven_rank_four_infrastructure.mathv \
-		$(BUILD_DIR)/library/Algebra/det_seven_residual_arithmetic.mathv \
-		$(BUILD_DIR)/library/Algebra/det_seven_residual_covers.mathv \
-		$(BUILD_DIR)/library/Algebra/det_seven_residual_m7_generated.mathv \
-		$(BUILD_DIR)/library/Algebra/det_seven_residual_m329_generated.mathv \
-		$(BUILD_DIR)/library/Algebra/det_seven_residual_m315_odd_generated.mathv \
-		$(BUILD_DIR)/library/Algebra/det_seven_finite_q0c7_generated.mathv \
-		$(BUILD_DIR)/library/Algebra/det_seven_finite_q2c9_generated.mathv \
-		$(BUILD_DIR)/library/Algebra/det_seven_finite_q1c7odd_generated.mathv \
-		$(BUILD_DIR)/library/Algebra/det_seven_finite_q1c7_even_generated.mathv \
-		$(BUILD_DIR)/library/Algebra/det_seven_generic_covers.mathv \
-		$(BUILD_DIR)/library/Algebra/det_seven_exceptional_infrastructure.mathv \
-		$(BUILD_DIR)/library/Algebra/det_seven_exceptional_cover.mathv \
-		$(BUILD_DIR)/library/Algebra/det_seven_covers.mathv
+		$(BUILD_DIR)/projects/FifteenTheorem/Test/det_seven_safe_converse_test.mathv \
+		$(BUILD_DIR)/projects/FifteenTheorem/Algebra/truant_squarefree.mathv \
+		$(BUILD_DIR)/projects/FifteenTheorem/Algebra/det_seven_rank_four_infrastructure.mathv \
+		$(BUILD_DIR)/projects/FifteenTheorem/Algebra/det_seven_residual_arithmetic.mathv \
+		$(BUILD_DIR)/projects/FifteenTheorem/Algebra/det_seven_residual_covers.mathv \
+		$(BUILD_DIR)/projects/FifteenTheorem/Algebra/det_seven_residual_m7_generated.mathv \
+		$(BUILD_DIR)/projects/FifteenTheorem/Algebra/det_seven_residual_m329_generated.mathv \
+		$(BUILD_DIR)/projects/FifteenTheorem/Algebra/det_seven_residual_m315_odd_generated.mathv \
+		$(BUILD_DIR)/projects/FifteenTheorem/Algebra/det_seven_finite_q0c7_generated.mathv \
+		$(BUILD_DIR)/projects/FifteenTheorem/Algebra/det_seven_finite_q2c9_generated.mathv \
+		$(BUILD_DIR)/projects/FifteenTheorem/Algebra/det_seven_finite_q1c7odd_generated.mathv \
+		$(BUILD_DIR)/projects/FifteenTheorem/Algebra/det_seven_finite_q1c7_even_generated.mathv \
+		$(BUILD_DIR)/projects/FifteenTheorem/Algebra/det_seven_generic_covers.mathv \
+		$(BUILD_DIR)/projects/FifteenTheorem/Algebra/det_seven_exceptional_infrastructure.mathv \
+		$(BUILD_DIR)/projects/FifteenTheorem/Algebra/det_seven_exceptional_cover.mathv \
+		$(BUILD_DIR)/projects/FifteenTheorem/Algebra/det_seven_covers.mathv
 	@bash scripts/check_det7_statement_shapes.sh ./kernel $^
 
 # Generated rank-four certificates are ordinary checked source, but a stale
@@ -416,6 +454,10 @@ error-tests: library
 # `CHECK_REDUNDANT_BY=1` for tidy-up sweeps. Doesn't affect cache
 # contents; warnings just go to stderr.
 VERIFY_FLAGS :=
+# Stage-1 (interface) flags. Empty for the library; the project targets add
+# their `--source-root` here as well as to VERIFY_FLAGS, because both stages
+# resolve imports.
+IFACE_FLAGS :=
 ifeq ($(CHECK_REDUNDANT_BY),1)
 VERIFY_FLAGS := --check-redundant-by
 endif
@@ -446,6 +488,20 @@ $(TEST_MATHV_FILES): VERIFY_FLAGS += --no-check-unused-names
 $(TEST_MATHV_FILES): export MATH_AUTOMATIC = 0
 $(TEST_MATHV_IFACE_FILES): export MATH_AUTOMATIC = 0
 
+# A project resolves an import against its own source root first, then
+# `library/`. So `import Algebra.rank_four_pilot` finds the project's own
+# copy and `import Algebra.matrix` falls through to the library — which is
+# what lets a project keep the `Algebra.*` namespace while living outside
+# `library/`. Library files pass no `--source-root` at all and keep the
+# single-rooted resolution they have always had.
+$(PROJECT_MATHV_FILES): VERIFY_FLAGS += --source-root library/
+$(PROJECT_MATHV_IFACE_FILES): IFACE_FLAGS += --source-root library/
+# The project's own Test/ fixtures get the same two opt-outs as the
+# library's (see above) — they are feature exercises, not library content.
+$(filter %_test.mathv,$(PROJECT_MATHV_FILES)): VERIFY_FLAGS += --no-check-unused-names
+$(filter %_test.mathv,$(PROJECT_MATHV_FILES)): export MATH_AUTOMATIC = 0
+$(filter %_test.mathv.iface,$(PROJECT_MATHV_IFACE_FILES)): export MATH_AUTOMATIC = 0
+
 # Recipe for a .mathv. The pattern rule provides the .math prerequisite;
 # the .mathv prerequisites — listed by the included dependency file —
 # drive `make`'s staleness tracking but are NOT passed to `kernel
@@ -471,7 +527,7 @@ $(TEST_MATHV_IFACE_FILES): export MATH_AUTOMATIC = 0
 $(BUILD_DIR)/%.mathv.iface: %.math kernel
 	@mkdir -p $(dir $@)
 	@MATH_STATEMENTS_ONLY=1 ./kernel verify --source $< \
-	    --output $(BUILD_DIR)/$*.mathv --cache-root $(BUILD_DIR)
+	    --output $(BUILD_DIR)/$*.mathv --cache-root $(BUILD_DIR) $(IFACE_FLAGS)
 
 # Stage 2 — proofs. Verifies the module's proofs against its own interface
 # (from stage 1) plus its imports' interfaces, writing the full `.mathv`.

@@ -25,7 +25,7 @@ ROW_CHUNK_SIZE = 20
 COVER_CHUNK_SIZE = 14
 TABLE_PREFIX = "rank_four_weighted_d5_base_tables_chunk"
 COVER_PREFIX = "rank_four_weighted_d5_covers_chunk"
-AGGREGATE = ROOT / "library/Algebra/rank_four_weighted_d5_covers.math"
+AGGREGATE = ROOT / "projects/FifteenTheorem/Algebra/rank_four_weighted_d5_covers.math"
 
 PARAMETERS = (
     *((0, 1, corner) for corner in range(5, 11)),
@@ -337,13 +337,13 @@ def render_outputs() -> dict[Path, str]:
     forms = list(PARAMETERS)
     for index in range(0, len(forms), TABLE_CHUNK_SIZE):
         chunk_index = index // TABLE_CHUNK_SIZE
-        outputs[ROOT / "library/Algebra" / f"{TABLE_PREFIX}{chunk_index}_generated.math"] = table_module(
+        outputs[ROOT / "projects/FifteenTheorem/Algebra" / f"{TABLE_PREFIX}{chunk_index}_generated.math"] = table_module(
             chunk_index, forms[index:index + TABLE_CHUNK_SIZE]
         )
     cover_count = 0
     for index in range(0, len(forms), COVER_CHUNK_SIZE):
         chunk_index = index // COVER_CHUNK_SIZE
-        outputs[ROOT / "library/Algebra" / f"{COVER_PREFIX}{chunk_index}.math"] = cover_module(
+        outputs[ROOT / "projects/FifteenTheorem/Algebra" / f"{COVER_PREFIX}{chunk_index}.math"] = cover_module(
             chunk_index, forms[index:index + COVER_CHUNK_SIZE]
         )
         cover_count += 1
@@ -356,8 +356,8 @@ def main() -> int:
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
     outputs = render_outputs()
-    generated = set((ROOT / "library/Algebra").glob(f"{TABLE_PREFIX}*_generated.math"))
-    generated.update((ROOT / "library/Algebra").glob(f"{COVER_PREFIX}*.math"))
+    generated = set((ROOT / "projects/FifteenTheorem/Algebra").glob(f"{TABLE_PREFIX}*_generated.math"))
+    generated.update((ROOT / "projects/FifteenTheorem/Algebra").glob(f"{COVER_PREFIX}*.math"))
     generated.add(AGGREGATE)
     stale_extra = generated - set(outputs)
 

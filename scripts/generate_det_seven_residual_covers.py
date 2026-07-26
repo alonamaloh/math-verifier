@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT_DIR = ROOT / "library" / "Algebra"
+OUTPUT_DIR = ROOT / "projects" / "FifteenTheorem" / "Algebra"
 MODULUS = 588
 CHUNKS = tuple((lower, lower + 49) for lower in range(0, MODULUS, 49))
 SELECTED_CHUNK_SIZE = 12

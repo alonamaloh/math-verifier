@@ -16,7 +16,7 @@ import sys
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_OUTPUT = ROOT / "library/Algebra/rank_four_pilot_generated.math"
+DEFAULT_OUTPUT = ROOT / "projects/FifteenTheorem/Algebra/rank_four_pilot_generated.math"
 
 REPRESENTATIVES: dict[int, tuple[int, int, int]] = {
     0: (0, 0, 0),

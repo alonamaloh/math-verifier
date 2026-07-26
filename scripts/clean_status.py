@@ -15,11 +15,21 @@ as new entries land), plus a couple of structural field milestones.
 """
 import re, os, json, subprocess, sys, argparse
 
-def path_of(mod):
-    return "library/" + mod.replace(".", "/") + ".math"
+def source_roots_for(path):
+    """Search roots for a file's imports, own root first — mirrors the
+    kernel's `--source-root` resolution. A manifest entry under
+    projects/<Name>/ sees its own modules before the library's."""
+    m = re.match(r'(projects/[^/]+/)', path)
+    return [m.group(1), "library/"] if m else ["library/"]
+
+def path_of(mod, roots=("library/",)):
+    suffix = mod.replace(".", "/") + ".math"
+    candidates = [root + suffix for root in roots]
+    return next((c for c in candidates if os.path.exists(c)), candidates[0])
 
 def cone(root):
     seen = set()
+    roots = source_roots_for(root)
     def visit(p):
         if p in seen or not os.path.exists(p):
             return
@@ -27,7 +37,7 @@ def cone(root):
         for line in open(p):
             m = re.match(r'\s*import\s+([\w.]+)', line)
             if m:
-                visit(path_of(m.group(1)))
+                visit(path_of(m.group(1), roots))
     visit(root)
     return seen
 

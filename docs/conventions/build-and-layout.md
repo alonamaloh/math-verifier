@@ -10,6 +10,10 @@ How to build the library, how the C++ sources are organised, and how
 `make -j 16 library` from the project root. The dep graph is parallel;
 warm rebuilds are sub-second. Always use `-j 16` (don't use bare `make`).
 
+`make -j 16 projects` builds everything under `projects/` (see "Projects"
+below), and `make -j 16 all` builds both. `library` is the inner loop and
+deliberately does not depend on `projects`.
+
 Objects land under `build/obj/` (mirroring `src/`); header dependencies
 are tracked automatically by the compiler (`-MMD -MP` + `-include`), so
 there is no hand-maintained header list in the Makefile.
@@ -92,3 +96,33 @@ library/
 
 Each module's files are layered (basics → operations → laws →
 instances). Imports flow up; you can't import a layer above you.
+
+## Projects
+
+A development that *uses* the library without being part of it lives under
+`projects/<Name>/`, laid out exactly like `library/`. The Fifteen Theorem is
+the first one.
+
+```
+projects/
+  FifteenTheorem/      Algebra/, Test/, fifteen-theorem.md
+```
+
+The test is reuse, not importance. Library content is re-verified on every
+kernel or elaborator change, so its cost is paid over and over; a project is
+a destination that nothing else will cite — often dominated by
+machine-generated case tables — and belongs outside that loop. Moving the
+fifteen theorem out took `library/` from 832 files / 424k lines to 401 files
+/ 102k lines, and left exactly one generated file behind.
+
+Each project directory is its own **source root**. Imports resolve against
+that root first and `library/` second, so a project may reuse the library's
+namespace: `import Algebra.rank_four_pilot` finds the project's copy and
+`import Algebra.matrix` falls through to the library. That ordering is the
+kernel's repeatable `--source-root DIR` flag, which the Makefile attaches to
+every project target; a library file passes none and keeps the single-rooted
+resolution it always had. `kernel deps` needs no flag — it resolves imports
+by module name across every source it is given.
+
+The one hard rule: **`library/` never imports a project.** Full guide, incl.
+adding a project: `projects/README.md`.

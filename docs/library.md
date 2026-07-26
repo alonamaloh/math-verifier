@@ -51,12 +51,14 @@ may import from its own layer and below, never above. (Build/layout depth:
   bundle, `matrix_vector`, `matrix_transpose`): the `determinant` via the
   permutation expansion (multiplicativity, transpose, bordered/Schur),
   `adjugate`/`matrix_inverse` and the Cramer identities, `permutation_sign`,
-  `characteristic_polynomial`, `rank_nullity`, and `cayley_hamilton`. The
-  quadratic-form/escalator development (now the largest part of `Algebra/` —
-  quadratic forms, escalation, truants, the rank-two/three classifications
-  and the 207-form rank-four cover, driving toward the Fifteen Theorem) has
-  its own concise map at
-  [`Algebra/fifteen-theorem.md`](../library/Algebra/fifteen-theorem.md).
+  `characteristic_polynomial`, `rank_nullity`, and `cayley_hamilton`. Also
+  the quadratic-form vocabulary — forms, escalation, truants, the rank-two
+  and rank-three classifications, `diagonal_forms`, and the obstruction half
+  of Legendre's three-squares theorem (the converse is the open obligation
+  `Matrix.ThreeSquaresConverse`). The Fifteen Theorem built on top of it is a
+  *project*, outside the library: see
+  [`projects/FifteenTheorem/fifteen-theorem.md`](../projects/FifteenTheorem/fifteen-theorem.md)
+  and [`projects/README.md`](../projects/README.md).
 - **`Polynomial/`** — the polynomial ring over a coefficient ring:
   `addition`/`multiplication`, `degree` (+ degree-of-product), `division`,
   `bezout`, `irreducible`, `units`, `quotient_field`.

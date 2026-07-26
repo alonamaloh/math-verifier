@@ -14,9 +14,9 @@ from generate_rank_four_isometry_certificates import form_expression, theorem_na
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_OUTPUT = ROOT / "library/Algebra/rank_four_global_classification_generated.math"
-DEFINITIONS_OUTPUT = ROOT / "library/Algebra/rank_four_selected_normal_forms_generated.math"
-BRANCH_OUTPUT = ROOT / "library/Algebra/rank_four_global_branch_coverage_generated.math"
+DEFAULT_OUTPUT = ROOT / "projects/FifteenTheorem/Algebra/rank_four_global_classification_generated.math"
+DEFINITIONS_OUTPUT = ROOT / "projects/FifteenTheorem/Algebra/rank_four_selected_normal_forms_generated.math"
+BRANCH_OUTPUT = ROOT / "projects/FifteenTheorem/Algebra/rank_four_global_branch_coverage_generated.math"
 CHUNK_SIZE = 8
 
 FAMILIES = (

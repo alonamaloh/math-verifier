@@ -27,6 +27,10 @@ write in a textbook, with the kernel doing the typechecking. Optimize for
   and say which.
 - **Build with `make -j 16 library`** from the project root (never bare
   `make`). `make -j 16 tests` also verifies the `Test/` feature files.
+  Developments that *use* the library without being part of it live under
+  `projects/<Name>/` and are built by `make -j 16 projects` — the Fifteen
+  Theorem is there, deliberately outside the inner loop. Nothing in
+  `library/` may import a project. See `projects/README.md`.
   Warm rebuilds are sub-second; a change to `*.cpp`/`*.hpp` (kernel or
   elaborator) re-verifies the whole library (the `.mathv` cache depends
   on the `kernel` binary), so **always validate elaborator changes with a

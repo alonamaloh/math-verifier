@@ -17,7 +17,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-LIB = ROOT / "library/Algebra"
+LIB = ROOT / "projects/FifteenTheorem/Algebra"
 OUTPUT = LIB / "rank_four_outcome_dispatch_generated.math"
 SELECTED = LIB / "rank_four_selected_normal_forms_generated.math"
 

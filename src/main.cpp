@@ -5108,7 +5108,8 @@ int verifyWithCache(const std::string& sourcePath,
                     bool reportRedundantByNonEq = false,
                     bool reportUnusedNames = false,
                     bool writeInterface = true,
-                    int goalAtLine = -1) {
+                    int goalAtLine = -1,
+                    const std::vector<std::string>& extraSourceRoots = {}) {
     Environment environment;
     std::set<std::string> alreadyLoaded;
 
@@ -5162,15 +5163,44 @@ int verifyWithCache(const std::string& sourcePath,
     // additionally mapped to its conventional cache path. Duplicates
     // are dropped by loadCacheRecursive's `alreadyLoaded` set, so the
     // two sources can overlap freely.
+    //
+    // An import is resolved against a LIST of source roots: the file's
+    // own root first (peeled off its path by `deriveSourceRoot`), then
+    // each `--source-root`, in order. A file under `projects/<Name>/`
+    // therefore sees its own modules before the library's, and falls
+    // back to `library/` for everything it imports from there. With no
+    // `--source-root` the list is just the file's own root, which is
+    // the single-rooted behaviour the library build has always had.
     std::vector<std::string> resolvedDependencyCachePaths(
         dependencyCachePaths);
     if (!cacheRoot.empty()) {
-        const std::string sourceRoot =
-            deriveSourceRoot(sourcePath, moduleName);
+        std::vector<std::string> sourceRoots{
+            deriveSourceRoot(sourcePath, moduleName)};
+        for (const auto& extra : extraSourceRoots) {
+            if (std::find(sourceRoots.begin(), sourceRoots.end(), extra)
+                    == sourceRoots.end()) {
+                sourceRoots.push_back(extra);
+            }
+        }
         for (const auto& importedName : importedModuleNames) {
+            const std::string suffix =
+                modulePathWithExtension(importedName, ".mathv");
+            std::vector<std::string> candidates;
+            for (const auto& root : sourceRoots) {
+                candidates.push_back(cacheRoot + "/" + root + suffix);
+            }
+            // First candidate whose cache exists in either form wins; if
+            // none does, keep the first so the load below reports the
+            // familiar "cache is missing or stale" error against the
+            // path the import was most likely meant to name.
+            auto found = std::find_if(
+                candidates.begin(), candidates.end(),
+                [](const std::string& candidate) {
+                    return std::filesystem::exists(candidate + ".iface")
+                        || std::filesystem::exists(candidate);
+                });
             resolvedDependencyCachePaths.push_back(
-                cacheRoot + "/" + sourceRoot
-                + modulePathWithExtension(importedName, ".mathv"));
+                found != candidates.end() ? *found : candidates.front());
         }
     }
 
@@ -7064,13 +7094,16 @@ static int kernelMain(int argc, char* argv[]) {
         bool reportUnusedNames = true;
         bool writeInterface = true;
         int goalAtLine = -1;
-        enum class State { None, Source, Output, Deps, CacheRoot, GoalAt } state = State::None;
+        std::vector<std::string> extraSourceRoots;
+        enum class State { None, Source, Output, Deps, CacheRoot, GoalAt,
+                           SourceRoot } state = State::None;
         for (int i = 2; i < argc; ++i) {
             std::string argument = argv[i];
             if (argument == "--source")      { state = State::Source; continue; }
             if (argument == "--output")      { state = State::Output; continue; }
             if (argument == "--deps")        { state = State::Deps;   continue; }
             if (argument == "--cache-root")  { state = State::CacheRoot; continue; }
+            if (argument == "--source-root") { state = State::SourceRoot; continue; }
             if (argument == "--goal-at")     { state = State::GoalAt; continue; }
             if (argument == "--no-interface") {
                 // Stage-2 of a two-stage build: verify proofs but leave the
@@ -7114,6 +7147,14 @@ static int kernelMain(int argc, char* argv[]) {
                 case State::Output: outputCachePath = argument; state = State::None; break;
                 case State::Deps:   dependencyCachePaths.push_back(argument); break;
                 case State::CacheRoot: cacheRoot = argument; state = State::None; break;
+                case State::SourceRoot: {
+                    // Normalise to a trailing slash: a source root is a path
+                    // PREFIX, concatenated directly with the module path.
+                    if (!argument.empty() && argument.back() != '/')
+                        argument += '/';
+                    extraSourceRoots.push_back(argument);
+                    break;
+                }
                 case State::GoalAt: {
                     char* parseEnd = nullptr;
                     long parsed = std::strtol(argument.c_str(), &parseEnd, 10);
@@ -7143,7 +7184,8 @@ static int kernelMain(int argc, char* argv[]) {
                                reportRedundantByNonEq,
                                reportUnusedNames,
                                writeInterface,
-                               goalAtLine);
+                               goalAtLine,
+                               extraSourceRoots);
     }
     if (argc >= 3 && std::string(argv[1]) == "rewrite") {
         // kernel rewrite --induction-spelling FILE.math [FILE.math ...]
@@ -7257,6 +7299,7 @@ static int kernelMain(int argc, char* argv[]) {
                   << "                      (legacy form, no caching)\n"
                   << "  kernel verify --source FILE.math --output FILE.mathv\n"
                   << "                  [--cache-root DIR]\n"
+                  << "                  [--source-root DIR ...]\n"
                   << "                  [--deps DEP.mathv DEP.mathv ...]\n"
                   << "                  [--no-interface]\n"
                   << "                  [--check-redundant-by]\n"
@@ -7269,6 +7312,12 @@ static int kernelMain(int argc, char* argv[]) {
                   << "                      With --cache-root, the file's imports\n"
                   << "                      are resolved against that root and need\n"
                   << "                      not be listed via --deps.\n"
+                  << "                      --source-root: an extra source root to\n"
+                  << "                      resolve imports against, after the file's\n"
+                  << "                      own. Repeatable, tried in order. A file\n"
+                  << "                      under projects/<Name>/ passes\n"
+                  << "                      `--source-root library/` to import the\n"
+                  << "                      library while its own modules win.\n"
                   << "                      --no-interface: stage 2 of a two-stage\n"
                   << "                      build — re-check proofs but leave the\n"
                   << "                      interface cache (from stage 1) untouched.\n"

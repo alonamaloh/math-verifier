@@ -18,7 +18,7 @@ from classify_rank_four_normal_forms import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_OUTPUT = ROOT / "library/Algebra/rank_four_isometry_certificates_generated.math"
+DEFAULT_OUTPUT = ROOT / "projects/FifteenTheorem/Algebra/rank_four_isometry_certificates_generated.math"
 
 
 def integer(value: int) -> str:

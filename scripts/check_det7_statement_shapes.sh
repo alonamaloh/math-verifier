@@ -6,9 +6,9 @@ shift || true
 
 if [[ $# -eq 0 ]]; then
   set -- \
-    build/library/Test/det_seven_safe_converse_test.mathv \
-    build/library/Algebra/truant_squarefree.mathv \
-    build/library/Algebra/det_seven_rank_four_infrastructure.mathv
+    build/projects/FifteenTheorem/Test/det_seven_safe_converse_test.mathv \
+    build/projects/FifteenTheorem/Algebra/truant_squarefree.mathv \
+    build/projects/FifteenTheorem/Algebra/det_seven_rank_four_infrastructure.mathv
 fi
 
 dump=

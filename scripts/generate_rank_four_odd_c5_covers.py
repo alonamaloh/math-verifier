@@ -24,8 +24,8 @@ from classify_rank_four_normal_forms import NamedForm, coordinate_bounds, named_
 
 ROW_CHUNK_SIZE = 20
 TABLE_PREFIX = "rank_four_odd_c5_base_tables_chunk"
-COVERS = ROOT / "library/Algebra/rank_four_odd_c5_covers.math"
-AUXILIARY_R1_C4 = ROOT / "library/Algebra/rank_four_odd_c5_auxiliary_r1_c4_generated.math"
+COVERS = ROOT / "projects/FifteenTheorem/Algebra/rank_four_odd_c5_covers.math"
+AUXILIARY_R1_C4 = ROOT / "projects/FifteenTheorem/Algebra/rank_four_odd_c5_auxiliary_r1_c4_generated.math"
 
 PARAMETERS = (
     (0, 6),
@@ -316,7 +316,7 @@ theorem Matrix.selectedOddC5_universal_of_three_squares_converse
 
 def render_outputs() -> dict[Path, str]:
     outputs = {
-        ROOT / "library/Algebra" / f"{TABLE_PREFIX}{index}_generated.math":
+        ROOT / "projects/FifteenTheorem/Algebra" / f"{TABLE_PREFIX}{index}_generated.math":
             table_module(f"{TABLE_PREFIX}{index}_generated", residue, corner)
         for index, (residue, corner) in enumerate(PARAMETERS)
     }
@@ -335,7 +335,7 @@ def main() -> int:
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
     outputs = render_outputs()
-    generated = set((ROOT / "library/Algebra").glob(f"{TABLE_PREFIX}*_generated.math"))
+    generated = set((ROOT / "projects/FifteenTheorem/Algebra").glob(f"{TABLE_PREFIX}*_generated.math"))
     generated.add(COVERS)
     generated.add(AUXILIARY_R1_C4)
     stale_extra = generated - set(outputs)

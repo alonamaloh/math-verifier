@@ -31,8 +31,8 @@ from generate_rank_four_weighted_d5_covers import (  # noqa: E402
 
 ROW_CHUNK_SIZE = 20
 TABLE_PREFIX = "rank_four_exceptional_weighted_d5_tables_chunk"
-COVERS = ROOT / "library/Algebra/rank_four_exceptional_weighted_d5_covers_generated.math"
-ODD_TABLES = ROOT / "library/Algebra/rank_four_exceptional_odd_c4_r2_c7_tables_generated.math"
+COVERS = ROOT / "projects/FifteenTheorem/Algebra/rank_four_exceptional_weighted_d5_covers_generated.math"
+ODD_TABLES = ROOT / "projects/FifteenTheorem/Algebra/rank_four_exceptional_odd_c4_r2_c7_tables_generated.math"
 
 WEIGHTED_PARAMETERS = ((0, 0, 5), (1, 1, 5), (1, 1, 9), (1, 2, 8))
 
@@ -336,7 +336,7 @@ import Algebra.rank_four_exceptional_weighted_d5_cover
 def render_outputs() -> dict[Path, str]:
     outputs: dict[Path, str] = {}
     for index, (second, third, corner) in enumerate(WEIGHTED_PARAMETERS):
-        outputs[ROOT / "library/Algebra" / f"{TABLE_PREFIX}{index}_generated.math"] = (
+        outputs[ROOT / "projects/FifteenTheorem/Algebra" / f"{TABLE_PREFIX}{index}_generated.math"] = (
             weighted_table_module(index, second, third, corner)
         )
     outputs[ODD_TABLES] = odd_table_module()
@@ -349,7 +349,7 @@ def main() -> int:
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
     outputs = render_outputs()
-    generated = set((ROOT / "library/Algebra").glob(f"{TABLE_PREFIX}*_generated.math"))
+    generated = set((ROOT / "projects/FifteenTheorem/Algebra").glob(f"{TABLE_PREFIX}*_generated.math"))
     generated.add(ODD_TABLES)
     generated.add(COVERS)
     stale_extra = generated - set(outputs)

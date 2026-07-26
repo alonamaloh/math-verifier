@@ -407,7 +407,7 @@ import Algebra.three_squares_mod_eight
 import Natural.multiply_bounds
 
 """
-    output = ROOT / "library/Algebra/residue_arithmetic_generated.math"
+    output = ROOT / "projects/FifteenTheorem/Algebra/residue_arithmetic_generated.math"
     expected = header + "\n".join(sections)
     if args.check:
         if not output.exists() or output.read_text() != expected:

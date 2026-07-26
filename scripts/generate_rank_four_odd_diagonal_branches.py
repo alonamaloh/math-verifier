@@ -56,7 +56,7 @@ class Branch:
 
     @property
     def outputs(self) -> dict[str, Path]:
-        base = ROOT / "library/Algebra"
+        base = ROOT / "projects/FifteenTheorem/Algebra"
         return {
             section: base / f"{self.stem}_{suffix}.math"
             for section, suffix in (

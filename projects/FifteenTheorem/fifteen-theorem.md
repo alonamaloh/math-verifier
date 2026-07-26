@@ -1,5 +1,24 @@
 # Quadratic forms and the Fifteen Theorem
 
+## Where this lives
+
+This development is a **project**, not part of the library — see
+`projects/README.md`. Build it with `make -j 16 project-FifteenTheorem`
+(or `make -j 16 projects`); `make -j 16 library` does not touch it.
+
+The split follows reuse. The general quadratic-form vocabulary stayed in
+`library/Algebra/`: `quadratic_form`, `integer_quadratic_form`,
+`square_form`, `diagonal_forms`, `gram`, `unimodular`, `sylvester`,
+`truant`, `escalation`, `escalator_tree`, the rank-two and rank-three
+classifications, and Legendre's three-squares theorem. Everything the
+fifteen theorem alone needs — the rank-four classification, the 207-form
+cover, the determinant-seven converses, and every machine-generated
+certificate table — moved here. Modules below are named without a directory
+prefix; look for each in `library/Algebra/` first, then in this project's
+`Algebra/`.
+
+## The development
+
 This development formalizes the escalation route toward the Fifteen Theorem.
 The final theorem is not yet proved. The foundations, the complete
 deduplicated rank-three classification, and a kernel-checked cover of every
