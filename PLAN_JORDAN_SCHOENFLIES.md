@@ -144,7 +144,28 @@ relative boundaries to relative boundaries.
 
 **Size:** 5–8k lines.
 
-## Layer 2 — `Plane/Compactness/`
+## Layer 2 — `Plane/Compactness/` — **DONE 2026-07-26**
+
+Delivered in `Natural/{frequently,subsequence}.math`,
+`Real/{archimedean,cluster}.math`, and
+`Plane/{sequence,compact,compactness,extremum,separation}.math`:
+sequences and the coordinatewise bridge; Bolzano–Weierstrass on the line
+(limsup + canonical extraction, no choice) and in the plane (the line's
+theorem twice); `IsCompact` sequential, with **Heine–Borel** as an
+equivalence; the extremum theorem for real-valued continuous functions;
+uniform continuity; the continuous image of a compactum; and the
+blueprint's `lem:compact-separation` for two disjoint compacta.
+
+`Logic.countable_choice` was added to `axioms.math` for this layer and is
+used at exactly the points where a witness must be produced per tolerance
+with nothing to distinguish the options.
+
+**Not built, deliberately.** `Plane.distanceToSet` and its 1-Lipschitz
+property — `lem:compact-separation` turned out not to need it, and a
+total `distanceToSet` wants infimum machinery the library does not yet
+have. Finite products of compacta — no consumer yet. The
+compact→Hausdorff homeomorphism is deferred to Layer 4, where H4 is its
+only customer.
 
 **Definitions.** `Plane.IsBounded`, `Plane.IsCompact` (recommend:
 *sequential*, then prove equivalence with closed-and-bounded);
