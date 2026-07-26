@@ -1,0 +1,298 @@
+-- Plane/model.math
+--
+-- The two model sets Layer 4 parametrises by, and their compactness.
+-- Layer 4.
+--
+-- An arc is a continuous injective image of an interval and a Jordan
+-- curve is one of a circle. Both models are taken here as **plane sets**:
+-- the unit segment, and the boundary of the square. That choice is what
+-- lets the whole of Layers 1–3 apply to arcs and curves unchanged — a
+-- parametrisation is a `Plane.Point → Plane.Point` map, its continuity is
+-- `Plane.ContinuousOn`, its image is `Plane.imageSet`, and the
+-- compactness the homeomorphism theorem needs is `Plane.IsCompact` of the
+-- model. Parametrising by `[0,1] ⊆ ℝ` instead would need a second copy of
+-- the relative topology for real-domain maps, and the circle would need a
+-- quotient; neither buys anything the segment does not already give.
+--
+-- The square's boundary is the sup-metric level set `‖x‖∞ = 1`, not a
+-- union of four segments. Compactness is then closed-and-bounded with no
+-- case analysis: bounded because the Euclidean norm is at most twice the
+-- sup norm, closed because moving a point moves its sup distance by no
+-- more than the move. The four sides come back as a decomposition when
+-- the arc structure of the model is wanted.
+
+module Plane.model
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import axioms
+import Set.basics
+import Set.algebra
+import Real.interface
+import Real.order
+import Real.order_field
+import Real.division
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.convergence
+import Real.limits
+import Real.cluster
+import Natural.subsequence
+import Plane.vector
+import Plane.point
+import Plane.norm
+import Plane.segment
+import Plane.topology
+import Plane.sequence
+import Plane.compact
+import Plane.compactness
+import Plane.connected
+
+definition Plane.origin : Plane.Point :=
+  Plane.Point.make(0, 0)
+
+-- ----------------------------------------------------------------------
+-- A segment is compact.
+--
+-- Bolzano–Weierstrass on the parameters, carried back to the plane by the
+-- walk's Lipschitz estimate. The parameters have to be chosen — a point
+-- of a degenerate segment has every parameter — which is the one place
+-- this file needs countable choice.
+
+theorem Plane.segment_IsCompact (a b : Plane.Point)
+        : Plane.IsCompact(Plane.segment(a, b)) := {
+  take s : ℕ → Plane.Point;
+  suppose ∀ (m : ℕ). s(m) ∈ Plane.segment(a, b) as inside;
+
+  ∀ (n : ℕ). ∃ (t : ℝ). (0 ≤ t ∧ t ≤ 1) ∧ s(n) = Plane.between(a, b, t)
+      by (n : ℕ) ↦ inside(n) as hasParameters;
+  choose parameter such that
+      ∀ (n : ℕ). (0 ≤ parameter(n) ∧ parameter(n) ≤ 1)
+                   ∧ s(n) = Plane.between(a, b, parameter(n))
+      as chosen
+      from Logic.countable_choice(
+          ℝ,
+          (n : ℕ) (t : ℝ) ↦ (0 ≤ t ∧ t ≤ 1) ∧ s(n) = Plane.between(a, b, t),
+          hasParameters);
+  ∀ (m : ℕ). 0 ≤ parameter(m)
+      by (m : ℕ) ↦ {
+        (0 ≤ parameter(m) ∧ parameter(m) ≤ 1)
+            ∧ s(m) = Plane.between(a, b, parameter(m)) by chosen(m);
+        done
+      }
+      as parametersNonneg;
+  ∀ (m : ℕ). parameter(m) ≤ 1
+      by (m : ℕ) ↦ {
+        (0 ≤ parameter(m) ∧ parameter(m) ≤ 1)
+            ∧ s(m) = Plane.between(a, b, parameter(m)) by chosen(m);
+        done
+      }
+      as parametersAtMostOne;
+
+  -- Thin the parameters to a convergent sequence; its limit is again a
+  -- parameter, so the walk reaches it.
+  Real.SequenceIsBounded(parameter)
+      by { witness (1 : ℝ) with
+             (m : ℕ) ↦ {
+               0 ≤ parameter(m) by parametersNonneg(m);
+               parameter(m) ≤ 1 by parametersAtMostOne(m);
+               -(1 : ℝ) ≤ parameter(m) by ordered_field;
+               done by Real.absolute_value_LessOrEqual_of_bounds
+             } };
+  choose index, limit such that
+      Real.SubsequenceConverges(parameter, index, limit)
+      from Real.bolzano_weierstrass(
+          parameter, { Real.SequenceIsBounded(parameter) });
+  Natural.IsStrictlyIncreasing(index)
+      by Real.SubsequenceConverges.increasing;
+  Real.SequenceConverges((k : ℕ) ↦ parameter(index(k)), limit)
+      by Real.SubsequenceConverges.converges as parametersConverge;
+  0 ≤ limit
+      by Real.SequenceConverges.ge_of_eventually_ge(
+          (k : ℕ) ↦ parameter(index(k)), limit, 0, parametersConverge, 0,
+          (m : ℕ) (beyond : 0 ≤ m) ↦ parametersNonneg(index(m)));
+  limit ≤ 1
+      by Real.SequenceConverges.le_of_eventually_le(
+          (k : ℕ) ↦ parameter(index(k)), limit, 1, parametersConverge, 0,
+          (m : ℕ) (beyond : 0 ≤ m) ↦ parametersAtMostOne(index(m)));
+  Plane.between(a, b, limit) ∈ Plane.segment(a, b)
+      by { witness limit with {
+             0 ≤ limit;
+             limit ≤ 1;
+             Plane.between(a, b, limit) = Plane.between(a, b, limit);
+             done
+           } };
+
+  Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), Plane.between(a, b, limit))
+      by (tolerance : ℝ) (tolerancePositive : tolerance > 0) ↦ {
+        0 < Plane.parameterGap(tolerance, a, b)
+            by Plane.parameterGap_positive;
+        choose threshold such that
+            ∀ (k : ℕ). threshold ≤ k →
+              abs(parameter(index(k)) - limit)
+                  < Plane.parameterGap(tolerance, a, b)
+            as gapSmall
+            from parametersConverge(
+                Plane.parameterGap(tolerance, a, b),
+                { 0 < Plane.parameterGap(tolerance, a, b) });
+        witness threshold with
+            (k : ℕ) (beyond : threshold ≤ k) ↦ {
+              (0 ≤ parameter(index(k)) ∧ parameter(index(k)) ≤ 1)
+                  ∧ s(index(k)) = Plane.between(a, b, parameter(index(k)))
+                  by chosen(index(k));
+              s(index(k)) = Plane.between(a, b, parameter(index(k)))
+                  as isWalkPoint;
+              abs(parameter(index(k)) - limit)
+                  < Plane.parameterGap(tolerance, a, b)
+                  by gapSmall(k, beyond);
+              Plane.distance(
+                  Plane.between(a, b, limit),
+                  Plane.between(a, b, parameter(index(k)))) < tolerance
+                  by Plane.between_close_of_gap(
+                      tolerance, a, b, limit, parameter(index(k)),
+                      tolerancePositive,
+                      { abs(parameter(index(k)) - limit)
+                            < Plane.parameterGap(tolerance, a, b) });
+              done by substituting isWalkPoint
+            }
+      };
+  witness index with { witness Plane.between(a, b, limit) with done }
+}
+
+-- ----------------------------------------------------------------------
+-- The unit segment: the model interval.
+
+definition Plane.unitSegment : Set(Plane.Point) :=
+  Plane.segment(Plane.origin, Plane.Point.make(1, 0))
+
+theorem Plane.unitSegment_IsCompact : Plane.IsCompact(Plane.unitSegment) :=
+  Plane.segment_IsCompact(Plane.origin, Plane.Point.make(1, 0))
+
+theorem Plane.unitSegment_IsConnected : Plane.IsConnected(Plane.unitSegment) :=
+  Plane.segment_IsConnected(Plane.origin, Plane.Point.make(1, 0))
+
+theorem Plane.start_in_unitSegment : Plane.origin ∈ Plane.unitSegment :=
+  Plane.left_in_segment(Plane.origin, Plane.Point.make(1, 0))
+
+theorem Plane.finish_in_unitSegment
+        : Plane.Point.make(1, 0) ∈ Plane.unitSegment :=
+  Plane.right_in_segment(Plane.origin, Plane.Point.make(1, 0))
+
+-- ----------------------------------------------------------------------
+-- The square's boundary: the model curve.
+
+definition Plane.squareBoundary : Set(Plane.Point) :=
+  (x : Plane.Point) ↦ Plane.supDistance(Plane.origin, x) = 1
+
+-- Membership read in both directions. The level-set spelling is not the
+-- one the arguments speak, and an equation-shaped membership is expensive
+-- for the auto-prover to unfold on its own, so these two readers carry it.
+theorem Plane.supDistance_of_squareBoundary (x : Plane.Point)
+        (onBoundary : x ∈ Plane.squareBoundary)
+        : Plane.supDistance(Plane.origin, x) = 1 :=
+  onBoundary
+
+theorem Plane.member_squareBoundary (x : Plane.Point)
+        (level : Plane.supDistance(Plane.origin, x) = 1)
+        : x ∈ Plane.squareBoundary :=
+  level
+
+theorem Plane.corner_in_squareBoundary
+        : Plane.Point.make(1, 1) ∈ Plane.squareBoundary := {
+  Plane.Vector.first(Plane.Point.make(1, 1) - Plane.origin)
+      = Plane.Point.first(Plane.Point.make(1, 1))
+          - Plane.Point.first(Plane.origin)
+      by Plane.Point.first_difference;
+  Plane.Vector.second(Plane.Point.make(1, 1) - Plane.origin)
+      = Plane.Point.second(Plane.Point.make(1, 1))
+          - Plane.Point.second(Plane.origin)
+      by Plane.Point.second_difference;
+  Plane.supDistance(Plane.origin, Plane.Point.make(1, 1))
+     = max(abs((1 : ℝ) - 0), abs((1 : ℝ) - 0))
+     = max((1 : ℝ), (1 : ℝ))
+     = 1 by Real.maximum_self;
+  done
+}
+
+theorem Plane.squareBoundary_IsNonempty
+        : Set.IsNonempty(Plane.Point, Plane.squareBoundary) :=
+  witness Plane.Point.make(1, 1) with
+      Plane.corner_in_squareBoundary
+
+theorem Plane.squareBoundary_IsBounded
+        : Plane.IsBounded(Plane.squareBoundary) := {
+  witness Plane.origin with {
+    witness (2 : ℝ) with
+        (x : Plane.Point) (onBoundary : x ∈ Plane.squareBoundary) ↦ {
+          Plane.supDistance(Plane.origin, x) = 1
+              by onBoundary as unitSupDistance;
+          Plane.distance(Plane.origin, x)
+             = Plane.Vector.norm(x - Plane.origin)
+             ≤ 2 * Plane.Vector.supNorm(x - Plane.origin)
+                   by Plane.Vector.norm_LessOrEqual_two_supNorm
+             = 2 * Plane.supDistance(Plane.origin, x)
+             = 2 * 1 by unitSupDistance
+             = 2;
+          done
+        }
+  }
+}
+
+-- The level set is closed: a point of its closure that missed it would
+-- have the whole gap to spare, and the sup distance from the origin moves
+-- by no more than the point does — less, even, than the Euclidean ball the
+-- closure hands over.
+theorem Plane.squareBoundary_IsClosed
+        : Plane.Closure(Plane.squareBoundary) ⊆ Plane.squareBoundary := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.Closure(Plane.squareBoundary) as inClosure;
+  ∀ (radius : ℝ). 0 < radius →
+      ∃ (y : Plane.Point). y ∈ Plane.squareBoundary
+        ∧ Plane.distance(x, y) < radius
+      as boundaryIsNear;
+  suppose ¬(Plane.supDistance(Plane.origin, x) = 1) as notOnLevel
+      for contradiction {
+    Plane.supDistance(Plane.origin, x) - 1 ≠ 0
+        by (gapVanishes : Plane.supDistance(Plane.origin, x) - 1 = 0) ↦ {
+          Plane.supDistance(Plane.origin, x) = 1
+              by linear_combination(gapVanishes);
+          done
+        };
+    0 < abs(Plane.supDistance(Plane.origin, x) - 1)
+        by Real.absolute_value_positive;
+    choose near such that
+        Plane.supDistance(Plane.origin, near) = 1
+          ∧ Plane.distance(x, near)
+                < abs(Plane.supDistance(Plane.origin, x) - 1)
+        from boundaryIsNear(
+            abs(Plane.supDistance(Plane.origin, x) - 1),
+            { 0 < abs(Plane.supDistance(Plane.origin, x) - 1) });
+    Plane.supDistance(Plane.origin, near) = 1 as nearOnLevel;
+    Plane.distance(x, near) < abs(Plane.supDistance(Plane.origin, x) - 1);
+    Plane.supDistance(Plane.origin, near) - Plane.supDistance(Plane.origin, x)
+        = 1 - Plane.supDistance(Plane.origin, x)
+        by linear_combination(nearOnLevel) as gapAtNear;
+    abs(Plane.supDistance(Plane.origin, near)
+            - Plane.supDistance(Plane.origin, x))
+        ≤ Plane.supDistance(x, near) by Plane.supDistance_shift_bound;
+    Plane.supDistance(x, near) ≤ Plane.distance(x, near)
+        by Plane.supDistance_LessOrEqual_distance;
+    abs(1 - Plane.supDistance(Plane.origin, x)) ≤ Plane.distance(x, near)
+        by substituting gapAtNear;
+    abs(Plane.supDistance(Plane.origin, x) - 1)
+       = abs(1 - Plane.supDistance(Plane.origin, x))
+             by Real.absolute_value_subtract_swap
+       ≤ Plane.distance(x, near)
+       < abs(Plane.supDistance(Plane.origin, x) - 1);
+    done by Real.LessThan.irreflexive
+  };
+  done by Plane.member_squareBoundary(
+      x, { Plane.supDistance(Plane.origin, x) = 1 })
+}
+
+theorem Plane.squareBoundary_IsCompact
+        : Plane.IsCompact(Plane.squareBoundary) :=
+  Plane.compact_of_closed_bounded(
+      Plane.squareBoundary, Plane.squareBoundary_IsClosed,
+      Plane.squareBoundary_IsBounded)

@@ -116,6 +116,104 @@ theorem Plane.supDistance_LessOrEqual_distance (p q : Plane.Point)
         : Plane.supDistance(p, q) ≤ Plane.distance(p, q) :=
   done by Plane.Vector.supNorm_LessOrEqual_norm
 
+theorem Plane.supDistance_nonneg (p q : Plane.Point)
+        : 0 ≤ Plane.supDistance(p, q) :=
+  done by Plane.Vector.supNorm_nonneg
+
+-- ----------------------------------------------------------------------
+-- The sup metric obeys the triangle inequality too, and coordinatewise
+-- the proof is where it belongs: each coordinate of a sum is below the
+-- sum of the two sup norms, and a bound on both coordinates bounds their
+-- maximum.
+
+theorem Plane.Vector.supNorm_triangle (u v : Plane.Vector)
+        : Plane.Vector.supNorm(u + v)
+              ≤ Plane.Vector.supNorm(u) + Plane.Vector.supNorm(v) := {
+  abs(Plane.Vector.first(u)) ≤ Plane.Vector.supNorm(u);
+  abs(Plane.Vector.second(u)) ≤ Plane.Vector.supNorm(u);
+  abs(Plane.Vector.first(v)) ≤ Plane.Vector.supNorm(v);
+  abs(Plane.Vector.second(v)) ≤ Plane.Vector.supNorm(v);
+  abs(Plane.Vector.first(u + v))
+     = abs(Plane.Vector.first(u) + Plane.Vector.first(v))
+           by Plane.Vector.first_add
+     ≤ abs(Plane.Vector.first(u)) + abs(Plane.Vector.first(v))
+     ≤ Plane.Vector.supNorm(u) + Plane.Vector.supNorm(v);
+  abs(Plane.Vector.second(u + v))
+     = abs(Plane.Vector.second(u) + Plane.Vector.second(v))
+           by Plane.Vector.second_add
+     ≤ abs(Plane.Vector.second(u)) + abs(Plane.Vector.second(v))
+     ≤ Plane.Vector.supNorm(u) + Plane.Vector.supNorm(v);
+  done by Real.maximum_LessOrEqual
+}
+
+-- The sup norm ignores sign: each coordinate keeps its absolute value, so
+-- the two maxima bound each other.
+theorem Plane.Vector.supNorm_negate (v : Plane.Vector)
+        : Plane.Vector.supNorm(-v) = Plane.Vector.supNorm(v) := {
+  abs(Plane.Vector.first(-v))
+     = abs(-Plane.Vector.first(v)) by Plane.Vector.first_negate
+     = abs(Plane.Vector.first(v)) by Real.absolute_value_negate
+     ≤ Plane.Vector.supNorm(v);
+  abs(Plane.Vector.second(-v))
+     = abs(-Plane.Vector.second(v)) by Plane.Vector.second_negate
+     = abs(Plane.Vector.second(v)) by Real.absolute_value_negate
+     ≤ Plane.Vector.supNorm(v);
+  Plane.Vector.supNorm(-v) ≤ Plane.Vector.supNorm(v)
+      by Real.maximum_LessOrEqual;
+  abs(Plane.Vector.first(v))
+     = abs(-Plane.Vector.first(v)) by Real.absolute_value_negate
+     = abs(Plane.Vector.first(-v)) by Plane.Vector.first_negate
+     ≤ Plane.Vector.supNorm(-v);
+  abs(Plane.Vector.second(v))
+     = abs(-Plane.Vector.second(v)) by Real.absolute_value_negate
+     = abs(Plane.Vector.second(-v)) by Plane.Vector.second_negate
+     ≤ Plane.Vector.supNorm(-v);
+  Plane.Vector.supNorm(v) ≤ Plane.Vector.supNorm(-v)
+      by Real.maximum_LessOrEqual;
+  done by Real.LessOrEqual.antisymmetric
+}
+
+-- The sup distance does not care about order: reversing the displacement
+-- negates it, and the sup norm does not see the sign.
+theorem Plane.supDistance_symmetric (p q : Plane.Point)
+        : Plane.supDistance(p, q) = Plane.supDistance(q, p) :=
+  Plane.Vector.supNorm(q - p)
+     = Plane.Vector.supNorm(-(p - q)) by Plane.Point.difference_reverse
+     = Plane.Vector.supNorm(p - q) by Plane.Vector.supNorm_negate
+
+theorem Plane.supDistance_triangle (p q r : Plane.Point)
+        : Plane.supDistance(p, r)
+              ≤ Plane.supDistance(p, q) + Plane.supDistance(q, r) :=
+  Plane.Vector.supNorm(r - p)
+     = Plane.Vector.supNorm((q - p) + (r - q))
+           by Plane.Point.difference_chain
+     ≤ Plane.Vector.supNorm(q - p) + Plane.Vector.supNorm(r - q)
+           by Plane.Vector.supNorm_triangle
+
+-- Moving the far endpoint moves the sup distance by no more than the
+-- move: the continuity of `supDistance(centre, ·)`, which is what makes
+-- a sup-metric level set closed.
+theorem Plane.supDistance_shift_bound (centre x y : Plane.Point)
+        : abs(Plane.supDistance(centre, y) - Plane.supDistance(centre, x))
+              ≤ Plane.supDistance(x, y) := {
+  Plane.supDistance(centre, y)
+      ≤ Plane.supDistance(centre, x) + Plane.supDistance(x, y)
+      by Plane.supDistance_triangle;
+  Plane.supDistance(centre, y) - Plane.supDistance(centre, x)
+      ≤ Plane.supDistance(x, y) by ordered_field;
+  Plane.supDistance(centre, x)
+      ≤ Plane.supDistance(centre, y) + Plane.supDistance(y, x)
+      by Plane.supDistance_triangle;
+  Plane.supDistance(y, x) = Plane.supDistance(x, y)
+      by Plane.supDistance_symmetric;
+  Plane.supDistance(centre, x)
+      ≤ Plane.supDistance(centre, y) + Plane.supDistance(x, y);
+  -Plane.supDistance(x, y)
+      ≤ Plane.supDistance(centre, y) - Plane.supDistance(centre, x)
+      by ordered_field;
+  done by Real.absolute_value_LessOrEqual_of_bounds
+}
+
 -- ----------------------------------------------------------------------
 -- The other half of the comparison, `‖v‖ ≤ √2·‖v‖∞`.
 
