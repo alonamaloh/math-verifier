@@ -279,3 +279,46 @@ theorem Plane.distance_triangle (p q r : Plane.Point)
            by Plane.Point.difference_chain
      ≤ Plane.Vector.norm(q - p) + Plane.Vector.norm(r - q)
            by Plane.Vector.norm_triangle
+
+-- ----------------------------------------------------------------------
+-- Scaling.
+
+-- Two nonnegative reals with the same square are the same real: each is
+-- below the other by comparing squares.
+theorem Real.equal_of_square_equal_nonneg (x y : ℝ)
+        (xNonneg : 0 ≤ x) (yNonneg : 0 ≤ y)
+        (squaresEqual : x * x = y * y)
+        : x = y := {
+  x * x ≤ y * y;
+  y * y ≤ x * x;
+  x ≤ y by Real.LessOrEqual_of_square_LessOrEqual;
+  y ≤ x by Real.LessOrEqual_of_square_LessOrEqual;
+  done by Real.LessOrEqual.antisymmetric
+}
+
+theorem Plane.Vector.norm_scale (factor : ℝ) (v : Plane.Vector)
+        : Plane.Vector.norm(factor * v)
+              = abs(factor) * Plane.Vector.norm(v) := {
+  0 ≤ Plane.Vector.norm(factor * v) by Plane.Vector.norm_nonneg;
+  0 ≤ abs(factor) by Real.absolute_value_nonneg;
+  Real.IsNonneg(abs(factor));
+  Real.IsNonneg(Plane.Vector.norm(v)) by Plane.Vector.norm_nonneg;
+  Real.IsNonneg(abs(factor) * Plane.Vector.norm(v)) by Real.IsNonneg.multiply;
+  0 ≤ abs(factor) * Plane.Vector.norm(v);
+  Plane.Vector.norm(factor * v) * Plane.Vector.norm(factor * v)
+     = Plane.Vector.innerProduct(factor * v, factor * v)
+           by Plane.Vector.norm_squared
+     = factor * Plane.Vector.innerProduct(v, factor * v)
+           by Plane.Vector.innerProduct_scale_left
+     = factor * (factor * Plane.Vector.innerProduct(v, v))
+           by Plane.Vector.innerProduct_scale_right
+     = (factor * factor) * Plane.Vector.innerProduct(v, v) by ring
+     = (abs(factor) * abs(factor)) * Plane.Vector.innerProduct(v, v)
+           by Real.absolute_value_square
+     = (abs(factor) * abs(factor))
+           * (Plane.Vector.norm(v) * Plane.Vector.norm(v))
+           by Plane.Vector.norm_squared
+     = (abs(factor) * Plane.Vector.norm(v))
+           * (abs(factor) * Plane.Vector.norm(v)) by ring;
+  done by Real.equal_of_square_equal_nonneg
+}
