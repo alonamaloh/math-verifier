@@ -1,0 +1,245 @@
+-- Natural/frequently.math
+--
+-- "Frequently P": the property P holds arbitrarily late. The dual of
+-- `Natural.Eventually`, and the hypothesis every subsequence extraction
+-- runs on.
+--
+-- The file's real content is the extraction principle: from a family of
+-- properties each of which holds arbitrarily late, one can build a
+-- strictly increasing sequence of indices realizing them all. That is the
+-- step where a mathematician says "choose n_k > n_{k-1} with P_k(n_k)"
+-- and a formal system asks which one. The answer here is the LEAST such
+-- index, which is canonical, so `Logic.the` suffices and no choice
+-- principle is needed. `Natural.leastWitness` packages that: the least
+-- natural satisfying a predicate, or 0 when none does.
+
+module Natural.frequently
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.subtraction
+import Natural.least_number
+
+-- ----------------------------------------------------------------------
+-- Holding arbitrarily late.
+
+definition Natural.Frequently (P : ℕ → Proposition) : Proposition :=
+  ∀ (bound : ℕ). ∃ (m : ℕ). bound < m ∧ P(m)
+
+-- ----------------------------------------------------------------------
+-- The least witness, made total. Written as a conjunction of two
+-- implications rather than a disjunction of two cases, so that consumers
+-- get at the half they want by applying rather than by case analysis.
+
+definition Natural.IsLeastWitness (P : ℕ → Proposition) (m : ℕ) : Proposition :=
+  ((∃ (n : ℕ). P(n)) → P(m) ∧ (∀ (k : ℕ). P(k) → m ≤ k))
+  ∧ (¬(∃ (n : ℕ). P(n)) → m = 0)
+
+theorem Natural.least_witness_or_zero_exists (P : ℕ → Proposition)
+        : ∃ (m : ℕ). Natural.IsLeastWitness(P, m) := {
+  done by cases {
+    case ∃ (n : ℕ). P(n) as someWitness: {
+        choose n such that P(n) as holdsAtN from someWitness;
+        ∃ (minimum : ℕ). P(minimum) ∧ (∀ (k : ℕ). P(k) → minimum ≤ k)
+            by Natural.least_witness(P, n, holdsAtN) as leastExists;
+        choose minimum such that
+            P(minimum) ∧ (∀ (k : ℕ). P(k) → minimum ≤ k)
+            as minimumIsLeast from leastExists;
+        witness minimum with {
+          (∃ (n : ℕ). P(n)) → P(minimum) ∧ (∀ (k : ℕ). P(k) → minimum ≤ k)
+              by (_ : ∃ (n : ℕ). P(n)) ↦ minimumIsLeast;
+          ¬(∃ (n : ℕ). P(n)) → minimum = 0
+              by (none : ¬(∃ (n : ℕ). P(n))) ↦ {
+                   False by none(someWitness);
+                   done
+                 };
+          done
+        }
+      }
+    otherwise as noWitness: {
+        witness (0 : ℕ) with {
+          (∃ (n : ℕ). P(n)) → P(0) ∧ (∀ (k : ℕ). P(k) → (0 : ℕ) ≤ k)
+              by (some : ∃ (n : ℕ). P(n)) ↦ {
+                   False by noWitness(some);
+                   done
+                 };
+          ¬(∃ (n : ℕ). P(n)) → (0 : ℕ) = 0
+              by (_ : ¬(∃ (n : ℕ). P(n))) ↦ reflexivity(ℕ, 0);
+          done
+        }
+      }
+  }
+}
+
+theorem Natural.least_witness_or_zero_unique (P : ℕ → Proposition)
+        : ∀ (a b : ℕ).
+            Natural.IsLeastWitness(P, a) → Natural.IsLeastWitness(P, b)
+            → a = b := {
+  take a : ℕ;
+  take b : ℕ;
+  suppose Natural.IsLeastWitness(P, a) as aIsLeast;
+  suppose Natural.IsLeastWitness(P, b) as bIsLeast;
+  (∃ (n : ℕ). P(n)) → P(a) ∧ (∀ (k : ℕ). P(k) → a ≤ k) as aWhenSome;
+  (∃ (n : ℕ). P(n)) → P(b) ∧ (∀ (k : ℕ). P(k) → b ≤ k) as bWhenSome;
+  ¬(∃ (n : ℕ). P(n)) → a = 0 as aWhenNone;
+  ¬(∃ (n : ℕ). P(n)) → b = 0 as bWhenNone;
+  done by cases {
+    case ∃ (n : ℕ). P(n) as someWitness: {
+        P(a) ∧ (∀ (k : ℕ). P(k) → a ≤ k) by aWhenSome(someWitness);
+        P(b) ∧ (∀ (k : ℕ). P(k) → b ≤ k) by bWhenSome(someWitness);
+        P(a) as holdsAtA;
+        P(b) as holdsAtB;
+        ∀ (k : ℕ). P(k) → a ≤ k as aBelowAll;
+        ∀ (k : ℕ). P(k) → b ≤ k as bBelowAll;
+        a ≤ b by aBelowAll(b, holdsAtB);
+        b ≤ a by bBelowAll(a, holdsAtA);
+        done by Natural.le_antisymmetric
+      }
+    otherwise as noWitness: {
+        a = 0 by aWhenNone(noWitness);
+        b = 0 by bWhenNone(noWitness);
+        done
+      }
+  }
+}
+
+-- The least natural satisfying `P` — or 0, when none does. Total, so it
+-- can be iterated in a recursive definition without carrying proofs.
+definition Natural.leastWitness (P : ℕ → Proposition) : ℕ :=
+  Logic.the(ℕ, (m : ℕ) ↦ Natural.IsLeastWitness(P, m),
+      Natural.least_witness_or_zero_exists(P),
+      Natural.least_witness_or_zero_unique(P))
+
+theorem Natural.leastWitness_characterized (P : ℕ → Proposition)
+        : Natural.IsLeastWitness(P, Natural.leastWitness(P)) :=
+  Logic.the_satisfies(ℕ, (m : ℕ) ↦ Natural.IsLeastWitness(P, m),
+      Natural.least_witness_or_zero_exists(P),
+      Natural.least_witness_or_zero_unique(P))
+
+-- When there is a witness at all, the least one is a witness.
+theorem Natural.leastWitness_satisfies (P : ℕ → Proposition)
+        (someWitness : ∃ (n : ℕ). P(n))
+        : P(Natural.leastWitness(P)) := {
+  Natural.IsLeastWitness(P, Natural.leastWitness(P))
+      by Natural.leastWitness_characterized;
+  (∃ (n : ℕ). P(n))
+      → P(Natural.leastWitness(P))
+        ∧ (∀ (k : ℕ). P(k) → Natural.leastWitness(P) ≤ k) as whenSome;
+  P(Natural.leastWitness(P))
+      ∧ (∀ (k : ℕ). P(k) → Natural.leastWitness(P) ≤ k)
+      by whenSome(someWitness);
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- Extraction. Given properties `P(k, -)` each holding arbitrarily late,
+-- `Natural.extract(P, k)` is the least index past the previous one at
+-- which `P(k, -)` holds.
+
+definition Natural.extract (P : ℕ → ℕ → Proposition) : ℕ → ℕ
+  | 0     => Natural.leastWitness((m : ℕ) ↦ P(0, m))
+  | 1 + k => Natural.leastWitness((m : ℕ) ↦
+                 Natural.extract(P, k) < m ∧ P(1 + k, m))
+
+-- The recurrence as a citeable equation: `Natural.add` is opaque, so
+-- `extract(P, 1 + k)` does not reduce on its own.
+theorem Natural.extract_add_one (P : ℕ → ℕ → Proposition) (k : ℕ)
+        : Natural.extract(P, 1 + k)
+              = Natural.leastWitness((m : ℕ) ↦
+                    Natural.extract(P, k) < m ∧ P(1 + k, m)) :=
+  Natural.extract(P, 1 + k)
+     = Natural.extract(P, successor(k))
+     = Natural.leastWitness((m : ℕ) ↦
+           Natural.extract(P, k) < m ∧ P(1 + k, m))
+
+-- ----------------------------------------------------------------------
+-- What extraction delivers: the indices strictly increase, and the
+-- properties hold along them.
+
+theorem Natural.extract_step (P : ℕ → ℕ → Proposition)
+        (late : ∀ (k : ℕ). Natural.Frequently((m : ℕ) ↦ P(k, m)))
+        (k : ℕ)
+        : Natural.extract(P, k) < Natural.extract(P, 1 + k)
+          ∧ P(1 + k, Natural.extract(P, 1 + k)) := {
+  ∃ (m : ℕ). Natural.extract(P, k) < m ∧ P(1 + k, m)
+      by late(1 + k, Natural.extract(P, k)) as someWitness;
+  Natural.extract(P, k) < Natural.leastWitness((m : ℕ) ↦
+          Natural.extract(P, k) < m ∧ P(1 + k, m))
+      ∧ P(1 + k, Natural.leastWitness((m : ℕ) ↦
+          Natural.extract(P, k) < m ∧ P(1 + k, m)))
+      by Natural.leastWitness_satisfies(
+          (m : ℕ) ↦ Natural.extract(P, k) < m ∧ P(1 + k, m),
+          someWitness);
+  Natural.leastWitness((m : ℕ) ↦
+      Natural.extract(P, k) < m ∧ P(1 + k, m))
+      = Natural.extract(P, 1 + k) by Natural.extract_add_one;
+  done
+}
+
+theorem Natural.extract_base (P : ℕ → ℕ → Proposition)
+        (late : ∀ (k : ℕ). Natural.Frequently((m : ℕ) ↦ P(k, m)))
+        : P(0, Natural.extract(P, 0)) := {
+  ∃ (m : ℕ). 0 < m ∧ P(0, m) by late(0, 0) as someLate;
+  choose m such that 0 < m ∧ P(0, m) from someLate;
+  P(0, m) as holdsAtM;
+  ∃ (m : ℕ). P(0, m) by { witness m with holdsAtM } as someWitness;
+  done by Natural.leastWitness_satisfies((m : ℕ) ↦ P(0, m), someWitness)
+}
+
+theorem Natural.extract_holds (P : ℕ → ℕ → Proposition)
+        (late : ∀ (k : ℕ). Natural.Frequently((m : ℕ) ↦ P(k, m)))
+        (k : ℕ)
+        : P(k, Natural.extract(P, k)) := {
+  done by induction on k with inductionHypothesis {
+    case base: Natural.extract_base(P, late)
+    case step(predecessor): {
+        Natural.extract(P, predecessor) < Natural.extract(P, 1 + predecessor)
+            ∧ P(1 + predecessor, Natural.extract(P, 1 + predecessor))
+            by Natural.extract_step(P, late, predecessor);
+        P(1 + predecessor, Natural.extract(P, 1 + predecessor));
+        1 + predecessor = successor(predecessor);
+        done
+      }
+  }
+}
+
+theorem Natural.extract_increasing (P : ℕ → ℕ → Proposition)
+        (late : ∀ (k : ℕ). Natural.Frequently((m : ℕ) ↦ P(k, m)))
+        (k : ℕ)
+        : Natural.extract(P, k) < Natural.extract(P, 1 + k) := {
+  Natural.extract(P, k) < Natural.extract(P, 1 + k)
+      ∧ P(1 + k, Natural.extract(P, 1 + k))
+      by Natural.extract_step(P, late, k);
+  done
+}
+
+-- An extracted index is at least its position, so an extracted sequence
+-- passes every threshold. This is what lets a subsequence inherit an
+-- `eventually`.
+theorem Natural.extract_LessOrEqual (P : ℕ → ℕ → Proposition)
+        (late : ∀ (k : ℕ). Natural.Frequently((m : ℕ) ↦ P(k, m)))
+        (k : ℕ)
+        : k ≤ Natural.extract(P, k) := {
+  done by induction on k with inductionHypothesis {
+    case base: { (0 : ℕ) ≤ Natural.extract(P, 0); done }
+    case step(predecessor): {
+        predecessor ≤ Natural.extract(P, predecessor)
+            by inductionHypothesis;
+        Natural.extract(P, predecessor) < Natural.extract(P, 1 + predecessor)
+            by Natural.extract_increasing(P, late, predecessor);
+        predecessor < Natural.extract(P, 1 + predecessor)
+            by Natural.LessThan.transitive_left;
+        predecessor + 1 ≤ Natural.extract(P, 1 + predecessor)
+            by Natural.add_one_le_of_lt;
+        1 + predecessor ≤ Natural.extract(P, 1 + predecessor);
+        1 + predecessor = successor(predecessor);
+        done
+      }
+  }
+}
