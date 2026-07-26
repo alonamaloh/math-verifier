@@ -189,7 +189,44 @@ are at positive distance; and the punctured version.
 
 **Size:** 6–9k lines.
 
-## Layer 3 — `Plane/Connectedness/`
+## Layer 3 — `Plane/Connectedness/` — **set-level content DONE 2026-07-26**
+
+Delivered in `Plane/{connected,component,polygonal}.math`, with
+`Plane/segment.math` picking up the Layer 0 facts they needed
+(`between_reverse`, `segment_symmetric`, `between_nested`,
+`segment_IsConvex`, `IsConvex.segment_inside`, the coordinates of a
+walk):
+
+- **Connectedness** is the clopen criterion taken as the definition — a
+  nonempty relatively-clopen piece is everything — so every consumer
+  discharges three positive obligations instead of refuting a separation.
+- Continuous images; unions through a common point; **convex sets are
+  connected** (the walk with a supremum, the layer's one analytic proof),
+  hence disks and segments; a connected set caught between two disjoint
+  open sets lies in the one it meets; adjoining limit points.
+- **Components** as the union of the connected parts through a point —
+  a comprehension, so no indexed unions. Connected, maximal, partitioning
+  (`Component.equal_of_member`, `equal_of_meeting`), open when the set is,
+  and `Component.recognize` for the blueprint's *Recognizing a component*.
+  The boundary of a component of an open set misses the set, so the
+  boundary of a component of a closed set's complement lies in the closed
+  set.
+- **`Plane.PolygonalReach`** — a walk is a finite chain of segments inside
+  the region, taken as an inductive relation — and
+  **`Plane.polygonal_connected`**: in an open connected set every point
+  is reachable from every other. `Plane.Component_is_reachable_set`
+  identifies the components of an open set with the walk classes, which
+  is the local-connectedness item in the form the blueprint uses it.
+
+**Not built, deliberately.** The **simplicity** clause of H3 (any two
+points of a region are joined by a *simple* polygonal arc). A walk is
+currently a derivation, not an object, so "simple" has nothing to be
+predicated of; stating it wants Layer 4's arc type and proving it wants
+the subdivide-at-intersections step of Layer 6. The walk relation is what
+Part I's clopen arguments actually consume, so this is a deferral of the
+statement, not of the workhorse. The general "locally path-connected
+carrier" formulation was also skipped in favour of the plane fact above —
+no consumer wants the abstract version.
 
 **Definitions.** `Plane.IsConnected` (relative), `Plane.Component`,
 `Plane.IsRegion` (nonempty open connected).

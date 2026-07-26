@@ -20,6 +20,7 @@ import Logic.basics
 import Logic.exists
 import Equality.basics
 import Set.basics
+import Set.algebra
 import Real.interface
 import Real.maximum
 import Real.absolute_value
@@ -109,6 +110,64 @@ theorem Plane.Vector.norm_affine_combination (u w : Plane.Vector) (t : ℝ)
 -- ----------------------------------------------------------------------
 -- Segments and convexity.
 
+-- The walk in coordinates: each coordinate walks from one endpoint's to
+-- the other's. Part I's parity counting reads points this way, and the
+-- reversal below is the first customer.
+theorem Plane.Point.first_between (a b : Plane.Point) (t : ℝ)
+        : Plane.Point.first(Plane.between(a, b, t))
+              = Plane.Point.first(a)
+                  + t * (Plane.Point.first(b) - Plane.Point.first(a)) := {
+  Plane.Point.first(Plane.between(a, b, t))
+     = Plane.Vector.first(Plane.Point.position(a) + t * (b - a))
+           by Plane.Point.position_translate
+     = Plane.Vector.first(Plane.Point.position(a))
+           + Plane.Vector.first(t * (b - a)) by Plane.Vector.first_add
+     = Plane.Point.first(a) + t * Plane.Vector.first(b - a)
+           by Plane.Vector.first_scale
+     = Plane.Point.first(a) + t * (Plane.Point.first(b) - Plane.Point.first(a))
+           by Plane.Point.first_difference;
+  done
+}
+
+theorem Plane.Point.second_between (a b : Plane.Point) (t : ℝ)
+        : Plane.Point.second(Plane.between(a, b, t))
+              = Plane.Point.second(a)
+                  + t * (Plane.Point.second(b) - Plane.Point.second(a)) := {
+  Plane.Point.second(Plane.between(a, b, t))
+     = Plane.Vector.second(Plane.Point.position(a) + t * (b - a))
+           by Plane.Point.position_translate
+     = Plane.Vector.second(Plane.Point.position(a))
+           + Plane.Vector.second(t * (b - a)) by Plane.Vector.second_add
+     = Plane.Point.second(a) + t * Plane.Vector.second(b - a)
+           by Plane.Vector.second_scale
+     = Plane.Point.second(a)
+           + t * (Plane.Point.second(b) - Plane.Point.second(a))
+           by Plane.Point.second_difference;
+  done
+}
+
+-- Walking backwards along the reversed walk lands in the same place, so
+-- the two orientations of a segment are the same set.
+theorem Plane.between_reverse (a b : Plane.Point) (t : ℝ)
+        : Plane.between(a, b, t) = Plane.between(b, a, 1 - t) := {
+  Plane.Point.first(Plane.between(a, b, t))
+     = Plane.Point.first(a) + t * (Plane.Point.first(b) - Plane.Point.first(a))
+           by Plane.Point.first_between
+     = Plane.Point.first(b)
+           + (1 - t) * (Plane.Point.first(a) - Plane.Point.first(b))
+     = Plane.Point.first(Plane.between(b, a, 1 - t))
+           by Plane.Point.first_between;
+  Plane.Point.second(Plane.between(a, b, t))
+     = Plane.Point.second(a)
+           + t * (Plane.Point.second(b) - Plane.Point.second(a))
+           by Plane.Point.second_between
+     = Plane.Point.second(b)
+           + (1 - t) * (Plane.Point.second(a) - Plane.Point.second(b))
+     = Plane.Point.second(Plane.between(b, a, 1 - t))
+           by Plane.Point.second_between;
+  done by Plane.Point.equal_of_coordinates
+}
+
 definition Plane.segment (a b : Plane.Point) : Set(Plane.Point) :=
   (x : Plane.Point) ↦
     ∃ (t : ℝ). (0 ≤ t ∧ t ≤ 1) ∧ x = Plane.between(a, b, t)
@@ -135,6 +194,180 @@ theorem Plane.right_in_segment (a b : Plane.Point)
     b = Plane.between(a, b, 1) by Plane.between_one;
     done
   }
+
+-- A segment has no preferred end.
+theorem Plane.segment_subset_reverse (a b : Plane.Point)
+        : Plane.segment(a, b) ⊆ Plane.segment(b, a) := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.segment(a, b) as onSegment;
+  choose t such that
+      (0 ≤ t ∧ t ≤ 1) ∧ x = Plane.between(a, b, t) from onSegment;
+  0 ≤ t;
+  t ≤ 1;
+  x = Plane.between(a, b, t);
+  witness 1 - t with {
+    0 ≤ 1 - t;
+    1 - t ≤ 1;
+    x = Plane.between(a, b, t)
+      = Plane.between(b, a, 1 - t) by Plane.between_reverse;
+    done
+  }
+}
+
+theorem Plane.segment_symmetric (a b : Plane.Point)
+        : Plane.segment(a, b) = Plane.segment(b, a) := {
+  Plane.segment(a, b) ⊆ Plane.segment(b, a) by Plane.segment_subset_reverse;
+  Plane.segment(b, a) ⊆ Plane.segment(a, b) by Plane.segment_subset_reverse;
+  done by Set.equal_of_same_members
+}
+
+-- Walking between two points of a walk is walking with the corresponding
+-- parameter: the parameters compose by the same weighted average as the
+-- points do. Read coordinatewise, this is one ring identity per axis.
+theorem Plane.between_nested (a b : Plane.Point) (s u t : ℝ)
+        : Plane.between(Plane.between(a, b, s), Plane.between(a, b, u), t)
+              = Plane.between(a, b, (1 - t) * s + t * u) := {
+  Plane.Point.first(Plane.between(a, b, s))
+      = Plane.Point.first(a) + s * (Plane.Point.first(b) - Plane.Point.first(a))
+      by Plane.Point.first_between as firstAtStart;
+  Plane.Point.first(Plane.between(a, b, u))
+      = Plane.Point.first(a) + u * (Plane.Point.first(b) - Plane.Point.first(a))
+      by Plane.Point.first_between as firstAtEnd;
+  Plane.Point.first(Plane.between(Plane.between(a, b, s), Plane.between(a, b, u), t))
+     = Plane.Point.first(Plane.between(a, b, s))
+           + t * (Plane.Point.first(Plane.between(a, b, u))
+                    - Plane.Point.first(Plane.between(a, b, s)))
+           by Plane.Point.first_between
+     = (Plane.Point.first(a) + s * (Plane.Point.first(b) - Plane.Point.first(a)))
+           + t * (Plane.Point.first(Plane.between(a, b, u))
+                    - (Plane.Point.first(a)
+                         + s * (Plane.Point.first(b) - Plane.Point.first(a))))
+           by substituting firstAtStart
+     = (Plane.Point.first(a) + s * (Plane.Point.first(b) - Plane.Point.first(a)))
+           + t * ((Plane.Point.first(a)
+                     + u * (Plane.Point.first(b) - Plane.Point.first(a)))
+                    - (Plane.Point.first(a)
+                         + s * (Plane.Point.first(b) - Plane.Point.first(a))))
+           by substituting firstAtEnd
+     = Plane.Point.first(a)
+           + ((1 - t) * s + t * u)
+               * (Plane.Point.first(b) - Plane.Point.first(a)) by ring
+     = Plane.Point.first(Plane.between(a, b, (1 - t) * s + t * u))
+           by Plane.Point.first_between;
+
+  Plane.Point.second(Plane.between(a, b, s))
+      = Plane.Point.second(a)
+          + s * (Plane.Point.second(b) - Plane.Point.second(a))
+      by Plane.Point.second_between as secondAtStart;
+  Plane.Point.second(Plane.between(a, b, u))
+      = Plane.Point.second(a)
+          + u * (Plane.Point.second(b) - Plane.Point.second(a))
+      by Plane.Point.second_between as secondAtEnd;
+  Plane.Point.second(Plane.between(Plane.between(a, b, s), Plane.between(a, b, u), t))
+     = Plane.Point.second(Plane.between(a, b, s))
+           + t * (Plane.Point.second(Plane.between(a, b, u))
+                    - Plane.Point.second(Plane.between(a, b, s)))
+           by Plane.Point.second_between
+     = (Plane.Point.second(a)
+            + s * (Plane.Point.second(b) - Plane.Point.second(a)))
+           + t * (Plane.Point.second(Plane.between(a, b, u))
+                    - (Plane.Point.second(a)
+                         + s * (Plane.Point.second(b) - Plane.Point.second(a))))
+           by substituting secondAtStart
+     = (Plane.Point.second(a)
+            + s * (Plane.Point.second(b) - Plane.Point.second(a)))
+           + t * ((Plane.Point.second(a)
+                     + u * (Plane.Point.second(b) - Plane.Point.second(a)))
+                    - (Plane.Point.second(a)
+                         + s * (Plane.Point.second(b) - Plane.Point.second(a))))
+           by substituting secondAtEnd
+     = Plane.Point.second(a)
+           + ((1 - t) * s + t * u)
+               * (Plane.Point.second(b) - Plane.Point.second(a)) by ring
+     = Plane.Point.second(Plane.between(a, b, (1 - t) * s + t * u))
+           by Plane.Point.second_between;
+  done by Plane.Point.equal_of_coordinates
+}
+
+-- A weighted average of two parameters in the unit interval is again in
+-- it, which is all the parameter bookkeeping a segment's convexity needs.
+theorem Plane.combination_in_unit_interval (s u t : ℝ)
+        (sNonneg : 0 ≤ s) (sAtMostOne : s ≤ 1)
+        (uNonneg : 0 ≤ u) (uAtMostOne : u ≤ 1)
+        (tNonneg : 0 ≤ t) (tAtMostOne : t ≤ 1)
+        : 0 ≤ (1 - t) * s + t * u ∧ (1 - t) * s + t * u ≤ 1 := {
+  0 ≤ 1 - t;
+  0 ≤ (1 - t) * s;
+  0 ≤ t * u;
+  0 ≤ (1 - t) * s + t * u;
+  (1 - t) * s ≤ (1 - t) * 1 by Real.LessOrEqual.multiply_by_nonneg_left;
+  t * u ≤ t * 1 by Real.LessOrEqual.multiply_by_nonneg_left;
+  (1 - t) * s + t * u
+     ≤ (1 - t) * 1 + t * 1
+     = 1 by ring;
+  done
+}
+
+-- A segment is convex, so it is connected once convex sets are: walking
+-- between two of its points never leaves it.
+theorem Plane.segment_IsConvex (a b : Plane.Point)
+        : Plane.IsConvex(Plane.segment(a, b)) := {
+  take p : Plane.Point;
+  suppose p ∈ Plane.segment(a, b) as pOnSegment;
+  take q : Plane.Point;
+  suppose q ∈ Plane.segment(a, b) as qOnSegment;
+  take t : ℝ;
+  suppose 0 ≤ t as tNonneg;
+  suppose t ≤ 1 as tAtMostOne;
+  choose s such that
+      (0 ≤ s ∧ s ≤ 1) ∧ p = Plane.between(a, b, s) from pOnSegment;
+  0 ≤ s as sNonneg;
+  s ≤ 1 as sAtMostOne;
+  p = Plane.between(a, b, s) as pIsWalkPoint;
+  choose u such that
+      (0 ≤ u ∧ u ≤ 1) ∧ q = Plane.between(a, b, u) from qOnSegment;
+  0 ≤ u as uNonneg;
+  u ≤ 1 as uAtMostOne;
+  q = Plane.between(a, b, u) as qIsWalkPoint;
+  0 ≤ (1 - t) * s + t * u ∧ (1 - t) * s + t * u ≤ 1
+      by Plane.combination_in_unit_interval(
+          s, u, t, sNonneg, sAtMostOne, uNonneg, uAtMostOne, tNonneg,
+          tAtMostOne);
+  0 ≤ (1 - t) * s + t * u;
+  (1 - t) * s + t * u ≤ 1;
+  Plane.between(p, q, t)
+     = Plane.between(Plane.between(a, b, s), q, t) by substituting pIsWalkPoint
+     = Plane.between(Plane.between(a, b, s), Plane.between(a, b, u), t)
+           by substituting qIsWalkPoint
+     = Plane.between(a, b, (1 - t) * s + t * u) by Plane.between_nested;
+  Plane.between(p, q, t) ∈ Plane.segment(a, b)
+      by { witness (1 - t) * s + t * u with {
+             0 ≤ (1 - t) * s + t * u;
+             (1 - t) * s + t * u ≤ 1;
+             Plane.between(p, q, t) = Plane.between(a, b, (1 - t) * s + t * u);
+             done
+           } };
+  done
+}
+
+-- Convexity, read as a statement about segments rather than about the
+-- walk: a convex set holds the whole segment between two of its points.
+theorem Plane.IsConvex.segment_inside (region : Set(Plane.Point))
+        (convex : Plane.IsConvex(region))
+        (a b : Plane.Point) (aInside : a ∈ region) (bInside : b ∈ region)
+        : Plane.segment(a, b) ⊆ region := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.segment(a, b) as onSegment;
+  choose t such that
+      (0 ≤ t ∧ t ≤ 1) ∧ x = Plane.between(a, b, t) from onSegment;
+  0 ≤ t as parameterNonneg;
+  t ≤ 1 as parameterAtMostOne;
+  x = Plane.between(a, b, t) as isWalkPoint;
+  Plane.between(a, b, t) ∈ region
+      by convex(a, aInside, b, bInside, t, parameterNonneg,
+          parameterAtMostOne);
+  done by substituting isWalkPoint
+}
 
 -- ----------------------------------------------------------------------
 -- Balls, and their convexity.

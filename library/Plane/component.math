@@ -289,6 +289,45 @@ theorem Plane.Component.equal_of_meeting
 }
 
 -- ----------------------------------------------------------------------
+-- Recognizing a component.
+--
+-- The blueprint's criterion, and the reason the clopen formulation was
+-- taken as the definition of connectedness: to identify a set as the
+-- component of one of its points, show it is connected and relatively
+-- clopen. Maximality gives one inclusion and the swallowing lemma the
+-- other.
+
+theorem Plane.Component.recognize
+        (region part : Set(Plane.Point)) (base : Plane.Point)
+        (partInside : part ⊆ region)
+        (partConnected : Plane.IsConnected(part))
+        (partOpen : Plane.OpenIn(part, region))
+        (partClosed : Plane.ClosedIn(part, region))
+        (baseInPart : base ∈ part)
+        : part = Plane.Component(region, base) := {
+  part ⊆ Plane.Component(region, base)
+      by Plane.Component_contains(
+          region, part, base, partInside, partConnected, baseInPart);
+  base ∈ region by partInside(base, baseInPart);
+  Plane.Component(region, base) ⊆ region by Plane.Component_subset;
+  Plane.IsConnected(Plane.Component(region, base))
+      by Plane.Component_IsConnected(region, base, { base ∈ region });
+  base ∈ Plane.Component(region, base)
+      by Plane.base_in_Component(region, base, { base ∈ region });
+  Set.IsNonempty(Plane.Point, part ∩ Plane.Component(region, base))
+      by { witness base with { done by Set.member_intersection } };
+  Plane.Component(region, base) ⊆ part
+      by Plane.IsConnected.swallows(
+          region, Plane.Component(region, base), part,
+          { Plane.IsConnected(Plane.Component(region, base)) },
+          { Plane.Component(region, base) ⊆ region },
+          partOpen, partClosed,
+          { Set.IsNonempty(
+                Plane.Point, part ∩ Plane.Component(region, base)) });
+  done by Set.equal_of_same_members
+}
+
+-- ----------------------------------------------------------------------
 -- Components of an open set are open.
 --
 -- A point of the component has a whole disk of the open set around it,
