@@ -566,6 +566,48 @@ definition Plane.ContinuousOn
         : Proposition :=
   ∀ (x : Plane.Point). x ∈ carrier → Plane.ContinuousAt(f, carrier, x)
 
+-- Continuity only sees the values on the carrier, so a map that agrees
+-- with a continuous one there is continuous there. This is what lets a
+-- glued map be pasted: on each piece it agrees with that piece's map.
+theorem Plane.ContinuousOn.of_agreeing
+        (f g : Plane.Point → Plane.Point) (carrier : Set(Plane.Point))
+        (agree : ∀ (x : Plane.Point). x ∈ carrier → f(x) = g(x))
+        (gContinuous : Plane.ContinuousOn(g, carrier))
+        : Plane.ContinuousOn(f, carrier) := {
+  take x : Plane.Point;
+  suppose x ∈ carrier as xInCarrier;
+  take tolerance : ℝ;
+  suppose 0 < tolerance as tolerancePositive;
+  choose nearness such that
+      0 < nearness ∧
+        ∀ (y : Plane.Point). y ∈ carrier →
+          Plane.distance(x, y) < nearness →
+            Plane.distance(g(x), g(y)) < tolerance
+      from gContinuous(x, xInCarrier, tolerance, tolerancePositive);
+  0 < nearness;
+  ∀ (y : Plane.Point). y ∈ carrier →
+      Plane.distance(x, y) < nearness →
+        Plane.distance(g(x), g(y)) < tolerance as valuesClose;
+  f(x) = g(x) by agree as valueAtCentre;
+  witness nearness with {
+    0 < nearness;
+    ∀ (y : Plane.Point). y ∈ carrier →
+        Plane.distance(x, y) < nearness →
+          Plane.distance(f(x), f(y)) < tolerance
+        by (y : Plane.Point) (yInCarrier : y ∈ carrier)
+           (near : Plane.distance(x, y) < nearness) ↦ {
+          f(y) = g(y) by agree as valueAtPoint;
+          Plane.distance(g(x), g(y)) < tolerance by valuesClose;
+          Plane.distance(f(x), f(y))
+             = Plane.distance(g(x), f(y)) by substituting valueAtCentre
+             = Plane.distance(g(x), g(y)) by substituting valueAtPoint
+             < tolerance;
+          done
+        };
+    done
+  }
+}
+
 -- Continuity composes. The outer map's tolerance chooses the nearness the
 -- inner map must meet, and the inner map's nearness answers for the
 -- composite — provided the inner map lands where the outer one is

@@ -1,0 +1,268 @@
+-- Plane/concatenate.math
+--
+-- Two arcs meeting only at an endpoint make one arc. Layer 4.
+--
+-- The glued map runs the first arc over the lower half of the model
+-- interval and the second over the upper half, each at double speed. The
+-- halves are named by their parameter (`first(x) ≤ 1/2`) rather than as
+-- segments, because every obligation is about that parameter: they cover
+-- the interval because the order is linear, each is closed because a
+-- coordinate gap never exceeds a distance, and the doubling maps are
+-- affine in it.
+--
+-- Continuity is then the pasting lemma — the halves are closed and the
+-- glued map agrees with a composition on each. Injectivity is the only
+-- place the hypotheses about the two arcs are used: inside a half it is
+-- that arc's injectivity, and across the halves it is the assumption that
+-- the arcs meet only at the shared endpoint.
+
+module Plane.concatenate
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import axioms
+import Set.basics
+import Set.algebra
+import Real.interface
+import Real.order
+import Real.order_field
+import Real.division
+import Real.linearity
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.order_multiplication
+import Plane.vector
+import Plane.point
+import Plane.norm
+import Plane.segment
+import Plane.topology
+import Plane.compactness
+import Plane.connected
+import Plane.separation
+import Plane.model
+import Plane.homeomorphism
+import Plane.curve
+import Plane.subarc
+
+-- ----------------------------------------------------------------------
+-- Retiming: the affine reparametrisation of the model interval.
+
+definition Plane.retime (scale shift : ℝ) : Plane.Point → Plane.Point :=
+  (x : Plane.Point) ↦
+    Plane.between(
+        Plane.origin, Plane.Point.make(1, 0),
+        scale * Plane.Point.first(x) + shift)
+
+theorem Plane.retime_parameter (scale shift : ℝ) (x : Plane.Point)
+        : Plane.Point.first(Plane.retime(scale, shift)(x))
+              = scale * Plane.Point.first(x) + shift :=
+  done by Plane.first_of_walk
+
+theorem Plane.retime_lands (scale shift : ℝ) (x : Plane.Point)
+        (lower : 0 ≤ scale * Plane.Point.first(x) + shift)
+        (upper : scale * Plane.Point.first(x) + shift ≤ 1)
+        : Plane.retime(scale, shift)(x) ∈ Plane.unitSegment :=
+  witness scale * Plane.Point.first(x) + shift with done
+
+-- The model interval has unit length, so a retiming moves points by the
+-- scale times the parameter gap — and a parameter gap never exceeds the
+-- distance between the points it comes from.
+theorem Plane.unitSegment_length
+        : Plane.distance(Plane.origin, Plane.Point.make(1, 0)) = 1 :=
+  done by Plane.distance_make
+
+theorem Plane.retime_ContinuousOn (scale shift : ℝ)
+        (carrier : Set(Plane.Point))
+        : Plane.ContinuousOn(Plane.retime(scale, shift), carrier) := {
+  take x : Plane.Point;
+  suppose x ∈ carrier;
+  take tolerance : ℝ;
+  suppose 0 < tolerance as tolerancePositive;
+  -- The stride is written out rather than bound with `let`: the sign
+  -- battery does not see through the binding, and `abs(scale) ≤ stride` is
+  -- the step the estimate turns on.
+  0 ≤ abs(scale);
+  0 < 1 + abs(scale);
+  1 + abs(scale) ≠ 0;
+  0 < tolerance / (1 + abs(scale)) by Real.divide_positive;
+  witness tolerance / (1 + abs(scale)) with {
+    0 < tolerance / (1 + abs(scale));
+    ∀ (y : Plane.Point). y ∈ carrier →
+        Plane.distance(x, y) < tolerance / (1 + abs(scale)) →
+          Plane.distance(
+              Plane.retime(scale, shift)(x),
+              Plane.retime(scale, shift)(y)) < tolerance
+        by (y : Plane.Point) (inCarrier : y ∈ carrier)
+           (near : Plane.distance(x, y)
+                       < tolerance / (1 + abs(scale))) ↦ {
+          -- A coordinate gap never exceeds the distance.
+          abs(Plane.Point.first(y) - Plane.Point.first(x))
+             = abs(Plane.Vector.first(y - x)) by Plane.Point.first_difference
+             ≤ Plane.Vector.norm(y - x)
+                   by Plane.Vector.absolute_first_LessOrEqual_norm
+             = Plane.distance(x, y);
+
+          -- Retiming multiplies that gap by the scale.
+          (scale * Plane.Point.first(y) + shift)
+                  - (scale * Plane.Point.first(x) + shift)
+              = scale * (Plane.Point.first(y) - Plane.Point.first(x))
+              by ring as retimedGap;
+          Plane.distance(
+              Plane.retime(scale, shift)(x), Plane.retime(scale, shift)(y))
+             = abs((scale * Plane.Point.first(y) + shift)
+                       - (scale * Plane.Point.first(x) + shift))
+                   * Plane.distance(Plane.origin, Plane.Point.make(1, 0))
+                   by Plane.between_distance
+             = abs(scale * (Plane.Point.first(y) - Plane.Point.first(x)))
+                   * Plane.distance(Plane.origin, Plane.Point.make(1, 0))
+                   by substituting retimedGap
+             = abs(scale * (Plane.Point.first(y) - Plane.Point.first(x))) * 1
+                   by Plane.unitSegment_length
+             = abs(scale) * abs(Plane.Point.first(y) - Plane.Point.first(x))
+                   by Real.absolute_value_multiplicative
+             as retimedDistance;
+
+          -- And the scale is below the stride, which the nearness divides.
+          Real.IsNonneg(abs(scale));
+          Real.IsNonneg(Plane.distance(x, y));
+          abs(scale) ≤ 1 + abs(scale) by ordered_field;
+          abs(scale) * abs(Plane.Point.first(y) - Plane.Point.first(x))
+              ≤ (1 + abs(scale)) * Plane.distance(x, y)
+              by Real.LessOrEqual.multiply_monotone_nonneg;
+          Plane.distance(
+              Plane.retime(scale, shift)(x), Plane.retime(scale, shift)(y))
+             = abs(scale) * abs(Plane.Point.first(y) - Plane.Point.first(x))
+                   by retimedDistance
+             ≤ (1 + abs(scale)) * Plane.distance(x, y)
+             = Plane.distance(x, y) * (1 + abs(scale))
+             < (tolerance / (1 + abs(scale))) * (1 + abs(scale))
+                   by Real.LessThan.multiply_by_positive_right
+             = (1 + abs(scale)) * (tolerance / (1 + abs(scale)))
+             = tolerance by Real.divide_cancel;
+          done
+        };
+    done
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- The two halves of the model interval.
+
+definition Plane.lowerHalf : Set(Plane.Point) :=
+  (x : Plane.Point) ↦ x ∈ Plane.unitSegment ∧ Plane.Point.first(x) ≤ 1 / 2
+
+definition Plane.upperHalf : Set(Plane.Point) :=
+  (x : Plane.Point) ↦ x ∈ Plane.unitSegment ∧ 1 / 2 ≤ Plane.Point.first(x)
+
+theorem Plane.halves_cover
+        : Plane.lowerHalf ∪ Plane.upperHalf = Plane.unitSegment := {
+  Plane.lowerHalf ∪ Plane.upperHalf ⊆ Plane.unitSegment
+      by (x : Plane.Point) (inUnion : x ∈ Plane.lowerHalf ∪ Plane.upperHalf) ↦ {
+        done by cases {
+          case x ∈ Plane.lowerHalf as inLower: { x ∈ Plane.unitSegment; done }
+          case x ∈ Plane.upperHalf as inUpper: { x ∈ Plane.unitSegment; done }
+        }
+      };
+  Plane.unitSegment ⊆ Plane.lowerHalf ∪ Plane.upperHalf
+      by (x : Plane.Point) (onSegment : x ∈ Plane.unitSegment) ↦ {
+        Plane.Point.first(x) ≤ 1 / 2 ∨ 1 / 2 ≤ Plane.Point.first(x)
+            by Real.LessOrEqual.linear;
+        done by cases {
+          case Plane.Point.first(x) ≤ 1 / 2 as low: {
+              x ∈ Plane.lowerHalf;
+              done
+            }
+          case 1 / 2 ≤ Plane.Point.first(x) as high: {
+              x ∈ Plane.upperHalf;
+              done
+            }
+        }
+      };
+  done by Set.equal_of_same_members
+}
+
+-- Each half is closed in the interval: a point on the far side of the
+-- midpoint has its whole parameter slack to spare, and a coordinate gap
+-- never exceeds a distance.
+theorem Plane.lowerHalf_ClosedIn
+        : Plane.ClosedIn(Plane.lowerHalf, Plane.unitSegment) := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.unitSegment ∖ Plane.lowerHalf as outside;
+  x ∈ Plane.unitSegment;
+  ¬(x ∈ Plane.lowerHalf);
+  ¬(Plane.Point.first(x) ≤ 1 / 2)
+      by (low : Plane.Point.first(x) ≤ 1 / 2) ↦ {
+        x ∈ Plane.lowerHalf;
+        done
+      };
+  1 / 2 < Plane.Point.first(x) by Real.LessThan_of_not_LessOrEqual;
+  0 < Plane.Point.first(x) - 1 / 2;
+  witness Plane.Point.first(x) - 1 / 2 with {
+    0 < Plane.Point.first(x) - 1 / 2;
+    ∀ (y : Plane.Point). y ∈ Plane.unitSegment →
+        Plane.distance(x, y) < Plane.Point.first(x) - 1 / 2 →
+          y ∈ Plane.unitSegment ∖ Plane.lowerHalf
+        by (y : Plane.Point) (yOnSegment : y ∈ Plane.unitSegment)
+           (near : Plane.distance(x, y) < Plane.Point.first(x) - 1 / 2) ↦ {
+          abs(Plane.Point.first(y) - Plane.Point.first(x))
+             = abs(Plane.Vector.first(y - x)) by Plane.Point.first_difference
+             ≤ Plane.Vector.norm(y - x)
+                   by Plane.Vector.absolute_first_LessOrEqual_norm
+             = Plane.distance(x, y)
+             < Plane.Point.first(x) - 1 / 2;
+          -(Plane.Point.first(x) - 1 / 2)
+              < Plane.Point.first(y) - Plane.Point.first(x)
+              by Real.absolute_value_LessThan_bounds;
+          1 / 2 < Plane.Point.first(y) by ordered_field;
+          ¬(y ∈ Plane.lowerHalf)
+              by (inLower : y ∈ Plane.lowerHalf) ↦ {
+                Plane.Point.first(y) ≤ 1 / 2;
+                done by Real.LessThan.irreflexive
+              };
+          done
+        };
+    done
+  }
+}
+
+theorem Plane.upperHalf_ClosedIn
+        : Plane.ClosedIn(Plane.upperHalf, Plane.unitSegment) := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.unitSegment ∖ Plane.upperHalf as outside;
+  x ∈ Plane.unitSegment;
+  ¬(x ∈ Plane.upperHalf);
+  ¬(1 / 2 ≤ Plane.Point.first(x))
+      by (high : 1 / 2 ≤ Plane.Point.first(x)) ↦ {
+        x ∈ Plane.upperHalf;
+        done
+      };
+  Plane.Point.first(x) < 1 / 2 by Real.LessThan_of_not_LessOrEqual;
+  0 < 1 / 2 - Plane.Point.first(x);
+  witness 1 / 2 - Plane.Point.first(x) with {
+    0 < 1 / 2 - Plane.Point.first(x);
+    ∀ (y : Plane.Point). y ∈ Plane.unitSegment →
+        Plane.distance(x, y) < 1 / 2 - Plane.Point.first(x) →
+          y ∈ Plane.unitSegment ∖ Plane.upperHalf
+        by (y : Plane.Point) (yOnSegment : y ∈ Plane.unitSegment)
+           (near : Plane.distance(x, y) < 1 / 2 - Plane.Point.first(x)) ↦ {
+          abs(Plane.Point.first(y) - Plane.Point.first(x))
+             = abs(Plane.Vector.first(y - x)) by Plane.Point.first_difference
+             ≤ Plane.Vector.norm(y - x)
+                   by Plane.Vector.absolute_first_LessOrEqual_norm
+             = Plane.distance(x, y)
+             < 1 / 2 - Plane.Point.first(x);
+          Plane.Point.first(y) - Plane.Point.first(x)
+              < 1 / 2 - Plane.Point.first(x)
+              by Real.absolute_value_LessThan_bounds;
+          Plane.Point.first(y) < 1 / 2 by ordered_field;
+          ¬(y ∈ Plane.upperHalf)
+              by (inUpper : y ∈ Plane.upperHalf) ↦ {
+                1 / 2 ≤ Plane.Point.first(y);
+                done by Real.LessThan.irreflexive
+              };
+          done
+        };
+    done
+  }
+}
