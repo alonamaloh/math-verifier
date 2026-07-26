@@ -633,3 +633,64 @@ batch) is one absent lemma, I2 is one absent `automatic` tag on
 strict counterparts, and I6 is an API split (`Real.IsNonneg.multiply`
 exists, a `≤`-stated `Real.multiply_nonneg` does not). I4 is the genuine
 linear-arithmetic decision procedure.
+
+## Q17 — `^`'s LEFT operand never sees an expected type, not even a direct ascription (2026-07-26)
+
+Found while checking whether the coercion improvements let the analysis
+files drop their numeral ascriptions. They mostly cannot, and this is
+why.
+
+**Symptom.** The named form coerces; the infix form does not.
+
+```math
+theorem NamedForm (m : ℕ) (x : ℝ) : Real.power(2, m) * x = Real.power(2, m) * x := ring   -- verifies
+theorem InfixForm (m : ℕ) (x : ℝ) : 2 ^ m * x = 2 ^ m * x := ring                          -- parse-time decline
+```
+
+```
+elaborate error: operator '^' is not supported for operand type 'Natural';
+supported: +, *, ≤, <, ∣ on Natural; +, *, - on Integer; ∧, ∨ on Proposition
+```
+
+**What is actually happening.** The bare `2` is elaborated bottom-up,
+lands at Natural, and `^` is then looked up for Natural — where it is
+not registered. The expected type (ℝ, from the goal, the chain carrier,
+or a sibling operand) is never consulted for the LEFT operand. This is
+the documented "RIGHT operands only; left bottom-up" limit, but `^` is
+where it bites hardest, because a Natural exponent makes the left
+operand the *only* thing that can carry the carrier.
+
+**Not fixed by an ascription on the enclosing expression.** Measured,
+all at goal `… * x` with `x : ℝ`:
+
+| spelling | verdict |
+| --- | --- |
+| `(2 : ℝ) ^ m` | works — ascription on the immediate base |
+| `(2 * 2 : ℝ) ^ m` | works — ascription on the immediate base, compound is fine |
+| `(2 ^ m : ℝ)` | **fails** — ascription outside the `^` does not reach the base |
+| `(2 ^ m * 2 ^ m : ℝ)` | **fails** |
+| `((2 : ℝ) ^ m * 2 ^ m)` | **fails** — an already-Real SIBLING does not help either |
+
+So the only spelling that works is one ascription per `^`, on its base.
+That is what `Real/arithmetic_geometric_mean.math` carries: 16 of its 20
+numeral ascriptions are `(2 : ℝ) ^ …` and every one is load-bearing.
+
+**Message quality.** The error blames the operator ("`^` is not
+supported for operand type Natural") when the real story is "the left
+operand was defaulted to Natural before the expected type was
+consulted". It sends the reader looking for a missing `^` registration
+on Natural rather than at the coercion. The supported-operators list it
+prints is accurate and useless here.
+
+**Fix direction.** Give the left operand the same expected-type pass the
+right operand already gets, at least when the bottom-up elaboration
+lands on a carrier where the operator is unregistered — that case is
+unambiguous, since there is nothing to be ambiguous with. Failing that,
+say so in the message.
+
+**Related but distinct — the two spellings are not term-identical.**
+`(2 * 2 : ℝ)` and `(2 : ℝ) * (2 : ℝ)` are provably equal (`ring` closes
+it) but do not interchange in a chain step whose justification matches
+on structure: swapping the base of `((2 : ℝ) * (2 : ℝ)) ^ m` for
+`(2 * 2 : ℝ) ^ m` in `Real.means_inequality_double` breaks step 12.
+Worth knowing before any bulk re-spelling of ascriptions.
