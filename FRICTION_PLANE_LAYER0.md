@@ -620,7 +620,7 @@ block move if the 2.3% is judged not worth it.
 
 ---
 
-### C1 — `by substituting` SEGFAULTS on a defined set
+### C1 — FIXED 2026-07-26 — a null proof from the depth guard, dereferenced
 
 ```
 definition Plane.probeSet (target carrier : Set(Plane.Point))
@@ -637,24 +637,48 @@ theorem T (target carrier : Set(Plane.Point)) (x : Plane.Point)
 ```
 → `kernel verify` exits **139 (SIGSEGV)**.
 
-Not memory exhaustion: it dies at ~100 MB RSS, and `ulimit -s unlimited`
-does not help. The same shape with opaque set VARIABLES on both sides of
-the equation verifies fine, so the trigger is the *definition* on the
-left. The likely mechanism is a rewrite loop — the rewrite fires, the
-re-proof unfolds the definition, the left side reappears, and it fires
-again.
+**My first diagnosis was wrong.** I guessed a rewrite loop, on the
+evidence that the same shape with opaque set variables verified. The
+backtrace says otherwise:
 
-This is the first crash any of this work has produced; every other
-friction has been an error message. A tactic that segfaults is worse than
-one that declines, because there is no line number and no goal to read —
-the first symptom is `timeout: the monitored command dumped core`, which
-says nothing about where.
+```
+#0  makeApplication (…) at src/kernel/expression.hpp:326
+      uint64_t argumentHash = argument->hash;      argument = {ptr_ = 0x0}
+#1  Elaborator::tryConjunctionIntro (…) prover.cpp:2286
+```
 
-Reproducer saved at `reports/CRASH_substituting_defined_set.math`.
+A **null dereference**, fault address `0x40`, with the stack pointer
+nowhere near the worker thread's 512 MB. Not memory, not stack — the
+100 MB RSS should have been the clue that "rewrite loop" was a guess
+rather than a reading.
 
-**Worked around** by `Set.member_of_equal` (`library/Set/algebra.math`),
-which proves the transport once over opaque sets — where `substituting`
-is well-behaved — and is a plain application at every use site. That is
-better style anyway, so the workaround is not a loss; but the crash
-should be fixed, and a depth cap on rewrite re-firing would turn it into
-an ordinary error.
+**Root cause.** `Elaborator::autoProveClaim` has a hard recursion bound
+at depth 64, added to stop an earlier stack overflow. It `return
+nullptr`-ed. Every other exit from that function either returns a real
+proof or throws, so its dozens of callers are written against "non-null
+or throws" — and most pass the result straight into `makeApplication`.
+`tryConjunctionIntro` did exactly that. The guard added to stop one
+segfault was causing another.
+
+Reaching depth 64 at all took a `contextEqualityBridge` ↔
+`conjunctionIntro` ping-pong, visible in the backtrace as
+`transportBudget` cycling 1 → 0 → 1: the bridge decrements it, and
+`conjunctionIntro` recurses with the default, re-arming it. That is
+wasteful but not itself unsound, and the depth guard is the right
+mechanism to bound it — it just has to bound it correctly.
+
+**Fixed** by making the guard `throwElaborate` a recoverable error
+naming the problem ("the search is not converging, so some step here
+needs to name what it uses"), which restores the invariant every caller
+already assumed, plus a defensive null check at the site that
+dereferenced. The reproducer now VERIFIES — the goal was provable all
+along; the search was being derailed.
+
+**The lesson worth keeping**: a crash gives you no line number and no
+goal, so the temptation is to guess from the surrounding math. Ten
+minutes of `gdb -ex run -ex bt` gave the answer outright. Reach for the
+debugger first.
+
+Reproducer kept at `reports/CRASH_substituting_defined_set.math`;
+`Set.member_of_equal` stays, because proving the transport once over
+opaque sets is better style than `substituting` at every site.

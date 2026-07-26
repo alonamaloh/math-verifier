@@ -2278,6 +2278,10 @@ ExpressionPointer Elaborator::tryConjunctionIntro(
                 bClosed, localBinders, line);
         } catch (const ElaborateError&) { return nullptr; }
           catch (const TypeError&) { return nullptr; }
+        // Defensive: `autoProveClaim` is documented as non-null-or-throws,
+        // but a null here would be built into an application and
+        // dereferenced, so check rather than trust.
+        if (!proofA || !proofB) return nullptr;
         if (!environment_.lookup("And.introduction")) return nullptr;
         ExpressionPointer call = makeConstant(
             "And.introduction", {});
@@ -3031,8 +3035,23 @@ ExpressionPointer Elaborator::autoProveClaim(
         // overflows (observed as SIGSEGV with kernel caches disabled).
         // Real searches resolve within a handful of levels; 64 is far
         // beyond any legitimate chain.
+        //
+        // THROWS rather than returning null, and that is load-bearing.
+        // Every other exit from this function either returns a real proof
+        // or throws, so callers are written against "non-null or throws"
+        // — and there are dozens of them, most of which pass the result
+        // straight into `makeApplication`. A null leaking out of here
+        // reached one of those as a null ExpressionPointer and dereferenced
+        // it: SIGSEGV with no line number, no goal, and no clue (the
+        // crash `reports/CRASH_substituting_defined_set.math` recorded).
+        // The guard that was added to stop one segfault was causing
+        // another.
         if (autoProveDepth_ > 64) {
-            return nullptr;
+            throwElaborate(
+                "the auto-prover's search nested 64 levels deep without "
+                "closing this goal — the search is not converging, so "
+                "some step here needs to name what it uses: add "
+                "`by <lemma>`");
         }
         // A goal that still mentions an unsolved call hole (`@_hole_…`) is
         // not a goal anyone wrote: it is a lemma's premise slot elaborated
