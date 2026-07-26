@@ -23,6 +23,8 @@ import Equality.basics
 import Natural.basics
 import Natural.peano
 import Natural.order
+import Natural.maximum
+import Natural.eventually
 import Natural.subtraction
 import Natural.least_number
 
@@ -242,4 +244,70 @@ theorem Natural.extract_LessOrEqual (P : ℕ → ℕ → Proposition)
         done
       }
   }
+}
+
+-- ----------------------------------------------------------------------
+-- Frequently and Eventually are dual, and combine.
+
+theorem Natural.Frequently.monotone (P Q : ℕ → Proposition)
+        (frequentP : Natural.Frequently(P))
+        (pointwise : ∀ (m : ℕ). P(m) → Q(m))
+        : Natural.Frequently(Q) := {
+  take bound : ℕ;
+  choose m such that bound < m ∧ P(m) from frequentP(bound);
+  bound < m;
+  P(m) as holdsAtM;
+  Q(m) by pointwise(m, holdsAtM);
+  witness m with done
+}
+
+-- What holds arbitrarily late still does so once an eventual fact is
+-- carried along: pass the eventual threshold to the frequent one.
+theorem Natural.Frequently.and_eventually (P Q : ℕ → Proposition)
+        (frequentP : Natural.Frequently(P))
+        (eventualQ : Natural.Eventually(Q))
+        : Natural.Frequently((m : ℕ) ↦ P(m) ∧ Q(m)) := {
+  take bound : ℕ;
+  choose threshold such that ∀ (m : ℕ). threshold ≤ m → Q(m)
+      as beyondThreshold from eventualQ;
+  choose m such that Natural.maximum(bound, threshold) < m ∧ P(m)
+      from frequentP(Natural.maximum(bound, threshold));
+  Natural.maximum(bound, threshold) < m;
+  bound ≤ Natural.maximum(bound, threshold);
+  bound < m by Natural.LessThan.transitive_left;
+  threshold ≤ Natural.maximum(bound, threshold);
+  threshold < m by Natural.LessThan.transitive_left;
+  threshold ≤ m by Natural.LessThan.weaken;
+  Q(m) by beyondThreshold(m, threshold ≤ m);
+  witness m with done
+}
+
+-- The duality. "Not frequently P" is "eventually not P": if no index past
+-- some bound satisfies P, that bound is the threshold.
+theorem Natural.Eventually.of_not_Frequently (P : ℕ → Proposition)
+        (notFrequent : ¬Natural.Frequently(P))
+        : Natural.Eventually((m : ℕ) ↦ ¬P(m)) := {
+  ∃ (bound : ℕ). ¬(∃ (m : ℕ). bound < m ∧ P(m))
+      by Logic.not_forall_implies_exists_not(
+             ℕ, (bound : ℕ) ↦ ∃ (m : ℕ). bound < m ∧ P(m), notFrequent)
+      as someBound;
+  choose bound such that ¬(∃ (m : ℕ). bound < m ∧ P(m)) from someBound;
+  witness 1 + bound with
+      (m : ℕ) (beyond : 1 + bound ≤ m) (holdsAtM : P(m)) ↦ {
+        bound + 1 ≤ m;
+        bound < m by Natural.lt_of_add_one_le;
+        ∃ (m : ℕ). bound < m ∧ P(m) by { witness m with done };
+        done
+      }
+}
+
+theorem Natural.Frequently.of_not_Eventually (P : ℕ → Proposition)
+        (notEventual : ¬Natural.Eventually((m : ℕ) ↦ ¬P(m)))
+        : Natural.Frequently(P) := {
+  suppose ¬Natural.Frequently(P) as notFrequent for contradiction {
+    Natural.Eventually((m : ℕ) ↦ ¬P(m))
+        by Natural.Eventually.of_not_Frequently;
+    done
+  };
+  done
 }

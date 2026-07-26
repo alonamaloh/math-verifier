@@ -1,0 +1,68 @@
+-- Real/archimedean.math
+--
+-- The reals are Archimedean: no real is larger than every natural, and
+-- equivalently the harmonic terms `1/(1+K)` get below any positive
+-- tolerance.
+--
+-- Both facts are inherited rather than proved: a positive real has a
+-- positive rational strictly below it (`Real.exists_positive_rational_below`),
+-- and ℚ is already known to be Archimedean
+-- (`Rational.archimedean_for_positives`). All that is left is to carry the
+-- inequality across the embedding.
+--
+-- `Real.harmonic_term` is the tolerance sequence every ε-argument that
+-- builds a subsequence reaches for: to extract a subsequence converging to
+-- a cluster point one asks, at step K, for an index where the sequence is
+-- within `harmonic_term(K)` of it.
+
+module Real.archimedean
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Rational.archimedean
+import Real.interface
+import Real.order
+import Real.embedding_order
+import Real.division
+import Real.order_field
+import Real.density
+import Real.harmonic_series
+
+-- Dividing an inequality by its own denominator, as an equation. Stated
+-- separately because `field` is a tactic and a `choose` body wants a lemma
+-- name in its `by`.
+theorem Real.reciprocal_multiply_cancel (c q : ℝ) (cNonzero : c ≠ 0)
+        : (1 / c) * (c * q) = q := by field
+
+-- Some harmonic term is below any positive tolerance. The rational
+-- witness `q` below the tolerance is the whole proof: ℚ's Archimedean
+-- property clears `1` by enough copies of `q`, and dividing back gives
+-- `1/(1+K) ≤ q`.
+theorem Real.exists_harmonic_term_below
+        (tolerance : ℝ) (tolerancePositive : 0 < tolerance)
+        : ∃ (K : ℕ). Real.harmonic_term(K) < tolerance := {
+  choose q such that Rational.zero < q ∧ q < tolerance
+      from Real.exists_positive_rational_below(tolerance, tolerancePositive);
+  Rational.zero < q as qPositive;
+  choose K such that (1 : ℚ) ≤ (1 + K : ℚ) * q
+      from Rational.archimedean_for_positives(
+          (1 : ℚ), q, { Rational.IsNonneg((1 : ℚ)) }, qPositive);
+  -- Across the embedding, and then divided by the positive `1 + K`.
+  (1 : ℝ) ≤ (1 + K : ℝ) * (q : ℝ)
+      by Rational.to_real.LessOrEqual_preserves;
+  (0 : ℝ) < (1 + K : ℝ);
+  (1 + K : ℝ) ≠ 0;
+  0 ≤ 1 / (1 + K : ℝ) by Real.divide_nonneg;
+  Real.IsNonneg(1 / (1 + K : ℝ));
+  (1 / (1 + K : ℝ)) * ((1 + K : ℝ) * (q : ℝ)) = (q : ℝ)
+      by Real.reciprocal_multiply_cancel;
+  Real.harmonic_term(K)
+     = (1 / (1 + K : ℝ)) * 1
+     ≤ (1 / (1 + K : ℝ)) * ((1 + K : ℝ) * (q : ℝ))
+           by Real.LessOrEqual.multiply_by_nonneg_left
+     = (q : ℝ)
+     < tolerance;
+  witness K with done
+}
