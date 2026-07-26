@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT = ROOT / "library/Algebra/three_squares_mod_eight_generated.math"
+OUTPUT = ROOT / "projects/FifteenTheorem/Algebra/three_squares_mod_eight_generated.math"
 
 VALUES = (
     ("IntegerMod.zero(8)", 0, "zero"),

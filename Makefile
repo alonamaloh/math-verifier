@@ -226,15 +226,29 @@ plane: $(PLANE_MATHV_FILES) $(PLANE_MATHV_FILES:.mathv=.mathv.iface) \
 
 tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES) checker-tests \
 	carrier-normal-form-check matrix-ergonomics-statement-check \
-	three-squares-generated-check
+	no-generated-in-library
 
 # The fifteen theorem's own gates. Separate from `tests` for the same reason
 # its proofs are separate from `library`: they re-render ~290k lines of
 # generated case tables and say nothing about the elaborator.
 project-tests: projects rank-four-generated-check \
-	residue-arithmetic-generated-check \
+	three-squares-generated-check residue-arithmetic-generated-check \
 	det-seven-residual-generated-check det-seven-finite-generated-check \
 	det-seven-statement-shape-check
+
+# Machine-generated case tables belong to a project, never to the library.
+# They are what made a full library re-verification cost twenty minutes, and
+# a single one checked in under library/ quietly reinstates that. The library
+# is at zero; hold it there.
+no-generated-in-library:
+	@found=$$(find library -name '*_generated.math' | sort); \
+	if [ -n "$$found" ]; then \
+	  echo "no-generated-in-library: FAIL — generated tables under library/:"; \
+	  echo "$$found" | sed 's/^/  /'; \
+	  echo "  move them to projects/<Name>/ (see projects/README.md)"; \
+	  exit 1; \
+	fi; \
+	echo "no-generated-in-library: PASS"
 
 # ----------------------------------------------------------------------
 # The clean set (see docs/CLEAN_STYLE_PLAN.md). `scripts/clean_manifest.txt`
@@ -429,7 +443,7 @@ det-seven-finite-generated-check:
 
 .PHONY: carrier-normal-form-check matrix-ergonomics-statement-check det-seven-statement-shape-check \
 	rank-four-generated-check three-squares-generated-check det-seven-residual-generated-check \
-	det-seven-finite-generated-check
+	det-seven-finite-generated-check no-generated-in-library
 
 # B3.4 — morphism-packet audit: re-verify the audit surface module
 # (which imports every packet-lemma home) with the audit flag on and
@@ -443,8 +457,13 @@ audit-coercions: library
 # intentionally-broken proof paired with a <name>.expected sidecar listing
 # substrings its error MUST contain. `make error-tests` asserts each file
 # fails to verify AND that its message still says the informative thing.
-# Needs the library caches present (imports resolve from build/).
-error-tests: library
+# Needs the library caches present (imports resolve from build/) — and the
+# Test/ ones too: `interface_sealing.math` imports `Test.counter_interface`,
+# an interface/implementation fixture that only lives under Test/. Depending
+# on `library` alone left that cache to whatever an earlier `make tests`
+# happened to leave behind, so the suite passed on a warm tree and failed on
+# a clean one.
+error-tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES)
 	@bash scripts/error_tests.sh
 
 # Verification flags. The redundant-`by` check is OFF by default: it

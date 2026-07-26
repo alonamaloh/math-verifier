@@ -53,9 +53,8 @@ may import from its own layer and below, never above. (Build/layout depth:
   `adjugate`/`matrix_inverse` and the Cramer identities, `permutation_sign`,
   `characteristic_polynomial`, `rank_nullity`, and `cayley_hamilton`. Also
   the quadratic-form vocabulary — forms, escalation, truants, the rank-two
-  and rank-three classifications, `diagonal_forms`, and the obstruction half
-  of Legendre's three-squares theorem (the converse is the open obligation
-  `Matrix.ThreeSquaresConverse`). The Fifteen Theorem built on top of it is a
+  and rank-three classifications, and `diagonal_forms`. The Fifteen Theorem
+  built on top of it — with the three-squares development it rests on — is a
   *project*, outside the library: see
   [`projects/FifteenTheorem/fifteen-theorem.md`](../projects/FifteenTheorem/fifteen-theorem.md)
   and [`projects/README.md`](../projects/README.md).

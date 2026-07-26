@@ -68,15 +68,13 @@ isometry-transport of truants, universality and positive-definiteness, the
 rank-two and rank-three classifications, and the general
 rank-one-through-four `diagonal_forms`.
 
-`three_squares_theorem` carries the **obstruction half** of Legendre's
-three-squares theorem, proved outright: a
-`Natural.IsThreeSquareObstruction(n)` — that is, `n = 4ᵃ(8b+7)` — is not
-represented by `Matrix.sumOfThreeSquaresForm`
-(`Matrix.sumOfThreeSquaresForm_not_represents_obstruction`, and its
-contrapositive `..._represents_only_admissible`). The converse is *not*
-proved: it is a named obligation, `Matrix.ThreeSquaresConverse`, and the
-biconditional `Matrix.sumOfThreeSquaresForm_characterization` takes it as a
-hypothesis. Nothing in the repository discharges it.
+The three-squares development went to the project with everything else that
+only the fifteen theorem uses. Its biconditional rests on a converse nothing
+discharges, and even its proved half is
+spelled `Matrix.Represents(Matrix.sumOfThreeSquaresForm, (n : ℤ))` rather
+than `∃ x y z : ℤ. n = x² + y² + z²` — fifteen-theorem vocabulary, not
+something a number theorist would find here. When the converse lands,
+Legendre's theorem earns a library home in the natural spelling.
 
 The Fifteen Theorem itself — the rank-four classification, the 207-form
 cover, the determinant-seven converses, and their machine-generated
@@ -97,5 +95,5 @@ stage-by-stage plan: **`PLAN_15_THEOREM.md`** (repo root).
   `determinant*`, `adjugate`, `characteristic_polynomial`, `cayley_hamilton`
 - Quadratic forms and escalation: `quadratic_form`, `integer_quadratic_form`,
   `square_form`, `diagonal_forms`, `truant`, `escalation`, `escalator_tree`,
-  `rank_two_*`, `rank_three_*`, `three_squares_*`, `gram`, `unimodular`
+  `rank_two_*`, `rank_three_*`, `gram`, `unimodular`
 - Finite permutations and signs: `finite_permutation`, `permutation_*`

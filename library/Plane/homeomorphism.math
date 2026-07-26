@@ -1,0 +1,250 @@
+-- Plane/homeomorphism.math
+--
+-- A continuous injection on a compactum is a homeomorphism onto its
+-- image. Layer 4 — deferred here from Layer 2, where nothing needed it
+-- yet, because it is the whole content of the model-curve theorem.
+--
+-- "The inverse is continuous" is stated **without naming the inverse**:
+-- `Plane.HasContinuousInverseOn(f, carrier)` says that points whose images
+-- are close are themselves close, which is what every consumer uses and
+-- what the sequence argument proves. Naming the inverse would mean
+-- choosing a preimage for every point of the image — a use of choice the
+-- statement does not need, and an extra function at every call site.
+--
+-- The proof is the textbook one. If some tolerance had no nearness, then
+-- at every scale there is a point of the carrier whose image is that close
+-- to `f(x)` and which is itself `tolerance` away from `x`. Compactness
+-- thins those points to a convergent sequence; continuity carries the
+-- images to the image of the limit, while the construction carries the
+-- same images to `f(x)`. Limits are unique, so the limit and `x` have the
+-- same image — and injectivity makes them the same point, which the
+-- distances forbid.
+
+module Plane.homeomorphism
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Set.algebra
+import Natural.basics
+import Natural.order
+import Natural.subsequence
+import Real.interface
+import Real.order
+import Real.order_field
+import Real.division
+import Real.absolute_value
+import Real.convergence
+import Real.harmonic_series
+import Real.archimedean
+import Plane.vector
+import Plane.point
+import Plane.norm
+import Plane.topology
+import Plane.sequence
+import Plane.compact
+import Plane.compactness
+
+-- ----------------------------------------------------------------------
+-- Injectivity and homeomorphism, both relative to a carrier.
+
+definition Plane.InjectiveOn
+        (f : Plane.Point → Plane.Point) (carrier : Set(Plane.Point))
+        : Proposition :=
+  ∀ (x : Plane.Point). x ∈ carrier →
+    ∀ (y : Plane.Point). y ∈ carrier → f(x) = f(y) → x = y
+
+definition Plane.HasContinuousInverseOn
+        (f : Plane.Point → Plane.Point) (carrier : Set(Plane.Point))
+        : Proposition :=
+  ∀ (x : Plane.Point). x ∈ carrier →
+    ∀ (tolerance : ℝ). 0 < tolerance →
+      ∃ (nearness : ℝ). 0 < nearness ∧
+        ∀ (y : Plane.Point). y ∈ carrier →
+          Plane.distance(f(x), f(y)) < nearness →
+            Plane.distance(x, y) < tolerance
+
+definition Plane.IsHomeomorphismOn
+        (f : Plane.Point → Plane.Point) (carrier : Set(Plane.Point))
+        : Proposition :=
+  Plane.ContinuousOn(f, carrier) ∧ Plane.InjectiveOn(f, carrier)
+    ∧ Plane.HasContinuousInverseOn(f, carrier)
+
+-- ----------------------------------------------------------------------
+-- "No nearness works at `x`, so at every scale some point of the carrier
+-- has an image that close and is itself far." The quantifier gymnastics,
+-- quarantined as in `Plane.bad_pair_at_every_scale`, so that the theorem
+-- below reads.
+
+theorem Plane.far_point_with_close_image_at_every_scale
+        (f : Plane.Point → Plane.Point) (carrier : Set(Plane.Point))
+        (x : Plane.Point) (tolerance : ℝ)
+        (noNearness : ¬(∃ (nearness : ℝ). 0 < nearness ∧
+            ∀ (y : Plane.Point). y ∈ carrier →
+              Plane.distance(f(x), f(y)) < nearness →
+                Plane.distance(x, y) < tolerance))
+        (n : ℕ)
+        : ∃ (y : Plane.Point). y ∈ carrier
+            ∧ (Plane.distance(f(x), f(y)) < Real.harmonic_term(n)
+                   ∧ ¬(Plane.distance(x, y) < tolerance)) := {
+  Real.harmonic_term(n) > 0 by Real.divide_positive;
+  suppose ¬(∃ (y : Plane.Point). y ∈ carrier
+      ∧ (Plane.distance(f(x), f(y)) < Real.harmonic_term(n)
+             ∧ ¬(Plane.distance(x, y) < tolerance)))
+      as noFarPoint for contradiction {
+    ∀ (y : Plane.Point). y ∈ carrier →
+        Plane.distance(f(x), f(y)) < Real.harmonic_term(n) →
+          Plane.distance(x, y) < tolerance
+        by (y : Plane.Point) (inCarrier : y ∈ carrier)
+           (imageClose : Plane.distance(f(x), f(y))
+                             < Real.harmonic_term(n)) ↦ {
+          suppose ¬(Plane.distance(x, y) < tolerance)
+              as pointFar for contradiction {
+            ∃ (z : Plane.Point). z ∈ carrier
+                ∧ (Plane.distance(f(x), f(z)) < Real.harmonic_term(n)
+                       ∧ ¬(Plane.distance(x, z) < tolerance))
+                by { witness y with done };
+            done
+          };
+          done
+        };
+    ∃ (nearness : ℝ). 0 < nearness ∧
+        ∀ (y : Plane.Point). y ∈ carrier →
+          Plane.distance(f(x), f(y)) < nearness →
+            Plane.distance(x, y) < tolerance
+        by { witness Real.harmonic_term(n) with done };
+    done
+  };
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The inverse of a continuous injection on a compactum is continuous.
+
+theorem Plane.inverse_continuous_on_compact
+        (f : Plane.Point → Plane.Point) (carrier : Set(Plane.Point))
+        (compact : Plane.IsCompact(carrier))
+        (continuous : Plane.ContinuousOn(f, carrier))
+        (injective : Plane.InjectiveOn(f, carrier))
+        : Plane.HasContinuousInverseOn(f, carrier) := {
+  take x : Plane.Point;
+  suppose x ∈ carrier as xInCarrier;
+  take tolerance : ℝ;
+  suppose 0 < tolerance as tolerancePositive;
+  suppose ¬(∃ (nearness : ℝ). 0 < nearness ∧
+      ∀ (y : Plane.Point). y ∈ carrier →
+        Plane.distance(f(x), f(y)) < nearness →
+          Plane.distance(x, y) < tolerance)
+      as noNearness for contradiction {
+
+    -- The bad points, one per scale.
+    ∀ (n : ℕ). ∃ (y : Plane.Point). y ∈ carrier
+        ∧ (Plane.distance(f(x), f(y)) < Real.harmonic_term(n)
+               ∧ ¬(Plane.distance(x, y) < tolerance))
+        by (n : ℕ) ↦ Plane.far_point_with_close_image_at_every_scale(
+            f, carrier, x, tolerance, noNearness, n)
+        as badPoints;
+    choose s such that
+        ∀ (n : ℕ). s(n) ∈ carrier
+          ∧ (Plane.distance(f(x), f(s(n))) < Real.harmonic_term(n)
+                 ∧ ¬(Plane.distance(x, s(n)) < tolerance))
+        as chosen
+        from Logic.countable_choice(
+            Plane.Point,
+            (n : ℕ) (y : Plane.Point) ↦ y ∈ carrier
+                ∧ (Plane.distance(f(x), f(y)) < Real.harmonic_term(n)
+                       ∧ ¬(Plane.distance(x, y) < tolerance)),
+            badPoints);
+    ∀ (m : ℕ). s(m) ∈ carrier
+        by (m : ℕ) ↦ {
+          s(m) ∈ carrier
+              ∧ (Plane.distance(f(x), f(s(m))) < Real.harmonic_term(m)
+                     ∧ ¬(Plane.distance(x, s(m)) < tolerance))
+              by chosen(m);
+          done
+        }
+        as inside;
+
+    -- Thin them to a convergent sequence.
+    choose index, limit such that
+        limit ∈ carrier ∧ Plane.SubsequenceConverges(s, index, limit)
+        from compact(s, inside);
+    Natural.IsStrictlyIncreasing(index)
+        by Plane.SubsequenceConverges.increasing;
+    limit ∈ carrier as limitInCarrier;
+    Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
+        by Plane.SubsequenceConverges.converges as converges;
+
+    -- The images have two limits: continuity gives one, the construction
+    -- gives the other.
+    Plane.SequenceConverges((k : ℕ) ↦ f(s(index(k))), f(limit))
+        by Plane.ContinuousAt.along_sequence(
+            f, carrier, limit, continuous(limit, limitInCarrier),
+            (k : ℕ) ↦ s(index(k)), (k : ℕ) ↦ inside(index(k)), converges)
+        as imagesToLimit;
+    Plane.SequenceConverges((k : ℕ) ↦ f(s(index(k))), f(x))
+        by (scale : ℝ) (scalePositive : scale > 0) ↦ {
+          choose step such that Real.harmonic_term(step) < scale
+              from Real.exists_harmonic_term_below(scale, scalePositive);
+          witness step with
+              (k : ℕ) (beyond : step ≤ k) ↦ {
+                s(index(k)) ∈ carrier
+                    ∧ (Plane.distance(f(x), f(s(index(k))))
+                           < Real.harmonic_term(index(k))
+                           ∧ ¬(Plane.distance(x, s(index(k))) < tolerance))
+                    by chosen(index(k));
+                Plane.distance(f(x), f(s(index(k))))
+                    < Real.harmonic_term(index(k));
+                k ≤ index(k) by Natural.IsStrictlyIncreasing.LessOrEqual;
+                Real.harmonic_term(index(k)) ≤ Real.harmonic_term(k)
+                    by Real.harmonic_term_antitone;
+                Real.harmonic_term(k) ≤ Real.harmonic_term(step)
+                    by Real.harmonic_term_antitone;
+                Plane.distance(f(x), f(s(index(k))))
+                    < Real.harmonic_term(step);
+                done
+              }
+        }
+        as imagesToValueAtX;
+    f(limit) = f(x)
+        by Plane.SequenceConverges.unique(
+            (k : ℕ) ↦ f(s(index(k))), f(limit), f(x), imagesToLimit,
+            imagesToValueAtX);
+    limit = x
+        by injective(limit, limitInCarrier, x, xInCarrier, { f(limit) = f(x) })
+        as limitIsX;
+
+    -- So the bad points converge to `x`, though every one of them was
+    -- chosen `tolerance` away from it.
+    choose threshold such that
+        ∀ (k : ℕ). threshold ≤ k →
+            Plane.distance(limit, s(index(k))) < tolerance
+        as closeBeyond from converges(tolerance, tolerancePositive);
+    Plane.distance(limit, s(index(threshold))) < tolerance
+        by closeBeyond(threshold, { threshold ≤ threshold });
+    Plane.distance(x, s(index(threshold))) < tolerance
+        by substituting limitIsX;
+    s(index(threshold)) ∈ carrier
+        ∧ (Plane.distance(f(x), f(s(index(threshold))))
+               < Real.harmonic_term(index(threshold))
+               ∧ ¬(Plane.distance(x, s(index(threshold))) < tolerance))
+        by chosen(index(threshold));
+    ¬(Plane.distance(x, s(index(threshold))) < tolerance);
+    done
+  };
+  done
+}
+
+theorem Plane.IsHomeomorphismOn.of_continuous_injective_on_compact
+        (f : Plane.Point → Plane.Point) (carrier : Set(Plane.Point))
+        (compact : Plane.IsCompact(carrier))
+        (continuous : Plane.ContinuousOn(f, carrier))
+        (injective : Plane.InjectiveOn(f, carrier))
+        : Plane.IsHomeomorphismOn(f, carrier) := {
+  Plane.HasContinuousInverseOn(f, carrier)
+      by Plane.inverse_continuous_on_compact(
+          f, carrier, compact, continuous, injective);
+  done
+}

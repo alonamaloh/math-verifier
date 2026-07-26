@@ -7,6 +7,39 @@
 #include "elaborator/internal.hpp"
 
 #include <limits>
+#include <set>
+
+namespace {
+
+// True when `pattern` is nothing but its head constant applied to distinct
+// bare metavariables — `Head m0 m1 m2` with the mi the definition's own
+// parameters. Such a pattern matches EVERY application of that head, so it
+// says nothing about the term it matched: folding into it renames rather
+// than abbreviates.
+//
+// `Set.singleton (X : Type(0)) (x : X) : Set(X) := (y : X) ↦ y = x` is the
+// case that forced this guard. Its body elaborates to `λX.λx.λy. Equality
+// X y x` — three leading lambdas, so the refolder read it as an arity-3
+// pattern `Equality X y x` and matched it against every equality in scope.
+// Any file transitively importing `Set/` printed the goal `b = a` as
+// `Set.singleton Integer a b`: notation replaced by an application, with
+// the operands in the definition's order rather than the goal's.
+bool patternIsBareRenaming(const ExpressionPointer& pattern, int arity) {
+    ExpressionPointer cursor = pattern;
+    std::set<int> metavariablesUsed;
+    while (auto* application = std::get_if<Application>(&cursor->node)) {
+        auto* bound =
+            std::get_if<BoundVariable>(&application->argument->node);
+        if (!bound || bound->deBruijnIndex >= arity) return false;
+        if (!metavariablesUsed.insert(bound->deBruijnIndex).second) {
+            return false;
+        }
+        cursor = application->function;
+    }
+    return std::holds_alternative<Constant>(cursor->node);
+}
+
+}  // namespace
 
 ExpressionPointer Elaborator::betaNormalizeForDisplay(
         ExpressionPointer expression) const {
@@ -113,6 +146,10 @@ ExpressionPointer Elaborator::refoldForDisplay(
             }
             if (arity == 0) continue;  // nullary defs: skip (noise risk)
             if (foldHeadKey(pattern) != key) continue;
+            // A wildcard over its head matches everything and abbreviates
+            // nothing — and would displace the surface notation the reader
+            // wrote (see patternIsBareRenaming).
+            if (patternIsBareRenaming(pattern, arity)) continue;
 
             std::vector<ExpressionPointer> bindings(arity);
             if (!const_cast<Elaborator*>(this)->matchAgainstPattern(
