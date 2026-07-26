@@ -340,6 +340,13 @@ Flagging these rather than deciding them, per the always-apply rule.
    Recommendation: general arcs in the definition; a `IsPolygonal`
    predicate; every later result assumes it.
 
+## Frictions found so far
+
+`FRICTION_PLANE_LAYER0.md` — the running log from Layer 0, in
+`QUIRK.md`'s format. Section I is inequalities and is the priority: every
+entry there is a step a mathematician writes without pausing, and a
+`linarith` over ordered fields would absorb most of them.
+
 ## Unknowns, honestly
 
 - **Geometry is a new domain for this system.** Every line-count estimate
