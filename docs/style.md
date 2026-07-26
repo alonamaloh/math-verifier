@@ -44,20 +44,148 @@ Try a by-less fact or chain step first. The prover uses local hypotheses,
 `automatic` declarations, and its built-in equality, order, sign, and
 algebra reasoning.
 
-When help is needed, cite the operative theorem without positional proof
-arguments:
+When help is needed, **cite the operative theorem and nothing else** — no
+argument list:
 
 ```math
 desiredFact by ImportantTheorem;
 ```
 
-Avoid:
+The goal instantiates the theorem's variables and its premises discharge
+from context. **This works far more often than it looks like it should**,
+and it is the single largest readability lever in the language. Measured
+over a ~30-site conversion in `Plane/`, the bare citation carried:
+
+- lemmas with four and five premises (`Plane.IsConnected.swallows`);
+- **inductive constructors** (`Plane.PolygonalReach.arrived`);
+- **`∀`-hypotheses of the theorem being proved** — `by convex`,
+  `by isUpperBound`, `by partConnected`, `by pieceInside` — where the
+  spelled-out form was `convex(a, aInRegion, b, bInRegion, t)`.
+
+### The recipe: hoist the premises, then cite bare
+
+A citation's premises are discharged **from context**, so state them as
+their own bare claims first. That is what turns a spelled-out call into a
+bare citation, and it reads better besides — each premise becomes a line
+of the argument instead of an argument of a call:
 
 ```math
-ImportantTheorem(a, b, premise)
+-- Instead of this:
+Plane.IsCompact(Plane.arc(parametrisation))
+    by Plane.IsCompact.image(
+        parametrisation, Plane.unitSegment, Plane.unitSegment_IsCompact,
+        continuous);
+
+-- write this:
+Plane.ContinuousOn(parametrisation, Plane.unitSegment);
+Plane.IsCompact(Plane.unitSegment) by Plane.unitSegment_IsCompact;
+done by Plane.IsCompact.image
 ```
 
-unless an argument is genuine mathematical data that cannot be inferred.
+The redundancy checker's "arguments … are inferable — `by <lemma>` alone
+suffices" finding only fires when the premises are **already** in context,
+so a spelled-out call it does *not* flag is not evidence the arguments
+were needed. Hoist first, then re-check.
+
+### When one argument genuinely cannot be inferred
+
+Pass that one **by name**, and only it:
+
+```math
+part ⊆ piece by Plane.IsConnected.swallows(whole := left ∪ right);
+Plane.OpenIn(piece ∩ part, part) by Plane.OpenIn.restrict(carrier := whole);
+Plane.PolygonalReach(region, source, x)
+    by Plane.PolygonalReach.extend(waypoint := y);
+```
+
+Those three are the real shapes: an **ambient set** that the conclusion
+does not mention, the **shared point** of a union, the **middle term** of a
+transitivity. If you find yourself naming two arguments, check whether a
+premise belongs in context instead.
+
+### Set-membership plumbing is not a citation
+
+`Set.member_intersection`, `Set.intersection_member_left/right`,
+`Set.member_union`, `Equality.symmetry` on a set equation: these name
+mechanism, not mathematics. A mathematician writing "x is in the
+intersection, hence in the piece" cites nothing, and the prover needs
+nothing. State the step bare:
+
+```math
+x ∈ piece ∩ part;      -- not: … by Set.member_intersection;
+x ∈ piece;             -- not: … by Set.intersection_member_left;
+```
+
+`Set.equal_of_same_members` is the exception worth keeping: how two
+inclusions become an equality is a step the reader should not have to
+reconstruct — the same judgment as `Plane.Point.equal_of_coordinates`.
+
+### Worked example: one theorem, both rules
+
+`Plane.IsConnected.swallows` — a relatively clopen piece of the whole, if
+it meets a connected part at all, contains it. As first written:
+
+```math
+  Plane.OpenIn(piece ∩ part, part)
+      by Plane.OpenIn.restrict(piece, whole, part, pieceOpen, partInside);
+  part ∖ (piece ∩ part) = (whole ∖ piece) ∩ part
+      by Plane.difference_intersection(whole, part, piece, partInside);
+  Plane.OpenIn((whole ∖ piece) ∩ part, part)
+      by Plane.OpenIn.restrict(
+          whole ∖ piece, whole, part, restOpen, partInside);
+  Plane.OpenIn(part ∖ (piece ∩ part), part);
+  piece ∩ part ⊆ part by Set.intersection_subset_right;
+  piece ∩ part = part
+      by partConnected(piece ∩ part,
+          { piece ∩ part ⊆ part },
+          { Plane.OpenIn(piece ∩ part, part) },
+          { Plane.OpenIn(part ∖ (piece ∩ part), part) },
+          meets);
+  take x : Plane.Point;
+  suppose x ∈ part as inPart;
+  part = piece ∩ part;
+  x ∈ piece ∩ part
+      by Set.member_of_equal(
+          part, piece ∩ part, { part = piece ∩ part }, x, inPart);
+  done
+```
+
+Every fact restated as an argument was already in context one line above.
+The same proof, citing facts instead of argument lists:
+
+```math
+  Plane.OpenIn(piece ∩ part, part) by Plane.OpenIn.restrict(carrier := whole);
+  part ∖ (piece ∩ part) = (whole ∖ piece) ∩ part
+      by Plane.difference_intersection;
+  Plane.OpenIn((whole ∖ piece) ∩ part, part)
+      by Plane.OpenIn.restrict(carrier := whole);
+  Plane.OpenIn(part ∖ (piece ∩ part), part);
+  piece ∩ part ⊆ part by Set.intersection_subset_right;
+  piece ∩ part = part by partConnected;
+  part = piece ∩ part;
+  take x : Plane.Point;
+  suppose x ∈ part;
+  x ∈ piece ∩ part;
+  done
+```
+
+Same theorem, same kernel-checked steps. The second one can be read aloud:
+the piece cut down to the part is relatively open, what it leaves is what
+the outside cuts down, so the cut-down piece is clopen and nonempty —
+hence everything, by connectedness of the part.
+
+Note what survived: `Set.intersection_subset_right` is load-bearing (drop
+it and the prover cannot find it), and `carrier := whole` names the
+ambient set the conclusion never mentions. Polishing is not "delete every
+`by`" — see *Polishing with the redundancy checks* below.
+
+### The corpus is not the authority
+
+Roughly 700 spelled-out citations predate this section. **Do not learn the
+style by imitating the file next door** — much of `library/` was written
+before the rule and has not been swept. This document is the authority;
+where a neighbouring proof disagrees with it, the neighbour is the one
+that is wrong.
 
 For commutative-ring identities, try `ring` first. For field identities
 with division, try `field(nonzeroFacts...)`.

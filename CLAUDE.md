@@ -11,6 +11,16 @@ write in a textbook, with the kernel doing the typechecking. Optimize for
 
 ## Always-apply rules
 
+- **Read `docs/style.md` before writing or editing any `.math` file.** Not
+  after, and not "if the proof looks odd" — before the first line. It is the
+  authority on what a proof should look like, and the rules that matter most
+  are the ones you will not rediscover by imitation: **cite the fact, never
+  its argument list** (hoist premises into context, then `by <Lemma>` alone;
+  name at most one argument, as `Lemma(name := value)`), and no plumbing
+  citations for set membership. Much of `library/` predates those rules, so
+  **the file next door is not the authority** — copying its style is how bad
+  proofs keep getting written. Re-read the guide when a session resumes on
+  new proof work.
 - **Fix bugs; never work around them.** When something misbehaves — a build
   flake, a tactic that "shouldn't" fail, a stale cache, a spurious error —
   diagnose the root cause and fix it at the source (kernel, elaborator,
