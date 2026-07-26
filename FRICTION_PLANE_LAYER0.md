@@ -711,3 +711,85 @@ mathematics — `Plane.segment_symmetric` now says a segment has no
 preferred end, so the lemma delivers one orientation and the other is a
 `substituting`. That is the better library, but the friction stands for
 any genuinely two-legged conclusion.
+
+### E13 — the expensive-step warning names the wrong remedy
+
+Layer 4, proving `Plane.supDistance_symmetric`. The first spelling was a
+coordinate chain in a block:
+
+```math
+  <the two coordinate equalities>
+  Plane.supDistance(p, q)
+     = max(abs(Plane.Vector.first(q - p)), abs(Plane.Vector.second(q - p)))
+     = max(abs(Plane.Vector.first(p - q)), abs(Plane.Vector.second(p - q)))
+     = Plane.supDistance(q, p);
+  done
+```
+
+→ `expensive by-less proof step (110659 kernel-steps) — the auto-prover
+closed it by search (via the equalityBattery strategy); add an explicit
+`by <reason>`…`, reported at the `done` line.
+
+Following the advice — name the chain, `done by orderDoesNotMatter` —
+silences it, and is exactly the noise the owner rule
+`no_claim_by_calc`/`dont_justify_routine_computation` exists to prevent.
+Measured four spellings:
+
+| spelling | steps |
+|---|---|
+| coordinate chain, block + bare `done`, before the lemmas below existed | 110659 |
+| same, after they existed | free |
+| negate-route chain, block + bare `done` | free |
+| negate-route chain as a `:=` body, no `done` | free |
+
+So neither the block, nor the trailing `done`, nor the missing name was
+the cause. The cause was that **the library had no lemma for the step**:
+`Plane.Vector.supNorm_negate` ("the sup norm ignores sign") and
+`Plane.Point.difference_reverse` ("reversing a displacement negates it")
+did not exist, so the battery reconstructed the symmetry by congruence
+over `max` from two context facts. With both present the natural
+one-hop-per-step chain is free.
+
+The warning's text sends the reader to the wrong repair. When the battery
+closes a step by congruence-over-a-compound rather than by a lemma, the
+message should say so — "no lemma matched; reconstructed by congruence
+from N context facts" — because the fix is usually a missing named fact,
+which is also the fix that improves the library. A minimal repro does NOT
+reproduce: the cost is a context/index-scan cost and needs a real file's
+scope to show up, which is why this entry records the measurements rather
+than a test file.
+
+### E14 — an equation-shaped conjunct costs a search to name
+
+Same layer, `Plane.squareBoundary_IsClosed`:
+
+```math
+  choose near such that
+      Plane.supDistance(Plane.origin, near) = 1
+        ∧ Plane.distance(x, near) < abs(Plane.supDistance(Plane.origin, x) - 1)
+      from boundaryIsNear(…);
+  Plane.supDistance(Plane.origin, near) = 1 as nearOnLevel;
+```
+
+→ `expensive by-less proof step (58452 kernel-steps)` on the last line.
+The fact is *literally* a conjunct of a context fact, and `And.left` is
+`automatic`; naming a conjunct of any other shape (`⊆`, `∈`, `≤`) is free
+throughout Layers 0–3. Only the equation-shaped conjunct pays, and it pays
+a five-figure search.
+
+There is no cheaper spelling: `by nearIsClose` fails (E12 — a citation
+whose conclusion is an `And` does not project), and the bare claim is the
+documented idiom for using a conjunction leg. Left as the bare claim, cost
+accepted, because contorting the proof around it would be worse than the
+58k steps.
+
+Related and worth fixing together with E12: the matcher should try
+`∧`-projection of in-context facts before the equality battery.
+
+### Layer 4 library gaps found and filled
+
+`Real.maximum_self`, `Plane.Vector.supNorm_triangle`,
+`Plane.Vector.supNorm_negate`, `Plane.supDistance_nonneg`,
+`Plane.supDistance_symmetric`, `Plane.supDistance_triangle`,
+`Plane.supDistance_shift_bound` (the sup metric had only its comparison
+with the Euclidean one), and `Plane.Point.difference_reverse`.
