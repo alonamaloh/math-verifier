@@ -545,3 +545,91 @@ prefilter before the full matcher; explicit `by` on the proof's bare claims;
 a ground fast path in `ring` (the generated tables carry ~23k `by ring` calls
 on CLOSED ground equations, and `ring` runs the full AC normaliser on each
 while the ground-relation tier already builds a compact certificate).
+
+**Q15 addendum — a NEGATIVE result worth keeping (2026-07-25).** The obvious
+reading of the scan census is that the unprompted IMPORT tier is the problem:
+on a failing scan the pool averages 158 candidates, of which ~123 are
+automatic imports. Gating that tier on the goal's head constant (the 2-level
+fingerprint the scorer already computes, checked against BOTH the written and
+the WHNF'd goal so an aliased conclusion is not dropped) removes ~78% of the
+candidates — and made the heaviest proof **SLOWER**: 255 s → 293 s, 283 s with
+the headless-goal guard. Two lessons. Candidate COUNT is not candidate COST:
+an import is a small closed statement that fails fast, while a local fact
+carries the proof's own `let`-spelled type and is expensive to match. And a
+prune that removes an EARLY winner makes the scan fail and the prover fall
+through to costlier tactics — so pruning must be justified by measured time,
+never by pool composition. The gate survives behind `MATH_SCAN_HEAD_GATE=1`,
+default OFF, as a probe for other module shapes.
+
+**Q15 addendum 2 — the local-window census and its (small) payoff, 2026-07-25.**
+Owner asked whether the unprompted scan should read only the last few local
+facts, and whether "every same-module declaration is automatic" was misguided.
+Census (`MATH_LOG_SCAN=1`, 503 scans over five proof-heavy modules —
+rank_four_exceptional_truants, sylvester, escalator_tree, Real/continuity,
+critical_value_minimality):
+
+| outcome | count |
+|---|---|
+| nothing won (full walk) | 255 (51%) |
+| won by a SAME-MODULE declaration | 151 (30%) |
+| won by an automatic import | 71 (14%) |
+| won by a LOCAL fact | 26 (5%) |
+
+Pool on a failing scan: 158 candidates — 25 local, 11 same-module, 123 import.
+Local wins by distance back in the stack: 21 at 0, two at 1, two at 2, one at 7.
+
+Timings on `Matrix.oddC4R2C7_not_represents_ten` (255 s after the ζ memo):
+window 4 as a hard PRUNE 233 s (−8.4%); window 1 as a prune 231 s (−9.6%);
+window 4 as a DEFERRAL (far locals moved behind the library tier — no
+semantic change) 254 s (nothing). The deferral buys nothing because the far
+locals are reached almost exclusively in the 51% of scans that FAIL, and a
+deferral still tries everything there.
+
+Conclusions. (a) The same-module tier is the CHEAPEST per win in the system —
+30% of wins for 7% of the pool — and the feared blow-up in big generated
+modules does not happen: `rank_four_weighted_diagonal_d5_generated` (425
+theorems) runs ZERO scans, because every generated row is an explicit
+citation. Keep it. (b) A local window is worth ≤10%, and 4-vs-1 is 1% — so
+the window size is a STYLE decision (how far may a proof reach silently?),
+not a performance one. The mechanism is in the tree behind
+`MATH_SCAN_LOCAL_WINDOW=N` (default 0 = off) as a deferral, with a warning
+naming the distant fact and asking for a `by`. (c) The cost is concentrated
+in the few PLAUSIBLE candidates that pass the head test and get a deep
+matching attempt (~10 ms each), not in the pool size — which is why the ζ
+memo (making each attempt cheaper) was worth 38% and every pool-trimming
+idea measured here was worth ~0 or negative.
+
+## Q16 — pointers into `FRICTION_PLANE_LAYER0.md` (2026-07-25)
+
+The Plane/Layer-0 session kept its findings in that file, in this format.
+Four of its entries meet work recorded here; noting the joins so neither
+side re-derives them.
+
+- **its I8** (lemma search ranks by fewest remaining hypotheses, so
+  inequality goals return nonsense) is the one place the Q15 SHAPE
+  FINGERPRINT belongs without reservation: `kernel search` emits a
+  suggestion list, not a proof step, so the winner-loss that blocks the
+  fingerprint as a prover filter cannot bite there. Measured discrimination
+  on real scans: 86–93% of candidates separated, 91% of the DEEP attempts.
+  Rank by shape compatibility first, hypothesis count second.
+- **its E2** (`ring` treats `Plane.Vector.first(u + v)` as an opaque atom)
+  looks like Q5's mechanism not reaching far enough rather than a new gap:
+  `Plane.Vector.first` is a plain `definition` (`Product.first(vector)`),
+  and Q5 taught `ring` to δβ-expose definition applications. Check that
+  before designing around it.
+- **its E4** (a ONE-step relation in proof position reads as a proposition,
+  a multi-step chain reads as a proof) is the same parser seam as the
+  `witness E with <one-step chain>` trap fixed at the message level on
+  2026-07-25 (ErrorTest/witness_one_step_chain). One seam, two symptoms.
+- **its I1** (the sign battery cannot parse `e ≤ 0`, only `0 ≤ e`) is index
+  work in `lemma_index.cpp` adjacent to Q15's territory: `parseSignJudgment`
+  computes an index KEY, so admitting `e ≤ 0` also needs the form bridge
+  `e ≤ 0 ⟼ 0 ≤ -e` before any existing rule matches.
+
+Its section I otherwise reads as missing LIBRARY rather than a missing
+tactic: I3 (add two inequalities — the most frequent friction in that
+batch) is one absent lemma, I2 is one absent `automatic` tag on
+`Real.LessOrEqual.negate` (its strict twin has one), I5 is two absent
+strict counterparts, and I6 is an API split (`Real.IsNonneg.multiply`
+exists, a `≤`-stated `Real.multiply_nonneg` does not). I4 is the genuine
+linear-arithmetic decision procedure.

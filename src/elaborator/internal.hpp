@@ -170,6 +170,7 @@ public:
 
     ~Elaborator() {
         if (autoProveProfileEnabled_) emitAutoProverProfile();
+        emitFingerprintCensus();
         if (!tacticTimingEnabled_ || tacticStats_.empty()) return;
         // Dump in descending order of total time.
         std::vector<std::pair<std::string, TacticStats>> rows(
@@ -205,6 +206,11 @@ public:
     //      distribution for contextFactMatch wins; local-binder-depth
     //      histogram; top library lemmas.
     void emitAutoProverProfile();
+
+    // MATH_LOG_FINGERPRINT dry run: what a masked 3-level shape compare
+    // WOULD have skipped, and what that would have saved. Reports nothing
+    // when the flag is off.
+    void emitFingerprintCensus();
 
     // Run a strategy and track its timing + success rate. The
     // strategy must return ExpressionPointer (nullptr on miss). When
@@ -1792,6 +1798,12 @@ private:
         // still rechecks whatever closes the goal), so the defeq winner is
         // tried first instead of after a run of head-compatible near-misses.
         int score = 0;
+        // Provenance, for the scan census (MATH_LOG_SCAN): how far back in
+        // the local binder stack this fact was bound (0 = most recent, -1 =
+        // not a local fact), and whether a declaration candidate comes from
+        // the module being elaborated rather than an `automatic` import.
+        int localDistance = -1;
+        bool sameModule = false;
     };
 
     std::vector<ContextFact> collectContextFacts(

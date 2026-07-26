@@ -39,6 +39,139 @@ bool automaticRestrictEnabled() {
     return v;
 }
 
+// ----------------------------------------------------------------------
+// Conclusion fingerprint (dry run, MATH_LOG_FINGERPRINT=1).
+//
+// A 64-bit shape code for a proposition: seven slots in heap order over the
+// first three levels of the term read as a BINARY tree — slot 0 the root,
+// 1/2 its children, 3..6 the grandchildren — plus a mask byte saying which
+// slots carry a comparable head. The tree is taken over the APPLICATION
+// SPINE, not raw curried applications (otherwise every level below the root
+// is just `Application` and carries nothing): a node's value is its head
+// constant, and its children are the spine's LAST TWO arguments. That reads
+// `Equality(T, lhs, rhs)` as root=Equality with children lhs, rhs — dropping
+// the carrier argument, which is exactly the uninformative one — and
+// `Matrix.quadraticForm(bundle, n, A, x)` as root with children A, x.
+//
+// Two candidates are COMPATIBLE when they agree on every slot both of them
+// fill (mask intersection): an absent or non-constant head matches anything,
+// so the comparison never rejects on a position one side leaves open.
+struct ShapeFingerprint {
+    uint8_t slot[7] = {0, 0, 0, 0, 0, 0, 0};
+    uint8_t mask = 0;
+};
+
+uint8_t constantByte(const std::string& name) {
+    uint64_t hash = 1469598103934665603ull;
+    for (unsigned char c : name) {
+        hash ^= c;
+        hash *= 1099511628211ull;
+    }
+    uint8_t byte = static_cast<uint8_t>(hash & 0xff);
+    return byte == 0 ? 1 : byte;  // 0 is reserved for "no head"
+}
+
+// Head constant + the last two spine arguments.
+void spineNodeParts(ExpressionPointer expression,
+                    std::string& head,
+                    ExpressionPointer& left,
+                    ExpressionPointer& right) {
+    head.clear();
+    left = nullptr;
+    right = nullptr;
+    std::vector<ExpressionPointer> args;
+    ExpressionPointer cursor = expression;
+    while (auto* application = std::get_if<Application>(&cursor->node)) {
+        args.push_back(application->argument);
+        cursor = application->function;
+    }
+    if (auto* constant = std::get_if<Constant>(&cursor->node)) {
+        head = constant->name;
+    }
+    // `args` is outermost-first; the last two spine arguments are its first
+    // two entries, in source order (second-to-last, last).
+    if (args.size() >= 2) {
+        left = args[1];
+        right = args[0];
+    } else if (args.size() == 1) {
+        right = args[0];
+    }
+}
+
+void fillFingerprint(ExpressionPointer expression, int slot,
+                     ShapeFingerprint& out) {
+    if (!expression || slot >= 7) return;
+    std::string head;
+    ExpressionPointer left;
+    ExpressionPointer right;
+    spineNodeParts(expression, head, left, right);
+    if (!head.empty()) {
+        out.slot[slot] = constantByte(head);
+        out.mask |= static_cast<uint8_t>(1u << slot);
+    }
+    fillFingerprint(left, 2 * slot + 1, out);
+    fillFingerprint(right, 2 * slot + 2, out);
+}
+
+ShapeFingerprint fingerprintOfConclusion(ExpressionPointer type) {
+    ExpressionPointer cursor = type;
+    while (auto* pi = std::get_if<Pi>(&cursor->node)) cursor = pi->codomain;
+    ShapeFingerprint print;
+    fillFingerprint(cursor, 0, print);
+    return print;
+}
+
+bool fingerprintsCompatible(const ShapeFingerprint& a,
+                            const ShapeFingerprint& b) {
+    uint8_t both = a.mask & b.mask;
+    for (int i = 0; i < 7; ++i) {
+        if (!((both >> i) & 1u)) continue;
+        if (a.slot[i] != b.slot[i]) return false;
+    }
+    return true;
+}
+
+// Dry-run counters, reported per module.
+struct FingerprintCensus {
+    long long attempts = 0;
+    long long rejects = 0;         // a masked compare would skip these
+    long long deepAttempts = 0;    // took longer than the deep threshold
+    long long deepRejects = 0;     // …and would have been skipped
+    long long rejectedMicros = 0;  // time inside would-be-skipped attempts
+    long long winnersRejected = 0; // MUST be 0 for the filter to be sound
+    long long winnersZetaFixed = 0;  // …of which ζ-unfolding would recover
+    // The same time, split by how the scan ENDED. A sound DEFERRAL (try the
+    // shape-compatible candidates first, the rest only if none wins) can
+    // only recover the winning-scan half: a failing scan tries everything
+    // either way. The split therefore decides whether the fingerprint is
+    // worth building as an ordering or only as a (winner-losing) filter.
+    long long rejectedMicrosInWins = 0;
+    long long rejectedMicrosInFailures = 0;
+};
+FingerprintCensus fingerprintCensus;
+constexpr long long kDeepAttemptMicros = 1000;
+
+bool fingerprintLogEnabled() {
+    static const bool v = std::getenv("MATH_LOG_FINGERPRINT") != nullptr;
+    return v;
+}
+
+// Cost tier for a local fact bound beyond the window: behind the library
+// tier (cost 3), so it is tried only when nothing nearer closes the goal.
+constexpr int kDeferredLocalCost = 5;
+
+// How many local facts (most recent first) the unprompted scan considers.
+// 0 = unlimited (today's behaviour). MATH_SCAN_LOCAL_WINDOW=N sets it.
+int scanLocalWindow() {
+    static const int v = [] {
+        const char* e = std::getenv("MATH_SCAN_LOCAL_WINDOW");
+        if (!e) return 0;
+        int n = std::atoi(e);
+        return n > 0 ? n : 0;
+    }();
+    return v;
+}
+
 // Cheap structural fingerprint of an expression's conclusion spine: the head
 // constant name plus the head-constant name of each top-level argument (empty
 // for a non-constant-headed argument). No WHNF, no allocation beyond the small
@@ -810,6 +943,7 @@ std::vector<Elaborator::ContextFact> Elaborator::collectLocalBinderFacts(
             ContextFact fact;
             fact.cost = 1;
             fact.source = "local binder " + localBinders[b].name;
+            fact.localDistance = N - 1 - b;
             fact.proofTerm = makeBoundVariable(N - 1 - b);
             fact.type = liftBoundVariables(
                 localBinders[b].type, lift, 0);
@@ -840,6 +974,7 @@ std::vector<Elaborator::ContextFact> Elaborator::collectLocalBinderFacts(
             ContextFact leftFact;
             leftFact.cost = childCost;
             leftFact.source = childSource + " (∧-left)";
+            leftFact.localDistance = facts[cursor].localDistance;
             leftFact.proofTerm = makeApplication(makeApplication(
                 makeApplication(makeConstant("And.left", {}),
                     leftType), rightType), proof);
@@ -848,6 +983,7 @@ std::vector<Elaborator::ContextFact> Elaborator::collectLocalBinderFacts(
             ContextFact rightFact;
             rightFact.cost = childCost;
             rightFact.source = childSource + " (∧-right)";
+            rightFact.localDistance = facts[cursor].localDistance;
             rightFact.proofTerm = makeApplication(makeApplication(
                 makeApplication(makeConstant("And.right", {}),
                     leftType), rightType), proof);
@@ -981,6 +1117,7 @@ std::vector<Elaborator::ContextFact> Elaborator::collectContextFacts(
             ContextFact fact;
             fact.cost = 3;
             fact.source = "library " + name;
+            fact.sameModule = moduleDeclarationNames_.count(name) != 0;
             fact.proofTerm = makeConstant(name, {});
             fact.type = declarationType;
             facts.push_back(std::move(fact));
@@ -1217,6 +1354,25 @@ ExpressionPointer Elaborator::trySubLemmaSharingMetavars(
         return call;
     }
 
+void Elaborator::emitFingerprintCensus() {
+        if (!fingerprintLogEnabled()) return;
+        if (fingerprintCensus.attempts == 0) return;
+        const auto& c = fingerprintCensus;
+        std::cerr << "[fingerprint] " << moduleName_
+                  << " attempts=" << c.attempts
+                  << " wouldReject=" << c.rejects
+                  << " (" << (100 * c.rejects / c.attempts) << "%)"
+                  << " deepAttempts=" << c.deepAttempts
+                  << " deepRejected=" << c.deepRejects
+                  << " timeInRejected=" << (c.rejectedMicros / 1000) << "ms"
+                  << " (inWins=" << (c.rejectedMicrosInWins / 1000) << "ms"
+                  << ", inFailures="
+                  << (c.rejectedMicrosInFailures / 1000) << "ms)"
+                  << " WINNERS_REJECTED=" << c.winnersRejected
+                  << " (zetaWouldRecover=" << c.winnersZetaFixed << ")\n";
+        fingerprintCensus = FingerprintCensus{};
+    }
+
 ExpressionPointer Elaborator::tryContextFactMatch(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
@@ -1235,13 +1391,70 @@ ExpressionPointer Elaborator::tryContextFactMatch(
         // (other equalities/inequalities), so this turns ~N failed attempts
         // before the win into ~1. Stable so recency order is the final
         // tiebreak (collectLocalBinderFacts emits most-recent first).
+        ShapeFingerprint goalPrint;
+        ShapeFingerprint goalPrintReduced;
+        long long rejectedMicrosThisScan = 0;
+        if (fingerprintLogEnabled()) {
+            goalPrint = fingerprintOfConclusion(goalClosed);
+            goalPrintReduced = fingerprintOfConclusion(goalReduced);
+        }
+        bool goalHasNamedHead = false;
         {
             std::string goalHead;
             std::vector<std::string> goalArgHeads;
             spineHeadAndArgHeads(goalClosed, goalHead, goalArgHeads);
+            // The same fingerprint against the WHNF'd goal, so a candidate
+            // stated through a definitional alias (`x ≤ y` vs the `IsNonneg`
+            // it unfolds to) is judged on the spelling it shares — the
+            // symmetric treatment the spine-hash prefilter already gives.
+            std::string goalHeadReduced;
+            std::vector<std::string> goalArgHeadsReduced;
+            spineHeadAndArgHeads(goalReduced, goalHeadReduced,
+                                 goalArgHeadsReduced);
+            // A goal with no named head (a `∀`/`→` statement, a bare
+            // variable) has nothing to fingerprint AGAINST — every score is
+            // 0 there, so the gate below must not read that as "no candidate
+            // is relevant" and empty the tier.
+            goalHasNamedHead =
+                !goalHead.empty() || !goalHeadReduced.empty();
             for (ContextFact& fact : facts) {
                 fact.score = structuralSimilarityScore(
                     goalHead, goalArgHeads, fact.type);
+                if (fact.score == 0 && goalHeadReduced != goalHead) {
+                    fact.score = structuralSimilarityScore(
+                        goalHeadReduced, goalArgHeadsReduced, fact.type);
+                }
+            }
+        }
+        // (A head gate on the import tier — dropping candidates whose
+        // conclusion does not share the goal's head — was measured here and
+        // REJECTED: it removes ~78% of the pool and is 11% SLOWER, because
+        // those candidates are the cheap ones to reject and some of them win
+        // early. See QUIRK Q15's addendum before re-deriving it from pool
+        // composition.)
+        (void)goalHasNamedHead;
+        // Local-fact window (MATH_SCAN_LOCAL_WINDOW=N), as a DEFERRAL rather
+        // than a prune. A local candidate is the expensive kind — its type is
+        // the proof's own, often spelled through `let`s the matcher must see
+        // through — while an import is a small closed statement that fails
+        // fast. Local facts carry cost 1, so today EVERY local is tried
+        // before the first import: a goal that a library lemma closes has
+        // already paid for the whole local stack.
+        //
+        // Moving the facts beyond the window BEHIND the library tier keeps
+        // every candidate reachable (nothing to migrate, no proof breaks) and
+        // costs nothing on a scan that fails — the same candidates are tried,
+        // in a different order — while a goal closed by a library or
+        // same-module lemma skips the far locals entirely. Census over five
+        // proof-heavy modules: 44% of scans are won by exactly those tiers,
+        // and of 26 local wins, 21 were the immediately preceding fact and 25
+        // within distance 2 — so the deferred tail is rarely what closes a
+        // goal, and when it is, the warning below asks for a citation.
+        if (int window = scanLocalWindow()) {
+            for (ContextFact& fact : facts) {
+                if (fact.localDistance >= window) {
+                    fact.cost = kDeferredLocalCost;
+                }
             }
         }
         std::stable_sort(facts.begin(), facts.end(),
@@ -1254,6 +1467,23 @@ ExpressionPointer Elaborator::tryContextFactMatch(
         lastContextFactWinner_.clear();
         lastContextFactCandidateCount_ = 0;
         int triedCount = 0;
+        // Scan census (MATH_LOG_SCAN): one line per scan — how big the
+        // candidate pool is by tier, how many were tried, and where the
+        // winner came from. The question it answers: how far back in the
+        // local stack, and how often a same-module declaration, does an
+        // unprompted proof actually reach?
+        static const bool logScan =
+            std::getenv("MATH_LOG_SCAN") != nullptr;
+        int poolLocal = 0;
+        int poolModule = 0;
+        int poolImport = 0;
+        if (logScan) {
+            for (const ContextFact& fact : facts) {
+                if (fact.localDistance >= 0) ++poolLocal;
+                else if (fact.sameModule) ++poolModule;
+                else ++poolImport;
+            }
+        }
         // Gate the citation premise-discharge's defeq fallback off for the
         // duration of this speculative scan (restored on exit): it is an
         // explicit-citation convenience, too costly to run per candidate here.
@@ -1270,6 +1500,37 @@ ExpressionPointer Elaborator::tryContextFactMatch(
             // the budget and stop scanning if it's exhausted.
             autoProveSpend(1);
             ++triedCount;
+            // Fingerprint dry run: decide what a masked shape compare WOULD
+            // have done with this candidate, then run the real attempt
+            // anyway and price what the skip would have saved.
+            bool wouldReject = false;
+            long long attemptStart = 0;
+            if (fingerprintLogEnabled()) {
+                ShapeFingerprint factPrint =
+                    fingerprintOfConclusion(fact.type);
+                // The fact's conclusion gets the same two-spelling treatment
+                // as the goal: a lemma stated through a definition (`≤` for
+                // the `IsNonneg` it unfolds to, `IsCriticalValue` for its
+                // `Or` chain) has a different shape from the goal three
+                // levels down until one side is reduced. Reject only when
+                // NO pairing of spellings is compatible.
+                ExpressionPointer factConclusion = fact.type;
+                while (auto* pi =
+                           std::get_if<Pi>(&factConclusion->node)) {
+                    factConclusion = pi->codomain;
+                }
+                ShapeFingerprint factPrintReduced = fingerprintOfConclusion(
+                    weakHeadNormalForm(environment_, factConclusion));
+                wouldReject =
+                    !fingerprintsCompatible(goalPrint, factPrint)
+                    && !fingerprintsCompatible(goalPrintReduced, factPrint)
+                    && !fingerprintsCompatible(goalPrint, factPrintReduced)
+                    && !fingerprintsCompatible(goalPrintReduced,
+                                               factPrintReduced);
+                ++fingerprintCensus.attempts;
+                if (wouldReject) ++fingerprintCensus.rejects;
+                attemptStart = monotonicNanos();
+            }
             ExpressionPointer result;
             try {
                 result = autoFillHintForClaim(
@@ -1279,6 +1540,47 @@ ExpressionPointer Elaborator::tryContextFactMatch(
                 result = nullptr;
             } catch (const TypeError&) {
                 result = nullptr;
+            }
+            if (fingerprintLogEnabled()) {
+                long long micros =
+                    (monotonicNanos() - attemptStart) / 1000;
+                bool deep = micros >= kDeepAttemptMicros;
+                if (deep) ++fingerprintCensus.deepAttempts;
+                if (wouldReject) {
+                    fingerprintCensus.rejectedMicros += micros;
+                    rejectedMicrosThisScan += micros;
+                    if (deep) ++fingerprintCensus.deepRejects;
+                    if (result) {
+                        ++fingerprintCensus.winnersRejected;
+                        // Diagnose the loss: would the code have matched if
+                        // both sides were ζ-unfolded first? In this library
+                        // a fact is routinely stated through the `let`s the
+                        // proof introduced, so its written shape differs
+                        // from the goal's three levels down even when the
+                        // two are definitionally equal — and the ζ memo now
+                        // makes unfolding cheap enough to fingerprint.
+                        ShapeFingerprint goalZeta = fingerprintOfConclusion(
+                            zetaUnfoldLetBindersCached(
+                                goalClosed, localBinders));
+                        ShapeFingerprint factZeta = fingerprintOfConclusion(
+                            zetaUnfoldLetBindersCached(
+                                fact.type, localBinders));
+                        bool zetaFixes =
+                            fingerprintsCompatible(goalZeta, factZeta);
+                        if (zetaFixes) ++fingerprintCensus.winnersZetaFixed;
+                        std::cerr << "[fingerprint-loss] " << moduleName_
+                                  << ":" << line
+                                  << " zetaWouldFix=" << (zetaFixes ? 1 : 0)
+                                  << " fact=" << fact.source
+                                  << "\n    goal: "
+                                  << prettyPrintInLocalScope(
+                                         goalClosed, localBinders)
+                                  << "\n    factType: "
+                                  << prettyPrintInLocalScope(
+                                         fact.type, localBinders)
+                                  << "\n";
+                    }
+                }
             }
             // When the cheap structural fill fails, retry a library-lemma
             // candidate with the full hole-inference + context-discharge
@@ -1298,11 +1600,51 @@ ExpressionPointer Elaborator::tryContextFactMatch(
                     lastContextFactCandidateCount_ = triedCount;
                 }
                 lastWinningDetail_ = fact.source;
+                fingerprintCensus.rejectedMicrosInWins +=
+                    rejectedMicrosThisScan;
+                // The goal was closed by a fact bound further back than the
+                // window — the search had to reach past everything nearer to
+                // find it. It verifies, so this is a nudge, not a failure:
+                // naming the fact makes the proof say where the step comes
+                // from, and keeps the search out of the deferred tail.
+                if (fact.cost == kDeferredLocalCost) {
+                    std::cerr << "warning: " << moduleName_ << ":" << line
+                              << ": the auto-prover closed this claim with `"
+                              << fact.source << "`, bound "
+                              << fact.localDistance
+                              << " facts back — beyond the "
+                              << scanLocalWindow()
+                              << "-fact window the search reads for free. "
+                                 "Cite it (`by <name>`), or restate it "
+                                 "nearer, so the step says what it uses\n";
+                }
+                if (logScan) {
+                    const char* tier = fact.localDistance >= 0 ? "local"
+                        : (fact.sameModule ? "module" : "import");
+                    std::cerr << "[scan] " << moduleName_ << ":" << line
+                              << " win tier=" << tier
+                              << " dist=" << fact.localDistance
+                              << " rank=" << triedCount
+                              << " pool=" << facts.size()
+                              << " local=" << poolLocal
+                              << " module=" << poolModule
+                              << " import=" << poolImport << "\n";
+                }
                 return result;
             }
         }
         if (autoProveProfileEnabled_) {
             lastContextFactCandidateCount_ = triedCount;
+        }
+        fingerprintCensus.rejectedMicrosInFailures += rejectedMicrosThisScan;
+        if (logScan) {
+            std::cerr << "[scan] " << moduleName_ << ":" << line
+                      << " win tier=none dist=-1"
+                      << " rank=" << triedCount
+                      << " pool=" << facts.size()
+                      << " local=" << poolLocal
+                      << " module=" << poolModule
+                      << " import=" << poolImport << "\n";
         }
         return nullptr;
     }
