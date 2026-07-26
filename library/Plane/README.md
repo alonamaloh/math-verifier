@@ -58,9 +58,14 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
   `difference_translate` and `translate_injective` (it is free),
   `difference_self`
 - Bilinear forms: `innerProduct_symmetric`, `innerProduct_add_left`,
-  `innerProduct_scale_left`, `innerProduct_self_nonneg`;
-  `determinant_antisymmetric`, `determinant_self`, `determinant_add_left`,
-  `determinant_scale_left`
+  `innerProduct_scale_left`, `innerProduct_self_nonneg`,
+  `innerProduct_add_self`; `determinant_antisymmetric`, `determinant_self`,
+  `determinant_add_left`, `determinant_scale_left`
+- **`lagrange_identity`** — `⟨u,v⟩² + det(u,v)² = ⟨u,u⟩⟨v,v⟩`, a ring
+  identity in coordinates — and `cauchy_schwarz` as its corollary
+- Metric: `norm_nonneg`, `norm_squared`, `supNorm_LessOrEqual_norm`,
+  `norm_LessOrEqual_rootTwo_supNorm` (together, `‖v‖∞ ≤ ‖v‖ ≤ √2·‖v‖∞`),
+  `norm_triangle`, `distance_triangle`
 - The right-angle turn: `innerProduct_perpendicular` (it is a right
   angle), `perpendicular_perpendicular` (twice reverses), and
   **`determinant_perpendicular`** — `det(v, v⊥) = ⟨v, v⟩`, the identity

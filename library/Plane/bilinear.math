@@ -163,3 +163,64 @@ theorem Plane.Vector.perpendicular_perpendicular (v : Plane.Vector)
       = Plane.Vector.second(-v);
   done by Plane.Vector.equal_of_coordinates
 }
+
+-- ----------------------------------------------------------------------
+-- Lagrange's identity, and Cauchy--Schwarz as its corollary.
+
+-- The two forms are complementary: what the inner product misses of the
+-- product of the lengths, the determinant supplies exactly. In
+-- coordinates this is (xu·xv + yu·yv)² + (xu·yv − yu·xv)² =
+-- (xu² + yu²)(xv² + yv²), a ring identity.
+theorem Plane.Vector.lagrange_identity (u v : Plane.Vector)
+        : Plane.Vector.innerProduct(u, v) * Plane.Vector.innerProduct(u, v)
+              + Plane.Vector.determinant(u, v) * Plane.Vector.determinant(u, v)
+              = Plane.Vector.innerProduct(u, u)
+                    * Plane.Vector.innerProduct(v, v) :=
+  (Plane.Vector.first(u) * Plane.Vector.first(v)
+       + Plane.Vector.second(u) * Plane.Vector.second(v))
+    * (Plane.Vector.first(u) * Plane.Vector.first(v)
+       + Plane.Vector.second(u) * Plane.Vector.second(v))
+  + (Plane.Vector.first(u) * Plane.Vector.second(v)
+       - Plane.Vector.second(u) * Plane.Vector.first(v))
+    * (Plane.Vector.first(u) * Plane.Vector.second(v)
+       - Plane.Vector.second(u) * Plane.Vector.first(v))
+      = (Plane.Vector.first(u) * Plane.Vector.first(u)
+             + Plane.Vector.second(u) * Plane.Vector.second(u))
+        * (Plane.Vector.first(v) * Plane.Vector.first(v)
+             + Plane.Vector.second(v) * Plane.Vector.second(v)) by ring
+
+-- Cauchy--Schwarz: drop the determinant term, which is a square.
+theorem Plane.Vector.cauchy_schwarz (u v : Plane.Vector)
+        : Plane.Vector.innerProduct(u, v) * Plane.Vector.innerProduct(u, v)
+              ≤ Plane.Vector.innerProduct(u, u)
+                    * Plane.Vector.innerProduct(v, v) := {
+  0 ≤ Plane.Vector.determinant(u, v) * Plane.Vector.determinant(u, v);
+  Plane.Vector.innerProduct(u, v) * Plane.Vector.innerProduct(u, v)
+     ≤ Plane.Vector.innerProduct(u, v) * Plane.Vector.innerProduct(u, v)
+           + Plane.Vector.determinant(u, v) * Plane.Vector.determinant(u, v)
+           by Real.less_or_equal_add_of_nonneg
+     = Plane.Vector.innerProduct(u, u) * Plane.Vector.innerProduct(v, v)
+           by Plane.Vector.lagrange_identity;
+  done
+}
+
+-- Expanding the squared length of a sum. Stated here rather than at the
+-- use site because `ring` cannot see through `Plane.Vector.first(u + v)`
+-- — the coordinates have to be expanded first.
+theorem Plane.Vector.innerProduct_add_self (u v : Plane.Vector)
+        : Plane.Vector.innerProduct(u + v, u + v)
+              = Plane.Vector.innerProduct(u, v) * 2
+                + (Plane.Vector.innerProduct(u, u)
+                       + Plane.Vector.innerProduct(v, v)) :=
+  Plane.Vector.first(u + v) * Plane.Vector.first(u + v)
+      + Plane.Vector.second(u + v) * Plane.Vector.second(u + v)
+    = (Plane.Vector.first(u) + Plane.Vector.first(v))
+          * (Plane.Vector.first(u) + Plane.Vector.first(v))
+      + (Plane.Vector.second(u) + Plane.Vector.second(v))
+          * (Plane.Vector.second(u) + Plane.Vector.second(v))
+    = (Plane.Vector.first(u) * Plane.Vector.first(v)
+           + Plane.Vector.second(u) * Plane.Vector.second(v)) * 2
+      + ((Plane.Vector.first(u) * Plane.Vector.first(u)
+              + Plane.Vector.second(u) * Plane.Vector.second(u))
+         + (Plane.Vector.first(v) * Plane.Vector.first(v)
+                + Plane.Vector.second(v) * Plane.Vector.second(v))) by ring

@@ -119,3 +119,163 @@ theorem Plane.distance_nonneg (p q : Plane.Point)
 theorem Plane.supDistance_LessOrEqual_distance (p q : Plane.Point)
         : Plane.supDistance(p, q) ≤ Plane.distance(p, q) :=
   done by Plane.Vector.supNorm_LessOrEqual_norm
+
+-- ----------------------------------------------------------------------
+-- The other half of the comparison, `‖v‖ ≤ √2·‖v‖∞`.
+
+theorem Plane.zero_LessOrEqual_two : Real.zero ≤ 2 :=
+  done
+
+-- √2, as the length of the diagonal of the unit square.
+definition Plane.rootTwo : ℝ :=
+  Real.square_root(2, Plane.zero_LessOrEqual_two)
+
+theorem Plane.rootTwo_nonneg : 0 ≤ Plane.rootTwo :=
+  done by Real.square_root_nonneg
+
+theorem Plane.rootTwo_squared : Plane.rootTwo * Plane.rootTwo = 2 :=
+  done by Real.square_root_squares
+
+-- Each coordinate's square is below the sup norm's, since the coordinate's
+-- size is and both are nonnegative.
+theorem Plane.Vector.first_square_LessOrEqual_supNorm_square (v : Plane.Vector)
+        : Plane.Vector.first(v) * Plane.Vector.first(v)
+              ≤ Plane.Vector.supNorm(v) * Plane.Vector.supNorm(v) := {
+  0 ≤ abs(Plane.Vector.first(v)) by Real.absolute_value_nonneg;
+  abs(Plane.Vector.first(v)) ≤ Plane.Vector.supNorm(v)
+      by Real.left_LessOrEqual_maximum;
+  Plane.Vector.first(v) * Plane.Vector.first(v)
+     = abs(Plane.Vector.first(v)) * abs(Plane.Vector.first(v))
+           by Real.absolute_value_square
+     ≤ Plane.Vector.supNorm(v) * Plane.Vector.supNorm(v)
+           by Real.LessOrEqual.multiply_monotone_nonneg;
+  done
+}
+
+theorem Plane.Vector.second_square_LessOrEqual_supNorm_square (v : Plane.Vector)
+        : Plane.Vector.second(v) * Plane.Vector.second(v)
+              ≤ Plane.Vector.supNorm(v) * Plane.Vector.supNorm(v) := {
+  0 ≤ abs(Plane.Vector.second(v)) by Real.absolute_value_nonneg;
+  abs(Plane.Vector.second(v)) ≤ Plane.Vector.supNorm(v)
+      by Real.right_LessOrEqual_maximum;
+  Plane.Vector.second(v) * Plane.Vector.second(v)
+     = abs(Plane.Vector.second(v)) * abs(Plane.Vector.second(v))
+           by Real.absolute_value_square
+     ≤ Plane.Vector.supNorm(v) * Plane.Vector.supNorm(v)
+           by Real.LessOrEqual.multiply_monotone_nonneg;
+  done
+}
+
+-- `‖v‖ ≤ √2·‖v‖∞`: the squared length is at most two copies of the sup
+-- norm's square, which is the square of √2 times it.
+theorem Plane.Vector.norm_LessOrEqual_rootTwo_supNorm (v : Plane.Vector)
+        : Plane.Vector.norm(v) ≤ Plane.rootTwo * Plane.Vector.supNorm(v) := {
+  0 ≤ Plane.Vector.supNorm(v) by Plane.Vector.supNorm_nonneg;
+  0 ≤ Plane.rootTwo by Plane.rootTwo_nonneg;
+  Real.IsNonneg(Plane.rootTwo);
+  Real.IsNonneg(Plane.Vector.supNorm(v));
+  Real.IsNonneg(Plane.rootTwo * Plane.Vector.supNorm(v))
+      by Real.IsNonneg.multiply;
+  0 ≤ Plane.rootTwo * Plane.Vector.supNorm(v);
+  Plane.Vector.first(v) * Plane.Vector.first(v)
+      ≤ Plane.Vector.supNorm(v) * Plane.Vector.supNorm(v)
+      by Plane.Vector.first_square_LessOrEqual_supNorm_square;
+  Plane.Vector.second(v) * Plane.Vector.second(v)
+      ≤ Plane.Vector.supNorm(v) * Plane.Vector.supNorm(v)
+      by Plane.Vector.second_square_LessOrEqual_supNorm_square;
+  Plane.Vector.norm(v) * Plane.Vector.norm(v)
+     = Plane.Vector.innerProduct(v, v) by Plane.Vector.norm_squared
+     = Plane.Vector.first(v) * Plane.Vector.first(v)
+           + Plane.Vector.second(v) * Plane.Vector.second(v)
+     ≤ Plane.Vector.supNorm(v) * Plane.Vector.supNorm(v)
+           + Plane.Vector.second(v) * Plane.Vector.second(v)
+           by Real.add_preserves_LessOrEqual
+     = Plane.Vector.second(v) * Plane.Vector.second(v)
+           + Plane.Vector.supNorm(v) * Plane.Vector.supNorm(v)
+     ≤ Plane.Vector.supNorm(v) * Plane.Vector.supNorm(v)
+           + Plane.Vector.supNorm(v) * Plane.Vector.supNorm(v)
+           by Real.add_preserves_LessOrEqual
+     = 2 * (Plane.Vector.supNorm(v) * Plane.Vector.supNorm(v)) by ring
+     = (Plane.rootTwo * Plane.rootTwo)
+           * (Plane.Vector.supNorm(v) * Plane.Vector.supNorm(v))
+           by Plane.rootTwo_squared
+     = (Plane.rootTwo * Plane.Vector.supNorm(v))
+           * (Plane.rootTwo * Plane.Vector.supNorm(v));
+  done by Real.LessOrEqual_of_square_LessOrEqual
+}
+
+-- ----------------------------------------------------------------------
+-- The triangle inequality.
+
+-- Cauchy--Schwarz, read at the level of lengths rather than squares.
+theorem Plane.Vector.innerProduct_LessOrEqual_norm_product (u v : Plane.Vector)
+        : Plane.Vector.innerProduct(u, v)
+              ≤ Plane.Vector.norm(u) * Plane.Vector.norm(v) := {
+  Real.IsNonneg(Plane.Vector.norm(u)) by Plane.Vector.norm_nonneg;
+  Real.IsNonneg(Plane.Vector.norm(v)) by Plane.Vector.norm_nonneg;
+  Real.IsNonneg(Plane.Vector.norm(u) * Plane.Vector.norm(v))
+      by Real.IsNonneg.multiply;
+  0 ≤ Plane.Vector.norm(u) * Plane.Vector.norm(v);
+  abs(Plane.Vector.innerProduct(u, v)) * abs(Plane.Vector.innerProduct(u, v))
+     = Plane.Vector.innerProduct(u, v) * Plane.Vector.innerProduct(u, v)
+           by Real.absolute_value_square
+     ≤ Plane.Vector.innerProduct(u, u) * Plane.Vector.innerProduct(v, v)
+           by Plane.Vector.cauchy_schwarz
+     = (Plane.Vector.norm(u) * Plane.Vector.norm(u))
+           * Plane.Vector.innerProduct(v, v)
+           by Plane.Vector.norm_squared
+     = (Plane.Vector.norm(u) * Plane.Vector.norm(u))
+           * (Plane.Vector.norm(v) * Plane.Vector.norm(v))
+           by Plane.Vector.norm_squared
+     = (Plane.Vector.norm(u) * Plane.Vector.norm(v))
+           * (Plane.Vector.norm(u) * Plane.Vector.norm(v));
+  abs(Plane.Vector.innerProduct(u, v))
+      ≤ Plane.Vector.norm(u) * Plane.Vector.norm(v)
+      by Real.LessOrEqual_of_square_LessOrEqual;
+  Plane.Vector.innerProduct(u, v)
+     ≤ abs(Plane.Vector.innerProduct(u, v))
+     ≤ Plane.Vector.norm(u) * Plane.Vector.norm(v);
+  done
+}
+
+theorem Plane.Vector.norm_triangle (u v : Plane.Vector)
+        : Plane.Vector.norm(u + v)
+              ≤ Plane.Vector.norm(u) + Plane.Vector.norm(v) := {
+  0 ≤ Plane.Vector.norm(u) by Plane.Vector.norm_nonneg;
+  0 ≤ Plane.Vector.norm(v) by Plane.Vector.norm_nonneg;
+  0 ≤ Plane.Vector.norm(u) + Plane.Vector.norm(v);
+  Plane.Vector.innerProduct(u, v)
+      ≤ Plane.Vector.norm(u) * Plane.Vector.norm(v)
+      by Plane.Vector.innerProduct_LessOrEqual_norm_product;
+  Real.IsNonneg((2 : ℝ));
+  Plane.Vector.innerProduct(u, v) * 2
+      ≤ (Plane.Vector.norm(u) * Plane.Vector.norm(v)) * 2
+      by Real.LessOrEqual.multiply_by_nonneg_right;
+  Plane.Vector.norm(u + v) * Plane.Vector.norm(u + v)
+     = Plane.Vector.innerProduct(u + v, u + v) by Plane.Vector.norm_squared
+     = Plane.Vector.innerProduct(u, v) * 2
+           + (Plane.Vector.innerProduct(u, u) + Plane.Vector.innerProduct(v, v))
+           by Plane.Vector.innerProduct_add_self
+     ≤ (Plane.Vector.norm(u) * Plane.Vector.norm(v)) * 2
+           + (Plane.Vector.innerProduct(u, u) + Plane.Vector.innerProduct(v, v))
+           by Real.add_preserves_LessOrEqual
+     = (Plane.Vector.norm(u) * Plane.Vector.norm(v)) * 2
+           + (Plane.Vector.norm(u) * Plane.Vector.norm(u)
+                  + Plane.Vector.innerProduct(v, v))
+           by Plane.Vector.norm_squared
+     = (Plane.Vector.norm(u) * Plane.Vector.norm(v)) * 2
+           + (Plane.Vector.norm(u) * Plane.Vector.norm(u)
+                  + Plane.Vector.norm(v) * Plane.Vector.norm(v))
+           by Plane.Vector.norm_squared
+     = (Plane.Vector.norm(u) + Plane.Vector.norm(v))
+           * (Plane.Vector.norm(u) + Plane.Vector.norm(v));
+  done by Real.LessOrEqual_of_square_LessOrEqual
+}
+
+theorem Plane.distance_triangle (p q r : Plane.Point)
+        : Plane.distance(p, r) ≤ Plane.distance(p, q) + Plane.distance(q, r) :=
+  Plane.Vector.norm(r - p)
+     = Plane.Vector.norm((q - p) + (r - q))
+           by Plane.Point.difference_chain
+     ≤ Plane.Vector.norm(q - p) + Plane.Vector.norm(r - q)
+           by Plane.Vector.norm_triangle
