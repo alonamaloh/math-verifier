@@ -413,3 +413,81 @@ The two options are (a) add countable choice, or full choice, to
 or (b) accept bisection rewrites at each of the three sites. This is a
 decision about the system, not about `Plane/`, so it is recorded here
 rather than worked around silently.
+
+---
+
+# Re-measurement after the `ordered_field` tactic (2026-07-26)
+
+Every entry above was replayed against the current build. Method: for
+each of the 65 `by Real.…` citations in `library/Plane/`, delete it,
+re-verify the file, restore. Then mark candidate lemmas `automatic` and
+repeat.
+
+## Result
+
+| | citations in `Plane/` |
+| --- | --- |
+| before | 65 |
+| after the tactic landed | 19 |
+| after eight `automatic` tags | **15** |
+
+The 15 survivors are the ones a mathematician *would* name:
+`LessOrEqual_of_square_LessOrEqual` (6×, "compare the squares"),
+`square_root_nonneg` / `square_root_squares` /
+`equal_of_square_equal_nonneg` (the defining properties of √),
+`SequenceConverges.unique` (2×), and three one-offs. Nothing left in
+`Plane/` is a step nobody writes down.
+
+Marked `automatic`: `absolute_value_nonneg`, `absolute_value_square`,
+`left_LessOrEqual_maximum`, `right_LessOrEqual_maximum`,
+`maximum_nonneg`, `maximum_LessOrEqual`, `maximum_LessThan`,
+`less_or_equal_add_of_nonneg`.
+
+Cost, since growing the candidate pool is charged to everyone:
+`Real/supremum` 3.14s → 3.14s, `Algebra/ring_lemmas` 1.38s → 1.36s,
+`Plane/norm` 1.07s → 1.05s, `Plane/topology` 0.51s → 0.52s.
+`Algebra/residue_arithmetic_generated` moved 135s → 144s, but its
+transitive cone contains **no** `Real/` module at all, so the tags cannot
+reach it — that spread is machine noise, and the file is a poor canary
+for changes in `Real/`.
+
+Two expensive-step warnings live in the `Plane` cone —
+`Real.supremum:878` and `Real.exponential_addition:121`. Both were
+confirmed **pre-existing** by reverting the tags, rebuilding, and
+re-verifying: same sites, same step counts (70839 / 61173 vs 61688).
+
+## Per-entry status
+
+- **I1** (`e ≤ 0` never enters the sign battery) — CLOSED. `2*(b-c) ≤ 0`
+  from `b ≤ c` now closes `by ordered_field`.
+- **I4** — CLOSED, as recorded above.
+- **I9** (`(2:ℝ) < 4`) — CLOSED `by ordered_field`. The asymmetry with
+  `≤`, which still closes with a bare `done`, remains but no longer
+  costs anything.
+- **E8** (a cited `∀`-fact not applied to an in-scope hypothesis) —
+  CLOSED. `done by close` now discharges `n ≤ m` from the context.
+- **E6** (a `case` pattern cannot have a top-level `∧`) — STILL OPEN.
+- **E7** (a theorem body cannot be a bare `by cases` / `by induction`) —
+  STILL OPEN.
+
+## Two gaps the tactic did not close
+
+**The tactic must be cited.** The auto-prover does not try
+`ordered_field`, so every one of I1/I4/I9 still needs `by ordered_field`
+written out — a step a mathematician would not have annotated. That is
+the same complaint the log opened with, moved one level up: the
+inequality is now *provable* rather than blocked, but saying so is still
+required. Whether the battery should call the tactic on failure is a cost
+question (how expensive is a failed search?) rather than a design one.
+
+**Division by a numeral is an opaque atom.** `Real.divide` carries a
+nonzero proof, so `e / 2` is not recognised as `(1/2)·e`:
+
+```
+x < e / 2  ⊢  x + x < e / 2 + e / 2     -- closes
+x < e / 2  ⊢  2 * x < e                 -- fails, even by ordered_field
+```
+
+This is the ε/2 idiom, the single most common shape in analysis. It is
+survivable in the first spelling, but the second is the one people
+write.
