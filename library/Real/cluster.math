@@ -1,0 +1,274 @@
+-- Real/cluster.math
+--
+-- Bolzano--Weierstrass on the line: a bounded sequence of reals has a
+-- convergent subsequence.
+--
+-- The proof splits in two, and the split is what makes it formalisable
+-- without a choice principle stronger than the one we have.
+--
+-- First, a bounded sequence has a CLUSTER POINT — a value it comes
+-- arbitrarily close to arbitrarily late. That is the completeness half,
+-- and it is the supremum of
+--
+--     A = { x : x ≤ s(m) for arbitrarily large m },
+--
+-- the limsup. Above the supremum the sequence is eventually smaller;
+-- just below it, the sequence is frequently larger; between those two
+-- statements the sequence is frequently within ε.
+--
+-- Second, a cluster point is the limit of a subsequence. That is the
+-- combinatorial half, and it is where "choose n_k > n_{k-1} with
+-- |s(n_k) − p| < 1/(1+k)" happens — taking the LEAST such index makes
+-- the choice canonical, so `Natural.extract` supplies it outright.
+--
+-- Keeping the halves apart matters: the cluster point is characterised
+-- by a property of the WHOLE sequence, so the index chosen at step k
+-- does not depend on the value chosen at step k−1. A proof that built
+-- the subsequence directly — the peak argument, say — would need that
+-- dependence, and `Natural.extract` deliberately does not offer it.
+
+module Real.cluster
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Natural.basics
+import Natural.order
+import Natural.eventually
+import Natural.frequently
+import Real.interface
+import Real.order
+import Real.order_field
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.linearity
+import Real.convergence
+import Real.supremum
+import Real.harmonic_series
+import Real.archimedean
+
+-- ----------------------------------------------------------------------
+-- Cluster points.
+
+definition Real.IsClusterPoint (s : ℕ → ℝ) (point : ℝ) : Proposition :=
+  ∀ (tolerance : ℝ). tolerance > 0 →
+    Natural.Frequently((m : ℕ) ↦ abs(s(m) - point) < tolerance)
+
+definition Real.SequenceIsBounded (s : ℕ → ℝ) : Proposition :=
+  ∃ (bound : ℝ). ∀ (m : ℕ). abs(s(m)) ≤ bound
+
+-- The limsup set: the values the sequence is frequently at least.
+definition Real.frequentlyBelow (s : ℕ → ℝ) : Set(ℝ) :=
+  (x : ℝ) ↦ Natural.Frequently((m : ℕ) ↦ x ≤ s(m))
+
+-- ----------------------------------------------------------------------
+-- The limsup set has a supremum: it holds the lower bound and stops at
+-- the upper one.
+
+-- A two-sided bound from an absolute one. Stated as its own lemma
+-- because `ordered_field` does not fire under a `take` binder, so the
+-- flip has to happen where the hypotheses are theorem parameters.
+theorem Real.negate_bound_of_absolute_value_bound (x bound : ℝ)
+        (bounded : abs(x) ≤ bound)
+        : -bound ≤ x := {
+  -x ≤ abs(x) by Real.negate_LessOrEqual_absolute_value;
+  -x ≤ bound;
+  done
+}
+
+-- Being strictly between `centre ± tolerance` is being within `tolerance`.
+-- A top-level lemma for the same reason as the one above: the
+-- rearrangement is linear, and `ordered_field` only fires where the
+-- hypotheses are theorem parameters.
+theorem Real.absolute_value_LessThan_of_strictly_between
+        (x centre tolerance : ℝ)
+        (above : centre - tolerance < x)
+        (below : x < centre + tolerance)
+        : abs(x - centre) < tolerance := {
+  -tolerance < x - centre by ordered_field;
+  x - centre < tolerance by ordered_field;
+  done by Real.absolute_value_LessThan_of_bounds
+}
+
+theorem Real.frequentlyBelow_nonempty (s : ℕ → ℝ) (bound : ℝ)
+        (bounded : ∀ (m : ℕ). abs(s(m)) ≤ bound)
+        : Set.IsNonempty(ℝ, Real.frequentlyBelow(s)) := {
+  ∀ (m : ℕ). -bound ≤ s(m)
+      by (m : ℕ) ↦ {
+        abs(s(m)) ≤ bound by bounded(m);
+        done by Real.negate_bound_of_absolute_value_bound
+      };
+  Natural.Frequently((m : ℕ) ↦ -bound ≤ s(m))
+      by Natural.Frequently.of_always;
+  witness -bound with done
+}
+
+theorem Real.frequentlyBelow_bounded_above (s : ℕ → ℝ) (bound : ℝ)
+        (bounded : ∀ (m : ℕ). abs(s(m)) ≤ bound)
+        : Real.IsBoundedAbove(Real.frequentlyBelow(s)) := {
+  Real.IsUpperBound(Real.frequentlyBelow(s), bound)
+      by (x : ℝ) (frequent : x ∈ Real.frequentlyBelow(s)) ↦ {
+        Natural.Frequently((m : ℕ) ↦ x ≤ s(m)) as frequentlyAbove;
+        choose m such that 0 < m ∧ x ≤ s(m) from frequentlyAbove(0);
+        abs(s(m)) ≤ bound by bounded(m);
+        x ≤ s(m)
+          ≤ abs(s(m)) by Real.LessOrEqual_absolute_value
+          ≤ bound;
+        done
+      };
+  witness bound with done
+}
+
+-- ----------------------------------------------------------------------
+-- The completeness half.
+
+theorem Real.cluster_point_exists (s : ℕ → ℝ)
+        (bounded : Real.SequenceIsBounded(s))
+        : ∃ (point : ℝ). Real.IsClusterPoint(s, point) := {
+  choose bound such that ∀ (m : ℕ). abs(s(m)) ≤ bound
+      as insideBound from bounded;
+  Set.IsNonempty(ℝ, Real.frequentlyBelow(s))
+      by Real.frequentlyBelow_nonempty(s, bound, insideBound);
+  Real.IsBoundedAbove(Real.frequentlyBelow(s))
+      by Real.frequentlyBelow_bounded_above(s, bound, insideBound);
+  choose limsup such that Real.IsSupremum(Real.frequentlyBelow(s), limsup)
+      as isSupremum
+      from Real.supremum_exists(
+          Real.frequentlyBelow(s),
+          { Set.IsNonempty(ℝ, Real.frequentlyBelow(s)) },
+          { Real.IsBoundedAbove(Real.frequentlyBelow(s)) });
+  Real.IsUpperBound(Real.frequentlyBelow(s), limsup) as isUpperBound;
+  witness limsup with
+      (tolerance : ℝ) (tolerancePositive : tolerance > 0) ↦ {
+        -- Below the supremum: some member of the set sits above
+        -- `limsup − tolerance`, and the sequence is frequently at least
+        -- that member.
+        limsup - tolerance < limsup;
+        choose nearly such that
+            nearly ∈ Real.frequentlyBelow(s) ∧ limsup - tolerance < nearly
+            from Real.IsSupremum.exists_above(
+                Real.frequentlyBelow(s), limsup, limsup - tolerance,
+                isSupremum, { limsup - tolerance < limsup });
+        limsup - tolerance < nearly;
+        Natural.Frequently((m : ℕ) ↦ nearly ≤ s(m)) as frequentlyAbove;
+        Natural.Frequently((m : ℕ) ↦ limsup - tolerance < s(m))
+            by Natural.Frequently.monotone(
+                (m : ℕ) ↦ nearly ≤ s(m),
+                (m : ℕ) ↦ limsup - tolerance < s(m),
+                frequentlyAbove,
+                (m : ℕ) (above : nearly ≤ s(m)) ↦ {
+                  limsup - tolerance < nearly ≤ s(m);
+                  done
+                })
+            as frequentlyHigh;
+
+        -- Above the supremum: `limsup + tolerance` is not in the set, or
+        -- leastness would put `limsup` above it. Not frequently exceeded
+        -- is eventually not exceeded.
+        ¬(limsup + tolerance ∈ Real.frequentlyBelow(s))
+            by (inside : limsup + tolerance ∈ Real.frequentlyBelow(s)) ↦ {
+                 limsup + tolerance ≤ limsup
+                     by isUpperBound(limsup + tolerance, inside);
+                 done
+               };
+        ¬Natural.Frequently((m : ℕ) ↦ limsup + tolerance ≤ s(m));
+        Natural.Eventually((m : ℕ) ↦ ¬(limsup + tolerance ≤ s(m)))
+            by Natural.Eventually.of_not_Frequently;
+        Natural.Eventually((m : ℕ) ↦ s(m) < limsup + tolerance)
+            by Natural.Eventually.monotone(
+                (m : ℕ) ↦ ¬(limsup + tolerance ≤ s(m)),
+                (m : ℕ) ↦ s(m) < limsup + tolerance,
+                Natural.Eventually.of_not_Frequently(
+                    (m : ℕ) ↦ limsup + tolerance ≤ s(m),
+                    { ¬Natural.Frequently(
+                          (m : ℕ) ↦ limsup + tolerance ≤ s(m)) }),
+                (m : ℕ) (notAbove : ¬(limsup + tolerance ≤ s(m))) ↦
+                    Real.LessThan_of_not_LessOrEqual(
+                        limsup + tolerance, s(m), notAbove))
+            as eventuallyLow;
+
+        -- Between the two, the sequence is frequently within tolerance.
+        Natural.Frequently((m : ℕ) ↦
+            (limsup - tolerance < s(m)) ∧ (s(m) < limsup + tolerance))
+            by Natural.Frequently.and_eventually(
+                (m : ℕ) ↦ limsup - tolerance < s(m),
+                (m : ℕ) ↦ s(m) < limsup + tolerance,
+                frequentlyHigh, eventuallyLow)
+            as frequentlyBetween;
+        done by Natural.Frequently.monotone(
+            (m : ℕ) ↦ (limsup - tolerance < s(m))
+                          ∧ (s(m) < limsup + tolerance),
+            (m : ℕ) ↦ abs(s(m) - limsup) < tolerance,
+            frequentlyBetween,
+            (m : ℕ) (between : (limsup - tolerance < s(m))
+                                   ∧ (s(m) < limsup + tolerance)) ↦ {
+              limsup - tolerance < s(m);
+              s(m) < limsup + tolerance;
+              done by Real.absolute_value_LessThan_of_strictly_between
+            })
+      }
+}
+
+-- ----------------------------------------------------------------------
+-- The combinatorial half: a cluster point is the limit of a subsequence.
+--
+-- `Natural.extract` takes the LEAST index past the previous one at which
+-- the sequence is within `harmonic_term(k)` of the point, which is where
+-- a textbook says "choose n_k".
+
+theorem Real.subsequence_at_cluster_point (s : ℕ → ℝ) (point : ℝ)
+        (isCluster : Real.IsClusterPoint(s, point))
+        : ∃ (index : ℕ → ℕ).
+            (∀ (k : ℕ). index(k) < index(1 + k))
+            ∧ Real.SequenceConverges((k : ℕ) ↦ s(index(k)), point) := {
+  ∀ (k : ℕ). Natural.Frequently((m : ℕ) ↦
+      abs(s(m) - point) < Real.harmonic_term(k))
+      by (k : ℕ) ↦ {
+        Real.harmonic_term(k) > 0 by Real.divide_positive;
+        done by isCluster(Real.harmonic_term(k))
+      }
+      as closeOften;
+  let approach : ℕ → ℕ → Proposition :=
+      (k : ℕ) (m : ℕ) ↦ abs(s(m) - point) < Real.harmonic_term(k);
+  let index : ℕ → ℕ := Natural.extract(approach);
+  ∀ (k : ℕ). index(k) < index(1 + k)
+      by (k : ℕ) ↦ Natural.extract_increasing(approach, closeOften, k);
+  ∀ (k : ℕ). abs(s(index(k)) - point) < Real.harmonic_term(k)
+      by (k : ℕ) ↦ Natural.extract_holds(approach, closeOften, k)
+      as closeAtIndex;
+  Real.SequenceConverges((k : ℕ) ↦ s(index(k)), point)
+      by (tolerance : ℝ) (tolerancePositive : tolerance > 0) ↦ {
+        choose threshold such that
+            Real.harmonic_term(threshold) < tolerance
+            from Real.exists_harmonic_term_below(tolerance, tolerancePositive);
+        witness threshold with
+            (k : ℕ) (beyond : threshold ≤ k) ↦ {
+              abs(s(index(k)) - point)
+                 < Real.harmonic_term(k) by closeAtIndex(k)
+                 ≤ Real.harmonic_term(threshold)
+                       by Real.harmonic_term_antitone
+                 < tolerance;
+              done
+            }
+      };
+  witness index with done
+}
+
+-- ----------------------------------------------------------------------
+-- Bolzano--Weierstrass.
+
+theorem Real.bolzano_weierstrass (s : ℕ → ℝ)
+        (bounded : Real.SequenceIsBounded(s))
+        : ∃ (index : ℕ → ℕ). ∃ (limit : ℝ).
+            (∀ (k : ℕ). index(k) < index(1 + k))
+            ∧ Real.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) := {
+  choose point such that Real.IsClusterPoint(s, point)
+      as isCluster from Real.cluster_point_exists(s, bounded);
+  choose index such that
+      (∀ (k : ℕ). index(k) < index(1 + k))
+      ∧ Real.SequenceConverges((k : ℕ) ↦ s(index(k)), point)
+      as subsequence
+      from Real.subsequence_at_cluster_point(s, point, isCluster);
+  witness index with { witness point with subsequence }
+}
