@@ -70,6 +70,8 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
   [curve.math](curve.math)
 - `Plane.walkOnto`, `Plane.subarc`, `Plane.openUnitSegment`,
   `Plane.openArc` — [subarc.math](subarc.math)
+- `Plane.retime`, `Plane.lowerHalf`, `Plane.upperHalf`,
+  `Plane.concatenate` — [concatenate.math](concatenate.math)
 
 ## Main theorems
 
@@ -138,6 +140,11 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
   with `Plane.subarc_image` identifying its image as the arc restricted to
   the subsegment, and
   `Plane.IsArc.openArc_is_arc_without_endpoints` for `P°`
+- **`Plane.IsArc.concatenate`** — two arcs meeting only at the endpoint they
+  share glue to an arc. Continuity is `Plane.ContinuousOn.paste` over the two
+  closed halves (with `Plane.ContinuousOn.of_agreeing`, since the glued map only
+  *agrees* with a composition on each); injectivity splits four ways, and
+  the seam case is where the meet-only-there hypothesis is used
 
 ## Connectedness is the clopen criterion
 

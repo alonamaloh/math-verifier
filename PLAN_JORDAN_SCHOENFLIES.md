@@ -311,27 +311,35 @@ it never moves — is what makes a subarc between *distinct* parameters an
 arc. `Plane.openArc` is the image of the model interval minus its ends, and
 on an arc that is exactly the arc minus its two endpoint values.
 
+**Concatenation is built** (`Plane/concatenate.math`, 830 lines).
+`Plane.retime(scale, shift)` is the affine reparametrisation of the model
+interval; the halves are named by their parameter, not as segments, because
+every obligation is about that parameter. Continuity is the pasting lemma
+(plus `ContinuousOn.of_agreeing`, which Layer 1 also lacked): on each half
+the glued map *agrees* with a composition. **The midpoint is where the
+hypotheses earn their place** — the `if` still takes the first branch
+there, and the two branches agree only because the arcs share that
+endpoint, so the assumption is what makes the map well defined rather than
+merely continuous. Injectivity splits four ways: inside a half it is that
+arc's injectivity through the retiming, and across the halves the common
+value must be the shared endpoint, which pins both parameters to the
+midpoint (`lowerHalf_at_finish_is_midpoint`, `upperHalf_at_start_is_midpoint`).
+
 **Not built.** In dependency order:
 
-1. **Concatenation** of two arcs meeting only at an endpoint. Feasible now
-   and self-contained: parametrise by halves (`first(x) ≤ 1/2`) with a
-   value-level `if`, glue with the **pasting lemma** already in Layer 1,
-   and split injectivity by cases. Budget ~400–500 lines, mostly parameter
-   arithmetic. This is what *builds* polygonal arcs out of segments, so it
-   is the next thing to do.
-2. **The subarc basis.** The homeomorphism already carries the topology
+1. **The subarc basis.** The homeomorphism already carries the topology
    (`IsHomeomorphismOn`); what is missing is that relatively open
    subsegments of the model interval have relatively open images. The
    endpoints are the only subtlety — a basic neighbourhood of an endpoint
    is a *half-open* subarc, which is why the faithful statement is about
    relatively open subarcs.
-3. **`Plane.IsPolygonal`.** Blocked on a design decision, not on
+2. **`Plane.IsPolygonal`.** Blocked on a design decision, not on
    mathematics: it wants a **vertex list**, and `Plane.PolygonalReach` is a
    derivation rather than an object. Either give the walk a list of
    vertices (see `fold_refactor_plan`) or define `IsPolygonal(f)` as "the
    arc is a finite union of segments" over `Lists`. Settle this before
    Layer 6, which needs polygonal edges as data.
-4. **The two arcs of a Jordan curve between two of its points**, and the
+3. **The two arcs of a Jordan curve between two of its points**, and the
    subarc basis *for a curve*. Genuinely blocked on the **arc structure of
    the model curve**: the circle minus two points has two components, each
    an arc. Getting there wants `∂Q`'s decomposition into four sides (a
