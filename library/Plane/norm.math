@@ -172,11 +172,7 @@ theorem Plane.Vector.norm_LessOrEqual_rootTwo_supNorm (v : Plane.Vector)
         : Plane.Vector.norm(v) ≤ Plane.rootTwo * Plane.Vector.supNorm(v) := {
   0 ≤ Plane.Vector.supNorm(v) by Plane.Vector.supNorm_nonneg;
   0 ≤ Plane.rootTwo by Plane.rootTwo_nonneg;
-  Real.IsNonneg(Plane.rootTwo);
-  Real.IsNonneg(Plane.Vector.supNorm(v));
-  Real.IsNonneg(Plane.rootTwo * Plane.Vector.supNorm(v))
-      by Real.IsNonneg.multiply;
-  0 ≤ Plane.rootTwo * Plane.Vector.supNorm(v);
+  0 ≤ Plane.rootTwo * Plane.Vector.supNorm(v) by Real.multiply_nonneg;
   Plane.Vector.first(v) * Plane.Vector.first(v)
       ≤ Plane.Vector.supNorm(v) * Plane.Vector.supNorm(v)
       by Plane.Vector.first_square_LessOrEqual_supNorm_square;
@@ -188,13 +184,8 @@ theorem Plane.Vector.norm_LessOrEqual_rootTwo_supNorm (v : Plane.Vector)
      = Plane.Vector.first(v) * Plane.Vector.first(v)
            + Plane.Vector.second(v) * Plane.Vector.second(v)
      ≤ Plane.Vector.supNorm(v) * Plane.Vector.supNorm(v)
-           + Plane.Vector.second(v) * Plane.Vector.second(v)
-           by Real.add_preserves_LessOrEqual
-     = Plane.Vector.second(v) * Plane.Vector.second(v)
            + Plane.Vector.supNorm(v) * Plane.Vector.supNorm(v)
-     ≤ Plane.Vector.supNorm(v) * Plane.Vector.supNorm(v)
-           + Plane.Vector.supNorm(v) * Plane.Vector.supNorm(v)
-           by Real.add_preserves_LessOrEqual
+           by Real.add_preserves_LessOrEqual_both
      = 2 * (Plane.Vector.supNorm(v) * Plane.Vector.supNorm(v)) by ring
      = (Plane.rootTwo * Plane.rootTwo)
            * (Plane.Vector.supNorm(v) * Plane.Vector.supNorm(v))
@@ -211,11 +202,9 @@ theorem Plane.Vector.norm_LessOrEqual_rootTwo_supNorm (v : Plane.Vector)
 theorem Plane.Vector.innerProduct_LessOrEqual_norm_product (u v : Plane.Vector)
         : Plane.Vector.innerProduct(u, v)
               ≤ Plane.Vector.norm(u) * Plane.Vector.norm(v) := {
-  Real.IsNonneg(Plane.Vector.norm(u)) by Plane.Vector.norm_nonneg;
-  Real.IsNonneg(Plane.Vector.norm(v)) by Plane.Vector.norm_nonneg;
-  Real.IsNonneg(Plane.Vector.norm(u) * Plane.Vector.norm(v))
-      by Real.IsNonneg.multiply;
-  0 ≤ Plane.Vector.norm(u) * Plane.Vector.norm(v);
+  0 ≤ Plane.Vector.norm(u) by Plane.Vector.norm_nonneg;
+  0 ≤ Plane.Vector.norm(v) by Plane.Vector.norm_nonneg;
+  0 ≤ Plane.Vector.norm(u) * Plane.Vector.norm(v) by Real.multiply_nonneg;
   abs(Plane.Vector.innerProduct(u, v)) * abs(Plane.Vector.innerProduct(u, v))
      = Plane.Vector.innerProduct(u, v) * Plane.Vector.innerProduct(u, v)
            by Real.absolute_value_square
@@ -283,28 +272,13 @@ theorem Plane.distance_triangle (p q r : Plane.Point)
 -- ----------------------------------------------------------------------
 -- Scaling.
 
--- Two nonnegative reals with the same square are the same real: each is
--- below the other by comparing squares.
-theorem Real.equal_of_square_equal_nonneg (x y : ℝ)
-        (xNonneg : 0 ≤ x) (yNonneg : 0 ≤ y)
-        (squaresEqual : x * x = y * y)
-        : x = y := {
-  x * x ≤ y * y;
-  y * y ≤ x * x;
-  x ≤ y by Real.LessOrEqual_of_square_LessOrEqual;
-  y ≤ x by Real.LessOrEqual_of_square_LessOrEqual;
-  done by Real.LessOrEqual.antisymmetric
-}
-
 theorem Plane.Vector.norm_scale (factor : ℝ) (v : Plane.Vector)
         : Plane.Vector.norm(factor * v)
               = abs(factor) * Plane.Vector.norm(v) := {
   0 ≤ Plane.Vector.norm(factor * v) by Plane.Vector.norm_nonneg;
   0 ≤ abs(factor) by Real.absolute_value_nonneg;
-  Real.IsNonneg(abs(factor));
-  Real.IsNonneg(Plane.Vector.norm(v)) by Plane.Vector.norm_nonneg;
-  Real.IsNonneg(abs(factor) * Plane.Vector.norm(v)) by Real.IsNonneg.multiply;
-  0 ≤ abs(factor) * Plane.Vector.norm(v);
+  0 ≤ Plane.Vector.norm(v) by Plane.Vector.norm_nonneg;
+  0 ≤ abs(factor) * Plane.Vector.norm(v) by Real.multiply_nonneg;
   Plane.Vector.norm(factor * v) * Plane.Vector.norm(factor * v)
      = Plane.Vector.innerProduct(factor * v, factor * v)
            by Plane.Vector.norm_squared

@@ -178,6 +178,46 @@ theorem Real.nonneg_of_multiply_nonneg (c x : ℝ)
   }
 
 -- Cancelling a positive factor out of a weak inequality.
+-- Strict counterpart of `Real.nonneg_of_multiply_nonneg`: a positive
+-- product with a positive factor forces the other factor positive.
+theorem Real.positive_of_multiply_positive (c x : ℝ)
+        (cPositive : Real.zero < c)
+        (productPositive : Real.zero < c * x)
+        : Real.zero < x := {
+  suppose x ≤ Real.zero for contradiction {
+      Real.IsNonneg(c);
+      x * c ≤ Real.zero * c
+          by Real.LessOrEqual.multiply_by_nonneg_right;
+      Real.zero
+         < c * x
+         = x * c
+         ≤ Real.zero * c
+         = Real.zero;
+      done
+  };
+  done by Real.LessThan_of_not_LessOrEqual
+}
+
+-- Strict cancellation on the left by a positive factor. The mirror of
+-- `Real.LessOrEqual.multiply_cancel_left_positive`, which had no strict
+-- counterpart: a proof reaching `2 * m < 2 * c` could not get to `m < c`.
+theorem Real.LessThan.multiply_cancel_left_positive
+        (c x y : ℝ)
+        (cPositive : Real.zero < c)
+        (scaledLess : c * x < c * y)
+        : x < y := {
+  Real.zero
+     = c * x - c * x
+     < c * y - c * x
+     = c * (y - x);
+  Real.zero < y - x
+      by Real.positive_of_multiply_positive;
+  x
+     = Real.zero + x
+     < (y - x) + x
+     = y
+}
+
 theorem Real.LessOrEqual.multiply_cancel_left_positive
         (c x y : ℝ)
         (cPositive : Real.zero < c)

@@ -438,6 +438,19 @@ automatic theorem Real.add_preserves_LessOrEqual
         : x + z ≤ y + z :=
   x + z ≤ y + z by substituting (ring : y - x = (y + z) - (x + z))
 
+-- Adding two inequalities. `add_preserves_LessOrEqual` moves one side at
+-- a time and only on the right, so summing two bounds otherwise costs two
+-- steps and a commute between them — the most frequent friction in the
+-- plane-geometry development.
+automatic theorem Real.add_preserves_LessOrEqual_both
+        (a b c d : ℝ) (aLeqB : a ≤ b) (cLeqD : c ≤ d)
+        : a + c ≤ b + d :=
+  a + c
+     ≤ b + c
+     = c + b
+     ≤ d + b
+     = b + d
+
 -- x + z = y + z → x = y. By ring + Equality.symmetry.
 theorem Real.add_cancel_right
         (x y z : ℝ) (sumEquality : x + z = y + z)
@@ -494,8 +507,21 @@ theorem Real.less_or_equal_add_of_nonneg (x c : ℝ) (cNonneg : c ≥ 0)
      = x + 0
      ≤ x + c
 
+-- A sum of two nonnegative reals vanishes only when both do: each is
+-- squeezed between zero and the sum.
+theorem Real.zero_of_nonneg_sum_zero (a b : ℝ)
+        (aNonneg : 0 ≤ a) (bNonneg : 0 ≤ b) (sumZero : a + b = 0)
+        : a = 0 := {
+  a ≤ a + b by Real.less_or_equal_add_of_nonneg
+    = 0;
+  done by Real.LessOrEqual.antisymmetric
+}
+
 -- Negation reverses ≤: (−x) − (−y) is the same difference as y − x.
-theorem Real.LessOrEqual.negate (x y : ℝ) (xLeqY : x ≤ y)
+-- `automatic` to match its strict twin `Real.LessThan.negate`: without it
+-- `-x ≤ c` from `-c ≤ x` had to be cited by hand while the `<` form went
+-- through unaided.
+automatic theorem Real.LessOrEqual.negate (x y : ℝ) (xLeqY : x ≤ y)
         : -y ≤ -x :=
   -y ≤ -x by substituting (ring : y - x = -x - -y)
 
