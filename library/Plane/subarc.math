@@ -305,3 +305,117 @@ theorem Plane.subarc_image (parametrisation : Plane.Point → Plane.Point)
       };
   done by Set.equal_of_same_members
 }
+
+-- ----------------------------------------------------------------------
+-- The arc without its endpoints — the blueprint's `P°`.
+--
+-- Taken on the parameter side, as the image of the model interval minus
+-- its two ends, because that is the form the subarc basis argument needs:
+-- an open subarc is the image of an open subsegment. Injectivity then says
+-- it is also the arc minus the two endpoint VALUES, which is how the
+-- blueprint reads it.
+
+definition Plane.openUnitSegment : Set(Plane.Point) :=
+  (x : Plane.Point) ↦ x ∈ Plane.unitSegment
+    ∧ ¬(x = Plane.origin) ∧ ¬(x = Plane.Point.make(1, 0))
+
+definition Plane.openArc (parametrisation : Plane.Point → Plane.Point)
+        : Set(Plane.Point) :=
+  Plane.imageSet(parametrisation, Plane.openUnitSegment)
+
+theorem Plane.openUnitSegment_subset
+        : Plane.openUnitSegment ⊆ Plane.unitSegment := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.openUnitSegment as inside;
+  done
+}
+
+-- On an arc the two readings agree: dropping the endpoints of the model
+-- interval drops exactly the two endpoint values, since no other parameter
+-- shares their images.
+theorem Plane.IsArc.openArc_is_arc_without_endpoints
+        (parametrisation : Plane.Point → Plane.Point)
+        (isArc : Plane.IsArc(parametrisation))
+        : Plane.openArc(parametrisation)
+              = Plane.arc(parametrisation)
+                    ∖ Set.singleton(
+                          Plane.Point, Plane.arcStart(parametrisation))
+                    ∖ Set.singleton(
+                          Plane.Point, Plane.arcFinish(parametrisation)) := {
+  Plane.InjectiveOn(parametrisation, Plane.unitSegment) as injective;
+  Plane.origin ∈ Plane.unitSegment by Plane.start_in_unitSegment;
+  Plane.Point.make(1, 0) ∈ Plane.unitSegment by Plane.finish_in_unitSegment;
+
+  Plane.openArc(parametrisation)
+      ⊆ Plane.arc(parametrisation)
+            ∖ Set.singleton(Plane.Point, Plane.arcStart(parametrisation))
+            ∖ Set.singleton(Plane.Point, Plane.arcFinish(parametrisation))
+      by (y : Plane.Point) (onOpenArc : y ∈ Plane.openArc(parametrisation)) ↦ {
+        choose source such that
+            source ∈ Plane.openUnitSegment ∧ parametrisation(source) = y
+            from onOpenArc;
+        source ∈ Plane.openUnitSegment;
+        source ∈ Plane.unitSegment by Plane.openUnitSegment_subset;
+        ¬(source = Plane.origin);
+        ¬(source = Plane.Point.make(1, 0));
+        parametrisation(source) = y;
+        y ∈ Plane.arc(parametrisation) by { witness source with done };
+        ¬(y = Plane.arcStart(parametrisation))
+            by (isStart : y = Plane.arcStart(parametrisation)) ↦ {
+              parametrisation(source) = parametrisation(Plane.origin);
+              source = Plane.origin by injective;
+              done
+            };
+        ¬(y = Plane.arcFinish(parametrisation))
+            by (isFinish : y = Plane.arcFinish(parametrisation)) ↦ {
+              parametrisation(source)
+                  = parametrisation(Plane.Point.make(1, 0));
+              source = Plane.Point.make(1, 0) by injective;
+              done
+            };
+        ¬(y ∈ Set.singleton(Plane.Point, Plane.arcStart(parametrisation)));
+        ¬(y ∈ Set.singleton(Plane.Point, Plane.arcFinish(parametrisation)));
+        done
+      };
+
+  Plane.arc(parametrisation)
+        ∖ Set.singleton(Plane.Point, Plane.arcStart(parametrisation))
+        ∖ Set.singleton(Plane.Point, Plane.arcFinish(parametrisation))
+      ⊆ Plane.openArc(parametrisation)
+      by (y : Plane.Point)
+         (onTrimmedArc :
+              y ∈ Plane.arc(parametrisation)
+                    ∖ Set.singleton(
+                          Plane.Point, Plane.arcStart(parametrisation))
+                    ∖ Set.singleton(
+                          Plane.Point, Plane.arcFinish(parametrisation))) ↦ {
+        y ∈ Plane.arc(parametrisation)
+              ∖ Set.singleton(Plane.Point, Plane.arcStart(parametrisation));
+        y ∈ Plane.arc(parametrisation) as onArc;
+        ¬(y ∈ Set.singleton(Plane.Point, Plane.arcStart(parametrisation)));
+        ¬(y ∈ Set.singleton(Plane.Point, Plane.arcFinish(parametrisation)));
+        choose source such that
+            source ∈ Plane.unitSegment ∧ parametrisation(source) = y
+            from onArc;
+        source ∈ Plane.unitSegment;
+        parametrisation(source) = y as valueAtSource;
+        ¬(source = Plane.origin)
+            by (isOrigin : source = Plane.origin) ↦ {
+              y = parametrisation(Plane.origin) by substituting valueAtSource;
+              y = Plane.arcStart(parametrisation);
+              y ∈ Set.singleton(Plane.Point, Plane.arcStart(parametrisation));
+              done
+            };
+        ¬(source = Plane.Point.make(1, 0))
+            by (isFinish : source = Plane.Point.make(1, 0)) ↦ {
+              y = parametrisation(Plane.Point.make(1, 0))
+                  by substituting valueAtSource;
+              y = Plane.arcFinish(parametrisation);
+              y ∈ Set.singleton(Plane.Point, Plane.arcFinish(parametrisation));
+              done
+            };
+        source ∈ Plane.openUnitSegment;
+        done by { witness source with done }
+      };
+  done by Set.equal_of_same_members
+}

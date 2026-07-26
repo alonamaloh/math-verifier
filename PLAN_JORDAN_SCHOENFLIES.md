@@ -300,12 +300,46 @@ continuous):
   reason the model interval runs along the axis, and what makes a subarc's
   reparametrisation need no inverse.
 
-**Not built yet.** Subarcs and concatenation; `Plane.IsPolygonal`; the two
-arcs of a Jordan curve between two of its points; `P°`; the subarc basis.
-All of these want the **arc structure of the model curve** — `∂Q`'s
-decomposition into four sides, plus the **radial-projection bridge**
-`∂Q ≅ circle` that transports it to the circle the definition uses. Both
-level-set definitions defer that structure rather than supply it.
+**Subarcs and `P°` are built** (`Plane/subarc.math`). A subarc is the arc
+composed with `Plane.walkOnto(a, b)`, the reparametrisation that reads a
+point's parameter off its **first coordinate** and walks that fraction from
+`a` to `b` — the payoff of laying the model interval along the axis, since
+it needs no inverse and no choice. Continuity and injectivity are then
+inherited from the composition (Layer 1 gained `ContinuousOn.compose`), and
+`Plane.between_injective` — the walk is injective in its parameter unless
+it never moves — is what makes a subarc between *distinct* parameters an
+arc. `Plane.openArc` is the image of the model interval minus its ends, and
+on an arc that is exactly the arc minus its two endpoint values.
+
+**Not built.** In dependency order:
+
+1. **Concatenation** of two arcs meeting only at an endpoint. Feasible now
+   and self-contained: parametrise by halves (`first(x) ≤ 1/2`) with a
+   value-level `if`, glue with the **pasting lemma** already in Layer 1,
+   and split injectivity by cases. Budget ~400–500 lines, mostly parameter
+   arithmetic. This is what *builds* polygonal arcs out of segments, so it
+   is the next thing to do.
+2. **The subarc basis.** The homeomorphism already carries the topology
+   (`IsHomeomorphismOn`); what is missing is that relatively open
+   subsegments of the model interval have relatively open images. The
+   endpoints are the only subtlety — a basic neighbourhood of an endpoint
+   is a *half-open* subarc, which is why the faithful statement is about
+   relatively open subarcs.
+3. **`Plane.IsPolygonal`.** Blocked on a design decision, not on
+   mathematics: it wants a **vertex list**, and `Plane.PolygonalReach` is a
+   derivation rather than an object. Either give the walk a list of
+   vertices (see `fold_refactor_plan`) or define `IsPolygonal(f)` as "the
+   arc is a finite union of segments" over `Lists`. Settle this before
+   Layer 6, which needs polygonal edges as data.
+4. **The two arcs of a Jordan curve between two of its points**, and the
+   subarc basis *for a curve*. Genuinely blocked on the **arc structure of
+   the model curve**: the circle minus two points has two components, each
+   an arc. Getting there wants `∂Q`'s decomposition into four sides (a
+   coordinate case analysis on `max(|x₁|, |x₂|) = 1`) plus the
+   **radial-projection bridge** `∂Q ≅ circle` (`x ↦ x/‖x‖` one way,
+   `x ↦ x/‖x‖∞` the other, both continuous on the level sets, a
+   homeomorphism by Layer 4's own theorem). Neither level-set definition
+   supplies that structure; both defer it.
 Also not built: the blueprint's **loop presentation** (`γ` on `[0,1]` with
 `γ(0) = γ(1)`, injective otherwise) and its bridge to `∂Q` through the
 four-side traversal `e`. That bridge is what *constructions* need — a

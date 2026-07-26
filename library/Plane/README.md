@@ -68,6 +68,8 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
 - `Plane.IsArc`, `Plane.arc`, `Plane.arcStart`, `Plane.arcFinish`,
   `Plane.IsJordanParametrisation`, `Plane.IsJordanCurve` —
   [curve.math](curve.math)
+- `Plane.walkOnto`, `Plane.subarc`, `Plane.openUnitSegment`,
+  `Plane.openArc` — [subarc.math](subarc.math)
 
 ## Main theorems
 
@@ -131,6 +133,11 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
 - `Plane.segment_IsCompact`, `Plane.squareBoundary_IsCompact`
 - **`Plane.IsHomeomorphismOn.of_continuous_injective_on_compact`** and
   **`Plane.IsJordanCurve.homeomorphic_to_circle`** (H4)
+- `Plane.ContinuousOn.compose`, `Plane.between_injective`, and
+  **`Plane.IsArc.subarc`** — a subarc between distinct parameters is an arc,
+  with `Plane.subarc_image` identifying its image as the arc restricted to
+  the subsegment, and
+  `Plane.IsArc.openArc_is_arc_without_endpoints` for `P°`
 
 ## Connectedness is the clopen criterion
 
