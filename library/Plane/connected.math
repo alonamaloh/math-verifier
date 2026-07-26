@@ -241,13 +241,8 @@ theorem Plane.IsConnected.image
         choose x such that x ∈ carrier ∧ f(x) = y from inImage;
         x ∈ carrier;
         f(x) = y;
-        carrier = Plane.preimageIn(f, piece, carrier)
-            by Equality.symmetry;
-        x ∈ Plane.preimageIn(f, piece, carrier)
-            by Set.member_of_equal(
-                carrier, Plane.preimageIn(f, piece, carrier),
-                { carrier = Plane.preimageIn(f, piece, carrier) },
-                x, { x ∈ carrier });
+        carrier = Plane.preimageIn(f, piece, carrier);
+        x ∈ Plane.preimageIn(f, piece, carrier);
         f(x) ∈ piece;
         done
       };
@@ -268,7 +263,7 @@ theorem Plane.OpenIn.restrict
         : Plane.OpenIn(piece ∩ smaller, smaller) := {
   take x : Plane.Point;
   suppose x ∈ piece ∩ smaller as inBoth;
-  x ∈ piece by Set.intersection_member_left;
+  x ∈ piece;
   choose radius such that
       0 < radius ∧
       ∀ (y : Plane.Point). y ∈ carrier →
@@ -285,8 +280,7 @@ theorem Plane.OpenIn.restrict
            (near : Plane.distance(x, y) < radius) ↦ {
           y ∈ carrier by inside(y, inSmaller);
           y ∈ piece by nearbyInPiece(y, { y ∈ carrier }, near);
-          done by Set.member_intersection
-        };
+          done        };
     done
   }
 }
@@ -305,21 +299,20 @@ theorem Plane.difference_intersection
         x ∈ larger by inside(x, inSmaller);
         ¬(x ∈ piece)
             by (inPiece : x ∈ piece) ↦ {
-              x ∈ piece ∩ smaller by Set.member_intersection;
+              x ∈ piece ∩ smaller;
               done
             };
         x ∈ larger ∖ piece;
-        done by Set.member_intersection
-      };
+        done      };
   (larger ∖ piece) ∩ smaller ⊆ smaller ∖ (piece ∩ smaller)
       by (x : Plane.Point)
          (inCut : x ∈ (larger ∖ piece) ∩ smaller) ↦ {
-        x ∈ larger ∖ piece by Set.intersection_member_left;
-        x ∈ smaller by Set.intersection_member_right;
+        x ∈ larger ∖ piece;
+        x ∈ smaller;
         ¬(x ∈ piece);
         ¬(x ∈ piece ∩ smaller)
             by (inBoth : x ∈ piece ∩ smaller) ↦ {
-              x ∈ piece by Set.intersection_member_left;
+              x ∈ piece;
               done
             };
         done
@@ -356,15 +349,12 @@ theorem Plane.IsConnected.swallows
           { piece ∩ part ⊆ part },
           { Plane.OpenIn(piece ∩ part, part) },
           { Plane.OpenIn(part ∖ (piece ∩ part), part) },
-          meets)
-      ;
+          meets);
+  part = piece ∩ part;
   take x : Plane.Point;
-  suppose x ∈ part as inPart;
-  part = piece ∩ part by Equality.symmetry;
-  x ∈ piece ∩ part
-      by Set.member_of_equal(
-          part, piece ∩ part, { part = piece ∩ part }, x, inPart);
-  done by Set.intersection_member_left
+  suppose x ∈ part;
+  x ∈ piece ∩ part;
+  done
 }
 
 -- ----------------------------------------------------------------------
@@ -395,7 +385,7 @@ theorem Plane.IsConnected.union
   shared ∈ piece by cases {
     case start ∈ left as startInLeft: {
         Set.IsNonempty(Plane.Point, piece ∩ left)
-            by { witness start with { done by Set.member_intersection } };
+            by { witness start with done };
         left ⊆ piece
             by Plane.IsConnected.swallows(
                 left ∪ right, left, piece, leftConnected,
@@ -406,7 +396,7 @@ theorem Plane.IsConnected.union
       }
     case start ∈ right as startInRight: {
         Set.IsNonempty(Plane.Point, piece ∩ right)
-            by { witness start with { done by Set.member_intersection } };
+            by { witness start with done };
         right ⊆ piece
             by Plane.IsConnected.swallows(
                 left ∪ right, right, piece, rightConnected,
@@ -419,9 +409,9 @@ theorem Plane.IsConnected.union
 
   -- With the shared point inside, both sides are swallowed.
   Set.IsNonempty(Plane.Point, piece ∩ left)
-      by { witness shared with { done by Set.member_intersection } };
+      by { witness shared with done };
   Set.IsNonempty(Plane.Point, piece ∩ right)
-      by { witness shared with { done by Set.member_intersection } };
+      by { witness shared with done };
   left ⊆ piece
       by Plane.IsConnected.swallows(
           left ∪ right, left, piece, leftConnected,
@@ -475,7 +465,7 @@ definition Plane.parameterGap (r : ℝ) (a b : Plane.Point) : ℝ :=
 theorem Plane.parameterGap_positive (r : ℝ) (a b : Plane.Point)
         (radiusPositive : 0 < r)
         : 0 < Plane.parameterGap(r, a, b) := {
-  0 ≤ Plane.distance(a, b) by Plane.distance_nonneg;
+  0 ≤ Plane.distance(a, b);
   0 < 1 + Plane.distance(a, b);
   1 + Plane.distance(a, b) ≠ 0;
   done by Real.divide_positive
@@ -486,14 +476,14 @@ theorem Plane.between_close_of_gap (r : ℝ) (a b : Plane.Point) (s t : ℝ)
         (radiusPositive : 0 < r)
         (gapSmall : abs(t - s) < Plane.parameterGap(r, a, b))
         : Plane.distance(Plane.between(a, b, s), Plane.between(a, b, t)) < r := {
-  0 ≤ Plane.distance(a, b) by Plane.distance_nonneg;
+  0 ≤ Plane.distance(a, b);
   0 < 1 + Plane.distance(a, b);
   1 + Plane.distance(a, b) ≠ 0;
   Real.IsNonneg(Plane.distance(a, b));
   abs(t - s) * Plane.distance(a, b)
       ≤ Plane.parameterGap(r, a, b) * Plane.distance(a, b)
       by Real.LessOrEqual.multiply_by_nonneg_right;
-  0 < Plane.parameterGap(r, a, b) by Plane.parameterGap_positive;
+  0 < Plane.parameterGap(r, a, b);
   Plane.distance(a, b) < 1 + Plane.distance(a, b);
   Plane.distance(a, b) * Plane.parameterGap(r, a, b)
       < (1 + Plane.distance(a, b)) * Plane.parameterGap(r, a, b)
@@ -503,7 +493,7 @@ theorem Plane.between_close_of_gap (r : ℝ) (a b : Plane.Point) (s t : ℝ)
   Plane.distance(Plane.between(a, b, s), Plane.between(a, b, t))
      = abs(t - s) * Plane.distance(a, b) by Plane.between_distance
      ≤ Plane.parameterGap(r, a, b) * Plane.distance(a, b)
-     = Plane.distance(a, b) * Plane.parameterGap(r, a, b) by ring
+     = Plane.distance(a, b) * Plane.parameterGap(r, a, b)
      < (1 + Plane.distance(a, b)) * Plane.parameterGap(r, a, b)
      = r;
   done
@@ -538,7 +528,7 @@ theorem Plane.reached_supremum_inside
     ∀ (y : Plane.Point). y ∈ region →
         Plane.distance(Plane.between(a, b, peak), y) < radius
           → y ∈ region ∖ piece as nearbyOutside;
-    0 < Plane.parameterGap(radius, a, b) by Plane.parameterGap_positive;
+    0 < Plane.parameterGap(radius, a, b);
     peak - Plane.parameterGap(radius, a, b) < peak;
     choose t such that
         t ∈ Plane.reachedParameters(piece, a, b)
@@ -604,7 +594,7 @@ theorem Plane.reached_supremum_is_one
     ∀ (y : Plane.Point). y ∈ region →
         Plane.distance(Plane.between(a, b, peak), y) < radius
           → y ∈ piece as nearbyInside;
-    0 < Plane.parameterGap(radius, a, b) by Plane.parameterGap_positive;
+    0 < Plane.parameterGap(radius, a, b);
 
     -- A step short of both the room left and the gap that keeps the walk
     -- inside the ball. Halving is what makes both comparisons strict.
@@ -661,7 +651,7 @@ theorem Plane.IsConvex.connected (region : Set(Plane.Point))
   region ⊆ piece
       by (target : Plane.Point) (targetInRegion : target ∈ region) ↦ {
         -- The parameters that have landed hold 0 and stop at 1.
-        Plane.between(start, target, 0) = start by Plane.between_zero;
+        Plane.between(start, target, 0) = start;
         (0 : ℝ) ∈ Plane.reachedParameters(piece, start, target)
             by { (0 : ℝ) ≤ 0;
                  (0 : ℝ) ≤ 1;
@@ -718,7 +708,7 @@ theorem Plane.IsConvex.connected (region : Set(Plane.Point))
                 { start ∈ region }, targetInRegion, pieceOpen,
                 isSupremum, { (0 : ℝ) ≤ peak }, { peak ≤ 1 },
                 { Plane.between(start, target, peak) ∈ piece });
-        Plane.between(start, target, 1) = target by Plane.between_one;
+        Plane.between(start, target, 1) = target;
         Plane.between(start, target, 1) ∈ piece;
         done
       };
@@ -773,21 +763,20 @@ theorem Plane.IsConnected.lands_in_side
         ¬(x ∈ left ∩ part);
         ¬(x ∈ left)
             by (xInLeft : x ∈ left) ↦ {
-              x ∈ left ∩ part by Set.member_intersection;
+              x ∈ left ∩ part;
               done
             };
         x ∈ left ∪ right by covered(x, xInPart);
         x ∈ left ∨ x ∈ right;
         x ∈ right;
-        done by Set.member_intersection
-      };
+        done      };
   right ∩ part ⊆ part ∖ (left ∩ part)
       by (x : Plane.Point) (inRightPart : x ∈ right ∩ part) ↦ {
-        x ∈ right by Set.intersection_member_left;
-        x ∈ part by Set.intersection_member_right;
+        x ∈ right;
+        x ∈ part;
         ¬(x ∈ left ∩ part)
             by (inLeftPart : x ∈ left ∩ part) ↦ {
-              x ∈ left by Set.intersection_member_left;
+              x ∈ left;
               ¬(x ∈ right) by apart(x, { x ∈ left });
               done
             };
@@ -804,13 +793,11 @@ theorem Plane.IsConnected.lands_in_side
           { Plane.OpenIn(left ∩ part, part) },
           { Plane.OpenIn(part ∖ (left ∩ part), part) },
           meetsLeft);
+  part = left ∩ part;
   take x : Plane.Point;
-  suppose x ∈ part as xInPart;
-  part = left ∩ part by Equality.symmetry;
-  x ∈ left ∩ part
-      by Set.member_of_equal(
-          part, left ∩ part, { part = left ∩ part }, x, xInPart);
-  done by Set.intersection_member_left
+  suppose x ∈ part;
+  x ∈ left ∩ part;
+  done
 }
 
 -- The same fact stated as the alternative it is usually quoted as. The
@@ -829,7 +816,7 @@ theorem Plane.IsConnected.lands_in_one_side
   done by cases {
     case start ∈ left as startInLeft: {
         Set.IsNonempty(Plane.Point, left ∩ part)
-            by { witness start with { done by Set.member_intersection } };
+            by { witness start with done };
         part ⊆ left
             by Plane.IsConnected.lands_in_side(
                 part, left, right, partConnected, leftOpen, rightOpen, apart,
@@ -848,10 +835,10 @@ theorem Plane.IsConnected.lands_in_one_side
               x ∈ left ∪ right by covered(x, xInPart);
               x ∈ left ∨ x ∈ right;
               x ∈ right ∨ x ∈ left by Or.swap;
-              done by Set.member_union
+              done
             };
         Set.IsNonempty(Plane.Point, right ∩ part)
-            by { witness start with { done by Set.member_intersection } };
+            by { witness start with done };
         part ⊆ right
             by Plane.IsConnected.lands_in_side(
                 part, right, left, partConnected, rightOpen, leftOpen,
@@ -911,7 +898,7 @@ theorem Plane.IsConnected.adjoin_limits
       by nearbyInPiece(near, { near ∈ wide },
           { Plane.distance(start, near) < radius });
   Set.IsNonempty(Plane.Point, piece ∩ core)
-      by { witness near with { done by Set.member_intersection } };
+      by { witness near with done };
   core ⊆ piece
       by Plane.IsConnected.swallows(
           wide, core, piece, coreConnected, coreInside, pieceOpen, restOpen,

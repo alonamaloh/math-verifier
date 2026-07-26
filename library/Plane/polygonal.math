@@ -78,9 +78,7 @@ theorem Plane.reachableFrom_subset
   take x : Plane.Point;
   suppose x ∈ Plane.reachableFrom(region, source) as reached;
   Plane.PolygonalReach(region, source, x);
-  done by Plane.PolygonalReach.inside(
-      region, source, sourceInRegion, x,
-      { Plane.PolygonalReach(region, source, x) })
+  done by Plane.PolygonalReach.inside
 }
 
 -- ----------------------------------------------------------------------
@@ -114,22 +112,17 @@ theorem Plane.segment_inside_of_open
       };
   Plane.distance(centre, centre) = 0 by Plane.distance_self;
   Plane.distance(centre, centre) < radius;
-  centre ∈ Plane.Ball(centre, radius) as centreInBall;
+  centre ∈ Plane.Ball(centre, radius);
   witness radius with {
     0 < radius;
     ∀ (y : Plane.Point). Plane.distance(centre, y) < radius →
         Plane.segment(centre, y) ⊆ region
         by (y : Plane.Point) (yNear : Plane.distance(centre, y) < radius) ↦ {
-          y ∈ Plane.Ball(centre, radius) as yInBall;
+          y ∈ Plane.Ball(centre, radius);
+          Plane.IsConvex(Plane.Ball(centre, radius)) by Plane.Ball_IsConvex;
           Plane.segment(centre, y) ⊆ Plane.Ball(centre, radius)
-              by Plane.IsConvex.segment_inside(
-                  Plane.Ball(centre, radius),
-                  Plane.Ball_IsConvex(centre, radius),
-                  centre, y, centreInBall, yInBall);
-          done by Set.subset.transitive(
-              Plane.segment(centre, y), Plane.Ball(centre, radius), region,
-              { Plane.segment(centre, y) ⊆ Plane.Ball(centre, radius) },
-              { Plane.Ball(centre, radius) ⊆ region })
+              by Plane.IsConvex.segment_inside;
+          done by Set.subset.transitive(b := Plane.Ball(centre, radius))
         };
     done
   }
@@ -144,10 +137,8 @@ theorem Plane.reachableFrom_OpenIn
         : Plane.OpenIn(Plane.reachableFrom(region, source), region) := {
   take x : Plane.Point;
   suppose x ∈ Plane.reachableFrom(region, source) as xReached;
-  Plane.PolygonalReach(region, source, x) as walkToX;
-  x ∈ region
-      by Plane.PolygonalReach.inside(
-          region, source, sourceInRegion, x, walkToX);
+  Plane.PolygonalReach(region, source, x);
+  x ∈ region by Plane.PolygonalReach.inside;
   choose radius such that
       0 < radius ∧
         ∀ (y : Plane.Point). Plane.distance(x, y) < radius →
@@ -166,9 +157,7 @@ theorem Plane.reachableFrom_OpenIn
            (yNear : Plane.distance(x, y) < radius) ↦ {
           Plane.segment(x, y) ⊆ region by nearbySegments(y, yNear);
           Plane.PolygonalReach(region, source, y)
-              by Plane.PolygonalReach.extend(
-                  region, source, x, y, walkToX,
-                  { Plane.segment(x, y) ⊆ region });
+              by Plane.PolygonalReach.extend(waypoint := x);
           done
         };
     done
@@ -203,11 +192,9 @@ theorem Plane.reachableFrom_ClosedIn
           Plane.segment(y, x) ⊆ region by substituting Plane.segment_symmetric;
           ¬(y ∈ Plane.reachableFrom(region, source))
               by (yReached : y ∈ Plane.reachableFrom(region, source)) ↦ {
-                Plane.PolygonalReach(region, source, y) as walkToY;
+                Plane.PolygonalReach(region, source, y);
                 Plane.PolygonalReach(region, source, x)
-                    by Plane.PolygonalReach.extend(
-                        region, source, y, x, walkToY,
-                        { Plane.segment(y, x) ⊆ region });
+                    by Plane.PolygonalReach.extend(waypoint := y);
                 x ∈ Plane.reachableFrom(region, source);
                 done
               };
@@ -241,12 +228,8 @@ theorem Plane.polygonal_connected
               region, regionOpen, source, sourceInRegion),
           { Set.IsNonempty(
                 Plane.Point, Plane.reachableFrom(region, source)) });
-  region = Plane.reachableFrom(region, source) by Equality.symmetry;
-  target ∈ Plane.reachableFrom(region, source)
-      by Set.member_of_equal(
-          region, Plane.reachableFrom(region, source),
-          { region = Plane.reachableFrom(region, source) },
-          target, targetInRegion);
+  region = Plane.reachableFrom(region, source);
+  target ∈ Plane.reachableFrom(region, source) by Set.member_of_equal;
   done
 }
 
@@ -272,51 +255,28 @@ theorem Plane.reachableFrom_subset_Component
         waypoint, endpoint, walkToWaypoint, segmentInside,
         waypointInComponent): {
         waypoint ∈ Plane.segment(waypoint, endpoint) by Plane.left_in_segment;
+        Plane.IsConnected(Plane.Component(region, base))
+            by Plane.Component_IsConnected;
+        Plane.IsConnected(Plane.segment(waypoint, endpoint))
+            by Plane.segment_IsConnected;
         Plane.IsConnected(
             Plane.Component(region, base) ∪ Plane.segment(waypoint, endpoint))
-            by Plane.IsConnected.union(
-                Plane.Component(region, base),
-                Plane.segment(waypoint, endpoint),
-                Plane.Component_IsConnected(region, base, baseInRegion),
-                Plane.segment_IsConnected(waypoint, endpoint),
-                waypoint, waypointInComponent,
-                { waypoint ∈ Plane.segment(waypoint, endpoint) });
+            by Plane.IsConnected.union(shared := waypoint);
         Plane.Component(region, base) ⊆ region by Plane.Component_subset;
         Plane.Component(region, base) ∪ Plane.segment(waypoint, endpoint)
-              ⊆ region
-            by Set.union_subset(
-                Plane.Component(region, base),
-                Plane.segment(waypoint, endpoint), region,
-                { Plane.Component(region, base) ⊆ region }, segmentInside);
-        base ∈ Plane.Component(region, base)
-            by Plane.base_in_Component(region, base, baseInRegion);
+              ⊆ region by Set.union_subset;
+        base ∈ Plane.Component(region, base) by Plane.base_in_Component;
         base ∈ Plane.Component(region, base)
                  ∪ Plane.segment(waypoint, endpoint)
-            by Set.subset_union_left(
-                Plane.Component(region, base),
-                Plane.segment(waypoint, endpoint));
+            by Set.subset_union_left;
         Plane.Component(region, base) ∪ Plane.segment(waypoint, endpoint)
               ⊆ Plane.Component(region, base)
-            by Plane.Component_contains(
-                region,
-                Plane.Component(region, base)
-                    ∪ Plane.segment(waypoint, endpoint),
-                base,
-                { Plane.Component(region, base)
-                      ∪ Plane.segment(waypoint, endpoint) ⊆ region },
-                { Plane.IsConnected(
-                      Plane.Component(region, base)
-                          ∪ Plane.segment(waypoint, endpoint)) },
-                { base ∈ Plane.Component(region, base)
-                      ∪ Plane.segment(waypoint, endpoint) })
-            as gluedInside;
+            by Plane.Component_contains as gluedInside;
         endpoint ∈ Plane.segment(waypoint, endpoint)
             by Plane.right_in_segment;
         endpoint ∈ Plane.Component(region, base)
                      ∪ Plane.segment(waypoint, endpoint)
-            by Set.subset_union_right(
-                Plane.Component(region, base),
-                Plane.segment(waypoint, endpoint));
+            by Set.subset_union_right;
         done by gluedInside(endpoint,
             { endpoint ∈ Plane.Component(region, base)
                   ∪ Plane.segment(waypoint, endpoint) })
@@ -328,31 +288,25 @@ theorem Plane.Component_is_reachable_set
         (base : Plane.Point) (baseInRegion : base ∈ region)
         : Plane.Component(region, base) = Plane.reachableFrom(region, base) := {
   Plane.Component(region, base) ⊆ region by Plane.Component_subset;
-  base ∈ Plane.Component(region, base)
-      by Plane.base_in_Component(region, base, baseInRegion);
-  Plane.PolygonalReach(region, base, base)
-      by Plane.PolygonalReach.arrived(region, base);
+  Plane.IsConnected(Plane.Component(region, base))
+      by Plane.Component_IsConnected;
+  base ∈ Plane.Component(region, base) by Plane.base_in_Component;
+  Plane.PolygonalReach(region, base, base) by Plane.PolygonalReach.arrived;
   base ∈ Plane.reachableFrom(region, base);
   Set.IsNonempty(Plane.Point,
       Plane.reachableFrom(region, base) ∩ Plane.Component(region, base))
-      by { witness base with { done by Set.member_intersection } };
+      by { witness base with done };
+  Plane.OpenIn(Plane.reachableFrom(region, base), region)
+      by Plane.reachableFrom_OpenIn;
+  Plane.OpenIn(region ∖ Plane.reachableFrom(region, base), region)
+      by Plane.reachableFrom_ClosedIn;
   Plane.Component(region, base) ⊆ Plane.reachableFrom(region, base)
-      by Plane.IsConnected.swallows(
-          region, Plane.Component(region, base),
-          Plane.reachableFrom(region, base),
-          Plane.Component_IsConnected(region, base, baseInRegion),
-          { Plane.Component(region, base) ⊆ region },
-          Plane.reachableFrom_OpenIn(region, regionOpen, base, baseInRegion),
-          Plane.reachableFrom_ClosedIn(region, regionOpen, base, baseInRegion),
-          { Set.IsNonempty(Plane.Point,
-                Plane.reachableFrom(region, base)
-                    ∩ Plane.Component(region, base)) });
+      by Plane.IsConnected.swallows;
   Plane.reachableFrom(region, base) ⊆ Plane.Component(region, base)
       by (x : Plane.Point)
          (xReached : x ∈ Plane.reachableFrom(region, base)) ↦ {
-        Plane.PolygonalReach(region, base, x) as walkToX;
-        done by Plane.reachableFrom_subset_Component(
-            region, base, baseInRegion, x, walkToX)
+        Plane.PolygonalReach(region, base, x);
+        done by Plane.reachableFrom_subset_Component
       };
   done by Set.equal_of_same_members
 }
