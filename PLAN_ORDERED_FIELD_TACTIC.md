@@ -251,6 +251,62 @@ the stages below specified, and what actually happened, in one place:
    nearly free: FM already has the elimination history, so
    back-substituting in reverse order gives a satisfying assignment.
 
+### O7 — ℚ: NOT BUILT, by measurement (2026-07-26)
+
+Open question 1 asked whether ℚ ships in the first cut. The O1 probe
+said yes on the strength of the bridge lemmas; the emission lemmas are
+the thicker requirement, and ℚ turns out to need **seven**:
+`add_nonneg`, `nonneg_subtract_of_LessOrEqual`,
+`nonneg_subtract_of_equal`, `nonneg_of_multiply_nonneg`,
+`positive_of_multiply_positive`, both `multiply_cancel_left_positive`
+strengths, and then the two combination lemmas on top.
+
+Before writing them, the demand was measured. **There is none.** No site
+in `Rational/` uses a nonnegative-increment workaround, and the ℚ order
+by-hints in the whole library are transitivity (8), antisymmetry (3),
+weakening (2) and multiplicative cancellation (3) — single-lemma steps
+the tactic would not improve. Not one is a nonnegative-combination
+shape.
+
+So ℚ stays unbuilt, and this is a *measurement*, not a backlog item.
+The carrier name table is the extension point: when a ℚ site appears
+that wants it, the work is those seven lemmas plus one table entry, no
+new machinery. Do not build it speculatively.
+
+### O8 — DONE 2026-07-26 — equality hypotheses as rows
+
+An `a = b` hypothesis now contributes BOTH `b − a ≥ 0` and `a − b ≥ 0`,
+so a proof may mix equations with inequalities without converting them
+by hand. One new lemma (`Real.nonneg_subtract_of_equal`) serves both
+directions: the second row is built on `buildEqualitySymmetry` of the
+same proof.
+
+This also closes an honesty gap left by O5. Equality hypotheses were
+previously dropped *silently* — not even named in the "not read as
+rows" list, which the O5 spec required — so a proof could fail with a
+message that never mentioned the fact it most needed.
+
+### O9 — DONE 2026-07-26 — `False` goals, so the tactic reaches reductio
+
+`done by ordered_field` now closes a `False` goal from contradictory
+order hypotheses, which is the idiom this library actually writes
+(`suppose … for contradiction { …; done }`).
+
+It needed almost no new machinery, because the contradiction can be
+routed through the *existing* concluding lemma: retarget the goal at
+`0 < 0`, let the certificate and the `ring`-checked bridge run
+unchanged (the combination sums to zero by construction), then hit the
+result with `LessThan.irreflexive`. The only structural differences are
+that no negated-goal row is added and there is no multiplier to divide
+through by.
+
+The carrier for a `False` goal comes from the first order hypothesis in
+scope — there is no goal to read it off. When no hypothesis supplies
+one, the decline says exactly that. When the hypotheses are merely
+consistent, the message says *that* and shows a satisfying valuation,
+rather than reporting a failure to prove some goal the author never
+wrote.
+
 ### O2 — atom extraction and the linear model (as specified)
 
 Walk goal and hypotheses into `Σ qₖ · atomₖ + q₀` over ℚ, with atom

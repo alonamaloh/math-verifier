@@ -385,7 +385,8 @@ it normalises to ordered words, keeps factor order, and declines `A * B =
 B * A`.
 
 `ordered_field` closes an `≤` / `<` goal that follows from the in-scope
-order hypotheses by the ordered-field axioms alone. Argument-free like
+order hypotheses (`≤`, `<`, `=`) by the ordered-field axioms alone, and a
+`False` goal when those hypotheses are contradictory. Argument-free like
 `ring`: it finds a nonnegative rational combination of the hypotheses and
 emits it as a `ring`-checked certificate.
 

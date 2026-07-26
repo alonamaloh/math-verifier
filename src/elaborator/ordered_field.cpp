@@ -369,12 +369,34 @@ ExpressionPointer Elaborator::elaborateOrderedField(
         openOverLocalBinders(expectedType, localBinders, binderCount);
     std::optional<OrderProposition> goal =
         parseOrderProposition(environment_, goalOpened);
+    // A `False` goal is the reductio idiom (`suppose … for contradiction
+    // { …; done }`): there is nothing to negate, the hypotheses must be
+    // inconsistent on their own. The carrier then has to come from them,
+    // so read it off the first order hypothesis in scope.
+    bool provingFalse = false;
+    if (!goal && headConstantName(goalOpened) == "False") {
+        for (const ContextFact& fact : collectLocalBinderFacts(localBinders)) {
+            goal = parseOrderProposition(
+                environment_,
+                openOverLocalBinders(fact.type, localBinders, binderCount));
+            if (goal) break;
+        }
+        if (!goal) {
+            throwElaborate(
+                "`ordered_field`: the goal is `False`, but no in-scope "
+                "hypothesis is an order relation at a concrete carrier, so "
+                "there is nothing to derive a contradiction from and no "
+                "carrier to work over.");
+        }
+        provingFalse = true;
+    }
     if (!goal) {
         throwElaborate(
             "`ordered_field`: the goal `"
             + prettyPrintInLocalScope(expectedType, localBinders)
             + "` is not an order relation at a concrete carrier. The tactic "
-              "proves `≤` and `<` goals; for an equality use `ring` or "
+              "proves `≤` and `<` goals, and `False` from contradictory "
+              "order hypotheses; for an equality use `ring` or "
               "`linear_combination`, and for a bundled-carrier order there "
               "is no ordered-field structure in the library to read the "
               "operations from.");
@@ -397,13 +419,14 @@ ExpressionPointer Elaborator::elaborateOrderedField(
     // bundle to read the operations from. A carrier missing an entry gets
     // told which one, rather than a generic decline.
     struct LemmaNames {
-        std::string nonnegOfWeak, positiveOfStrict;
+        std::string nonnegOfWeak, positiveOfStrict, nonnegOfEqual;
         std::string addNonneg, addPositiveNonneg, addNonnegPositive,
                     addPositivePositive, nonnegOfPositive;
-        std::string weakCombination, strictCombination;
+        std::string weakCombination, strictCombination, irreflexive;
     } names;
     names.nonnegOfWeak = carrierName + ".nonneg_subtract_of_LessOrEqual";
     names.positiveOfStrict = carrierName + ".subtract_positive_of_LessThan";
+    names.nonnegOfEqual = carrierName + ".nonneg_subtract_of_equal";
     names.addNonneg = carrierName + ".add_nonneg";
     names.addPositiveNonneg = carrierName + ".add_positive_nonneg";
     names.addNonnegPositive = carrierName + ".add_nonneg_positive";
@@ -413,11 +436,14 @@ ExpressionPointer Elaborator::elaborateOrderedField(
         carrierName + ".LessOrEqual_of_scaled_nonneg_combination";
     names.strictCombination =
         carrierName + ".LessThan_of_scaled_positive_combination";
+    names.irreflexive = carrierName + ".LessThan.irreflexive";
     for (const std::string* required : {
-            &names.nonnegOfWeak, &names.positiveOfStrict, &names.addNonneg,
+            &names.nonnegOfWeak, &names.positiveOfStrict,
+            &names.nonnegOfEqual, &names.addNonneg,
             &names.addPositiveNonneg, &names.addNonnegPositive,
             &names.addPositivePositive, &names.nonnegOfPositive,
-            &names.weakCombination, &names.strictCombination}) {
+            &names.weakCombination, &names.strictCombination,
+            &names.irreflexive}) {
         if (!environment_.lookup(*required)) {
             throwElaborate(
                 "`ordered_field`: carrier `" + carrierName
@@ -457,6 +483,15 @@ ExpressionPointer Elaborator::elaborateOrderedField(
               "cannot be spelled. Import the carrier's embedding modules.");
     }
 
+    // A `False` goal is proved by deriving `0 < 0` and hitting it with
+    // irreflexivity, so retarget it at the carrier's zero. Everything
+    // downstream — certificate, bridge, concluding lemma — is unchanged.
+    if (provingFalse) {
+        goal->left = buildRingZeroKernel(context);
+        goal->right = goal->left;
+        goal->strict = true;
+    }
+
     auto subtractTerm = [&](ExpressionPointer larger,
                             ExpressionPointer smaller) {
         return makeApplication(
@@ -475,47 +510,79 @@ ExpressionPointer Elaborator::elaborateOrderedField(
     };
 
     // Rows from the context. A hypothesis `a ≤ b` becomes `b − a ≥ 0`,
-    // proved by the carrier's subtraction bridge applied to it.
+    // proved by the carrier's subtraction bridge applied to it; an
+    // equation `a = b` becomes BOTH `b − a ≥ 0` and `a − b ≥ 0`, so a
+    // proof that mixes equations with inequalities does not have to
+    // convert them by hand first.
     std::vector<OrderedFieldRow> rows;
     std::vector<std::string> skippedFacts;
+    auto addRow = [&](const std::string& label, ExpressionPointer smaller,
+                      ExpressionPointer larger, bool strict,
+                      ExpressionPointer bridgeName, ExpressionPointer proof) {
+        OrderedFieldRow row;
+        row.strict = strict;
+        row.label = label;
+        row.expression = subtractTerm(larger, smaller);
+        row.polynomial = polynomialOfDifference(larger, smaller);
+        ExpressionPointer bridge = makeApplication(bridgeName, smaller);
+        bridge = makeApplication(bridge, larger);
+        row.proof = makeApplication(bridge, proof);
+        rows.push_back(std::move(row));
+    };
     for (const ContextFact& fact : collectLocalBinderFacts(localBinders)) {
         ExpressionPointer factType =
             openOverLocalBinders(fact.type, localBinders, binderCount);
-        std::optional<OrderProposition> relation =
-            parseOrderProposition(environment_, factType);
-        if (!relation) continue;
-        if (relation->carrierName != carrierName) {
-            skippedFacts.push_back(
-                fact.source + " (at `" + relation->carrierName
-                + "`, not `" + carrierName + "`)");
+        ExpressionPointer factProof =
+            openOverLocalBinders(fact.proofTerm, localBinders, binderCount);
+        if (std::optional<OrderProposition> relation =
+                parseOrderProposition(environment_, factType)) {
+            if (relation->carrierName != carrierName) {
+                skippedFacts.push_back(
+                    fact.source + " (at `" + relation->carrierName
+                    + "`, not `" + carrierName + "`)");
+                continue;
+            }
+            addRow(fact.source, relation->left, relation->right,
+                   relation->strict,
+                   makeConstant(relation->strict ? names.positiveOfStrict
+                                                 : names.nonnegOfWeak),
+                   factProof);
             continue;
         }
-        OrderedFieldRow row;
-        row.strict = relation->strict;
-        row.label = fact.source;
-        row.expression = subtractTerm(relation->right, relation->left);
-        row.polynomial =
-            polynomialOfDifference(relation->right, relation->left);
-        ExpressionPointer bridge = makeConstant(
-            relation->strict ? names.positiveOfStrict : names.nonnegOfWeak);
-        bridge = makeApplication(bridge, relation->left);
-        bridge = makeApplication(bridge, relation->right);
-        row.proof = makeApplication(
-            bridge,
-            openOverLocalBinders(fact.proofTerm, localBinders, binderCount));
-        rows.push_back(std::move(row));
+        // An equation at the carrier: two weak rows, the second built on
+        // the symmetric proof so one bridge lemma serves both.
+        EqualityComponents equation;
+        try {
+            equation = extractEqualityComponents(
+                weakHeadNormalForm(environment_, factType),
+                "ordered_field hypothesis", line);
+        } catch (const ElaborateError&) {
+            continue;
+        }
+        if (headConstantName(equation.carrierType) != carrierName) continue;
+        ExpressionPointer equalityBridge = makeConstant(names.nonnegOfEqual);
+        addRow(fact.source, equation.leftEndpoint, equation.rightEndpoint,
+               false, equalityBridge, factProof);
+        addRow(fact.source, equation.rightEndpoint, equation.leftEndpoint,
+               false, equalityBridge,
+               buildEqualitySymmetry(
+                   equation.carrierUniverseLevel, equation.carrierType,
+                   equation.leftEndpoint, equation.rightEndpoint, factProof));
     }
     size_t hypothesisCount = rows.size();
 
     // The negated goal. `L ≤ R` is refuted by `L − R > 0`; `L < R` by
     // `L − R ≥ 0`. It carries no proof — it is discharged by the
     // contradiction, never used as a term.
-    OrderedFieldRow goalRow;
-    goalRow.strict = !goal->strict;
-    goalRow.label = "the negated goal";
-    goalRow.polynomial = polynomialOfDifference(goal->left, goal->right);
-    rows.push_back(goalRow);
-    const size_t goalRowIndex = rows.size() - 1;
+    size_t goalRowIndex = 0;
+    if (!provingFalse) {
+        OrderedFieldRow goalRow;
+        goalRow.strict = !goal->strict;
+        goalRow.label = "the negated goal";
+        goalRow.polynomial = polynomialOfDifference(goal->left, goal->right);
+        rows.push_back(goalRow);
+        goalRowIndex = rows.size() - 1;
+    }
 
     std::string capReason;
     std::optional<OrderedFieldCertificate> certificate =
@@ -595,6 +662,17 @@ ExpressionPointer Elaborator::elaborateOrderedField(
             witness += describeMonomial(entry.first) + " = "
                      + entry.second.get_str();
         }
+        if (provingFalse) {
+            throwElaborate(
+                "`ordered_field`: the " + countedHypotheses()
+                + (hypothesisCount == 1 ? " is" : " are")
+                + " consistent, so no nonnegative combination of them "
+                  "reaches a contradiction"
+                + (witness.empty()
+                       ? std::string(".")
+                       : (" — they all hold at " + witness + "."))
+                + describeSkipped());
+        }
         throwElaborate(
             "`ordered_field`: no nonnegative combination of the "
             + countedHypotheses() + " yields `" + describeClosed(goalOpened)
@@ -606,7 +684,7 @@ ExpressionPointer Elaborator::elaborateOrderedField(
                         "consequence of them."))
             + describeNonlinearity() + describeSkipped());
     }
-    if (certificate->rowMultipliers[goalRowIndex] == 0) {
+    if (!provingFalse && certificate->rowMultipliers[goalRowIndex] == 0) {
         throwElaborate(
             "`ordered_field`: the in-scope hypotheses are already "
             "contradictory, so the goal follows vacuously rather than by a "
@@ -617,7 +695,8 @@ ExpressionPointer Elaborator::elaborateOrderedField(
 
     // Direct form: divide the refutation through by the negated goal's
     // multiplier. `R − L = Σ cᵢ·Qᵢ + slack`, all cᵢ and slack ≥ 0.
-    mpq_class goalMultiplier = certificate->rowMultipliers[goalRowIndex];
+    mpq_class goalMultiplier =
+        provingFalse ? mpq_class(1) : certificate->rowMultipliers[goalRowIndex];
     std::vector<mpq_class> coefficients(hypothesisCount);
     for (size_t index = 0; index < hypothesisCount; ++index) {
         coefficients[index] = certificate->rowMultipliers[index] / goalMultiplier;
@@ -765,6 +844,11 @@ ExpressionPointer Elaborator::elaborateOrderedField(
             goal->left, goal->right, certificateExpression, scaleTerm,
             scalePositiveProof, certificateProof, bridgeProof}) {
         conclusion = makeApplication(conclusion, argument);
+    }
+    if (provingFalse) {
+        conclusion = makeApplication(
+            makeApplication(makeConstant(names.irreflexive), goal->left),
+            conclusion);
     }
     (void)column;
     return closeOverLocalBinders(conclusion, localBinders, binderCount);

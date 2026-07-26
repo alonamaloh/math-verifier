@@ -258,19 +258,33 @@ to relate a product to its factors — `x * x ≤ y * y` from `x ≤ y` is
 declined, because `x * x` and `y * y` are unrelated variables. The
 failure message says exactly this when it applies.
 
+It also closes a **`False` goal** from contradictory order hypotheses,
+which is what makes it reach the reductio idiom:
+
+```math
+suppose a ≤ b for contradiction {
+  …
+  done by ordered_field
+};
+```
+
+There the hypotheses must be inconsistent on their own — there is no
+goal to negate — and a decline says they are consistent and shows values
+satisfying them, rather than reporting a failure to prove something.
+
 Scope/limits:
-- **Goals**: `≤` and `<`. An equality goal is `ring`'s or
+- **Goals**: `≤`, `<`, and `False`. An equality goal is `ring`'s or
   `linear_combination`'s job and the decline says so.
 - **Carriers**: those with the ordered-field lemma table —
-  `Real` today. The table is nine names (`add_nonneg`,
+  `Real` today. The table is eleven names (`add_nonneg`,
   `nonneg_subtract_of_LessOrEqual`,
   `LessOrEqual_of_scaled_nonneg_combination`, …); a carrier missing one
   is told which. There is no ordered-field *bundle* in the library, so
   a bundled carrier is not supported.
-- **Hypotheses**: `≤` and `<` at the same carrier. Equality hypotheses
-  are not read as rows — combine them with `substituting` first, or
-  reach for `linear_combination`. Hypotheses skipped for being at
-  another carrier are named in the failure message.
+- **Hypotheses**: `≤`, `<`, and `=` at the same carrier. An equation
+  contributes bounds in *both* directions, so a proof may mix equations
+  with inequalities without converting them by hand. Hypotheses skipped
+  for being at another carrier are named in the failure message.
 - **Integer arithmetic**: not in the fragment. `2 * n ≥ 1 → n ≥ 1` over
   ℕ/ℤ needs rounding, which no ordered field supplies.
 - **Emitter cap**: the certificate is emitted as repeated addition, so
