@@ -180,3 +180,26 @@ theorem Plane.bolzano_weierstrass (s : ℕ → Plane.Point)
   witness ((k : ℕ) ↦ firstIndex(secondIndex(k))) with
       { witness limit with done }
 }
+
+-- ----------------------------------------------------------------------
+-- Thinning preserves a limit here too — the same argument as on the
+-- line, and for the same reason: an index map never falls behind its own
+-- index, so the subsequence reaches every threshold the sequence does.
+
+theorem Plane.SequenceConverges.subsequence
+        (s : ℕ → Plane.Point) (limit : Plane.Point) (index : ℕ → ℕ)
+        (converges : Plane.SequenceConverges(s, limit))
+        (increasing : Natural.IsStrictlyIncreasing(index))
+        : Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) := {
+  take tolerance : ℝ;
+  suppose tolerance > 0;
+  choose threshold such that
+      ∀ (m : ℕ). threshold ≤ m → Plane.distance(limit, s(m)) < tolerance
+      as closeBeyond from converges(tolerance, { tolerance > 0 });
+  witness threshold with
+      (k : ℕ) (beyond : threshold ≤ k) ↦ {
+        k ≤ index(k) by Natural.IsStrictlyIncreasing.LessOrEqual;
+        threshold ≤ index(k);
+        done by closeBeyond(index(k), { threshold ≤ index(k) })
+      }
+}

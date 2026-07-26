@@ -1,0 +1,208 @@
+-- Plane/compactness.math
+--
+-- Compactness in the plane, in its sequential form, and the Heine--Borel
+-- characterisation: a set is compact exactly when it is closed and
+-- bounded.
+--
+-- This is where `Logic.countable_choice` earns its place. Every argument
+-- below that starts from a point and produces a sequence — a point of the
+-- closure is a limit of points of the set; an unbounded set has points
+-- escaping to infinity — is a choice of one witness per tolerance, and
+-- nothing distinguishes the witnesses. The tolerances themselves are the
+-- harmonic terms, so "for each n pick a point within 1/(1+n)" is the
+-- shape every one of them takes.
+
+module Plane.compactness
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Set.algebra
+import Natural.basics
+import Natural.order
+import Natural.subsequence
+import Real.interface
+import Real.order
+import Real.order_field
+import Real.absolute_value
+import Real.harmonic_series
+import Real.archimedean
+import Plane.vector
+import Plane.point
+import Plane.norm
+import Plane.segment
+import Plane.topology
+import Plane.sequence
+import Plane.compact
+
+-- ----------------------------------------------------------------------
+-- Compactness.
+
+definition Plane.IsCompact (region : Set(Plane.Point)) : Proposition :=
+  ∀ (s : ℕ → Plane.Point). (∀ (m : ℕ). s(m) ∈ region) →
+    ∃ (index : ℕ → ℕ). ∃ (limit : Plane.Point).
+      Natural.IsStrictlyIncreasing(index)
+      ∧ limit ∈ region
+      ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
+
+-- The closure of a set, taken in the whole plane.
+definition Plane.Closure (region : Set(Plane.Point)) : Set(Plane.Point) :=
+  Plane.ClosureIn(region, Set.universe(Plane.Point))
+
+-- ----------------------------------------------------------------------
+-- Closure and limits. The two directions are asymmetric: a limit of
+-- points of the set lands in the closure by definition, while producing
+-- the sequence from a point of the closure is a choice.
+
+theorem Plane.limit_in_Closure (region : Set(Plane.Point))
+        (s : ℕ → Plane.Point) (inside : ∀ (m : ℕ). s(m) ∈ region)
+        (limit : Plane.Point)
+        (converges : Plane.SequenceConverges(s, limit))
+        : limit ∈ Plane.Closure(region) := {
+  limit ∈ Set.universe(Plane.Point) by Set.member_universe;
+  ∀ (radius : ℝ). 0 < radius →
+      ∃ (y : Plane.Point). y ∈ region ∧ Plane.distance(limit, y) < radius
+      by (radius : ℝ) (radiusPositive : 0 < radius) ↦ {
+        choose threshold such that
+            ∀ (m : ℕ). threshold ≤ m → Plane.distance(limit, s(m)) < radius
+            as closeBeyond
+            from converges(radius, { 0 < radius });
+        s(threshold) ∈ region by inside(threshold);
+        Plane.distance(limit, s(threshold)) < radius
+            by closeBeyond(threshold, { threshold ≤ threshold });
+        witness s(threshold) with done
+      };
+  done
+}
+
+-- A point of the closure is the limit of a sequence from the set. For
+-- each `n` the closure offers a point within `1/(1+n)`; countable choice
+-- turns that family of nonempty options into one sequence.
+theorem Plane.sequence_to_Closure_point (region : Set(Plane.Point))
+        (x : Plane.Point) (inClosure : x ∈ Plane.Closure(region))
+        : ∃ (s : ℕ → Plane.Point).
+            (∀ (m : ℕ). s(m) ∈ region) ∧ Plane.SequenceConverges(s, x) := {
+  ∀ (radius : ℝ). 0 < radius →
+      ∃ (y : Plane.Point). y ∈ region ∧ Plane.distance(x, y) < radius
+      as meetsEveryBall;
+  ∀ (n : ℕ). ∃ (y : Plane.Point).
+      y ∈ region ∧ Plane.distance(x, y) < Real.harmonic_term(n)
+      by (n : ℕ) ↦ {
+        Real.harmonic_term(n) > 0 by Real.divide_positive;
+        done by meetsEveryBall(
+            Real.harmonic_term(n), { 0 < Real.harmonic_term(n) })
+      }
+      as closeAtEveryScale;
+  ∃ (chosen : ℕ → Plane.Point). ∀ (n : ℕ).
+      chosen(n) ∈ region ∧ Plane.distance(x, chosen(n)) < Real.harmonic_term(n)
+      by Logic.countable_choice(
+          Plane.Point,
+          (n : ℕ) (y : Plane.Point) ↦
+              y ∈ region ∧ Plane.distance(x, y) < Real.harmonic_term(n),
+          closeAtEveryScale)
+      as choiceMade;
+  choose s such that
+      ∀ (n : ℕ). s(n) ∈ region
+          ∧ Plane.distance(x, s(n)) < Real.harmonic_term(n)
+      as chosenClose from choiceMade;
+  ∀ (m : ℕ). s(m) ∈ region
+      by (m : ℕ) ↦ { s(m) ∈ region ∧ Plane.distance(x, s(m))
+                         < Real.harmonic_term(m) by chosenClose(m);
+                     done };
+  Plane.SequenceConverges(s, x)
+      by (tolerance : ℝ) (tolerancePositive : tolerance > 0) ↦ {
+        choose threshold such that Real.harmonic_term(threshold) < tolerance
+            from Real.exists_harmonic_term_below(tolerance, tolerancePositive);
+        witness threshold with
+            (m : ℕ) (beyond : threshold ≤ m) ↦ {
+              s(m) ∈ region ∧ Plane.distance(x, s(m))
+                  < Real.harmonic_term(m) by chosenClose(m);
+              Plane.distance(x, s(m))
+                 < Real.harmonic_term(m)
+                 ≤ Real.harmonic_term(threshold)
+                       by Real.harmonic_term_antitone
+                 < tolerance;
+              done
+            }
+      };
+  witness s with done
+}
+
+-- ----------------------------------------------------------------------
+-- Heine--Borel. Closed is spelled `Closure(region) ⊆ region`: the
+-- sequential form, which is what both directions actually use.
+
+theorem Plane.IsCompact.Closure_subset (region : Set(Plane.Point))
+        (compact : Plane.IsCompact(region))
+        : Plane.Closure(region) ⊆ region := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.Closure(region) as inClosure;
+  choose s such that
+      (∀ (m : ℕ). s(m) ∈ region) ∧ Plane.SequenceConverges(s, x)
+      from Plane.sequence_to_Closure_point(region, x, inClosure);
+  ∀ (m : ℕ). s(m) ∈ region as inside;
+  Plane.SequenceConverges(s, x) as toX;
+  choose index such that
+      ∃ (limit : Plane.Point).
+          Natural.IsStrictlyIncreasing(index)
+          ∧ limit ∈ region
+          ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
+      as limitExists from compact(s, inside);
+  choose limit such that
+      Natural.IsStrictlyIncreasing(index)
+      ∧ limit ∈ region
+      ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
+      from limitExists;
+  Natural.IsStrictlyIncreasing(index) as increasing;
+  limit ∈ region;
+  Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) as toLimit;
+  -- The thinned sequence still converges to `x`, so the two limits agree.
+  Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), x)
+      by Plane.SequenceConverges.subsequence(s, x, index, toX, increasing);
+  x = limit
+      by Plane.SequenceConverges.unique(
+          (k : ℕ) ↦ s(index(k)), x, limit,
+          { Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), x) }, toLimit);
+  done
+}
+
+-- The converse direction, and the one the blueprint uses to GET
+-- compactness: a closed bounded set is compact. Bolzano--Weierstrass
+-- supplies the subsequence; closedness puts its limit back in the set.
+theorem Plane.compact_of_closed_bounded (region : Set(Plane.Point))
+        (closed : Plane.Closure(region) ⊆ region)
+        (bounded : Plane.IsBounded(region))
+        : Plane.IsCompact(region) := {
+  take s : ℕ → Plane.Point;
+  suppose ∀ (m : ℕ). s(m) ∈ region as inside;
+  choose centre such that
+      ∃ (bound : ℝ). ∀ (x : Plane.Point). x ∈ region →
+          Plane.distance(centre, x) ≤ bound
+      as boundExists from bounded;
+  choose bound such that
+      ∀ (x : Plane.Point). x ∈ region → Plane.distance(centre, x) ≤ bound
+      as insideBall from boundExists;
+  Plane.SequenceIsBounded(s)
+      by { witness centre with { witness bound with
+             (m : ℕ) ↦ insideBall(s(m), inside(m)) } };
+  choose index such that
+      ∃ (limit : Plane.Point).
+          Natural.IsStrictlyIncreasing(index)
+          ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
+      as limitExists
+      from Plane.bolzano_weierstrass(s, { Plane.SequenceIsBounded(s) });
+  choose limit such that
+      Natural.IsStrictlyIncreasing(index)
+      ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
+      from limitExists;
+  Natural.IsStrictlyIncreasing(index);
+  Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) as converges;
+  limit ∈ Plane.Closure(region)
+      by Plane.limit_in_Closure(
+          region, (k : ℕ) ↦ s(index(k)),
+          (k : ℕ) ↦ inside(index(k)), limit, converges);
+  limit ∈ region by closed(limit, { limit ∈ Plane.Closure(region) });
+  witness index with { witness limit with done }
+}
