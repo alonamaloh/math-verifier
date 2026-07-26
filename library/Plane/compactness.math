@@ -17,6 +17,7 @@ module Plane.compactness
 import axioms
 import Logic.basics
 import Logic.exists
+import Logic.functions
 import Equality.basics
 import Set.basics
 import Set.algebra
@@ -305,4 +306,98 @@ theorem Plane.IsCompact.bounded (region : Set(Plane.Point))
     done
   };
   done
+}
+
+-- ----------------------------------------------------------------------
+-- Continuous images.
+
+-- Point-valued continuity is sequential too, by the same three lines as
+-- the real-valued case.
+theorem Plane.ContinuousAt.along_sequence
+        (f : Plane.Point → Plane.Point) (carrier : Set(Plane.Point))
+        (x : Plane.Point) (continuous : Plane.ContinuousAt(f, carrier, x))
+        (s : ℕ → Plane.Point) (inside : ∀ (m : ℕ). s(m) ∈ carrier)
+        (converges : Plane.SequenceConverges(s, x))
+        : Plane.SequenceConverges((m : ℕ) ↦ f(s(m)), f(x)) := {
+  take tolerance : ℝ;
+  suppose tolerance > 0;
+  choose nearness such that
+      0 < nearness ∧
+      ∀ (y : Plane.Point). y ∈ carrier →
+        Plane.distance(x, y) < nearness →
+          Plane.distance(f(x), f(y)) < tolerance
+      from continuous(tolerance, { 0 < tolerance });
+  0 < nearness as nearnessPositive;
+  ∀ (y : Plane.Point). y ∈ carrier →
+      Plane.distance(x, y) < nearness →
+        Plane.distance(f(x), f(y)) < tolerance
+      as imagesClose;
+  choose threshold such that
+      ∀ (m : ℕ). threshold ≤ m → Plane.distance(x, s(m)) < nearness
+      as closeBeyond from converges(nearness, nearnessPositive);
+  witness threshold with
+      (m : ℕ) (beyond : threshold ≤ m) ↦ {
+        Plane.distance(x, s(m)) < nearness
+            by closeBeyond(m, { threshold ≤ m });
+        done by imagesClose(s(m), inside(m),
+            { Plane.distance(x, s(m)) < nearness })
+      }
+}
+
+definition Plane.imageSet
+        (f : Plane.Point → Plane.Point) (region : Set(Plane.Point))
+        : Set(Plane.Point) :=
+  (y : Plane.Point) ↦ ∃ (x : Plane.Point). x ∈ region ∧ f(x) = y
+
+-- The continuous image of a compact set is compact. A sequence in the
+-- image has preimages — countable choice again — which compactness thins
+-- to a convergent one; continuity carries that convergence forward.
+theorem Plane.IsCompact.image
+        (f : Plane.Point → Plane.Point) (region : Set(Plane.Point))
+        (compact : Plane.IsCompact(region))
+        (continuous : Plane.ContinuousOn(f, region))
+        : Plane.IsCompact(Plane.imageSet(f, region)) := {
+  take t : ℕ → Plane.Point;
+  suppose ∀ (m : ℕ). t(m) ∈ Plane.imageSet(f, region) as inImage;
+  ∀ (n : ℕ). ∃ (x : Plane.Point). x ∈ region ∧ f(x) = t(n)
+      by (n : ℕ) ↦ inImage(n)
+      as preimages;
+  choose s such that ∀ (n : ℕ). s(n) ∈ region ∧ f(s(n)) = t(n)
+      as chosen
+      from Logic.countable_choice(
+          Plane.Point,
+          (n : ℕ) (x : Plane.Point) ↦ x ∈ region ∧ f(x) = t(n),
+          preimages);
+  ∀ (m : ℕ). s(m) ∈ region
+      by (m : ℕ) ↦ { s(m) ∈ region ∧ f(s(m)) = t(m) by chosen(m); done }
+      as inside;
+  choose index such that
+      ∃ (limit : Plane.Point).
+          Natural.IsStrictlyIncreasing(index)
+          ∧ limit ∈ region
+          ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
+      as limitExists from compact(s, inside);
+  choose limit such that
+      Natural.IsStrictlyIncreasing(index)
+      ∧ limit ∈ region
+      ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
+      from limitExists;
+  Natural.IsStrictlyIncreasing(index);
+  limit ∈ region as limitInside;
+  Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) as converges;
+  f(limit) ∈ Plane.imageSet(f, region) by { witness limit with done };
+  Plane.SequenceConverges((k : ℕ) ↦ f(s(index(k))), f(limit))
+      by Plane.ContinuousAt.along_sequence(
+          f, region, limit, continuous(limit, limitInside),
+          (k : ℕ) ↦ s(index(k)), (k : ℕ) ↦ inside(index(k)), converges)
+      ;
+  ∀ (k : ℕ). f(s(index(k))) = t(index(k))
+      by (k : ℕ) ↦ { s(index(k)) ∈ region ∧ f(s(index(k))) = t(index(k))
+                         by chosen(index(k));
+                     done }
+      ;
+  ((k : ℕ) ↦ f(s(index(k)))) = ((k : ℕ) ↦ t(index(k)))
+      by Function.extensionality;
+  Plane.SequenceConverges((k : ℕ) ↦ t(index(k)), f(limit));
+  witness index with { witness f(limit) with done }
 }
