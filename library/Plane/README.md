@@ -44,9 +44,29 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
 - `Plane.between`, `Plane.segment`, `Plane.IsConvex`, `Plane.Ball`, and
   `Plane.supBall` — [segment.math](segment.math)
 - `Plane.OpenIn`, `Plane.IsOpen`, `Plane.ClosedIn`, `Plane.InteriorIn`,
-  `Plane.ClosureIn`, `Plane.BoundaryIn` —
-  [topology.math](topology.math). **Relative to a carrier from the
-  start**; the absolute notions are the `carrier = universe` case.
+  `Plane.ClosureIn`, `Plane.BoundaryIn`, `Plane.ContinuousAt`,
+  `Plane.ContinuousOn` — [topology.math](topology.math). **Relative to a
+  carrier from the start**; the absolute notions are the
+  `carrier = universe` case.
+- `Plane.SequenceConverges`, `Plane.IsBounded` —
+  [sequence.math](sequence.math); `Plane.SubsequenceConverges` —
+  [compact.math](compact.math)
+- `Plane.IsCompact` (**sequential**), `Plane.Closure`, `Plane.imageSet` —
+  [compactness.math](compactness.math)
+- `Plane.RealContinuousOn`, `Plane.image`, `Plane.UniformlyContinuousOn` —
+  [extremum.math](extremum.math)
+- `Plane.IsConnected` (**the clopen criterion, as the definition**),
+  `Plane.preimageIn`, `Plane.reachedParameters`, `Plane.parameterGap` —
+  [connected.math](connected.math)
+- `Plane.Component`, `Plane.IsRegion` — [component.math](component.math)
+- `Plane.PolygonalReach`, `Plane.reachableFrom` —
+  [polygonal.math](polygonal.math)
+- `Plane.origin`, `Plane.unitSegment`, `Plane.squareBoundary` —
+  [model.math](model.math)
+- `Plane.InjectiveOn`, `Plane.HasContinuousInverseOn`,
+  `Plane.IsHomeomorphismOn` — [homeomorphism.math](homeomorphism.math)
+- `Plane.IsArc`, `Plane.arc`, `Plane.arcStart`, `Plane.arcFinish`,
+  `Plane.IsJordanCurve`, `Plane.jordanCurve` — [curve.math](curve.math)
 
 ## Main theorems
 
@@ -81,6 +101,65 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
   **`Plane.Vector.norm_affine_combination`** (a weighted average is no
   longer than the longer summand — the estimate every convexity argument
   runs on), and **`Plane.Ball_IsConvex`**
+
+### Compactness, connectedness, curves
+
+- **`Plane.bolzano_weierstrass`** in the plane (the line's theorem twice),
+  **`Plane.compact_of_closed_bounded`** and `Plane.IsCompact.bounded`
+  (Heine–Borel as an equivalence), `Plane.IsCompact.image`,
+  `Plane.attains_maximum` / `attains_minimum`,
+  `Plane.uniformly_continuous_on_compact`, `Plane.compact_separation`
+- `Plane.IsConnected.image`, `.union` (through a common point), `.swallows`,
+  `.lands_in_side`, `.adjoin_limits`; **`Plane.IsConvex.connected`** (the
+  layer's one analytic proof — a walk with a supremum), hence
+  `Plane.Ball_IsConnected` and `Plane.segment_IsConnected`
+- `Plane.Component_IsConnected`, `Plane.Component_IsOpen`,
+  `Plane.Component.equal_of_meeting` (components partition),
+  **`Plane.Component.recognize`**, `Plane.Component_boundary_in_closed`
+- **`Plane.polygonal_connected`** — any two points of an open connected set
+  are joined by a chain of segments inside it — and
+  `Plane.Component_is_reachable_set`, which identifies the components of an
+  open set with the walk classes
+- `Plane.segment_IsCompact`, `Plane.squareBoundary_IsCompact`
+- **`Plane.IsHomeomorphismOn.of_continuous_injective_on_compact`** and
+  **`Plane.JordanCurve.homeomorphic_to_square_boundary`** (H4)
+
+## Connectedness is the clopen criterion
+
+`Plane.IsConnected(region)` says: a subset of the region that is relatively
+open, whose complement in the region is relatively open, and which is
+nonempty, **is the region**. Not the absence of a separation.
+
+Every consumer of connectedness in the blueprint is discharging exactly
+those three obligations and concluding the fourth, so taking the criterion
+as the definition spares each of them a reductio — and the blueprint's own
+"Recognizing a component" is then `Plane.Component.recognize`, two lines.
+
+## Arcs and curves are parametrised by plane sets
+
+An arc is a continuous injective map on `Plane.unitSegment`; a Jordan curve
+is one on `Plane.squareBoundary`. **Both model domains are subsets of the
+plane, not of ℝ.** That is what lets everything above apply unchanged: a
+parametrisation is an ordinary `Plane.Point → Plane.Point` map, its
+continuity is `ContinuousOn`, its image is `imageSet`, its compactness is
+`IsCompact`. Parametrising by `[0,1] ⊆ ℝ` would need a second relative
+topology for real-domain maps, and a circle would need a quotient.
+
+Two consequences worth knowing before extending this area:
+
+- `Plane.squareBoundary` is the sup-metric level set `‖x‖∞ = 1`, so its
+  compactness is closed-and-bounded with no case analysis. Its
+  decomposition into four sides is **not** built yet, and everything that
+  needs the arc structure of the model curve waits on it.
+- The parameter of a point of the unit segment is its **first coordinate**
+  (`Plane.unitSegment_at_first_coordinate`). The model interval runs along
+  the axis for exactly this reason: a reparametrisation reads its parameter
+  off the point, with no inverse to construct.
+
+The inverse of a homeomorphism is never named:
+`Plane.HasContinuousInverseOn(f, carrier)` says points whose images are
+close are themselves close. That is the form consumers use, and it avoids
+choosing a preimage for every point of the image.
 
 ## The Euclidean norm is primary
 
