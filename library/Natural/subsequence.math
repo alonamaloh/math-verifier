@@ -1,0 +1,89 @@
+-- Natural/subsequence.math
+--
+-- Index maps: the strictly increasing `ℕ → ℕ` that turns a sequence into
+-- a subsequence.
+--
+-- Three facts are all anyone needs. A strictly increasing map is
+-- increasing across any gap, not just the unit one; it never falls behind
+-- its own index, which is what lets a subsequence inherit an `eventually`;
+-- and two of them compose, which is what lets a plane sequence be thinned
+-- once per coordinate.
+
+module Natural.subsequence
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.add_order
+
+definition Natural.IsStrictlyIncreasing (index : ℕ → ℕ) : Proposition :=
+  ∀ (k : ℕ). index(k) < index(1 + k)
+
+-- Increasing across a gap of any size, by induction on the gap.
+theorem Natural.IsStrictlyIncreasing.across_gap (index : ℕ → ℕ)
+        (increasing : Natural.IsStrictlyIncreasing(index))
+        (a gap : ℕ)
+        : index(a) < index(a + (1 + gap)) := {
+  done by induction on gap with inductionHypothesis {
+    case base: {
+        a + (1 + (0 : ℕ)) = 1 + a;
+        index(a) < index(1 + a) by increasing(a);
+        done
+      }
+    case step(predecessor): {
+        index(a) < index(a + (1 + predecessor)) by inductionHypothesis;
+        index(a + (1 + predecessor))
+            < index(1 + (a + (1 + predecessor)))
+            by increasing(a + (1 + predecessor));
+        a + (1 + successor(predecessor)) = 1 + (a + (1 + predecessor));
+        index(a) < index(a + (1 + successor(predecessor)));
+        done
+      }
+  }
+}
+
+theorem Natural.IsStrictlyIncreasing.monotone (index : ℕ → ℕ)
+        (increasing : Natural.IsStrictlyIncreasing(index))
+        (a b : ℕ) (ordered : a < b)
+        : index(a) < index(b) := {
+  choose gap such that a + (1 + gap) = b from Natural.lt_elim(a, b, ordered);
+  index(a) < index(a + (1 + gap))
+      by Natural.IsStrictlyIncreasing.across_gap;
+  done
+}
+
+-- An index map never falls behind its own index, so a subsequence
+-- reaches every threshold the sequence does.
+theorem Natural.IsStrictlyIncreasing.LessOrEqual (index : ℕ → ℕ)
+        (increasing : Natural.IsStrictlyIncreasing(index))
+        (k : ℕ)
+        : k ≤ index(k) := {
+  done by induction on k with inductionHypothesis {
+    case base: { (0 : ℕ) ≤ index(0); done }
+    case step(predecessor): {
+        predecessor ≤ index(predecessor) by inductionHypothesis;
+        index(predecessor) < index(1 + predecessor) by increasing(predecessor);
+        predecessor < index(1 + predecessor)
+            by Natural.LessThan.transitive_left;
+        predecessor + 1 ≤ index(1 + predecessor)
+            by Natural.add_one_le_of_lt;
+        1 + predecessor ≤ index(1 + predecessor);
+        1 + predecessor = successor(predecessor);
+        done
+      }
+  }
+}
+
+-- Thinning twice is thinning once.
+theorem Natural.IsStrictlyIncreasing.compose (outer inner : ℕ → ℕ)
+        (outerIncreasing : Natural.IsStrictlyIncreasing(outer))
+        (innerIncreasing : Natural.IsStrictlyIncreasing(inner))
+        : Natural.IsStrictlyIncreasing((k : ℕ) ↦ outer(inner(k))) := {
+  take k : ℕ;
+  inner(k) < inner(1 + k) by innerIncreasing(k);
+  done by Natural.IsStrictlyIncreasing.monotone(
+      outer, outerIncreasing, inner(k), inner(1 + k))
+}

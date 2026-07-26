@@ -37,6 +37,7 @@ import Natural.basics
 import Natural.order
 import Natural.eventually
 import Natural.frequently
+import Natural.subsequence
 import Real.interface
 import Real.order
 import Real.order_field
@@ -208,7 +209,7 @@ theorem Real.cluster_point_exists (s : ℕ → ℝ)
 theorem Real.subsequence_at_cluster_point (s : ℕ → ℝ) (point : ℝ)
         (isCluster : Real.IsClusterPoint(s, point))
         : ∃ (index : ℕ → ℕ).
-            (∀ (k : ℕ). index(k) < index(1 + k))
+            Natural.IsStrictlyIncreasing(index)
             ∧ Real.SequenceConverges((k : ℕ) ↦ s(index(k)), point) := {
   ∀ (k : ℕ). Natural.Frequently((m : ℕ) ↦
       abs(s(m) - point) < Real.harmonic_term(k))
@@ -220,7 +221,7 @@ theorem Real.subsequence_at_cluster_point (s : ℕ → ℝ) (point : ℝ)
   let approach : ℕ → ℕ → Proposition :=
       (k : ℕ) (m : ℕ) ↦ abs(s(m) - point) < Real.harmonic_term(k);
   let index : ℕ → ℕ := Natural.extract(approach);
-  ∀ (k : ℕ). index(k) < index(1 + k)
+  Natural.IsStrictlyIncreasing(index)
       by (k : ℕ) ↦ Natural.extract_increasing(approach, closeOften, k);
   ∀ (k : ℕ). abs(s(index(k)) - point) < Real.harmonic_term(k)
       by (k : ℕ) ↦ Natural.extract_holds(approach, closeOften, k)
@@ -249,14 +250,37 @@ theorem Real.subsequence_at_cluster_point (s : ℕ → ℝ) (point : ℝ)
 theorem Real.bolzano_weierstrass (s : ℕ → ℝ)
         (bounded : Real.SequenceIsBounded(s))
         : ∃ (index : ℕ → ℕ). ∃ (limit : ℝ).
-            (∀ (k : ℕ). index(k) < index(1 + k))
+            Natural.IsStrictlyIncreasing(index)
             ∧ Real.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) := {
   choose point such that Real.IsClusterPoint(s, point)
       as isCluster from Real.cluster_point_exists(s, bounded);
   choose index such that
-      (∀ (k : ℕ). index(k) < index(1 + k))
+      Natural.IsStrictlyIncreasing(index)
       ∧ Real.SequenceConverges((k : ℕ) ↦ s(index(k)), point)
       as subsequence
       from Real.subsequence_at_cluster_point(s, point, isCluster);
   witness index with { witness point with subsequence }
+}
+
+-- ----------------------------------------------------------------------
+-- Thinning preserves a limit. Needed to apply Bolzano--Weierstrass twice:
+-- the coordinate that converged on the first pass has to keep converging
+-- when the second pass thins the sequence again.
+
+theorem Real.SequenceConverges.subsequence
+        (s : ℕ → ℝ) (limit : ℝ) (index : ℕ → ℕ)
+        (converges : Real.SequenceConverges(s, limit))
+        (increasing : Natural.IsStrictlyIncreasing(index))
+        : Real.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) := {
+  take tolerance : ℝ;
+  suppose tolerance > 0;
+  choose threshold such that
+      ∀ (m : ℕ). threshold ≤ m → abs(s(m) - limit) < tolerance
+      as closeBeyond from converges(tolerance, { tolerance > 0 });
+  witness threshold with
+      (k : ℕ) (beyond : threshold ≤ k) ↦ {
+        k ≤ index(k) by Natural.IsStrictlyIncreasing.LessOrEqual;
+        threshold ≤ index(k);
+        done by closeBeyond(index(k), { threshold ≤ index(k) })
+      }
 }
