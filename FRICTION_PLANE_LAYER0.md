@@ -472,13 +472,15 @@ re-verifying: same sites, same step counts (70839 / 61173 vs 61688).
 
 ## Two gaps the tactic did not close
 
-**The tactic must be cited.** The auto-prover does not try
-`ordered_field`, so every one of I1/I4/I9 still needs `by ordered_field`
-written out — a step a mathematician would not have annotated. That is
-the same complaint the log opened with, moved one level up: the
-inequality is now *provable* rather than blocked, but saying so is still
-required. Whether the battery should call the tactic on failure is a cost
-question (how expensive is a failed search?) rather than a design one.
+**The tactic must be cited.** — CLOSED 2026-07-26. The auto-prover now
+runs `ordered_field` as the last tier of its battery, so I1, I4 and I9
+close with a bare `done`. Placing it last is what makes it free: it is
+reached only on a goal that was about to be an error, so a library that
+verifies never runs it. Measured on the 163-module `Plane` cone (the
+algebra/analysis spine, no fifteen-theorem), forcing a full
+re-verification: baseline wall 17.83 / 16.84 / 17.79 s, user 125.06 /
+126.02 / 124.82 s; with the tier wall 17.12 / 17.53 / 16.85 s, user
+124.04 / 124.30 / 125.10 s. No measurable cost.
 
 **Division by a numeral is an opaque atom.** `Real.divide` carries a
 nonzero proof, so `e / 2` is not recognised as `(1/2)·e`:
