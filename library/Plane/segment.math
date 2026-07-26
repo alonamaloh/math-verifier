@@ -76,28 +76,30 @@ theorem Plane.Vector.norm_affine_combination (u w : Plane.Vector) (t : ℝ)
         : Plane.Vector.norm((1 - t) * u + t * w)
               ≤ max(Plane.Vector.norm(u), Plane.Vector.norm(w)) := {
   0 ≤ 1 - t;
-  abs(1 - t) = 1 - t;
-  abs(t) = t by Real.absolute_value_when_nonneg;
-  Plane.Vector.norm(u) ≤ max(Plane.Vector.norm(u), Plane.Vector.norm(w))
-;
-  Plane.Vector.norm(w) ≤ max(Plane.Vector.norm(u), Plane.Vector.norm(w))
-;
+  abs(1 - t) = 1 - t as absWeight;
+  abs(t) = t by Real.absolute_value_when_nonneg as absRest;
+  Plane.Vector.norm(u) ≤ max(Plane.Vector.norm(u), Plane.Vector.norm(w));
+  Plane.Vector.norm(w) ≤ max(Plane.Vector.norm(u), Plane.Vector.norm(w));
   Real.IsNonneg(1 - t);
   Real.IsNonneg(t);
   (1 - t) * Plane.Vector.norm(u)
-      ≤ (1 - t) * max(Plane.Vector.norm(u), Plane.Vector.norm(w))
-;
+      ≤ (1 - t) * max(Plane.Vector.norm(u), Plane.Vector.norm(w));
   t * Plane.Vector.norm(w)
-      ≤ t * max(Plane.Vector.norm(u), Plane.Vector.norm(w))
-;
+      ≤ t * max(Plane.Vector.norm(u), Plane.Vector.norm(w));
+  -- Both weights are nonnegative, so the scaling law drops its `abs`.
+  Plane.Vector.norm((1 - t) * u)
+     = abs(1 - t) * Plane.Vector.norm(u) by Plane.Vector.norm_scale
+     = (1 - t) * Plane.Vector.norm(u) by absWeight as scaledLeft;
+  Plane.Vector.norm(t * w)
+     = abs(t) * Plane.Vector.norm(w) by Plane.Vector.norm_scale
+     = t * Plane.Vector.norm(w) by absRest as scaledRight;
   Plane.Vector.norm((1 - t) * u + t * w)
      ≤ Plane.Vector.norm((1 - t) * u) + Plane.Vector.norm(t * w)
            by Plane.Vector.norm_triangle
-     = abs(1 - t) * Plane.Vector.norm(u) + Plane.Vector.norm(t * w)
-           by Plane.Vector.norm_scale
-     = abs(1 - t) * Plane.Vector.norm(u) + abs(t) * Plane.Vector.norm(w)
-           by Plane.Vector.norm_scale
+     = (1 - t) * Plane.Vector.norm(u) + Plane.Vector.norm(t * w)
+           by scaledLeft
      = (1 - t) * Plane.Vector.norm(u) + t * Plane.Vector.norm(w)
+           by scaledRight
      ≤ (1 - t) * max(Plane.Vector.norm(u), Plane.Vector.norm(w))
            + t * max(Plane.Vector.norm(u), Plane.Vector.norm(w))
      = max(Plane.Vector.norm(u), Plane.Vector.norm(w)) by ring;
@@ -158,8 +160,7 @@ theorem Plane.Ball_IsConvex (center : Plane.Point) (radius : ℝ)
   suppose t ≤ 1 as tAtMostOne;
   Plane.Vector.norm(a - center) < radius;
   Plane.Vector.norm(b - center) < radius;
-  max(Plane.Vector.norm(a - center), Plane.Vector.norm(b - center)) < radius
-;
+  max(Plane.Vector.norm(a - center), Plane.Vector.norm(b - center)) < radius;
   Plane.Vector.norm(Plane.between(a, b, t) - center)
      = Plane.Vector.norm((1 - t) * (a - center) + t * (b - center))
            by Plane.between_difference

@@ -218,6 +218,43 @@ definition Plane.BallWitness
         Plane.distance(x, z) < radius → z ∈ subset)
   ∧ Plane.distance(x, y) < radius
 
+-- The four legs, as citations. `BallWitness` is a definition, so a proof
+-- that reaches into a folded witness pays a δ-unfolding at every
+-- projection; these pay it once each, and the use sites then say which
+-- leg they are using.
+theorem Plane.BallWitness.centre_inside
+        (subset carrier : Set(Plane.Point))
+        (x : Plane.Point) (radius : ℝ) (y : Plane.Point)
+        (holds : Plane.BallWitness(subset, carrier, x, radius, y))
+        : x ∈ subset :=
+  unfold Plane.BallWitness in { x ∈ subset; done }
+
+theorem Plane.BallWitness.radius_positive
+        (subset carrier : Set(Plane.Point))
+        (x : Plane.Point) (radius : ℝ) (y : Plane.Point)
+        (holds : Plane.BallWitness(subset, carrier, x, radius, y))
+        : 0 < radius :=
+  unfold Plane.BallWitness in { 0 < radius; done }
+
+theorem Plane.BallWitness.ball_inside
+        (subset carrier : Set(Plane.Point))
+        (x : Plane.Point) (radius : ℝ) (y : Plane.Point)
+        (holds : Plane.BallWitness(subset, carrier, x, radius, y))
+        : ∀ (z : Plane.Point). z ∈ carrier →
+              Plane.distance(x, z) < radius → z ∈ subset :=
+  unfold Plane.BallWitness in {
+    ∀ (z : Plane.Point). z ∈ carrier →
+        Plane.distance(x, z) < radius → z ∈ subset;
+    done
+  }
+
+theorem Plane.BallWitness.reaches
+        (subset carrier : Set(Plane.Point))
+        (x : Plane.Point) (radius : ℝ) (y : Plane.Point)
+        (holds : Plane.BallWitness(subset, carrier, x, radius, y))
+        : Plane.distance(x, y) < radius :=
+  unfold Plane.BallWitness in { Plane.distance(x, y) < radius; done }
+
 definition Plane.openHull (subset carrier : Set(Plane.Point))
         : Set(Plane.Point) :=
   (y : Plane.Point) ↦
@@ -230,11 +267,12 @@ theorem Plane.openHull_IsOpen (subset carrier : Set(Plane.Point))
   suppose y ∈ Plane.openHull(subset, carrier) as inHull;
   choose x, radius such that
       Plane.BallWitness(subset, carrier, x, radius, y) from inHull;
-  x ∈ subset;
-  0 < radius;
+  x ∈ subset by Plane.BallWitness.centre_inside;
+  0 < radius by Plane.BallWitness.radius_positive;
   ∀ (z : Plane.Point). z ∈ carrier →
-      Plane.distance(x, z) < radius → z ∈ subset;
-  Plane.distance(x, y) < radius;
+      Plane.distance(x, z) < radius → z ∈ subset
+      by Plane.BallWitness.ball_inside;
+  Plane.distance(x, y) < radius by Plane.BallWitness.reaches;
   0 < radius - Plane.distance(x, y);
   witness radius - Plane.distance(x, y) with {
     0 < radius - Plane.distance(x, y);
@@ -292,8 +330,9 @@ theorem Plane.openHull_intersection_subset (subset carrier : Set(Plane.Point))
   choose x, radius such that
       Plane.BallWitness(subset, carrier, x, radius, y) from inHull;
   ∀ (z : Plane.Point). z ∈ carrier →
-      Plane.distance(x, z) < radius → z ∈ subset as ballProperty;
-  Plane.distance(x, y) < radius;
+      Plane.distance(x, z) < radius → z ∈ subset
+      by Plane.BallWitness.ball_inside as ballProperty;
+  Plane.distance(x, y) < radius by Plane.BallWitness.reaches;
   done by ballProperty
 }
 
@@ -401,8 +440,7 @@ theorem Plane.InteriorIn_OpenIn (subset carrier : Set(Plane.Point))
         by (y : Plane.Point) (yInCarrier : y ∈ carrier)
            (yClose : Plane.distance(x, y) < radius) ↦ {
              y ∈ subset by ballProperty;
-             0 < radius - Plane.distance(x, y)
-;
+             0 < radius - Plane.distance(x, y);
              ∃ (smaller : ℝ). 0 < smaller ∧
                  ∀ (z : Plane.Point). z ∈ carrier →
                    Plane.distance(y, z) < smaller → z ∈ subset
