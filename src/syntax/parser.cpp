@@ -89,6 +89,8 @@ bool isOperatorSymbolToken(TokenKind kind) {
         case TokenKind::SubsetOf:
         case TokenKind::NotSubsetOf:
         case TokenKind::SetMinus:
+        case TokenKind::Union:
+        case TokenKind::Intersection:
         case TokenKind::Approx:
         case TokenKind::InverseSuperscript:
         case TokenKind::TransposeSuperscript:
@@ -3350,10 +3352,12 @@ private:
         while (peek().kind == TokenKind::Plus
                || peek().kind == TokenKind::Minus
                || peek().kind == TokenKind::SetMinus
+               || peek().kind == TokenKind::Union
                || peek().kind == TokenKind::Monus) {
             Token op = consumeAny();
             const char* sym = (op.kind == TokenKind::Plus) ? "+"
                             : (op.kind == TokenKind::SetMinus) ? "∖"
+                            : (op.kind == TokenKind::Union) ? "∪"
                             : (op.kind == TokenKind::Monus) ? "∸" : "-";
             if (peek().kind == TokenKind::Ellipsis) {
                 // `t₁ op … op ... op g` — ellipsis fold notation.
@@ -3397,10 +3401,12 @@ private:
                || peek().kind == TokenKind::Slash
                || peek().kind == TokenKind::CenterDot
                || peek().kind == TokenKind::Bullet
+               || peek().kind == TokenKind::Intersection
                || peek().kind == TokenKind::Compose) {
             Token op = consumeAny();
             const char* sym = nullptr;
             switch (op.kind) {
+                case TokenKind::Intersection: sym = "∩"; break;
                 case TokenKind::Star:      sym = "*"; break;
                 case TokenKind::Slash:     sym = "/"; break;
                 case TokenKind::CenterDot: sym = "·"; break;

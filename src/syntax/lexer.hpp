@@ -110,6 +110,8 @@ enum class TokenKind {
     SubsetOf,        // "⊆" (subset)
     NotSubsetOf,     // "⊈" (negated subset)
     SetMinus,        // "∖" (set difference; on lists, element removal)
+    Union,           // "∪" (set union)
+    Intersection,    // "∩" (set intersection)
     Approx,          // "≈" (equinumerous / generic transitive relation)
     ForAll,          // "∀" (universal-quantifier prefix)
     Exists,          // "∃" (existential-quantifier prefix)

@@ -1,0 +1,153 @@
+-- Set/algebra.math
+--
+-- The Boolean operations on `Set(T) = T → Proposition`, and the laws a
+-- consumer needs to reason with them.
+--
+-- Every membership fact here is definitional: `x ∈ a ∪ b` IS
+-- `x ∈ a ∨ x ∈ b`, so the characterizing theorems are there for the
+-- reader and for goal-shape matching rather than to do work. The laws
+-- below them are the ones that are not free.
+
+module Set.algebra
+
+import Logic.basics
+import Logic.excluded_middle
+import Equality.basics
+import Set.basics
+
+-- ----------------------------------------------------------------------
+-- The operations.
+
+definition Set.universe (T : Type(0)) : Set(T) :=
+  (subject : T) ↦ True
+
+definition Set.empty (T : Type(0)) : Set(T) :=
+  (subject : T) ↦ False
+
+definition Set.union {T : Type(0)} (left right : Set(T)) : Set(T) :=
+  (subject : T) ↦ subject ∈ left ∨ subject ∈ right
+
+definition Set.intersection {T : Type(0)} (left right : Set(T)) : Set(T) :=
+  (subject : T) ↦ subject ∈ left ∧ subject ∈ right
+
+definition Set.complement {T : Type(0)} (subset : Set(T)) : Set(T) :=
+  (subject : T) ↦ ¬(subject ∈ subset)
+
+definition Set.difference {T : Type(0)} (larger smaller : Set(T)) : Set(T) :=
+  (subject : T) ↦ subject ∈ larger ∧ ¬(subject ∈ smaller)
+
+operator (∪) on (Set, Set) := Set.union
+operator (∩) on (Set, Set) := Set.intersection
+operator (∖) on (Set, Set) := Set.difference
+
+-- ----------------------------------------------------------------------
+-- Membership, spelled out. Definitional, but the shapes a proof cites.
+
+theorem Set.member_universe {T : Type(0)} (subject : T)
+        : subject ∈ Set.universe(T) :=
+  True.trivial
+
+theorem Set.not_member_empty {T : Type(0)} (subject : T)
+        : ¬(subject ∈ Set.empty(T)) := {
+  suppose subject ∈ Set.empty(T);
+  done
+}
+
+theorem Set.member_union {T : Type(0)} (subject : T) (left right : Set(T))
+        (inEither : subject ∈ left ∨ subject ∈ right)
+        : subject ∈ left ∪ right :=
+  inEither
+
+theorem Set.member_intersection {T : Type(0)} (subject : T)
+        (left right : Set(T))
+        (inLeft : subject ∈ left) (inRight : subject ∈ right)
+        : subject ∈ left ∩ right := {
+  subject ∈ left;
+  subject ∈ right;
+  done
+}
+
+theorem Set.intersection_member_left {T : Type(0)} (subject : T)
+        (left right : Set(T)) (inBoth : subject ∈ left ∩ right)
+        : subject ∈ left := {
+  subject ∈ left;
+  done
+}
+
+theorem Set.intersection_member_right {T : Type(0)} (subject : T)
+        (left right : Set(T)) (inBoth : subject ∈ left ∩ right)
+        : subject ∈ right := {
+  subject ∈ right;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- Subset laws.
+
+theorem Set.intersection_subset_left {T : Type(0)} (left right : Set(T))
+        : left ∩ right ⊆ left := {
+  take subject : T;
+  suppose subject ∈ left ∩ right as inBoth;
+  done by Set.intersection_member_left
+}
+
+theorem Set.intersection_subset_right {T : Type(0)} (left right : Set(T))
+        : left ∩ right ⊆ right := {
+  take subject : T;
+  suppose subject ∈ left ∩ right as inBoth;
+  done by Set.intersection_member_right
+}
+
+theorem Set.subset_union_left {T : Type(0)} (left right : Set(T))
+        : left ⊆ left ∪ right := {
+  take subject : T;
+  suppose subject ∈ left as inLeft;
+  subject ∈ left ∨ subject ∈ right;
+  done by Set.member_union
+}
+
+theorem Set.subset_union_right {T : Type(0)} (left right : Set(T))
+        : right ⊆ left ∪ right := {
+  take subject : T;
+  suppose subject ∈ right as inRight;
+  subject ∈ left ∨ subject ∈ right;
+  done by Set.member_union
+}
+
+theorem Set.subset_universe {T : Type(0)} (subset : Set(T))
+        : subset ⊆ Set.universe(T) := {
+  take subject : T;
+  suppose subject ∈ subset;
+  done by Set.member_universe
+}
+
+-- ----------------------------------------------------------------------
+-- Complement. The one place classical logic is needed: a point outside
+-- the complement is inside the set.
+
+theorem Set.member_of_not_member_complement {T : Type(0)} (subject : T)
+        (subset : Set(T))
+        (notOutside : ¬(subject ∈ Set.complement(subset)))
+        : subject ∈ subset := {
+  suppose ¬(subject ∈ subset) for contradiction {
+    subject ∈ Set.complement(subset);
+    done
+  };
+  done
+}
+
+theorem Set.complement_complement_member {T : Type(0)} (subject : T)
+        (subset : Set(T)) (inside : subject ∈ subset)
+        : ¬(subject ∈ Set.complement(subset)) := {
+  suppose subject ∈ Set.complement(subset) as outside;
+  done
+}
+
+-- A difference is an intersection with a complement — the spelling the
+-- topology layer uses when it wants `closure(U) \ U` to be closed under
+-- the intersection laws above.
+theorem Set.difference_member_intersection_complement {T : Type(0)}
+        (larger smaller : Set(T))
+        (subject : T) (inDifference : subject ∈ larger ∖ smaller)
+        : subject ∈ larger ∩ Set.complement(smaller) :=
+  inDifference

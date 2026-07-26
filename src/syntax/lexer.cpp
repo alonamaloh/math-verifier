@@ -367,6 +367,8 @@ private:
             {"⊆", TokenKind::SubsetOf},
             {"⊈", TokenKind::NotSubsetOf},
             {"∖", TokenKind::SetMinus},
+            {"∪", TokenKind::Union},
+            {"∩", TokenKind::Intersection},
             {"≈", TokenKind::Approx},
             {"∀", TokenKind::ForAll},
             {"∃", TokenKind::Exists},
@@ -614,6 +616,8 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::SubsetOf:             return "'⊆'";
         case TokenKind::NotSubsetOf:          return "'⊈'";
         case TokenKind::SetMinus:             return "'∖'";
+        case TokenKind::Union:                return "'∪'";
+        case TokenKind::Intersection:         return "'∩'";
         case TokenKind::Approx:               return "'≈'";
         case TokenKind::ForAll:               return "'∀'";
         case TokenKind::Exists:               return "'∃'";
