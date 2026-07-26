@@ -108,6 +108,98 @@ theorem Plane.distance_symmetric (p q : Plane.Point)
 }
 
 -- ----------------------------------------------------------------------
+-- Two sequences that close on each other have the same limit.
+--
+-- Stated on a common thinning, because that is how it arrives: two
+-- sequences built in step, thinned together until both converge. The
+-- three-term triangle inequality does the work, with a quarter of the
+-- tolerance for each end and a quarter for the gap between them.
+
+theorem Plane.equal_limits_of_closing
+        (u v : ℕ → Plane.Point) (index : ℕ → ℕ)
+        (limitU limitV : Plane.Point)
+        (increasing : Natural.IsStrictlyIncreasing(index))
+        (toU : Plane.SequenceConverges((k : ℕ) ↦ u(index(k)), limitU))
+        (toV : Plane.SequenceConverges((k : ℕ) ↦ v(index(k)), limitV))
+        (closing : ∀ (n : ℕ).
+            Plane.distance(u(n), v(n)) < Real.harmonic_term(n))
+        : limitU = limitV := {
+  ∀ (tolerance : ℝ). 0 < tolerance →
+      Plane.distance(limitU, limitV) < tolerance
+      by (tolerance : ℝ) (tolerancePositive : 0 < tolerance) ↦ {
+        (4 : ℝ) ≠ 0;
+        0 < tolerance / 4 by Real.divide_positive;
+        choose thresholdU such that
+            ∀ (k : ℕ). thresholdU ≤ k →
+                Plane.distance(limitU, u(index(k))) < tolerance / 4
+            as closeU from toU(tolerance / 4, { 0 < tolerance / 4 });
+        choose thresholdV such that
+            ∀ (k : ℕ). thresholdV ≤ k →
+                Plane.distance(limitV, v(index(k))) < tolerance / 4
+            as closeV from toV(tolerance / 4, { 0 < tolerance / 4 });
+        choose scale such that Real.harmonic_term(scale) < tolerance / 4
+            from Real.exists_harmonic_term_below(
+                tolerance / 4, { 0 < tolerance / 4 });
+        let far : ℕ :=
+            Natural.maximum(Natural.maximum(thresholdU, thresholdV), scale);
+        Natural.maximum(thresholdU, thresholdV) ≤ far;
+        thresholdU ≤ Natural.maximum(thresholdU, thresholdV);
+        thresholdV ≤ Natural.maximum(thresholdU, thresholdV);
+        thresholdU ≤ far;
+        thresholdV ≤ far;
+        scale ≤ far;
+        let deep : ℕ := index(far);
+        Plane.distance(limitU, u(deep)) < tolerance / 4
+            by closeU(far, { thresholdU ≤ far });
+        Plane.distance(limitV, v(deep)) < tolerance / 4
+            by closeV(far, { thresholdV ≤ far });
+        Plane.distance(u(deep), v(deep)) < Real.harmonic_term(deep)
+            by closing(deep);
+        far ≤ deep by Natural.IsStrictlyIncreasing.LessOrEqual;
+        scale ≤ deep;
+        Real.harmonic_term(deep) ≤ Real.harmonic_term(scale)
+            by Real.harmonic_term_antitone;
+        Plane.distance(u(deep), v(deep)) < tolerance / 4;
+        Plane.distance(limitV, v(deep)) = Plane.distance(v(deep), limitV)
+            by Plane.distance_symmetric;
+        tolerance / 4 + tolerance / 4 + tolerance / 4
+            < tolerance / 4 + tolerance / 4 + tolerance / 4 + tolerance / 4;
+        tolerance / 4 + tolerance / 4 + tolerance / 4 + tolerance / 4
+            = tolerance by Real.divide_four_quarters;
+        Plane.distance(u(deep), limitV)
+            ≤ Plane.distance(u(deep), v(deep))
+                  + Plane.distance(v(deep), limitV)
+            by Plane.distance_triangle;
+        Plane.distance(limitU, limitV)
+           ≤ Plane.distance(limitU, u(deep)) + Plane.distance(u(deep), limitV)
+                 by Plane.distance_triangle
+           ≤ Plane.distance(limitU, u(deep))
+                 + (Plane.distance(u(deep), v(deep))
+                        + Plane.distance(v(deep), limitV))
+           = Plane.distance(limitU, u(deep))
+                 + Plane.distance(u(deep), v(deep))
+                 + Plane.distance(v(deep), limitV) by ring
+           < tolerance / 4 + tolerance / 4 + tolerance / 4
+           < tolerance;
+        done
+      }
+      as arbitrarilyClose;
+  0 ≤ Plane.distance(limitU, limitV) by Plane.distance_nonneg;
+  abs(Plane.distance(limitU, limitV)) = Plane.distance(limitU, limitV)
+      by Real.absolute_value_when_nonneg;
+  ∀ (tolerance : ℝ). 0 < tolerance →
+      abs(Plane.distance(limitU, limitV)) < tolerance
+      by (tolerance : ℝ) (tolerancePositive : 0 < tolerance) ↦ {
+        Plane.distance(limitU, limitV) < tolerance
+            by arbitrarilyClose(tolerance, tolerancePositive);
+        done
+      };
+  Plane.distance(limitU, limitV) = 0
+      by Real.eq_of_absolute_value_less_than_all_positive_real;
+  done by Plane.equal_of_distance_zero
+}
+
+-- ----------------------------------------------------------------------
 -- The separation lemma.
 
 theorem Plane.compact_separation (regionA regionB : Set(Plane.Point))
@@ -253,93 +345,21 @@ theorem Plane.compact_separation (regionA regionB : Set(Plane.Point))
             toLimitA, secondIncreasing)
         as toLimitAThinned;
 
-    -- The two limits are at distance zero.
-    ∀ (tolerance : ℝ). 0 < tolerance →
-        Plane.distance(limitA, limitB) < tolerance
-        by (tolerance : ℝ) (tolerancePositive : 0 < tolerance) ↦ {
-          (4 : ℝ) ≠ 0;
-          0 < tolerance / 4 by Real.divide_positive;
-          choose thresholdA such that
-              ∀ (k : ℕ). thresholdA ≤ k →
-                  Plane.distance(limitA, a(firstIndex(secondIndex(k))))
-                      < tolerance / 4
-              as closeA
-              from toLimitAThinned(tolerance / 4, { 0 < tolerance / 4 });
-          choose thresholdB such that
-              ∀ (k : ℕ). thresholdB ≤ k →
-                  Plane.distance(limitB, b(firstIndex(secondIndex(k))))
-                      < tolerance / 4
-              as closeB
-              from toLimitB(tolerance / 4, { 0 < tolerance / 4 });
-          choose scale such that Real.harmonic_term(scale) < tolerance / 4
-              from Real.exists_harmonic_term_below(
-                  tolerance / 4, { 0 < tolerance / 4 });
-          let far : ℕ :=
-              Natural.maximum(Natural.maximum(thresholdA, thresholdB), scale);
-          Natural.maximum(thresholdA, thresholdB) ≤ far;
-          thresholdA ≤ Natural.maximum(thresholdA, thresholdB);
-          thresholdB ≤ Natural.maximum(thresholdA, thresholdB);
-          thresholdA ≤ far;
-          thresholdB ≤ far;
-          scale ≤ far;
-          let deep : ℕ := firstIndex(secondIndex(far));
-          Plane.distance(limitA, a(deep)) < tolerance / 4
-              by closeA(far, { thresholdA ≤ far });
-          Plane.distance(limitB, b(deep)) < tolerance / 4
-              by closeB(far, { thresholdB ≤ far });
-          b(deep) ∈ regionB ∧ Plane.distance(a(deep), b(deep))
-              < Real.harmonic_term(deep) by chosenB(deep);
-          Plane.distance(a(deep), b(deep)) < Real.harmonic_term(deep);
-          -- The middle term is under a harmonic term at an index at least
-          -- `far`, hence at least `scale`.
-          far ≤ deep
-              by Natural.IsStrictlyIncreasing.LessOrEqual(
-                  (k : ℕ) ↦ firstIndex(secondIndex(k)),
-                  Natural.IsStrictlyIncreasing.compose(
-                      firstIndex, secondIndex,
-                      firstIncreasing, secondIncreasing),
-                  far);
-          scale ≤ deep;
-          Real.harmonic_term(deep) ≤ Real.harmonic_term(scale)
-              by Real.harmonic_term_antitone;
-          Plane.distance(a(deep), b(deep)) < tolerance / 4;
-          Plane.distance(limitB, b(deep)) = Plane.distance(b(deep), limitB)
-              by Plane.distance_symmetric;
-          tolerance / 4 + tolerance / 4 + tolerance / 4
-              < tolerance / 4 + tolerance / 4 + tolerance / 4 + tolerance / 4;
-          tolerance / 4 + tolerance / 4 + tolerance / 4 + tolerance / 4
-              = tolerance by Real.divide_four_quarters;
-          Plane.distance(a(deep), limitB)
-              ≤ Plane.distance(a(deep), b(deep))
-                    + Plane.distance(b(deep), limitB)
-              by Plane.distance_triangle;
-          Plane.distance(limitA, limitB)
-             ≤ Plane.distance(limitA, a(deep)) + Plane.distance(a(deep), limitB)
-                   by Plane.distance_triangle
-             ≤ Plane.distance(limitA, a(deep))
-                   + (Plane.distance(a(deep), b(deep))
-                          + Plane.distance(b(deep), limitB))
-             = Plane.distance(limitA, a(deep))
-                   + Plane.distance(a(deep), b(deep))
-                   + Plane.distance(b(deep), limitB) by ring
-             < tolerance / 4 + tolerance / 4 + tolerance / 4
-             < tolerance;
+    -- The two limits coincide: the pairs were built to close on each
+    -- other, and both thinnings kept them in step.
+    ∀ (n : ℕ). Plane.distance(a(n), b(n)) < Real.harmonic_term(n)
+        by (n : ℕ) ↦ {
+          b(n) ∈ regionB ∧ Plane.distance(a(n), b(n))
+              < Real.harmonic_term(n) by chosenB(n);
           done
         }
-        as arbitrarilyClose;
-    0 ≤ Plane.distance(limitA, limitB) by Plane.distance_nonneg;
-    abs(Plane.distance(limitA, limitB)) = Plane.distance(limitA, limitB)
-        by Real.absolute_value_when_nonneg;
-    ∀ (tolerance : ℝ). 0 < tolerance →
-        abs(Plane.distance(limitA, limitB)) < tolerance
-        by (tolerance : ℝ) (tolerancePositive : 0 < tolerance) ↦ {
-          Plane.distance(limitA, limitB) < tolerance
-              by arbitrarilyClose(tolerance, tolerancePositive);
-          done
-        };
-    Plane.distance(limitA, limitB) = 0
-        by Real.eq_of_absolute_value_less_than_all_positive_real;
-    limitA = limitB by Plane.equal_of_distance_zero;
+        as closing;
+    limitA = limitB
+        by Plane.equal_limits_of_closing(
+            a, b, (k : ℕ) ↦ firstIndex(secondIndex(k)), limitA, limitB,
+            Natural.IsStrictlyIncreasing.compose(
+                firstIndex, secondIndex, firstIncreasing, secondIncreasing),
+            toLimitAThinned, toLimitB, closing);
     limitA ∈ regionB;
     ¬(limitA ∈ regionB) by disjoint(limitA, limitAInside);
     done
