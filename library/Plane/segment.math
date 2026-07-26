@@ -169,3 +169,35 @@ theorem Plane.Ball_IsConvex (center : Plane.Point) (radius : ℝ)
      < radius;
   done
 }
+
+-- ----------------------------------------------------------------------
+-- Walking at unit speed.
+--
+-- Two points of the same walk differ by the parameter gap times the
+-- displacement, so the distance between them is proportional to the gap.
+-- This is what turns an ε on the plane into a δ on the parameter, and it
+-- is the only estimate the connectedness of a convex set needs.
+
+theorem Plane.between_difference_parameter (a b : Plane.Point) (s t : ℝ)
+        : Plane.between(a, b, t) - Plane.between(a, b, s)
+              = (t - s) * (b - a) :=
+  Plane.between(a, b, t) - Plane.between(a, b, s)
+     = (Plane.between(a, b, t) - a) - (Plane.between(a, b, s) - a)
+           by Plane.Point.difference_via
+     = t * (b - a) - (Plane.between(a, b, s) - a)
+           by Plane.Point.difference_translate
+     = t * (b - a) - s * (b - a)
+           by Plane.Point.difference_translate
+     = (t - s) * (b - a) by Plane.Vector.subtract_scale_factors
+
+theorem Plane.between_distance (a b : Plane.Point) (s t : ℝ)
+        : Plane.distance(Plane.between(a, b, s), Plane.between(a, b, t))
+              = abs(t - s) * Plane.distance(a, b) := {
+  Plane.distance(Plane.between(a, b, s), Plane.between(a, b, t))
+     = Plane.Vector.norm(Plane.between(a, b, t) - Plane.between(a, b, s))
+     = Plane.Vector.norm((t - s) * (b - a))
+           by Plane.between_difference_parameter
+     = abs(t - s) * Plane.Vector.norm(b - a) by Plane.Vector.norm_scale
+     = abs(t - s) * Plane.distance(a, b);
+  done
+}

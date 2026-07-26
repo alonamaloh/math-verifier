@@ -23,6 +23,13 @@ import Set.basics
 import Set.algebra
 import Real.interface
 import Real.order
+import Real.order_field
+import Real.division
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.minimum
+import Real.supremum
+import Plane.segment
 import Plane.vector
 import Plane.point
 import Plane.norm
@@ -435,4 +442,135 @@ theorem Plane.IsConnected.union
         }
       };
   done by Set.equal_of_same_members
+}
+
+-- ----------------------------------------------------------------------
+-- Convex sets are connected.
+--
+-- The proof is the one on the line, transported along a walk. Fix a
+-- point of the piece and any target of the region, and look at the set
+-- of parameters whose walk has landed in the piece:
+--
+--     reached = { t ∈ [0,1] : between(start, target, t) ∈ piece }.
+--
+-- It holds 0 and stops at 1, so it has a supremum. The walk at the
+-- supremum cannot be outside the piece — the piece's complement is open,
+-- and parameters just short of the supremum are already inside. And the
+-- supremum cannot be short of 1 — the piece is open, so parameters just
+-- past it would be inside too, and the supremum would not be one.
+--
+-- The estimate that turns "just short" into a distance is
+-- `Plane.between_distance`: a parameter gap of `g` moves the walk by
+-- `g · distance(start, target)`, so `r / (1 + distance(start, target))`
+-- is always a small enough gap.
+
+definition Plane.reachedParameters
+        (piece : Set(Plane.Point)) (a b : Plane.Point) : Set(ℝ) :=
+  (t : ℝ) ↦ (0 ≤ t ∧ t ≤ 1) ∧ Plane.between(a, b, t) ∈ piece
+
+-- The parameter gap that keeps the walk inside a ball of radius `r`.
+definition Plane.parameterGap (r : ℝ) (a b : Plane.Point) : ℝ :=
+  r / (1 + Plane.distance(a, b))
+
+theorem Plane.parameterGap_positive (r : ℝ) (a b : Plane.Point)
+        (radiusPositive : 0 < r)
+        : 0 < Plane.parameterGap(r, a, b) := {
+  0 ≤ Plane.distance(a, b) by Plane.distance_nonneg;
+  0 < 1 + Plane.distance(a, b);
+  1 + Plane.distance(a, b) ≠ 0;
+  done by Real.divide_positive
+}
+
+-- A gap below `parameterGap(r, a, b)` moves the walk less than `r`.
+theorem Plane.between_close_of_gap (r : ℝ) (a b : Plane.Point) (s t : ℝ)
+        (radiusPositive : 0 < r)
+        (gapSmall : abs(t - s) < Plane.parameterGap(r, a, b))
+        : Plane.distance(Plane.between(a, b, s), Plane.between(a, b, t)) < r := {
+  0 ≤ Plane.distance(a, b) by Plane.distance_nonneg;
+  0 < 1 + Plane.distance(a, b);
+  1 + Plane.distance(a, b) ≠ 0;
+  Real.IsNonneg(Plane.distance(a, b));
+  abs(t - s) * Plane.distance(a, b)
+      ≤ Plane.parameterGap(r, a, b) * Plane.distance(a, b)
+      by Real.LessOrEqual.multiply_by_nonneg_right;
+  0 < Plane.parameterGap(r, a, b) by Plane.parameterGap_positive;
+  Plane.distance(a, b) < 1 + Plane.distance(a, b);
+  Plane.distance(a, b) * Plane.parameterGap(r, a, b)
+      < (1 + Plane.distance(a, b)) * Plane.parameterGap(r, a, b)
+      by Real.LessThan.multiply_by_positive_right;
+  (1 + Plane.distance(a, b)) * Plane.parameterGap(r, a, b) = r
+      by Real.divide_cancel;
+  Plane.distance(Plane.between(a, b, s), Plane.between(a, b, t))
+     = abs(t - s) * Plane.distance(a, b) by Plane.between_distance
+     ≤ Plane.parameterGap(r, a, b) * Plane.distance(a, b)
+     = Plane.distance(a, b) * Plane.parameterGap(r, a, b) by ring
+     < (1 + Plane.distance(a, b)) * Plane.parameterGap(r, a, b)
+     = r;
+  done
+}
+
+-- The walk at the supremum has landed in the piece. If it had not, the
+-- complement is open around it, and parameters just short of the
+-- supremum — which the supremum guarantees exist — would be outside the
+-- piece too, though they were chosen for being inside it.
+theorem Plane.reached_supremum_inside
+        (region piece : Set(Plane.Point)) (a b : Plane.Point) (peak : ℝ)
+        (convex : Plane.IsConvex(region))
+        (aInRegion : a ∈ region) (bInRegion : b ∈ region)
+        (restOpen : Plane.OpenIn(region ∖ piece, region))
+        (isSupremum : Real.IsSupremum(Plane.reachedParameters(piece, a, b), peak))
+        (peakLow : 0 ≤ peak) (peakHigh : peak ≤ 1)
+        : Plane.between(a, b, peak) ∈ piece := {
+  Real.IsUpperBound(Plane.reachedParameters(piece, a, b), peak) as isUpperBound;
+  Plane.between(a, b, peak) ∈ region
+      by convex(a, aInRegion, b, bInRegion, peak, peakLow, peakHigh);
+  suppose ¬(Plane.between(a, b, peak) ∈ piece)
+      as outside for contradiction {
+    Plane.between(a, b, peak) ∈ region ∖ piece;
+    choose radius such that
+        0 < radius ∧
+        ∀ (y : Plane.Point). y ∈ region →
+          Plane.distance(Plane.between(a, b, peak), y) < radius
+            → y ∈ region ∖ piece
+        from restOpen(Plane.between(a, b, peak),
+            { Plane.between(a, b, peak) ∈ region ∖ piece });
+    0 < radius;
+    ∀ (y : Plane.Point). y ∈ region →
+        Plane.distance(Plane.between(a, b, peak), y) < radius
+          → y ∈ region ∖ piece as nearbyOutside;
+    0 < Plane.parameterGap(radius, a, b) by Plane.parameterGap_positive;
+    peak - Plane.parameterGap(radius, a, b) < peak;
+    choose t such that
+        t ∈ Plane.reachedParameters(piece, a, b)
+        ∧ peak - Plane.parameterGap(radius, a, b) < t
+        from Real.IsSupremum.exists_above(
+            Plane.reachedParameters(piece, a, b), peak,
+            peak - Plane.parameterGap(radius, a, b), isSupremum,
+            { peak - Plane.parameterGap(radius, a, b) < peak });
+    t ∈ Plane.reachedParameters(piece, a, b) as tReached;
+    peak - Plane.parameterGap(radius, a, b) < t;
+    t ≤ peak by isUpperBound(t, tReached);
+    (0 ≤ t ∧ t ≤ 1);
+    0 ≤ t;
+    t ≤ 1;
+    Plane.between(a, b, t) ∈ piece;
+    Plane.between(a, b, t) ∈ region by convex(a, aInRegion, b, bInRegion, t);
+    -Plane.parameterGap(radius, a, b) < t - peak;
+    t - peak < Plane.parameterGap(radius, a, b);
+    abs(t - peak) < Plane.parameterGap(radius, a, b)
+        by Real.absolute_value_LessThan_of_bounds;
+    Plane.distance(Plane.between(a, b, peak), Plane.between(a, b, t)) < radius
+        by Plane.between_close_of_gap;
+    Plane.between(a, b, t) ∈ region ∖ piece
+        by nearbyOutside(Plane.between(a, b, t),
+            { Plane.between(a, b, t) ∈ region },
+            { Plane.distance(
+                  Plane.between(a, b, peak), Plane.between(a, b, t))
+                  < radius });
+    ¬(Plane.between(a, b, t) ∈ piece);
+    False by { ¬(Plane.between(a, b, t) ∈ piece) }(
+        { Plane.between(a, b, t) ∈ piece });
+    done
+  };
+  done
 }
