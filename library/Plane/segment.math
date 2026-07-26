@@ -1,0 +1,171 @@
+-- Plane/segment.math
+--
+-- Segments, convexity, and the two kinds of ball. The last file of
+-- Layer 0.
+--
+-- `Plane.between(a, b, t)` walks the fraction `t` of the way from `a` to
+-- `b`. A set is convex when it is closed under that walk, and the
+-- blueprint's use of convexity is always this direct: a disk contains the
+-- segment between any two of its points, so a crosscut through a disk
+-- stays inside it.
+--
+-- The key estimate is `Plane.Vector.norm_affine_combination`: a weighted
+-- average of two vectors is no longer than the longer of them. Its proof
+-- is the triangle inequality plus `norm_scale`, with `Real.maximum` doing
+-- the "longer of them" bookkeeping.
+
+module Plane.segment
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Real.interface
+import Real.maximum
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.order_multiplication
+import Plane.vector
+import Plane.point
+import Plane.bilinear
+import Plane.norm
+
+-- ----------------------------------------------------------------------
+-- Walking from one point toward another.
+
+definition Plane.between (a b : Plane.Point) (t : ℝ) : Plane.Point :=
+  a + t * (b - a)
+
+theorem Plane.between_zero (a b : Plane.Point)
+        : Plane.between(a, b, 0) = a := {
+  (0 : ℝ) * (b - a) = Plane.Vector.zero by Plane.Vector.scale_zero;
+  Plane.between(a, b, 0)
+     = a + (0 : ℝ) * (b - a)
+     = a + Plane.Vector.zero
+     = a by Plane.Point.translate_zero;
+  done
+}
+
+theorem Plane.between_one (a b : Plane.Point)
+        : Plane.between(a, b, 1) = b := {
+  (1 : ℝ) * (b - a) = b - a by Plane.Vector.scale_one;
+  Plane.between(a, b, 1)
+     = a + (1 : ℝ) * (b - a)
+     = a + (b - a)
+     = b by Plane.Point.translate_difference;
+  done
+}
+
+-- Measured from any third point, the walk is the weighted average of the
+-- two displacements. This is the identity every estimate below runs on.
+theorem Plane.between_difference (a b c : Plane.Point) (t : ℝ)
+        : Plane.between(a, b, t) - c
+              = (1 - t) * (a - c) + t * (b - c) :=
+  Plane.between(a, b, t) - c
+     = (a + t * (b - a)) - c
+     = (a - c) + t * (b - a) by Plane.Point.translate_difference_left
+     = (a - c) + t * ((b - c) - (a - c)) by Plane.Point.difference_via
+     = (1 - t) * (a - c) + t * (b - c)
+           by Plane.Vector.affine_combination
+
+-- ----------------------------------------------------------------------
+-- The estimate: a weighted average is no longer than the longer summand.
+
+theorem Plane.Vector.norm_affine_combination (u w : Plane.Vector) (t : ℝ)
+        (tNonneg : 0 ≤ t) (tAtMostOne : t ≤ 1)
+        : Plane.Vector.norm((1 - t) * u + t * w)
+              ≤ max(Plane.Vector.norm(u), Plane.Vector.norm(w)) := {
+  0 ≤ 1 - t;
+  abs(1 - t) = 1 - t by Real.absolute_value_when_nonneg;
+  abs(t) = t by Real.absolute_value_when_nonneg;
+  Plane.Vector.norm(u) ≤ max(Plane.Vector.norm(u), Plane.Vector.norm(w))
+      by Real.left_LessOrEqual_maximum;
+  Plane.Vector.norm(w) ≤ max(Plane.Vector.norm(u), Plane.Vector.norm(w))
+      by Real.right_LessOrEqual_maximum;
+  Real.IsNonneg(1 - t);
+  Real.IsNonneg(t);
+  (1 - t) * Plane.Vector.norm(u)
+      ≤ (1 - t) * max(Plane.Vector.norm(u), Plane.Vector.norm(w))
+      by Real.LessOrEqual.multiply_by_nonneg_left;
+  t * Plane.Vector.norm(w)
+      ≤ t * max(Plane.Vector.norm(u), Plane.Vector.norm(w))
+      by Real.LessOrEqual.multiply_by_nonneg_left;
+  Plane.Vector.norm((1 - t) * u + t * w)
+     ≤ Plane.Vector.norm((1 - t) * u) + Plane.Vector.norm(t * w)
+           by Plane.Vector.norm_triangle
+     = abs(1 - t) * Plane.Vector.norm(u) + Plane.Vector.norm(t * w)
+           by Plane.Vector.norm_scale
+     = abs(1 - t) * Plane.Vector.norm(u) + abs(t) * Plane.Vector.norm(w)
+           by Plane.Vector.norm_scale
+     = (1 - t) * Plane.Vector.norm(u) + t * Plane.Vector.norm(w)
+     ≤ (1 - t) * max(Plane.Vector.norm(u), Plane.Vector.norm(w))
+           + t * max(Plane.Vector.norm(u), Plane.Vector.norm(w))
+           by Real.add_preserves_LessOrEqual_both
+     = max(Plane.Vector.norm(u), Plane.Vector.norm(w)) by ring;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- Segments and convexity.
+
+definition Plane.segment (a b : Plane.Point) : Set(Plane.Point) :=
+  (x : Plane.Point) ↦
+    ∃ (t : ℝ). (0 ≤ t ∧ t ≤ 1) ∧ x = Plane.between(a, b, t)
+
+definition Plane.IsConvex (region : Set(Plane.Point)) : Proposition :=
+  ∀ (a : Plane.Point). a ∈ region →
+    ∀ (b : Plane.Point). b ∈ region →
+      ∀ (t : ℝ). 0 ≤ t → t ≤ 1 → Plane.between(a, b, t) ∈ region
+
+theorem Plane.left_in_segment (a b : Plane.Point)
+        : a ∈ Plane.segment(a, b) :=
+  witness (0 : ℝ) with {
+    (0 : ℝ) ≤ 0;
+    (0 : ℝ) ≤ 1;
+    a = Plane.between(a, b, 0) by Plane.between_zero;
+    done
+  }
+
+theorem Plane.right_in_segment (a b : Plane.Point)
+        : b ∈ Plane.segment(a, b) :=
+  witness (1 : ℝ) with {
+    (0 : ℝ) ≤ 1;
+    (1 : ℝ) ≤ 1;
+    b = Plane.between(a, b, 1) by Plane.between_one;
+    done
+  }
+
+-- ----------------------------------------------------------------------
+-- Balls, and their convexity.
+
+definition Plane.Ball (center : Plane.Point) (radius : ℝ) : Set(Plane.Point) :=
+  (x : Plane.Point) ↦ Plane.distance(center, x) < radius
+
+definition Plane.supBall (center : Plane.Point) (radius : ℝ)
+        : Set(Plane.Point) :=
+  (x : Plane.Point) ↦ Plane.supDistance(center, x) < radius
+
+-- A disk is convex: the walk between two of its points stays inside,
+-- because a weighted average of the two displacements is no longer than
+-- the longer of them, which is already short of the radius.
+theorem Plane.Ball_IsConvex (center : Plane.Point) (radius : ℝ)
+        : Plane.IsConvex(Plane.Ball(center, radius)) := {
+  take a : Plane.Point;
+  suppose a ∈ Plane.Ball(center, radius) as aInside;
+  take b : Plane.Point;
+  suppose b ∈ Plane.Ball(center, radius) as bInside;
+  take t : ℝ;
+  suppose 0 ≤ t as tNonneg;
+  suppose t ≤ 1 as tAtMostOne;
+  Plane.Vector.norm(a - center) < radius;
+  Plane.Vector.norm(b - center) < radius;
+  max(Plane.Vector.norm(a - center), Plane.Vector.norm(b - center)) < radius
+      by Real.maximum_LessThan;
+  Plane.Vector.norm(Plane.between(a, b, t) - center)
+     = Plane.Vector.norm((1 - t) * (a - center) + t * (b - center))
+           by Plane.between_difference
+     ≤ max(Plane.Vector.norm(a - center), Plane.Vector.norm(b - center))
+           by Plane.Vector.norm_affine_combination
+     < radius;
+  done
+}

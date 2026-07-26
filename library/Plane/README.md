@@ -41,6 +41,8 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
   `Plane.Vector.Counterclockwise` — [direction.math](direction.math)
 - `Plane.Vector.norm`, `Plane.Vector.supNorm`, `Plane.distance`, and
   `Plane.supDistance` — [norm.math](norm.math)
+- `Plane.between`, `Plane.segment`, `Plane.IsConvex`, `Plane.Ball`, and
+  `Plane.supBall` — [segment.math](segment.math)
 
 ## Main theorems
 
@@ -70,6 +72,11 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
   angle), `perpendicular_perpendicular` (twice reverses), and
   **`determinant_perpendicular`** — `det(v, v⊥) = ⟨v, v⟩`, the identity
   the strip lemma runs on
+- Convexity: `between_zero`, `between_one`, `between_difference`,
+  `left_in_segment`, `right_in_segment`,
+  **`Plane.Vector.norm_affine_combination`** (a weighted average is no
+  longer than the longer summand — the estimate every convexity argument
+  runs on), and **`Plane.Ball_IsConvex`**
 
 ## The Euclidean norm is primary
 
