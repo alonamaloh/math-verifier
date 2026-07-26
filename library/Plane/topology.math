@@ -200,3 +200,309 @@ theorem Plane.Ball_IsOpen (center : Plane.Point) (radius : ℝ)
     done
   }
 }
+
+-- ----------------------------------------------------------------------
+-- The textbook characterization: relatively open means "cut out of the
+-- carrier by an open set". The ε-ball form above is what the proofs
+-- manipulate; this is what a reader expects to see.
+
+-- Witness for the forward direction: the union of every ball the ε-ball
+-- condition supplies. A comprehension, so no indexed unions are needed.
+-- The conjunction is kept flat so that a proof builds it leg by leg.
+definition Plane.BallWitness
+        (subset carrier : Set(Plane.Point))
+        (x : Plane.Point) (radius : ℝ) (y : Plane.Point) : Proposition :=
+  x ∈ subset
+  ∧ 0 < radius
+  ∧ (∀ (z : Plane.Point). z ∈ carrier →
+        Plane.distance(x, z) < radius → z ∈ subset)
+  ∧ Plane.distance(x, y) < radius
+
+definition Plane.openHull (subset carrier : Set(Plane.Point))
+        : Set(Plane.Point) :=
+  (y : Plane.Point) ↦
+    ∃ (x : Plane.Point). ∃ (radius : ℝ).
+      Plane.BallWitness(subset, carrier, x, radius, y)
+
+theorem Plane.openHull_IsOpen (subset carrier : Set(Plane.Point))
+        : Plane.IsOpen(Plane.openHull(subset, carrier)) := {
+  take y : Plane.Point;
+  suppose y ∈ Plane.openHull(subset, carrier) as inHull;
+  choose x, radius such that
+      Plane.BallWitness(subset, carrier, x, radius, y) from inHull;
+  x ∈ subset;
+  0 < radius;
+  ∀ (z : Plane.Point). z ∈ carrier →
+      Plane.distance(x, z) < radius → z ∈ subset;
+  Plane.distance(x, y) < radius;
+  0 < radius - Plane.distance(x, y) by Real.subtract_positive_of_LessThan;
+  witness radius - Plane.distance(x, y) with {
+    0 < radius - Plane.distance(x, y);
+    ∀ (w : Plane.Point). w ∈ Set.universe(Plane.Point) →
+        Plane.distance(y, w) < radius - Plane.distance(x, y) →
+          w ∈ Plane.openHull(subset, carrier)
+        by (w : Plane.Point) (wAnywhere : w ∈ Set.universe(Plane.Point))
+           (wNear : Plane.distance(y, w) < radius - Plane.distance(x, y)) ↦ {
+             Plane.distance(x, w)
+                ≤ Plane.distance(x, y) + Plane.distance(y, w)
+                      by Plane.distance_triangle
+                < Plane.distance(x, y) + (radius - Plane.distance(x, y))
+                = radius;
+             Plane.BallWitness(subset, carrier, x, radius, w) as witnessHolds;
+             witness x with witness radius with witnessHolds
+           };
+    done
+  }
+}
+
+-- Forward: a relatively open subset is cut out by its own open hull.
+theorem Plane.subset_openHull_intersection (subset carrier : Set(Plane.Point))
+        (subsetInCarrier : subset ⊆ carrier)
+        (openInCarrier : Plane.OpenIn(subset, carrier))
+        : subset ⊆ Plane.openHull(subset, carrier) ∩ carrier := {
+  take y : Plane.Point;
+  suppose y ∈ subset as yInSubset;
+  y ∈ carrier by subsetInCarrier;
+  choose radius such that
+      0 < radius ∧
+        ∀ (z : Plane.Point). z ∈ carrier →
+          Plane.distance(y, z) < radius → z ∈ subset
+      from openInCarrier(y, yInSubset);
+  0 < radius;
+  ∀ (z : Plane.Point). z ∈ carrier →
+      Plane.distance(y, z) < radius → z ∈ subset;
+  Plane.distance(y, y)
+     = 0 by Plane.distance_self
+     < radius;
+  Plane.BallWitness(subset, carrier, y, radius, y) as witnessHolds;
+  y ∈ Plane.openHull(subset, carrier)
+      by { witness y with witness radius with witnessHolds };
+  done by Set.member_intersection
+}
+
+-- Backward: whatever the hull cuts out of the carrier was already in the
+-- subset — that is precisely what each ball property says.
+theorem Plane.openHull_intersection_subset (subset carrier : Set(Plane.Point))
+        : Plane.openHull(subset, carrier) ∩ carrier ⊆ subset := {
+  take y : Plane.Point;
+  suppose y ∈ Plane.openHull(subset, carrier) ∩ carrier as inBoth;
+  y ∈ Plane.openHull(subset, carrier)
+      by Set.intersection_member_left as inHull;
+  y ∈ carrier by Set.intersection_member_right;
+  choose x, radius such that
+      Plane.BallWitness(subset, carrier, x, radius, y) from inHull;
+  ∀ (z : Plane.Point). z ∈ carrier →
+      Plane.distance(x, z) < radius → z ∈ subset as ballProperty;
+  Plane.distance(x, y) < radius;
+  done by ballProperty
+}
+
+theorem Plane.OpenIn_cut_by_open (subset carrier : Set(Plane.Point))
+        (subsetInCarrier : subset ⊆ carrier)
+        (openInCarrier : Plane.OpenIn(subset, carrier))
+        : subset = Plane.openHull(subset, carrier) ∩ carrier := {
+  subset ⊆ Plane.openHull(subset, carrier) ∩ carrier
+      by Plane.subset_openHull_intersection;
+  Plane.openHull(subset, carrier) ∩ carrier ⊆ subset
+      by Plane.openHull_intersection_subset;
+  done by Set.equal_of_same_members
+}
+
+-- The converse, and the direction consumers use to BUILD relatively open
+-- sets: anything cut out of the carrier by an open set is open in it.
+theorem Plane.OpenIn_of_cut (subset carrier ambient : Set(Plane.Point))
+        (ambientOpen : Plane.IsOpen(ambient))
+        (cut : subset = ambient ∩ carrier)
+        : Plane.OpenIn(subset, carrier) := {
+  take x : Plane.Point;
+  suppose x ∈ subset as xInSubset;
+  x ∈ ambient ∩ carrier by substituting cut;
+  x ∈ ambient by Set.intersection_member_left as xInAmbient;
+  choose radius such that
+      0 < radius ∧
+        ∀ (y : Plane.Point). y ∈ Set.universe(Plane.Point) →
+          Plane.distance(x, y) < radius → y ∈ ambient
+      from ambientOpen(x, xInAmbient);
+  0 < radius;
+  ∀ (y : Plane.Point). y ∈ Set.universe(Plane.Point) →
+      Plane.distance(x, y) < radius → y ∈ ambient as ambientBall;
+  witness radius with {
+    0 < radius;
+    ∀ (y : Plane.Point). y ∈ carrier →
+        Plane.distance(x, y) < radius → y ∈ subset
+        by (y : Plane.Point) (yInCarrier : y ∈ carrier)
+           (yClose : Plane.distance(x, y) < radius) ↦ {
+             y ∈ Set.universe(Plane.Point) by Set.member_universe;
+             y ∈ ambient by ambientBall;
+             y ∈ ambient ∩ carrier by Set.member_intersection;
+             done by substituting cut
+           };
+    done
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- Interior, closure, boundary — all relative to the carrier.
+--
+-- The interior collects the points that have a ball to themselves; the
+-- closure collects the points of the carrier that every ball reaches; the
+-- boundary is what the closure has and the interior does not.
+
+definition Plane.InteriorIn (subset carrier : Set(Plane.Point))
+        : Set(Plane.Point) :=
+  (x : Plane.Point) ↦ x ∈ subset ∧
+    ∃ (radius : ℝ). 0 < radius ∧
+      ∀ (y : Plane.Point). y ∈ carrier →
+        Plane.distance(x, y) < radius → y ∈ subset
+
+definition Plane.ClosureIn (subset carrier : Set(Plane.Point))
+        : Set(Plane.Point) :=
+  (x : Plane.Point) ↦ x ∈ carrier ∧
+    ∀ (radius : ℝ). 0 < radius →
+      ∃ (y : Plane.Point). y ∈ subset ∧ Plane.distance(x, y) < radius
+
+definition Plane.BoundaryIn (subset carrier : Set(Plane.Point))
+        : Set(Plane.Point) :=
+  Plane.ClosureIn(subset, carrier) ∖ Plane.InteriorIn(subset, carrier)
+
+-- ----------------------------------------------------------------------
+-- Interior.
+
+theorem Plane.InteriorIn_subset (subset carrier : Set(Plane.Point))
+        : Plane.InteriorIn(subset, carrier) ⊆ subset := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.InteriorIn(subset, carrier) as inInterior;
+  x ∈ subset;
+  done
+}
+
+-- The interior is relatively open: shrink the radius by the distance
+-- already travelled, exactly as for a ball.
+theorem Plane.InteriorIn_OpenIn (subset carrier : Set(Plane.Point))
+        : Plane.OpenIn(Plane.InteriorIn(subset, carrier), carrier) := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.InteriorIn(subset, carrier) as inInterior;
+  x ∈ subset;
+  ∃ (radius : ℝ). 0 < radius ∧
+      ∀ (y : Plane.Point). y ∈ carrier →
+        Plane.distance(x, y) < radius → y ∈ subset as hasBall;
+  choose radius such that 0 < radius ∧
+      ∀ (y : Plane.Point). y ∈ carrier →
+        Plane.distance(x, y) < radius → y ∈ subset
+      from hasBall;
+  0 < radius;
+  ∀ (y : Plane.Point). y ∈ carrier →
+      Plane.distance(x, y) < radius → y ∈ subset as ballProperty;
+  witness radius with {
+    0 < radius;
+    ∀ (y : Plane.Point). y ∈ carrier →
+        Plane.distance(x, y) < radius →
+          y ∈ Plane.InteriorIn(subset, carrier)
+        by (y : Plane.Point) (yInCarrier : y ∈ carrier)
+           (yClose : Plane.distance(x, y) < radius) ↦ {
+             y ∈ subset by ballProperty;
+             0 < radius - Plane.distance(x, y)
+                 by Real.subtract_positive_of_LessThan;
+             ∃ (smaller : ℝ). 0 < smaller ∧
+                 ∀ (z : Plane.Point). z ∈ carrier →
+                   Plane.distance(y, z) < smaller → z ∈ subset
+                 by { witness radius - Plane.distance(x, y) with {
+                        0 < radius - Plane.distance(x, y);
+                        ∀ (z : Plane.Point). z ∈ carrier →
+                            Plane.distance(y, z) < radius - Plane.distance(x, y)
+                              → z ∈ subset
+                            by (z : Plane.Point) (zInCarrier : z ∈ carrier)
+                               (zClose : Plane.distance(y, z)
+                                   < radius - Plane.distance(x, y)) ↦ {
+                                 Plane.distance(x, z)
+                                    ≤ Plane.distance(x, y) + Plane.distance(y, z)
+                                          by Plane.distance_triangle
+                                    < Plane.distance(x, y)
+                                          + (radius - Plane.distance(x, y))
+                                    = radius;
+                                 done by ballProperty
+                               };
+                        done
+                      } };
+             done
+           };
+    done
+  }
+}
+
+-- A relatively open subset is its own interior.
+theorem Plane.subset_InteriorIn_of_OpenIn (subset carrier : Set(Plane.Point))
+        (openInCarrier : Plane.OpenIn(subset, carrier))
+        : subset ⊆ Plane.InteriorIn(subset, carrier) := {
+  take x : Plane.Point;
+  suppose x ∈ subset as xInSubset;
+  ∃ (radius : ℝ). 0 < radius ∧
+      ∀ (y : Plane.Point). y ∈ carrier →
+        Plane.distance(x, y) < radius → y ∈ subset
+      by openInCarrier(x, xInSubset);
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- Closure.
+
+theorem Plane.ClosureIn_subset_carrier (subset carrier : Set(Plane.Point))
+        : Plane.ClosureIn(subset, carrier) ⊆ carrier := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.ClosureIn(subset, carrier) as inClosure;
+  x ∈ carrier;
+  done
+}
+
+-- A subset of the carrier lies in its own closure: the point itself is
+-- the witness at every radius, since it is at distance zero from itself.
+theorem Plane.subset_ClosureIn (subset carrier : Set(Plane.Point))
+        (subsetInCarrier : subset ⊆ carrier)
+        : subset ⊆ Plane.ClosureIn(subset, carrier) := {
+  take x : Plane.Point;
+  suppose x ∈ subset as xInSubset;
+  x ∈ carrier by subsetInCarrier;
+  ∀ (radius : ℝ). 0 < radius →
+      ∃ (y : Plane.Point). y ∈ subset ∧ Plane.distance(x, y) < radius
+      by (radius : ℝ) (radiusPositive : 0 < radius) ↦ {
+        Plane.distance(x, x)
+           = 0 by Plane.distance_self
+           < radius;
+        witness x with {
+          x ∈ subset;
+          Plane.distance(x, x) < radius;
+          done
+        }
+      };
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- Boundary.
+
+theorem Plane.BoundaryIn_subset_ClosureIn (subset carrier : Set(Plane.Point))
+        : Plane.BoundaryIn(subset, carrier)
+              ⊆ Plane.ClosureIn(subset, carrier) := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.BoundaryIn(subset, carrier) as onBoundary;
+  x ∈ Plane.ClosureIn(subset, carrier);
+  done
+}
+
+-- For a relatively open subset the boundary is what the closure adds:
+-- `∂U = closure(U) ∖ U`, because such a `U` is already its own interior.
+theorem Plane.BoundaryIn_of_OpenIn (subset carrier : Set(Plane.Point))
+        (openInCarrier : Plane.OpenIn(subset, carrier))
+        (x : Plane.Point)
+        (onBoundary : x ∈ Plane.BoundaryIn(subset, carrier))
+        : x ∈ Plane.ClosureIn(subset, carrier) ∖ subset := {
+  x ∈ Plane.ClosureIn(subset, carrier);
+  ¬(x ∈ Plane.InteriorIn(subset, carrier));
+  ¬(x ∈ subset)
+      by (xInSubset : x ∈ subset) ↦ {
+        x ∈ Plane.InteriorIn(subset, carrier)
+            by Plane.subset_InteriorIn_of_OpenIn;
+        done
+      };
+  done
+}

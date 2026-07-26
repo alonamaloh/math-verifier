@@ -13,6 +13,7 @@ module Set.algebra
 import Logic.basics
 import Logic.excluded_middle
 import Equality.basics
+import Logic.functions
 import Set.basics
 
 -- ----------------------------------------------------------------------
@@ -151,3 +152,20 @@ theorem Set.difference_member_intersection_complement {T : Type(0)}
         (subject : T) (inDifference : subject ∈ larger ∖ smaller)
         : subject ∈ larger ∩ Set.complement(smaller) :=
   inDifference
+
+-- ----------------------------------------------------------------------
+-- Extensionality: a set IS its membership predicate, so two sets with
+-- the same members are equal. Function extensionality on the predicate,
+-- propositional extensionality at each point.
+
+theorem Set.equal_of_same_members {T : Type(0)} (left right : Set(T))
+        (forward : left ⊆ right) (backward : right ⊆ left)
+        : left = right := {
+  ∀ (subject : T). (subject ∈ left) = (subject ∈ right)
+      by (subject : T) ↦ {
+        subject ∈ left → subject ∈ right by forward;
+        subject ∈ right → subject ∈ left by backward;
+        done by Equality.propositional_extensionality
+      };
+  done by Function.extensionality
+}

@@ -43,7 +43,8 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
   `Plane.supDistance` — [norm.math](norm.math)
 - `Plane.between`, `Plane.segment`, `Plane.IsConvex`, `Plane.Ball`, and
   `Plane.supBall` — [segment.math](segment.math)
-- `Plane.OpenIn`, `Plane.IsOpen`, `Plane.ClosedIn` —
+- `Plane.OpenIn`, `Plane.IsOpen`, `Plane.ClosedIn`, `Plane.InteriorIn`,
+  `Plane.ClosureIn`, `Plane.BoundaryIn` —
   [topology.math](topology.math). **Relative to a carrier from the
   start**; the absolute notions are the `carrier = universe` case.
 
@@ -95,6 +96,27 @@ through the root itself, and `Real.LessOrEqual_of_square_LessOrEqual`
 turns a comparison of squares back into a comparison of values. The sup
 norm sits alongside for the axis-parallel squares the polygonal work is
 built on.
+
+## Relative topology
+
+`Plane.OpenIn(subset, carrier)` is the ε-ball condition with the ball cut
+down to the carrier: only `y ∈ carrier` within the radius is constrained.
+Drop that clause and you have ordinary openness, which is why
+`Plane.IsOpen(U)` is literally `OpenIn(U, Set.universe)` rather than a
+second definition.
+
+This is not decoration. An open subarc of a Jordan curve has empty
+interior in the plane — the only plane-open subset of a curve is empty —
+so "the relatively open subarcs form a basis" cannot even be *stated*
+absolutely. Connectedness will be applied to arcs as subspaces for the
+same reason.
+
+`OpenIn` deliberately does **not** require `subset ⊆ carrier`: the ε-ball
+condition is meaningful without it and demanding it would put a proof
+obligation at every use. `Plane.OpenIn_cut_by_open` supplies the textbook
+characterization (`subset = openHull ∩ carrier`) where the inclusion is
+genuinely needed, and `Plane.OpenIn_of_cut` is the converse — the
+direction consumers use to *build* relatively open sets.
 
 ## Orientation instead of angles
 
