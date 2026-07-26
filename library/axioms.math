@@ -6,7 +6,7 @@
 -- an axiom declared anywhere else is flagged so we never accidentally
 -- introduce new ones.
 --
--- Two groups:
+-- Four groups:
 --
 --   1. Propositional extensionality. If two propositions imply each
 --      other, they are equal as values of `Proposition`. Standard
@@ -20,6 +20,12 @@
 --      types) is significantly more setup for no practical gain since
 --      the axioms are well-understood and consistent.
 --
+--   3. Selection: `Logic.the` (definite description — unique choice)
+--      and `Logic.countable_choice`. The first turns a functional
+--      relation into a function; the second picks one option from each
+--      of countably many nonempty sets, where nothing distinguishes the
+--      options. Each carries its own justification below.
+--
 -- Plus the unsound-by-design `Internal.sorry` axiom, which is the
 -- target of the `sorry` placeholder used in unfinished proofs.
 
@@ -28,6 +34,9 @@ module axioms
 import Logic.basics
 import Equality.basics
 import Logic.exists
+-- For the index type of countable choice below. `Natural.basics` has no
+-- imports of its own, so this adds nothing else to anyone's cone.
+import Natural.basics
 
 -- ----------------------------------------------------------------------
 -- Propositional extensionality.
@@ -128,6 +137,42 @@ axiom Logic.the_satisfies.{u}
       → ∀ (existence : ∃ (x : T). P(x)).
       (uniqueness : ∀ (x y : T). P(x) → P(y) → x = y)
       → P(Logic.the(T, P, existence, uniqueness))
+
+-- ----------------------------------------------------------------------
+-- Countable choice: from a family of nonempty options indexed by ℕ,
+-- a function picking one from each.
+--
+-- `Logic.the` above covers selection that is CANONICAL — the least
+-- natural, the limit, the root — and that carried the analysis arc as
+-- far as sequences of numbers. It does not reach selection of a POINT,
+-- where nothing distinguishes the options. Three standard compactness
+-- arguments open exactly that way:
+--
+--   * a compact set is closed:   `p ∈ closure(K)` gives, for each n, a
+--     point of K within 1/(n+1) of p — but no particular one;
+--   * a continuous function on a compact set attains its minimum: pick
+--     `x_n` with `f(x_n)` descending to the infimum;
+--   * uniform continuity, by contradiction: pick `x_n, y_n` within
+--     `1/(n+1)` of each other whose images stay ε apart.
+--
+-- Each can be rewritten as an explicit bisection — halve the square,
+-- keep the half where the obstruction survives, which IS canonical —
+-- but that is not the proof a mathematician writes, and writing the
+-- textbook proof is the standard this library holds itself to.
+--
+-- Only the countable form is assumed. It is what the analysis needs,
+-- and it is strictly weaker than the full axiom of choice that Lean's
+-- `Classical.choice` provides. The conclusion is an `∃` in
+-- `Proposition`, so `choose` eliminates it in the usual way; nothing
+-- here pierces the "no large elimination from Prop" rule.
+--
+-- Decided 2026-07-25: adopted to support Layer 2 of the
+-- Jordan--Schönflies development (compactness in the plane).
+
+axiom Logic.countable_choice
+    : ∀ (T : Type(0)). (P : Natural → T → Proposition)
+      → (∀ (n : Natural). ∃ (x : T). P(n, x))
+      → ∃ (chosen : Natural → T). ∀ (n : Natural). P(n, chosen(n))
 
 -- ----------------------------------------------------------------------
 -- The `sorry` placeholder. The keyword desugars to a call of one of
