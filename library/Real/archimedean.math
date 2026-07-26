@@ -22,6 +22,7 @@ import Logic.exists
 import Equality.basics
 import Natural.basics
 import Rational.archimedean
+import Rational.triangle_more
 import Real.interface
 import Real.order
 import Real.embedding_order
@@ -81,4 +82,25 @@ theorem Real.harmonic_term_antitone (k j : ℕ) (ordered : k ≤ j)
      ≤ 1 / (1 + k : ℝ) by Real.one_divide_antitone
      = Real.harmonic_term(k);
   done
+}
+
+-- No real bounds every natural. The companion to the harmonic statement
+-- above, and the form the "escaping to infinity" arguments want.
+theorem Real.exists_natural_above (r : ℝ) : ∃ (n : ℕ). r < (1 + n : ℝ) := {
+  choose q such that r ≤ (q : ℝ) from Real.exists_rational_above(r);
+  Rational.IsNonneg(abs(q));
+  Rational.zero < (1 : ℚ);
+  choose K such that abs(q) ≤ (1 + K : ℚ) * 1
+      from Rational.archimedean_for_positives(
+          abs(q), (1 : ℚ), { Rational.IsNonneg(abs(q)) },
+          { Rational.zero < (1 : ℚ) });
+  q ≤ abs(q) by Rational.le_absolute_value;
+  abs(q) ≤ (1 + K : ℚ);
+  q ≤ (1 + K : ℚ);
+  (q : ℝ) ≤ (1 + K : ℝ) by Rational.to_real.LessOrEqual_preserves;
+  (1 + K : ℝ) < (1 + (1 + K) : ℝ);
+  r ≤ (q : ℝ)
+    ≤ (1 + K : ℝ)
+    < (1 + (1 + K) : ℝ);
+  witness 1 + K with done
 }

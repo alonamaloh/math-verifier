@@ -206,3 +206,103 @@ theorem Plane.compact_of_closed_bounded (region : Set(Plane.Point))
   limit ∈ region by closed(limit, { limit ∈ Plane.Closure(region) });
   witness index with { witness limit with done }
 }
+
+-- The remaining direction, so the characterisation is an equivalence: a
+-- compact set is bounded. If it were not, some point of it would escape
+-- every distance from a fixed centre, and countable choice assembles
+-- those escapes into a sequence. Compactness thins it to a convergent
+-- one — but a convergent sequence stays within one unit of its limit
+-- past some threshold, while the escapes pass every natural.
+theorem Plane.IsCompact.bounded (region : Set(Plane.Point))
+        (compact : Plane.IsCompact(region))
+        : Plane.IsBounded(region) := {
+  let centre : Plane.Point := Plane.Point.make(0, 0);
+  suppose ¬Plane.IsBounded(region) as unbounded for contradiction {
+    -- Past every natural, some point of the region.
+    ∀ (n : ℕ). ∃ (x : Plane.Point).
+        x ∈ region ∧ (1 + n : ℝ) < Plane.distance(centre, x)
+        by (n : ℕ) ↦ {
+          suppose ¬(∃ (x : Plane.Point).
+              x ∈ region ∧ (1 + n : ℝ) < Plane.distance(centre, x))
+              as noneBeyond for contradiction {
+            ∀ (x : Plane.Point). x ∈ region →
+                Plane.distance(centre, x) ≤ (1 + n : ℝ)
+                by (x : Plane.Point) (inRegion : x ∈ region) ↦ {
+                  suppose ¬(Plane.distance(centre, x) ≤ (1 + n : ℝ))
+                      as far for contradiction {
+                    (1 + n : ℝ) < Plane.distance(centre, x)
+                        by Real.LessThan_of_not_LessOrEqual;
+                    ∃ (x : Plane.Point). x ∈ region
+                        ∧ (1 + n : ℝ) < Plane.distance(centre, x)
+                        by { witness x with done };
+                    done
+                  };
+                  done
+                };
+            Plane.IsBounded(region)
+                by { witness centre with { witness (1 + n : ℝ) with done } };
+            done
+          };
+          done
+        }
+        as escapes;
+    choose s such that
+        ∀ (n : ℕ). s(n) ∈ region
+            ∧ (1 + n : ℝ) < Plane.distance(centre, s(n))
+        as escapesAt
+        from Logic.countable_choice(
+            Plane.Point,
+            (n : ℕ) (x : Plane.Point) ↦
+                x ∈ region ∧ (1 + n : ℝ) < Plane.distance(centre, x),
+            escapes);
+    ∀ (m : ℕ). s(m) ∈ region
+        by (m : ℕ) ↦ { s(m) ∈ region ∧ (1 + m : ℝ)
+                           < Plane.distance(centre, s(m)) by escapesAt(m);
+                       done }
+        as inside;
+    choose index such that
+        ∃ (limit : Plane.Point).
+            Natural.IsStrictlyIncreasing(index)
+            ∧ limit ∈ region
+            ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
+        as limitExists from compact(s, inside);
+    choose limit such that
+        Natural.IsStrictlyIncreasing(index)
+        ∧ limit ∈ region
+        ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
+        from limitExists;
+    Natural.IsStrictlyIncreasing(index);
+    Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) as converges;
+    (0 : ℝ) < 1;
+    choose threshold such that
+        ∀ (k : ℕ). threshold ≤ k →
+            Plane.distance(limit, s(index(k))) < 1
+        as closeBeyond from converges(1, { (0 : ℝ) < 1 });
+    -- One index past both the convergence threshold and any natural
+    -- exceeding `distance(centre, limit) + 1` is a contradiction.
+    choose escape such that
+        Plane.distance(centre, limit) + 1 < (1 + escape : ℝ)
+        from Real.exists_natural_above(Plane.distance(centre, limit) + 1);
+    let far : ℕ := Natural.maximum(threshold, escape);
+    threshold ≤ far;
+    escape ≤ far;
+    Plane.distance(limit, s(index(far))) < 1 by closeBeyond(far, { threshold ≤ far });
+    s(index(far)) ∈ region ∧ (1 + index(far) : ℝ)
+        < Plane.distance(centre, s(index(far))) by escapesAt(index(far));
+    (1 + index(far) : ℝ) < Plane.distance(centre, s(index(far)));
+    far ≤ index(far) by Natural.IsStrictlyIncreasing.LessOrEqual;
+    escape ≤ index(far);
+    (1 + escape : ℝ) ≤ (1 + index(far) : ℝ);
+    Plane.distance(centre, s(index(far)))
+        ≤ Plane.distance(centre, limit) + Plane.distance(limit, s(index(far)))
+        by Plane.distance_triangle;
+    Plane.distance(centre, limit) + 1
+       < (1 + escape : ℝ)
+       ≤ (1 + index(far) : ℝ)
+       < Plane.distance(centre, s(index(far)))
+       ≤ Plane.distance(centre, limit) + Plane.distance(limit, s(index(far)))
+       < Plane.distance(centre, limit) + 1;
+    done
+  };
+  done
+}
