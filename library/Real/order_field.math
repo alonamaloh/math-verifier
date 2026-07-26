@@ -234,3 +234,40 @@ theorem Real.LessOrEqual.multiply_cancel_left_positive
      ≤ (y - x) + x
      = y
 }
+
+-- ----------------------------------------------------------------------
+-- The reductions behind the `ordered_field` tactic, in the shape
+-- `Ring.equal_of_linear_combination` has for `linear_combination`: a
+-- goal follows from ONE nonnegative quantity plus a ring identity. The
+-- tactic finds a nonnegative rational combination of the hypotheses,
+-- emits it as `certificate` with its own nonnegativity proof, and lets
+-- `ring` check the bridge. `scale` clears the combination's
+-- denominators, so the coefficients the emitter handles stay integral.
+
+theorem Real.LessOrEqual_of_scaled_nonneg_combination
+        (goalLeft goalRight certificate scale : ℝ)
+        (scalePositive : 0 < scale)
+        (certificateNonneg : 0 ≤ certificate)
+        (bridge : scale * (goalRight - goalLeft) = certificate)
+        : goalLeft ≤ goalRight := {
+  0 ≤ scale * (goalRight - goalLeft) by substituting bridge;
+  scale * 0
+     = 0
+     ≤ scale * (goalRight - goalLeft);
+  0 ≤ goalRight - goalLeft by Real.LessOrEqual.multiply_cancel_left_positive;
+  done
+}
+
+theorem Real.LessThan_of_scaled_positive_combination
+        (goalLeft goalRight certificate scale : ℝ)
+        (scalePositive : 0 < scale)
+        (certificatePositive : 0 < certificate)
+        (bridge : scale * (goalRight - goalLeft) = certificate)
+        : goalLeft < goalRight := {
+  0 < scale * (goalRight - goalLeft) by substituting bridge;
+  scale * 0
+     = 0
+     < scale * (goalRight - goalLeft);
+  0 < goalRight - goalLeft by Real.LessThan.multiply_cancel_left_positive;
+  done by Real.LessThan_of_positive_subtract
+}

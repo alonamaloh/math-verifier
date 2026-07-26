@@ -37,6 +37,7 @@ bool isContextualKeyword(TokenKind kind) {
         case TokenKind::KeywordMonoid:
         case TokenKind::KeywordField:
         case TokenKind::KeywordLinearCombination:
+        case TokenKind::KeywordOrderedField:
         case TokenKind::KeywordOperator:
         case TokenKind::KeywordOverload:
         case TokenKind::KeywordCoercion:
@@ -3789,6 +3790,10 @@ private:
         if (current.kind == TokenKind::KeywordModule) {
             Token token = consumeAny();
             return makeSurfaceModuleNormalise(token.line, token.column);
+        }
+        if (current.kind == TokenKind::KeywordOrderedField) {
+            Token token = consumeAny();
+            return makeSurfaceOrderedField(token.line, token.column);
         }
         if (current.kind == TokenKind::KeywordField) {
             Token fieldToken = consumeAny();

@@ -117,22 +117,34 @@ sides are *syntactically* sums. `a - b ≤ (c - a) + (c - b)` is not, so
 `Real.maximum_LessOrEqual` still routes by hand — that residue is I4, not
 I3.
 
-### I4 — linear arithmetic over an ordered field is not closed
+### I4 — CLOSED 2026-07-25 — linear arithmetic over an ordered field
 
 **Symptom.** `a - b ≤ (c - a) + (c - b)` from `a ≤ c` and `b ≤ c` is
 declined. It is a pure linear consequence.
 
-**Workaround.** Hand-route as a nonnegative increment:
-`a - b ≤ (a - b) + 2*(c - a) = (c - a) + (c - b)`.
+**Workaround (retired).** Hand-route as a nonnegative increment:
+`a - b ≤ (a - b) + 2*(c - a) = (c - a) + (c - b)`. Every such step in
+`Real/maximum.math` had to be written this way.
 
-Every such step in `Real/maximum.math` had to be rewritten this way. This
-is the entry a `linarith` would delete outright, along with I2 and I3.
+**Fixed:** the `ordered_field` tactic
+(`PLAN_ORDERED_FIELD_TACTIC.md`, `src/elaborator/ordered_field.cpp`),
+named for the theory the way `ring` is. Both proofs in
+`Real/maximum.math` now say
+`a - b ≤ (c - a) + (c - b) by ordered_field;` and the `-2c`
+scaffolding is gone.
 
-**Being worked as `PLAN_ORDERED_FIELD_TACTIC.md`** — a `by ordered_field`
-tactic, named for the theory the way `by ring` is. This entry is its
-specification, and the four closed entries above are its scope
-boundary: the corpus is I4 plus the `Plane/` sites that are linear over
-compound atoms, not section I as a whole.
+Two things the fix taught, worth keeping:
+
+- **The gap was two-layered.** Even handed the difference in the goal's
+  own spelling, `0 ≤ ((c - a) + (c - b)) - (a - b)` from `a ≤ c`
+  exhausts the auto-prover budget: the sign battery does not
+  ring-normalise its subject, AND nothing bridges `0 ≤ D` to `L ≤ R`
+  when `D` merely ring-equals `R - L`. Both had to be covered.
+- **The corpus was smaller than this section looks.** `x ≤ x + y` from
+  `0 ≤ y` already closed bare, so the `Plane/bilinear.math` and
+  `Plane/norm.math` sites were never I4 — their
+  `by Real.less_or_equal_add_of_nonneg` is a redundant hint. Measuring
+  each shape in isolation before building is what caught that.
 
 ### I5 — CLOSED 2026-07-25 — missing strict counterparts
 

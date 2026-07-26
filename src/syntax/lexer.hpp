@@ -61,6 +61,7 @@ enum class TokenKind {
     KeywordMonoid,          // `monoid` — monoid decision tactic (associativity + identity)
     KeywordField,           // `field` — field decision tactic (ring + reciprocal_function)
     KeywordLinearCombination,  // `linear_combination(e)` — ring + a known equation
+    KeywordOrderedField,    // `ordered_field` — linear-arithmetic decision tactic
     KeywordConvention,      // `convention p : T with H` — name-bound implicit binder
     KeywordConstruction,    // `construction Name(args) : T := mk(...)` — canonical quotient intro (transparent definition)
     KeywordInstance,        // `instance Name` — register a canonical structure instance (e.g. Integer ⇒ IsGroup)

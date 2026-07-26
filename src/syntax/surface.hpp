@@ -414,6 +414,18 @@ struct SurfaceLinearCombination {
     SurfaceExpressionPointer combination;
 };
 
+// `ordered_field` — closes an order goal (`L ≤ R`, `L < R`) that follows
+// from the in-scope hypotheses by the ordered-field axioms alone. The
+// elaborator reads goal and hypotheses as linear forms over the ring
+// normaliser's monomials, searches for a nonnegative rational
+// combination that yields the goal, and emits that combination as a
+// kernel term: scaled hypothesis facts folded with the nonnegativity
+// lemmas, a `ring`-checked bridge, and one concluding lemma. The search
+// is a heuristic, never a trusted oracle — a wrong coefficient vector
+// fails the bridge rather than producing a bad proof. Argument-free like
+// `ring`: the hypotheses come from the context.
+struct SurfaceOrderedField { };
+
 // `by induction on scrutinee using inductionLemma with subjectName,
 // ihName { body }`. The elaborator constructs the motive by
 // abstracting the surrounding expected type over the scrutinee
@@ -690,7 +702,7 @@ struct SurfaceExpression {
         SurfaceAnonymousTuple, SurfaceCases, SurfaceSorry,
         SurfaceRing, SurfaceFiniteCheck, SurfaceDisjunct,
         SurfaceGroup, SurfaceModuleNormalise, SurfaceField,
-        SurfaceLinearCombination,
+        SurfaceLinearCombination, SurfaceOrderedField,
         SurfaceCalc, SurfaceByInductionUsing,
         SurfaceStructuredClaim, SurfaceGiven, SurfaceChoose,
         SurfaceByStrongInduction, SurfaceEventuallyScope,
@@ -909,6 +921,10 @@ inline SurfaceExpressionPointer makeSurfaceLinearCombination(
     SurfaceExpressionPointer combination, int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceLinearCombination{std::move(combination)}, line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceOrderedField(int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceOrderedField{}, line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceCalc(
     SurfaceExpressionPointer initialExpression,

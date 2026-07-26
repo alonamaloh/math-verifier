@@ -5529,6 +5529,59 @@ private:
         const std::vector<LocalBinder>& localBinders,
         size_t binderCount);
 
+    // =====================================================================
+    // `ordered_field` — linear arithmetic over an ordered field
+    // (PLAN_ORDERED_FIELD_TACTIC.md, src/elaborator/ordered_field.cpp).
+    //
+    // The linear model reuses the ring normaliser wholesale: each goal or
+    // hypothesis becomes a RingPolynomial over ONE shared
+    // RingNormalisationContext, and the linear-model VARIABLES are the
+    // polynomial's monomial signatures. So `x·y` and `abs(a − b)` are
+    // ordinary variables, the empty signature is the constant term, and
+    // "linear in the atoms" needs no separate check — it is what the
+    // polynomial representation already is. A divergent notion of "same
+    // subterm" here would re-earn QUIRK Q5 and Q14.
+    //
+    // One row of the linear system: `polynomial ≥ 0`, or `> 0` when
+    // `strict`. `proof` proves `0 ≤ expression` / `0 < expression` and is
+    // null for the negated-goal row (which is discharged by contradiction,
+    // never by a proof term).
+    struct OrderedFieldRow {
+        RingPolynomial polynomial;
+        bool strict = false;
+        ExpressionPointer proof = nullptr;      // opened
+        ExpressionPointer expression = nullptr; // opened; the `b − a` term
+        std::string label;                      // hypothesis name, for errors
+    };
+
+    // A Farkas certificate: one nonnegative multiplier per row, and the
+    // constant the combination collapses to. `rowMultipliers[i]` pairs with
+    // the row at index `i` in the system handed to the search.
+    struct OrderedFieldCertificate {
+        std::vector<mpq_class> rowMultipliers;
+        mpq_class constant;
+    };
+
+    // Fourier–Motzkin elimination with multiplier tracking. Returns the
+    // refutation certificate, or nullopt when the system is satisfiable or
+    // a cap trips (`capReasonOut` non-empty says which — the caller must
+    // report it rather than claiming no certificate exists).
+    std::optional<OrderedFieldCertificate> searchOrderedFieldCertificate(
+        const std::vector<OrderedFieldRow>& rows,
+        std::string& capReasonOut);
+
+    // A satisfying valuation of the monomial variables, used by the failure
+    // message: values at which every hypothesis holds and the goal fails.
+    // Only meaningful when the search reported "satisfiable".
+    std::map<RingMonomialSignature, mpq_class>
+    findOrderedFieldWitnessValuation(
+        const std::vector<OrderedFieldRow>& rows);
+
+    ExpressionPointer elaborateOrderedField(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column);
+
     // Reduce `goalL − goalR` modulo the relations `bᵢ·rᵢ = 1` to find ring
     // cofactors `cᵢ` with `goalL − goalR = Σ cᵢ·(bᵢrᵢ − 1)`, then assemble
     // the linear-combination proof in OPENED form. Returns nullopt if the

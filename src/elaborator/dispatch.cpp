@@ -2503,6 +2503,11 @@ ExpressionPointer Elaborator::elaborateExpression(
                 *lincomb, localBinders, expectedType,
                 expression.line, expression.column);
         }
+        if (std::get_if<SurfaceOrderedField>(&expression.node)) {
+            return elaborateOrderedField(
+                localBinders, expectedType,
+                expression.line, expression.column);
+        }
         if (auto* calc = std::get_if<SurfaceCalc>(&expression.node)) {
             return elaborateCalc(*calc, localBinders, expectedType,
                                   expression.line, expression.column);

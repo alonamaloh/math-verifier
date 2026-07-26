@@ -205,7 +205,53 @@ is a separate decision requiring its own canary measurement.
 Open question 1 is answered by this: ℚ is in from the start, and its
 lemmas cost nothing extra.
 
-### O2 — atom extraction and the linear model
+### O2–O6 — DONE 2026-07-25
+
+Landed as `src/elaborator/ordered_field.cpp` plus the surface plumbing
+(`KeywordOrderedField`, `SurfaceOrderedField`, one dispatch case). What
+the stages below specified, and what actually happened, in one place:
+
+- **O2.** The linear model turned out to need no atom extraction of its
+  own. `normaliseToRingPolynomial` already returns
+  `map<monomial signature, coefficient>`; taking the SIGNATURES as the
+  linear-model variables makes "linear in the atoms" true by
+  construction, with the empty signature as the constant term. Products
+  are ordinary variables for free, and there is exactly one notion of
+  "same subterm" in the elaborator — the constraint the stage was
+  written to enforce.
+- **O3.** Fourier–Motzkin with multiplier tracking, ~120 lines, caps at
+  512 rows / 32 eliminations, both reported by name when they trip.
+- **O4.** Emission as designed: hypothesis bridges → repeated addition
+  folded with the four `add_*` lemmas → `ring`-checked bridge → one
+  concluding lemma. Repeated addition rather than scalar multiplication
+  is what keeps `0 ≤ c` proofs for coefficients out of the emitter
+  entirely; the price is a 64-copy cap.
+- **O5.** Four distinguished failures, two locked in `ErrorTest/`
+  (`ordered_field_not_linear`, `ordered_field_wrong_goal_shape`).
+- **O6.** `Real/maximum.math` rewritten — the two hand-routed
+  nonnegative-increment blocks in `maximum_LessOrEqual` and
+  `maximum_LessThan` became one `by ordered_field` line each, and the
+  `-2c` scaffolding is gone. That is the whole corpus rewrite: the
+  measurement had already removed the `Plane/` sites, and the
+  `Real/derivative.math` citations read better than `ordered_field`
+  would. Docs: `docs/reference.md`, `docs/conventions/algebra-tactics.md`.
+
+**Three things worth carrying forward.**
+
+1. `weakHeadNormalForm` on the goal was exactly the wrong first move:
+   `Real.LessOrEqual` is a `definition`, so WHNF unfolds the head the
+   parser is trying to read and the relation disappears into its
+   representative-level body. Read the FOLDED form first, WHNF only as
+   a retry. This is QUIRK E1's lesson from the other direction — there
+   the printer folded and made an unfolded goal look folded.
+2. Emitting the certificate as repeated addition instead of scaled
+   terms removed a whole class of work (numeral-nonnegativity proofs)
+   at the cost of one cap. Worth remembering as a shape.
+3. The witness valuation is what makes the decline useful, and it is
+   nearly free: FM already has the elimination history, so
+   back-substituting in reverse order gives a satisfying assignment.
+
+### O2 — atom extraction and the linear model (as specified)
 
 Walk goal and hypotheses into `Σ qₖ · atomₖ + q₀` over ℚ, with atom
 identity by the same term-equality the ring normaliser uses (reuse

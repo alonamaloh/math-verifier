@@ -1,6 +1,6 @@
-# Algebra tactics: ring, field, linear_combination, group, module
+# Algebra tactics: ring, field, linear_combination, ordered_field, group, module
 
-The `ring`/`field` tactics, foundational-vs-derived ring lemmas, and `linear_combination` (ring with equational hypotheses).
+The `ring`/`field` tactics, foundational-vs-derived ring lemmas, `linear_combination` (ring with equational hypotheses), and `ordered_field` (linear arithmetic over an ordered field).
 
 *(Part of the project conventions; see `LANGUAGE.md` for the index.)*
 
@@ -223,6 +223,65 @@ Works as a relation-step `by` proof too. Scope/limits:
 - Leaves that aren't equality proofs are treated as scalars (the
   trivial `v = v`), so a malformed combination surfaces as a ring
   bridge that doesn't normalise.
+
+## `ordered_field` — inequalities that follow from the order axioms
+
+`ring` proves identities that hold in any commutative ring;
+`ordered_field` proves inequalities that hold in any ordered field. It
+takes no arguments — the hypotheses come from the context, the way
+`ring`'s axioms do:
+
+```math
+-- the rearrangement IS the content, so no sum-of-two-bounds lemma reaches it
+theorem _ (a b c : ℝ) (aBelow : a ≤ c) (bBelow : b ≤ c)
+        : a - b ≤ (c - a) + (c - b) := ordered_field
+
+-- as a step justification
+a - b ≤ (c - a) + (c - b) by ordered_field;
+```
+
+Given the goal and every in-scope `≤` / `<` hypothesis at the same
+carrier, it searches for a **nonnegative rational combination** of the
+hypotheses that yields the goal, then emits that combination as a
+kernel term: the scaled hypothesis facts folded together with the
+carrier's nonnegativity lemmas, a bridge equation checked by `ring`,
+and one concluding lemma. The search is a heuristic; the bridge is
+what makes it safe, so a wrong coefficient vector fails to typecheck
+rather than producing a bad proof.
+
+**What counts as linear.** The linear model's variables are the ring
+normaliser's *monomials*, so a product is an ordinary variable:
+`abs(a - b)`, `f(x)`, and `innerProduct(u, v) * innerProduct(u, v)` all
+work as opaque quantities, and `x ≤ x + y` from `0 ≤ y` is in scope
+whatever `x` and `y` are. What is *out* of scope is any step that has
+to relate a product to its factors — `x * x ≤ y * y` from `x ≤ y` is
+declined, because `x * x` and `y * y` are unrelated variables. The
+failure message says exactly this when it applies.
+
+Scope/limits:
+- **Goals**: `≤` and `<`. An equality goal is `ring`'s or
+  `linear_combination`'s job and the decline says so.
+- **Carriers**: those with the ordered-field lemma table —
+  `Real` today. The table is nine names (`add_nonneg`,
+  `nonneg_subtract_of_LessOrEqual`,
+  `LessOrEqual_of_scaled_nonneg_combination`, …); a carrier missing one
+  is told which. There is no ordered-field *bundle* in the library, so
+  a bundled carrier is not supported.
+- **Hypotheses**: `≤` and `<` at the same carrier. Equality hypotheses
+  are not read as rows — combine them with `substituting` first, or
+  reach for `linear_combination`. Hypotheses skipped for being at
+  another carrier are named in the failure message.
+- **Integer arithmetic**: not in the fragment. `2 * n ≥ 1 → n ≥ 1` over
+  ℕ/ℤ needs rounding, which no ordered field supplies.
+- **Emitter cap**: the certificate is emitted as repeated addition, so
+  coefficients summing over 64 are declined with a message that says
+  the goal *is* a linear consequence and the limit is the emitter's.
+
+When it declines because the goal is not a linear consequence, the
+message reports a **witness valuation** — values for the monomials at
+which every hypothesis holds and the goal fails. That is a genuine
+counterexample to linearity, so it distinguishes "your goal is false"
+from "you forgot a hypothesis" without further experiment.
 
 ## `group` / `monoid` — the (abelian) group normaliser
 

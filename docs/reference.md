@@ -371,6 +371,7 @@ Quotient-facing public destructuring is documented in
 ring
 field(nonzeroFact, ...)
 linear_combination(expression)
+ordered_field
 group
 monoid
 module
@@ -382,6 +383,11 @@ The applicable carrier structures and limitations are described in
 the usual way; on a **non-commutative** carrier (e.g. the square-matrix ring)
 it normalises to ordered words, keeps factor order, and declines `A * B =
 B * A`.
+
+`ordered_field` closes an `≤` / `<` goal that follows from the in-scope
+order hypotheses by the ordered-field axioms alone. Argument-free like
+`ring`: it finds a nonnegative rational combination of the hypotheses and
+emits it as a `ring`-checked certificate.
 
 `disjunct(proof)` injects a proof into the matching branch of a
 right-associated disjunction. It is especially useful for generated finite
