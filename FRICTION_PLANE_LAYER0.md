@@ -514,3 +514,56 @@ The message names the one thing that is not wrong, and points at the
 The right message is "lemma `X` takes 4 explicit arguments and 2 were
 given — supply the rest or drop them all", which the surrounding code
 already has the arity to say.
+
+### E10 — `ordered_field` does not fire under a `take` binder
+
+The goal from I4, which the tactic closes at top level, stops being
+recognised the moment a binder is introduced mid-proof:
+
+```
+theorem T (a b c : ℝ) (x : a ≤ c) (y : b ≤ c)
+        : ∀ (m : ℕ). a - b ≤ (c - a) + (c - b) := {
+  take m : ℕ;
+  done by ordered_field
+}
+```
+→ ``ordered_field`: the goal `a - b ≤ c - a + (c - b)` is not an order
+relation at a concrete carrier``
+
+The goal is unchanged — it does not mention `m` at all — and the same
+claim with `a b c` as theorem parameters and no `take` verifies. A
+`(m : ℕ) ↦ …` lambda body fails identically. So it is the mid-proof
+binder, not the atoms, the carrier, or the imports.
+
+The likely cause is the opening discipline:
+`elaborateOrderedField` does
+`openOverLocalBinders(expectedType, localBinders, binderCount)` and then
+parses, where `elaborateRing` — which does work under binders — instead
+`zetaUnfoldLetBinders`es and inspects `expectedType` directly. Every
+existing call site in the library (`Real/maximum.math`,
+`Test/ordered_field_test.math`) has its hypotheses as theorem
+parameters, so the gap was never exercised until the tier started
+running everywhere.
+
+This matters more than it looks. Analysis proofs live under binders —
+`take m : ℕ`, `witness N with (m : ℕ) (beyond : …) ↦ …` — so the tactic
+is unavailable at exactly the sites the friction log was written about.
+Two steps in `Real/cluster.math` had to be hoisted into their own
+top-level lemmas to get at it.
+
+### E11 — an earlier expensive tier preempts the cheap one
+
+With the goal at top level, where `ordered_field` *does* fire:
+
+```
+  -tolerance < x - centre;              -- 81445 kernel-steps, by search
+  -tolerance < x - centre by ordered_field;   -- instant
+```
+
+The battery closes the bare claim through an earlier tier that rewrites
+with `Real.negate_subtract`, at ~80-100k kernel steps, and never reaches
+the tier that would have produced a three-line certificate. Placing
+`ordered_field` last was the right call for cost on the failure path,
+but it means a linear goal that some expensive tier can also reach never
+gets the cheap proof. Worth measuring whether a goal that parses as an
+order relation should try the certificate BEFORE the rewriting tiers.
