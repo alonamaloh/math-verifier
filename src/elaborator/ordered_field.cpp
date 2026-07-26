@@ -853,3 +853,59 @@ ExpressionPointer Elaborator::elaborateOrderedField(
     (void)column;
     return closeOverLocalBinders(conclusion, localBinders, binderCount);
 }
+
+// ---------------------------------------------------------------------------
+// `ordered_field` as an auto-prover tier.
+//
+// The tactic above throws a helpful message when it cannot apply, which is
+// right for `by ordered_field` — the author asked for it by name. As a tier
+// the same failure has to be a quiet decline, so the battery can move on.
+//
+// Cost: the caller places this LAST, after every other tier has missed, so
+// in a library that verifies it runs on nothing. What it changes is the
+// error path — a linear consequence of the hypotheses now closes instead of
+// being reported, which is the whole point: a step a mathematician would not
+// have annotated no longer has to be.
+ExpressionPointer Elaborator::tryOrderedFieldTier(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line) {
+    if (inOrderedFieldTier_) return nullptr;
+
+    size_t binderCount = localBinders.size();
+    ExpressionPointer goalOpened;
+    try {
+        goalOpened =
+            openOverLocalBinders(goalClosed, localBinders, binderCount);
+    } catch (const ElaborateError&) {
+        return nullptr;
+    } catch (const TypeError&) {
+        return nullptr;
+    }
+    if (!goalOpened) return nullptr;
+    // The gate. `False` is admitted because it is the reductio idiom
+    // (`suppose … for contradiction`), where the contradiction is among the
+    // hypotheses; the tactic itself checks that some hypothesis is an order
+    // relation and declines otherwise.
+    if (!parseOrderProposition(environment_, goalOpened)
+        && headConstantName(goalOpened) != "False") {
+        return nullptr;
+    }
+
+    // RAII so the flag is cleared even when AutoProverBudgetError unwinds
+    // through — that one must NOT be swallowed, or the budget stops binding.
+    struct Guard {
+        bool& flag;
+        explicit Guard(bool& f) : flag(f) { flag = true; }
+        ~Guard() { flag = false; }
+    } guard(inOrderedFieldTier_);
+
+    try {
+        return elaborateOrderedField(
+            localBinders, goalClosed, line, /*column=*/0);
+    } catch (const ElaborateError&) {
+        return nullptr;
+    } catch (const TypeError&) {
+        return nullptr;
+    }
+}

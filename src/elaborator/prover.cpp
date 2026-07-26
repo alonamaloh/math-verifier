@@ -3744,6 +3744,19 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
             if (attempt) return attempt;
         }
 
+        // `ordered_field` — last, because it is the one tier that would
+        // otherwise re-decide goals the cheap tiers already own. Reached
+        // only on a goal that was about to be reported as an error, so a
+        // library that verifies never pays for it, and its gate declines
+        // instantly on anything that is not an order relation at a
+        // concrete carrier.
+        {
+            ExpressionPointer attempt = runTactic("orderedField",
+                [&] { return tryOrderedFieldTier(
+                    goalClosed, localBinders, line); });
+            if (attempt) return attempt;
+        }
+
         throwElaborate(
             "claim `"
             + prettyPrintInLocalScope(goalClosed, localBinders)
@@ -3752,7 +3765,8 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
             "goal, no transitivity chain reaches the goal, no "
             "conjunction split decomposes it, no in-scope "
             "contradiction lets us close it, no library theorem "
-            "with this conclusion shape applies, and no context "
+            "with this conclusion shape applies, no linear combination "
+            "of the order hypotheses reaches it, and no context "
             "equality lets us rewrite to a provable form — add "
             "`by <lemma>` to specify"
             + searchSuggestionsIfTopLevel(goalClosed, localBinders));
@@ -3914,6 +3928,9 @@ ExpressionPointer Elaborator::autoProveClaimProfiling(
         runProfiled("symmetryFlip", [&] {
             return trySymmetryFlip(goalClosed, localBinders, line);
         });
+        runProfiled("orderedField", [&] {
+            return tryOrderedFieldTier(goalClosed, localBinders, line);
+        });
 
         autoProveRows_.push_back(std::move(row));
 
@@ -3926,7 +3943,8 @@ ExpressionPointer Elaborator::autoProveClaimProfiling(
             "goal, no transitivity chain reaches the goal, no "
             "conjunction split decomposes it, no in-scope "
             "contradiction lets us close it, no library theorem "
-            "with this conclusion shape applies, and no context "
+            "with this conclusion shape applies, no linear combination "
+            "of the order hypotheses reaches it, and no context "
             "equality lets us rewrite to a provable form — add "
             "`by <lemma>` to specify"
             + searchSuggestionsIfTopLevel(goalClosed, localBinders));

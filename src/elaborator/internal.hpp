@@ -5582,6 +5582,24 @@ private:
         ExpressionPointer expectedType,
         int line, int column);
 
+    // The same tactic as an auto-prover tier: declines instead of throwing,
+    // so the battery can try it unprompted. Placed LAST in the chain, so it
+    // runs only on goals that were about to be reported as errors — in a
+    // green library that is no goals at all, which is what keeps it free.
+    //
+    // The cheap gate is `parseOrderProposition`: anything that is not `≤`,
+    // `<`, or `False` at a concrete carrier declines before any work.
+    ExpressionPointer tryOrderedFieldTier(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line);
+
+    // Re-entrancy guard for the tier above. `elaborateOrderedField` calls
+    // `autoProveClaim` to discharge the certificate's `0 < scale` side
+    // condition; without this flag that call would arrive back at the tier
+    // and recurse.
+    bool inOrderedFieldTier_ = false;
+
     // Reduce `goalL − goalR` modulo the relations `bᵢ·rᵢ = 1` to find ring
     // cofactors `cᵢ` with `goalL − goalR = Σ cᵢ·(bᵢrᵢ − 1)`, then assemble
     // the linear-combination proof in OPENED form. Returns nullopt if the
