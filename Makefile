@@ -172,6 +172,7 @@ TEST_MATHV_IFACE_FILES := $(TEST_MATHV_FILES:.mathv=.mathv.iface)
 PROJECT_MATHV_IFACE_FILES := $(PROJECT_MATHV_FILES:.mathv=.mathv.iface)
 
 .PHONY: library library-clean plane tests error-tests checker-tests \
+        premise-block-warning-check \
         clean-check clean-status projects projects-clean project-tests all
 
 # Bare `make` VERIFIES THE LIBRARY — not just builds the kernel binary. The
@@ -226,7 +227,7 @@ plane: $(PLANE_MATHV_FILES) $(PLANE_MATHV_FILES:.mathv=.mathv.iface) \
 
 tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES) checker-tests \
 	carrier-normal-form-check matrix-ergonomics-statement-check \
-	no-generated-in-library
+	premise-block-warning-check no-generated-in-library
 
 # The fifteen theorem's own gates. Separate from `tests` for the same reason
 # its proofs are separate from `library`: they re-render ~290k lines of
@@ -240,6 +241,22 @@ project-tests: projects rank-four-generated-check \
 # They are what made a full library re-verification cost twenty minutes, and
 # a single one checked in under library/ quietly reinstates that. The library
 # is at zero; hold it there.
+# A premise spelled as a proof block inside a citation's argument list
+# (`by Lemma(…, { P })`) is a step of the proof hiding in an argument. The
+# elaborator warns at write time; this asserts the warning still fires, and
+# that the idiomatic spelling beside it stays silent. The fixture VERIFIES,
+# so it cannot live in ErrorTest/ (whose files must fail).
+premise-block-warning-check:
+	@output=$$(./kernel verify --source library/Test/premise_block_argument.math \
+	    --output build/premise-block-warning.mathv --cache-root build 2>&1); \
+	hits=$$(printf '%s\n' "$$output" | grep -c "spelled as a proof block"); \
+	if [ "$$hits" != "1" ]; then \
+	  echo "premise-block-warning-check: FAIL — expected exactly 1 warning, got $$hits"; \
+	  printf '%s\n' "$$output" | sed 's/^/  /'; \
+	  exit 1; \
+	fi; \
+	echo "premise-block-warning-check: PASS"
+
 no-generated-in-library:
 	@found=$$(find library -name '*_generated.math' | sort); \
 	if [ -n "$$found" ]; then \

@@ -712,6 +712,12 @@ struct SurfaceExpression {
     > node;
     int line = 0;
     int column = 0;
+    // Set when this expression was written as a braced block — `{ P }`.
+    // A single-statement block returns its statement directly, so the
+    // braces leave no trace in the node itself; the flag keeps them
+    // visible to the diagnostic that asks whether a premise was spelled
+    // inline in a citation's argument list instead of stated as a claim.
+    bool fromBracedBlock = false;
 };
 
 // Substitutes free occurrences of identifier `targetName` in `expression`

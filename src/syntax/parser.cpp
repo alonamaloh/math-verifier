@@ -3936,7 +3936,17 @@ private:
             // `{ let pat := v; ...; final_expr }` as an expression.
             // Same shape as the theorem-body block form; useful inside
             // case clauses or anywhere an expression is expected.
-            return parseBlockBody();
+            SurfaceExpressionPointer block = parseBlockBody();
+            if (!block) {
+                return block;
+            }
+            // Nodes are shared and const, so the flag goes on a copy —
+            // a single-statement block returns the statement itself, and
+            // that same node may be shared elsewhere.
+            SurfaceExpression braced = *block;
+            braced.fromBracedBlock = true;
+            return std::make_shared<const SurfaceExpression>(
+                std::move(braced));
         }
         if (current.kind == TokenKind::KeywordSorry) {
             Token sorryToken = consumeAny();

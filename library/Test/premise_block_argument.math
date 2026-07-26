@@ -1,0 +1,37 @@
+-- Test/premise_block_argument.math
+--
+-- Lock for the "premise spelled as a proof block" warning.
+--
+-- `by Lemma(…, { P })` hides a step of the proof inside an argument list.
+-- Stated as its own claim before the citation, `P` reads as a line of the
+-- argument and then discharges from context — which is what lets the whole
+-- argument list go. The warning says so at write time; this file is the
+-- shape it must keep firing on.
+--
+-- It VERIFIES (the spelling is legal, just unidiomatic), so the assertion
+-- lives in the `premise-block-warning-check` Makefile target rather than
+-- in `ErrorTest/`, whose fixtures must fail.
+
+module Test.premise_block_argument
+
+import Logic.basics
+import Equality.basics
+import Set.basics
+import Set.algebra
+
+theorem Test.premise_as_block {T : Type(0)} (a b : Set(T)) (x : T)
+        (inA : x ∈ a) (inB : x ∈ b)
+        : x ∈ a ∩ b := {
+  x ∈ a ∩ b by Set.member_intersection(x, a, b, { x ∈ a }, inB);
+  done
+}
+
+-- The idiomatic form of the same proof, kept beside it: the premises are
+-- claims, and the citation names only the lemma. This one must NOT warn.
+theorem Test.premise_as_claim {T : Type(0)} (a b : Set(T)) (x : T)
+        (inA : x ∈ a) (inB : x ∈ b)
+        : x ∈ a ∩ b := {
+  x ∈ a;
+  x ∈ b;
+  done by Set.member_intersection
+}

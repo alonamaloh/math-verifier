@@ -1477,6 +1477,50 @@ void Elaborator::reportClaimHintDiagnostics(
                 classifyAttempt != nullptr, line);
         }
 
+        // A premise spelled as a proof BLOCK argument — `by Lemma(…, { P })`
+        // — is a step of the proof hiding inside an argument list. Stated as
+        // its own claim before the citation it reads as a line of the
+        // argument, and it then discharges from CONTEXT, which is what lets
+        // the rest of the argument list go too (`by Lemma` alone).
+        //
+        // Purely syntactic, so it is not gated behind `--check-redundant-by`
+        // and costs nothing: the point is to catch the shape while it is
+        // being written, not at polish time. The two probes below cannot
+        // catch it — they ask whether the CURRENT spelling is removable,
+        // and a premise that is not yet in context makes the bare citation
+        // genuinely fail.
+        if (claim.byHint && !claim.bySubstitution) {
+            if (auto* citation = std::get_if<SurfaceApplication>(
+                    &claim.byHint->node)) {
+                auto* citedName = std::get_if<SurfaceIdentifier>(
+                    &citation->function->node);
+                size_t blockArguments = 0;
+                for (const SurfaceArgument& argument : citation->arguments) {
+                    if (argument.value && argument.value->fromBracedBlock) {
+                        ++blockArguments;
+                    }
+                }
+                if (citedName && blockArguments > 0) {
+                    std::cerr << "warning: " << moduleName_
+                        << ":" << line
+                        << ": " << blockArguments << " premise"
+                        << (blockArguments == 1 ? "" : "s")
+                        << " of `" << citedName->qualifiedName
+                        << "` " << (blockArguments == 1 ? "is" : "are")
+                        << " spelled as a proof block in the argument list"
+                           " — state "
+                        << (blockArguments == 1 ? "it" : "them")
+                        << " as bare claim"
+                        << (blockArguments == 1 ? "" : "s")
+                        << " before this step, then drop the argument list"
+                           " (`by "
+                        << citedName->qualifiedName
+                        << "` usually closes it once the premises are in"
+                           " context)\n";
+                }
+            }
+        }
+
         // `--check-redundant-by`: speculatively run the bare-`claim`
         // auto-prover on the same goal. If it would also discharge
         // the goal, warn that the hint is redundant. (The old `since`
