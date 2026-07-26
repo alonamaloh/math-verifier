@@ -80,18 +80,18 @@ theorem Plane.OpenIn.intersection
         : Plane.OpenIn(left ∩ right, carrier) := {
   take x : Plane.Point;
   suppose x ∈ left ∩ right as inBoth;
-  x ∈ left by Set.intersection_member_left as inLeft;
-  x ∈ right by Set.intersection_member_right as inRight;
+  x ∈ left by Set.intersection_member_left;
+  x ∈ right by Set.intersection_member_right;
   choose leftRadius such that
       0 < leftRadius ∧
         ∀ (y : Plane.Point). y ∈ carrier →
           Plane.distance(x, y) < leftRadius → y ∈ left
-      from leftOpen(x, inLeft);
+      from leftOpen(x, { x ∈ left });
   choose rightRadius such that
       0 < rightRadius ∧
         ∀ (y : Plane.Point). y ∈ carrier →
           Plane.distance(x, y) < rightRadius → y ∈ right
-      from rightOpen(x, inRight);
+      from rightOpen(x, { x ∈ right });
   0 < leftRadius;
   0 < rightRadius;
   ∀ (y : Plane.Point). y ∈ carrier →
@@ -128,12 +128,12 @@ theorem Plane.OpenIn.union
   take x : Plane.Point;
   suppose x ∈ left ∪ right as inEither;
   done by cases {
-    case x ∈ left as inLeft: {
+    case x ∈ left: {
         choose radius such that
             0 < radius ∧
               ∀ (y : Plane.Point). y ∈ carrier →
                 Plane.distance(x, y) < radius → y ∈ left
-            from leftOpen(x, inLeft);
+            from leftOpen(x, { x ∈ left });
         0 < radius;
         ∀ (y : Plane.Point). y ∈ carrier →
             Plane.distance(x, y) < radius → y ∈ left as leftBall;
@@ -149,12 +149,12 @@ theorem Plane.OpenIn.union
           done
         }
       }
-    case x ∈ right as inRight: {
+    case x ∈ right: {
         choose radius such that
             0 < radius ∧
               ∀ (y : Plane.Point). y ∈ carrier →
                 Plane.distance(x, y) < radius → y ∈ right
-            from rightOpen(x, inRight);
+            from rightOpen(x, { x ∈ right });
         0 < radius;
         ∀ (y : Plane.Point). y ∈ carrier →
             Plane.distance(x, y) < radius → y ∈ right as rightBall;
@@ -261,13 +261,13 @@ theorem Plane.subset_openHull_intersection (subset carrier : Set(Plane.Point))
         (openInCarrier : Plane.OpenIn(subset, carrier))
         : subset ⊆ Plane.openHull(subset, carrier) ∩ carrier := {
   take y : Plane.Point;
-  suppose y ∈ subset as yInSubset;
+  suppose y ∈ subset;
   y ∈ carrier by subsetInCarrier;
   choose radius such that
       0 < radius ∧
         ∀ (z : Plane.Point). z ∈ carrier →
           Plane.distance(y, z) < radius → z ∈ subset
-      from openInCarrier(y, yInSubset);
+      from openInCarrier(y, { y ∈ subset });
   0 < radius;
   ∀ (z : Plane.Point). z ∈ carrier →
       Plane.distance(y, z) < radius → z ∈ subset;
@@ -317,12 +317,12 @@ theorem Plane.OpenIn_of_cut (subset carrier ambient : Set(Plane.Point))
   take x : Plane.Point;
   suppose x ∈ subset as xInSubset;
   x ∈ ambient ∩ carrier by substituting cut;
-  x ∈ ambient by Set.intersection_member_left as xInAmbient;
+  x ∈ ambient by Set.intersection_member_left;
   choose radius such that
       0 < radius ∧
         ∀ (y : Plane.Point). y ∈ Set.universe(Plane.Point) →
           Plane.distance(x, y) < radius → y ∈ ambient
-      from ambientOpen(x, xInAmbient);
+      from ambientOpen(x, { x ∈ ambient });
   0 < radius;
   ∀ (y : Plane.Point). y ∈ Set.universe(Plane.Point) →
       Plane.distance(x, y) < radius → y ∈ ambient as ambientBall;
@@ -439,7 +439,7 @@ theorem Plane.subset_InteriorIn_of_OpenIn (subset carrier : Set(Plane.Point))
   ∃ (radius : ℝ). 0 < radius ∧
       ∀ (y : Plane.Point). y ∈ carrier →
         Plane.distance(x, y) < radius → y ∈ subset
-      by openInCarrier(x, xInSubset);
+      by openInCarrier(x, { x ∈ subset });
   done
 }
 
@@ -505,4 +505,195 @@ theorem Plane.BoundaryIn_of_OpenIn (subset carrier : Set(Plane.Point))
         done
       };
   done
+}
+
+-- ----------------------------------------------------------------------
+-- Continuity, relative to a carrier.
+--
+-- A map is continuous on a carrier when the usual ε-δ condition holds
+-- with both quantifiers restricted to it. Nothing is asked of the map
+-- off the carrier.
+
+definition Plane.ContinuousAt
+        (f : Plane.Point → Plane.Point) (carrier : Set(Plane.Point))
+        (x : Plane.Point) : Proposition :=
+  ∀ (tolerance : ℝ). 0 < tolerance →
+    ∃ (nearness : ℝ). 0 < nearness ∧
+      ∀ (y : Plane.Point). y ∈ carrier →
+        Plane.distance(x, y) < nearness →
+          Plane.distance(f(x), f(y)) < tolerance
+
+definition Plane.ContinuousOn
+        (f : Plane.Point → Plane.Point) (carrier : Set(Plane.Point))
+        : Proposition :=
+  ∀ (x : Plane.Point). x ∈ carrier → Plane.ContinuousAt(f, carrier, x)
+
+-- Restricting the carrier only weakens the condition.
+theorem Plane.ContinuousOn.restrict
+        (f : Plane.Point → Plane.Point)
+        (smaller larger : Set(Plane.Point))
+        (smallerInLarger : smaller ⊆ larger)
+        (continuousOnLarger : Plane.ContinuousOn(f, larger))
+        : Plane.ContinuousOn(f, smaller) := {
+  take x : Plane.Point;
+  suppose x ∈ smaller as xInSmaller;
+  x ∈ larger by smallerInLarger;
+  take tolerance : ℝ;
+  suppose 0 < tolerance as tolerancePositive;
+  choose nearness such that 0 < nearness ∧
+      ∀ (y : Plane.Point). y ∈ larger →
+        Plane.distance(x, y) < nearness →
+          Plane.distance(f(x), f(y)) < tolerance
+      from continuousOnLarger(x, { x ∈ larger }, tolerance, { 0 < tolerance });
+  0 < nearness;
+  ∀ (y : Plane.Point). y ∈ larger →
+      Plane.distance(x, y) < nearness →
+        Plane.distance(f(x), f(y)) < tolerance as largerBall;
+  witness nearness with {
+    0 < nearness;
+    ∀ (y : Plane.Point). y ∈ smaller →
+        Plane.distance(x, y) < nearness →
+          Plane.distance(f(x), f(y)) < tolerance
+        by (y : Plane.Point) (yInSmaller : y ∈ smaller)
+           (yClose : Plane.distance(x, y) < nearness) ↦ {
+             y ∈ larger by smallerInLarger;
+             done by largerBall
+           };
+    done
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- The pasting lemma.
+--
+-- Each piece supplies a radius at every point of the union, by one of two
+-- routes. If the point is IN the piece, continuity on that piece supplies
+-- it. If the point is NOT in the piece, the piece being closed in the
+-- union supplies a radius within which no point of the union is in the
+-- piece at all, so the requirement is vacuous. Both routes give the same
+-- statement, which is what lets the main proof avoid a four-way split.
+
+theorem Plane.pasteRadius
+        (f : Plane.Point → Plane.Point)
+        (piece union : Set(Plane.Point))
+        (pieceClosed : Plane.ClosedIn(piece, union))
+        (pieceContinuous : Plane.ContinuousOn(f, piece))
+        (x : Plane.Point) (xInUnion : x ∈ union)
+        (tolerance : ℝ) (tolerancePositive : 0 < tolerance)
+        : ∃ (nearness : ℝ). 0 < nearness ∧
+            ∀ (y : Plane.Point). y ∈ union → y ∈ piece →
+              Plane.distance(x, y) < nearness →
+                Plane.distance(f(x), f(y)) < tolerance :=
+  done by cases {
+    case x ∈ piece: {
+        choose nearness such that 0 < nearness ∧
+            ∀ (y : Plane.Point). y ∈ piece →
+              Plane.distance(x, y) < nearness →
+                Plane.distance(f(x), f(y)) < tolerance
+            from pieceContinuous(x, { x ∈ piece }, tolerance, { 0 < tolerance });
+        0 < nearness;
+        ∀ (y : Plane.Point). y ∈ piece →
+            Plane.distance(x, y) < nearness →
+              Plane.distance(f(x), f(y)) < tolerance as pieceBall;
+        witness nearness with {
+          0 < nearness;
+          ∀ (y : Plane.Point). y ∈ union → y ∈ piece →
+              Plane.distance(x, y) < nearness →
+                Plane.distance(f(x), f(y)) < tolerance
+              by (y : Plane.Point) (yInUnion : y ∈ union)
+                 (yInPiece : y ∈ piece)
+                 (yClose : Plane.distance(x, y) < nearness) ↦
+                   pieceBall(y, yInPiece, yClose);
+          done
+        }
+      }
+    otherwise as xOutsidePiece: {
+        x ∈ union ∖ piece;
+        choose nearness such that 0 < nearness ∧
+            ∀ (y : Plane.Point). y ∈ union →
+              Plane.distance(x, y) < nearness →
+                y ∈ union ∖ piece
+            from pieceClosed(x, { x ∈ union ∖ piece });
+        0 < nearness;
+        ∀ (y : Plane.Point). y ∈ union →
+            Plane.distance(x, y) < nearness →
+              y ∈ union ∖ piece as avoidsPiece;
+        witness nearness with {
+          0 < nearness;
+          ∀ (y : Plane.Point). y ∈ union → y ∈ piece →
+              Plane.distance(x, y) < nearness →
+                Plane.distance(f(x), f(y)) < tolerance
+              by (y : Plane.Point) (yInUnion : y ∈ union)
+                 (yInPiece : y ∈ piece)
+                 (yClose : Plane.distance(x, y) < nearness) ↦ {
+                   y ∈ union ∖ piece by avoidsPiece;
+                   ¬(y ∈ piece);
+                   False;
+                   done
+                 };
+          done
+        }
+      }
+  }
+
+-- A map continuous on each of two relatively closed pieces is continuous
+-- on their union. This is what glues the interior and exterior extensions
+-- of the main theorem along the curve they share.
+theorem Plane.ContinuousOn.paste
+        (f : Plane.Point → Plane.Point)
+        (first second : Set(Plane.Point))
+        (firstClosed : Plane.ClosedIn(first, first ∪ second))
+        (secondClosed : Plane.ClosedIn(second, first ∪ second))
+        (firstContinuous : Plane.ContinuousOn(f, first))
+        (secondContinuous : Plane.ContinuousOn(f, second))
+        : Plane.ContinuousOn(f, first ∪ second) := {
+  take x : Plane.Point;
+  suppose x ∈ first ∪ second as xInUnion;
+  take tolerance : ℝ;
+  suppose 0 < tolerance as tolerancePositive;
+  choose firstNearness such that 0 < firstNearness ∧
+      ∀ (y : Plane.Point). y ∈ first ∪ second → y ∈ first →
+        Plane.distance(x, y) < firstNearness →
+          Plane.distance(f(x), f(y)) < tolerance
+      from Plane.pasteRadius(f, first, first ∪ second, firstClosed,
+               firstContinuous, x, xInUnion, tolerance, tolerancePositive);
+  choose secondNearness such that 0 < secondNearness ∧
+      ∀ (y : Plane.Point). y ∈ first ∪ second → y ∈ second →
+        Plane.distance(x, y) < secondNearness →
+          Plane.distance(f(x), f(y)) < tolerance
+      from Plane.pasteRadius(f, second, first ∪ second, secondClosed,
+               secondContinuous, x, xInUnion, tolerance, tolerancePositive);
+  0 < firstNearness;
+  0 < secondNearness;
+  ∀ (y : Plane.Point). y ∈ first ∪ second → y ∈ first →
+      Plane.distance(x, y) < firstNearness →
+        Plane.distance(f(x), f(y)) < tolerance as firstBall;
+  ∀ (y : Plane.Point). y ∈ first ∪ second → y ∈ second →
+      Plane.distance(x, y) < secondNearness →
+        Plane.distance(f(x), f(y)) < tolerance as secondBall;
+  witness min(firstNearness, secondNearness) with {
+    0 < min(firstNearness, secondNearness) by Real.minimum_positive;
+    ∀ (y : Plane.Point). y ∈ first ∪ second →
+        Plane.distance(x, y) < min(firstNearness, secondNearness) →
+          Plane.distance(f(x), f(y)) < tolerance
+        by (y : Plane.Point) (yInUnion : y ∈ first ∪ second)
+           (yClose : Plane.distance(x, y)
+               < min(firstNearness, secondNearness)) ↦ {
+             Plane.distance(x, y)
+                < min(firstNearness, secondNearness)
+                ≤ firstNearness by Real.minimum_LessOrEqual_left;
+             Plane.distance(x, y)
+                < min(firstNearness, secondNearness)
+                ≤ secondNearness by Real.minimum_LessOrEqual_right;
+             done by cases {
+               case y ∈ first as yInFirst:
+                   firstBall(y, yInUnion, yInFirst,
+                       { Plane.distance(x, y) < firstNearness })
+               case y ∈ second as yInSecond:
+                   secondBall(y, yInUnion, yInSecond,
+                       { Plane.distance(x, y) < secondNearness })
+             }
+           };
+    done
+  }
 }
