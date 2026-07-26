@@ -128,6 +128,12 @@ declined. It is a pure linear consequence.
 Every such step in `Real/maximum.math` had to be rewritten this way. This
 is the entry a `linarith` would delete outright, along with I2 and I3.
 
+**Being worked as `PLAN_ORDERED_FIELD_TACTIC.md`** — a `by ordered_field`
+tactic, named for the theory the way `by ring` is. This entry is its
+specification, and the four closed entries above are its scope
+boundary: the corpus is I4 plus the `Plane/` sites that are linear over
+compound atoms, not section I as a whole.
+
 ### I5 — CLOSED 2026-07-25 — missing strict counterparts
 
 - `Real.LessOrEqual.multiply_cancel_left_positive` exists;
