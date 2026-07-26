@@ -477,7 +477,7 @@ theorem Plane.subset_InteriorIn_of_OpenIn (subset carrier : Set(Plane.Point))
   ∃ (radius : ℝ). 0 < radius ∧
       ∀ (y : Plane.Point). y ∈ carrier →
         Plane.distance(x, y) < radius → y ∈ subset
-      by openInCarrier(x, { x ∈ subset });
+      by openInCarrier;
   done
 }
 
@@ -565,6 +565,60 @@ definition Plane.ContinuousOn
         (f : Plane.Point → Plane.Point) (carrier : Set(Plane.Point))
         : Proposition :=
   ∀ (x : Plane.Point). x ∈ carrier → Plane.ContinuousAt(f, carrier, x)
+
+-- Continuity composes. The outer map's tolerance chooses the nearness the
+-- inner map must meet, and the inner map's nearness answers for the
+-- composite — provided the inner map lands where the outer one is
+-- continuous.
+theorem Plane.ContinuousOn.compose
+        (inner outer : Plane.Point → Plane.Point)
+        (carrier target : Set(Plane.Point))
+        (innerContinuous : Plane.ContinuousOn(inner, carrier))
+        (lands : ∀ (x : Plane.Point). x ∈ carrier → inner(x) ∈ target)
+        (outerContinuous : Plane.ContinuousOn(outer, target))
+        : Plane.ContinuousOn((x : Plane.Point) ↦ outer(inner(x)), carrier) := {
+  take x : Plane.Point;
+  suppose x ∈ carrier as xInCarrier;
+  take tolerance : ℝ;
+  suppose 0 < tolerance as tolerancePositive;
+  inner(x) ∈ target by lands;
+  choose middle such that
+      0 < middle ∧
+        ∀ (y : Plane.Point). y ∈ target →
+          Plane.distance(inner(x), y) < middle →
+            Plane.distance(outer(inner(x)), outer(y)) < tolerance
+      from outerContinuous(
+          inner(x), { inner(x) ∈ target }, tolerance, tolerancePositive);
+  0 < middle as middlePositive;
+  ∀ (y : Plane.Point). y ∈ target →
+      Plane.distance(inner(x), y) < middle →
+        Plane.distance(outer(inner(x)), outer(y)) < tolerance
+      as outerAnswers;
+  choose nearness such that
+      0 < nearness ∧
+        ∀ (y : Plane.Point). y ∈ carrier →
+          Plane.distance(x, y) < nearness →
+            Plane.distance(inner(x), inner(y)) < middle
+      from innerContinuous(x, xInCarrier, middle, middlePositive);
+  0 < nearness;
+  ∀ (y : Plane.Point). y ∈ carrier →
+      Plane.distance(x, y) < nearness →
+        Plane.distance(inner(x), inner(y)) < middle
+      as innerAnswers;
+  witness nearness with {
+    0 < nearness;
+    ∀ (y : Plane.Point). y ∈ carrier →
+        Plane.distance(x, y) < nearness →
+          Plane.distance(outer(inner(x)), outer(inner(y))) < tolerance
+        by (y : Plane.Point) (yInCarrier : y ∈ carrier)
+           (near : Plane.distance(x, y) < nearness) ↦ {
+          Plane.distance(inner(x), inner(y)) < middle by innerAnswers;
+          inner(y) ∈ target by lands;
+          done by outerAnswers
+        };
+    done
+  }
+}
 
 -- Restricting the carrier only weakens the condition.
 theorem Plane.ContinuousOn.restrict

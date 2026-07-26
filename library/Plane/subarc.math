@@ -1,0 +1,307 @@
+-- Plane/subarc.math
+--
+-- Subarcs, and the arc without its endpoints. Layer 4.
+--
+-- A subarc is the arc restricted to a subsegment of the model interval —
+-- but an arc is a map ON the unit segment, so the restriction has to be
+-- reparametrised back onto it. `Plane.walkOnto(a, b)` is that
+-- reparametrisation: it reads a point's parameter off its first coordinate
+-- and walks that fraction of the way from `a` to `b`. The unit segment lies
+-- along the axis precisely so that this reads the parameter with no inverse
+-- to construct and no choice to make.
+--
+-- With it, a subarc is a composition, and the two things an arc must be —
+-- continuous and injective — are the two things a composition inherits.
+
+module Plane.subarc
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Set.algebra
+import Real.interface
+import Real.order
+import Real.order_field
+import Real.absolute_value
+import Real.absolute_value_order
+import Plane.vector
+import Plane.point
+import Plane.norm
+import Plane.segment
+import Plane.topology
+import Plane.compactness
+import Plane.connected
+import Plane.separation
+import Plane.model
+import Plane.homeomorphism
+import Plane.curve
+
+-- ----------------------------------------------------------------------
+-- The walk is injective in its parameter, unless it never moves.
+
+theorem Plane.between_injective (a b : Plane.Point) (distinct : ¬(a = b))
+        (s t : ℝ)
+        (sameWalk : Plane.between(a, b, s) = Plane.between(a, b, t))
+        : s = t := {
+  Plane.distance(a, b) ≠ 0
+      by (noDistance : Plane.distance(a, b) = 0) ↦ {
+        a = b by Plane.equal_of_distance_zero;
+        done
+      };
+  Plane.distance(Plane.between(a, b, s), Plane.between(a, b, t))
+      = Plane.distance(Plane.between(a, b, s), Plane.between(a, b, s))
+      by substituting sameWalk;
+  Plane.distance(Plane.between(a, b, s), Plane.between(a, b, s)) = 0
+      by Plane.distance_self;
+  abs(t - s) * Plane.distance(a, b)
+     = Plane.distance(Plane.between(a, b, s), Plane.between(a, b, t))
+           by Plane.between_distance
+     = 0;
+
+  -- A product is zero only if a factor is, and the distance is not.
+  abs(t - s) = 0 by {
+    suppose ¬(abs(t - s) = 0) as gapNonzero for contradiction {
+      abs(t - s) * Plane.distance(a, b) ≠ 0 by Real.multiply_nonzero;
+      done
+    };
+    done
+  };
+  -- A quantity trapped between its absolute value and minus it, with that
+  -- absolute value zero, is zero.
+  t - s
+     ≤ abs(t - s) by Real.LessOrEqual_absolute_value
+     = 0;
+  -(t - s)
+     ≤ abs(t - s) by Real.negate_LessOrEqual_absolute_value
+     = 0;
+  0 ≤ t - s by ordered_field;
+  t - s = 0 by Real.LessOrEqual.antisymmetric as gapVanishes;
+  s = t by linear_combination(-1 * gapVanishes);
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- Reparametrising the unit segment onto any segment.
+
+definition Plane.walkOnto (a b : Plane.Point) : Plane.Point → Plane.Point :=
+  (x : Plane.Point) ↦ Plane.between(a, b, Plane.Point.first(x))
+
+theorem Plane.walkOnto_start (a b : Plane.Point)
+        : Plane.walkOnto(a, b)(Plane.origin) = a :=
+  Plane.between(a, b, Plane.Point.first(Plane.origin))
+     = Plane.between(a, b, 0)
+     = a by Plane.between_zero
+
+theorem Plane.walkOnto_finish (a b : Plane.Point)
+        : Plane.walkOnto(a, b)(Plane.Point.make(1, 0)) = b :=
+  Plane.between(a, b, Plane.Point.first(Plane.Point.make(1, 0)))
+     = Plane.between(a, b, 1)
+     = b by Plane.between_one
+
+-- The reparametrisation lands in the segment it names, so a subarc of an
+-- arc is the arc restricted to that segment.
+theorem Plane.walkOnto_lands (a b : Plane.Point) (x : Plane.Point)
+        (onSegment : x ∈ Plane.unitSegment)
+        : Plane.walkOnto(a, b)(x) ∈ Plane.segment(a, b) := {
+  0 ≤ Plane.Point.first(x) by Plane.first_coordinate_nonneg_on_unitSegment;
+  Plane.Point.first(x) ≤ 1
+      by Plane.first_coordinate_atMostOne_on_unitSegment;
+  done by { witness Plane.Point.first(x) with done }
+}
+
+-- And it reaches every point of that segment: the parameter of the target
+-- names the point of the unit segment that walks to it.
+theorem Plane.walkOnto_reaches (a b : Plane.Point) (y : Plane.Point)
+        (onSegment : y ∈ Plane.segment(a, b))
+        : ∃ (x : Plane.Point). x ∈ Plane.unitSegment
+            ∧ Plane.walkOnto(a, b)(x) = y := {
+  choose parameter such that
+      (0 ≤ parameter ∧ parameter ≤ 1) ∧ y = Plane.between(a, b, parameter)
+      from onSegment;
+  0 ≤ parameter;
+  parameter ≤ 1;
+  y = Plane.between(a, b, parameter);
+  let source : Plane.Point :=
+      Plane.between(Plane.origin, Plane.Point.make(1, 0), parameter);
+  source ∈ Plane.unitSegment by { witness parameter with done };
+  Plane.Point.first(source) = parameter
+      by Plane.first_coordinate_of_unitSegment;
+  Plane.walkOnto(a, b)(source)
+     = Plane.between(a, b, Plane.Point.first(source))
+     = Plane.between(a, b, parameter)
+     = y by Equality.symmetry;
+  done by { witness source with done }
+}
+
+theorem Plane.walkOnto_ContinuousOn (a b : Plane.Point)
+        : Plane.ContinuousOn(Plane.walkOnto(a, b), Plane.unitSegment) := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.unitSegment;
+  take tolerance : ℝ;
+  suppose 0 < tolerance as tolerancePositive;
+  0 < Plane.parameterGap(tolerance, a, b);
+  witness Plane.parameterGap(tolerance, a, b) with {
+    0 < Plane.parameterGap(tolerance, a, b);
+    ∀ (y : Plane.Point). y ∈ Plane.unitSegment →
+        Plane.distance(x, y) < Plane.parameterGap(tolerance, a, b) →
+          Plane.distance(
+              Plane.walkOnto(a, b)(x), Plane.walkOnto(a, b)(y)) < tolerance
+        by (y : Plane.Point) (onSegment : y ∈ Plane.unitSegment)
+           (near : Plane.distance(x, y)
+                       < Plane.parameterGap(tolerance, a, b)) ↦ {
+          -- A coordinate gap never exceeds the distance, so the parameters
+          -- are as close as the points.
+          abs(Plane.Point.first(y) - Plane.Point.first(x))
+             = abs(Plane.Vector.first(y - x)) by Plane.Point.first_difference
+             ≤ Plane.Vector.norm(y - x)
+                   by Plane.Vector.absolute_first_LessOrEqual_norm
+             = Plane.distance(x, y)
+             < Plane.parameterGap(tolerance, a, b);
+          done by Plane.between_close_of_gap
+        };
+    done
+  }
+}
+
+theorem Plane.walkOnto_InjectiveOn (a b : Plane.Point) (distinct : ¬(a = b))
+        : Plane.InjectiveOn(Plane.walkOnto(a, b), Plane.unitSegment) := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.unitSegment as xOnSegment;
+  take y : Plane.Point;
+  suppose y ∈ Plane.unitSegment as yOnSegment;
+  suppose Plane.walkOnto(a, b)(x) = Plane.walkOnto(a, b)(y) as sameWalk;
+  Plane.between(a, b, Plane.Point.first(x))
+      = Plane.between(a, b, Plane.Point.first(y)) by sameWalk;
+  Plane.Point.first(x) = Plane.Point.first(y)
+      by Plane.between_injective as sameParameter;
+  -- A point of the unit segment is the walk at its own first coordinate,
+  -- so equal coordinates are equal points.
+  x = Plane.between(Plane.origin, Plane.Point.make(1, 0), Plane.Point.first(x))
+      by Plane.unitSegment_at_first_coordinate;
+  y = Plane.between(Plane.origin, Plane.Point.make(1, 0), Plane.Point.first(y))
+      by Plane.unitSegment_at_first_coordinate;
+  x = Plane.between(Plane.origin, Plane.Point.make(1, 0), Plane.Point.first(x))
+    = Plane.between(Plane.origin, Plane.Point.make(1, 0), Plane.Point.first(y))
+          by substituting sameParameter
+    = y by Equality.symmetry;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- Subarcs.
+
+definition Plane.subarc (parametrisation : Plane.Point → Plane.Point)
+        (a b : Plane.Point) : Plane.Point → Plane.Point :=
+  (x : Plane.Point) ↦ parametrisation(Plane.walkOnto(a, b)(x))
+
+theorem Plane.subarc_start (parametrisation : Plane.Point → Plane.Point)
+        (a b : Plane.Point)
+        : Plane.arcStart(Plane.subarc(parametrisation, a, b))
+              = parametrisation(a) := {
+  Plane.walkOnto(a, b)(Plane.origin) = a by Plane.walkOnto_start;
+  done by substituting Plane.walkOnto(a, b)(Plane.origin) = a
+}
+
+theorem Plane.subarc_finish (parametrisation : Plane.Point → Plane.Point)
+        (a b : Plane.Point)
+        : Plane.arcFinish(Plane.subarc(parametrisation, a, b))
+              = parametrisation(b) := {
+  Plane.walkOnto(a, b)(Plane.Point.make(1, 0)) = b by Plane.walkOnto_finish;
+  done by substituting Plane.walkOnto(a, b)(Plane.Point.make(1, 0)) = b
+}
+
+-- A subarc between two distinct points of the model interval is an arc:
+-- the reparametrisation is continuous and injective onto a subsegment, and
+-- the unit segment is convex, so that subsegment is where the arc still
+-- lives.
+theorem Plane.IsArc.subarc (parametrisation : Plane.Point → Plane.Point)
+        (isArc : Plane.IsArc(parametrisation))
+        (a b : Plane.Point)
+        (aOnSegment : a ∈ Plane.unitSegment)
+        (bOnSegment : b ∈ Plane.unitSegment)
+        (distinct : ¬(a = b))
+        : Plane.IsArc(Plane.subarc(parametrisation, a, b)) := {
+  Plane.ContinuousOn(parametrisation, Plane.unitSegment);
+  Plane.InjectiveOn(parametrisation, Plane.unitSegment) as injective;
+  Plane.IsConvex(Plane.unitSegment) by Plane.unitSegment_IsConvex;
+  Plane.segment(a, b) ⊆ Plane.unitSegment
+      by Plane.IsConvex.segment_inside as subsegmentInside;
+  ∀ (x : Plane.Point). x ∈ Plane.unitSegment →
+      Plane.walkOnto(a, b)(x) ∈ Plane.unitSegment
+      by (x : Plane.Point) (onSegment : x ∈ Plane.unitSegment) ↦ {
+        Plane.walkOnto(a, b)(x) ∈ Plane.segment(a, b)
+            by Plane.walkOnto_lands;
+        done by subsegmentInside
+      }
+      as landsInModel;
+
+  Plane.ContinuousOn(Plane.walkOnto(a, b), Plane.unitSegment)
+      by Plane.walkOnto_ContinuousOn;
+  Plane.ContinuousOn(
+      Plane.subarc(parametrisation, a, b), Plane.unitSegment)
+      by Plane.ContinuousOn.compose(
+          inner := Plane.walkOnto(a, b), outer := parametrisation,
+          target := Plane.unitSegment);
+
+  Plane.InjectiveOn(Plane.walkOnto(a, b), Plane.unitSegment)
+      by Plane.walkOnto_InjectiveOn as walkInjective;
+  Plane.InjectiveOn(
+      Plane.subarc(parametrisation, a, b), Plane.unitSegment)
+      by (x : Plane.Point) (xOnSegment : x ∈ Plane.unitSegment)
+         (y : Plane.Point) (yOnSegment : y ∈ Plane.unitSegment)
+         (sameValue : Plane.subarc(parametrisation, a, b)(x)
+                          = Plane.subarc(parametrisation, a, b)(y)) ↦ {
+        Plane.walkOnto(a, b)(x) ∈ Plane.unitSegment by landsInModel;
+        Plane.walkOnto(a, b)(y) ∈ Plane.unitSegment by landsInModel;
+        parametrisation(Plane.walkOnto(a, b)(x))
+            = parametrisation(Plane.walkOnto(a, b)(y)) by sameValue;
+        Plane.walkOnto(a, b)(x) = Plane.walkOnto(a, b)(y) by injective;
+        done by walkInjective
+      };
+  done
+}
+
+-- The subarc's image is the arc restricted to the subsegment — which is
+-- what "sub" means, and the form every consumer wants.
+theorem Plane.subarc_image (parametrisation : Plane.Point → Plane.Point)
+        (a b : Plane.Point)
+        : Plane.arc(Plane.subarc(parametrisation, a, b))
+              = Plane.imageSet(parametrisation, Plane.segment(a, b)) := {
+  Plane.arc(Plane.subarc(parametrisation, a, b))
+      ⊆ Plane.imageSet(parametrisation, Plane.segment(a, b))
+      by (y : Plane.Point)
+         (onSubarc : y ∈ Plane.arc(Plane.subarc(parametrisation, a, b))) ↦ {
+        choose source such that
+            source ∈ Plane.unitSegment
+              ∧ Plane.subarc(parametrisation, a, b)(source) = y
+            from onSubarc;
+        source ∈ Plane.unitSegment;
+        parametrisation(Plane.walkOnto(a, b)(source)) = y;
+        Plane.walkOnto(a, b)(source) ∈ Plane.segment(a, b)
+            by Plane.walkOnto_lands;
+        done by { witness Plane.walkOnto(a, b)(source) with done }
+      };
+  Plane.imageSet(parametrisation, Plane.segment(a, b))
+      ⊆ Plane.arc(Plane.subarc(parametrisation, a, b))
+      by (y : Plane.Point)
+         (onRestriction :
+              y ∈ Plane.imageSet(parametrisation, Plane.segment(a, b))) ↦ {
+        choose middle such that
+            middle ∈ Plane.segment(a, b) ∧ parametrisation(middle) = y
+            from onRestriction;
+        middle ∈ Plane.segment(a, b) as middleOnSegment;
+        parametrisation(middle) = y as valueAtMiddle;
+        choose source such that
+            source ∈ Plane.unitSegment ∧ Plane.walkOnto(a, b)(source) = middle
+            from Plane.walkOnto_reaches(a, b, middle, middleOnSegment);
+        source ∈ Plane.unitSegment;
+        Plane.walkOnto(a, b)(source) = middle as walksToMiddle;
+        Plane.subarc(parametrisation, a, b)(source)
+           = parametrisation(Plane.walkOnto(a, b)(source))
+           = parametrisation(middle) by substituting walksToMiddle
+           = y by valueAtMiddle;
+        done by { witness source with done }
+      };
+  done by Set.equal_of_same_members
+}
