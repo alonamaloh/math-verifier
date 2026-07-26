@@ -1995,3 +1995,64 @@ split form shows the intermediate spelling, which the style guide prefers.
 index has no level story, so such a declaration silently degrades to
 citation-only. The audit says no current declaration is affected; the cheap
 guard (warn at declaration time) is still unwritten.
+
+---
+
+## Layer 3–4 pass (Plane/, 2026-07-26)
+
+**GOOD — the "search by conclusion shape" candidate list.** Removing a
+`by Set.intersection_subset_right` that turned out to be load-bearing gave:
+
+```
+claim `Set.subset Plane.Point (Set.intersection Plane.Point piece part) part`:
+  no in-scope hypothesis matches structurally, … — add `by <lemma>` to specify
+  search by conclusion shape — candidates (cite one as `by <lemma>(…)`):
+    Set.intersection_subset_right : … Set.subset T (Set.intersection T left right) right
+        (in scope but not `automatic` — cite it as `by Set.intersection_subset_right`,
+         or mark the lemma `automatic`)
+```
+
+Named the exact lemma, said it was in scope, and offered the two repairs.
+The whole diagnosis was one read. More messages should end this way.
+
+**MISLEADING (measured) — "expensive by-less proof step … add an explicit
+`by <reason>`".** Four spellings measured in FRICTION E13: the 110k-step
+search was not caused by the missing `by`, the block, or the trailing
+`done`. It was caused by the LIBRARY not having a lemma for the step
+(`supNorm_negate`, `difference_reverse`); with those added the bare form is
+free. The advice sends the reader to add a hint, which is the fix the style
+guide then tells them to remove. When the battery closes a step by
+congruence over a compound rather than by a lemma, say that — "no lemma
+matched; reconstructed by congruence from N context facts" — because the
+real repair is usually a missing named fact.
+
+**CONFUSING — a citation whose conclusion is an `And` does not project to
+the leg** (FRICTION E12, hit again in Layer 4 with a plain hypothesis):
+
+```
+  the `nearIsClose` citation does not prove this goal
+    goal:        Set.member Plane.Point near Plane.squareBoundary
+    `nearIsClose` has type: And (Set.member …) (Plane.Ball …)
+  its conclusion is about `And` but the goal is about `Set.member` —
+  this lemma does not target this goal (check the lemma name)
+```
+
+The message is accurate but the parenthetical advice ("check the lemma
+name") is wrong here: the name is right, the projection is missing.
+`And.left`/`And.right` are `automatic`, so one hop would close it.
+
+**COST, not a message — naming an equation-shaped conjunct of a context
+fact took 58k steps** in `Plane.squareBoundary_IsClosed`, while the same
+shape elsewhere in the same file is free (FRICTION E14). Unmeasured whether
+the trigger is the numeral right-hand side or the enclosing reductio's
+context.
+
+**WORKED WELL, worth advertising — argument-free citation is far stronger
+than the docs suggest.** `by <Lemma>` with every argument read off the goal
+and every premise discharged from context worked at essentially every site
+in a ~30-site conversion, INCLUDING: inductive constructors
+(`Plane.PolygonalReach.arrived`), ∀-hypotheses (`by convex`,
+`by isUpperBound`, `by partConnected`), and lemmas with four premises. Where
+one argument is genuinely undetermined, `Lemma(name := value)` covers it.
+This is the single biggest readability lever in the language and the style
+guide should lead with it.
