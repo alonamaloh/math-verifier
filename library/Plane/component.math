@@ -1,0 +1,403 @@
+-- Plane/component.math
+--
+-- Connected components, and regions. Layer 3.
+--
+-- The component of a point is the union of every connected part of the
+-- region that holds the point. Taken this way it is a comprehension, not
+-- an indexed union, and its two characteristic properties fall out of the
+-- definition: it holds every connected part through the point
+-- (`Plane.Component_contains`), and it is contained in the region.
+--
+-- The work is in the third property, that the component is itself
+-- connected: a relatively clopen piece of it swallows whichever part
+-- witnesses one of its own points, hence holds the base point, hence
+-- swallows every part through the base — which is everything. That is
+-- `Plane.IsConnected.swallows` applied twice, exactly as in the union
+-- theorem it was extracted for.
+
+module Plane.component
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Set.algebra
+import Real.interface
+import Real.order
+import Plane.segment
+import Plane.point
+import Plane.norm
+import Plane.topology
+import Plane.connected
+
+-- ----------------------------------------------------------------------
+-- A single point is connected: a nonempty subset of it is all of it.
+
+theorem Plane.singleton_IsConnected (base : Plane.Point)
+        : Plane.IsConnected(Set.singleton(Plane.Point, base)) := {
+  take piece : Set(Plane.Point);
+  suppose piece ⊆ Set.singleton(Plane.Point, base) as pieceInside;
+  suppose Plane.OpenIn(piece, Set.singleton(Plane.Point, base));
+  suppose Plane.OpenIn(
+      Set.singleton(Plane.Point, base) ∖ piece,
+      Set.singleton(Plane.Point, base));
+  suppose Set.IsNonempty(Plane.Point, piece) as pieceNonempty;
+  choose start such that start ∈ piece as startInPiece from pieceNonempty;
+  start ∈ Set.singleton(Plane.Point, base)
+      by pieceInside(start, startInPiece);
+  start = base as startIsBase;
+  base ∈ piece by substituting startIsBase;
+  Set.singleton(Plane.Point, base) ⊆ piece
+      by Set.singleton_subset(base, piece, { base ∈ piece });
+  done by Set.equal_of_same_members
+}
+
+-- ----------------------------------------------------------------------
+-- The component of a point in a region.
+
+definition Plane.Component (region : Set(Plane.Point)) (base : Plane.Point)
+        : Set(Plane.Point) :=
+  (x : Plane.Point) ↦ ∃ (part : Set(Plane.Point)).
+    part ⊆ region ∧ Plane.IsConnected(part) ∧ base ∈ part ∧ x ∈ part
+
+-- Maximality, in the form every consumer wants: a connected part of the
+-- region through the base point is inside the component.
+theorem Plane.Component_contains
+        (region part : Set(Plane.Point)) (base : Plane.Point)
+        (partInside : part ⊆ region)
+        (partConnected : Plane.IsConnected(part))
+        (baseInPart : base ∈ part)
+        : part ⊆ Plane.Component(region, base) := {
+  take x : Plane.Point;
+  suppose x ∈ part as xInPart;
+  x ∈ Plane.Component(region, base)
+      by { witness part with {
+             part ⊆ region;
+             Plane.IsConnected(part);
+             base ∈ part;
+             x ∈ part;
+             done
+           } };
+  done
+}
+
+theorem Plane.Component_subset (region : Set(Plane.Point)) (base : Plane.Point)
+        : Plane.Component(region, base) ⊆ region := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.Component(region, base) as inComponent;
+  choose part such that
+      part ⊆ region ∧ Plane.IsConnected(part) ∧ base ∈ part ∧ x ∈ part
+      from inComponent;
+  part ⊆ region as partInside;
+  x ∈ part as xInPart;
+  done by partInside(x, xInPart)
+}
+
+theorem Plane.base_in_Component
+        (region : Set(Plane.Point)) (base : Plane.Point)
+        (baseInRegion : base ∈ region)
+        : base ∈ Plane.Component(region, base) := {
+  Set.singleton(Plane.Point, base) ⊆ region
+      by Set.singleton_subset(base, region, baseInRegion);
+  base ∈ Set.singleton(Plane.Point, base) by Set.singleton_member;
+  Set.singleton(Plane.Point, base) ⊆ Plane.Component(region, base)
+      by Plane.Component_contains(
+          region, Set.singleton(Plane.Point, base), base,
+          { Set.singleton(Plane.Point, base) ⊆ region },
+          Plane.singleton_IsConnected(base),
+          { base ∈ Set.singleton(Plane.Point, base) })
+      as singletonInside;
+  done by singletonInside(base, { base ∈ Set.singleton(Plane.Point, base) })
+}
+
+-- ----------------------------------------------------------------------
+-- The component is connected.
+
+theorem Plane.Component_IsConnected
+        (region : Set(Plane.Point)) (base : Plane.Point)
+        (baseInRegion : base ∈ region)
+        : Plane.IsConnected(Plane.Component(region, base)) := {
+  take piece : Set(Plane.Point);
+  suppose piece ⊆ Plane.Component(region, base) as pieceInside;
+  suppose Plane.OpenIn(piece, Plane.Component(region, base)) as pieceOpen;
+  suppose Plane.OpenIn(
+      Plane.Component(region, base) ∖ piece,
+      Plane.Component(region, base)) as restOpen;
+  suppose Set.IsNonempty(Plane.Point, piece) as pieceNonempty;
+
+  -- Whichever part witnesses a point of the piece is swallowed whole,
+  -- and it holds the base point.
+  choose start such that start ∈ piece as startInPiece from pieceNonempty;
+  start ∈ Plane.Component(region, base) by pieceInside(start, startInPiece);
+  choose startPart such that
+      startPart ⊆ region ∧ Plane.IsConnected(startPart) ∧
+        base ∈ startPart ∧ start ∈ startPart
+      from { start ∈ Plane.Component(region, base) };
+  startPart ⊆ region as startPartInside;
+  Plane.IsConnected(startPart) as startPartConnected;
+  base ∈ startPart as baseInStartPart;
+  start ∈ startPart;
+  startPart ⊆ Plane.Component(region, base)
+      by Plane.Component_contains(
+          region, startPart, base, startPartInside, startPartConnected,
+          baseInStartPart);
+  Set.IsNonempty(Plane.Point, piece ∩ startPart)
+      by { witness start with { done by Set.member_intersection } };
+  startPart ⊆ piece
+      by Plane.IsConnected.swallows(
+          Plane.Component(region, base), startPart, piece,
+          startPartConnected,
+          { startPart ⊆ Plane.Component(region, base) },
+          pieceOpen, restOpen,
+          { Set.IsNonempty(Plane.Point, piece ∩ startPart) })
+      as startPartInPiece;
+  base ∈ piece by startPartInPiece(base, baseInStartPart);
+
+  -- With the base point inside, every part through it is swallowed too.
+  Plane.Component(region, base) ⊆ piece
+      by (x : Plane.Point)
+         (xInComponent : x ∈ Plane.Component(region, base)) ↦ {
+        choose part such that
+            part ⊆ region ∧ Plane.IsConnected(part) ∧ base ∈ part ∧ x ∈ part
+            from xInComponent;
+        part ⊆ region as partInside;
+        Plane.IsConnected(part) as partConnected;
+        base ∈ part as baseInPart;
+        x ∈ part as xInPart;
+        part ⊆ Plane.Component(region, base)
+            by Plane.Component_contains(
+                region, part, base, partInside, partConnected, baseInPart);
+        Set.IsNonempty(Plane.Point, piece ∩ part)
+            by { witness base with { done by Set.member_intersection } };
+        part ⊆ piece
+            by Plane.IsConnected.swallows(
+                Plane.Component(region, base), part, piece, partConnected,
+                { part ⊆ Plane.Component(region, base) },
+                pieceOpen, restOpen,
+                { Set.IsNonempty(Plane.Point, piece ∩ part) })
+            as partInPiece;
+        done by partInPiece(x, xInPart)
+      };
+  done by Set.equal_of_same_members
+}
+
+-- ----------------------------------------------------------------------
+-- Components partition the region.
+--
+-- A point of a component has the same component: the two witnessing
+-- parts share that point, so their union is a connected part of the
+-- region holding both base points, and each component swallows the
+-- other's witnesses.
+
+theorem Plane.Component.equal_of_member
+        (region : Set(Plane.Point)) (base other : Plane.Point)
+        (otherInComponent : other ∈ Plane.Component(region, base))
+        : Plane.Component(region, other) = Plane.Component(region, base) := {
+  choose bridge such that
+      bridge ⊆ region ∧ Plane.IsConnected(bridge) ∧
+        base ∈ bridge ∧ other ∈ bridge
+      from otherInComponent;
+  bridge ⊆ region as bridgeInside;
+  Plane.IsConnected(bridge) as bridgeConnected;
+  base ∈ bridge as baseInBridge;
+  other ∈ bridge as otherInBridge;
+
+  Plane.Component(region, other) ⊆ Plane.Component(region, base)
+      by (x : Plane.Point)
+         (xInOther : x ∈ Plane.Component(region, other)) ↦ {
+        choose part such that
+            part ⊆ region ∧ Plane.IsConnected(part) ∧
+              other ∈ part ∧ x ∈ part
+            from xInOther;
+        part ⊆ region as partInside;
+        Plane.IsConnected(part) as partConnected;
+        other ∈ part as otherInPart;
+        x ∈ part;
+        Plane.IsConnected(bridge ∪ part)
+            by Plane.IsConnected.union(
+                bridge, part, bridgeConnected, partConnected, other,
+                otherInBridge, otherInPart);
+        bridge ∪ part ⊆ region
+            by Set.union_subset(bridge, part, region, bridgeInside, partInside);
+        base ∈ bridge ∪ part by Set.subset_union_left(bridge, part);
+        x ∈ bridge ∪ part by Set.subset_union_right(bridge, part);
+        bridge ∪ part ⊆ Plane.Component(region, base)
+            by Plane.Component_contains(
+                region, bridge ∪ part, base,
+                { bridge ∪ part ⊆ region },
+                { Plane.IsConnected(bridge ∪ part) },
+                { base ∈ bridge ∪ part })
+            as unionInside;
+        done by unionInside(x, { x ∈ bridge ∪ part })
+      };
+
+  Plane.Component(region, base) ⊆ Plane.Component(region, other)
+      by (x : Plane.Point)
+         (xInBase : x ∈ Plane.Component(region, base)) ↦ {
+        choose part such that
+            part ⊆ region ∧ Plane.IsConnected(part) ∧
+              base ∈ part ∧ x ∈ part
+            from xInBase;
+        part ⊆ region as partInside;
+        Plane.IsConnected(part) as partConnected;
+        base ∈ part as baseInPart;
+        x ∈ part;
+        Plane.IsConnected(bridge ∪ part)
+            by Plane.IsConnected.union(
+                bridge, part, bridgeConnected, partConnected, base,
+                baseInBridge, baseInPart);
+        bridge ∪ part ⊆ region
+            by Set.union_subset(bridge, part, region, bridgeInside, partInside);
+        other ∈ bridge ∪ part by Set.subset_union_left(bridge, part);
+        x ∈ bridge ∪ part by Set.subset_union_right(bridge, part);
+        bridge ∪ part ⊆ Plane.Component(region, other)
+            by Plane.Component_contains(
+                region, bridge ∪ part, other,
+                { bridge ∪ part ⊆ region },
+                { Plane.IsConnected(bridge ∪ part) },
+                { other ∈ bridge ∪ part })
+            as unionInside;
+        done by unionInside(x, { x ∈ bridge ∪ part })
+      };
+  done by Set.equal_of_same_members
+}
+
+-- Two components that meet coincide. With `Plane.base_in_Component`,
+-- this is the partition statement.
+theorem Plane.Component.equal_of_meeting
+        (region : Set(Plane.Point)) (first second : Plane.Point)
+        (meets : Set.IsNonempty(
+            Plane.Point,
+            Plane.Component(region, first) ∩ Plane.Component(region, second)))
+        : Plane.Component(region, first) = Plane.Component(region, second) := {
+  choose shared such that
+      shared ∈ Plane.Component(region, first) ∩ Plane.Component(region, second)
+      from meets;
+  shared ∈ Plane.Component(region, first) by Set.intersection_member_left;
+  shared ∈ Plane.Component(region, second) by Set.intersection_member_right;
+  Plane.Component(region, shared) = Plane.Component(region, first)
+      by Plane.Component.equal_of_member(
+          region, first, shared, { shared ∈ Plane.Component(region, first) });
+  Plane.Component(region, shared) = Plane.Component(region, second)
+      by Plane.Component.equal_of_member(
+          region, second, shared, { shared ∈ Plane.Component(region, second) });
+  Plane.Component(region, first) = Plane.Component(region, shared)
+      by Equality.symmetry;
+  Plane.Component(region, first) = Plane.Component(region, second)
+      by Equality.transitivity;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- Components of an open set are open.
+--
+-- A point of the component has a whole disk of the open set around it,
+-- and a disk is connected. Glued to the part that witnessed the point,
+-- it is one more connected part through the base — so the disk is inside
+-- the component, which is the radius the definition asks for.
+
+theorem Plane.Component_IsOpen
+        (region : Set(Plane.Point)) (base : Plane.Point)
+        (regionOpen : Plane.IsOpen(region))
+        : Plane.IsOpen(Plane.Component(region, base)) := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.Component(region, base) as xInComponent;
+  choose part such that
+      part ⊆ region ∧ Plane.IsConnected(part) ∧ base ∈ part ∧ x ∈ part
+      from xInComponent;
+  part ⊆ region as partInside;
+  Plane.IsConnected(part) as partConnected;
+  base ∈ part;
+  x ∈ part as xInPart;
+  x ∈ region by partInside(x, xInPart);
+  choose radius such that
+      0 < radius ∧
+        ∀ (y : Plane.Point). y ∈ Set.universe(Plane.Point) →
+          Plane.distance(x, y) < radius → y ∈ region
+      from regionOpen(x, { x ∈ region });
+  0 < radius;
+  ∀ (y : Plane.Point). y ∈ Set.universe(Plane.Point) →
+      Plane.distance(x, y) < radius → y ∈ region as nearbyInRegion;
+
+  Plane.Ball(x, radius) ⊆ region
+      by (y : Plane.Point) (yInBall : y ∈ Plane.Ball(x, radius)) ↦ {
+        Plane.distance(x, y) < radius;
+        y ∈ Set.universe(Plane.Point) by Set.member_universe;
+        done by nearbyInRegion(y, { y ∈ Set.universe(Plane.Point) },
+                               { Plane.distance(x, y) < radius })
+      };
+  Plane.distance(x, x) = 0 by Plane.distance_self;
+  Plane.distance(x, x) < radius;
+  x ∈ Plane.Ball(x, radius) as centreInBall;
+  Plane.IsConnected(part ∪ Plane.Ball(x, radius))
+      by Plane.IsConnected.union(
+          part, Plane.Ball(x, radius), partConnected,
+          Plane.Ball_IsConnected(x, radius), x, xInPart, centreInBall);
+  part ∪ Plane.Ball(x, radius) ⊆ region
+      by Set.union_subset(
+          part, Plane.Ball(x, radius), region, partInside,
+          { Plane.Ball(x, radius) ⊆ region });
+  base ∈ part ∪ Plane.Ball(x, radius) by Set.subset_union_left(part, Plane.Ball(x, radius));
+  part ∪ Plane.Ball(x, radius) ⊆ Plane.Component(region, base)
+      by Plane.Component_contains(
+          region, part ∪ Plane.Ball(x, radius), base,
+          { part ∪ Plane.Ball(x, radius) ⊆ region },
+          { Plane.IsConnected(part ∪ Plane.Ball(x, radius)) },
+          { base ∈ part ∪ Plane.Ball(x, radius) })
+      as unionInside;
+
+  witness radius with {
+    0 < radius;
+    ∀ (y : Plane.Point). y ∈ Set.universe(Plane.Point) →
+        Plane.distance(x, y) < radius → y ∈ Plane.Component(region, base)
+        by (y : Plane.Point) (yAnywhere : y ∈ Set.universe(Plane.Point))
+           (yClose : Plane.distance(x, y) < radius) ↦ {
+          y ∈ Plane.Ball(x, radius);
+          y ∈ part ∪ Plane.Ball(x, radius)
+              by Set.subset_union_right(part, Plane.Ball(x, radius));
+          done by unionInside(y, { y ∈ part ∪ Plane.Ball(x, radius) })
+        };
+    done
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- Regions.
+
+definition Plane.IsRegion (region : Set(Plane.Point)) : Proposition :=
+  Set.IsNonempty(Plane.Point, region) ∧ Plane.IsOpen(region) ∧
+    Plane.IsConnected(region)
+
+-- A disk of positive radius is a region: the model case, and the one the
+-- polygonal-connectedness argument runs on.
+theorem Plane.Ball_IsRegion (center : Plane.Point) (radius : ℝ)
+        (radiusPositive : 0 < radius)
+        : Plane.IsRegion(Plane.Ball(center, radius)) := {
+  Plane.distance(center, center) = 0 by Plane.distance_self;
+  Plane.distance(center, center) < radius;
+  center ∈ Plane.Ball(center, radius);
+  Set.IsNonempty(Plane.Point, Plane.Ball(center, radius))
+      by { witness center with done };
+  Plane.IsOpen(Plane.Ball(center, radius)) by Plane.Ball_IsOpen;
+  Plane.IsConnected(Plane.Ball(center, radius)) by Plane.Ball_IsConnected;
+  done
+}
+
+-- The component of a point of an open set is a region: it is open, it is
+-- connected, and it holds the point. This is the shape Layer 3's
+-- consumers use — every face of a plane graph is produced this way.
+theorem Plane.Component_IsRegion
+        (region : Set(Plane.Point)) (base : Plane.Point)
+        (regionOpen : Plane.IsOpen(region))
+        (baseInRegion : base ∈ region)
+        : Plane.IsRegion(Plane.Component(region, base)) := {
+  Set.IsNonempty(Plane.Point, Plane.Component(region, base))
+      by { witness base with {
+             done by Plane.base_in_Component(region, base, baseInRegion)
+           } };
+  Plane.IsOpen(Plane.Component(region, base))
+      by Plane.Component_IsOpen(region, base, regionOpen);
+  Plane.IsConnected(Plane.Component(region, base))
+      by Plane.Component_IsConnected(region, base, baseInRegion);
+  done
+}
