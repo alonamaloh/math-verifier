@@ -204,11 +204,12 @@ theorem Plane.image_bounded_above (f : Plane.Point → ℝ)
         by Plane.SubsequenceConverges.increasing;
     limit ∈ region as limitInRegion;
     Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
-        by Plane.SubsequenceConverges.converges as converges;
+        by Plane.SubsequenceConverges.converges;
     Real.SequenceConverges((k : ℕ) ↦ f(s(index(k))), f(limit))
         by Plane.RealContinuousAt.along_sequence(
-            f, region, limit, continuous(limit, limitInRegion),
-            (k : ℕ) ↦ s(index(k)), (k : ℕ) ↦ inside(index(k)), converges)
+            continuous := continuous(limit, limitInRegion),
+            s := (k : ℕ) ↦ s(index(k)),
+            inside := (k : ℕ) ↦ inside(index(k)))
         as valuesConverge;
     (0 : ℝ) < 1;
     choose threshold such that
@@ -253,8 +254,7 @@ theorem Plane.attains_maximum (f : Plane.Point → ℝ)
   choose start such that start ∈ region from nonempty;
   Set.IsNonempty(ℝ, Plane.image(f, region))
       by { witness f(start) with { witness start with done } };
-  Real.IsBoundedAbove(Plane.image(f, region))
-      by Plane.image_bounded_above(f, region, compact, continuous);
+  Real.IsBoundedAbove(Plane.image(f, region)) by Plane.image_bounded_above;
   choose peak such that Real.IsSupremum(Plane.image(f, region), peak)
       as isSupremum
       from Real.supremum_exists(
@@ -315,15 +315,15 @@ theorem Plane.attains_maximum (f : Plane.Point → ℝ)
       by Plane.SubsequenceConverges.increasing;
   p ∈ region as inRegion;
   Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), p)
-      by Plane.SubsequenceConverges.converges as converges;
+      by Plane.SubsequenceConverges.converges;
 
   -- Continuity carries the limit of the points to `f(p)`; the squeeze
   -- carries the same sequence of values to `peak`.
   Real.SequenceConverges((k : ℕ) ↦ f(s(index(k))), f(p))
       by Plane.RealContinuousAt.along_sequence(
-          f, region, p, continuous(p, inRegion),
-          (k : ℕ) ↦ s(index(k)), (k : ℕ) ↦ inside(index(k)), converges)
-      as toValueAtP;
+          continuous := continuous(p, inRegion),
+          s := (k : ℕ) ↦ s(index(k)),
+          inside := (k : ℕ) ↦ inside(index(k)));
   Real.SequenceConverges((k : ℕ) ↦ f(s(index(k))), peak)
       by (tolerance : ℝ) (tolerancePositive : tolerance > 0) ↦ {
         choose scale such that Real.harmonic_term(scale) < tolerance
@@ -345,11 +345,9 @@ theorem Plane.attains_maximum (f : Plane.Point → ℝ)
               f(s(index(k))) - peak < tolerance;
               done by Real.absolute_value_LessThan_of_bounds
             }
-      }
-      as toPeak;
+      };
   f(p) = peak
-      by Real.SequenceConverges.unique(
-          (k : ℕ) ↦ f(s(index(k))), f(p), peak, toValueAtP, toPeak);
+      by Real.SequenceConverges.unique(s := (k : ℕ) ↦ f(s(index(k))));
   ∀ (x : Plane.Point). x ∈ region → f(x) ≤ f(p)
       by (x : Plane.Point) (inRegionX : x ∈ region) ↦ {
         f(x) ≤ peak by belowPeak(x, inRegionX);
@@ -368,7 +366,7 @@ theorem Plane.attains_minimum (f : Plane.Point → ℝ)
         : ∃ (p : Plane.Point). p ∈ region
             ∧ ∀ (x : Plane.Point). x ∈ region → f(p) ≤ f(x) := {
   Plane.RealContinuousOn((x : Plane.Point) ↦ -f(x), region)
-      by Plane.RealContinuousOn.negate(f, region, continuous);
+      by Plane.RealContinuousOn.negate;
   choose p such that
       p ∈ region ∧ ∀ (x : Plane.Point). x ∈ region → -f(x) ≤ -f(p)
       from Plane.attains_maximum(

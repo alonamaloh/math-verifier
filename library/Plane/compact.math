@@ -136,8 +136,7 @@ theorem Plane.bolzano_weierstrass (s : ℕ → Plane.Point)
   -- Thin once, so the first coordinate converges.
   Real.SequenceIsBounded((m : ℕ) ↦ Plane.Point.first(s(m)))
       by Plane.coordinate_bounded(
-          s, centre, bound, inside, Plane.Point.first,
-          Plane.first_gap_below_distance);
+          gapBelowDistance := Plane.first_gap_below_distance);
   choose firstIndex such that
       ∃ (firstLimit : ℝ).
           Real.SubsequenceConverges(
@@ -151,18 +150,18 @@ theorem Plane.bolzano_weierstrass (s : ℕ → Plane.Point)
           (m : ℕ) ↦ Plane.Point.first(s(m)), firstIndex, firstLimit)
       from firstLimitExists;
   Natural.IsStrictlyIncreasing(firstIndex)
-      by Real.SubsequenceConverges.increasing as firstIncreasing;
+      by Real.SubsequenceConverges.increasing;
   Real.SequenceConverges(
       (k : ℕ) ↦ Plane.Point.first(s(firstIndex(k))), firstLimit)
-      by Real.SubsequenceConverges.converges as firstConverges;
+      by Real.SubsequenceConverges.converges;
 
   -- Thin again, so the second coordinate does too. The thinned sequence
   -- is still bounded — it is a subfamily of the same one.
   Real.SequenceIsBounded((k : ℕ) ↦ Plane.Point.second(s(firstIndex(k))))
       by Plane.coordinate_bounded(
-          (k : ℕ) ↦ s(firstIndex(k)), centre, bound,
-          (k : ℕ) ↦ inside(firstIndex(k)),
-          Plane.Point.second, Plane.second_gap_below_distance);
+          s := (k : ℕ) ↦ s(firstIndex(k)),
+          inside := (k : ℕ) ↦ inside(firstIndex(k)),
+          gapBelowDistance := Plane.second_gap_below_distance);
   choose secondIndex such that
       ∃ (secondLimit : ℝ).
           Real.SubsequenceConverges(
@@ -179,29 +178,23 @@ theorem Plane.bolzano_weierstrass (s : ℕ → Plane.Point)
             (k : ℕ) ↦ Plane.Point.second(s(firstIndex(secondIndex(k)))),
             secondLimit)
       from secondLimitExists;
-  Natural.IsStrictlyIncreasing(secondIndex) as secondIncreasing;
+  Natural.IsStrictlyIncreasing(secondIndex);
   Real.SequenceConverges(
       (k : ℕ) ↦ Plane.Point.second(s(firstIndex(secondIndex(k)))),
-      secondLimit)
-      as secondConverges;
+      secondLimit);
 
   -- The first coordinate survives the second thinning.
   Real.SequenceConverges(
       (k : ℕ) ↦ Plane.Point.first(s(firstIndex(secondIndex(k)))), firstLimit)
       by Real.SequenceConverges.subsequence(
-          (k : ℕ) ↦ Plane.Point.first(s(firstIndex(k))),
-          firstLimit, secondIndex, firstConverges, secondIncreasing)
-      as firstStillConverges;
+          s := (k : ℕ) ↦ Plane.Point.first(s(firstIndex(k))));
 
   let limit : Plane.Point := Plane.Point.make(firstLimit, secondLimit);
   Natural.IsStrictlyIncreasing((k : ℕ) ↦ firstIndex(secondIndex(k)))
-      by Natural.IsStrictlyIncreasing.compose(
-          firstIndex, secondIndex, firstIncreasing, secondIncreasing);
+      by Natural.IsStrictlyIncreasing.compose;
   Plane.SequenceConverges(
       (k : ℕ) ↦ s(firstIndex(secondIndex(k))), limit)
-      by Plane.SequenceConverges.of_coordinates(
-          (k : ℕ) ↦ s(firstIndex(secondIndex(k))), limit,
-          firstStillConverges, secondConverges);
+      by Plane.SequenceConverges.of_coordinates;
   Plane.SubsequenceConverges(
       s, (k : ℕ) ↦ firstIndex(secondIndex(k)), limit);
   witness ((k : ℕ) ↦ firstIndex(secondIndex(k))) with
