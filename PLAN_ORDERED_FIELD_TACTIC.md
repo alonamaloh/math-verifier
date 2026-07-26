@@ -142,6 +142,29 @@ nonnegative increment, and each should collapse to one `by ordered_field`:
 | `library/Real/derivative.math:303,305` | `X ≤ abs(X) + 1` style bounds |
 | `library/Plane/sequence.math:146-155` | `< ε/2 + ε/2 = ε` — currently three cited steps; rational constants make it one |
 
+**Measured 2026-07-25, after O1.** Each shape was probed in isolation.
+The corpus is smaller and sharper than the table above:
+
+- **`Real/maximum.math` is the real target, and it is worse than I4
+  claimed.** The bare goal declines (expected). Stating the certificate's
+  nonnegative term first (`0 ≤ 2 * (c - a);`) does not help. Stating the
+  difference in the goal's own spelling
+  (`0 ≤ ((c - a) + (c - b)) - (a - b)`) does not help either — that claim
+  *exhausts the auto-prover budget*. So the gap is two-layered: the sign
+  battery does not ring-normalise its subject, and there is no bridge
+  from `0 ≤ D` to `L ≤ R` when `D` merely ring-equals `R - L`. Steps 4
+  and 5 of the emission cover both, which is a good sign for the design.
+- **The two `Plane/` sites leave the corpus.** `x ≤ x + y` from `0 ≤ y`
+  closes bare — the `by Real.less_or_equal_add_of_nonneg` at
+  `Plane/bilinear.math:201` and `Plane/norm.math:60` is a redundant hint,
+  not an I4 workaround. Whether to strip it is a per-site readability
+  call under the redundant-`by` rule, and it is not this plan's business.
+- **The `Real/derivative.math` sites stay, but their `by` is
+  load-bearing**: `abs(x) ≤ abs(x) + 1` declines bare, because the
+  numeral's `0 ≤ 1` is not discharged in that position. Linear over atoms
+  once it is, so the tactic should reach them — a useful second test
+  case, since it exercises the constant row.
+
 Acceptance for the corpus is not "the tactic closes them" but "the file
 reads better afterwards" — judged by reading the proofs, per
 `docs/style.md`, not by counting hints. `Real/maximum.math` is the file to
@@ -154,23 +177,33 @@ specification.
 
 ## Stages
 
-### O1 — the concluding and normalising lemmas (library only, no elaborator)
+### O1 — DONE 2026-07-25 — the concluding lemmas (library only)
 
-The assembly needs bridges that do not exist. Currently only the strict
-subtraction direction is present (`Real.subtract_positive_of_LessThan`,
-`library/Real/order.math:514`); the weak form and both converses are
-missing. Add, beside their families:
+Probed before writing anything, and the guess was wrong in both
+directions. **Both weak bridges already close unaided** at ℝ and at ℚ —
+`0 ≤ b - a` from `a ≤ b` (as `Real/order.math:511` already claimed) and,
+unrecorded until now, the converse `a ≤ b` from `0 ≤ b - a`. What was
+missing is the *strict* side, and ℚ was missing more of it than ℝ:
 
-- `Real.LessOrEqual_of_nonneg_subtract : 0 ≤ b - a → a ≤ b`
-- `Real.nonneg_subtract_of_LessOrEqual : a ≤ b → 0 ≤ b - a`
-- `Real.LessThan_of_positive_subtract : 0 < b - a → a < b`
-- the ℚ twins (`Rational.less_or_equal_add_of_nonneg` already exists at
-  `library/Rational/order_arithmetic.math:282`, so the naming is fixed)
+| Bridge | ℝ | ℚ |
+| --- | --- | --- |
+| `a ≤ b → 0 ≤ b - a` | automatic already | automatic already |
+| `0 ≤ b - a → a ≤ b` | automatic already | automatic already |
+| `a < b → 0 < b - a` | `subtract_positive_of_LessThan` (I2's fix) | **added** |
+| `0 < b - a → a < b` | **added** | **added** |
 
-These are the same *kind* of gap as the four closed frictions — one-line
-`ring`-backed lemmas — and they are worth landing first because they may
-independently shorten some corpus sites. Acceptance: `make -j 16 plane`,
-no elaborator change.
+Landed: `Real.LessThan_of_positive_subtract`
+(`library/Real/order.math`), `Rational.subtract_positive_of_LessThan` and
+`Rational.LessThan_of_positive_subtract`
+(`library/Rational/order_arithmetic.math`). All three in the natural
+spelling (`a = a + 0 < a + (b - a) = b`), first try, no hints.
+
+Deliberately **not** `automatic`: the tactic cites them by name, so
+marking them would widen the candidate pool for zero benefit here. That
+is a separate decision requiring its own canary measurement.
+
+Open question 1 is answered by this: ℚ is in from the start, and its
+lemmas cost nothing extra.
 
 ### O2 — atom extraction and the linear model
 
@@ -266,11 +299,16 @@ Iterate with `make -j 16 plane`, which is exactly this: `PLANE_CONE_MATHV`
 in `Makefile:188-192` uses `scripts/module_cone.py` to request the cone's
 proofs, so the narrow target is correct as well as fast.
 
-**But the final gate is `make -j 16 tests`.** Every `.mathv` depends on
-the `kernel` binary, so an elaborator change invalidates the whole cache;
-the narrow target is an iteration tool, not an acceptance one. Budget one
-full run before committing. (CLAUDE.md states this; it is repeated here
-because the two rules above look contradictory and are not.)
+**The final gate is `make -j 16 tests`, and it is run ONCE, at the end of
+the elaborator work — not per stage.** Every `.mathv` depends on the
+`kernel` binary, so an elaborator change invalidates the whole cache. But
+the full run is dominated by the Python-generated fifteen-theorem files
+(one is ~15 minutes), and those are the *least* informative files in the
+library for this purpose: they are long, repetitive and structurally
+simple, so they almost never catch an elaborator mistake that
+`make plane` and `Test/` did not. Pay for it before declaring O4 done;
+do not pay for it after each edit. Library-only stages (O1) need only
+`make -j 16 plane`.
 
 **Cap memory** on every kernel/make invocation (`ulimit -v`) — a runaway
 allocation OOM-kills the session.
