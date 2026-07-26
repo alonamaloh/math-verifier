@@ -1,0 +1,189 @@
+-- Plane/sequence.math
+--
+-- Sequences of points, and the coordinatewise bridge. The first file of
+-- Layer 2.
+--
+-- The architectural move: a sequence of points converges exactly when
+-- both coordinate sequences converge, to the corresponding coordinates.
+-- That reduces every question about convergence in the plane to the same
+-- question on the line, where `Real/convergence.math` already has the
+-- answers — and it is what will reduce Bolzano--Weierstrass in the plane
+-- to Bolzano--Weierstrass on the line, applied twice.
+--
+-- Both directions are a comparison of norms. Backwards, a coordinate gap
+-- never exceeds the distance. Forwards, the distance is at most twice the
+-- larger coordinate gap, so an ε/2 bound on each coordinate is an ε bound
+-- on the distance.
+
+module Plane.sequence
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Natural.basics
+import Natural.order
+import Natural.maximum
+import Natural.eventually
+import Real.interface
+import Real.order
+import Real.convergence
+import Real.division
+import Real.maximum
+import Real.absolute_value
+import Real.absolute_value_order
+import Plane.vector
+import Plane.point
+import Plane.norm
+
+-- ----------------------------------------------------------------------
+-- Convergence, and boundedness.
+
+definition Plane.SequenceConverges
+        (s : ℕ → Plane.Point) (limit : Plane.Point) : Proposition :=
+  ∀ (tolerance : ℝ). tolerance > 0 →
+    eventually (m). Plane.distance(limit, s(m)) < tolerance
+
+definition Plane.IsBounded (region : Set(Plane.Point)) : Proposition :=
+  ∃ (center : Plane.Point). ∃ (bound : ℝ).
+    ∀ (x : Plane.Point). x ∈ region → Plane.distance(center, x) ≤ bound
+
+-- ----------------------------------------------------------------------
+-- Backwards: each coordinate of a convergent sequence converges, because
+-- a coordinate gap never exceeds the distance.
+
+theorem Plane.SequenceConverges.first
+        (s : ℕ → Plane.Point) (limit : Plane.Point)
+        (converges : Plane.SequenceConverges(s, limit))
+        : Real.SequenceConverges(
+              (m : ℕ) ↦ Plane.Point.first(s(m)),
+              Plane.Point.first(limit)) := {
+  take tolerance : ℝ;
+  suppose tolerance > 0;
+  choose threshold such that
+      ∀ (m : ℕ). threshold ≤ m → Plane.distance(limit, s(m)) < tolerance
+      from converges(tolerance, { tolerance > 0 });
+  witness threshold with
+      (m : ℕ) (beyond : threshold ≤ m) ↦ {
+        Plane.distance(limit, s(m)) < tolerance;
+        abs(Plane.Point.first(s(m)) - Plane.Point.first(limit))
+           = abs(Plane.Vector.first(s(m) - limit))
+                 by Plane.Point.first_difference
+           ≤ Plane.Vector.norm(s(m) - limit)
+                 by Plane.Vector.absolute_first_LessOrEqual_norm
+           < tolerance;
+        done
+      }
+}
+
+theorem Plane.SequenceConverges.second
+        (s : ℕ → Plane.Point) (limit : Plane.Point)
+        (converges : Plane.SequenceConverges(s, limit))
+        : Real.SequenceConverges(
+              (m : ℕ) ↦ Plane.Point.second(s(m)),
+              Plane.Point.second(limit)) := {
+  take tolerance : ℝ;
+  suppose tolerance > 0;
+  choose threshold such that
+      ∀ (m : ℕ). threshold ≤ m → Plane.distance(limit, s(m)) < tolerance
+      from converges(tolerance, { tolerance > 0 });
+  witness threshold with
+      (m : ℕ) (beyond : threshold ≤ m) ↦ {
+        Plane.distance(limit, s(m)) < tolerance;
+        abs(Plane.Point.second(s(m)) - Plane.Point.second(limit))
+           = abs(Plane.Vector.second(s(m) - limit))
+                 by Plane.Point.second_difference
+           ≤ Plane.Vector.norm(s(m) - limit)
+                 by Plane.Vector.absolute_second_LessOrEqual_norm
+           < tolerance;
+        done
+      }
+}
+
+-- ----------------------------------------------------------------------
+-- Forwards: coordinatewise convergence is convergence. Past both
+-- thresholds each coordinate gap is under ε/2, hence so is their
+-- maximum, and the distance is at most two copies of that maximum.
+
+theorem Plane.SequenceConverges.of_coordinates
+        (s : ℕ → Plane.Point) (limit : Plane.Point)
+        (firstConverges : Real.SequenceConverges(
+              (m : ℕ) ↦ Plane.Point.first(s(m)),
+              Plane.Point.first(limit)))
+        (secondConverges : Real.SequenceConverges(
+              (m : ℕ) ↦ Plane.Point.second(s(m)),
+              Plane.Point.second(limit)))
+        : Plane.SequenceConverges(s, limit) := {
+  take tolerance : ℝ;
+  suppose tolerance > 0;
+  (2 : ℝ) ≠ 0;
+  0 < tolerance / 2 by Real.divide_positive;
+  choose firstThreshold such that
+      ∀ (m : ℕ). firstThreshold ≤ m →
+          abs(Plane.Point.first(s(m)) - Plane.Point.first(limit))
+              < tolerance / 2
+      as firstClose
+      from firstConverges(tolerance / 2, { 0 < tolerance / 2 });
+  choose secondThreshold such that
+      ∀ (m : ℕ). secondThreshold ≤ m →
+          abs(Plane.Point.second(s(m)) - Plane.Point.second(limit))
+              < tolerance / 2
+      as secondClose
+      from secondConverges(tolerance / 2, { 0 < tolerance / 2 });
+  witness Natural.maximum(firstThreshold, secondThreshold) with
+      (m : ℕ)
+      (beyond : Natural.maximum(firstThreshold, secondThreshold) ≤ m) ↦ {
+        firstThreshold ≤ m as pastFirst;
+        secondThreshold ≤ m as pastSecond;
+        abs(Plane.Vector.first(s(m) - limit))
+           = abs(Plane.Point.first(s(m)) - Plane.Point.first(limit))
+                 by Plane.Point.first_difference
+           < tolerance / 2 by firstClose(m, pastFirst);
+        abs(Plane.Vector.second(s(m) - limit))
+           = abs(Plane.Point.second(s(m)) - Plane.Point.second(limit))
+                 by Plane.Point.second_difference
+           < tolerance / 2 by secondClose(m, pastSecond);
+        Plane.Vector.supNorm(s(m) - limit) < tolerance / 2
+            by Real.maximum_LessThan;
+        Plane.distance(limit, s(m))
+           = Plane.Vector.norm(s(m) - limit)
+           ≤ 2 * Plane.Vector.supNorm(s(m) - limit)
+                 by Plane.Vector.norm_LessOrEqual_two_supNorm
+           = Plane.Vector.supNorm(s(m) - limit)
+                 + Plane.Vector.supNorm(s(m) - limit) by ring
+           < tolerance / 2 + tolerance / 2
+                 by Real.LessThan.add_strict_strict
+           = tolerance by Real.divide_two_doubled;
+        done
+      }
+}
+
+-- ----------------------------------------------------------------------
+-- With both directions in hand, uniqueness of limits is inherited one
+-- coordinate at a time.
+
+theorem Plane.SequenceConverges.unique
+        (s : ℕ → Plane.Point) (limit other : Plane.Point)
+        (toLimit : Plane.SequenceConverges(s, limit))
+        (toOther : Plane.SequenceConverges(s, other))
+        : limit = other := {
+  Plane.Point.first(limit) = Plane.Point.first(other) by {
+    Real.SequenceConverges(
+        (m : ℕ) ↦ Plane.Point.first(s(m)), Plane.Point.first(limit))
+        by Plane.SequenceConverges.first;
+    Real.SequenceConverges(
+        (m : ℕ) ↦ Plane.Point.first(s(m)), Plane.Point.first(other))
+        by Plane.SequenceConverges.first;
+    done by Real.SequenceConverges.unique
+  };
+  Plane.Point.second(limit) = Plane.Point.second(other) by {
+    Real.SequenceConverges(
+        (m : ℕ) ↦ Plane.Point.second(s(m)), Plane.Point.second(limit))
+        by Plane.SequenceConverges.second;
+    Real.SequenceConverges(
+        (m : ℕ) ↦ Plane.Point.second(s(m)), Plane.Point.second(other))
+        by Plane.SequenceConverges.second;
+    done by Real.SequenceConverges.unique
+  };
+  done by Plane.Point.equal_of_coordinates
+}

@@ -49,6 +49,36 @@ theorem Plane.Point.equal_of_position (p q : Plane.Point)
     = q by Plane.Point.fromOrigin_position
 
 -- ----------------------------------------------------------------------
+-- Coordinates. Naming a point by a pair of reals is the one thing the
+-- choice of origin buys us; the laws below never depend on it again.
+
+definition Plane.Point.make (first second : ℝ) : Plane.Point :=
+  Plane.Point.fromOrigin(Plane.Vector.make(first, second))
+
+definition Plane.Point.first (point : Plane.Point) : ℝ :=
+  Plane.Vector.first(Plane.Point.position(point))
+
+definition Plane.Point.second (point : Plane.Point) : ℝ :=
+  Plane.Vector.second(Plane.Point.position(point))
+
+theorem Plane.Point.first_make (first second : ℝ)
+        : Plane.Point.first(Plane.Point.make(first, second)) = first :=
+  reflexivity(ℝ, first)
+
+theorem Plane.Point.second_make (first second : ℝ)
+        : Plane.Point.second(Plane.Point.make(first, second)) = second :=
+  reflexivity(ℝ, second)
+
+theorem Plane.Point.equal_of_coordinates (p q : Plane.Point)
+        (firstEqual : Plane.Point.first(p) = Plane.Point.first(q))
+        (secondEqual : Plane.Point.second(p) = Plane.Point.second(q))
+        : p = q := {
+  Plane.Point.position(p) = Plane.Point.position(q)
+      by Plane.Vector.equal_of_coordinates;
+  done by Plane.Point.equal_of_position
+}
+
+-- ----------------------------------------------------------------------
 -- Translation and difference.
 
 definition Plane.Point.translate (point : Plane.Point) (displacement : Plane.Vector)
@@ -65,6 +95,17 @@ theorem Plane.Point.position_translate (point : Plane.Point) (displacement : Pla
         : Plane.Point.position(point + displacement)
               = Plane.Point.position(point) + displacement :=
   reflexivity(Plane.Vector, Plane.Point.position(point) + displacement)
+
+-- The vector between two points has the coordinate gaps as coordinates.
+theorem Plane.Point.first_difference (p q : Plane.Point)
+        : Plane.Vector.first(p - q)
+              = Plane.Point.first(p) - Plane.Point.first(q) :=
+  done by Plane.Vector.first_subtract
+
+theorem Plane.Point.second_difference (p q : Plane.Point)
+        : Plane.Vector.second(p - q)
+              = Plane.Point.second(p) - Plane.Point.second(q) :=
+  done by Plane.Vector.second_subtract
 
 -- ----------------------------------------------------------------------
 -- The affine laws. Together they say that the vectors act freely and
