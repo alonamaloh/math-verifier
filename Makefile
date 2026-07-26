@@ -178,8 +178,18 @@ library: $(LIBRARY_MATHV_FILES) $(LIBRARY_MATHV_IFACE_FILES)
 # before committing.
 PLANE_MATH_FILES := $(filter library/Plane/%,$(LIBRARY_MATH_FILES))
 PLANE_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(PLANE_MATH_FILES))
+# Stage 2 (`X.mathv`) depends on its imports' INTERFACES, not their proofs —
+# deliberately, so a proof-only edit elsewhere does not re-verify you. The
+# consequence is that asking for Plane's .mathv never asks for its
+# dependencies' .mathv at all. Right for a .math edit; wrong after a kernel
+# or elaborator change, which invalidates every module's proofs (each .mathv
+# does depend on `kernel` — nothing was ever REQUESTING them). So request the
+# cone's proofs too: free when they are up to date, correct when they are not.
+PLANE_CONE_MATHV := $(shell python3 scripts/module_cone.py \
+    $(BUILD_DIR)/library-depends.mk $(BUILD_DIR)/library/Plane 2>/dev/null)
 
-plane: $(PLANE_MATHV_FILES) $(PLANE_MATHV_FILES:.mathv=.mathv.iface)
+plane: $(PLANE_MATHV_FILES) $(PLANE_MATHV_FILES:.mathv=.mathv.iface) \
+       $(PLANE_CONE_MATHV)
 
 tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES) checker-tests \
 	carrier-normal-form-check matrix-ergonomics-statement-check rank-four-generated-check \

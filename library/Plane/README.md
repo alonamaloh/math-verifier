@@ -18,9 +18,14 @@ make -j 16 plane      # this area and exactly its transitive imports
 ```
 
 Not `make library`: that verifies the Algebra/ fifteen-theorem material,
-which dominates the wall clock. The `plane` target pulls in 19 of the 546
-Algebra files — the bundled-structure basics that `Real`'s field and ring
-instances need — and nothing else. A warm run is about two seconds.
+which dominates the wall clock. The `plane` target covers the 156-module
+import cone — including 19 of the 546 Algebra files, the bundled-structure
+basics that `Real`'s field and ring instances need — and nothing else.
+
+About two seconds warm; about eighteen after a kernel or elaborator
+change, which invalidates every module's proofs. The target asks for the
+cone's proofs, not just its interfaces, so that second case is actually
+re-verified rather than silently skipped (`scripts/module_cone.py`).
 
 ## Main definitions
 
