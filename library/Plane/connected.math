@@ -731,3 +731,218 @@ theorem Plane.Ball_IsConnected (center : Plane.Point) (radius : ℝ)
         : Plane.IsConnected(Plane.Ball(center, radius)) :=
   Plane.IsConvex.connected(
       Plane.Ball(center, radius), Plane.Ball_IsConvex(center, radius))
+
+-- ----------------------------------------------------------------------
+-- A connected set caught between two disjoint open sets lies in one of
+-- them.
+--
+-- The side it meets is relatively clopen in it: relatively open because
+-- an open set cuts it out, relatively closed because the other side is
+-- all that remains, and nonempty by hypothesis. So it is everything.
+
+theorem Plane.IsConnected.lands_in_side
+        (part left right : Set(Plane.Point))
+        (partConnected : Plane.IsConnected(part))
+        (leftOpen : Plane.IsOpen(left)) (rightOpen : Plane.IsOpen(right))
+        (apart : ∀ (x : Plane.Point). x ∈ left → ¬(x ∈ right))
+        (covered : part ⊆ left ∪ right)
+        (meetsLeft : Set.IsNonempty(Plane.Point, left ∩ part))
+        : part ⊆ left := {
+  part ⊆ Set.universe(Plane.Point) by Set.subset_universe;
+  Plane.OpenIn(left ∩ part, part)
+      by Plane.OpenIn.restrict(
+          left, Set.universe(Plane.Point), part, leftOpen,
+          { part ⊆ Set.universe(Plane.Point) });
+  Plane.OpenIn(right ∩ part, part)
+      by Plane.OpenIn.restrict(
+          right, Set.universe(Plane.Point), part, rightOpen,
+          { part ⊆ Set.universe(Plane.Point) });
+
+  -- What the left side leaves of `part` is exactly what the right side
+  -- catches, so the leftover is relatively open too.
+  part ∖ (left ∩ part) ⊆ right ∩ part
+      by (x : Plane.Point) (missedLeft : x ∈ part ∖ (left ∩ part)) ↦ {
+        x ∈ part as xInPart;
+        ¬(x ∈ left ∩ part);
+        ¬(x ∈ left)
+            by (xInLeft : x ∈ left) ↦ {
+              x ∈ left ∩ part by Set.member_intersection;
+              done
+            };
+        x ∈ left ∪ right by covered(x, xInPart);
+        x ∈ left ∨ x ∈ right;
+        x ∈ right;
+        done by Set.member_intersection
+      };
+  right ∩ part ⊆ part ∖ (left ∩ part)
+      by (x : Plane.Point) (inRightPart : x ∈ right ∩ part) ↦ {
+        x ∈ right by Set.intersection_member_left;
+        x ∈ part by Set.intersection_member_right;
+        ¬(x ∈ left ∩ part)
+            by (inLeftPart : x ∈ left ∩ part) ↦ {
+              x ∈ left by Set.intersection_member_left;
+              ¬(x ∈ right) by apart(x, { x ∈ left });
+              done
+            };
+        done
+      };
+  part ∖ (left ∩ part) = right ∩ part
+      by Set.equal_of_same_members as leftoverIsRight;
+  Plane.OpenIn(part ∖ (left ∩ part), part) by substituting leftoverIsRight;
+
+  left ∩ part ⊆ part by Set.intersection_subset_right;
+  left ∩ part = part
+      by partConnected(left ∩ part,
+          { left ∩ part ⊆ part },
+          { Plane.OpenIn(left ∩ part, part) },
+          { Plane.OpenIn(part ∖ (left ∩ part), part) },
+          meetsLeft);
+  take x : Plane.Point;
+  suppose x ∈ part as xInPart;
+  part = left ∩ part by Equality.symmetry;
+  x ∈ left ∩ part
+      by Set.member_of_equal(
+          part, left ∩ part, { part = left ∩ part }, x, xInPart);
+  done by Set.intersection_member_left
+}
+
+-- The same fact stated as the alternative it is usually quoted as. The
+-- side a nonempty connected set meets is decided by any one of its
+-- points.
+theorem Plane.IsConnected.lands_in_one_side
+        (part left right : Set(Plane.Point))
+        (partConnected : Plane.IsConnected(part))
+        (leftOpen : Plane.IsOpen(left)) (rightOpen : Plane.IsOpen(right))
+        (apart : ∀ (x : Plane.Point). x ∈ left → ¬(x ∈ right))
+        (covered : part ⊆ left ∪ right)
+        (nonempty : Set.IsNonempty(Plane.Point, part))
+        : part ⊆ left ∨ part ⊆ right := {
+  choose start such that start ∈ part as startInPart from nonempty;
+  start ∈ left ∪ right by covered(start, startInPart);
+  done by cases {
+    case start ∈ left as startInLeft: {
+        Set.IsNonempty(Plane.Point, left ∩ part)
+            by { witness start with { done by Set.member_intersection } };
+        part ⊆ left
+            by Plane.IsConnected.lands_in_side(
+                part, left, right, partConnected, leftOpen, rightOpen, apart,
+                covered, { Set.IsNonempty(Plane.Point, left ∩ part) });
+        done
+      }
+    case start ∈ right as startInRight: {
+        ∀ (x : Plane.Point). x ∈ right → ¬(x ∈ left)
+            by (x : Plane.Point) (xInRight : x ∈ right)
+               (xInLeft : x ∈ left) ↦ {
+              ¬(x ∈ right) by apart(x, xInLeft);
+              done
+            };
+        part ⊆ right ∪ left
+            by (x : Plane.Point) (xInPart : x ∈ part) ↦ {
+              x ∈ left ∪ right by covered(x, xInPart);
+              x ∈ left ∨ x ∈ right;
+              x ∈ right ∨ x ∈ left by Or.swap;
+              done by Set.member_union
+            };
+        Set.IsNonempty(Plane.Point, right ∩ part)
+            by { witness start with { done by Set.member_intersection } };
+        part ⊆ right
+            by Plane.IsConnected.lands_in_side(
+                part, right, left, partConnected, rightOpen, leftOpen,
+                { ∀ (x : Plane.Point). x ∈ right → ¬(x ∈ left) },
+                { part ⊆ right ∪ left },
+                { Set.IsNonempty(Plane.Point, right ∩ part) });
+        done
+      }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- Adjoining limit points keeps a set connected.
+--
+-- A relatively clopen piece of the wider set is nonempty, and its
+-- openness gives it a radius around one of its points; that radius
+-- reaches the core, because the point is a limit of the core. So the
+-- piece meets the core and swallows it. Then no point of the wider set
+-- can be outside the piece: the leftover is relatively open too, so it
+-- would come with a radius of its own, and that radius also reaches the
+-- core — which is already inside the piece.
+
+theorem Plane.IsConnected.adjoin_limits
+        (core wide : Set(Plane.Point))
+        (coreConnected : Plane.IsConnected(core))
+        (coreInside : core ⊆ wide)
+        (wideInClosure : wide ⊆ Plane.ClosureIn(core, wide))
+        : Plane.IsConnected(wide) := {
+  take piece : Set(Plane.Point);
+  suppose piece ⊆ wide as pieceInside;
+  suppose Plane.OpenIn(piece, wide) as pieceOpen;
+  suppose Plane.OpenIn(wide ∖ piece, wide) as restOpen;
+  suppose Set.IsNonempty(Plane.Point, piece) as pieceNonempty;
+
+  -- The piece reaches the core, so it holds all of it.
+  choose start such that start ∈ piece as startInPiece from pieceNonempty;
+  start ∈ wide by pieceInside(start, startInPiece) as startInWide;
+  choose radius such that
+      0 < radius ∧
+        ∀ (y : Plane.Point). y ∈ wide →
+          Plane.distance(start, y) < radius → y ∈ piece
+      from pieceOpen(start, startInPiece);
+  0 < radius as radiusPositive;
+  ∀ (y : Plane.Point). y ∈ wide →
+      Plane.distance(start, y) < radius → y ∈ piece as nearbyInPiece;
+  start ∈ Plane.ClosureIn(core, wide) by wideInClosure(start, startInWide);
+  ∀ (scale : ℝ). 0 < scale →
+      ∃ (y : Plane.Point). y ∈ core ∧ Plane.distance(start, y) < scale
+      as coreIsNear;
+  choose near such that
+      near ∈ core ∧ Plane.distance(start, near) < radius
+      from coreIsNear(radius, radiusPositive);
+  near ∈ core as nearInCore;
+  Plane.distance(start, near) < radius;
+  near ∈ wide by coreInside(near, nearInCore);
+  near ∈ piece
+      by nearbyInPiece(near, { near ∈ wide },
+          { Plane.distance(start, near) < radius });
+  Set.IsNonempty(Plane.Point, piece ∩ core)
+      by { witness near with { done by Set.member_intersection } };
+  core ⊆ piece
+      by Plane.IsConnected.swallows(
+          wide, core, piece, coreConnected, coreInside, pieceOpen, restOpen,
+          { Set.IsNonempty(Plane.Point, piece ∩ core) })
+      as coreInPiece;
+
+  -- And nothing of the wider set is left outside it.
+  wide ⊆ piece
+      by (x : Plane.Point) (xInWide : x ∈ wide) ↦ {
+        suppose ¬(x ∈ piece) as xOutside for contradiction {
+          x ∈ wide ∖ piece;
+          choose reach such that
+              0 < reach ∧
+                ∀ (y : Plane.Point). y ∈ wide →
+                  Plane.distance(x, y) < reach → y ∈ wide ∖ piece
+              from restOpen(x, { x ∈ wide ∖ piece });
+          0 < reach as reachPositive;
+          ∀ (y : Plane.Point). y ∈ wide →
+              Plane.distance(x, y) < reach → y ∈ wide ∖ piece
+              as nearbyOutside;
+          x ∈ Plane.ClosureIn(core, wide) by wideInClosure(x, xInWide);
+          ∀ (scale : ℝ). 0 < scale →
+              ∃ (y : Plane.Point). y ∈ core ∧ Plane.distance(x, y) < scale
+              as coreIsNearX;
+          choose witnessPoint such that
+              witnessPoint ∈ core ∧ Plane.distance(x, witnessPoint) < reach
+              from coreIsNearX(reach, reachPositive);
+          witnessPoint ∈ core as witnessInCore;
+          Plane.distance(x, witnessPoint) < reach;
+          witnessPoint ∈ wide by coreInside(witnessPoint, witnessInCore);
+          witnessPoint ∈ wide ∖ piece
+              by nearbyOutside(witnessPoint, { witnessPoint ∈ wide },
+                  { Plane.distance(x, witnessPoint) < reach });
+          ¬(witnessPoint ∈ piece);
+          witnessPoint ∈ piece by coreInPiece(witnessPoint, witnessInCore);
+          done
+        };
+        done
+      };
+  done by Set.equal_of_same_members
+}

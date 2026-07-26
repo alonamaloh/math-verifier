@@ -362,6 +362,104 @@ theorem Plane.Component_IsOpen
 }
 
 -- ----------------------------------------------------------------------
+-- The boundary of a component of an open set misses the set.
+--
+-- A boundary point still inside the region would carry a component of
+-- its own, open around it, and the closure condition puts a point of the
+-- old component within that radius. Two components sharing a point are
+-- one component, so the boundary point would lie in the component it
+-- bounds.
+
+theorem Plane.Component_boundary_outside_region
+        (region : Set(Plane.Point)) (base : Plane.Point)
+        (regionOpen : Plane.IsOpen(region))
+        (x : Plane.Point)
+        (onBoundary : x ∈ Plane.BoundaryIn(
+            Plane.Component(region, base), Set.universe(Plane.Point)))
+        : ¬(x ∈ region) := {
+  Plane.OpenIn(Plane.Component(region, base), Set.universe(Plane.Point))
+      by Plane.Component_IsOpen(region, base, regionOpen);
+  x ∈ Plane.ClosureIn(
+          Plane.Component(region, base), Set.universe(Plane.Point))
+        ∖ Plane.Component(region, base)
+      by Plane.BoundaryIn_of_OpenIn(
+          Plane.Component(region, base), Set.universe(Plane.Point),
+          { Plane.OpenIn(
+                Plane.Component(region, base), Set.universe(Plane.Point)) },
+          x, onBoundary);
+  ¬(x ∈ Plane.Component(region, base));
+  x ∈ Plane.ClosureIn(
+      Plane.Component(region, base), Set.universe(Plane.Point));
+  ∀ (scale : ℝ). 0 < scale →
+      ∃ (y : Plane.Point). y ∈ Plane.Component(region, base) ∧
+        Plane.distance(x, y) < scale
+      as componentIsNear;
+
+  suppose x ∈ region as xInRegion;
+  x ∈ Plane.Component(region, x)
+      by Plane.base_in_Component(region, x, xInRegion);
+  Plane.IsOpen(Plane.Component(region, x))
+      by Plane.Component_IsOpen(region, x, regionOpen);
+  choose radius such that
+      0 < radius ∧
+        ∀ (y : Plane.Point). y ∈ Set.universe(Plane.Point) →
+          Plane.distance(x, y) < radius → y ∈ Plane.Component(region, x)
+      from { Plane.IsOpen(Plane.Component(region, x)) }(
+          x, { x ∈ Plane.Component(region, x) });
+  0 < radius as radiusPositive;
+  ∀ (y : Plane.Point). y ∈ Set.universe(Plane.Point) →
+      Plane.distance(x, y) < radius → y ∈ Plane.Component(region, x)
+      as nearbyInOwnComponent;
+  choose near such that
+      near ∈ Plane.Component(region, base) ∧ Plane.distance(x, near) < radius
+      from componentIsNear(radius, radiusPositive);
+  near ∈ Plane.Component(region, base);
+  Plane.distance(x, near) < radius;
+  near ∈ Set.universe(Plane.Point) by Set.member_universe;
+  near ∈ Plane.Component(region, x)
+      by nearbyInOwnComponent(near, { near ∈ Set.universe(Plane.Point) },
+          { Plane.distance(x, near) < radius });
+  Set.IsNonempty(Plane.Point,
+      Plane.Component(region, x) ∩ Plane.Component(region, base))
+      by { witness near with { done by Set.member_intersection } };
+  Plane.Component(region, x) = Plane.Component(region, base)
+      by Plane.Component.equal_of_meeting(region, x, base,
+          { Set.IsNonempty(Plane.Point,
+                Plane.Component(region, x) ∩ Plane.Component(region, base)) })
+      as componentsAgree;
+  x ∈ Plane.Component(region, base)
+      by Set.member_of_equal(
+          Plane.Component(region, x), Plane.Component(region, base),
+          componentsAgree, x, { x ∈ Plane.Component(region, x) });
+  done
+}
+
+-- The blueprint's phrasing: the complement of a closed set is open, so
+-- the boundary of one of its components has nowhere to be but the closed
+-- set itself.
+theorem Plane.Component_boundary_in_closed
+        (closedSet : Set(Plane.Point)) (base : Plane.Point)
+        (closed : Plane.ClosedIn(closedSet, Set.universe(Plane.Point)))
+        (x : Plane.Point)
+        (onBoundary : x ∈ Plane.BoundaryIn(
+            Plane.Component(Set.universe(Plane.Point) ∖ closedSet, base),
+            Set.universe(Plane.Point)))
+        : x ∈ closedSet := {
+  Plane.IsOpen(Set.universe(Plane.Point) ∖ closedSet);
+  ¬(x ∈ Set.universe(Plane.Point) ∖ closedSet)
+      by Plane.Component_boundary_outside_region(
+          Set.universe(Plane.Point) ∖ closedSet, base,
+          { Plane.IsOpen(Set.universe(Plane.Point) ∖ closedSet) },
+          x, onBoundary);
+  suppose ¬(x ∈ closedSet) for contradiction {
+    x ∈ Set.universe(Plane.Point) by Set.member_universe;
+    x ∈ Set.universe(Plane.Point) ∖ closedSet;
+    done
+  };
+  done
+}
+
+-- ----------------------------------------------------------------------
 -- Regions.
 
 definition Plane.IsRegion (region : Set(Plane.Point)) : Proposition :=
