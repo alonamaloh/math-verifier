@@ -281,3 +281,117 @@ sitting in `Plane/` now live where they belong:
 `componentwise` tactic that would collapse the duplicated coordinate
 chains in `Plane/vector.math` — roughly two thirds of that file is the
 same proof written once for `first` and once for `second`.
+
+---
+
+# Frictions found building Layer 2 (sequences and extraction)
+
+Added 2026-07-25, same conventions as above.
+
+### I9 — ground numeral comparison on ℝ is decided for `≤` but not `<`
+
+```
+theorem T : Real.LessOrEqual(2, 4) := done   -- verifies
+theorem T : Real.LessThan(2, 4)    := done   -- "no library theorem
+                                             --  with this conclusion
+                                             --  shape applies"
+```
+
+Same two numerals, same embedding chain
+`Rational.to_real(Integer.to_rational(Natural.to_integer n))`. The `≤`
+side reaches a decision procedure; the `<` side reaches nothing, and
+there is no lemma to cite either — `Rational.to_real.LessThan_preserves`
+exists but the elaborator does not find it, and reaching it by hand
+means descending three embeddings.
+
+Cost: `Plane.rootTwo < 2` had to be weakened to `Plane.rootTwo ≤ 2`,
+and the ε/2 estimate reworded to only need the non-strict form. That
+happened to be free here, but it is luck, not design.
+
+### E6 — a `case` pattern cannot have a top-level `∧`
+
+```
+done by cases on aIsLeast {
+  case P(a) ∧ (∀ (k : ℕ). P(k) → a ≤ k) as aWitnesses: { … }
+```
+→ `parse error: expected ':' between case pattern and body (got '∧')`
+
+A top-level `∃` in a case pattern parses fine (`Natural/least_number.math`
+does it), and `∧` *under* the `∃` parses fine too — it is only `∧` at the
+top of the pattern that stops the parser. Parenthesizing works.
+
+Worth fixing at the parser: case patterns should accept a full
+proposition. In the meantime the workaround that is actually *better*
+style is to phrase the disjunction as a conjunction of two implications
+(`(H → A) ∧ (¬H → B)` rather than `(H ∧ A) ∨ (¬H ∧ B)`), which is what
+`Natural.IsLeastWitness` now does — consumers apply instead of
+case-splitting.
+
+### E7 — a theorem body cannot be a bare `by cases`
+
+```
+theorem T … : G :=
+  by cases { … }        -- parse error at the first `case`
+```
+must be written
+
+```
+theorem T … : G := {
+  done by cases { … }
+}
+```
+
+`by induction on …` has the same shape restriction. This is a small
+thing but it costs a re-read of the error every time, because the
+reported position is the first token *inside* the block, not the `by`.
+
+### E8 — a cited `∀`-fact is not applied to hypotheses already in scope
+
+```
+choose threshold such that
+    ∀ (m : ℕ). threshold ≤ m → abs(…) < tolerance / 2 as close from …;
+…
+threshold ≤ m;                       -- in context, anonymous
+… < tolerance / 2 by close;          -- "its arguments could not be
+                                     --  inferred from the step"
+```
+
+The index `m` is inferable from the conclusion, but the proof of
+`threshold ≤ m` is not, even though it is sitting in the context — so the
+citation has to be spelled `close(m, pastThreshold)`, which forces naming
+the threshold fact. Without the citation the auto-prover *does* find it,
+but at 60k kernel-steps and an expensive-step warning. So the choice is
+between a slow proof and a noisy one.
+
+## Architectural: Layer 2 needs a choice principle, or careful avoidance
+
+The only selection axiom in the system is `Logic.the` — definite
+description, which demands uniqueness. There is no countable choice.
+
+For *index* selection that is fine, and `Natural/frequently.math` shows
+why: "choose n_k > n_{k-1} with P_k(n_k)" becomes "take the LEAST such
+n_k", which is canonical, so `Logic.the` applies and subsequence
+extraction is choice-free.
+
+For *point* selection it is not fine. Three standard Layer 2 arguments
+each begin by building a sequence of points from `∀ n. ∃ x. …`:
+
+- compact ⟹ closed (`p ∈ closure(K)` ⟹ pick `x_n ∈ K` with
+  `d(p, x_n) < 1/(n+1)`)
+- a continuous function on a compact set attains its minimum (pick
+  `x_n` with `f(x_n) → inf`)
+- uniform continuity by contradiction (pick `x_n, y_n` close but with
+  `|f(x_n) − f(y_n)| ≥ ε`)
+
+None of these has a canonical choice available, so `Logic.the` does not
+reach them. Each *can* be replaced by an explicit bisection — halve the
+square, keep the half where the obstruction survives, which is a
+canonical binary choice — but that is a different proof from the one in
+the textbook, and it is the textbook proof we said we wanted to be able
+to write.
+
+The two options are (a) add countable choice, or full choice, to
+`axioms.math` — Lean carries `Classical.choice` for exactly this reason —
+or (b) accept bisection rewrites at each of the three sites. This is a
+decision about the system, not about `Plane/`, so it is recorded here
+rather than worked around silently.
