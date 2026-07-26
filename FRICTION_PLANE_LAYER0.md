@@ -773,9 +773,12 @@ Same layer, `Plane.squareBoundary_IsClosed`:
 
 → `expensive by-less proof step (58452 kernel-steps)` on the last line.
 The fact is *literally* a conjunct of a context fact, and `And.left` is
-`automatic`; naming a conjunct of any other shape (`⊆`, `∈`, `≤`) is free
-throughout Layers 0–3. Only the equation-shaped conjunct pays, and it pays
-a five-figure search.
+`automatic`. Naming a conjunct is free everywhere else in Layers 0–4 --
+including other equation-shaped conjuncts in this same file (the three
+`first_coordinate_*_on_unitSegment` lemmas each name `x = between(…)` off a
+`choose`, for nothing). So the trigger is narrower than "equations are
+expensive"; what is different here is the numeral right-hand side and the
+enclosing reductio's context. Unmeasured which of the two it is.
 
 There is no cheaper spelling: `by nearIsClose` fails (E12 — a citation
 whose conclusion is an `And` does not project), and the bare claim is the

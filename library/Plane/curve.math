@@ -1,0 +1,152 @@
+-- Plane/curve.math
+--
+-- Arcs and Jordan curves. Layer 4.
+--
+-- An arc is a continuous injective map on the unit segment; a Jordan curve
+-- is one on the square's boundary. Both carry their parametrisation, as
+-- the blueprint does — it slides between "the arc" and "the map" freely,
+-- and subarcs and concatenation are painful set-first — while the point
+-- set is derived (`Plane.arc`, `Plane.jordanCurve`).
+--
+-- The blueprint's model-curve lemma comes out of Layer 4's homeomorphism
+-- theorem with nothing left to do: a Jordan curve's parametrisation is a
+-- continuous injection on a compactum, hence a homeomorphism from the
+-- square's boundary onto the curve. Stated against `∂Q` rather than the
+-- circle — the substitution Layer 0 settled — it needs no trigonometry and
+-- no quotient.
+
+module Plane.curve
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Set.algebra
+import Real.interface
+import Real.order
+import Plane.vector
+import Plane.point
+import Plane.norm
+import Plane.segment
+import Plane.topology
+import Plane.compact
+import Plane.compactness
+import Plane.connected
+import Plane.model
+import Plane.homeomorphism
+
+-- ----------------------------------------------------------------------
+-- Arcs.
+
+definition Plane.IsArc (parametrisation : Plane.Point → Plane.Point)
+        : Proposition :=
+  Plane.ContinuousOn(parametrisation, Plane.unitSegment)
+    ∧ Plane.InjectiveOn(parametrisation, Plane.unitSegment)
+
+definition Plane.arc (parametrisation : Plane.Point → Plane.Point)
+        : Set(Plane.Point) :=
+  Plane.imageSet(parametrisation, Plane.unitSegment)
+
+definition Plane.arcStart (parametrisation : Plane.Point → Plane.Point)
+        : Plane.Point :=
+  parametrisation(Plane.origin)
+
+definition Plane.arcFinish (parametrisation : Plane.Point → Plane.Point)
+        : Plane.Point :=
+  parametrisation(Plane.Point.make(1, 0))
+
+theorem Plane.arcStart_in_arc (parametrisation : Plane.Point → Plane.Point)
+        : Plane.arcStart(parametrisation) ∈ Plane.arc(parametrisation) :=
+  witness Plane.origin with {
+    Plane.origin ∈ Plane.unitSegment by Plane.start_in_unitSegment;
+    parametrisation(Plane.origin) = Plane.arcStart(parametrisation);
+    done
+  }
+
+theorem Plane.arcFinish_in_arc (parametrisation : Plane.Point → Plane.Point)
+        : Plane.arcFinish(parametrisation) ∈ Plane.arc(parametrisation) :=
+  witness Plane.Point.make(1, 0) with {
+    Plane.Point.make(1, 0) ∈ Plane.unitSegment
+        by Plane.finish_in_unitSegment;
+    parametrisation(Plane.Point.make(1, 0))
+        = Plane.arcFinish(parametrisation);
+    done
+  }
+
+theorem Plane.IsArc.IsCompact (parametrisation : Plane.Point → Plane.Point)
+        (isArc : Plane.IsArc(parametrisation))
+        : Plane.IsCompact(Plane.arc(parametrisation)) := {
+  Plane.ContinuousOn(parametrisation, Plane.unitSegment) as continuous;
+  done by Plane.IsCompact.image(
+      parametrisation, Plane.unitSegment, Plane.unitSegment_IsCompact,
+      continuous)
+}
+
+theorem Plane.IsArc.IsConnected (parametrisation : Plane.Point → Plane.Point)
+        (isArc : Plane.IsArc(parametrisation))
+        : Plane.IsConnected(Plane.arc(parametrisation)) := {
+  Plane.ContinuousOn(parametrisation, Plane.unitSegment) as continuous;
+  done by Plane.IsConnected.image(
+      parametrisation, Plane.unitSegment, Plane.unitSegment_IsConnected,
+      continuous)
+}
+
+-- An arc is a homeomorphic copy of the unit segment: the parametrisation
+-- is a continuous injection on a compactum.
+theorem Plane.IsArc.IsHomeomorphismOn
+        (parametrisation : Plane.Point → Plane.Point)
+        (isArc : Plane.IsArc(parametrisation))
+        : Plane.IsHomeomorphismOn(parametrisation, Plane.unitSegment) := {
+  Plane.ContinuousOn(parametrisation, Plane.unitSegment) as continuous;
+  Plane.InjectiveOn(parametrisation, Plane.unitSegment) as injective;
+  done by Plane.IsHomeomorphismOn.of_continuous_injective_on_compact(
+      parametrisation, Plane.unitSegment, Plane.unitSegment_IsCompact,
+      continuous, injective)
+}
+
+-- ----------------------------------------------------------------------
+-- Jordan curves.
+
+definition Plane.IsJordanCurve (parametrisation : Plane.Point → Plane.Point)
+        : Proposition :=
+  Plane.ContinuousOn(parametrisation, Plane.squareBoundary)
+    ∧ Plane.InjectiveOn(parametrisation, Plane.squareBoundary)
+
+definition Plane.jordanCurve (parametrisation : Plane.Point → Plane.Point)
+        : Set(Plane.Point) :=
+  Plane.imageSet(parametrisation, Plane.squareBoundary)
+
+theorem Plane.IsJordanCurve.IsCompact
+        (parametrisation : Plane.Point → Plane.Point)
+        (isCurve : Plane.IsJordanCurve(parametrisation))
+        : Plane.IsCompact(Plane.jordanCurve(parametrisation)) := {
+  Plane.ContinuousOn(parametrisation, Plane.squareBoundary) as continuous;
+  done by Plane.IsCompact.image(
+      parametrisation, Plane.squareBoundary, Plane.squareBoundary_IsCompact,
+      continuous)
+}
+
+theorem Plane.IsJordanCurve.IsNonempty
+        (parametrisation : Plane.Point → Plane.Point)
+        : Set.IsNonempty(Plane.Point, Plane.jordanCurve(parametrisation)) := {
+  choose corner such that corner ∈ Plane.squareBoundary
+      from Plane.squareBoundary_IsNonempty;
+  parametrisation(corner) ∈ Plane.jordanCurve(parametrisation)
+      by { witness corner with done };
+  done by { witness parametrisation(corner) with done }
+}
+
+-- ----------------------------------------------------------------------
+-- The model-curve theorem, H4: a Jordan curve is a homeomorphic copy of
+-- the square's boundary.
+
+theorem Plane.JordanCurve.homeomorphic_to_square_boundary
+        (parametrisation : Plane.Point → Plane.Point)
+        (isCurve : Plane.IsJordanCurve(parametrisation))
+        : Plane.IsHomeomorphismOn(parametrisation, Plane.squareBoundary) := {
+  Plane.ContinuousOn(parametrisation, Plane.squareBoundary) as continuous;
+  Plane.InjectiveOn(parametrisation, Plane.squareBoundary) as injective;
+  done by Plane.IsHomeomorphismOn.of_continuous_injective_on_compact(
+      parametrisation, Plane.squareBoundary, Plane.squareBoundary_IsCompact,
+      continuous, injective)
+}

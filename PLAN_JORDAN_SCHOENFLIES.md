@@ -252,7 +252,48 @@ simple polygonal arc — the workhorse of Part I).
 
 **Size:** 5–8k lines.
 
-## Layer 4 — `Plane/Curve/` : arcs and Jordan curves
+## Layer 4 — `Plane/Curve/` : arcs and Jordan curves — **H4 DONE 2026-07-26**
+
+Delivered in `Plane/{model,homeomorphism,curve}.math`, with `Plane/norm.math`
+picking up the sup metric's missing facts (triangle inequality, sign
+blindness, symmetry, and the shift bound that makes `supDistance(origin, ·)`
+continuous):
+
+- **Settled: parametrisation domains are PLANE sets**, not `[0,1] ⊆ ℝ`.
+  `Plane.unitSegment` is the model interval and `Plane.squareBoundary` the
+  model curve, so a parametrisation is a `Plane.Point → Plane.Point` map,
+  its continuity is Layer 1's `ContinuousOn`, its image is `imageSet`, and
+  its compactness is Layer 2's `IsCompact` — Layers 1–3 apply to arcs and
+  curves with nothing added. Parametrising by a real interval would need a
+  second copy of the relative topology for real-domain maps, and the circle
+  would need a quotient.
+- `Plane.squareBoundary` is the **sup-metric level set** `‖x‖∞ = 1`, so
+  compactness is closed-and-bounded with no four-way case analysis.
+  `Plane.segment_IsCompact` is Bolzano–Weierstrass on the parameters,
+  carried back by the walk's Lipschitz estimate.
+- **`Plane.IsHomeomorphismOn`**, with the inverse's continuity stated
+  *without naming the inverse* (`HasContinuousInverseOn`: points with close
+  images are close) — the form every consumer uses, and no choice needed.
+  Then the engine Layer 2 deferred: **a continuous injection on a compactum
+  is a homeomorphism onto its image**.
+- **H4, `Plane.JordanCurve.homeomorphic_to_square_boundary`**, falls out of
+  that engine with nothing left to do. Arcs are compact, connected, and
+  homeomorphic copies of the unit segment.
+- The parameter of a point of the unit segment is **its first coordinate**
+  (`Plane.unitSegment_at_first_coordinate` and the two range lemmas) — the
+  reason the model interval runs along the axis, and what makes a subarc's
+  reparametrisation need no inverse.
+
+**Not built yet.** Subarcs and concatenation; `Plane.IsPolygonal`; the two
+arcs of a Jordan curve between two of its points; `P°`; the subarc basis.
+All of these want the **arc structure of `∂Q`** (its decomposition into the
+four sides), which the level-set definition defers rather than supplies.
+Also not built: the blueprint's **loop presentation** (`γ` on `[0,1]` with
+`γ(0) = γ(1)`, injective otherwise) and its bridge to `∂Q` through the
+four-side traversal `e`. That bridge is what *constructions* need — a
+polygonal closed curve arrives as a loop — so it is the next slice, not an
+optional extra. What H4 needs, it has: the ∂Q-parametrised definition is
+the standard one.
 
 **Definitions.** `Plane.Arc` (recommend bundling the parametrisation:
 a continuous injective map from `[0,1]`, with the image derived, not

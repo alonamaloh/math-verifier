@@ -179,6 +179,86 @@ theorem Plane.finish_in_unitSegment
         : Plane.Point.make(1, 0) ∈ Plane.unitSegment :=
   Plane.right_in_segment(Plane.origin, Plane.Point.make(1, 0))
 
+theorem Plane.unitSegment_IsConvex : Plane.IsConvex(Plane.unitSegment) :=
+  Plane.segment_IsConvex(Plane.origin, Plane.Point.make(1, 0))
+
+-- The parameter of a point of the unit segment is its first coordinate.
+-- That is the whole reason the model interval runs along the axis: a
+-- subarc's reparametrisation reads its parameter off the point, with no
+-- inverse to construct and no choice to make.
+
+theorem Plane.first_coordinate_of_unitSegment (x : Plane.Point)
+        (onSegment : x ∈ Plane.unitSegment)
+        (parameter : ℝ)
+        (isWalkPoint
+            : x = Plane.between(Plane.origin, Plane.Point.make(1, 0), parameter))
+        : Plane.Point.first(x) = parameter :=
+  Plane.Point.first(x)
+     = Plane.Point.first(
+           Plane.between(Plane.origin, Plane.Point.make(1, 0), parameter))
+           by substituting isWalkPoint
+     = Plane.Point.first(Plane.origin)
+           + parameter * (Plane.Point.first(Plane.Point.make(1, 0))
+                              - Plane.Point.first(Plane.origin))
+           by Plane.Point.first_between
+     = 0 + parameter * (1 - 0)
+     = parameter by ring
+
+theorem Plane.unitSegment_at_first_coordinate (x : Plane.Point)
+        (onSegment : x ∈ Plane.unitSegment)
+        : Plane.between(
+              Plane.origin, Plane.Point.make(1, 0), Plane.Point.first(x)) = x := {
+  choose parameter such that
+      (0 ≤ parameter ∧ parameter ≤ 1)
+        ∧ x = Plane.between(Plane.origin, Plane.Point.make(1, 0), parameter)
+      from onSegment;
+  x = Plane.between(Plane.origin, Plane.Point.make(1, 0), parameter)
+      as isWalkPoint;
+  Plane.Point.first(x) = parameter
+      by Plane.first_coordinate_of_unitSegment(
+          x, onSegment, parameter, isWalkPoint)
+      as parameterIsFirst;
+  Plane.between(Plane.origin, Plane.Point.make(1, 0), Plane.Point.first(x))
+     = Plane.between(Plane.origin, Plane.Point.make(1, 0), parameter)
+           by substituting parameterIsFirst
+     = x by Equality.symmetry;
+  done
+}
+
+theorem Plane.first_coordinate_nonneg_on_unitSegment (x : Plane.Point)
+        (onSegment : x ∈ Plane.unitSegment)
+        : 0 ≤ Plane.Point.first(x) := {
+  choose parameter such that
+      (0 ≤ parameter ∧ parameter ≤ 1)
+        ∧ x = Plane.between(Plane.origin, Plane.Point.make(1, 0), parameter)
+      from onSegment;
+  0 ≤ parameter;
+  x = Plane.between(Plane.origin, Plane.Point.make(1, 0), parameter)
+      as isWalkPoint;
+  Plane.Point.first(x) = parameter
+      by Plane.first_coordinate_of_unitSegment(
+          x, onSegment, parameter, isWalkPoint)
+      as parameterIsFirst;
+  done by substituting parameterIsFirst
+}
+
+theorem Plane.first_coordinate_atMostOne_on_unitSegment (x : Plane.Point)
+        (onSegment : x ∈ Plane.unitSegment)
+        : Plane.Point.first(x) ≤ 1 := {
+  choose parameter such that
+      (0 ≤ parameter ∧ parameter ≤ 1)
+        ∧ x = Plane.between(Plane.origin, Plane.Point.make(1, 0), parameter)
+      from onSegment;
+  parameter ≤ 1;
+  x = Plane.between(Plane.origin, Plane.Point.make(1, 0), parameter)
+      as isWalkPoint;
+  Plane.Point.first(x) = parameter
+      by Plane.first_coordinate_of_unitSegment(
+          x, onSegment, parameter, isWalkPoint)
+      as parameterIsFirst;
+  done by substituting parameterIsFirst
+}
+
 -- ----------------------------------------------------------------------
 -- The square's boundary: the model curve.
 
