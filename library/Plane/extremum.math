@@ -144,6 +144,36 @@ definition Plane.image (f : Plane.Point → ℝ) (region : Set(Plane.Point))
 -- thin them to a convergent sequence, and continuity would pin their
 -- values near a single number they were meant to run past.
 
+-- "The values are not bounded, so at every scale one of them is past it."
+-- The block is what pushing the negation through the quantifiers costs.
+theorem Plane.value_past_every_scale (f : Plane.Point → ℝ)
+        (region : Set(Plane.Point))
+        (unbounded : ¬Real.IsBoundedAbove(Plane.image(f, region)))
+        (n : ℕ)
+        : ∃ (x : Plane.Point). x ∈ region ∧ (1 + n : ℝ) < f(x) := {
+  suppose ¬(∃ (x : Plane.Point). x ∈ region ∧ (1 + n : ℝ) < f(x))
+      as noneBeyond for contradiction {
+    Real.IsUpperBound(Plane.image(f, region), (1 + n : ℝ))
+        by (value : ℝ) (inImage : value ∈ Plane.image(f, region)) ↦ {
+          choose x such that x ∈ region ∧ f(x) = value from inImage;
+          x ∈ region;
+          f(x) = value;
+          suppose ¬(f(x) ≤ (1 + n : ℝ)) as high for contradiction {
+            (1 + n : ℝ) < f(x) by Real.LessThan_of_not_LessOrEqual;
+            ∃ (x : Plane.Point). x ∈ region ∧ (1 + n : ℝ) < f(x)
+                by { witness x with done };
+            done
+          };
+          f(x) ≤ (1 + n : ℝ);
+          done
+        };
+    Real.IsBoundedAbove(Plane.image(f, region))
+        by { witness (1 + n : ℝ) with done };
+    done
+  };
+  done
+}
+
 theorem Plane.image_bounded_above (f : Plane.Point → ℝ)
         (region : Set(Plane.Point))
         (compact : Plane.IsCompact(region))
@@ -152,30 +182,8 @@ theorem Plane.image_bounded_above (f : Plane.Point → ℝ)
   suppose ¬Real.IsBoundedAbove(Plane.image(f, region))
       as unbounded for contradiction {
     ∀ (n : ℕ). ∃ (x : Plane.Point). x ∈ region ∧ (1 + n : ℝ) < f(x)
-        by (n : ℕ) ↦ {
-          suppose ¬(∃ (x : Plane.Point). x ∈ region ∧ (1 + n : ℝ) < f(x))
-              as noneBeyond for contradiction {
-            Real.IsUpperBound(Plane.image(f, region), (1 + n : ℝ))
-                by (value : ℝ) (inImage : value ∈ Plane.image(f, region)) ↦ {
-                  choose x such that x ∈ region ∧ f(x) = value
-                      from inImage;
-                  x ∈ region;
-                  f(x) = value;
-                  suppose ¬(f(x) ≤ (1 + n : ℝ)) as high for contradiction {
-                    (1 + n : ℝ) < f(x) by Real.LessThan_of_not_LessOrEqual;
-                    ∃ (x : Plane.Point). x ∈ region ∧ (1 + n : ℝ) < f(x)
-                        by { witness x with done };
-                    done
-                  };
-                  f(x) ≤ (1 + n : ℝ);
-                  done
-                };
-            Real.IsBoundedAbove(Plane.image(f, region))
-                by { witness (1 + n : ℝ) with done };
-            done
-          };
-          done
-        }
+        by (n : ℕ) ↦
+             Plane.value_past_every_scale(f, region, unbounded, n)
         as escapes;
     choose s such that
         ∀ (n : ℕ). s(n) ∈ region ∧ (1 + n : ℝ) < f(s(n))
@@ -410,6 +418,59 @@ definition Plane.UniformlyContinuousOn
         ∀ (y : Plane.Point). y ∈ carrier →
           Plane.distance(x, y) < nearness → abs(f(x) - f(y)) < tolerance
 
+-- "No nearness works, so at every scale some pair is close with values
+-- that are not." Same quarantine as the two above.
+theorem Plane.bad_pair_at_every_scale (f : Plane.Point → ℝ)
+        (region : Set(Plane.Point)) (tolerance : ℝ)
+        (noNearness : ¬(∃ (nearness : ℝ). 0 < nearness ∧
+            ∀ (x : Plane.Point). x ∈ region →
+              ∀ (y : Plane.Point). y ∈ region →
+                Plane.distance(x, y) < nearness
+                  → abs(f(x) - f(y)) < tolerance))
+        (n : ℕ)
+        : ∃ (p : Plane.Point). p ∈ region ∧
+            ∃ (q : Plane.Point). q ∈ region
+                ∧ (Plane.distance(p, q) < Real.harmonic_term(n)
+                       ∧ ¬(abs(f(p) - f(q)) < tolerance)) := {
+  Real.harmonic_term(n) > 0 by Real.divide_positive;
+  suppose ¬(∃ (p : Plane.Point). p ∈ region ∧
+      ∃ (q : Plane.Point). q ∈ region
+          ∧ (Plane.distance(p, q) < Real.harmonic_term(n)
+                 ∧ ¬(abs(f(p) - f(q)) < tolerance)))
+      as noBadPair for contradiction {
+    ∀ (x : Plane.Point). x ∈ region →
+      ∀ (y : Plane.Point). y ∈ region →
+        Plane.distance(x, y) < Real.harmonic_term(n)
+          → abs(f(x) - f(y)) < tolerance
+        by (x : Plane.Point) (inX : x ∈ region)
+           (y : Plane.Point) (inY : y ∈ region)
+           (near : Plane.distance(x, y) < Real.harmonic_term(n)) ↦ {
+          suppose ¬(abs(f(x) - f(y)) < tolerance)
+              as valuesApart for contradiction {
+            ∃ (q : Plane.Point). q ∈ region
+                ∧ (Plane.distance(x, q) < Real.harmonic_term(n)
+                       ∧ ¬(abs(f(x) - f(q)) < tolerance))
+                by { witness y with done };
+            ∃ (p : Plane.Point). p ∈ region ∧
+                ∃ (q : Plane.Point). q ∈ region
+                    ∧ (Plane.distance(p, q) < Real.harmonic_term(n)
+                           ∧ ¬(abs(f(p) - f(q)) < tolerance))
+                by { witness x with done };
+            done
+          };
+          done
+        };
+    ∃ (nearness : ℝ). 0 < nearness ∧
+        ∀ (x : Plane.Point). x ∈ region →
+          ∀ (y : Plane.Point). y ∈ region →
+            Plane.distance(x, y) < nearness
+              → abs(f(x) - f(y)) < tolerance
+        by { witness Real.harmonic_term(n) with done };
+    done
+  };
+  done
+}
+
 theorem Plane.uniformly_continuous_on_compact
         (f : Plane.Point → ℝ) (region : Set(Plane.Point))
         (compact : Plane.IsCompact(region))
@@ -428,45 +489,8 @@ theorem Plane.uniformly_continuous_on_compact
         ∃ (q : Plane.Point). q ∈ region
             ∧ (Plane.distance(p, q) < Real.harmonic_term(n)
                    ∧ ¬(abs(f(p) - f(q)) < tolerance))
-        by (n : ℕ) ↦ {
-          Real.harmonic_term(n) > 0 by Real.divide_positive;
-          suppose ¬(∃ (p : Plane.Point). p ∈ region ∧
-              ∃ (q : Plane.Point). q ∈ region
-                  ∧ (Plane.distance(p, q) < Real.harmonic_term(n)
-                         ∧ ¬(abs(f(p) - f(q)) < tolerance)))
-              as noBadPair for contradiction {
-            ∀ (x : Plane.Point). x ∈ region →
-              ∀ (y : Plane.Point). y ∈ region →
-                Plane.distance(x, y) < Real.harmonic_term(n)
-                  → abs(f(x) - f(y)) < tolerance
-                by (x : Plane.Point) (inX : x ∈ region)
-                   (y : Plane.Point) (inY : y ∈ region)
-                   (near : Plane.distance(x, y) < Real.harmonic_term(n)) ↦ {
-                  suppose ¬(abs(f(x) - f(y)) < tolerance)
-                      as valuesApart for contradiction {
-                    ∃ (q : Plane.Point). q ∈ region
-                        ∧ (Plane.distance(x, q) < Real.harmonic_term(n)
-                               ∧ ¬(abs(f(x) - f(q)) < tolerance))
-                        by { witness y with done };
-                    ∃ (p : Plane.Point). p ∈ region ∧
-                        ∃ (q : Plane.Point). q ∈ region
-                            ∧ (Plane.distance(p, q) < Real.harmonic_term(n)
-                                   ∧ ¬(abs(f(p) - f(q)) < tolerance))
-                        by { witness x with done };
-                    done
-                  };
-                  done
-                };
-            ∃ (nearness : ℝ). 0 < nearness ∧
-                ∀ (x : Plane.Point). x ∈ region →
-                  ∀ (y : Plane.Point). y ∈ region →
-                    Plane.distance(x, y) < nearness
-                      → abs(f(x) - f(y)) < tolerance
-                by { witness Real.harmonic_term(n) with done };
-            done
-          };
-          done
-        }
+        by (n : ℕ) ↦ Plane.bad_pair_at_every_scale(
+             f, region, tolerance, noNearness, n)
         as badPairs;
 
     choose p such that

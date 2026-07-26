@@ -204,6 +204,56 @@ theorem Plane.equal_limits_of_closing
 -- ----------------------------------------------------------------------
 -- The separation lemma.
 
+-- "No gap works, so every scale is beaten by some pair." One sentence in
+-- a textbook; the block below is what pushing the negation through the
+-- quantifiers costs, and it is quarantined here so the theorem that uses
+-- it can just say the sentence.
+theorem Plane.close_pair_at_every_scale
+        (regionA regionB : Set(Plane.Point))
+        (noGap : ¬(∃ (gap : ℝ). 0 < gap ∧
+            ∀ (a : Plane.Point). a ∈ regionA →
+              ∀ (b : Plane.Point). b ∈ regionB →
+                gap ≤ Plane.distance(a, b)))
+        (n : ℕ)
+        : ∃ (a : Plane.Point). a ∈ regionA ∧
+            ∃ (b : Plane.Point). b ∈ regionB
+                ∧ Plane.distance(a, b) < Real.harmonic_term(n) := {
+  Real.harmonic_term(n) > 0 by Real.divide_positive;
+  suppose ¬(∃ (a : Plane.Point). a ∈ regionA ∧
+      ∃ (b : Plane.Point). b ∈ regionB
+          ∧ Plane.distance(a, b) < Real.harmonic_term(n))
+      as noClosePair for contradiction {
+    ∀ (a : Plane.Point). a ∈ regionA →
+      ∀ (b : Plane.Point). b ∈ regionB →
+        Real.harmonic_term(n) ≤ Plane.distance(a, b)
+        by (a : Plane.Point) (inA : a ∈ regionA)
+           (b : Plane.Point) (inB : b ∈ regionB) ↦ {
+          suppose ¬(Real.harmonic_term(n) ≤ Plane.distance(a, b))
+              as close for contradiction {
+            Plane.distance(a, b) < Real.harmonic_term(n)
+                by Real.LessThan_of_not_LessOrEqual;
+            ∃ (b : Plane.Point). b ∈ regionB
+                ∧ Plane.distance(a, b) < Real.harmonic_term(n)
+                by { witness b with done };
+            ∃ (a : Plane.Point). a ∈ regionA ∧
+                ∃ (b : Plane.Point). b ∈ regionB
+                    ∧ Plane.distance(a, b) < Real.harmonic_term(n)
+                by { witness a with done };
+            done
+          };
+          done
+        };
+    ∃ (gap : ℝ). 0 < gap ∧
+        ∀ (a : Plane.Point). a ∈ regionA →
+          ∀ (b : Plane.Point). b ∈ regionB →
+            gap ≤ Plane.distance(a, b)
+        by { witness Real.harmonic_term(n) with done };
+    done
+  };
+  done
+}
+
+
 theorem Plane.compact_separation (regionA regionB : Set(Plane.Point))
         (compactA : Plane.IsCompact(regionA))
         (compactB : Plane.IsCompact(regionB))
@@ -221,41 +271,8 @@ theorem Plane.compact_separation (regionA regionB : Set(Plane.Point))
     ∀ (n : ℕ). ∃ (a : Plane.Point). a ∈ regionA ∧
         ∃ (b : Plane.Point). b ∈ regionB
             ∧ Plane.distance(a, b) < Real.harmonic_term(n)
-        by (n : ℕ) ↦ {
-          Real.harmonic_term(n) > 0 by Real.divide_positive;
-          suppose ¬(∃ (a : Plane.Point). a ∈ regionA ∧
-              ∃ (b : Plane.Point). b ∈ regionB
-                  ∧ Plane.distance(a, b) < Real.harmonic_term(n))
-              as noClosePair for contradiction {
-            ∀ (a : Plane.Point). a ∈ regionA →
-              ∀ (b : Plane.Point). b ∈ regionB →
-                Real.harmonic_term(n) ≤ Plane.distance(a, b)
-                by (a : Plane.Point) (inA : a ∈ regionA)
-                   (b : Plane.Point) (inB : b ∈ regionB) ↦ {
-                  suppose ¬(Real.harmonic_term(n) ≤ Plane.distance(a, b))
-                      as close for contradiction {
-                    Plane.distance(a, b) < Real.harmonic_term(n)
-                        by Real.LessThan_of_not_LessOrEqual;
-                    ∃ (b : Plane.Point). b ∈ regionB
-                        ∧ Plane.distance(a, b) < Real.harmonic_term(n)
-                        by { witness b with done };
-                    ∃ (a : Plane.Point). a ∈ regionA ∧
-                        ∃ (b : Plane.Point). b ∈ regionB
-                            ∧ Plane.distance(a, b) < Real.harmonic_term(n)
-                        by { witness a with done };
-                    done
-                  };
-                  done
-                };
-            ∃ (gap : ℝ). 0 < gap ∧
-                ∀ (a : Plane.Point). a ∈ regionA →
-                  ∀ (b : Plane.Point). b ∈ regionB →
-                    gap ≤ Plane.distance(a, b)
-                by { witness Real.harmonic_term(n) with done };
-            done
-          };
-          done
-        }
+        by (n : ℕ) ↦
+             Plane.close_pair_at_every_scale(regionA, regionB, noGap, n)
         as closePairs;
 
     -- First choice: the point of `A`.
