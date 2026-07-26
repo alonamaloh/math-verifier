@@ -1,0 +1,82 @@
+-- Real/maximum.math
+--
+-- The maximum of two reals in closed form: max(a, b) = (a + b + |a − b|) / 2.
+-- The mirror of Real.minimum, and for the same reason: ℝ has no decidable
+-- order, so the definite description is unavailable and the absolute value
+-- of the gap does the selecting. When a ≥ b the |·| is a − b and the formula
+-- collapses to a; otherwise to b.
+--
+-- Unlike minimum, the least-upper-bound direction is stated here
+-- (`Real.maximum_LessOrEqual`): the sup metric on the plane needs to bound
+-- max(|x|, |y|) from above, which is exactly that direction.
+
+module Real.maximum
+
+import Logic.basics
+import Equality.basics
+import Real.basics
+import Real.order
+import Real.order_field
+import Real.division
+import Real.absolute_value_order
+
+-- max(a, b): the larger of the two, read off the absolute value of the gap.
+definition Real.maximum (a b : ℝ) : ℝ :=
+  (a + b + abs(a - b)) / 2
+
+overload max := Real.maximum
+
+-- a ≤ max(a, b): equivalently a − b ≤ |a − b|.
+theorem Real.left_LessOrEqual_maximum (a b : ℝ) : a ≤ max(a, b) := {
+  (2 : ℝ) > 0;
+  a - b ≤ abs(a - b);
+  (2 : ℝ) * a
+     = a + b + (a - b)
+     ≤ a + b + abs(a - b)
+     = 2 * max(a, b);
+  done by Real.LessOrEqual.multiply_cancel_left_positive
+}
+
+-- b ≤ max(a, b): symmetric — b − a ≤ |a − b|.
+theorem Real.right_LessOrEqual_maximum (a b : ℝ) : b ≤ max(a, b) := {
+  (2 : ℝ) > 0;
+  b - a
+     = -(a - b)
+     ≤ abs(a - b);
+  (2 : ℝ) * b
+     = a + b + (b - a)
+     ≤ a + b + abs(a - b)
+     = 2 * max(a, b);
+  done by Real.LessOrEqual.multiply_cancel_left_positive
+}
+
+-- The least upper bound: anything above both is above the maximum. This is
+-- the direction that makes max usable as a bound rather than merely a value.
+theorem Real.maximum_LessOrEqual (a b c : ℝ)
+        (aBelow : a ≤ c) (bBelow : b ≤ c)
+        : max(a, b) ≤ c := {
+  (2 : ℝ) > 0;
+  0 ≤ 2 * (c - a);
+  0 ≤ 2 * (c - b);
+  a - b
+     ≤ (a - b) + 2 * (c - a) by Real.less_or_equal_add_of_nonneg
+     = (c - a) + (c - b);
+  -((c - a) + (c - b))
+     = a + b - 2 * c
+     ≤ (a + b - 2 * c) + 2 * (c - b) by Real.less_or_equal_add_of_nonneg
+     = a - b;
+  abs(a - b) ≤ (c - a) + (c - b)
+      by Real.absolute_value_LessOrEqual_of_bounds;
+  (2 : ℝ) * max(a, b)
+     = a + b + abs(a - b)
+     ≤ a + b + ((c - a) + (c - b))
+     = 2 * c;
+  done by Real.LessOrEqual.multiply_cancel_left_positive
+}
+
+-- The maximum of two nonnegatives is nonnegative — immediate from the left
+-- bound, but stated because the sup metric leans on it constantly.
+theorem Real.maximum_nonneg (a b : ℝ) (aNonneg : 0 ≤ a)
+        : 0 ≤ max(a, b) :=
+  0 ≤ a by aNonneg
+    ≤ max(a, b) by Real.left_LessOrEqual_maximum
