@@ -493,3 +493,24 @@ x < e / 2  ⊢  2 * x < e                 -- fails, even by ordered_field
 This is the ε/2 idiom, the single most common shape in analysis. It is
 survivable in the first spelling, but the second is the one people
 write.
+
+---
+
+### E9 — a partly-applied lemma reports the wrong problem
+
+```
+choose K such that (1 : ℚ) ≤ (1 + K : ℚ) * q
+    from Rational.archimedean_for_positives((1 : ℚ), q);
+```
+→ ``elaborate error: `by <lemma>` (in obtain) expects a lemma name``
+
+The lemma takes four explicit arguments and got two, so the elaborator
+routed the citation down the infer-the-rest path
+(`SurfaceCiteInferred`, `src/elaborator/dispatch.cpp:305`) and then
+complained that the *head* was not an identifier — which it plainly was.
+The message names the one thing that is not wrong, and points at the
+`choose`, not at the application. Supplying all four arguments fixes it.
+
+The right message is "lemma `X` takes 4 explicit arguments and 2 were
+given — supply the rest or drop them all", which the surrounding code
+already has the arity to say.
