@@ -682,3 +682,32 @@ debugger first.
 Reproducer kept at `reports/CRASH_substituting_defined_set.math`;
 `Set.member_of_equal` stays, because proving the transport once over
 opaque sets is better style than `substituting` at every site.
+
+### E12 — a citation that lands on a conjunction does not project to the leg
+
+Found writing Layer 3's polygonal connectedness. A lemma delivered both
+orientations of a segment at once:
+
+```
+∀ (y : Plane.Point). Plane.distance(centre, y) < radius →
+    Plane.segment(centre, y) ⊆ region ∧ Plane.segment(y, centre) ⊆ region
+    as nearbySegments;
+...
+Plane.segment(x, y) ⊆ region by nearbySegments(y, yNear);
+```
+
+→ `the `nearbySegments` citation does not prove this goal` … `its
+conclusion is about `And` but the goal is about `Set.subset``.
+
+The message is accurate and even prints both types, so the elaborator
+knows the goal is one leg of the conjunction it produced — `And.left` and
+`And.right` are already `automatic`. One `∧`-projection hop on a citation
+whose conclusion is a conjunction would close it; instead the site has to
+restate the whole conjunction as a claim and then bare-claim the leg,
+which is boilerplate proportional to the size of the conjunction.
+
+Worked around in this case by removing the conjunction from the
+mathematics — `Plane.segment_symmetric` now says a segment has no
+preferred end, so the lemma delivers one orientation and the other is a
+`substituting`. That is the better library, but the friction stands for
+any genuinely two-legged conclusion.
