@@ -197,20 +197,14 @@ theorem Plane.image_bounded_above (f : Plane.Point → ℝ)
                            by escapesAt(m);
                        done }
         as inside;
-    choose index such that
-        ∃ (limit : Plane.Point).
-            Natural.IsStrictlyIncreasing(index)
-            ∧ limit ∈ region
-            ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
-        as limitExists from compact(s, inside);
-    choose limit such that
-        Natural.IsStrictlyIncreasing(index)
-        ∧ limit ∈ region
-        ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
-        from limitExists;
-    Natural.IsStrictlyIncreasing(index);
+    choose index, limit such that
+        limit ∈ region ∧ Plane.SubsequenceConverges(s, index, limit)
+        from compact(s, inside);
+    Natural.IsStrictlyIncreasing(index)
+        by Plane.SubsequenceConverges.increasing;
     limit ∈ region as limitInRegion;
-    Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) as converges;
+    Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
+        by Plane.SubsequenceConverges.converges as converges;
     Real.SequenceConverges((k : ℕ) ↦ f(s(index(k))), f(limit))
         by Plane.RealContinuousAt.along_sequence(
             f, region, limit, continuous(limit, limitInRegion),
@@ -314,20 +308,14 @@ theorem Plane.attains_maximum (f : Plane.Point → ℝ)
                      done }
       as inside;
 
-  choose index such that
-      ∃ (limit : Plane.Point).
-          Natural.IsStrictlyIncreasing(index)
-          ∧ limit ∈ region
-          ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
-      as limitExists from compact(s, inside);
-  choose p such that
-      Natural.IsStrictlyIncreasing(index)
-      ∧ p ∈ region
-      ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), p)
-      from limitExists;
-  Natural.IsStrictlyIncreasing(index);
+  choose index, p such that
+      p ∈ region ∧ Plane.SubsequenceConverges(s, index, p)
+      from compact(s, inside);
+  Natural.IsStrictlyIncreasing(index)
+      by Plane.SubsequenceConverges.increasing;
   p ∈ region as inRegion;
-  Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), p) as converges;
+  Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), p)
+      by Plane.SubsequenceConverges.converges as converges;
 
   -- Continuity carries the limit of the points to `f(p)`; the squeeze
   -- carries the same sequence of values to `peak`.
@@ -547,36 +535,22 @@ theorem Plane.uniformly_continuous_on_compact
         as insideQ;
 
     -- Thin twice, and the two limits coincide.
-    choose firstIndex such that
-        ∃ (limit : Plane.Point).
-            Natural.IsStrictlyIncreasing(firstIndex)
-            ∧ limit ∈ region
-            ∧ Plane.SequenceConverges((k : ℕ) ↦ p(firstIndex(k)), limit)
-        as limitPExists from compact(p, insideP);
-    choose limitP such that
-        Natural.IsStrictlyIncreasing(firstIndex)
-        ∧ limitP ∈ region
-        ∧ Plane.SequenceConverges((k : ℕ) ↦ p(firstIndex(k)), limitP)
-        from limitPExists;
-    Natural.IsStrictlyIncreasing(firstIndex) as firstIncreasing;
+    choose firstIndex, limitP such that
+        limitP ∈ region ∧ Plane.SubsequenceConverges(p, firstIndex, limitP)
+        from compact(p, insideP);
+    Natural.IsStrictlyIncreasing(firstIndex)
+        by Plane.SubsequenceConverges.increasing as firstIncreasing;
     limitP ∈ region as limitInside;
-    Plane.SequenceConverges((k : ℕ) ↦ p(firstIndex(k)), limitP) as toLimitP;
-    choose secondIndex such that
-        ∃ (limit : Plane.Point).
-            Natural.IsStrictlyIncreasing(secondIndex)
-            ∧ limit ∈ region
-            ∧ Plane.SequenceConverges(
-                  (k : ℕ) ↦ q(firstIndex(secondIndex(k))), limit)
-        as limitQExists
+    Plane.SequenceConverges((k : ℕ) ↦ p(firstIndex(k)), limitP)
+        by Plane.SubsequenceConverges.converges as toLimitP;
+    choose secondIndex, limitQ such that
+        limitQ ∈ region
+        ∧ Plane.SubsequenceConverges(
+              (k : ℕ) ↦ q(firstIndex(k)), secondIndex, limitQ)
         from compact((k : ℕ) ↦ q(firstIndex(k)),
                      (k : ℕ) ↦ insideQ(firstIndex(k)));
-    choose limitQ such that
-        Natural.IsStrictlyIncreasing(secondIndex)
-        ∧ limitQ ∈ region
-        ∧ Plane.SequenceConverges(
-              (k : ℕ) ↦ q(firstIndex(secondIndex(k))), limitQ)
-        from limitQExists;
-    Natural.IsStrictlyIncreasing(secondIndex) as secondIncreasing;
+    Natural.IsStrictlyIncreasing(secondIndex)
+        by Plane.SubsequenceConverges.increasing as secondIncreasing;
     Plane.SequenceConverges(
         (k : ℕ) ↦ q(firstIndex(secondIndex(k))), limitQ) as toLimitQ;
     Plane.SequenceConverges((k : ℕ) ↦ p(firstIndex(secondIndex(k))), limitP)

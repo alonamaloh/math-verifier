@@ -93,13 +93,40 @@ theorem Plane.second_gap_below_distance (p q : Plane.Point)
 }
 
 -- ----------------------------------------------------------------------
+-- Thinning, as a named relation — the plane twin of
+-- `Real.SubsequenceConverges`.
+
+definition Plane.SubsequenceConverges
+        (s : ℕ → Plane.Point) (index : ℕ → ℕ) (limit : Plane.Point)
+        : Proposition :=
+  Natural.IsStrictlyIncreasing(index)
+  ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
+
+theorem Plane.SubsequenceConverges.increasing
+        (s : ℕ → Plane.Point) (index : ℕ → ℕ) (limit : Plane.Point)
+        (thins : Plane.SubsequenceConverges(s, index, limit))
+        : Natural.IsStrictlyIncreasing(index) :=
+  unfold Plane.SubsequenceConverges in {
+    Natural.IsStrictlyIncreasing(index);
+    done
+  }
+
+theorem Plane.SubsequenceConverges.converges
+        (s : ℕ → Plane.Point) (index : ℕ → ℕ) (limit : Plane.Point)
+        (thins : Plane.SubsequenceConverges(s, index, limit))
+        : Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) :=
+  unfold Plane.SubsequenceConverges in {
+    Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit);
+    done
+  }
+
+-- ----------------------------------------------------------------------
 -- Bolzano--Weierstrass in the plane.
 
 theorem Plane.bolzano_weierstrass (s : ℕ → Plane.Point)
         (bounded : Plane.SequenceIsBounded(s))
         : ∃ (index : ℕ → ℕ). ∃ (limit : Plane.Point).
-            Natural.IsStrictlyIncreasing(index)
-            ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) := {
+            Plane.SubsequenceConverges(s, index, limit) := {
   choose centre such that
       ∃ (bound : ℝ). ∀ (m : ℕ). Plane.distance(centre, s(m)) ≤ bound
       as boundExists from bounded;
@@ -113,22 +140,21 @@ theorem Plane.bolzano_weierstrass (s : ℕ → Plane.Point)
           Plane.first_gap_below_distance);
   choose firstIndex such that
       ∃ (firstLimit : ℝ).
-          Natural.IsStrictlyIncreasing(firstIndex)
-          ∧ Real.SequenceConverges(
-                (k : ℕ) ↦ Plane.Point.first(s(firstIndex(k))), firstLimit)
+          Real.SubsequenceConverges(
+              (m : ℕ) ↦ Plane.Point.first(s(m)), firstIndex, firstLimit)
       as firstLimitExists
       from Real.bolzano_weierstrass(
           (m : ℕ) ↦ Plane.Point.first(s(m)),
           { Real.SequenceIsBounded((m : ℕ) ↦ Plane.Point.first(s(m))) });
   choose firstLimit such that
-      Natural.IsStrictlyIncreasing(firstIndex)
-      ∧ Real.SequenceConverges(
-            (k : ℕ) ↦ Plane.Point.first(s(firstIndex(k))), firstLimit)
+      Real.SubsequenceConverges(
+          (m : ℕ) ↦ Plane.Point.first(s(m)), firstIndex, firstLimit)
       from firstLimitExists;
-  Natural.IsStrictlyIncreasing(firstIndex) as firstIncreasing;
+  Natural.IsStrictlyIncreasing(firstIndex)
+      by Real.SubsequenceConverges.increasing as firstIncreasing;
   Real.SequenceConverges(
       (k : ℕ) ↦ Plane.Point.first(s(firstIndex(k))), firstLimit)
-      as firstConverges;
+      by Real.SubsequenceConverges.converges as firstConverges;
 
   -- Thin again, so the second coordinate does too. The thinned sequence
   -- is still bounded — it is a subfamily of the same one.
@@ -139,10 +165,9 @@ theorem Plane.bolzano_weierstrass (s : ℕ → Plane.Point)
           Plane.Point.second, Plane.second_gap_below_distance);
   choose secondIndex such that
       ∃ (secondLimit : ℝ).
-          Natural.IsStrictlyIncreasing(secondIndex)
-          ∧ Real.SequenceConverges(
-                (k : ℕ) ↦ Plane.Point.second(s(firstIndex(secondIndex(k)))),
-                secondLimit)
+          Real.SubsequenceConverges(
+              (k : ℕ) ↦ Plane.Point.second(s(firstIndex(k))),
+              secondIndex, secondLimit)
       as secondLimitExists
       from Real.bolzano_weierstrass(
           (k : ℕ) ↦ Plane.Point.second(s(firstIndex(k))),
@@ -177,6 +202,8 @@ theorem Plane.bolzano_weierstrass (s : ℕ → Plane.Point)
       by Plane.SequenceConverges.of_coordinates(
           (k : ℕ) ↦ s(firstIndex(secondIndex(k))), limit,
           firstStillConverges, secondConverges);
+  Plane.SubsequenceConverges(
+      s, (k : ℕ) ↦ firstIndex(secondIndex(k)), limit);
   witness ((k : ℕ) ↦ firstIndex(secondIndex(k))) with
       { witness limit with done }
 }

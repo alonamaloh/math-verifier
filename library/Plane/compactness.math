@@ -44,9 +44,7 @@ import Plane.compact
 definition Plane.IsCompact (region : Set(Plane.Point)) : Proposition :=
   ∀ (s : ℕ → Plane.Point). (∀ (m : ℕ). s(m) ∈ region) →
     ∃ (index : ℕ → ℕ). ∃ (limit : Plane.Point).
-      Natural.IsStrictlyIncreasing(index)
-      ∧ limit ∈ region
-      ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
+      limit ∈ region ∧ Plane.SubsequenceConverges(s, index, limit)
 
 -- The closure of a set, taken in the whole plane.
 definition Plane.Closure (region : Set(Plane.Point)) : Set(Plane.Point) :=
@@ -145,20 +143,14 @@ theorem Plane.IsCompact.Closure_subset (region : Set(Plane.Point))
       from Plane.sequence_to_Closure_point(region, x, inClosure);
   ∀ (m : ℕ). s(m) ∈ region as inside;
   Plane.SequenceConverges(s, x) as toX;
-  choose index such that
-      ∃ (limit : Plane.Point).
-          Natural.IsStrictlyIncreasing(index)
-          ∧ limit ∈ region
-          ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
-      as limitExists from compact(s, inside);
-  choose limit such that
-      Natural.IsStrictlyIncreasing(index)
-      ∧ limit ∈ region
-      ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
-      from limitExists;
-  Natural.IsStrictlyIncreasing(index) as increasing;
+  choose index, limit such that
+      limit ∈ region ∧ Plane.SubsequenceConverges(s, index, limit)
+      from compact(s, inside);
+  Natural.IsStrictlyIncreasing(index)
+      by Plane.SubsequenceConverges.increasing as increasing;
   limit ∈ region;
-  Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) as toLimit;
+  Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
+      by Plane.SubsequenceConverges.converges as toLimit;
   -- The thinned sequence still converges to `x`, so the two limits agree.
   Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), x)
       by Plane.SequenceConverges.subsequence(s, x, index, toX, increasing);
@@ -188,18 +180,14 @@ theorem Plane.compact_of_closed_bounded (region : Set(Plane.Point))
   Plane.SequenceIsBounded(s)
       by { witness centre with { witness bound with
              (m : ℕ) ↦ insideBall(s(m), inside(m)) } };
-  choose index such that
-      ∃ (limit : Plane.Point).
-          Natural.IsStrictlyIncreasing(index)
-          ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
-      as limitExists
-      from Plane.bolzano_weierstrass(s, { Plane.SequenceIsBounded(s) });
-  choose limit such that
+  choose index, limit such that
       Natural.IsStrictlyIncreasing(index)
       ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
-      from limitExists;
-  Natural.IsStrictlyIncreasing(index);
-  Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) as converges;
+      from Plane.bolzano_weierstrass(s, { Plane.SequenceIsBounded(s) });
+  Natural.IsStrictlyIncreasing(index)
+      by Plane.SubsequenceConverges.increasing;
+  Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
+      by Plane.SubsequenceConverges.converges as converges;
   limit ∈ Plane.Closure(region)
       by Plane.limit_in_Closure(
           region, (k : ℕ) ↦ s(index(k)),
@@ -272,19 +260,15 @@ theorem Plane.IsCompact.bounded (region : Set(Plane.Point))
                            < Plane.distance(centre, s(m)) by escapesAt(m);
                        done }
         as inside;
-    choose index such that
-        ∃ (limit : Plane.Point).
-            Natural.IsStrictlyIncreasing(index)
-            ∧ limit ∈ region
-            ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
-        as limitExists from compact(s, inside);
-    choose limit such that
-        Natural.IsStrictlyIncreasing(index)
-        ∧ limit ∈ region
-        ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
-        from limitExists;
-    Natural.IsStrictlyIncreasing(index);
-    Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) as converges;
+    choose index, limit such that
+        limit ∈ region
+
+            ∧ Plane.SubsequenceConverges(s, index, limit)
+        from compact(s, inside);
+    Natural.IsStrictlyIncreasing(index)
+        by Plane.SubsequenceConverges.increasing;
+    Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
+        by Plane.SubsequenceConverges.converges as converges;
     (0 : ℝ) < 1;
     choose threshold such that
         ∀ (k : ℕ). threshold ≤ k →
@@ -382,20 +366,14 @@ theorem Plane.IsCompact.image
   ∀ (m : ℕ). s(m) ∈ region
       by (m : ℕ) ↦ { s(m) ∈ region ∧ f(s(m)) = t(m) by chosen(m); done }
       as inside;
-  choose index such that
-      ∃ (limit : Plane.Point).
-          Natural.IsStrictlyIncreasing(index)
-          ∧ limit ∈ region
-          ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
-      as limitExists from compact(s, inside);
-  choose limit such that
-      Natural.IsStrictlyIncreasing(index)
-      ∧ limit ∈ region
-      ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
-      from limitExists;
-  Natural.IsStrictlyIncreasing(index);
+  choose index, limit such that
+      limit ∈ region ∧ Plane.SubsequenceConverges(s, index, limit)
+      from compact(s, inside);
+  Natural.IsStrictlyIncreasing(index)
+      by Plane.SubsequenceConverges.increasing;
   limit ∈ region as limitInside;
-  Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) as converges;
+  Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
+      by Plane.SubsequenceConverges.converges as converges;
   f(limit) ∈ Plane.imageSet(f, region) by { witness limit with done };
   Plane.SequenceConverges((k : ℕ) ↦ f(s(index(k))), f(limit))
       by Plane.ContinuousAt.along_sequence(

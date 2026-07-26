@@ -200,6 +200,37 @@ theorem Real.cluster_point_exists (s : ℕ → ℝ)
 }
 
 -- ----------------------------------------------------------------------
+-- Thinning, as a named relation.
+--
+-- "`index` thins `s` to a sequence converging to `limit`" is the shape
+-- every subsequence theorem returns and every consumer takes apart.
+-- Naming it keeps those statements to one line and lets a consumer say
+-- which half it is using.
+
+definition Real.SubsequenceConverges
+        (s : ℕ → ℝ) (index : ℕ → ℕ) (limit : ℝ) : Proposition :=
+  Natural.IsStrictlyIncreasing(index)
+  ∧ Real.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
+
+theorem Real.SubsequenceConverges.increasing
+        (s : ℕ → ℝ) (index : ℕ → ℕ) (limit : ℝ)
+        (thins : Real.SubsequenceConverges(s, index, limit))
+        : Natural.IsStrictlyIncreasing(index) :=
+  unfold Real.SubsequenceConverges in {
+    Natural.IsStrictlyIncreasing(index);
+    done
+  }
+
+theorem Real.SubsequenceConverges.converges
+        (s : ℕ → ℝ) (index : ℕ → ℕ) (limit : ℝ)
+        (thins : Real.SubsequenceConverges(s, index, limit))
+        : Real.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) :=
+  unfold Real.SubsequenceConverges in {
+    Real.SequenceConverges((k : ℕ) ↦ s(index(k)), limit);
+    done
+  }
+
+-- ----------------------------------------------------------------------
 -- The combinatorial half: a cluster point is the limit of a subsequence.
 --
 -- `Natural.extract` takes the LEAST index past the previous one at which
@@ -209,8 +240,7 @@ theorem Real.cluster_point_exists (s : ℕ → ℝ)
 theorem Real.subsequence_at_cluster_point (s : ℕ → ℝ) (point : ℝ)
         (isCluster : Real.IsClusterPoint(s, point))
         : ∃ (index : ℕ → ℕ).
-            Natural.IsStrictlyIncreasing(index)
-            ∧ Real.SequenceConverges((k : ℕ) ↦ s(index(k)), point) := {
+            Real.SubsequenceConverges(s, index, point) := {
   ∀ (k : ℕ). Natural.Frequently((m : ℕ) ↦
       abs(s(m) - point) < Real.harmonic_term(k))
       by (k : ℕ) ↦ {
@@ -241,6 +271,7 @@ theorem Real.subsequence_at_cluster_point (s : ℕ → ℝ) (point : ℝ)
               done
             }
       };
+  Real.SubsequenceConverges(s, index, point);
   witness index with done
 }
 
@@ -250,16 +281,13 @@ theorem Real.subsequence_at_cluster_point (s : ℕ → ℝ) (point : ℝ)
 theorem Real.bolzano_weierstrass (s : ℕ → ℝ)
         (bounded : Real.SequenceIsBounded(s))
         : ∃ (index : ℕ → ℕ). ∃ (limit : ℝ).
-            Natural.IsStrictlyIncreasing(index)
-            ∧ Real.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) := {
+            Real.SubsequenceConverges(s, index, limit) := {
   choose point such that Real.IsClusterPoint(s, point)
       as isCluster from Real.cluster_point_exists(s, bounded);
-  choose index such that
-      Natural.IsStrictlyIncreasing(index)
-      ∧ Real.SequenceConverges((k : ℕ) ↦ s(index(k)), point)
-      as subsequence
+  choose index such that Real.SubsequenceConverges(s, index, point)
+      as thinning
       from Real.subsequence_at_cluster_point(s, point, isCluster);
-  witness index with { witness point with subsequence }
+  witness index with { witness point with thinning }
 }
 
 -- ----------------------------------------------------------------------

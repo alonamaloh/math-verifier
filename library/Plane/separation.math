@@ -323,37 +323,24 @@ theorem Plane.compact_separation (regionA regionB : Set(Plane.Point))
         as insideB;
 
     -- Thin twice: once so `a` converges, once more so `b` does.
-    choose firstIndex such that
-        ∃ (limit : Plane.Point).
-            Natural.IsStrictlyIncreasing(firstIndex)
-            ∧ limit ∈ regionA
-            ∧ Plane.SequenceConverges((k : ℕ) ↦ a(firstIndex(k)), limit)
-        as limitAExists from compactA(a, insideA);
-    choose limitA such that
-        Natural.IsStrictlyIncreasing(firstIndex)
-        ∧ limitA ∈ regionA
-        ∧ Plane.SequenceConverges((k : ℕ) ↦ a(firstIndex(k)), limitA)
-        from limitAExists;
-    Natural.IsStrictlyIncreasing(firstIndex) as firstIncreasing;
+    choose firstIndex, limitA such that
+        limitA ∈ regionA
+        ∧ Plane.SubsequenceConverges(a, firstIndex, limitA)
+        from compactA(a, insideA);
+    Natural.IsStrictlyIncreasing(firstIndex)
+        by Plane.SubsequenceConverges.increasing as firstIncreasing;
     limitA ∈ regionA as limitAInside;
-    Plane.SequenceConverges((k : ℕ) ↦ a(firstIndex(k)), limitA) as toLimitA;
+    Plane.SequenceConverges((k : ℕ) ↦ a(firstIndex(k)), limitA)
+        by Plane.SubsequenceConverges.converges as toLimitA;
 
-    choose secondIndex such that
-        ∃ (limit : Plane.Point).
-            Natural.IsStrictlyIncreasing(secondIndex)
-            ∧ limit ∈ regionB
-            ∧ Plane.SequenceConverges(
-                  (k : ℕ) ↦ b(firstIndex(secondIndex(k))), limit)
-        as limitBExists
+    choose secondIndex, limitB such that
+        limitB ∈ regionB
+        ∧ Plane.SubsequenceConverges(
+              (k : ℕ) ↦ b(firstIndex(k)), secondIndex, limitB)
         from compactB((k : ℕ) ↦ b(firstIndex(k)),
                       (k : ℕ) ↦ insideB(firstIndex(k)));
-    choose limitB such that
-        Natural.IsStrictlyIncreasing(secondIndex)
-        ∧ limitB ∈ regionB
-        ∧ Plane.SequenceConverges(
-              (k : ℕ) ↦ b(firstIndex(secondIndex(k))), limitB)
-        from limitBExists;
-    Natural.IsStrictlyIncreasing(secondIndex) as secondIncreasing;
+    Natural.IsStrictlyIncreasing(secondIndex)
+        by Plane.SubsequenceConverges.increasing as secondIncreasing;
     limitB ∈ regionB;
     Plane.SequenceConverges(
         (k : ℕ) ↦ b(firstIndex(secondIndex(k))), limitB) as toLimitB;
