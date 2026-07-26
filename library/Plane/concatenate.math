@@ -85,7 +85,7 @@ theorem Plane.retime_ContinuousOn (scale shift : ℝ)
   0 ≤ abs(scale);
   0 < 1 + abs(scale);
   1 + abs(scale) ≠ 0;
-  0 < tolerance / (1 + abs(scale)) by Real.divide_positive;
+  0 < tolerance / (1 + abs(scale));
   witness tolerance / (1 + abs(scale)) with {
     0 < tolerance / (1 + abs(scale));
     ∀ (y : Plane.Point). y ∈ carrier →
@@ -98,7 +98,7 @@ theorem Plane.retime_ContinuousOn (scale shift : ℝ)
                        < tolerance / (1 + abs(scale))) ↦ {
           -- A coordinate gap never exceeds the distance.
           abs(Plane.Point.first(y) - Plane.Point.first(x))
-             = abs(Plane.Vector.first(y - x)) by Plane.Point.first_difference
+             = abs(Plane.Vector.first(y - x))
              ≤ Plane.Vector.norm(y - x)
                    by Plane.Vector.absolute_first_LessOrEqual_norm
              = Plane.distance(x, y);
@@ -148,6 +148,18 @@ theorem Plane.retime_ContinuousOn (scale shift : ℝ)
 
 -- ----------------------------------------------------------------------
 -- The two halves of the model interval.
+
+-- The midpoint's parameter, named once: `1/2` is a cast rational, so the
+-- ground-arithmetic tier does not decide comparisons against it.
+theorem Plane.midpoint_positive : (0 : ℝ) < 1 / 2 :=
+  done by Real.divide_positive
+
+theorem Plane.midpoint_below_one : 1 / 2 < (1 : ℝ) := {
+  (0 : ℝ) < 1 / 2;
+  (2 : ℝ) ≠ 0;
+  (2 : ℝ) * (1 / 2) = 1 by Real.divide_cancel;
+  done by ordered_field
+}
 
 definition Plane.lowerHalf : Set(Plane.Point) :=
   (x : Plane.Point) ↦ x ∈ Plane.unitSegment ∧ Plane.Point.first(x) ≤ 1 / 2
@@ -206,7 +218,7 @@ theorem Plane.lowerHalf_ClosedIn
         by (y : Plane.Point) (yOnSegment : y ∈ Plane.unitSegment)
            (near : Plane.distance(x, y) < Plane.Point.first(x) - 1 / 2) ↦ {
           abs(Plane.Point.first(y) - Plane.Point.first(x))
-             = abs(Plane.Vector.first(y - x)) by Plane.Point.first_difference
+             = abs(Plane.Vector.first(y - x))
              ≤ Plane.Vector.norm(y - x)
                    by Plane.Vector.absolute_first_LessOrEqual_norm
              = Plane.distance(x, y)
@@ -247,7 +259,7 @@ theorem Plane.upperHalf_ClosedIn
         by (y : Plane.Point) (yOnSegment : y ∈ Plane.unitSegment)
            (near : Plane.distance(x, y) < 1 / 2 - Plane.Point.first(x)) ↦ {
           abs(Plane.Point.first(y) - Plane.Point.first(x))
-             = abs(Plane.Vector.first(y - x)) by Plane.Point.first_difference
+             = abs(Plane.Vector.first(y - x))
              ≤ Plane.Vector.norm(y - x)
                    by Plane.Vector.absolute_first_LessOrEqual_norm
              = Plane.distance(x, y)
@@ -265,4 +277,554 @@ theorem Plane.upperHalf_ClosedIn
         };
     done
   }
+}
+
+-- ----------------------------------------------------------------------
+-- The concatenation.
+--
+-- Below the midpoint the first arc runs at double speed; above it, the
+-- second. At the midpoint both branches are asked for, and they agree
+-- exactly because the arcs share that endpoint — which is what makes the
+-- glued map well defined and lets the pasting lemma close continuity.
+
+definition Plane.concatenate
+        (firstArc secondArc : Plane.Point → Plane.Point)
+        : Plane.Point → Plane.Point :=
+  (x : Plane.Point) ↦
+    if Plane.Point.first(x) ≤ 1 / 2
+    then firstArc(Plane.retime(2, 0)(x))
+    else secondArc(Plane.retime(2, -(1 : ℝ))(x))
+
+theorem Plane.concatenate_on_lowerHalf
+        (firstArc secondArc : Plane.Point → Plane.Point) (x : Plane.Point)
+        (inLower : x ∈ Plane.lowerHalf)
+        : Plane.concatenate(firstArc, secondArc)(x)
+              = firstArc(Plane.retime(2, 0)(x)) := {
+  Plane.Point.first(x) ≤ 1 / 2;
+  done by Logic.if_positive
+}
+
+theorem Plane.concatenate_on_upperHalf
+        (firstArc secondArc : Plane.Point → Plane.Point) (x : Plane.Point)
+        (inUpper : x ∈ Plane.upperHalf)
+        (aboveMidpoint : ¬(Plane.Point.first(x) ≤ 1 / 2))
+        : Plane.concatenate(firstArc, secondArc)(x)
+              = secondArc(Plane.retime(2, -(1 : ℝ))(x)) :=
+  done by Logic.if_negative
+
+theorem Plane.concatenate_start
+        (firstArc secondArc : Plane.Point → Plane.Point)
+        : Plane.arcStart(Plane.concatenate(firstArc, secondArc))
+              = Plane.arcStart(firstArc) := {
+  Plane.Point.first(Plane.origin)
+     = 0
+     < 1 / 2 by Plane.midpoint_positive;
+  Plane.Point.first(Plane.origin) ≤ 1 / 2 by Real.LessThan.weaken;
+  Plane.retime(2, 0)(Plane.origin)
+     = Plane.between(Plane.origin, Plane.Point.make(1, 0), 2 * 0 + 0)
+     = Plane.between(Plane.origin, Plane.Point.make(1, 0), 0)
+     = Plane.origin by Plane.between_zero as retimedStart;
+  Plane.concatenate(firstArc, secondArc)(Plane.origin)
+     = firstArc(Plane.retime(2, 0)(Plane.origin)) by Logic.if_positive
+     = firstArc(Plane.origin) by substituting retimedStart;
+  done
+}
+
+theorem Plane.concatenate_finish
+        (firstArc secondArc : Plane.Point → Plane.Point)
+        : Plane.arcFinish(Plane.concatenate(firstArc, secondArc))
+              = Plane.arcFinish(secondArc) := {
+  1 / 2 < (1 : ℝ) by Plane.midpoint_below_one;
+  ¬(Plane.Point.first(Plane.Point.make(1, 0)) ≤ 1 / 2)
+      by (low : Plane.Point.first(Plane.Point.make(1, 0)) ≤ 1 / 2) ↦ {
+        Plane.Point.first(Plane.Point.make(1, 0)) = 1;
+        (1 : ℝ) ≤ 1 / 2;
+        done by Real.LessThan.irreflexive
+      };
+  Plane.retime(2, -(1 : ℝ))(Plane.Point.make(1, 0))
+     = Plane.between(
+           Plane.origin, Plane.Point.make(1, 0), 2 * 1 + -(1 : ℝ))
+     = Plane.between(Plane.origin, Plane.Point.make(1, 0), 1)
+     = Plane.Point.make(1, 0) by Plane.between_one as retimedFinish;
+  Plane.concatenate(firstArc, secondArc)(Plane.Point.make(1, 0))
+     = secondArc(Plane.retime(2, -(1 : ℝ))(Plane.Point.make(1, 0)))
+           by Logic.if_negative
+     = secondArc(Plane.Point.make(1, 0)) by substituting retimedFinish;
+  done
+}
+
+-- Each half retimes into the model interval: doubling a parameter below
+-- the midpoint reaches at most one, and doubling one above it, less one,
+-- reaches at least nothing.
+theorem Plane.lowerHalf_retime_lands (x : Plane.Point)
+        (inLower : x ∈ Plane.lowerHalf)
+        : Plane.retime(2, 0)(x) ∈ Plane.unitSegment := {
+  x ∈ Plane.unitSegment;
+  Plane.Point.first(x) ≤ 1 / 2;
+  0 ≤ Plane.Point.first(x)
+      by Plane.first_coordinate_nonneg_on_unitSegment;
+  (2 : ℝ) ≠ 0;
+  (2 : ℝ) * (1 / 2) = 1 by Real.divide_cancel;
+  0 ≤ 2 * Plane.Point.first(x) + 0 by ordered_field;
+  2 * Plane.Point.first(x) + 0 ≤ 1 by ordered_field;
+  done by Plane.retime_lands
+}
+
+theorem Plane.upperHalf_retime_lands (x : Plane.Point)
+        (inUpper : x ∈ Plane.upperHalf)
+        : Plane.retime(2, -(1 : ℝ))(x) ∈ Plane.unitSegment := {
+  x ∈ Plane.unitSegment;
+  1 / 2 ≤ Plane.Point.first(x);
+  Plane.Point.first(x) ≤ 1
+      by Plane.first_coordinate_atMostOne_on_unitSegment;
+  (2 : ℝ) ≠ 0;
+  (2 : ℝ) * (1 / 2) = 1 by Real.divide_cancel;
+  0 ≤ 2 * Plane.Point.first(x) + -(1 : ℝ) by ordered_field;
+  2 * Plane.Point.first(x) + -(1 : ℝ) ≤ 1 by ordered_field;
+  done by Plane.retime_lands
+}
+
+-- ----------------------------------------------------------------------
+-- Continuity: each half carries a composition, and the halves are closed.
+
+theorem Plane.concatenate_ContinuousOn
+        (firstArc secondArc : Plane.Point → Plane.Point)
+        (firstContinuous : Plane.ContinuousOn(firstArc, Plane.unitSegment))
+        (secondContinuous : Plane.ContinuousOn(secondArc, Plane.unitSegment))
+        (sharedEndpoint
+            : Plane.arcFinish(firstArc) = Plane.arcStart(secondArc))
+        : Plane.ContinuousOn(
+              Plane.concatenate(firstArc, secondArc), Plane.unitSegment) := {
+  -- On the lower half the glued map IS the first arc, retimed.
+  ∀ (x : Plane.Point). x ∈ Plane.lowerHalf →
+      Plane.retime(2, 0)(x) ∈ Plane.unitSegment
+      by (x : Plane.Point) (inLower : x ∈ Plane.lowerHalf) ↦
+           Plane.lowerHalf_retime_lands(x, inLower);
+  Plane.ContinuousOn(Plane.retime(2, 0), Plane.lowerHalf)
+      by Plane.retime_ContinuousOn;
+  Plane.ContinuousOn(
+      (x : Plane.Point) ↦ firstArc(Plane.retime(2, 0)(x)), Plane.lowerHalf)
+      by Plane.ContinuousOn.compose(
+          inner := Plane.retime(2, 0), outer := firstArc,
+          target := Plane.unitSegment);
+  ∀ (x : Plane.Point). x ∈ Plane.lowerHalf →
+      Plane.concatenate(firstArc, secondArc)(x)
+          = firstArc(Plane.retime(2, 0)(x))
+      by (x : Plane.Point) (inLower : x ∈ Plane.lowerHalf) ↦
+           Plane.concatenate_on_lowerHalf(firstArc, secondArc, x, inLower);
+  Plane.ContinuousOn(
+      Plane.concatenate(firstArc, secondArc), Plane.lowerHalf)
+      by Plane.ContinuousOn.of_agreeing(
+          g := (x : Plane.Point) ↦ firstArc(Plane.retime(2, 0)(x)));
+
+  -- On the upper half it is the second arc, retimed — including at the
+  -- midpoint, where the `if` still takes the first branch but the two arcs
+  -- agree because they share that endpoint.
+  ∀ (x : Plane.Point). x ∈ Plane.upperHalf →
+      Plane.retime(2, -(1 : ℝ))(x) ∈ Plane.unitSegment
+      by (x : Plane.Point) (inUpper : x ∈ Plane.upperHalf) ↦
+           Plane.upperHalf_retime_lands(x, inUpper);
+  Plane.ContinuousOn(Plane.retime(2, -(1 : ℝ)), Plane.upperHalf)
+      by Plane.retime_ContinuousOn;
+  Plane.ContinuousOn(
+      (x : Plane.Point) ↦ secondArc(Plane.retime(2, -(1 : ℝ))(x)),
+      Plane.upperHalf)
+      by Plane.ContinuousOn.compose(
+          inner := Plane.retime(2, -(1 : ℝ)), outer := secondArc,
+          target := Plane.unitSegment);
+  ∀ (x : Plane.Point). x ∈ Plane.upperHalf →
+      Plane.concatenate(firstArc, secondArc)(x)
+          = secondArc(Plane.retime(2, -(1 : ℝ))(x))
+      by (x : Plane.Point) (inUpper : x ∈ Plane.upperHalf) ↦ {
+        done by cases {
+          case Plane.Point.first(x) ≤ 1 / 2 as atMidpoint: {
+              -- The only such point is the midpoint: there the first arc
+              -- finishes where the second starts.
+              1 / 2 ≤ Plane.Point.first(x);
+              Plane.Point.first(x) = 1 / 2
+                  by Real.LessOrEqual.antisymmetric as isMidpoint;
+              (2 : ℝ) ≠ 0;
+              (2 : ℝ) * (1 / 2) = 1 by Real.divide_cancel as halfDoubles;
+              2 * Plane.Point.first(x) + 0 = (2 : ℝ) * (1 / 2) + 0
+                  by substituting isMidpoint;
+              (2 : ℝ) * (1 / 2) + 0 = 1 by linear_combination(halfDoubles);
+              2 * Plane.Point.first(x) + 0 = 1 as lowerParameterIsOne;
+              2 * Plane.Point.first(x) + -(1 : ℝ)
+                  = (2 : ℝ) * (1 / 2) + -(1 : ℝ) by substituting isMidpoint;
+              (2 : ℝ) * (1 / 2) + -(1 : ℝ) = 0
+                  by linear_combination(halfDoubles);
+              2 * Plane.Point.first(x) + -(1 : ℝ) = 0 as upperParameterIsZero;
+
+              -- The lower branch has run out the first arc, and the upper
+              -- branch is about to start the second.
+              Plane.retime(2, 0)(x)
+                 = Plane.between(
+                       Plane.origin, Plane.Point.make(1, 0),
+                       2 * Plane.Point.first(x) + 0)
+                 = Plane.between(Plane.origin, Plane.Point.make(1, 0), 1)
+                       by substituting lowerParameterIsOne
+                 = Plane.Point.make(1, 0) by Plane.between_one
+                 as lowerReachesFinish;
+              Plane.retime(2, -(1 : ℝ))(x)
+                 = Plane.between(
+                       Plane.origin, Plane.Point.make(1, 0),
+                       2 * Plane.Point.first(x) + -(1 : ℝ))
+                 = Plane.between(Plane.origin, Plane.Point.make(1, 0), 0)
+                       by substituting upperParameterIsZero
+                 = Plane.origin by Plane.between_zero as upperReachesStart;
+              Plane.concatenate(firstArc, secondArc)(x)
+                 = firstArc(Plane.retime(2, 0)(x)) by Logic.if_positive
+                 = firstArc(Plane.Point.make(1, 0))
+                       by substituting lowerReachesFinish
+                 = secondArc(Plane.origin) by sharedEndpoint
+                 = secondArc(Plane.retime(2, -(1 : ℝ))(x))
+                       by substituting upperReachesStart;
+              done
+            }
+          otherwise as aboveMidpoint: {
+              done by Plane.concatenate_on_upperHalf(
+                  firstArc, secondArc, x, inUpper, aboveMidpoint)
+            }
+        }
+      };
+  Plane.ContinuousOn(
+      Plane.concatenate(firstArc, secondArc), Plane.upperHalf)
+      by Plane.ContinuousOn.of_agreeing(
+          g := (x : Plane.Point) ↦
+                   secondArc(Plane.retime(2, -(1 : ℝ))(x)));
+
+  -- The halves are closed and cover, so pasting closes the argument.
+  Plane.lowerHalf ∪ Plane.upperHalf = Plane.unitSegment
+      by Plane.halves_cover as halvesCover;
+  Plane.ClosedIn(Plane.lowerHalf, Plane.unitSegment)
+      by Plane.lowerHalf_ClosedIn;
+  Plane.ClosedIn(Plane.upperHalf, Plane.unitSegment)
+      by Plane.upperHalf_ClosedIn;
+  Plane.ClosedIn(Plane.lowerHalf, Plane.lowerHalf ∪ Plane.upperHalf)
+      by substituting halvesCover;
+  Plane.ClosedIn(Plane.upperHalf, Plane.lowerHalf ∪ Plane.upperHalf)
+      by substituting halvesCover;
+  Plane.ContinuousOn(
+      Plane.concatenate(firstArc, secondArc),
+      Plane.lowerHalf ∪ Plane.upperHalf)
+      by Plane.ContinuousOn.paste;
+  done by substituting halvesCover
+}
+
+-- ----------------------------------------------------------------------
+-- Injectivity, and the theorem.
+--
+-- Inside one half it is that arc's own injectivity, carried back through
+-- the retiming. Across the halves the two values agree, so the value lies
+-- on both arcs — and the arcs were assumed to meet only at the shared
+-- endpoint, which pins both parameters to the midpoint.
+
+theorem Plane.retime_InjectiveOn (scale shift : ℝ) (scaleNonzero : scale ≠ 0)
+        (carrier : Set(Plane.Point)) (inside : carrier ⊆ Plane.unitSegment)
+        : Plane.InjectiveOn(Plane.retime(scale, shift), carrier) := {
+  take x : Plane.Point;
+  suppose x ∈ carrier as xInCarrier;
+  take y : Plane.Point;
+  suppose y ∈ carrier as yInCarrier;
+  suppose Plane.retime(scale, shift)(x) = Plane.retime(scale, shift)(y)
+      as sameImage;
+  x ∈ Plane.unitSegment by inside;
+  y ∈ Plane.unitSegment by inside;
+  Plane.distance(Plane.origin, Plane.Point.make(1, 0)) = 1
+      by Plane.unitSegment_length;
+  ¬(Plane.origin = Plane.Point.make(1, 0))
+      by (degenerate : Plane.origin = Plane.Point.make(1, 0)) ↦ {
+        (1 : ℝ)
+           = Plane.distance(Plane.origin, Plane.Point.make(1, 0))
+                           = Plane.distance(Plane.origin, Plane.origin)
+                 by substituting degenerate
+           = 0 by Plane.distance_self;
+        (1 : ℝ) ≠ 0;
+        done
+      };
+  scale * Plane.Point.first(x) + shift = scale * Plane.Point.first(y) + shift
+      by Plane.between_injective as sameParameter;
+  scale * Plane.Point.first(x) = scale * Plane.Point.first(y)
+      by linear_combination(sameParameter);
+  Plane.Point.first(x) = Plane.Point.first(y)
+      by Real.equal_of_multiply_left as sameCoordinate;
+  x = Plane.between(Plane.origin, Plane.Point.make(1, 0), Plane.Point.first(x))
+      by Plane.unitSegment_at_first_coordinate;
+  y = Plane.between(Plane.origin, Plane.Point.make(1, 0), Plane.Point.first(y))
+      by Plane.unitSegment_at_first_coordinate;
+  x = Plane.between(Plane.origin, Plane.Point.make(1, 0), Plane.Point.first(x))
+    = Plane.between(Plane.origin, Plane.Point.make(1, 0), Plane.Point.first(y))
+          by substituting sameCoordinate
+    = y by Equality.symmetry;
+  done
+}
+
+
+-- At the seam the value is the shared endpoint, and injectivity of the arc
+-- it belongs to pins the parameter to the midpoint. The two halves need
+-- the statement separately, since they retime differently.
+
+theorem Plane.lowerHalf_at_finish_is_midpoint
+        (firstArc : Plane.Point → Plane.Point)
+        (firstInjective : Plane.InjectiveOn(firstArc, Plane.unitSegment))
+        (x : Plane.Point) (inLower : x ∈ Plane.lowerHalf)
+        (atFinish
+            : firstArc(Plane.retime(2, 0)(x)) = Plane.arcFinish(firstArc))
+        : Plane.Point.first(x) = 1 / 2 := {
+  Plane.retime(2, 0)(x) ∈ Plane.unitSegment
+      by Plane.lowerHalf_retime_lands;
+  Plane.Point.make(1, 0) ∈ Plane.unitSegment by Plane.finish_in_unitSegment;
+  firstArc(Plane.retime(2, 0)(x)) = firstArc(Plane.Point.make(1, 0))
+      by atFinish;
+  Plane.retime(2, 0)(x) = Plane.Point.make(1, 0)
+      by firstInjective as reachesFinish;
+  Plane.Point.first(Plane.retime(2, 0)(x))
+     = 2 * Plane.Point.first(x) + 0 by Plane.retime_parameter;
+  Plane.Point.first(Plane.retime(2, 0)(x))
+     = Plane.Point.first(Plane.Point.make(1, 0)) by substituting reachesFinish;
+  2 * Plane.Point.first(x) + 0 = 1 as doubledIsOne;
+  (2 : ℝ) ≠ 0;
+  (2 : ℝ) * (1 / 2) = 1 by Real.divide_cancel as halfDoubles;
+  2 * Plane.Point.first(x) = 2 * (1 / 2)
+      by linear_combination(doubledIsOne - halfDoubles);
+  done by Real.equal_of_multiply_left
+}
+
+theorem Plane.upperHalf_at_start_is_midpoint
+        (secondArc : Plane.Point → Plane.Point)
+        (secondInjective : Plane.InjectiveOn(secondArc, Plane.unitSegment))
+        (y : Plane.Point) (inUpper : y ∈ Plane.upperHalf)
+        (atStart
+            : secondArc(Plane.retime(2, -(1 : ℝ))(y))
+                  = Plane.arcStart(secondArc))
+        : Plane.Point.first(y) = 1 / 2 := {
+  Plane.retime(2, -(1 : ℝ))(y) ∈ Plane.unitSegment
+      by Plane.upperHalf_retime_lands;
+  Plane.origin ∈ Plane.unitSegment by Plane.start_in_unitSegment;
+  secondArc(Plane.retime(2, -(1 : ℝ))(y)) = secondArc(Plane.origin)
+      by atStart;
+  Plane.retime(2, -(1 : ℝ))(y) = Plane.origin
+      by secondInjective as reachesStart;
+  Plane.Point.first(Plane.retime(2, -(1 : ℝ))(y))
+     = 2 * Plane.Point.first(y) + -(1 : ℝ) by Plane.retime_parameter;
+  Plane.Point.first(Plane.retime(2, -(1 : ℝ))(y))
+     = Plane.Point.first(Plane.origin) by substituting reachesStart;
+  2 * Plane.Point.first(y) + -(1 : ℝ) = 0 as doubledIsZero;
+  (2 : ℝ) ≠ 0;
+  (2 : ℝ) * (1 / 2) = 1 by Real.divide_cancel as halfDoubles;
+  2 * Plane.Point.first(y) = 2 * (1 / 2)
+      by linear_combination(doubledIsZero - halfDoubles);
+  done by Real.equal_of_multiply_left
+}
+
+-- Two arcs meeting only at the endpoint they share concatenate to an arc.
+theorem Plane.IsArc.concatenate
+        (firstArc secondArc : Plane.Point → Plane.Point)
+        (firstIsArc : Plane.IsArc(firstArc))
+        (secondIsArc : Plane.IsArc(secondArc))
+        (sharedEndpoint
+            : Plane.arcFinish(firstArc) = Plane.arcStart(secondArc))
+        (meetOnlyThere
+            : ∀ (z : Plane.Point). z ∈ Plane.arc(firstArc) →
+                z ∈ Plane.arc(secondArc) → z = Plane.arcFinish(firstArc))
+        : Plane.IsArc(Plane.concatenate(firstArc, secondArc)) := {
+  Plane.ContinuousOn(firstArc, Plane.unitSegment);
+  Plane.InjectiveOn(firstArc, Plane.unitSegment) as firstInjective;
+  Plane.ContinuousOn(secondArc, Plane.unitSegment);
+  Plane.InjectiveOn(secondArc, Plane.unitSegment) as secondInjective;
+  Plane.ContinuousOn(
+      Plane.concatenate(firstArc, secondArc), Plane.unitSegment)
+      by Plane.concatenate_ContinuousOn;
+
+  Plane.lowerHalf ⊆ Plane.unitSegment
+      by (x : Plane.Point) (inLower : x ∈ Plane.lowerHalf) ↦ {
+        x ∈ Plane.unitSegment;
+        done
+      };
+  Plane.upperHalf ⊆ Plane.unitSegment
+      by (x : Plane.Point) (inUpper : x ∈ Plane.upperHalf) ↦ {
+        x ∈ Plane.unitSegment;
+        done
+      };
+  (2 : ℝ) ≠ 0;
+  Plane.InjectiveOn(Plane.retime(2, 0), Plane.lowerHalf)
+      by Plane.retime_InjectiveOn as lowerRetimeInjective;
+  Plane.InjectiveOn(Plane.retime(2, -(1 : ℝ)), Plane.upperHalf)
+      by Plane.retime_InjectiveOn as upperRetimeInjective;
+
+  Plane.InjectiveOn(
+      Plane.concatenate(firstArc, secondArc), Plane.unitSegment)
+      by (x : Plane.Point) (xOnSegment : x ∈ Plane.unitSegment)
+         (y : Plane.Point) (yOnSegment : y ∈ Plane.unitSegment)
+         (sameValue : Plane.concatenate(firstArc, secondArc)(x)
+                          = Plane.concatenate(firstArc, secondArc)(y)) ↦ {
+        done by cases {
+          case Plane.Point.first(x) ≤ 1 / 2 as xLow: {
+              x ∈ Plane.lowerHalf;
+              Plane.retime(2, 0)(x) ∈ Plane.unitSegment
+                  by Plane.lowerHalf_retime_lands;
+              Plane.concatenate(firstArc, secondArc)(x)
+                  = firstArc(Plane.retime(2, 0)(x)) by Logic.if_positive;
+              done by cases {
+                case Plane.Point.first(y) ≤ 1 / 2 as yLow: {
+                    -- Both in the first arc: its injectivity, retimed.
+                    y ∈ Plane.lowerHalf;
+                    Plane.retime(2, 0)(y) ∈ Plane.unitSegment
+                        by Plane.lowerHalf_retime_lands;
+                    Plane.concatenate(firstArc, secondArc)(y)
+                        = firstArc(Plane.retime(2, 0)(y))
+                        by Logic.if_positive as valueAtY;
+                    firstArc(Plane.retime(2, 0)(x))
+                       = Plane.concatenate(firstArc, secondArc)(x)
+                                                   = Plane.concatenate(firstArc, secondArc)(y)
+                             by sameValue
+                       = firstArc(Plane.retime(2, 0)(y)) by valueAtY;
+                    Plane.retime(2, 0)(x) = Plane.retime(2, 0)(y)
+                        by firstInjective;
+                    done by lowerRetimeInjective
+                  }
+                otherwise as yHigh: {
+                    -- Across the seam: the common value is on both arcs,
+                    -- so it is the shared endpoint and both parameters are
+                    -- the midpoint.
+                    1 / 2 ≤ Plane.Point.first(y)
+                        by Real.not_LessOrEqual_implies;
+                    y ∈ Plane.upperHalf;
+                    Plane.retime(2, -(1 : ℝ))(y) ∈ Plane.unitSegment
+                        by Plane.upperHalf_retime_lands;
+                    Plane.concatenate(firstArc, secondArc)(y)
+                        = secondArc(Plane.retime(2, -(1 : ℝ))(y))
+                        by Logic.if_negative as valueAtY;
+                    let shared : Plane.Point := firstArc(Plane.retime(2, 0)(x));
+                    shared ∈ Plane.arc(firstArc)
+                        by { witness Plane.retime(2, 0)(x) with done };
+                    shared
+                       = Plane.concatenate(firstArc, secondArc)(x)
+                                                   = Plane.concatenate(firstArc, secondArc)(y)
+                             by sameValue
+                       = secondArc(Plane.retime(2, -(1 : ℝ))(y))
+                             by valueAtY as sharedOnSecond;
+                    secondArc(Plane.retime(2, -(1 : ℝ))(y)) = shared
+                        by Equality.symmetry;
+                    shared ∈ Plane.arc(secondArc)
+                        by { witness Plane.retime(2, -(1 : ℝ))(y) with done };
+                    shared = Plane.arcFinish(firstArc) by meetOnlyThere;
+                    firstArc(Plane.retime(2, 0)(x))
+                        = Plane.arcFinish(firstArc);
+                    Plane.Point.first(x) = 1 / 2
+                        by Plane.lowerHalf_at_finish_is_midpoint;
+                    secondArc(Plane.retime(2, -(1 : ℝ))(y))
+                        = Plane.arcFinish(firstArc)
+                        by substituting sharedOnSecond;
+                    secondArc(Plane.retime(2, -(1 : ℝ))(y))
+                        = Plane.arcStart(secondArc) by sharedEndpoint;
+                    Plane.Point.first(y) = 1 / 2
+                        by Plane.upperHalf_at_start_is_midpoint;
+                    Plane.Point.first(x) = Plane.Point.first(y)
+                        as sameCoordinate;
+                    x = Plane.between(
+                            Plane.origin, Plane.Point.make(1, 0),
+                            Plane.Point.first(x))
+                        by Plane.unitSegment_at_first_coordinate;
+                    y = Plane.between(
+                            Plane.origin, Plane.Point.make(1, 0),
+                            Plane.Point.first(y))
+                        by Plane.unitSegment_at_first_coordinate;
+                    x = Plane.between(
+                            Plane.origin, Plane.Point.make(1, 0),
+                            Plane.Point.first(x))
+                      = Plane.between(
+                            Plane.origin, Plane.Point.make(1, 0),
+                            Plane.Point.first(y))
+                            by substituting sameCoordinate
+                      = y by Equality.symmetry;
+                    done
+                  }
+              }
+            }
+          otherwise as xHigh: {
+              1 / 2 ≤ Plane.Point.first(x) by Real.not_LessOrEqual_implies;
+              x ∈ Plane.upperHalf;
+              Plane.retime(2, -(1 : ℝ))(x) ∈ Plane.unitSegment
+                  by Plane.upperHalf_retime_lands;
+              Plane.concatenate(firstArc, secondArc)(x)
+                  = secondArc(Plane.retime(2, -(1 : ℝ))(x))
+                  by Logic.if_negative as valueAtX;
+              done by cases {
+                case Plane.Point.first(y) ≤ 1 / 2 as yLow: {
+                    -- The mirror of the seam case, with the roles swapped.
+                    y ∈ Plane.lowerHalf;
+                    Plane.retime(2, 0)(y) ∈ Plane.unitSegment
+                        by Plane.lowerHalf_retime_lands;
+                    Plane.concatenate(firstArc, secondArc)(y)
+                        = firstArc(Plane.retime(2, 0)(y))
+                        by Logic.if_positive;
+                    let shared : Plane.Point := firstArc(Plane.retime(2, 0)(y));
+                    shared ∈ Plane.arc(firstArc)
+                        by { witness Plane.retime(2, 0)(y) with done };
+                    shared
+                       = Plane.concatenate(firstArc, secondArc)(y)
+                                                   = Plane.concatenate(firstArc, secondArc)(x)
+                                                   = secondArc(Plane.retime(2, -(1 : ℝ))(x))
+                             by valueAtX as sharedOnSecond;
+                    secondArc(Plane.retime(2, -(1 : ℝ))(x)) = shared
+                        by Equality.symmetry;
+                    shared ∈ Plane.arc(secondArc)
+                        by { witness Plane.retime(2, -(1 : ℝ))(x) with done };
+                    shared = Plane.arcFinish(firstArc) by meetOnlyThere;
+                    firstArc(Plane.retime(2, 0)(y))
+                        = Plane.arcFinish(firstArc);
+                    Plane.Point.first(y) = 1 / 2
+                        by Plane.lowerHalf_at_finish_is_midpoint;
+                    secondArc(Plane.retime(2, -(1 : ℝ))(x))
+                        = Plane.arcFinish(firstArc)
+                        by substituting sharedOnSecond;
+                    secondArc(Plane.retime(2, -(1 : ℝ))(x))
+                        = Plane.arcStart(secondArc) by sharedEndpoint;
+                    Plane.Point.first(x) = 1 / 2
+                        by Plane.upperHalf_at_start_is_midpoint;
+                    Plane.Point.first(x) = Plane.Point.first(y)
+                        as sameCoordinate;
+                    x = Plane.between(
+                            Plane.origin, Plane.Point.make(1, 0),
+                            Plane.Point.first(x))
+                        by Plane.unitSegment_at_first_coordinate;
+                    y = Plane.between(
+                            Plane.origin, Plane.Point.make(1, 0),
+                            Plane.Point.first(y))
+                        by Plane.unitSegment_at_first_coordinate;
+                    x = Plane.between(
+                            Plane.origin, Plane.Point.make(1, 0),
+                            Plane.Point.first(x))
+                      = Plane.between(
+                            Plane.origin, Plane.Point.make(1, 0),
+                            Plane.Point.first(y))
+                            by substituting sameCoordinate
+                      = y by Equality.symmetry;
+                    done
+                  }
+                otherwise as yHigh: {
+                    -- Both in the second arc.
+                    1 / 2 ≤ Plane.Point.first(y)
+                        by Real.not_LessOrEqual_implies;
+                    y ∈ Plane.upperHalf;
+                    Plane.retime(2, -(1 : ℝ))(y) ∈ Plane.unitSegment
+                        by Plane.upperHalf_retime_lands;
+                    Plane.concatenate(firstArc, secondArc)(y)
+                        = secondArc(Plane.retime(2, -(1 : ℝ))(y))
+                        by Logic.if_negative as valueAtY;
+                    secondArc(Plane.retime(2, -(1 : ℝ))(x))
+                       = Plane.concatenate(firstArc, secondArc)(x)
+                                                   = Plane.concatenate(firstArc, secondArc)(y)
+                             by sameValue
+                       = secondArc(Plane.retime(2, -(1 : ℝ))(y)) by valueAtY;
+                    Plane.retime(2, -(1 : ℝ))(x)
+                        = Plane.retime(2, -(1 : ℝ))(y) by secondInjective;
+                    done by upperRetimeInjective
+                  }
+              }
+            }
+        }
+      };
+  done
 }
