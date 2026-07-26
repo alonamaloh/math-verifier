@@ -3592,6 +3592,27 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
             if (attempt) return attempt;
         }
 
+        // `ordered_field` — after the microsecond-scale structural tiers
+        // above, and before everything expensive below.
+        //
+        // Measured on the goal that motivated the move (`-t < x - c` from
+        // `c - t < x`): the certificate takes 1.3 ms, while the tier that
+        // used to reach it first — contextEqualityBridge, rewriting with
+        // `Real.negate_subtract` — takes 300 ms, with conjunctionIntro
+        // burning another 210 ms failing on the way. Two hundred times the
+        // cost for the same fact.
+        //
+        // Safe this early because the gate is a goal-shape read: anything
+        // that is not `≤`, `<`, or `False` at a concrete carrier declines
+        // before any work, so non-order goals pay nothing and every tier
+        // below keeps the goals it used to own.
+        {
+            ExpressionPointer attempt = runTactic("orderedField",
+                [&] { return tryOrderedFieldTier(
+                    goalClosed, localBinders, line); });
+            if (attempt) return attempt;
+        }
+
         {
             ExpressionPointer attempt = runTactic("conjunctionIntro",
                 [&] { return tryConjunctionIntro(
@@ -3744,19 +3765,6 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
             if (attempt) return attempt;
         }
 
-        // `ordered_field` — last, because it is the one tier that would
-        // otherwise re-decide goals the cheap tiers already own. Reached
-        // only on a goal that was about to be reported as an error, so a
-        // library that verifies never pays for it, and its gate declines
-        // instantly on anything that is not an order relation at a
-        // concrete carrier.
-        {
-            ExpressionPointer attempt = runTactic("orderedField",
-                [&] { return tryOrderedFieldTier(
-                    goalClosed, localBinders, line); });
-            if (attempt) return attempt;
-        }
-
         throwElaborate(
             "claim `"
             + prettyPrintInLocalScope(goalClosed, localBinders)
@@ -3888,6 +3896,9 @@ ExpressionPointer Elaborator::autoProveClaimProfiling(
             return tryCastNotEqualTier(
                 goalClosed, localBinders, line);
         });
+        runProfiled("orderedField", [&] {
+            return tryOrderedFieldTier(goalClosed, localBinders, line);
+        });
         runProfiled("conjunctionIntro", [&] {
             return tryConjunctionIntro(
                 goalClosed, localBinders, line);
@@ -3927,9 +3938,6 @@ ExpressionPointer Elaborator::autoProveClaimProfiling(
         });
         runProfiled("symmetryFlip", [&] {
             return trySymmetryFlip(goalClosed, localBinders, line);
-        });
-        runProfiled("orderedField", [&] {
-            return tryOrderedFieldTier(goalClosed, localBinders, line);
         });
 
         autoProveRows_.push_back(std::move(row));

@@ -356,6 +356,17 @@ spineOf(ExpressionPointer term) {
     return {constant ? constant->name : std::string(), std::move(arguments)};
 }
 
+// Is the head of this application spine a Lambda? That is the β-redex
+// shape an `Exists` destructuring leaves behind, and the only shape for
+// which a WHNF retry can reveal anything new.
+bool spineHeadIsLambda(ExpressionPointer term) {
+    ExpressionPointer head = term;
+    while (auto* application = std::get_if<Application>(&head->node)) {
+        head = application->function;
+    }
+    return std::holds_alternative<Lambda>(head->node);
+}
+
 // Read the relation off a goal that has been δ-unfolded ONE step.
 //
 // `take m : ℕ` (and a `↦` lambda body) hands the tactic the goal already
@@ -440,6 +451,15 @@ std::optional<OrderProposition> parseOrderProposition(
     if (auto unfolded = parseUnfoldedOrderProposition(proposition)) {
         return unfolded;
     }
+    // The β-redex case, and ONLY that case. Every context fact passes
+    // through here — the row builder asks each one whether it is an order
+    // relation — so an unconditional `weakHeadNormalForm` would δ-unfold
+    // arbitrary propositions on every call, which is what made the tactic
+    // cost milliseconds per invocation once it ran on more than the
+    // error path. A spine whose head is a Lambda is the shape the retry
+    // was written for; anything else has already been read as far as it
+    // can be.
+    if (!spineHeadIsLambda(proposition)) return std::nullopt;
     ExpressionPointer normalised =
         weakHeadNormalForm(environment, proposition);
     if (auto folded = parseFoldedOrderProposition(normalised)) return folded;
@@ -625,8 +645,14 @@ ExpressionPointer Elaborator::elaborateOrderedField(
     for (const ContextFact& fact : collectLocalBinderFacts(localBinders)) {
         ExpressionPointer factType =
             openOverLocalBinders(fact.type, localBinders, binderCount);
-        ExpressionPointer factProof =
-            openOverLocalBinders(fact.proofTerm, localBinders, binderCount);
+        // Opened only once the fact is known to become a row. Proof terms
+        // are large, and most facts in scope are not order relations at
+        // this carrier — opening every one of them was most of what the
+        // tactic cost per invocation.
+        auto openedProof = [&] {
+            return openOverLocalBinders(
+                fact.proofTerm, localBinders, binderCount);
+        };
         if (std::optional<OrderProposition> relation =
                 parseOrderProposition(environment_, factType)) {
             if (relation->carrierName != carrierName) {
@@ -639,11 +665,29 @@ ExpressionPointer Elaborator::elaborateOrderedField(
                    relation->strict,
                    makeConstant(relation->strict ? names.positiveOfStrict
                                                  : names.nonnegOfWeak),
-                   factProof);
+                   openedProof());
             continue;
         }
         // An equation at the carrier: two weak rows, the second built on
         // the symmetric proof so one bridge lemma serves both.
+        //
+        // Gated on a cheap head read first. `extractEqualityComponents`
+        // reports a non-equality by THROWING, and every fact in scope that
+        // is neither an order relation nor an equation used to reach it —
+        // one C++ exception per fact per invocation, which was the bulk of
+        // what this tactic cost once it ran outside the error path.
+        {
+            auto [factHead, factArguments] = spineOf(factType);
+            bool looksLikeEquality =
+                factHead == "Equality" && factArguments.size() == 3;
+            if (!looksLikeEquality && spineHeadIsLambda(factType)) {
+                auto [normalisedHead, normalisedArguments] =
+                    spineOf(weakHeadNormalForm(environment_, factType));
+                looksLikeEquality = normalisedHead == "Equality"
+                    && normalisedArguments.size() == 3;
+            }
+            if (!looksLikeEquality) continue;
+        }
         EqualityComponents equation;
         try {
             equation = extractEqualityComponents(
@@ -654,6 +698,7 @@ ExpressionPointer Elaborator::elaborateOrderedField(
         }
         if (headConstantName(equation.carrierType) != carrierName) continue;
         ExpressionPointer equalityBridge = makeConstant(names.nonnegOfEqual);
+        ExpressionPointer factProof = openedProof();
         addRow(fact.source, equation.leftEndpoint, equation.rightEndpoint,
                false, equalityBridge, factProof);
         addRow(fact.source, equation.rightEndpoint, equation.leftEndpoint,

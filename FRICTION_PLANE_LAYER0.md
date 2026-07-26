@@ -574,7 +574,7 @@ Cost on the 163-module `Plane` cone: user 124.49 / 124.56 / 124.28 s
 against a 125.30 s baseline — none. 270 `Test/` fixtures and 83 error
 tests pass.
 
-### E11 — an earlier expensive tier preempts the cheap one
+### E11 — CLOSED 2026-07-26 — an earlier expensive tier preempted the cheap one
 
 With the goal at top level, where `ordered_field` *does* fire:
 
@@ -583,10 +583,37 @@ With the goal at top level, where `ordered_field` *does* fire:
   -tolerance < x - centre by ordered_field;   -- instant
 ```
 
-The battery closes the bare claim through an earlier tier that rewrites
-with `Real.negate_subtract`, at ~80-100k kernel steps, and never reaches
-the tier that would have produced a three-line certificate. Placing
-`ordered_field` last was the right call for cost on the failure path,
-but it means a linear goal that some expensive tier can also reach never
-gets the cheap proof. Worth measuring whether a goal that parses as an
-order relation should try the certificate BEFORE the rewriting tiers.
+**Measured.** `MATH_PROFILE_AUTOPROVER=1` on that claim:
+
+```
+contextEqualityBridge  ok=1  296633 us   <- the winner
+conjunctionIntro       ok=0  196451 us   <- fails on the way
+contextFactMatch       ok=0    7087 us
+orderedField           ok=1    1211 us   <- never reached
+```
+
+Two hundred times the cost for the same fact. `conjunctionIntro` is
+expensive here because `x < y` unfolds to `x ≤ y ∧ ¬(x = y)`, so it
+applies structurally and recurses into both legs.
+
+**Fixed** by moving the tier from last to just before `conjunctionIntro`
+— after the microsecond-scale structural tiers, ahead of everything
+expensive. Safe there because the gate is a goal-shape read: anything
+that is not `≤`, `<`, or `False` at a concrete carrier declines before
+any work.
+
+**This one is not free**, unlike the tier's original placement. The 163-
+module `Plane` cone goes from 124.44 s of CPU to 127.26 s, **+2.3%** —
+the tier now runs on every order goal the cheap tiers miss, at ~2.9 ms
+each on hypothesis-rich analysis files (106 invocations in
+`Real/supremum`, 61 in `Real/limits`). Two cheap wins were found while
+looking for that cost and kept: proof terms are opened only for facts
+that become rows, and the equality path is gated on a head read rather
+than reached by throwing one C++ exception per non-order fact. Neither
+moved the cone number much; the remaining cost is the ring
+normalisation of the hypotheses, which is what the tactic *is*.
+
+The trade is build time against authoring: goals that need the
+certificate now get it in 1.3 ms instead of 300, and two steps in
+`Real/cluster.math` lost their expensive-step warnings. Reverting is one
+block move if the 2.3% is judged not worth it.
