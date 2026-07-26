@@ -1,0 +1,248 @@
+-- Plane/connected.math
+--
+-- Connectedness in the plane, relative throughout. Layer 3.
+--
+-- The definition is the clopen one: a set is connected when its only
+-- nonempty relatively-clopen subset is itself. That is the blueprint's
+-- "Recognizing a component" criterion taken as primitive rather than
+-- derived, because it is the form every consumer uses — one shows a
+-- candidate piece is open, that its complement is open, that it is not
+-- empty, and concludes it is everything.
+--
+-- Stating it as `piece = region` rather than as the absence of a
+-- separation also spares every consumer the negation: a connectedness
+-- argument becomes three positive obligations and a conclusion, with no
+-- reductio in sight.
+
+module Plane.connected
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Set.algebra
+import Real.interface
+import Real.order
+import Plane.vector
+import Plane.point
+import Plane.norm
+import Plane.topology
+import Plane.sequence
+import Plane.compact
+import Plane.compactness
+
+-- ----------------------------------------------------------------------
+-- Connectedness.
+
+definition Plane.IsConnected (region : Set(Plane.Point)) : Proposition :=
+  ∀ (piece : Set(Plane.Point)).
+    piece ⊆ region →
+    Plane.OpenIn(piece, region) →
+    Plane.OpenIn(region ∖ piece, region) →
+    Set.IsNonempty(Plane.Point, piece) →
+    piece = region
+
+-- A nonempty open-and-closed piece is everything. This is the definition
+-- read back through `ClosedIn`, which is how a topology argument states
+-- the obligation it has just discharged.
+theorem Plane.IsConnected.clopen_is_everything
+        (region piece : Set(Plane.Point))
+        (connected : Plane.IsConnected(region))
+        (inside : piece ⊆ region)
+        (open : Plane.OpenIn(piece, region))
+        (closed : Plane.ClosedIn(piece, region))
+        (nonempty : Set.IsNonempty(Plane.Point, piece))
+        : piece = region :=
+  connected(piece, inside, open, closed, nonempty)
+
+-- ----------------------------------------------------------------------
+-- Preimages.
+--
+-- The relative topology transports backwards along a continuous map:
+-- what is open in the image is open in the domain. This is the one
+-- topological fact the image theorem below needs, and it is the ε–δ
+-- argument spelled out — the radius comes from the image's openness,
+-- the nearness from continuity at the point.
+
+definition Plane.preimageIn
+        (f : Plane.Point → Plane.Point) (target carrier : Set(Plane.Point))
+        : Set(Plane.Point) :=
+  (x : Plane.Point) ↦ x ∈ carrier ∧ f(x) ∈ target
+
+theorem Plane.OpenIn.preimage
+        (f : Plane.Point → Plane.Point) (carrier target : Set(Plane.Point))
+        (continuous : Plane.ContinuousOn(f, carrier))
+        (targetOpen : Plane.OpenIn(target, Plane.imageSet(f, carrier)))
+        : Plane.OpenIn(Plane.preimageIn(f, target, carrier), carrier) := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.preimageIn(f, target, carrier) as inPreimage;
+  x ∈ carrier as inCarrier;
+  f(x) ∈ target as valueInTarget;
+  choose radius such that
+      0 < radius ∧
+      ∀ (w : Plane.Point). w ∈ Plane.imageSet(f, carrier) →
+        Plane.distance(f(x), w) < radius → w ∈ target
+      from targetOpen(f(x), valueInTarget);
+  0 < radius as radiusPositive;
+  ∀ (w : Plane.Point). w ∈ Plane.imageSet(f, carrier) →
+      Plane.distance(f(x), w) < radius → w ∈ target
+      as nearbyValuesHit;
+  choose nearness such that
+      0 < nearness ∧
+      ∀ (y : Plane.Point). y ∈ carrier →
+        Plane.distance(x, y) < nearness →
+          Plane.distance(f(x), f(y)) < radius
+      from continuous(x, inCarrier, radius, radiusPositive);
+  0 < nearness;
+  ∀ (y : Plane.Point). y ∈ carrier →
+      Plane.distance(x, y) < nearness →
+        Plane.distance(f(x), f(y)) < radius
+      as nearbyPointsMoveLittle;
+  witness nearness with {
+    0 < nearness;
+    ∀ (y : Plane.Point). y ∈ carrier →
+        Plane.distance(x, y) < nearness →
+          y ∈ Plane.preimageIn(f, target, carrier)
+        by (y : Plane.Point) (inCarrierY : y ∈ carrier)
+           (near : Plane.distance(x, y) < nearness) ↦ {
+          Plane.distance(f(x), f(y)) < radius
+              by nearbyPointsMoveLittle(y, inCarrierY, near);
+          f(y) ∈ Plane.imageSet(f, carrier) by { witness y with done };
+          f(y) ∈ target
+              by nearbyValuesHit(f(y),
+                  { f(y) ∈ Plane.imageSet(f, carrier) },
+                  { Plane.distance(f(x), f(y)) < radius });
+          y ∈ Plane.preimageIn(f, target, carrier);
+          done
+        };
+    done
+  }
+}
+
+theorem Plane.preimageIn_subset
+        (f : Plane.Point → Plane.Point) (target carrier : Set(Plane.Point))
+        : Plane.preimageIn(f, target, carrier) ⊆ carrier := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.preimageIn(f, target, carrier) as inPreimage;
+  x ∈ carrier;
+  done
+}
+
+-- The complement of a preimage is the preimage of the complement — the
+-- bookkeeping that turns "clopen in the image" into "clopen in the
+-- domain".
+theorem Plane.preimageIn_complement
+        (f : Plane.Point → Plane.Point) (carrier target : Set(Plane.Point))
+        : carrier ∖ Plane.preimageIn(f, target, carrier)
+              = Plane.preimageIn(
+                    f, Plane.imageSet(f, carrier) ∖ target, carrier) := {
+  carrier ∖ Plane.preimageIn(f, target, carrier)
+      ⊆ Plane.preimageIn(f, Plane.imageSet(f, carrier) ∖ target, carrier)
+      by (x : Plane.Point)
+         (outside : x ∈ carrier ∖ Plane.preimageIn(f, target, carrier)) ↦ {
+        x ∈ carrier;
+        ¬(x ∈ Plane.preimageIn(f, target, carrier));
+        f(x) ∈ Plane.imageSet(f, carrier) by { witness x with done };
+        ¬(f(x) ∈ target)
+            by (hits : f(x) ∈ target) ↦ {
+              x ∈ Plane.preimageIn(f, target, carrier);
+              done
+            };
+        f(x) ∈ Plane.imageSet(f, carrier) ∖ target;
+        done
+      };
+  Plane.preimageIn(f, Plane.imageSet(f, carrier) ∖ target, carrier)
+      ⊆ carrier ∖ Plane.preimageIn(f, target, carrier)
+      by (x : Plane.Point)
+         (inside : x ∈ Plane.preimageIn(
+              f, Plane.imageSet(f, carrier) ∖ target, carrier)) ↦ {
+        x ∈ carrier;
+        f(x) ∈ Plane.imageSet(f, carrier) ∖ target;
+        ¬(f(x) ∈ target);
+        ¬(x ∈ Plane.preimageIn(f, target, carrier))
+            by (inPreimage : x ∈ Plane.preimageIn(f, target, carrier)) ↦ {
+              f(x) ∈ target;
+              done
+            };
+        done
+      };
+  done by Set.equal_of_same_members
+}
+
+-- ----------------------------------------------------------------------
+-- The continuous image of a connected set is connected.
+--
+-- Pull the clopen piece back: it is clopen in the domain by the two
+-- lemmas above, and nonempty because the piece has a point and the point
+-- has a preimage. Connectedness of the domain makes the pullback
+-- everything, and pushing that forward makes the piece everything.
+
+theorem Plane.IsConnected.image
+        (f : Plane.Point → Plane.Point) (carrier : Set(Plane.Point))
+        (connected : Plane.IsConnected(carrier))
+        (continuous : Plane.ContinuousOn(f, carrier))
+        : Plane.IsConnected(Plane.imageSet(f, carrier)) := {
+  take piece : Set(Plane.Point);
+  suppose piece ⊆ Plane.imageSet(f, carrier) as pieceInImage;
+  suppose Plane.OpenIn(piece, Plane.imageSet(f, carrier)) as pieceOpen;
+  suppose Plane.OpenIn(
+      Plane.imageSet(f, carrier) ∖ piece, Plane.imageSet(f, carrier))
+      as restOpen;
+  suppose Set.IsNonempty(Plane.Point, piece) as pieceNonempty;
+
+  Plane.preimageIn(f, piece, carrier) ⊆ carrier
+      by Plane.preimageIn_subset;
+  Plane.OpenIn(Plane.preimageIn(f, piece, carrier), carrier)
+      by Plane.OpenIn.preimage(f, carrier, piece, continuous, pieceOpen);
+  carrier ∖ Plane.preimageIn(f, piece, carrier)
+      = Plane.preimageIn(f, Plane.imageSet(f, carrier) ∖ piece, carrier)
+      by Plane.preimageIn_complement;
+  Plane.OpenIn(
+      Plane.preimageIn(f, Plane.imageSet(f, carrier) ∖ piece, carrier),
+      carrier)
+      by Plane.OpenIn.preimage(
+          f, carrier, Plane.imageSet(f, carrier) ∖ piece,
+          continuous, restOpen);
+  Plane.OpenIn(carrier ∖ Plane.preimageIn(f, piece, carrier), carrier);
+
+  -- The piece has a point, and that point is a value.
+  choose value such that value ∈ piece as valueInPiece from pieceNonempty;
+  value ∈ Plane.imageSet(f, carrier) by pieceInImage(value, valueInPiece);
+  choose source such that source ∈ carrier ∧ f(source) = value
+      from { value ∈ Plane.imageSet(f, carrier) };
+  source ∈ carrier;
+  f(source) = value;
+  f(source) ∈ piece;
+  source ∈ Plane.preimageIn(f, piece, carrier);
+  Set.IsNonempty(Plane.Point, Plane.preimageIn(f, piece, carrier))
+      by { witness source with done };
+
+  Plane.preimageIn(f, piece, carrier) = carrier
+      by connected(Plane.preimageIn(f, piece, carrier),
+          { Plane.preimageIn(f, piece, carrier) ⊆ carrier },
+          { Plane.OpenIn(Plane.preimageIn(f, piece, carrier), carrier) },
+          { Plane.OpenIn(
+                carrier ∖ Plane.preimageIn(f, piece, carrier), carrier) },
+          { Set.IsNonempty(
+                Plane.Point, Plane.preimageIn(f, piece, carrier)) })
+      ;
+
+  -- Pushing that forward: every value is the value at a point of the
+  -- pullback, hence lands in the piece.
+  Plane.imageSet(f, carrier) ⊆ piece
+      by (y : Plane.Point) (inImage : y ∈ Plane.imageSet(f, carrier)) ↦ {
+        choose x such that x ∈ carrier ∧ f(x) = y from inImage;
+        x ∈ carrier;
+        f(x) = y;
+        carrier = Plane.preimageIn(f, piece, carrier)
+            by Equality.symmetry;
+        x ∈ Plane.preimageIn(f, piece, carrier)
+            by Set.member_of_equal(
+                carrier, Plane.preimageIn(f, piece, carrier),
+                { carrier = Plane.preimageIn(f, piece, carrier) },
+                x, { x ∈ carrier });
+        f(x) ∈ piece;
+        done
+      };
+  done by Set.equal_of_same_members
+}

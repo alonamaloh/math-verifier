@@ -1,0 +1,41 @@
+-- REPRODUCER — `kernel verify` exits 139 (SIGSEGV) on this file.
+--
+-- `by substituting <eq>` where the equation's left side is a DEFINED set
+-- applied to arguments, and the goal is a membership in that same set,
+-- crashes instead of erroring. Not memory exhaustion: it dies at ~100 MB
+-- RSS, and raising the stack limit does not help.
+--
+-- The same shape with opaque set VARIABLES verifies:
+--
+--   theorem T (a b : Set(Plane.Point)) (x : Plane.Point)
+--           (same : a = b) (inB : x ∈ b) : x ∈ a := {
+--     x ∈ a by substituting same;
+--     done
+--   }
+--
+-- so the trigger is the definition on the left of the equation. The
+-- likely mechanism is that the rewrite fires, the re-proof unfolds the
+-- definition, the left side reappears, and it fires again.
+--
+-- Found while writing Plane/connected.math (Layer 3): the step wanted
+-- `x ∈ preimageIn(f, piece, carrier)` from `preimageIn(…) = carrier` and
+-- `x ∈ carrier`. Worked around with `Set.member_of_equal`.
+
+module Plane.probe_crash
+import Logic.basics
+import Equality.basics
+import Set.basics
+import Set.algebra
+import Plane.point
+
+definition Plane.probeSet (target carrier : Set(Plane.Point))
+        : Set(Plane.Point) :=
+  (x : Plane.Point) ↦ x ∈ carrier ∧ x ∈ target
+
+theorem Plane.probe_crash (target carrier : Set(Plane.Point)) (x : Plane.Point)
+        (same : Plane.probeSet(target, carrier) = carrier)
+        (inCarrier : x ∈ carrier)
+        : x ∈ Plane.probeSet(target, carrier) := {
+  x ∈ Plane.probeSet(target, carrier) by substituting same;
+  done
+}

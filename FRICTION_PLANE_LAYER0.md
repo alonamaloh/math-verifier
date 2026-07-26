@@ -617,3 +617,44 @@ The trade is build time against authoring: goals that need the
 certificate now get it in 1.3 ms instead of 300, and two steps in
 `Real/cluster.math` lost their expensive-step warnings. Reverting is one
 block move if the 2.3% is judged not worth it.
+
+---
+
+### C1 — `by substituting` SEGFAULTS on a defined set
+
+```
+definition Plane.probeSet (target carrier : Set(Plane.Point))
+        : Set(Plane.Point) :=
+  (x : Plane.Point) ↦ x ∈ carrier ∧ x ∈ target
+
+theorem T (target carrier : Set(Plane.Point)) (x : Plane.Point)
+        (same : Plane.probeSet(target, carrier) = carrier)
+        (inCarrier : x ∈ carrier)
+        : x ∈ Plane.probeSet(target, carrier) := {
+  x ∈ Plane.probeSet(target, carrier) by substituting same;
+  done
+}
+```
+→ `kernel verify` exits **139 (SIGSEGV)**.
+
+Not memory exhaustion: it dies at ~100 MB RSS, and `ulimit -s unlimited`
+does not help. The same shape with opaque set VARIABLES on both sides of
+the equation verifies fine, so the trigger is the *definition* on the
+left. The likely mechanism is a rewrite loop — the rewrite fires, the
+re-proof unfolds the definition, the left side reappears, and it fires
+again.
+
+This is the first crash any of this work has produced; every other
+friction has been an error message. A tactic that segfaults is worse than
+one that declines, because there is no line number and no goal to read —
+the first symptom is `timeout: the monitored command dumped core`, which
+says nothing about where.
+
+Reproducer saved at `reports/CRASH_substituting_defined_set.math`.
+
+**Worked around** by `Set.member_of_equal` (`library/Set/algebra.math`),
+which proves the transport once over opaque sets — where `substituting`
+is well-behaved — and is a plain application at every use site. That is
+better style anyway, so the workaround is not a loss; but the crash
+should be fixed, and a depth cap on rewrite re-firing would turn it into
+an ordinary error.
