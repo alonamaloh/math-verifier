@@ -1,0 +1,121 @@
+-- Plane/norm.math
+--
+-- Length and distance. The Euclidean norm is the primary one — it is what
+-- a mathematician reaches for without thinking, and the development should
+-- support that — with the sup norm alongside for the axis-parallel squares
+-- the polygonal work is built on.
+--
+-- `Real.square_root` takes the nonnegativity of its argument as an
+-- argument. That obligation is discharged ONCE, here in the definition,
+-- from `innerProduct_self_nonneg`. Downstream `norm(v)` takes only `v`,
+-- and no proof term ever appears at a call site.
+
+module Plane.norm
+
+import Logic.basics
+import Equality.basics
+import Real.interface
+import Real.square_root
+import Real.maximum
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.order_multiplication
+import Plane.vector
+import Plane.bilinear
+import Plane.direction
+import Plane.point
+
+-- ----------------------------------------------------------------------
+-- The Euclidean norm.
+
+definition Plane.Vector.norm (v : Plane.Vector) : ℝ :=
+  Real.square_root(
+      Plane.Vector.innerProduct(v, v),
+      Plane.Vector.innerProduct_self_nonneg(v))
+
+theorem Plane.Vector.norm_nonneg (v : Plane.Vector)
+        : 0 ≤ Plane.Vector.norm(v) :=
+  done by Real.square_root_nonneg
+
+-- The defining property: the norm squares back to the squared length.
+-- Every estimate below goes through this rather than through the root.
+theorem Plane.Vector.norm_squared (v : Plane.Vector)
+        : Plane.Vector.norm(v) * Plane.Vector.norm(v)
+              = Plane.Vector.innerProduct(v, v) :=
+  done by Real.square_root_squares
+
+-- ----------------------------------------------------------------------
+-- Each coordinate is bounded by the norm: its square is one of the two
+-- summands of the squared length.
+
+theorem Plane.Vector.absolute_first_LessOrEqual_norm (v : Plane.Vector)
+        : abs(Plane.Vector.first(v)) ≤ Plane.Vector.norm(v) := {
+  0 ≤ Plane.Vector.norm(v) by Plane.Vector.norm_nonneg;
+  0 ≤ Plane.Vector.second(v) * Plane.Vector.second(v);
+  abs(Plane.Vector.first(v)) * abs(Plane.Vector.first(v))
+     = Plane.Vector.first(v) * Plane.Vector.first(v)
+           by Real.absolute_value_square
+     ≤ Plane.Vector.first(v) * Plane.Vector.first(v)
+           + Plane.Vector.second(v) * Plane.Vector.second(v)
+           by Real.less_or_equal_add_of_nonneg
+     = Plane.Vector.innerProduct(v, v)
+     = Plane.Vector.norm(v) * Plane.Vector.norm(v)
+           by Plane.Vector.norm_squared;
+  done by Real.LessOrEqual_of_square_LessOrEqual
+}
+
+theorem Plane.Vector.absolute_second_LessOrEqual_norm (v : Plane.Vector)
+        : abs(Plane.Vector.second(v)) ≤ Plane.Vector.norm(v) := {
+  0 ≤ Plane.Vector.norm(v) by Plane.Vector.norm_nonneg;
+  0 ≤ Plane.Vector.first(v) * Plane.Vector.first(v);
+  abs(Plane.Vector.second(v)) * abs(Plane.Vector.second(v))
+     = Plane.Vector.second(v) * Plane.Vector.second(v)
+           by Real.absolute_value_square
+     = 0 + Plane.Vector.second(v) * Plane.Vector.second(v)
+     ≤ Plane.Vector.first(v) * Plane.Vector.first(v)
+           + Plane.Vector.second(v) * Plane.Vector.second(v)
+           by Real.add_preserves_LessOrEqual
+     = Plane.Vector.innerProduct(v, v)
+     = Plane.Vector.norm(v) * Plane.Vector.norm(v)
+           by Plane.Vector.norm_squared;
+  done by Real.LessOrEqual_of_square_LessOrEqual
+}
+
+-- ----------------------------------------------------------------------
+-- The sup norm, and the half of the comparison that needs no root.
+
+definition Plane.Vector.supNorm (v : Plane.Vector) : ℝ :=
+  max(abs(Plane.Vector.first(v)), abs(Plane.Vector.second(v)))
+
+theorem Plane.Vector.supNorm_nonneg (v : Plane.Vector)
+        : 0 ≤ Plane.Vector.supNorm(v) := {
+  0 ≤ abs(Plane.Vector.first(v)) by Real.absolute_value_nonneg;
+  done by Real.maximum_nonneg
+}
+
+-- `‖v‖∞ ≤ ‖v‖`: both coordinates are below the norm, so their maximum is.
+theorem Plane.Vector.supNorm_LessOrEqual_norm (v : Plane.Vector)
+        : Plane.Vector.supNorm(v) ≤ Plane.Vector.norm(v) := {
+  abs(Plane.Vector.first(v)) ≤ Plane.Vector.norm(v)
+      by Plane.Vector.absolute_first_LessOrEqual_norm;
+  abs(Plane.Vector.second(v)) ≤ Plane.Vector.norm(v)
+      by Plane.Vector.absolute_second_LessOrEqual_norm;
+  done by Real.maximum_LessOrEqual
+}
+
+-- ----------------------------------------------------------------------
+-- Distance between points, in both metrics.
+
+definition Plane.distance (p q : Plane.Point) : ℝ :=
+  Plane.Vector.norm(q - p)
+
+definition Plane.supDistance (p q : Plane.Point) : ℝ :=
+  Plane.Vector.supNorm(q - p)
+
+theorem Plane.distance_nonneg (p q : Plane.Point)
+        : 0 ≤ Plane.distance(p, q) :=
+  done by Plane.Vector.norm_nonneg
+
+theorem Plane.supDistance_LessOrEqual_distance (p q : Plane.Point)
+        : Plane.supDistance(p, q) ≤ Plane.distance(p, q) :=
+  done by Plane.Vector.supNorm_LessOrEqual_norm

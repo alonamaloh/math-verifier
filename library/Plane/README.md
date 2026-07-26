@@ -37,6 +37,10 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
   [point.math](point.math)
 - `Plane.Vector.innerProduct`, `Plane.Vector.determinant`, and
   `Plane.Vector.perpendicular` — [bilinear.math](bilinear.math)
+- `Plane.Vector.IsNonzero`, `Parallel`, `SameRay`, `OppositeRay`, and
+  `Plane.Vector.Counterclockwise` — [direction.math](direction.math)
+- `Plane.Vector.norm`, `Plane.Vector.supNorm`, `Plane.distance`, and
+  `Plane.supDistance` — [norm.math](norm.math)
 
 ## Main theorems
 
@@ -61,6 +65,21 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
   angle), `perpendicular_perpendicular` (twice reverses), and
   **`determinant_perpendicular`** — `det(v, v⊥) = ⟨v, v⟩`, the identity
   the strip lemma runs on
+
+## The Euclidean norm is primary
+
+`Real.square_root` takes the nonnegativity of its argument as an
+argument. That obligation is discharged **once**, in the definition of
+`Plane.Vector.norm`, out of `innerProduct_self_nonneg`. Downstream
+`norm(v)` takes only `v` and no proof term ever appears at a call site —
+a mathematician does not think twice before writing ‖v‖, and neither
+should a proof here.
+
+Estimates go through `norm_squared` (`‖v‖·‖v‖ = ⟨v,v⟩`) rather than
+through the root itself, and `Real.LessOrEqual_of_square_LessOrEqual`
+turns a comparison of squares back into a comparison of values. The sup
+norm sits alongside for the axis-parallel squares the polygonal work is
+built on.
 
 ## Orientation instead of angles
 
