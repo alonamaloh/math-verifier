@@ -61,12 +61,13 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
 - `Plane.Component`, `Plane.IsRegion` — [component.math](component.math)
 - `Plane.PolygonalReach`, `Plane.reachableFrom` —
   [polygonal.math](polygonal.math)
-- `Plane.origin`, `Plane.unitSegment`, `Plane.squareBoundary` —
-  [model.math](model.math)
+- `Plane.origin`, `Plane.unitSegment`, `Plane.squareBoundary`,
+  `Plane.circle` — [model.math](model.math)
 - `Plane.InjectiveOn`, `Plane.HasContinuousInverseOn`,
   `Plane.IsHomeomorphismOn` — [homeomorphism.math](homeomorphism.math)
 - `Plane.IsArc`, `Plane.arc`, `Plane.arcStart`, `Plane.arcFinish`,
-  `Plane.IsJordanCurve`, `Plane.jordanCurve` — [curve.math](curve.math)
+  `Plane.IsJordanParametrisation`, `Plane.IsJordanCurve` —
+  [curve.math](curve.math)
 
 ## Main theorems
 
@@ -89,6 +90,13 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
   `determinant_add_left`, `determinant_scale_left`
 - **`lagrange_identity`** — `⟨u,v⟩² + det(u,v)² = ⟨u,u⟩⟨v,v⟩`, a ring
   identity in coordinates — and `cauchy_schwarz` as its corollary
+- **`Plane.distance_make`** — the distance between two points named by
+  coordinates. A square root is not a computation, so the caller names the
+  value and the lemma checks its square; cite it argument-free and the
+  goal supplies the coordinates (`Plane.pole_in_circle` is two lines this
+  way). Its sup-metric siblings are `supNorm_triangle`, `supNorm_negate`,
+  `supDistance_symmetric`, `supDistance_triangle` and
+  `supDistance_shift_bound`
 - Metric: `norm_nonneg`, `norm_squared`, `supNorm_LessOrEqual_norm`,
   `norm_LessOrEqual_rootTwo_supNorm` (together, `‖v‖∞ ≤ ‖v‖ ≤ √2·‖v‖∞`),
   `norm_triangle`, `distance_triangle`
@@ -122,7 +130,7 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
   open set with the walk classes
 - `Plane.segment_IsCompact`, `Plane.squareBoundary_IsCompact`
 - **`Plane.IsHomeomorphismOn.of_continuous_injective_on_compact`** and
-  **`Plane.JordanCurve.homeomorphic_to_square_boundary`** (H4)
+  **`Plane.IsJordanCurve.homeomorphic_to_circle`** (H4)
 
 ## Connectedness is the clopen criterion
 
@@ -138,8 +146,9 @@ as the definition spares each of them a reductio — and the blueprint's own
 ## Arcs and curves are parametrised by plane sets
 
 An arc is a continuous injective map on `Plane.unitSegment`; a Jordan curve
-is one on `Plane.squareBoundary`. **Both model domains are subsets of the
-plane, not of ℝ.** That is what lets everything above apply unchanged: a
+is a **set** carried onto by a continuous injection from `Plane.circle`.
+**Both model domains are subsets of the plane, not of ℝ.** That is what
+lets everything above apply unchanged: a
 parametrisation is an ordinary `Plane.Point → Plane.Point` map, its
 continuity is `ContinuousOn`, its image is `imageSet`, its compactness is
 `IsCompact`. Parametrising by `[0,1] ⊆ ℝ` would need a second relative
@@ -147,10 +156,15 @@ topology for real-domain maps, and a circle would need a quotient.
 
 Two consequences worth knowing before extending this area:
 
-- `Plane.squareBoundary` is the sup-metric level set `‖x‖∞ = 1`, so its
-  compactness is closed-and-bounded with no case analysis. Its
-  decomposition into four sides is **not** built yet, and everything that
-  needs the arc structure of the model curve waits on it.
+- There are **two model curves, on purpose**. `Plane.circle` (`‖x‖ = 1`) is
+  what a Jordan curve is defined against, because that is the textbook
+  definition and a circle needs no trigonometry to *define* — only to
+  traverse. `Plane.squareBoundary` (`‖x‖∞ = 1`) is the working model
+  wherever a traversal is wanted, because its traversal is piecewise
+  affine. Both are level sets, so both are compact in three lines. The
+  radial-projection bridge between them (`x ↦ x/‖x‖`, `x ↦ x/‖x‖∞`) and
+  `∂Q`'s decomposition into four sides are **not** built yet; everything
+  needing the arc structure of a model curve waits on them.
 - The parameter of a point of the unit segment is its **first coordinate**
   (`Plane.unitSegment_at_first_coordinate`). The model interval runs along
   the axis for exactly this reason: a reparametrisation reads its parameter

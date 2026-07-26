@@ -120,6 +120,36 @@ theorem Plane.supDistance_nonneg (p q : Plane.Point)
         : 0 ≤ Plane.supDistance(p, q) :=
   done by Plane.Vector.supNorm_nonneg
 
+-- The distance between two points named by their coordinates. A square
+-- root is not a computation, so the caller names the value and this checks
+-- its square — which for concrete points is ground arithmetic, and for
+-- symbolic ones is `ring`.
+theorem Plane.distance_make
+        (firstStart secondStart firstFinish secondFinish value : ℝ)
+        (valueNonneg : 0 ≤ value)
+        (squares
+            : (firstFinish - firstStart) * (firstFinish - firstStart)
+                  + (secondFinish - secondStart) * (secondFinish - secondStart)
+                = value * value)
+        : Plane.distance(
+              Plane.Point.make(firstStart, secondStart),
+              Plane.Point.make(firstFinish, secondFinish)) = value := {
+  let start : Plane.Point := Plane.Point.make(firstStart, secondStart);
+  let finish : Plane.Point := Plane.Point.make(firstFinish, secondFinish);
+  Plane.Vector.first(finish - start) = firstFinish - firstStart
+      by Plane.Point.first_difference;
+  Plane.Vector.second(finish - start) = secondFinish - secondStart
+      by Plane.Point.second_difference;
+  Plane.distance(start, finish) * Plane.distance(start, finish)
+     = Plane.Vector.innerProduct(finish - start, finish - start)
+           by Plane.Vector.norm_squared
+     = (firstFinish - firstStart) * (firstFinish - firstStart)
+           + (secondFinish - secondStart) * (secondFinish - secondStart)
+     = value * value by squares;
+  0 ≤ Plane.distance(start, finish) by Plane.distance_nonneg;
+  done by Real.equal_of_square_equal_nonneg
+}
+
 -- ----------------------------------------------------------------------
 -- The sup metric obeys the triangle inequality too, and coordinatewise
 -- the proof is where it belongs: each coordinate of a sum is below the

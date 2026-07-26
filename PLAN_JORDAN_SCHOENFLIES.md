@@ -92,12 +92,23 @@ require editing the blueprint**, whose Appendix C imports "polar
 coordinates about a point, and the decomposition of a circle by finitely
 many directions into arcs".
 
-1. **Model curve = the boundary of the unit square, not the circle.**
-   `lem:jordan-circle` becomes *every Jordan curve is homeomorphic to
-   `∂Q`*. The blueprint already offers this in passing ("and to the
-   boundary of a square"), and all of Part II targets the square `Q`
-   anyway, so the circle is never actually wanted — only a model curve
-   with an arc structure. `∂Q` is piecewise linear and needs no analysis.
+1. **Working model curve = the boundary of the unit square. The
+   *definition* keeps the circle.** *(Revised 2026-07-26, on building
+   Layer 4.)* The original form of this substitution — restate
+   `lem:jordan-circle` against `∂Q` — went further than the missing
+   trigonometry forces. The unit circle is `{x : ‖x‖ = 1}`, a level set of
+   the Euclidean norm, and needs no trigonometry to **define**: it is
+   `Plane.circle`, and its compactness is the same three lines as `∂Q`'s.
+   Trigonometry is only wanted to **traverse** a circle at constant speed.
+
+   So: `Plane.IsJordanCurve(C)` is the textbook statement — `C` is carried
+   onto by a continuous injection from the circle — and H4 is *a Jordan
+   curve is homeomorphic to the circle*, with no substitution at all. `∂Q`
+   stays as the working model wherever a traversal is wanted, because its
+   traversal is piecewise affine, and Part II targets the square anyway.
+   The two models are bridged by radial projection (`x ↦ x/‖x‖` one way,
+   `x ↦ x/‖x‖∞` the other) — **not yet built**, and the one place the
+   trigonometry-free choice still costs something.
 
 2. **Circular order on directions via the determinant, not via angles.**
    The strip lemma's argument — that the left germs at polar angles
@@ -276,8 +287,13 @@ continuous):
   images are close) — the form every consumer uses, and no choice needed.
   Then the engine Layer 2 deferred: **a continuous injection on a compactum
   is a homeomorphism onto its image**.
-- **H4, `Plane.JordanCurve.homeomorphic_to_square_boundary`**, falls out of
-  that engine with nothing left to do. Arcs are compact, connected, and
+- **`Plane.circle`** as `{x : ‖x‖ = 1}` — no trigonometry needed to define
+  a circle, only to traverse one — so `Plane.IsJordanCurve(C)` is the
+  textbook definition: `C` is carried onto by a continuous injection from
+  the circle. A **set**, not a map; the parametrisation comes back by
+  `choose`, and `Plane.IsJordanParametrisation` names its property.
+- **H4, `Plane.IsJordanCurve.homeomorphic_to_circle`**, falls out of that
+  engine with nothing left to do. Arcs are compact, connected, and
   homeomorphic copies of the unit segment.
 - The parameter of a point of the unit segment is **its first coordinate**
   (`Plane.unitSegment_at_first_coordinate` and the two range lemmas) — the
@@ -286,8 +302,10 @@ continuous):
 
 **Not built yet.** Subarcs and concatenation; `Plane.IsPolygonal`; the two
 arcs of a Jordan curve between two of its points; `P°`; the subarc basis.
-All of these want the **arc structure of `∂Q`** (its decomposition into the
-four sides), which the level-set definition defers rather than supplies.
+All of these want the **arc structure of the model curve** — `∂Q`'s
+decomposition into four sides, plus the **radial-projection bridge**
+`∂Q ≅ circle` that transports it to the circle the definition uses. Both
+level-set definitions defer that structure rather than supply it.
 Also not built: the blueprint's **loop presentation** (`γ` on `[0,1]` with
 `γ(0) = γ(1)`, injective otherwise) and its bridge to `∂Q` through the
 four-side traversal `e`. That bridge is what *constructions* need — a

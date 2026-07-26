@@ -106,47 +106,85 @@ theorem Plane.IsArc.IsHomeomorphismOn
 
 -- ----------------------------------------------------------------------
 -- Jordan curves.
+--
+-- A Jordan curve is a SET: a subset of the plane carried onto by a
+-- continuous injection from the circle, which is the textbook definition
+-- and the one the theorems about it need — "ℝ² ∖ C has two regions" is a
+-- statement about a set. The parametrisation is recovered by `choose`
+-- wherever a proof wants it, and `Plane.IsJordanParametrisation` names the
+-- property it has.
 
-definition Plane.IsJordanCurve (parametrisation : Plane.Point → Plane.Point)
-        : Proposition :=
-  Plane.ContinuousOn(parametrisation, Plane.squareBoundary)
-    ∧ Plane.InjectiveOn(parametrisation, Plane.squareBoundary)
+definition Plane.IsJordanParametrisation
+        (parametrisation : Plane.Point → Plane.Point) : Proposition :=
+  Plane.ContinuousOn(parametrisation, Plane.circle)
+    ∧ Plane.InjectiveOn(parametrisation, Plane.circle)
 
-definition Plane.jordanCurve (parametrisation : Plane.Point → Plane.Point)
-        : Set(Plane.Point) :=
-  Plane.imageSet(parametrisation, Plane.squareBoundary)
+definition Plane.IsJordanCurve (curve : Set(Plane.Point)) : Proposition :=
+  ∃ (parametrisation : Plane.Point → Plane.Point).
+    Plane.IsJordanParametrisation(parametrisation)
+      ∧ Plane.imageSet(parametrisation, Plane.circle) = curve
 
-theorem Plane.IsJordanCurve.IsCompact
-        (parametrisation : Plane.Point → Plane.Point)
-        (isCurve : Plane.IsJordanCurve(parametrisation))
-        : Plane.IsCompact(Plane.jordanCurve(parametrisation)) := {
-  Plane.ContinuousOn(parametrisation, Plane.squareBoundary) as continuous;
-  done by Plane.IsCompact.image(
-      parametrisation, Plane.squareBoundary, Plane.squareBoundary_IsCompact,
-      continuous)
+theorem Plane.IsJordanCurve.IsCompact (curve : Set(Plane.Point))
+        (isCurve : Plane.IsJordanCurve(curve))
+        : Plane.IsCompact(curve) := {
+  choose parametrisation such that
+      Plane.IsJordanParametrisation(parametrisation)
+        ∧ Plane.imageSet(parametrisation, Plane.circle) = curve
+      from isCurve;
+  Plane.imageSet(parametrisation, Plane.circle) = curve as carriesOnto;
+  Plane.ContinuousOn(parametrisation, Plane.circle) as continuous;
+  Plane.IsCompact(Plane.imageSet(parametrisation, Plane.circle))
+      by Plane.IsCompact.image(
+          parametrisation, Plane.circle, Plane.circle_IsCompact, continuous);
+  done by substituting carriesOnto
 }
 
-theorem Plane.IsJordanCurve.IsNonempty
-        (parametrisation : Plane.Point → Plane.Point)
-        : Set.IsNonempty(Plane.Point, Plane.jordanCurve(parametrisation)) := {
-  choose corner such that corner ∈ Plane.squareBoundary
-      from Plane.squareBoundary_IsNonempty;
-  parametrisation(corner) ∈ Plane.jordanCurve(parametrisation)
-      by { witness corner with done };
-  done by { witness parametrisation(corner) with done }
+theorem Plane.IsJordanCurve.IsNonempty (curve : Set(Plane.Point))
+        (isCurve : Plane.IsJordanCurve(curve))
+        : Set.IsNonempty(Plane.Point, curve) := {
+  choose parametrisation such that
+      Plane.IsJordanParametrisation(parametrisation)
+        ∧ Plane.imageSet(parametrisation, Plane.circle) = curve
+      from isCurve;
+  Plane.imageSet(parametrisation, Plane.circle) = curve as carriesOnto;
+  Plane.Point.make(1, 0) ∈ Plane.circle by Plane.pole_in_circle;
+  parametrisation(Plane.Point.make(1, 0))
+      ∈ Plane.imageSet(parametrisation, Plane.circle)
+      by { witness Plane.Point.make(1, 0) with done };
+  parametrisation(Plane.Point.make(1, 0)) ∈ curve by substituting carriesOnto;
+  done by { witness parametrisation(Plane.Point.make(1, 0)) with done }
 }
 
 -- ----------------------------------------------------------------------
--- The model-curve theorem, H4: a Jordan curve is a homeomorphic copy of
--- the square's boundary.
+-- The model-curve theorem, H4: a parametrisation of a Jordan curve is a
+-- homeomorphism from the circle onto it. Nothing is left to do — a
+-- continuous injection on a compactum is a homeomorphism onto its image,
+-- and the circle is compact.
 
-theorem Plane.JordanCurve.homeomorphic_to_square_boundary
+theorem Plane.IsJordanParametrisation.IsHomeomorphismOn
         (parametrisation : Plane.Point → Plane.Point)
-        (isCurve : Plane.IsJordanCurve(parametrisation))
-        : Plane.IsHomeomorphismOn(parametrisation, Plane.squareBoundary) := {
-  Plane.ContinuousOn(parametrisation, Plane.squareBoundary) as continuous;
-  Plane.InjectiveOn(parametrisation, Plane.squareBoundary) as injective;
+        (isParametrisation : Plane.IsJordanParametrisation(parametrisation))
+        : Plane.IsHomeomorphismOn(parametrisation, Plane.circle) := {
+  Plane.ContinuousOn(parametrisation, Plane.circle) as continuous;
+  Plane.InjectiveOn(parametrisation, Plane.circle) as injective;
   done by Plane.IsHomeomorphismOn.of_continuous_injective_on_compact(
-      parametrisation, Plane.squareBoundary, Plane.squareBoundary_IsCompact,
-      continuous, injective)
+      parametrisation, Plane.circle, Plane.circle_IsCompact, continuous,
+      injective)
+}
+
+theorem Plane.IsJordanCurve.homeomorphic_to_circle (curve : Set(Plane.Point))
+        (isCurve : Plane.IsJordanCurve(curve))
+        : ∃ (parametrisation : Plane.Point → Plane.Point).
+            Plane.IsHomeomorphismOn(parametrisation, Plane.circle)
+              ∧ Plane.imageSet(parametrisation, Plane.circle) = curve := {
+  choose parametrisation such that
+      Plane.IsJordanParametrisation(parametrisation)
+        ∧ Plane.imageSet(parametrisation, Plane.circle) = curve
+      from isCurve;
+  Plane.IsJordanParametrisation(parametrisation) as isParametrisation;
+  Plane.imageSet(parametrisation, Plane.circle) = curve;
+  Plane.IsHomeomorphismOn(parametrisation, Plane.circle)
+      by Plane.IsJordanParametrisation.IsHomeomorphismOn(
+          parametrisation, isParametrisation);
+  done by { witness parametrisation with done }
 }
