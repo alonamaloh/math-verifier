@@ -246,3 +246,193 @@ theorem Plane.IsConnected.image
       };
   done by Set.equal_of_same_members
 }
+
+-- ----------------------------------------------------------------------
+-- Restriction.
+--
+-- Relative openness survives shrinking the carrier: what is open in a set
+-- is open in any subset of it, once cut down to that subset. The radius
+-- is unchanged — only fewer points have to be checked.
+
+theorem Plane.OpenIn.restrict
+        (piece carrier smaller : Set(Plane.Point))
+        (openInCarrier : Plane.OpenIn(piece, carrier))
+        (inside : smaller ⊆ carrier)
+        : Plane.OpenIn(piece ∩ smaller, smaller) := {
+  take x : Plane.Point;
+  suppose x ∈ piece ∩ smaller as inBoth;
+  x ∈ piece by Set.intersection_member_left;
+  choose radius such that
+      0 < radius ∧
+      ∀ (y : Plane.Point). y ∈ carrier →
+        Plane.distance(x, y) < radius → y ∈ piece
+      from openInCarrier(x, { x ∈ piece });
+  0 < radius;
+  ∀ (y : Plane.Point). y ∈ carrier →
+      Plane.distance(x, y) < radius → y ∈ piece as nearbyInPiece;
+  witness radius with {
+    0 < radius;
+    ∀ (y : Plane.Point). y ∈ smaller →
+        Plane.distance(x, y) < radius → y ∈ piece ∩ smaller
+        by (y : Plane.Point) (inSmaller : y ∈ smaller)
+           (near : Plane.distance(x, y) < radius) ↦ {
+          y ∈ carrier by inside(y, inSmaller);
+          y ∈ piece by nearbyInPiece(y, { y ∈ carrier }, near);
+          done by Set.member_intersection
+        };
+    done
+  }
+}
+
+-- Cutting a piece out of a subset is the same as cutting the ambient
+-- complement down to it. The bookkeeping the union argument runs on.
+theorem Plane.difference_intersection
+        (larger smaller piece : Set(Plane.Point))
+        (inside : smaller ⊆ larger)
+        : smaller ∖ (piece ∩ smaller) = (larger ∖ piece) ∩ smaller := {
+  smaller ∖ (piece ∩ smaller) ⊆ (larger ∖ piece) ∩ smaller
+      by (x : Plane.Point)
+         (outside : x ∈ smaller ∖ (piece ∩ smaller)) ↦ {
+        x ∈ smaller as inSmaller;
+        ¬(x ∈ piece ∩ smaller);
+        x ∈ larger by inside(x, inSmaller);
+        ¬(x ∈ piece)
+            by (inPiece : x ∈ piece) ↦ {
+              x ∈ piece ∩ smaller by Set.member_intersection;
+              done
+            };
+        x ∈ larger ∖ piece;
+        done by Set.member_intersection
+      };
+  (larger ∖ piece) ∩ smaller ⊆ smaller ∖ (piece ∩ smaller)
+      by (x : Plane.Point)
+         (inCut : x ∈ (larger ∖ piece) ∩ smaller) ↦ {
+        x ∈ larger ∖ piece by Set.intersection_member_left;
+        x ∈ smaller by Set.intersection_member_right;
+        ¬(x ∈ piece);
+        ¬(x ∈ piece ∩ smaller)
+            by (inBoth : x ∈ piece ∩ smaller) ↦ {
+              x ∈ piece by Set.intersection_member_left;
+              done
+            };
+        done
+      };
+  done by Set.equal_of_same_members
+}
+
+-- ----------------------------------------------------------------------
+-- A connected piece swallows a whole connected set it meets.
+--
+-- Extracted because the union argument needs it twice, once per side,
+-- and because it is the step a reader wants named: a relatively clopen
+-- piece of the whole, if it meets a connected part at all, contains it.
+
+theorem Plane.IsConnected.swallows
+        (whole part piece : Set(Plane.Point))
+        (partConnected : Plane.IsConnected(part))
+        (partInside : part ⊆ whole)
+        (pieceOpen : Plane.OpenIn(piece, whole))
+        (restOpen : Plane.OpenIn(whole ∖ piece, whole))
+        (meets : Set.IsNonempty(Plane.Point, piece ∩ part))
+        : part ⊆ piece := {
+  Plane.OpenIn(piece ∩ part, part)
+      by Plane.OpenIn.restrict(piece, whole, part, pieceOpen, partInside);
+  part ∖ (piece ∩ part) = (whole ∖ piece) ∩ part
+      by Plane.difference_intersection(whole, part, piece, partInside);
+  Plane.OpenIn((whole ∖ piece) ∩ part, part)
+      by Plane.OpenIn.restrict(
+          whole ∖ piece, whole, part, restOpen, partInside);
+  Plane.OpenIn(part ∖ (piece ∩ part), part);
+  piece ∩ part ⊆ part by Set.intersection_subset_right;
+  piece ∩ part = part
+      by partConnected(piece ∩ part,
+          { piece ∩ part ⊆ part },
+          { Plane.OpenIn(piece ∩ part, part) },
+          { Plane.OpenIn(part ∖ (piece ∩ part), part) },
+          meets)
+      ;
+  take x : Plane.Point;
+  suppose x ∈ part as inPart;
+  part = piece ∩ part by Equality.symmetry;
+  x ∈ piece ∩ part
+      by Set.member_of_equal(
+          part, piece ∩ part, { part = piece ∩ part }, x, inPart);
+  done by Set.intersection_member_left
+}
+
+-- ----------------------------------------------------------------------
+-- Two connected sets that share a point make a connected union.
+--
+-- A relatively clopen piece of the union is nonempty, so it meets one of
+-- the two sides; that side is swallowed whole, which drags in the shared
+-- point, which puts the other side's meeting in evidence too.
+
+theorem Plane.IsConnected.union
+        (left right : Set(Plane.Point))
+        (leftConnected : Plane.IsConnected(left))
+        (rightConnected : Plane.IsConnected(right))
+        (shared : Plane.Point)
+        (sharedInLeft : shared ∈ left) (sharedInRight : shared ∈ right)
+        : Plane.IsConnected(left ∪ right) := {
+  take piece : Set(Plane.Point);
+  suppose piece ⊆ left ∪ right as pieceInside;
+  suppose Plane.OpenIn(piece, left ∪ right) as pieceOpen;
+  suppose Plane.OpenIn((left ∪ right) ∖ piece, left ∪ right) as restOpen;
+  suppose Set.IsNonempty(Plane.Point, piece) as pieceNonempty;
+  left ⊆ left ∪ right by Set.subset_union_left;
+  right ⊆ left ∪ right by Set.subset_union_right;
+
+  -- Whichever side the piece meets, the shared point ends up inside it.
+  choose start such that start ∈ piece as startInPiece from pieceNonempty;
+  start ∈ left ∪ right by pieceInside(start, startInPiece);
+  shared ∈ piece by cases {
+    case start ∈ left as startInLeft: {
+        Set.IsNonempty(Plane.Point, piece ∩ left)
+            by { witness start with { done by Set.member_intersection } };
+        left ⊆ piece
+            by Plane.IsConnected.swallows(
+                left ∪ right, left, piece, leftConnected,
+                { left ⊆ left ∪ right }, pieceOpen, restOpen,
+                { Set.IsNonempty(Plane.Point, piece ∩ left) })
+            as leftSwallowed;
+        done by leftSwallowed(shared, sharedInLeft)
+      }
+    case start ∈ right as startInRight: {
+        Set.IsNonempty(Plane.Point, piece ∩ right)
+            by { witness start with { done by Set.member_intersection } };
+        right ⊆ piece
+            by Plane.IsConnected.swallows(
+                left ∪ right, right, piece, rightConnected,
+                { right ⊆ left ∪ right }, pieceOpen, restOpen,
+                { Set.IsNonempty(Plane.Point, piece ∩ right) })
+            as rightSwallowed;
+        done by rightSwallowed(shared, sharedInRight)
+      }
+  };
+
+  -- With the shared point inside, both sides are swallowed.
+  Set.IsNonempty(Plane.Point, piece ∩ left)
+      by { witness shared with { done by Set.member_intersection } };
+  Set.IsNonempty(Plane.Point, piece ∩ right)
+      by { witness shared with { done by Set.member_intersection } };
+  left ⊆ piece
+      by Plane.IsConnected.swallows(
+          left ∪ right, left, piece, leftConnected,
+          { left ⊆ left ∪ right }, pieceOpen, restOpen,
+          { Set.IsNonempty(Plane.Point, piece ∩ left) })
+      as leftInPiece;
+  right ⊆ piece
+      by Plane.IsConnected.swallows(
+          left ∪ right, right, piece, rightConnected,
+          { right ⊆ left ∪ right }, pieceOpen, restOpen,
+          { Set.IsNonempty(Plane.Point, piece ∩ right) })
+      as rightInPiece;
+  left ∪ right ⊆ piece
+      by (x : Plane.Point) (inUnion : x ∈ left ∪ right) ↦ {
+        done by cases {
+          case x ∈ left as inLeft: leftInPiece(x, inLeft)
+          case x ∈ right as inRight: rightInPiece(x, inRight)
+        }
+      };
+  done by Set.equal_of_same_members
+}
