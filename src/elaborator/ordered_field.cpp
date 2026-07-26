@@ -342,15 +342,108 @@ std::optional<OrderProposition> parseFoldedOrderProposition(
     return parsed;
 }
 
+// Destructure an application spine into head name and arguments.
+std::pair<std::string, std::vector<ExpressionPointer>>
+spineOf(ExpressionPointer term) {
+    std::vector<ExpressionPointer> arguments;
+    ExpressionPointer head = term;
+    while (auto* application = std::get_if<Application>(&head->node)) {
+        arguments.push_back(application->argument);
+        head = application->function;
+    }
+    std::reverse(arguments.begin(), arguments.end());
+    auto* constant = std::get_if<Constant>(&head->node);
+    return {constant ? constant->name : std::string(), std::move(arguments)};
+}
+
+// Read the relation off a goal that has been δ-unfolded ONE step.
+//
+// `take m : ℕ` (and a `↦` lambda body) hands the tactic the goal already
+// expanded through the definition of the relation, so the folded read
+// above finds no `C.LessOrEqual` head to key on. What it finds instead is
+// exactly one of the two definition bodies:
+//
+//     C.LessOrEqual(x, y)  :=  C.IsNonneg(y − x)
+//     C.LessThan(x, y)     :=  C.LessOrEqual(x, y) ∧ ¬(x = y)
+//
+// Both are inverted here. Inverting rather than re-folding matters for
+// the certificate: reading `C.IsNonneg(u − v)` back as `v ≤ u` keeps the
+// endpoints the tactic will subtract, so the assembled proof concludes
+// the relation whose body IS the stated goal and the kernel accepts it
+// without a bridge.
+std::optional<OrderProposition> parseUnfoldedOrderProposition(
+        ExpressionPointer proposition) {
+    auto [head, arguments] = spineOf(proposition);
+
+    // `C.IsNonneg(u − v)` is `v ≤ u`. A non-subtraction argument is
+    // declined: `0 ≤ e` would need a zero the caller has not built yet,
+    // and the unfolding always produces a subtraction anyway.
+    const std::string nonnegSuffix = ".IsNonneg";
+    bool isNonneg = arguments.size() == 1
+        && head.size() > nonnegSuffix.size()
+        && head.compare(head.size() - nonnegSuffix.size(),
+                        nonnegSuffix.size(), nonnegSuffix) == 0;
+    if (isNonneg) {
+        std::string carrier =
+            head.substr(0, head.size() - nonnegSuffix.size());
+        if (carrier.find('.') != std::string::npos) return std::nullopt;
+        auto [difference, differenceArguments] = spineOf(arguments[0]);
+        if (differenceArguments.size() != 2
+            || difference != carrier + ".subtract") {
+            return std::nullopt;
+        }
+        OrderProposition parsed;
+        parsed.carrierName = carrier;
+        parsed.strict = false;
+        parsed.left = differenceArguments[1];
+        parsed.right = differenceArguments[0];
+        return parsed;
+    }
+
+    // `A ∧ ¬(x = y)` is the strict relation, provided `A` is the weak one
+    // at the same endpoints — the equality check is what keeps an
+    // unrelated conjunction from being read as an order goal.
+    if (arguments.size() == 2 && head == "And") {
+        std::optional<OrderProposition> weak =
+            parseFoldedOrderProposition(arguments[0]);
+        if (!weak) weak = parseUnfoldedOrderProposition(arguments[0]);
+        if (!weak || weak->strict) return std::nullopt;
+        auto [negation, negationArguments] = spineOf(arguments[1]);
+        if (negationArguments.size() != 1 || negation != "Not") {
+            return std::nullopt;
+        }
+        auto [equality, equalityArguments] = spineOf(negationArguments[0]);
+        if (equalityArguments.size() != 3 || equality != "Equality") {
+            return std::nullopt;
+        }
+        if (!structurallyEqual(equalityArguments[1], weak->left)
+            || !structurallyEqual(equalityArguments[2], weak->right)) {
+            return std::nullopt;
+        }
+        OrderProposition parsed = *weak;
+        parsed.strict = true;
+        return parsed;
+    }
+
+    return std::nullopt;
+}
+
 // The folded form is the normal case. A β-redex — a binder whose type
 // arrived as `(λ p. …)(x)`, the way an `Exists` destructuring leaves it —
 // needs one WHNF step to expose the application spine, so retry there;
-// but only when the folded read failed, never before it.
+// but only when the folded read failed, never before it. Failing both,
+// the goal may have been δ-unfolded through the relation's definition,
+// which the inverter above undoes.
 std::optional<OrderProposition> parseOrderProposition(
         const Environment& environment, ExpressionPointer proposition) {
     if (auto folded = parseFoldedOrderProposition(proposition)) return folded;
-    return parseFoldedOrderProposition(
-        weakHeadNormalForm(environment, proposition));
+    if (auto unfolded = parseUnfoldedOrderProposition(proposition)) {
+        return unfolded;
+    }
+    ExpressionPointer normalised =
+        weakHeadNormalForm(environment, proposition);
+    if (auto folded = parseFoldedOrderProposition(normalised)) return folded;
+    return parseUnfoldedOrderProposition(normalised);
 }
 
 }  // namespace

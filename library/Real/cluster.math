@@ -66,26 +66,14 @@ definition Real.frequentlyBelow (s : ℕ → ℝ) : Set(ℝ) :=
 -- The limsup set has a supremum: it holds the lower bound and stops at
 -- the upper one.
 
--- A two-sided bound from an absolute one. Stated as its own lemma
--- because `ordered_field` does not fire under a `take` binder, so the
--- flip has to happen where the hypotheses are theorem parameters.
-theorem Real.negate_bound_of_absolute_value_bound (x bound : ℝ)
-        (bounded : abs(x) ≤ bound)
-        : -bound ≤ x := {
-  -x ≤ abs(x) by Real.negate_LessOrEqual_absolute_value;
-  -x ≤ bound;
-  done
-}
-
 -- Being strictly between `centre ± tolerance` is being within `tolerance`.
--- A top-level lemma for the same reason as the one above: the
--- rearrangement is linear, and `ordered_field` only fires where the
--- hypotheses are theorem parameters.
 theorem Real.absolute_value_LessThan_of_strictly_between
         (x centre tolerance : ℝ)
         (above : centre - tolerance < x)
         (below : x < centre + tolerance)
         : abs(x - centre) < tolerance := {
+  -- Cited: the battery reaches these by rewriting, at ~100k kernel steps
+  -- each, before it reaches the certificate. See friction E11.
   -tolerance < x - centre by ordered_field;
   x - centre < tolerance by ordered_field;
   done by Real.absolute_value_LessThan_of_bounds
@@ -97,7 +85,9 @@ theorem Real.frequentlyBelow_nonempty (s : ℕ → ℝ) (bound : ℝ)
   ∀ (m : ℕ). -bound ≤ s(m)
       by (m : ℕ) ↦ {
         abs(s(m)) ≤ bound by bounded(m);
-        done by Real.negate_bound_of_absolute_value_bound
+        -s(m) ≤ abs(s(m)) by Real.negate_LessOrEqual_absolute_value;
+        -s(m) ≤ bound;
+        done
       };
   Natural.Frequently((m : ℕ) ↦ -bound ≤ s(m))
       by Natural.Frequently.of_always;

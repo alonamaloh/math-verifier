@@ -515,7 +515,7 @@ The right message is "lemma `X` takes 4 explicit arguments and 2 were
 given — supply the rest or drop them all", which the surrounding code
 already has the arity to say.
 
-### E10 — `ordered_field` does not fire under a `take` binder
+### E10 — CLOSED 2026-07-26 — `ordered_field` did not fire under a `take` binder
 
 The goal from I4, which the tactic closes at top level, stops being
 recognised the moment a binder is introduced mid-proof:
@@ -535,21 +535,44 @@ claim with `a b c` as theorem parameters and no `take` verifies. A
 `(m : ℕ) ↦ …` lambda body fails identically. So it is the mid-proof
 binder, not the atoms, the carrier, or the imports.
 
-The likely cause is the opening discipline:
-`elaborateOrderedField` does
-`openOverLocalBinders(expectedType, localBinders, binderCount)` and then
-parses, where `elaborateRing` — which does work under binders — instead
-`zetaUnfoldLetBinders`es and inspects `expectedType` directly. Every
-existing call site in the library (`Real/maximum.math`,
-`Test/ordered_field_test.math`) has its hypotheses as theorem
-parameters, so the gap was never exercised until the tier started
-running everywhere.
+**Root cause — found.** Not the opening discipline, which was the first
+guess. A binder hands the tactic its goal already δ-unfolded ONE step
+through the relation's own definition:
 
-This matters more than it looks. Analysis proofs live under binders —
-`take m : ℕ`, `witness N with (m : ℕ) (beyond : …) ↦ …` — so the tactic
-is unavailable at exactly the sites the friction log was written about.
-Two steps in `Real/cluster.math` had to be hoisted into their own
-top-level lemmas to get at it.
+```
+Real.LessOrEqual(x, y)  :=  Real.IsNonneg(y − x)
+Real.LessThan(x, y)     :=  Real.LessOrEqual(x, y) ∧ ¬(x = y)
+```
+
+so `parseFoldedOrderProposition`, which keys on a `C.LessOrEqual` /
+`C.LessThan` head, finds `Real.IsNonneg` or `And` instead and declines.
+A diagnostic print of the goal as the tactic receives it showed it
+outright:
+
+```
+binders=5  raw=<bound 4> - <bound 3> ≤ …                       parsed=1
+binders=6  raw=Real.IsNonneg (<bound 3> - <bound 5> + … - …)   parsed=0
+```
+
+**Fixed** by `parseUnfoldedOrderProposition`
+(`src/elaborator/ordered_field.cpp`), which inverts both definition
+bodies. Inverting rather than re-folding is what makes the certificate
+typecheck: reading `C.IsNonneg(u − v)` back as `v ≤ u` keeps the
+endpoints the tactic will subtract, so the assembled proof concludes the
+relation whose body IS the stated goal. The strict case additionally
+checks that the negated equality's sides match the weak leg's endpoints,
+so an unrelated conjunction is not read as an order goal.
+
+Every existing call site in the library (`Real/maximum.math`,
+`Test/ordered_field_test.math`) had its hypotheses as theorem
+parameters, so the gap was never exercised until the tier started
+running everywhere. `Test/ordered_field_under_binder_test.math` pins all
+five shapes, including the bare claim that reaches the tactic through
+the battery.
+
+Cost on the 163-module `Plane` cone: user 124.49 / 124.56 / 124.28 s
+against a 125.30 s baseline — none. 270 `Test/` fixtures and 83 error
+tests pass.
 
 ### E11 — an earlier expensive tier preempts the cheap one
 

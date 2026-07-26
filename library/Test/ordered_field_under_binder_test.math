@@ -1,0 +1,48 @@
+-- Test/ordered_field_under_binder_test.math
+--
+-- `take m : ℕ` and a `↦` lambda body hand the tactic its goal already
+-- δ-unfolded through the relation's definition —
+-- `x ≤ y` arrives as `IsNonneg(y − x)`, `x < y` as `x ≤ y ∧ ¬(x = y)` —
+-- so the folded read finds no relation head to key on. Both forms are
+-- inverted, and these are the shapes that regressed when they were not.
+
+module Test.ordered_field_under_binder_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Real.interface
+import Real.order
+import Real.order_field
+
+theorem Test.weak_under_take (a b c : ℝ) (belowA : a ≤ c) (belowB : b ≤ c)
+        : ∀ (m : ℕ). a - b ≤ (c - a) + (c - b) := {
+  take m : ℕ;
+  done by ordered_field
+}
+
+theorem Test.strict_under_take (a b c : ℝ) (belowA : a < c) (belowB : b ≤ c)
+        : ∀ (m : ℕ). a - b < (c - a) + (c - b) := {
+  take m : ℕ;
+  done by ordered_field
+}
+
+theorem Test.weak_under_lambda (a b c : ℝ) (belowA : a ≤ c) (belowB : b ≤ c)
+        : ∀ (m : ℕ). a - b ≤ (c - a) + (c - b) :=
+  (m : ℕ) ↦ { done by ordered_field }
+
+-- Unprompted, through the auto-prover's last tier.
+theorem Test.bare_claim_under_take (a b c : ℝ)
+        (belowA : a ≤ c) (belowB : b ≤ c)
+        : ∀ (m : ℕ). a - b ≤ (c - a) + (c - b) := {
+  take m : ℕ;
+  done
+}
+
+-- The reductio idiom keeps working under a binder too.
+theorem Test.contradiction_under_take (a b : ℝ)
+        (below : a < b) (above : b < a)
+        : ∀ (m : ℕ). False := {
+  take m : ℕ;
+  done by ordered_field
+}
