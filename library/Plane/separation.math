@@ -1,0 +1,348 @@
+-- Plane/separation.math
+--
+-- Disjoint compact sets are a positive distance apart.
+--
+-- This is the blueprint's `lem:compact-separation`, and the last thing
+-- Layer 2 owes it. The proof is the one a mathematician writes: if no gap
+-- worked, there would be pairs of points, one from each set, closer than
+-- every 1/(1+n); thinning twice makes both sequences converge; the limits
+-- are then at distance zero, hence equal, hence a point in both sets.
+--
+-- Two applications of countable choice, in sequence rather than over
+-- pairs: the first picks the point of `A`, the second — knowing that
+-- point — picks its partner in `B`. That avoids needing a product type
+-- and reads the way the argument is spoken.
+
+module Plane.separation
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Set.algebra
+import Natural.basics
+import Natural.order
+import Natural.maximum
+import Natural.subsequence
+import Real.interface
+import Real.order
+import Real.order_field
+import Real.division
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.convergence
+import Real.harmonic_series
+import Real.archimedean
+import Plane.vector
+import Plane.point
+import Plane.bilinear
+import Plane.direction
+import Plane.norm
+import Plane.sequence
+import Plane.compact
+import Plane.compactness
+
+-- ----------------------------------------------------------------------
+-- Distance separates points.
+
+theorem Plane.equal_of_distance_zero (p q : Plane.Point)
+        (apart : Plane.distance(p, q) = 0)
+        : p = q := {
+  Plane.Vector.innerProduct(q - p, q - p)
+     = Plane.Vector.norm(q - p) * Plane.Vector.norm(q - p)
+           by Plane.Vector.norm_squared
+     = 0 * 0
+     = 0;
+  q - p = Plane.Vector.zero
+      by Plane.Vector.zero_of_innerProduct_self_zero;
+  p + (q - p) = q by Plane.Point.translate_difference;
+  p + Plane.Vector.zero = p by Plane.Point.translate_zero;
+  q = p + (q - p)
+    = p + Plane.Vector.zero
+    = p;
+  done
+}
+
+-- Distance does not care about order: the two difference vectors have
+-- opposite coordinates, so the same inner product with themselves.
+theorem Plane.distance_symmetric (p q : Plane.Point)
+        : Plane.distance(p, q) = Plane.distance(q, p) := {
+  0 ≤ Plane.Vector.norm(q - p) by Plane.Vector.norm_nonneg;
+  0 ≤ Plane.Vector.norm(p - q) by Plane.Vector.norm_nonneg;
+  Plane.Vector.first(p - q)
+      = Plane.Point.first(p) - Plane.Point.first(q)
+      by Plane.Point.first_difference;
+  Plane.Vector.first(q - p)
+      = Plane.Point.first(q) - Plane.Point.first(p)
+      by Plane.Point.first_difference;
+  Plane.Vector.second(p - q)
+      = Plane.Point.second(p) - Plane.Point.second(q)
+      by Plane.Point.second_difference;
+  Plane.Vector.second(q - p)
+      = Plane.Point.second(q) - Plane.Point.second(p)
+      by Plane.Point.second_difference;
+  -- Expanded into coordinates before `ring`: it reads a projection of a
+  -- compound as an opaque atom, so the difference vectors have to be gone
+  -- by the time it runs.
+  Plane.Vector.norm(q - p) * Plane.Vector.norm(q - p)
+     = Plane.Vector.innerProduct(q - p, q - p) by Plane.Vector.norm_squared
+     = Plane.Vector.first(q - p) * Plane.Vector.first(q - p)
+           + Plane.Vector.second(q - p) * Plane.Vector.second(q - p)
+     = (Plane.Point.first(q) - Plane.Point.first(p))
+           * (Plane.Point.first(q) - Plane.Point.first(p))
+       + (Plane.Point.second(q) - Plane.Point.second(p))
+           * (Plane.Point.second(q) - Plane.Point.second(p))
+     = (Plane.Point.first(p) - Plane.Point.first(q))
+           * (Plane.Point.first(p) - Plane.Point.first(q))
+       + (Plane.Point.second(p) - Plane.Point.second(q))
+           * (Plane.Point.second(p) - Plane.Point.second(q)) by ring
+     = Plane.Vector.first(p - q) * Plane.Vector.first(p - q)
+           + Plane.Vector.second(p - q) * Plane.Vector.second(p - q)
+     = Plane.Vector.innerProduct(p - q, p - q)
+     = Plane.Vector.norm(p - q) * Plane.Vector.norm(p - q)
+           by Plane.Vector.norm_squared;
+  Plane.Vector.norm(q - p) = Plane.Vector.norm(p - q)
+      by Real.equal_of_square_equal_nonneg;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The separation lemma.
+
+theorem Plane.compact_separation (regionA regionB : Set(Plane.Point))
+        (compactA : Plane.IsCompact(regionA))
+        (compactB : Plane.IsCompact(regionB))
+        (disjoint : ∀ (x : Plane.Point). x ∈ regionA → ¬(x ∈ regionB))
+        : ∃ (gap : ℝ). 0 < gap ∧
+            ∀ (a : Plane.Point). a ∈ regionA →
+              ∀ (b : Plane.Point). b ∈ regionB →
+                gap ≤ Plane.distance(a, b) := {
+  suppose ¬(∃ (gap : ℝ). 0 < gap ∧
+      ∀ (a : Plane.Point). a ∈ regionA →
+        ∀ (b : Plane.Point). b ∈ regionB →
+          gap ≤ Plane.distance(a, b)) as noGap for contradiction {
+
+    -- No gap works, so every scale is beaten by some pair.
+    ∀ (n : ℕ). ∃ (a : Plane.Point). a ∈ regionA ∧
+        ∃ (b : Plane.Point). b ∈ regionB
+            ∧ Plane.distance(a, b) < Real.harmonic_term(n)
+        by (n : ℕ) ↦ {
+          Real.harmonic_term(n) > 0 by Real.divide_positive;
+          suppose ¬(∃ (a : Plane.Point). a ∈ regionA ∧
+              ∃ (b : Plane.Point). b ∈ regionB
+                  ∧ Plane.distance(a, b) < Real.harmonic_term(n))
+              as noClosePair for contradiction {
+            ∀ (a : Plane.Point). a ∈ regionA →
+              ∀ (b : Plane.Point). b ∈ regionB →
+                Real.harmonic_term(n) ≤ Plane.distance(a, b)
+                by (a : Plane.Point) (inA : a ∈ regionA)
+                   (b : Plane.Point) (inB : b ∈ regionB) ↦ {
+                  suppose ¬(Real.harmonic_term(n) ≤ Plane.distance(a, b))
+                      as close for contradiction {
+                    Plane.distance(a, b) < Real.harmonic_term(n)
+                        by Real.LessThan_of_not_LessOrEqual;
+                    ∃ (b : Plane.Point). b ∈ regionB
+                        ∧ Plane.distance(a, b) < Real.harmonic_term(n)
+                        by { witness b with done };
+                    ∃ (a : Plane.Point). a ∈ regionA ∧
+                        ∃ (b : Plane.Point). b ∈ regionB
+                            ∧ Plane.distance(a, b) < Real.harmonic_term(n)
+                        by { witness a with done };
+                    done
+                  };
+                  done
+                };
+            ∃ (gap : ℝ). 0 < gap ∧
+                ∀ (a : Plane.Point). a ∈ regionA →
+                  ∀ (b : Plane.Point). b ∈ regionB →
+                    gap ≤ Plane.distance(a, b)
+                by { witness Real.harmonic_term(n) with done };
+            done
+          };
+          done
+        }
+        as closePairs;
+
+    -- First choice: the point of `A`.
+    choose a such that
+        ∀ (n : ℕ). a(n) ∈ regionA ∧
+            ∃ (b : Plane.Point). b ∈ regionB
+                ∧ Plane.distance(a(n), b) < Real.harmonic_term(n)
+        as chosenA
+        from Logic.countable_choice(
+            Plane.Point,
+            (n : ℕ) (x : Plane.Point) ↦ x ∈ regionA ∧
+                ∃ (b : Plane.Point). b ∈ regionB
+                    ∧ Plane.distance(x, b) < Real.harmonic_term(n),
+            closePairs);
+    ∀ (m : ℕ). a(m) ∈ regionA
+        by (m : ℕ) ↦ { a(m) ∈ regionA ∧
+                         ∃ (b : Plane.Point). b ∈ regionB
+                             ∧ Plane.distance(a(m), b)
+                                   < Real.harmonic_term(m) by chosenA(m);
+                       done }
+        as insideA;
+
+    -- Second choice: its partner in `B`.
+    ∀ (n : ℕ). ∃ (y : Plane.Point). y ∈ regionB
+        ∧ Plane.distance(a(n), y) < Real.harmonic_term(n)
+        by (n : ℕ) ↦ {
+          a(n) ∈ regionA ∧
+              ∃ (b : Plane.Point). b ∈ regionB
+                  ∧ Plane.distance(a(n), b) < Real.harmonic_term(n)
+              by chosenA(n);
+          done
+        }
+        as partners;
+    choose b such that
+        ∀ (n : ℕ). b(n) ∈ regionB
+            ∧ Plane.distance(a(n), b(n)) < Real.harmonic_term(n)
+        as chosenB
+        from Logic.countable_choice(
+            Plane.Point,
+            (n : ℕ) (y : Plane.Point) ↦ y ∈ regionB
+                ∧ Plane.distance(a(n), y) < Real.harmonic_term(n),
+            partners);
+    ∀ (m : ℕ). b(m) ∈ regionB
+        by (m : ℕ) ↦ { b(m) ∈ regionB
+                           ∧ Plane.distance(a(m), b(m))
+                                 < Real.harmonic_term(m) by chosenB(m);
+                       done }
+        as insideB;
+
+    -- Thin twice: once so `a` converges, once more so `b` does.
+    choose firstIndex such that
+        ∃ (limit : Plane.Point).
+            Natural.IsStrictlyIncreasing(firstIndex)
+            ∧ limit ∈ regionA
+            ∧ Plane.SequenceConverges((k : ℕ) ↦ a(firstIndex(k)), limit)
+        as limitAExists from compactA(a, insideA);
+    choose limitA such that
+        Natural.IsStrictlyIncreasing(firstIndex)
+        ∧ limitA ∈ regionA
+        ∧ Plane.SequenceConverges((k : ℕ) ↦ a(firstIndex(k)), limitA)
+        from limitAExists;
+    Natural.IsStrictlyIncreasing(firstIndex) as firstIncreasing;
+    limitA ∈ regionA as limitAInside;
+    Plane.SequenceConverges((k : ℕ) ↦ a(firstIndex(k)), limitA) as toLimitA;
+
+    choose secondIndex such that
+        ∃ (limit : Plane.Point).
+            Natural.IsStrictlyIncreasing(secondIndex)
+            ∧ limit ∈ regionB
+            ∧ Plane.SequenceConverges(
+                  (k : ℕ) ↦ b(firstIndex(secondIndex(k))), limit)
+        as limitBExists
+        from compactB((k : ℕ) ↦ b(firstIndex(k)),
+                      (k : ℕ) ↦ insideB(firstIndex(k)));
+    choose limitB such that
+        Natural.IsStrictlyIncreasing(secondIndex)
+        ∧ limitB ∈ regionB
+        ∧ Plane.SequenceConverges(
+              (k : ℕ) ↦ b(firstIndex(secondIndex(k))), limitB)
+        from limitBExists;
+    Natural.IsStrictlyIncreasing(secondIndex) as secondIncreasing;
+    limitB ∈ regionB;
+    Plane.SequenceConverges(
+        (k : ℕ) ↦ b(firstIndex(secondIndex(k))), limitB) as toLimitB;
+    Plane.SequenceConverges(
+        (k : ℕ) ↦ a(firstIndex(secondIndex(k))), limitA)
+        by Plane.SequenceConverges.subsequence(
+            (k : ℕ) ↦ a(firstIndex(k)), limitA, secondIndex,
+            toLimitA, secondIncreasing)
+        as toLimitAThinned;
+
+    -- The two limits are at distance zero.
+    ∀ (tolerance : ℝ). 0 < tolerance →
+        Plane.distance(limitA, limitB) < tolerance
+        by (tolerance : ℝ) (tolerancePositive : 0 < tolerance) ↦ {
+          (4 : ℝ) ≠ 0;
+          0 < tolerance / 4 by Real.divide_positive;
+          choose thresholdA such that
+              ∀ (k : ℕ). thresholdA ≤ k →
+                  Plane.distance(limitA, a(firstIndex(secondIndex(k))))
+                      < tolerance / 4
+              as closeA
+              from toLimitAThinned(tolerance / 4, { 0 < tolerance / 4 });
+          choose thresholdB such that
+              ∀ (k : ℕ). thresholdB ≤ k →
+                  Plane.distance(limitB, b(firstIndex(secondIndex(k))))
+                      < tolerance / 4
+              as closeB
+              from toLimitB(tolerance / 4, { 0 < tolerance / 4 });
+          choose scale such that Real.harmonic_term(scale) < tolerance / 4
+              from Real.exists_harmonic_term_below(
+                  tolerance / 4, { 0 < tolerance / 4 });
+          let far : ℕ :=
+              Natural.maximum(Natural.maximum(thresholdA, thresholdB), scale);
+          Natural.maximum(thresholdA, thresholdB) ≤ far;
+          thresholdA ≤ Natural.maximum(thresholdA, thresholdB);
+          thresholdB ≤ Natural.maximum(thresholdA, thresholdB);
+          thresholdA ≤ far;
+          thresholdB ≤ far;
+          scale ≤ far;
+          let deep : ℕ := firstIndex(secondIndex(far));
+          Plane.distance(limitA, a(deep)) < tolerance / 4
+              by closeA(far, { thresholdA ≤ far });
+          Plane.distance(limitB, b(deep)) < tolerance / 4
+              by closeB(far, { thresholdB ≤ far });
+          b(deep) ∈ regionB ∧ Plane.distance(a(deep), b(deep))
+              < Real.harmonic_term(deep) by chosenB(deep);
+          Plane.distance(a(deep), b(deep)) < Real.harmonic_term(deep);
+          -- The middle term is under a harmonic term at an index at least
+          -- `far`, hence at least `scale`.
+          far ≤ deep
+              by Natural.IsStrictlyIncreasing.LessOrEqual(
+                  (k : ℕ) ↦ firstIndex(secondIndex(k)),
+                  Natural.IsStrictlyIncreasing.compose(
+                      firstIndex, secondIndex,
+                      firstIncreasing, secondIncreasing),
+                  far);
+          scale ≤ deep;
+          Real.harmonic_term(deep) ≤ Real.harmonic_term(scale)
+              by Real.harmonic_term_antitone;
+          Plane.distance(a(deep), b(deep)) < tolerance / 4;
+          Plane.distance(limitB, b(deep)) = Plane.distance(b(deep), limitB)
+              by Plane.distance_symmetric;
+          tolerance / 4 + tolerance / 4 + tolerance / 4
+              < tolerance / 4 + tolerance / 4 + tolerance / 4 + tolerance / 4;
+          tolerance / 4 + tolerance / 4 + tolerance / 4 + tolerance / 4
+              = tolerance by Real.divide_four_quarters;
+          Plane.distance(a(deep), limitB)
+              ≤ Plane.distance(a(deep), b(deep))
+                    + Plane.distance(b(deep), limitB)
+              by Plane.distance_triangle;
+          Plane.distance(limitA, limitB)
+             ≤ Plane.distance(limitA, a(deep)) + Plane.distance(a(deep), limitB)
+                   by Plane.distance_triangle
+             ≤ Plane.distance(limitA, a(deep))
+                   + (Plane.distance(a(deep), b(deep))
+                          + Plane.distance(b(deep), limitB))
+             = Plane.distance(limitA, a(deep))
+                   + Plane.distance(a(deep), b(deep))
+                   + Plane.distance(b(deep), limitB) by ring
+             < tolerance / 4 + tolerance / 4 + tolerance / 4
+             < tolerance;
+          done
+        }
+        as arbitrarilyClose;
+    0 ≤ Plane.distance(limitA, limitB) by Plane.distance_nonneg;
+    abs(Plane.distance(limitA, limitB)) = Plane.distance(limitA, limitB)
+        by Real.absolute_value_when_nonneg;
+    ∀ (tolerance : ℝ). 0 < tolerance →
+        abs(Plane.distance(limitA, limitB)) < tolerance
+        by (tolerance : ℝ) (tolerancePositive : 0 < tolerance) ↦ {
+          Plane.distance(limitA, limitB) < tolerance
+              by arbitrarilyClose(tolerance, tolerancePositive);
+          done
+        };
+    Plane.distance(limitA, limitB) = 0
+        by Real.eq_of_absolute_value_less_than_all_positive_real;
+    limitA = limitB by Plane.equal_of_distance_zero;
+    limitA ∈ regionB;
+    ¬(limitA ∈ regionB) by disjoint(limitA, limitAInside);
+    done
+  };
+  done
+}
