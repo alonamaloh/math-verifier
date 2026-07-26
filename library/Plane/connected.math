@@ -113,7 +113,7 @@ theorem Plane.OpenIn.preimage
         by (y : Plane.Point) (inCarrierY : y ∈ carrier)
            (near : Plane.distance(x, y) < nearness) ↦ {
           Plane.distance(f(x), f(y)) < radius
-              by nearbyPointsMoveLittle(y, inCarrierY, near);
+              by nearbyPointsMoveLittle;
           f(y) ∈ Plane.imageSet(f, carrier) by { witness y with done };
           f(y) ∈ target
               by nearbyValuesHit(f(y),
@@ -213,8 +213,8 @@ theorem Plane.IsConnected.image
   Plane.OpenIn(carrier ∖ Plane.preimageIn(f, piece, carrier), carrier);
 
   -- The piece has a point, and that point is a value.
-  choose value such that value ∈ piece as valueInPiece from pieceNonempty;
-  value ∈ Plane.imageSet(f, carrier) by pieceInImage(value, valueInPiece);
+  choose value such that value ∈ piece from pieceNonempty;
+  value ∈ Plane.imageSet(f, carrier) by pieceInImage;
   choose source such that source ∈ carrier ∧ f(source) = value
       from { value ∈ Plane.imageSet(f, carrier) };
   source ∈ carrier;
@@ -278,8 +278,8 @@ theorem Plane.OpenIn.restrict
         Plane.distance(x, y) < radius → y ∈ piece ∩ smaller
         by (y : Plane.Point) (inSmaller : y ∈ smaller)
            (near : Plane.distance(x, y) < radius) ↦ {
-          y ∈ carrier by inside(y, inSmaller);
-          y ∈ piece by nearbyInPiece(y, { y ∈ carrier }, near);
+          y ∈ carrier by inside;
+          y ∈ piece by nearbyInPiece;
           done        };
     done
   }
@@ -294,9 +294,9 @@ theorem Plane.difference_intersection
   smaller ∖ (piece ∩ smaller) ⊆ (larger ∖ piece) ∩ smaller
       by (x : Plane.Point)
          (outside : x ∈ smaller ∖ (piece ∩ smaller)) ↦ {
-        x ∈ smaller as inSmaller;
+        x ∈ smaller;
         ¬(x ∈ piece ∩ smaller);
-        x ∈ larger by inside(x, inSmaller);
+        x ∈ larger by inside;
         ¬(x ∈ piece)
             by (inPiece : x ∈ piece) ↦ {
               x ∈ piece ∩ smaller;
@@ -335,21 +335,14 @@ theorem Plane.IsConnected.swallows
         (restOpen : Plane.OpenIn(whole ∖ piece, whole))
         (meets : Set.IsNonempty(Plane.Point, piece ∩ part))
         : part ⊆ piece := {
-  Plane.OpenIn(piece ∩ part, part)
-      by Plane.OpenIn.restrict(piece, whole, part, pieceOpen, partInside);
+  Plane.OpenIn(piece ∩ part, part) by Plane.OpenIn.restrict(carrier := whole);
   part ∖ (piece ∩ part) = (whole ∖ piece) ∩ part
-      by Plane.difference_intersection(whole, part, piece, partInside);
+      by Plane.difference_intersection;
   Plane.OpenIn((whole ∖ piece) ∩ part, part)
-      by Plane.OpenIn.restrict(
-          whole ∖ piece, whole, part, restOpen, partInside);
+      by Plane.OpenIn.restrict(carrier := whole);
   Plane.OpenIn(part ∖ (piece ∩ part), part);
   piece ∩ part ⊆ part by Set.intersection_subset_right;
-  piece ∩ part = part
-      by partConnected(piece ∩ part,
-          { piece ∩ part ⊆ part },
-          { Plane.OpenIn(piece ∩ part, part) },
-          { Plane.OpenIn(part ∖ (piece ∩ part), part) },
-          meets);
+  piece ∩ part = part by partConnected;
   part = piece ∩ part;
   take x : Plane.Point;
   suppose x ∈ part;
@@ -380,17 +373,14 @@ theorem Plane.IsConnected.union
   right ⊆ left ∪ right by Set.subset_union_right;
 
   -- Whichever side the piece meets, the shared point ends up inside it.
-  choose start such that start ∈ piece as startInPiece from pieceNonempty;
-  start ∈ left ∪ right by pieceInside(start, startInPiece);
+  choose start such that start ∈ piece from pieceNonempty;
+  start ∈ left ∪ right by pieceInside;
   shared ∈ piece by cases {
     case start ∈ left as startInLeft: {
         Set.IsNonempty(Plane.Point, piece ∩ left)
             by { witness start with done };
         left ⊆ piece
-            by Plane.IsConnected.swallows(
-                left ∪ right, left, piece, leftConnected,
-                { left ⊆ left ∪ right }, pieceOpen, restOpen,
-                { Set.IsNonempty(Plane.Point, piece ∩ left) })
+            by Plane.IsConnected.swallows(whole := left ∪ right)
             as leftSwallowed;
         done by leftSwallowed(shared, sharedInLeft)
       }
@@ -398,10 +388,7 @@ theorem Plane.IsConnected.union
         Set.IsNonempty(Plane.Point, piece ∩ right)
             by { witness start with done };
         right ⊆ piece
-            by Plane.IsConnected.swallows(
-                left ∪ right, right, piece, rightConnected,
-                { right ⊆ left ∪ right }, pieceOpen, restOpen,
-                { Set.IsNonempty(Plane.Point, piece ∩ right) })
+            by Plane.IsConnected.swallows(whole := left ∪ right)
             as rightSwallowed;
         done by rightSwallowed(shared, sharedInRight)
       }
@@ -413,17 +400,9 @@ theorem Plane.IsConnected.union
   Set.IsNonempty(Plane.Point, piece ∩ right)
       by { witness shared with done };
   left ⊆ piece
-      by Plane.IsConnected.swallows(
-          left ∪ right, left, piece, leftConnected,
-          { left ⊆ left ∪ right }, pieceOpen, restOpen,
-          { Set.IsNonempty(Plane.Point, piece ∩ left) })
-      as leftInPiece;
+      by Plane.IsConnected.swallows(whole := left ∪ right) as leftInPiece;
   right ⊆ piece
-      by Plane.IsConnected.swallows(
-          left ∪ right, right, piece, rightConnected,
-          { right ⊆ left ∪ right }, pieceOpen, restOpen,
-          { Set.IsNonempty(Plane.Point, piece ∩ right) })
-      as rightInPiece;
+      by Plane.IsConnected.swallows(whole := left ∪ right) as rightInPiece;
   left ∪ right ⊆ piece
       by (x : Plane.Point) (inUnion : x ∈ left ∪ right) ↦ {
         done by cases {
@@ -513,7 +492,7 @@ theorem Plane.reached_supremum_inside
         : Plane.between(a, b, peak) ∈ piece := {
   Real.IsUpperBound(Plane.reachedParameters(piece, a, b), peak) as isUpperBound;
   Plane.between(a, b, peak) ∈ region
-      by convex(a, aInRegion, b, bInRegion, peak, peakLow, peakHigh);
+      by convex;
   suppose ¬(Plane.between(a, b, peak) ∈ piece)
       as outside for contradiction {
     Plane.between(a, b, peak) ∈ region ∖ piece;
@@ -537,14 +516,14 @@ theorem Plane.reached_supremum_inside
             Plane.reachedParameters(piece, a, b), peak,
             peak - Plane.parameterGap(radius, a, b), isSupremum,
             { peak - Plane.parameterGap(radius, a, b) < peak });
-    t ∈ Plane.reachedParameters(piece, a, b) as tReached;
+    t ∈ Plane.reachedParameters(piece, a, b);
     peak - Plane.parameterGap(radius, a, b) < t;
-    t ≤ peak by isUpperBound(t, tReached);
+    t ≤ peak by isUpperBound;
     (0 ≤ t ∧ t ≤ 1);
     0 ≤ t;
     t ≤ 1;
     Plane.between(a, b, t) ∈ piece;
-    Plane.between(a, b, t) ∈ region by convex(a, aInRegion, b, bInRegion, t);
+    Plane.between(a, b, t) ∈ region by convex;
     -Plane.parameterGap(radius, a, b) < t - peak;
     t - peak < Plane.parameterGap(radius, a, b);
     abs(t - peak) < Plane.parameterGap(radius, a, b)
@@ -629,8 +608,8 @@ theorem Plane.reached_supremum_is_one
                   Plane.between(a, b, peak),
                   Plane.between(a, b, peak + room / 2)) < radius });
     (0 ≤ peak + room / 2 ∧ peak + room / 2 ≤ 1);
-    peak + room / 2 ∈ Plane.reachedParameters(piece, a, b) as stepReached;
-    peak + room / 2 ≤ peak by isUpperBound(peak + room / 2, stepReached);
+    peak + room / 2 ∈ Plane.reachedParameters(piece, a, b);
+    peak + room / 2 ≤ peak by isUpperBound;
     peak < peak + room / 2;
     done
   };
@@ -645,8 +624,8 @@ theorem Plane.IsConvex.connected (region : Set(Plane.Point))
   suppose Plane.OpenIn(piece, region) as pieceOpen;
   suppose Plane.OpenIn(region ∖ piece, region) as restOpen;
   suppose Set.IsNonempty(Plane.Point, piece) as pieceNonempty;
-  choose start such that start ∈ piece as startInPiece from pieceNonempty;
-  start ∈ region by pieceInside(start, startInPiece);
+  choose start such that start ∈ piece from pieceNonempty;
+  start ∈ region by pieceInside;
 
   region ⊆ piece
       by (target : Plane.Point) (targetInRegion : target ∈ region) ↦ {
@@ -747,13 +726,9 @@ theorem Plane.IsConnected.lands_in_side
         : part ⊆ left := {
   part ⊆ Set.universe(Plane.Point) by Set.subset_universe;
   Plane.OpenIn(left ∩ part, part)
-      by Plane.OpenIn.restrict(
-          left, Set.universe(Plane.Point), part, leftOpen,
-          { part ⊆ Set.universe(Plane.Point) });
+      by Plane.OpenIn.restrict(carrier := Set.universe(Plane.Point));
   Plane.OpenIn(right ∩ part, part)
-      by Plane.OpenIn.restrict(
-          right, Set.universe(Plane.Point), part, rightOpen,
-          { part ⊆ Set.universe(Plane.Point) });
+      by Plane.OpenIn.restrict(carrier := Set.universe(Plane.Point));
 
   -- What the left side leaves of `part` is exactly what the right side
   -- catches, so the leftover is relatively open too.
@@ -818,9 +793,7 @@ theorem Plane.IsConnected.lands_in_one_side
         Set.IsNonempty(Plane.Point, left ∩ part)
             by { witness start with done };
         part ⊆ left
-            by Plane.IsConnected.lands_in_side(
-                part, left, right, partConnected, leftOpen, rightOpen, apart,
-                covered, { Set.IsNonempty(Plane.Point, left ∩ part) });
+            by Plane.IsConnected.lands_in_side(right := right);
         done
       }
     case start ∈ right as startInRight: {
@@ -840,11 +813,7 @@ theorem Plane.IsConnected.lands_in_one_side
         Set.IsNonempty(Plane.Point, right ∩ part)
             by { witness start with done };
         part ⊆ right
-            by Plane.IsConnected.lands_in_side(
-                part, right, left, partConnected, rightOpen, leftOpen,
-                { ∀ (x : Plane.Point). x ∈ right → ¬(x ∈ left) },
-                { part ⊆ right ∪ left },
-                { Set.IsNonempty(Plane.Point, right ∩ part) });
+            by Plane.IsConnected.lands_in_side(right := left);
         done
       }
   }
@@ -874,13 +843,13 @@ theorem Plane.IsConnected.adjoin_limits
   suppose Set.IsNonempty(Plane.Point, piece) as pieceNonempty;
 
   -- The piece reaches the core, so it holds all of it.
-  choose start such that start ∈ piece as startInPiece from pieceNonempty;
-  start ∈ wide by pieceInside(start, startInPiece) as startInWide;
+  choose start such that start ∈ piece from pieceNonempty;
+  start ∈ wide by pieceInside as startInWide;
   choose radius such that
       0 < radius ∧
         ∀ (y : Plane.Point). y ∈ wide →
           Plane.distance(start, y) < radius → y ∈ piece
-      from pieceOpen(start, startInPiece);
+      from pieceOpen(start, { start ∈ piece });
   0 < radius as radiusPositive;
   ∀ (y : Plane.Point). y ∈ wide →
       Plane.distance(start, y) < radius → y ∈ piece as nearbyInPiece;

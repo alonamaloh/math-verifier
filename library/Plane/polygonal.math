@@ -215,19 +215,16 @@ theorem Plane.polygonal_connected
         (target : Plane.Point) (targetInRegion : target ∈ region)
         : Plane.PolygonalReach(region, source, target) := {
   Plane.PolygonalReach(region, source, source)
-      by Plane.PolygonalReach.arrived(region, source);
+      by Plane.PolygonalReach.arrived;
   source ∈ Plane.reachableFrom(region, source);
   Set.IsNonempty(Plane.Point, Plane.reachableFrom(region, source))
       by { witness source with done };
-  Plane.reachableFrom(region, source) = region
-      by regionConnected(Plane.reachableFrom(region, source),
-          Plane.reachableFrom_subset(region, source, sourceInRegion),
-          Plane.reachableFrom_OpenIn(
-              region, regionOpen, source, sourceInRegion),
-          Plane.reachableFrom_ClosedIn(
-              region, regionOpen, source, sourceInRegion),
-          { Set.IsNonempty(
-                Plane.Point, Plane.reachableFrom(region, source)) });
+  Plane.reachableFrom(region, source) ⊆ region by Plane.reachableFrom_subset;
+  Plane.OpenIn(Plane.reachableFrom(region, source), region)
+      by Plane.reachableFrom_OpenIn;
+  Plane.OpenIn(region ∖ Plane.reachableFrom(region, source), region)
+      by Plane.reachableFrom_ClosedIn;
+  Plane.reachableFrom(region, source) = region by regionConnected;
   region = Plane.reachableFrom(region, source);
   target ∈ Plane.reachableFrom(region, source) by Set.member_of_equal;
   done
@@ -317,9 +314,7 @@ theorem Plane.IsRegion.polygonal_connected
         (source : Plane.Point) (sourceInRegion : source ∈ region)
         (target : Plane.Point) (targetInRegion : target ∈ region)
         : Plane.PolygonalReach(region, source, target) := {
-  Plane.IsOpen(region) as regionOpen;
-  Plane.IsConnected(region) as regionConnected;
-  done by Plane.polygonal_connected(
-      region, regionOpen, regionConnected, source, sourceInRegion, target,
-      targetInRegion)
+  Plane.IsOpen(region);
+  Plane.IsConnected(region);
+  done by Plane.polygonal_connected
 }
