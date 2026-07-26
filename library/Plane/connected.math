@@ -574,3 +574,160 @@ theorem Plane.reached_supremum_inside
   };
   done
 }
+
+-- The supremum is 1. If it were short of 1 the piece is open around the
+-- walk there, so a parameter a little past the supremum lands in the
+-- piece too — and a parameter past the supremum that belongs to the set
+-- is not what a supremum allows.
+theorem Plane.reached_supremum_is_one
+        (region piece : Set(Plane.Point)) (a b : Plane.Point) (peak : ℝ)
+        (convex : Plane.IsConvex(region))
+        (aInRegion : a ∈ region) (bInRegion : b ∈ region)
+        (pieceOpen : Plane.OpenIn(piece, region))
+        (isSupremum : Real.IsSupremum(Plane.reachedParameters(piece, a, b), peak))
+        (peakLow : 0 ≤ peak) (peakHigh : peak ≤ 1)
+        (peakInside : Plane.between(a, b, peak) ∈ piece)
+        : peak = 1 := {
+  Real.IsUpperBound(Plane.reachedParameters(piece, a, b), peak) as isUpperBound;
+  suppose ¬(peak = 1) as short for contradiction {
+    peak ≤ 1;
+    ¬(peak = 1);
+    peak < 1;
+    0 < 1 - peak;
+    choose radius such that
+        0 < radius ∧
+        ∀ (y : Plane.Point). y ∈ region →
+          Plane.distance(Plane.between(a, b, peak), y) < radius
+            → y ∈ piece
+        from pieceOpen(Plane.between(a, b, peak), peakInside);
+    0 < radius;
+    ∀ (y : Plane.Point). y ∈ region →
+        Plane.distance(Plane.between(a, b, peak), y) < radius
+          → y ∈ piece as nearbyInside;
+    0 < Plane.parameterGap(radius, a, b) by Plane.parameterGap_positive;
+
+    -- A step short of both the room left and the gap that keeps the walk
+    -- inside the ball. Halving is what makes both comparisons strict.
+    (2 : ℝ) ≠ 0;
+    let room : ℝ := min(1 - peak, Plane.parameterGap(radius, a, b));
+    0 < room by Real.minimum_positive;
+    room / 2 < room by Real.divide_two_less_than_self;
+    room ≤ 1 - peak by Real.minimum_LessOrEqual_left;
+    room ≤ Plane.parameterGap(radius, a, b) by Real.minimum_LessOrEqual_right;
+    room / 2 < 1 - peak;
+    room / 2 < Plane.parameterGap(radius, a, b);
+    0 < room / 2 by Real.divide_positive;
+
+    0 ≤ peak + room / 2;
+    peak + room / 2 ≤ 1;
+    Plane.between(a, b, peak + room / 2) ∈ region
+        by convex(a, aInRegion, b, bInRegion, peak + room / 2);
+    (peak + room / 2) - peak = room / 2 by ring as stepGap;
+    abs(room / 2) = room / 2
+        by Real.absolute_value_when_nonneg as absStep;
+    abs((peak + room / 2) - peak)
+       = abs(room / 2) by stepGap
+       = room / 2 by absStep
+       < Plane.parameterGap(radius, a, b);
+    Plane.distance(
+        Plane.between(a, b, peak), Plane.between(a, b, peak + room / 2))
+        < radius by Plane.between_close_of_gap;
+    Plane.between(a, b, peak + room / 2) ∈ piece
+        by nearbyInside(Plane.between(a, b, peak + room / 2),
+            { Plane.between(a, b, peak + room / 2) ∈ region },
+            { Plane.distance(
+                  Plane.between(a, b, peak),
+                  Plane.between(a, b, peak + room / 2)) < radius });
+    (0 ≤ peak + room / 2 ∧ peak + room / 2 ≤ 1);
+    peak + room / 2 ∈ Plane.reachedParameters(piece, a, b) as stepReached;
+    peak + room / 2 ≤ peak by isUpperBound(peak + room / 2, stepReached);
+    peak < peak + room / 2;
+    done
+  };
+  done
+}
+
+theorem Plane.IsConvex.connected (region : Set(Plane.Point))
+        (convex : Plane.IsConvex(region))
+        : Plane.IsConnected(region) := {
+  take piece : Set(Plane.Point);
+  suppose piece ⊆ region as pieceInside;
+  suppose Plane.OpenIn(piece, region) as pieceOpen;
+  suppose Plane.OpenIn(region ∖ piece, region) as restOpen;
+  suppose Set.IsNonempty(Plane.Point, piece) as pieceNonempty;
+  choose start such that start ∈ piece as startInPiece from pieceNonempty;
+  start ∈ region by pieceInside(start, startInPiece);
+
+  region ⊆ piece
+      by (target : Plane.Point) (targetInRegion : target ∈ region) ↦ {
+        -- The parameters that have landed hold 0 and stop at 1.
+        Plane.between(start, target, 0) = start by Plane.between_zero;
+        (0 : ℝ) ∈ Plane.reachedParameters(piece, start, target)
+            by { (0 : ℝ) ≤ 0;
+                 (0 : ℝ) ≤ 1;
+                 Plane.between(start, target, 0) ∈ piece;
+                 done };
+        Set.IsNonempty(ℝ, Plane.reachedParameters(piece, start, target))
+            by { witness (0 : ℝ) with done };
+        Real.IsUpperBound(
+            Plane.reachedParameters(piece, start, target), (1 : ℝ))
+            by (t : ℝ)
+               (reached : t ∈ Plane.reachedParameters(piece, start, target)) ↦ {
+              (0 ≤ t ∧ t ≤ 1);
+              done
+            };
+        Real.IsBoundedAbove(Plane.reachedParameters(piece, start, target))
+            by { witness (1 : ℝ) with done };
+        choose peak such that
+            Real.IsSupremum(
+                Plane.reachedParameters(piece, start, target), peak)
+            as isSupremum
+            from Real.supremum_exists(
+                Plane.reachedParameters(piece, start, target),
+                { Set.IsNonempty(
+                      ℝ, Plane.reachedParameters(piece, start, target)) },
+                { Real.IsBoundedAbove(
+                      Plane.reachedParameters(piece, start, target)) });
+        Real.IsUpperBound(
+            Plane.reachedParameters(piece, start, target), peak)
+            as isUpperBound;
+
+        -- It sits in the unit interval …
+        (0 : ℝ) ≤ peak
+            by isUpperBound((0 : ℝ),
+                { (0 : ℝ) ∈ Plane.reachedParameters(piece, start, target) });
+        ∀ (otherBound : ℝ).
+            Real.IsUpperBound(
+                Plane.reachedParameters(piece, start, target), otherBound)
+            → peak ≤ otherBound as isLeast;
+        peak ≤ 1
+            by isLeast((1 : ℝ),
+                { Real.IsUpperBound(
+                      Plane.reachedParameters(piece, start, target),
+                      (1 : ℝ)) });
+
+        -- … the walk there has landed, and it is the end of the walk.
+        Plane.between(start, target, peak) ∈ piece
+            by Plane.reached_supremum_inside(
+                region, piece, start, target, peak, convex,
+                { start ∈ region }, targetInRegion, restOpen,
+                isSupremum, { (0 : ℝ) ≤ peak }, { peak ≤ 1 });
+        peak = 1
+            by Plane.reached_supremum_is_one(
+                region, piece, start, target, peak, convex,
+                { start ∈ region }, targetInRegion, pieceOpen,
+                isSupremum, { (0 : ℝ) ≤ peak }, { peak ≤ 1 },
+                { Plane.between(start, target, peak) ∈ piece });
+        Plane.between(start, target, 1) = target by Plane.between_one;
+        Plane.between(start, target, 1) ∈ piece;
+        done
+      };
+  done by Set.equal_of_same_members
+}
+
+-- A disk is connected, being convex. This is what makes the components
+-- of an open set open, which is where Layer 3 is going.
+theorem Plane.Ball_IsConnected (center : Plane.Point) (radius : ℝ)
+        : Plane.IsConnected(Plane.Ball(center, radius)) :=
+  Plane.IsConvex.connected(
+      Plane.Ball(center, radius), Plane.Ball_IsConvex(center, radius))
