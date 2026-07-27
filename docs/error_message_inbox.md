@@ -2079,3 +2079,24 @@ they landed in, say both carriers. The deeper alternative — seed an
 unanchored claim from the ambient goal's carrier — is the same root cause as
 the numeral-arithmetic case fixed in `PLAN_ELABORATOR_ERGONOMICS` E2 and
 belongs with that work, not with a message change.
+
+**OPEN — `by <fact>` without parentheses reports the fact's TYPE, not the
+parse.** Layer 4, `concatenate.math`. The cite-a-proposition form needs
+parentheses around the whole proposition:
+
+```math
+= Plane.walk(1) by ((2 : ℝ) * 1 + -(1 : ℝ) = 1)     -- verifies
+= Plane.walk(1) by (2 : ℝ) * 1 + -(1 : ℝ) = 1       -- rejected
+```
+
+Without them the `by` argument is parsed as a *term*, and the diagnostic is
+
+```
+this step's justification proves a different relation than the step claims
+  this step claims:    (Plane.walk (2 * 1 - 1)) = (Plane.walk 1)
+  but its proof shows: Real
+```
+
+"its proof shows: Real" is the type of the parsed term — accurate and
+useless. A justification that elaborates to a non-`Prop` is always a parse
+accident; the message should say so and suggest the parenthesised form.

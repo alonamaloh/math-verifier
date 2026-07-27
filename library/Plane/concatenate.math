@@ -49,10 +49,7 @@ import Plane.subarc
 -- Retiming: the affine reparametrisation of the model interval.
 
 definition Plane.retime (scale shift : ℝ) : Plane.Point → Plane.Point :=
-  (x : Plane.Point) ↦
-    Plane.between(
-        Plane.origin, Plane.Point.make(1, 0),
-        scale * Plane.Point.first(x) + shift)
+  (x : Plane.Point) ↦ Plane.walk(scale * Plane.Point.first(x) + shift)
 
 theorem Plane.retime_parameter (scale shift : ℝ) (x : Plane.Point)
         : Plane.Point.first(Plane.retime(scale, shift)(x))
@@ -321,9 +318,9 @@ theorem Plane.concatenate_start
      < 1 / 2 by Plane.midpoint_positive;
   Plane.Point.first(Plane.origin) ≤ 1 / 2 by Real.LessThan.weaken;
   Plane.retime(2, 0)(Plane.origin)
-     = Plane.between(Plane.origin, Plane.Point.make(1, 0), 2 * 0 + 0)
-     = Plane.between(Plane.origin, Plane.Point.make(1, 0), 0)
-     = Plane.origin by Plane.between_zero as retimedStart;
+     = Plane.walk(2 * 0 + 0)
+     = Plane.walk(0)
+     = Plane.origin by Plane.walk_zero as retimedStart;
   Plane.concatenate(firstArc, secondArc)(Plane.origin)
      = firstArc(Plane.retime(2, 0)(Plane.origin)) by Logic.if_positive
      = firstArc(Plane.origin) by substituting retimedStart;
@@ -342,10 +339,9 @@ theorem Plane.concatenate_finish
         done by Real.LessThan.irreflexive
       };
   Plane.retime(2, -(1 : ℝ))(Plane.Point.make(1, 0))
-     = Plane.between(
-           Plane.origin, Plane.Point.make(1, 0), 2 * 1 + -(1 : ℝ))
-     = Plane.between(Plane.origin, Plane.Point.make(1, 0), 1)
-     = Plane.Point.make(1, 0) by Plane.between_one as retimedFinish;
+     = Plane.walk(2 * 1 + -(1 : ℝ))
+     = Plane.walk(1) by ((2 : ℝ) * 1 + -(1 : ℝ) = 1)
+     = Plane.Point.make(1, 0) by Plane.walk_one as retimedFinish;
   Plane.concatenate(firstArc, secondArc)(Plane.Point.make(1, 0))
      = secondArc(Plane.retime(2, -(1 : ℝ))(Plane.Point.make(1, 0)))
            by Logic.if_negative
@@ -420,20 +416,14 @@ theorem Plane.concatenate_value_on_upperHalf
               -- The lower branch has run out the first arc, and the upper
               -- branch is about to start the second.
               Plane.retime(2, 0)(x)
-                 = Plane.between(
-                       Plane.origin, Plane.Point.make(1, 0),
-                       2 * Plane.Point.first(x) + 0)
-                 = Plane.between(Plane.origin, Plane.Point.make(1, 0), 1)
-                       by substituting lowerParameterIsOne
-                 = Plane.Point.make(1, 0) by Plane.between_one
+                 = Plane.walk(2 * Plane.Point.first(x) + 0)
+                 = Plane.walk(1) by substituting lowerParameterIsOne
+                 = Plane.Point.make(1, 0) by Plane.walk_one
                  as lowerReachesFinish;
               Plane.retime(2, -(1 : ℝ))(x)
-                 = Plane.between(
-                       Plane.origin, Plane.Point.make(1, 0),
-                       2 * Plane.Point.first(x) + -(1 : ℝ))
-                 = Plane.between(Plane.origin, Plane.Point.make(1, 0), 0)
-                       by substituting upperParameterIsZero
-                 = Plane.origin by Plane.between_zero as upperReachesStart;
+                 = Plane.walk(2 * Plane.Point.first(x) + -(1 : ℝ))
+                 = Plane.walk(0) by substituting upperParameterIsZero
+                 = Plane.origin by Plane.walk_zero as upperReachesStart;
               Plane.concatenate(firstArc, secondArc)(x)
                  = firstArc(Plane.retime(2, 0)(x)) by Logic.if_positive
                  = firstArc(Plane.Point.make(1, 0))
@@ -561,16 +551,8 @@ theorem Plane.retime_InjectiveOn (scale shift : ℝ) (scaleNonzero : scale ≠ 0
   scale * Plane.Point.first(x) = scale * Plane.Point.first(y)
       by linear_combination(sameParameter);
   Plane.Point.first(x) = Plane.Point.first(y)
-      by Real.equal_of_multiply_left as sameCoordinate;
-  x = Plane.between(Plane.origin, Plane.Point.make(1, 0), Plane.Point.first(x))
-      by Plane.unitSegment_at_first_coordinate;
-  y = Plane.between(Plane.origin, Plane.Point.make(1, 0), Plane.Point.first(y))
-      by Plane.unitSegment_at_first_coordinate;
-  x = Plane.between(Plane.origin, Plane.Point.make(1, 0), Plane.Point.first(x))
-    = Plane.between(Plane.origin, Plane.Point.make(1, 0), Plane.Point.first(y))
-          by substituting sameCoordinate
-    = y by Equality.symmetry;
-  done
+      by Real.equal_of_multiply_left;
+  done by Plane.unitSegment_equal_of_first_coordinate
 }
 
 
@@ -734,25 +716,8 @@ theorem Plane.IsArc.concatenate
                         = Plane.arcStart(secondArc) by sharedEndpoint;
                     Plane.Point.first(y) = 1 / 2
                         by Plane.upperHalf_at_start_is_midpoint;
-                    Plane.Point.first(x) = Plane.Point.first(y)
-                        as sameCoordinate;
-                    x = Plane.between(
-                            Plane.origin, Plane.Point.make(1, 0),
-                            Plane.Point.first(x))
-                        by Plane.unitSegment_at_first_coordinate;
-                    y = Plane.between(
-                            Plane.origin, Plane.Point.make(1, 0),
-                            Plane.Point.first(y))
-                        by Plane.unitSegment_at_first_coordinate;
-                    x = Plane.between(
-                            Plane.origin, Plane.Point.make(1, 0),
-                            Plane.Point.first(x))
-                      = Plane.between(
-                            Plane.origin, Plane.Point.make(1, 0),
-                            Plane.Point.first(y))
-                            by substituting sameCoordinate
-                      = y by Equality.symmetry;
-                    done
+                    Plane.Point.first(x) = Plane.Point.first(y);
+                    done by Plane.unitSegment_equal_of_first_coordinate
                   }
               }
             }
@@ -797,25 +762,8 @@ theorem Plane.IsArc.concatenate
                         = Plane.arcStart(secondArc) by sharedEndpoint;
                     Plane.Point.first(x) = 1 / 2
                         by Plane.upperHalf_at_start_is_midpoint;
-                    Plane.Point.first(x) = Plane.Point.first(y)
-                        as sameCoordinate;
-                    x = Plane.between(
-                            Plane.origin, Plane.Point.make(1, 0),
-                            Plane.Point.first(x))
-                        by Plane.unitSegment_at_first_coordinate;
-                    y = Plane.between(
-                            Plane.origin, Plane.Point.make(1, 0),
-                            Plane.Point.first(y))
-                        by Plane.unitSegment_at_first_coordinate;
-                    x = Plane.between(
-                            Plane.origin, Plane.Point.make(1, 0),
-                            Plane.Point.first(x))
-                      = Plane.between(
-                            Plane.origin, Plane.Point.make(1, 0),
-                            Plane.Point.first(y))
-                            by substituting sameCoordinate
-                      = y by Equality.symmetry;
-                    done
+                    Plane.Point.first(x) = Plane.Point.first(y);
+                    done by Plane.unitSegment_equal_of_first_coordinate
                   }
                 otherwise as yHigh: {
                     -- Both in the second arc.
@@ -869,10 +817,7 @@ theorem Plane.lowerHalf_retime_onto (u : Plane.Point)
       by Real.LessOrEqual.multiply_by_nonneg_right;
   (1 : ℝ) * (1 / 2) ≤ 1 by ordered_field;
   Plane.Point.first(u) * (1 / 2) ≤ 1;
-  let source : Plane.Point :=
-      Plane.between(
-          Plane.origin, Plane.Point.make(1, 0),
-          Plane.Point.first(u) * (1 / 2));
+  let source : Plane.Point := Plane.walk(Plane.Point.first(u) * (1 / 2));
   source ∈ Plane.unitSegment
       by { witness Plane.Point.first(u) * (1 / 2) with done };
   Plane.Point.first(source) = Plane.Point.first(u) * (1 / 2)
@@ -884,12 +829,8 @@ theorem Plane.lowerHalf_retime_onto (u : Plane.Point)
           2 * sourceParameter + Plane.Point.first(u) * halfDoubles)
       as doubledParameter;
   Plane.retime(2, 0)(source)
-     = Plane.between(
-           Plane.origin, Plane.Point.make(1, 0),
-           2 * Plane.Point.first(source) + 0)
-     = Plane.between(
-           Plane.origin, Plane.Point.make(1, 0), Plane.Point.first(u))
-           by substituting doubledParameter
+     = Plane.walk(2 * Plane.Point.first(source) + 0)
+     = Plane.walk(Plane.Point.first(u)) by substituting doubledParameter
      = u by Plane.unitSegment_at_first_coordinate;
   done by { witness source with done }
 }
@@ -912,9 +853,7 @@ theorem Plane.upperHalf_retime_onto (u : Plane.Point)
   0 ≤ Plane.Point.first(u) * (1 / 2) + 1 / 2 by ordered_field;
   Plane.Point.first(u) * (1 / 2) + 1 / 2 ≤ 1 by ordered_field;
   let source : Plane.Point :=
-      Plane.between(
-          Plane.origin, Plane.Point.make(1, 0),
-          Plane.Point.first(u) * (1 / 2) + 1 / 2);
+      Plane.walk(Plane.Point.first(u) * (1 / 2) + 1 / 2);
   source ∈ Plane.unitSegment
       by { witness Plane.Point.first(u) * (1 / 2) + 1 / 2 with done };
   Plane.Point.first(source) = Plane.Point.first(u) * (1 / 2) + 1 / 2
@@ -927,12 +866,8 @@ theorem Plane.upperHalf_retime_onto (u : Plane.Point)
               + halfDoubles)
       as doubledParameter;
   Plane.retime(2, -(1 : ℝ))(source)
-     = Plane.between(
-           Plane.origin, Plane.Point.make(1, 0),
-           2 * Plane.Point.first(source) + -(1 : ℝ))
-     = Plane.between(
-           Plane.origin, Plane.Point.make(1, 0), Plane.Point.first(u))
-           by substituting doubledParameter
+     = Plane.walk(2 * Plane.Point.first(source) + -(1 : ℝ))
+     = Plane.walk(Plane.Point.first(u)) by substituting doubledParameter
      = u by Plane.unitSegment_at_first_coordinate;
   done by { witness source with done }
 }

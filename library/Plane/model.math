@@ -167,6 +167,23 @@ theorem Plane.segment_IsCompact (a b : Plane.Point)
 definition Plane.unitSegment : Set(Plane.Point) :=
   Plane.segment(Plane.origin, Plane.Point.make(1, 0))
 
+-- The point of the model interval at parameter `t`. Every statement about
+-- the interval is about this walk, and spelling it out as a walk between
+-- two named endpoints buries the parameter it is really about.
+definition Plane.walk (parameter : ℝ) : Plane.Point :=
+  Plane.between(Plane.origin, Plane.Point.make(1, 0), parameter)
+
+theorem Plane.walk_zero : Plane.walk(0) = Plane.origin :=
+  Plane.between_zero(Plane.origin, Plane.Point.make(1, 0))
+
+theorem Plane.walk_one : Plane.walk(1) = Plane.Point.make(1, 0) :=
+  Plane.between_one(Plane.origin, Plane.Point.make(1, 0))
+
+theorem Plane.walk_in_unitSegment (parameter : ℝ)
+        (atLeastZero : 0 ≤ parameter) (atMostOne : parameter ≤ 1)
+        : Plane.walk(parameter) ∈ Plane.unitSegment :=
+  witness parameter with done
+
 theorem Plane.unitSegment_IsCompact : Plane.IsCompact(Plane.unitSegment) :=
   Plane.segment_IsCompact(Plane.origin, Plane.Point.make(1, 0))
 
@@ -190,14 +207,11 @@ theorem Plane.unitSegment_IsConvex : Plane.IsConvex(Plane.unitSegment) :=
 
 -- The walk along the model interval is its own parameter, read off the
 -- first coordinate. No membership hypothesis: this is a computation about
--- `between`, and it holds for parameters outside the unit interval too —
+-- the walk, and it holds for parameters outside the unit interval too —
 -- which is what an affine reparametrisation needs.
 theorem Plane.first_of_walk (parameter : ℝ)
-        : Plane.Point.first(
-              Plane.between(Plane.origin, Plane.Point.make(1, 0), parameter))
-              = parameter :=
-  Plane.Point.first(
-      Plane.between(Plane.origin, Plane.Point.make(1, 0), parameter))
+        : Plane.Point.first(Plane.walk(parameter)) = parameter :=
+  Plane.Point.first(Plane.walk(parameter))
      = Plane.Point.first(Plane.origin)
            + parameter * (Plane.Point.first(Plane.Point.make(1, 0))
                               - Plane.Point.first(Plane.origin))
@@ -206,31 +220,42 @@ theorem Plane.first_of_walk (parameter : ℝ)
      = parameter by ring
 
 theorem Plane.first_coordinate_of_unitSegment (x : Plane.Point)
-        (parameter : ℝ)
-        (isWalkPoint
-            : x = Plane.between(Plane.origin, Plane.Point.make(1, 0), parameter))
+        (parameter : ℝ) (isWalkPoint : x = Plane.walk(parameter))
         : Plane.Point.first(x) = parameter :=
   Plane.Point.first(x)
-     = Plane.Point.first(
-           Plane.between(Plane.origin, Plane.Point.make(1, 0), parameter))
-           by substituting isWalkPoint
+     = Plane.Point.first(Plane.walk(parameter)) by substituting isWalkPoint
      = parameter by Plane.first_of_walk
 
 theorem Plane.unitSegment_at_first_coordinate (x : Plane.Point)
         (onSegment : x ∈ Plane.unitSegment)
-        : Plane.between(
-              Plane.origin, Plane.Point.make(1, 0), Plane.Point.first(x)) = x := {
+        : Plane.walk(Plane.Point.first(x)) = x := {
   choose parameter such that
-      (0 ≤ parameter ∧ parameter ≤ 1)
-        ∧ x = Plane.between(Plane.origin, Plane.Point.make(1, 0), parameter)
+      (0 ≤ parameter ∧ parameter ≤ 1) ∧ x = Plane.walk(parameter)
       from onSegment;
-  x = Plane.between(Plane.origin, Plane.Point.make(1, 0), parameter);
+  x = Plane.walk(parameter);
   Plane.Point.first(x) = parameter
       by Plane.first_coordinate_of_unitSegment as parameterIsFirst;
-  Plane.between(Plane.origin, Plane.Point.make(1, 0), Plane.Point.first(x))
-     = Plane.between(Plane.origin, Plane.Point.make(1, 0), parameter)
-           by substituting parameterIsFirst
+  Plane.walk(Plane.Point.first(x))
+     = Plane.walk(parameter) by substituting parameterIsFirst
      = x by Equality.symmetry;
+  done
+}
+
+-- A point of the model interval is the walk at its own first coordinate,
+-- so the first coordinate determines the point. Without this the same
+-- four-line detour through the walk gets written out at every use.
+theorem Plane.unitSegment_equal_of_first_coordinate (x y : Plane.Point)
+        (xOnSegment : x ∈ Plane.unitSegment)
+        (yOnSegment : y ∈ Plane.unitSegment)
+        (sameParameter : Plane.Point.first(x) = Plane.Point.first(y))
+        : x = y := {
+  Plane.walk(Plane.Point.first(x)) = x
+      by Plane.unitSegment_at_first_coordinate as xIsItsWalk;
+  Plane.walk(Plane.Point.first(y)) = y
+      by Plane.unitSegment_at_first_coordinate;
+  x = Plane.walk(Plane.Point.first(x)) by xIsItsWalk
+    = Plane.walk(Plane.Point.first(y)) by substituting sameParameter
+    = y;
   done
 }
 
@@ -238,11 +263,10 @@ theorem Plane.first_coordinate_nonneg_on_unitSegment (x : Plane.Point)
         (onSegment : x ∈ Plane.unitSegment)
         : 0 ≤ Plane.Point.first(x) := {
   choose parameter such that
-      (0 ≤ parameter ∧ parameter ≤ 1)
-        ∧ x = Plane.between(Plane.origin, Plane.Point.make(1, 0), parameter)
+      (0 ≤ parameter ∧ parameter ≤ 1) ∧ x = Plane.walk(parameter)
       from onSegment;
   0 ≤ parameter;
-  x = Plane.between(Plane.origin, Plane.Point.make(1, 0), parameter);
+  x = Plane.walk(parameter);
   Plane.Point.first(x) = parameter
       by Plane.first_coordinate_of_unitSegment as parameterIsFirst;
   done by substituting parameterIsFirst
@@ -252,11 +276,10 @@ theorem Plane.first_coordinate_atMostOne_on_unitSegment (x : Plane.Point)
         (onSegment : x ∈ Plane.unitSegment)
         : Plane.Point.first(x) ≤ 1 := {
   choose parameter such that
-      (0 ≤ parameter ∧ parameter ≤ 1)
-        ∧ x = Plane.between(Plane.origin, Plane.Point.make(1, 0), parameter)
+      (0 ≤ parameter ∧ parameter ≤ 1) ∧ x = Plane.walk(parameter)
       from onSegment;
   parameter ≤ 1;
-  x = Plane.between(Plane.origin, Plane.Point.make(1, 0), parameter);
+  x = Plane.walk(parameter);
   Plane.Point.first(x) = parameter
       by Plane.first_coordinate_of_unitSegment as parameterIsFirst;
   done by substituting parameterIsFirst

@@ -122,9 +122,8 @@ theorem Plane.walkOnto_reaches (a b : Plane.Point) (y : Plane.Point)
   0 ≤ parameter;
   parameter ≤ 1;
   y = Plane.between(a, b, parameter);
-  let source : Plane.Point :=
-      Plane.between(Plane.origin, Plane.Point.make(1, 0), parameter);
-  source ∈ Plane.unitSegment by { witness parameter with done };
+  let source : Plane.Point := Plane.walk(parameter);
+  source ∈ Plane.unitSegment by Plane.walk_in_unitSegment;
   Plane.Point.first(source) = parameter
       by Plane.first_coordinate_of_unitSegment;
   Plane.walkOnto(a, b)(source)
@@ -173,19 +172,8 @@ theorem Plane.walkOnto_InjectiveOn (a b : Plane.Point) (distinct : ¬(a = b))
   suppose Plane.walkOnto(a, b)(x) = Plane.walkOnto(a, b)(y) as sameWalk;
   Plane.between(a, b, Plane.Point.first(x))
       = Plane.between(a, b, Plane.Point.first(y)) by sameWalk;
-  Plane.Point.first(x) = Plane.Point.first(y)
-      by Plane.between_injective as sameParameter;
-  -- A point of the unit segment is the walk at its own first coordinate,
-  -- so equal coordinates are equal points.
-  x = Plane.between(Plane.origin, Plane.Point.make(1, 0), Plane.Point.first(x))
-      by Plane.unitSegment_at_first_coordinate;
-  y = Plane.between(Plane.origin, Plane.Point.make(1, 0), Plane.Point.first(y))
-      by Plane.unitSegment_at_first_coordinate;
-  x = Plane.between(Plane.origin, Plane.Point.make(1, 0), Plane.Point.first(x))
-    = Plane.between(Plane.origin, Plane.Point.make(1, 0), Plane.Point.first(y))
-          by substituting sameParameter
-    = y by Equality.symmetry;
-  done
+  Plane.Point.first(x) = Plane.Point.first(y) by Plane.between_injective;
+  done by Plane.unitSegment_equal_of_first_coordinate
 }
 
 -- ----------------------------------------------------------------------
@@ -214,27 +202,34 @@ theorem Plane.subarc_finish (parametrisation : Plane.Point → Plane.Point)
 -- A subarc between two distinct points of the model interval is an arc:
 -- the reparametrisation is continuous and injective onto a subsegment, and
 -- the unit segment is convex, so that subsegment is where the arc still
--- lives.
-theorem Plane.IsArc.subarc (parametrisation : Plane.Point → Plane.Point)
-        (isArc : Plane.IsArc(parametrisation))
+-- lives. Injectivity is needed only where the subarc runs — a loop has it
+-- everywhere but its finish, which is what the two arcs of a Jordan curve
+-- are cut from.
+theorem Plane.IsArc.subarc_on_subsegment
+        (parametrisation : Plane.Point → Plane.Point)
+        (continuous : Plane.ContinuousOn(parametrisation, Plane.unitSegment))
         (a b : Plane.Point)
         (aOnSegment : a ∈ Plane.unitSegment)
         (bOnSegment : b ∈ Plane.unitSegment)
         (distinct : ¬(a = b))
+        (injective
+            : Plane.InjectiveOn(parametrisation, Plane.segment(a, b)))
         : Plane.IsArc(Plane.subarc(parametrisation, a, b)) := {
-  Plane.ContinuousOn(parametrisation, Plane.unitSegment);
-  Plane.InjectiveOn(parametrisation, Plane.unitSegment) as injective;
   Plane.IsConvex(Plane.unitSegment) by Plane.unitSegment_IsConvex;
   Plane.segment(a, b) ⊆ Plane.unitSegment
       by Plane.IsConvex.segment_inside as subsegmentInside;
   ∀ (x : Plane.Point). x ∈ Plane.unitSegment →
+      Plane.walkOnto(a, b)(x) ∈ Plane.segment(a, b)
+      by (x : Plane.Point) (onSegment : x ∈ Plane.unitSegment) ↦
+           Plane.walkOnto_lands(a, b, x, onSegment)
+      as landsInSubsegment;
+  ∀ (x : Plane.Point). x ∈ Plane.unitSegment →
       Plane.walkOnto(a, b)(x) ∈ Plane.unitSegment
       by (x : Plane.Point) (onSegment : x ∈ Plane.unitSegment) ↦ {
         Plane.walkOnto(a, b)(x) ∈ Plane.segment(a, b)
-            by Plane.walkOnto_lands;
+            by landsInSubsegment;
         done by subsegmentInside
-      }
-      as landsInModel;
+      };
 
   Plane.ContinuousOn(Plane.walkOnto(a, b), Plane.unitSegment)
       by Plane.walkOnto_ContinuousOn;
@@ -252,14 +247,37 @@ theorem Plane.IsArc.subarc (parametrisation : Plane.Point → Plane.Point)
          (y : Plane.Point) (yOnSegment : y ∈ Plane.unitSegment)
          (sameValue : Plane.subarc(parametrisation, a, b)(x)
                           = Plane.subarc(parametrisation, a, b)(y)) ↦ {
-        Plane.walkOnto(a, b)(x) ∈ Plane.unitSegment by landsInModel;
-        Plane.walkOnto(a, b)(y) ∈ Plane.unitSegment by landsInModel;
+        Plane.walkOnto(a, b)(x) ∈ Plane.segment(a, b) by landsInSubsegment;
+        Plane.walkOnto(a, b)(y) ∈ Plane.segment(a, b) by landsInSubsegment;
         parametrisation(Plane.walkOnto(a, b)(x))
             = parametrisation(Plane.walkOnto(a, b)(y)) by sameValue;
         Plane.walkOnto(a, b)(x) = Plane.walkOnto(a, b)(y) by injective;
         done by walkInjective
       };
   done
+}
+
+theorem Plane.IsArc.subarc (parametrisation : Plane.Point → Plane.Point)
+        (isArc : Plane.IsArc(parametrisation))
+        (a b : Plane.Point)
+        (aOnSegment : a ∈ Plane.unitSegment)
+        (bOnSegment : b ∈ Plane.unitSegment)
+        (distinct : ¬(a = b))
+        : Plane.IsArc(Plane.subarc(parametrisation, a, b)) := {
+  Plane.ContinuousOn(parametrisation, Plane.unitSegment);
+  Plane.InjectiveOn(parametrisation, Plane.unitSegment) as injective;
+  Plane.IsConvex(Plane.unitSegment) by Plane.unitSegment_IsConvex;
+  Plane.segment(a, b) ⊆ Plane.unitSegment
+      by Plane.IsConvex.segment_inside as subsegmentInside;
+  Plane.InjectiveOn(parametrisation, Plane.segment(a, b))
+      by (x : Plane.Point) (xOnSubsegment : x ∈ Plane.segment(a, b))
+         (y : Plane.Point) (yOnSubsegment : y ∈ Plane.segment(a, b))
+         (sameValue : parametrisation(x) = parametrisation(y)) ↦ {
+        x ∈ Plane.unitSegment by subsegmentInside;
+        y ∈ Plane.unitSegment by subsegmentInside;
+        done by injective
+      };
+  done by Plane.IsArc.subarc_on_subsegment
 }
 
 -- The subarc's image is the arc restricted to the subsegment — which is
