@@ -306,16 +306,41 @@ ExpressionPointer Elaborator::elaborateExpression(
             }
             const Declaration* decl =
                 environment_.lookup(identifier->qualifiedName);
-            if (!decl) {
+            ExpressionPointer declType;
+            int implicitCount = 0;
+            if (decl) {
+                declType = declarationType(*decl);
+                implicitCount = environment_.implicitArgumentCount(
+                    identifier->qualifiedName);
+            } else {
+                // A LOCAL fact cited the same way — `choose radius … from
+                // pieceOpen`, where `pieceOpen : ∀ x. x ∈ piece → ∃ r. …`.
+                // Its ∀/→ slots become holes exactly like a lemma's, so a
+                // citation reads the same whether the fact came from the
+                // statement, an earlier claim, or the library. Without
+                // this, every such source has to be spelled as a positional
+                // application of the hypothesis.
+                for (auto binder = localBinders.rbegin();
+                     binder != localBinders.rend(); ++binder) {
+                    if (binder->name == identifier->qualifiedName) {
+                        declType = binder->type;
+                        break;
+                    }
+                }
+            }
+            if (!declType) {
                 throwElaborate("unknown lemma '" + identifier->qualifiedName
                                + "' in `by`-citation");
             }
-            ExpressionPointer declType = declarationType(*decl);
-            int totalPi = declType ? countLeadingPis(declType) : 0;
-            int implicitCount = environment_.implicitArgumentCount(
-                identifier->qualifiedName);
+            int totalPi = countLeadingPis(declType);
             int explicitCount = totalPi - implicitCount;
-            if (explicitCount <= 0) {
+            // A definition-spelled conclusion (`pieceOpen : OpenIn(piece,
+            // wide)`) shows no Pi until WHNF opens it, so the syntactic
+            // count is 0 while the fact really does take arguments. Only
+            // when BOTH counts are empty is there nothing to infer.
+            int whnfExplicitCount =
+                countLeadingPisThroughWhnf(declType) - implicitCount;
+            if (explicitCount <= 0 && whnfExplicitCount <= 0) {
                 throwElaborate("lemma '" + identifier->qualifiedName
                                + "' takes no explicit arguments to infer");
             }
@@ -379,9 +404,10 @@ ExpressionPointer Elaborator::elaborateExpression(
             // would break every negation-concluding citation. On a
             // failed retry, the stated-form outcome stands — its
             // diagnostics match what the user wrote.
-            int throughWhnf = declType
-                ? countLeadingPisThroughWhnf(declType) : 0;
-            int extendedCount = throughWhnf - implicitCount;
+            int extendedCount = whnfExplicitCount;
+            if (explicitCount <= 0) {
+                return elaborateWithHoles(extendedCount);
+            }
             try {
                 ExpressionPointer stated =
                     elaborateWithHoles(explicitCount);
