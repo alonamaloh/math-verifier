@@ -1,0 +1,213 @@
+-- Plane/polyline.math
+--
+-- Polygonal arcs, built from a vertex list. Layer 4.
+--
+-- The blueprint defines a polygonal arc set-level — "a finite union of line
+-- segments" — and then every proof that uses one *subdivides* it: at
+-- intersections, at the endpoints of overlapping intervals, deleting
+-- duplicates, handing the result to a graph. That work is list work, so the
+-- vertices are built in rather than existentially recovered:
+-- `Plane.polyline` constructs the parametrisation from the list, and
+-- `Plane.IsPolygonal` is the blueprint's set-level predicate, bridged to it
+-- by `Plane.arc_polyline`.
+--
+-- The recursion carries the walk's current position as an accumulator, so
+-- it needs neither a two-element pattern nor a fold over consecutive pairs.
+--
+-- The parametrisation is NOT constant speed: each remaining tail gets half
+-- of what is left of the model interval. Nothing in Part I needs constant
+-- speed — only the image and the order along it — and building it in would
+-- put the vertex count into the retiming coefficients.
+
+module Plane.polyline
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Set.algebra
+import Lists.list
+import Real.interface
+import Real.order
+import Plane.vector
+import Plane.point
+import Plane.norm
+import Plane.segment
+import Plane.topology
+import Plane.compactness
+import Plane.connected
+import Plane.separation
+import Plane.model
+import Plane.homeomorphism
+import Plane.curve
+import Plane.subarc
+import Plane.concatenate
+
+-- ----------------------------------------------------------------------
+-- A segment, as an arc.
+
+theorem Plane.arc_walkOnto (a b : Plane.Point)
+        : Plane.arc(Plane.walkOnto(a, b)) = Plane.segment(a, b) := {
+  Plane.arc(Plane.walkOnto(a, b)) ⊆ Plane.segment(a, b)
+      by (y : Plane.Point) (onArc : y ∈ Plane.arc(Plane.walkOnto(a, b))) ↦ {
+        choose source such that
+            source ∈ Plane.unitSegment ∧ Plane.walkOnto(a, b)(source) = y
+            from onArc;
+        source ∈ Plane.unitSegment;
+        Plane.walkOnto(a, b)(source) = y as valueAtSource;
+        Plane.walkOnto(a, b)(source) ∈ Plane.segment(a, b)
+            by Plane.walkOnto_lands;
+        done by substituting valueAtSource
+      };
+  Plane.segment(a, b) ⊆ Plane.arc(Plane.walkOnto(a, b))
+      by (y : Plane.Point) (onSegment : y ∈ Plane.segment(a, b)) ↦ {
+        choose source such that
+            source ∈ Plane.unitSegment ∧ Plane.walkOnto(a, b)(source) = y
+            from Plane.walkOnto_reaches(a, b, y, onSegment);
+        source ∈ Plane.unitSegment;
+        Plane.walkOnto(a, b)(source) = y;
+        done by { witness source with done }
+      };
+  done by Set.equal_of_same_members
+}
+
+theorem Plane.IsArc.walkOnto (a b : Plane.Point) (distinct : ¬(a = b))
+        : Plane.IsArc(Plane.walkOnto(a, b)) := {
+  Plane.ContinuousOn(Plane.walkOnto(a, b), Plane.unitSegment)
+      by Plane.walkOnto_ContinuousOn;
+  Plane.InjectiveOn(Plane.walkOnto(a, b), Plane.unitSegment)
+      by Plane.walkOnto_InjectiveOn;
+  done
+}
+
+theorem Plane.walkOnto_arcStart (a b : Plane.Point)
+        : Plane.arcStart(Plane.walkOnto(a, b)) = a :=
+  done by Plane.walkOnto_start
+
+theorem Plane.walkOnto_arcFinish (a b : Plane.Point)
+        : Plane.arcFinish(Plane.walkOnto(a, b)) = b :=
+  done by Plane.walkOnto_finish
+
+-- ----------------------------------------------------------------------
+-- The chain of a vertex list, and the polyline that traverses it.
+
+-- The walk's current position is threaded through the RETURN TYPE, not as
+-- a parameter that the recursive call changes. A definition whose fixed
+-- parameter varies elaborates but its recursion equation never fires, so
+-- `chainFrom(a, b :: rest)` would not reduce; recursing into a function of
+-- the start keeps the shape plain and the equation definitional.
+definition Plane.chainFunction
+        : List(Plane.Point) → (Plane.Point → Set(Plane.Point))
+  | List.empty => (start : Plane.Point) ↦ Set.singleton(Plane.Point, start)
+  | List.prepend(next, rest) =>
+      (start : Plane.Point) ↦
+          Plane.segment(start, next) ∪ Plane.chainFunction(rest)(next)
+
+definition Plane.chainFrom (start : Plane.Point)
+        (vertices : List(Plane.Point)) : Set(Plane.Point) :=
+  Plane.chainFunction(vertices)(start)
+
+definition Plane.polylineFunction
+        : List(Plane.Point) → (Plane.Point → (Plane.Point → Plane.Point))
+  | List.empty => (start : Plane.Point) ↦ ((x : Plane.Point) ↦ start)
+  | List.prepend(next, rest) =>
+      (start : Plane.Point) ↦
+          Plane.concatenate(
+              Plane.walkOnto(start, next), Plane.polylineFunction(rest)(next))
+
+definition Plane.polyline (start : Plane.Point)
+        (vertices : List(Plane.Point)) : Plane.Point → Plane.Point :=
+  Plane.polylineFunction(vertices)(start)
+
+-- The blueprint's predicate: a finite union of segments, which is what a
+-- chain is. Stated on the SET, so a theorem about a polygonal arc never has
+-- to transport along an equality of parametrisations.
+definition Plane.IsPolygonal (region : Set(Plane.Point)) : Proposition :=
+  ∃ (start : Plane.Point). ∃ (vertices : List(Plane.Point)).
+    region = Plane.chainFrom(start, vertices)
+
+-- ----------------------------------------------------------------------
+-- The bridge: what a polyline covers is the chain of its vertices.
+
+-- Both facts are proved with the START GENERALISED: the recursion moves the
+-- accumulator, so an induction that fixes it gets a hypothesis about the
+-- wrong walk.
+
+theorem Plane.polyline_arcStart (vertices : List(Plane.Point))
+        : ∀ (start : Plane.Point).
+            Plane.arcStart(Plane.polyline(start, vertices)) = start :=
+  by induction on vertices {
+    case List.empty: (start : Plane.Point) ↦ reflexivity(Plane.Point, start)
+    case List.prepend(next, rest): (start : Plane.Point) ↦ {
+        Plane.arcStart(
+            Plane.polyline(start, List.prepend(Plane.Point, next, rest)))
+           = Plane.arcStart(
+                 Plane.concatenate(
+                     Plane.walkOnto(start, next), Plane.polyline(next, rest)))
+           = Plane.arcStart(Plane.walkOnto(start, next))
+                 by Plane.concatenate_start
+           = start by Plane.walkOnto_arcStart;
+        done
+      }
+  }
+
+theorem Plane.arc_polyline (vertices : List(Plane.Point))
+        : ∀ (start : Plane.Point).
+            Plane.arc(Plane.polyline(start, vertices))
+                = Plane.chainFrom(start, vertices) :=
+  by induction on vertices with tailCovers {
+    case List.empty: (start : Plane.Point) ↦ {
+        -- The degenerate polyline stands still, so its arc is the one point.
+        Plane.arc((x : Plane.Point) ↦ start)
+            ⊆ Set.singleton(Plane.Point, start)
+            by (y : Plane.Point)
+               (onArc : y ∈ Plane.arc((x : Plane.Point) ↦ start)) ↦ {
+              choose source such that
+                  source ∈ Plane.unitSegment ∧ start = y from onArc;
+              start = y;
+              y = start by Equality.symmetry;
+              done
+            };
+        Set.singleton(Plane.Point, start)
+            ⊆ Plane.arc((x : Plane.Point) ↦ start)
+            by (y : Plane.Point)
+               (isStart : y ∈ Set.singleton(Plane.Point, start)) ↦ {
+              y = start;
+              Plane.origin ∈ Plane.unitSegment by Plane.start_in_unitSegment;
+              start = y by Equality.symmetry;
+              done by { witness Plane.origin with done }
+            };
+        done by Set.equal_of_same_members
+      }
+    case List.prepend(next, rest): (start : Plane.Point) ↦ {
+        Plane.arc(Plane.polyline(next, rest)) = Plane.chainFrom(next, rest)
+            by tailCovers(next);
+        Plane.arcFinish(Plane.walkOnto(start, next)) = next
+            by Plane.walkOnto_arcFinish;
+        Plane.arcStart(Plane.polyline(next, rest)) = next
+            by Plane.polyline_arcStart;
+        Plane.arcFinish(Plane.walkOnto(start, next))
+            = Plane.arcStart(Plane.polyline(next, rest));
+        Plane.arc(Plane.polyline(start, List.prepend(Plane.Point, next, rest)))
+           = Plane.arc(
+                 Plane.concatenate(
+                     Plane.walkOnto(start, next), Plane.polyline(next, rest)))
+           = Plane.arc(Plane.walkOnto(start, next))
+                 ∪ Plane.arc(Plane.polyline(next, rest))
+                 by Plane.arc_concatenate
+           = Plane.segment(start, next)
+                 ∪ Plane.arc(Plane.polyline(next, rest))
+                 by Plane.arc_walkOnto
+           = Plane.segment(start, next) ∪ Plane.chainFrom(next, rest)
+                 by tailCovers(next);
+        done
+      }
+  }
+
+theorem Plane.IsPolygonal.of_polyline (start : Plane.Point)
+        (vertices : List(Plane.Point))
+        : Plane.IsPolygonal(Plane.arc(Plane.polyline(start, vertices))) := {
+  Plane.arc(Plane.polyline(start, vertices))
+      = Plane.chainFrom(start, vertices) by Plane.arc_polyline;
+  done by { witness start with { witness vertices with done } }
+}
