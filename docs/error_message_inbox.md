@@ -2100,3 +2100,31 @@ this step's justification proves a different relation than the step claims
 "its proof shows: Real" is the type of the parsed term — accurate and
 useless. A justification that elaborates to a non-`Prop` is always a parse
 accident; the message should say so and suggest the parenthesised form.
+
+**OPEN — the auto-prover does not ∀-instantiate a context fact, so a leg
+of an instantiated conjunction needs the name.** Layer 2, `separation.math`.
+With `chosenA : ∀ n. a(n) ∈ regionA ∧ …` in scope:
+
+```math
+∀ (m : ℕ). a(m) ∈ regionA by (m : ℕ) ↦ { done by chosenA };   -- works
+∀ (m : ℕ). a(m) ∈ regionA by (m : ℕ) ↦ { done };              -- rejected
+∀ (m : ℕ). a(m) ∈ regionA;                                    -- rejected
+```
+
+The citation both instantiates at `m` and projects the leg, which is the
+whole reason the ten sites that spelled the conjunction out first were
+unnecessary. The bare `done` fails with
+
+```
+claim `regionA (a m)`: … no conjunction split decomposes it …
+```
+
+which is *almost* right: splitting is tried, but only on facts already at
+the right instantiation, and the message doesn't distinguish "no
+conjunction in scope" from "a conjunction is in scope one ∀ away". Worth
+saying which, since the repair differs (restate the fact vs name it).
+
+Known limit of the citation itself, and the reason two sites keep the
+restatement: it projects a DIRECT leg only. `0 ≤ parameter(m)` out of
+`(0 ≤ t ∧ t ≤ 1) ∧ s(m) = …` is one level too deep, and reports
+"its conclusion is about `And` but the goal is about `Real.IsNonneg`".

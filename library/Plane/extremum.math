@@ -496,33 +496,8 @@ theorem Plane.uniformly_continuous_on_compact
     ∀ (m : ℕ). q(m) ∈ region
         by (m : ℕ) ↦ { done by chosenQ };
 
-    -- Thin twice, and the two limits coincide.
-    choose firstIndex : ℕ → ℕ, limitP : Plane.Point such that
-        limitP ∈ region ∧ Plane.SubsequenceConverges(p, firstIndex, limitP)
-        from compact;
-    Natural.IsStrictlyIncreasing(firstIndex)
-        by Plane.SubsequenceConverges.increasing as firstIncreasing;
-    limitP ∈ region;
-    Plane.SequenceConverges((k : ℕ) ↦ p(firstIndex(k)), limitP)
-        by Plane.SubsequenceConverges.converges as toLimitP;
-    choose secondIndex : ℕ → ℕ, limitQ : Plane.Point such that
-        limitQ ∈ region
-        ∧ Plane.SubsequenceConverges(
-              (k : ℕ) ↦ q(firstIndex(k)), secondIndex, limitQ)
-        from compact;
-    Natural.IsStrictlyIncreasing(secondIndex)
-        by Plane.SubsequenceConverges.increasing as secondIncreasing;
-    Plane.SequenceConverges(
-        (k : ℕ) ↦ q(firstIndex(secondIndex(k))), limitQ) as toLimitQ;
-    Plane.SequenceConverges((k : ℕ) ↦ p(firstIndex(secondIndex(k))), limitP)
-        by Plane.SequenceConverges.subsequence(
-            (k : ℕ) ↦ p(firstIndex(k)), limitP, secondIndex,
-            toLimitP, secondIncreasing)
-        as toLimitPThinned;
-    Natural.IsStrictlyIncreasing((k : ℕ) ↦ firstIndex(secondIndex(k)))
-        by Natural.IsStrictlyIncreasing.compose(
-            firstIndex, secondIndex, firstIncreasing, secondIncreasing)
-        as bothIncreasing;
+    -- The pairs close on each other, so one thinning carries both to the
+    -- same limit.
     ∀ (n : ℕ). Plane.distance(p(n), q(n)) < Real.harmonic_term(n)
         by (n : ℕ) ↦ {
           q(n) ∈ region
@@ -530,12 +505,15 @@ theorem Plane.uniformly_continuous_on_compact
                      ∧ ¬(abs(f(p(n)) - f(q(n))) < tolerance))
               by chosenQ;
           done
-        }
-        as closing;
-    limitP = limitQ
-        by Plane.equal_limits_of_closing(
-            p, q, (k : ℕ) ↦ firstIndex(secondIndex(k)), limitP, limitQ,
-            bothIncreasing, toLimitPThinned, toLimitQ, closing);
+        };
+    choose index : ℕ → ℕ, limit : Plane.Point such that
+        (limit ∈ region ∧ limit ∈ region)
+        ∧ (Plane.SequenceConverges((k : ℕ) ↦ p(index(k)), limit)
+               ∧ Plane.SequenceConverges((k : ℕ) ↦ q(index(k)), limit))
+        from Plane.closing_pairs_share_a_limit;
+    limit ∈ region;
+    Plane.SequenceConverges((k : ℕ) ↦ p(index(k)), limit) as toLimitP;
+    Plane.SequenceConverges((k : ℕ) ↦ q(index(k)), limit) as toLimitQ;
 
     -- Continuity at the common limit puts both values within half the
     -- tolerance of the value there — so within the tolerance of each
@@ -545,48 +523,42 @@ theorem Plane.uniformly_continuous_on_compact
     choose nearness such that
         0 < nearness ∧
         ∀ (y : Plane.Point). y ∈ region →
-          Plane.distance(limitP, y) < nearness
-            → abs(f(limitP) - f(y)) < tolerance / 2
+          Plane.distance(limit, y) < nearness
+            → abs(f(limit) - f(y)) < tolerance / 2
         from continuous;
     0 < nearness as nearnessPositive;
     ∀ (y : Plane.Point). y ∈ region →
-        Plane.distance(limitP, y) < nearness
-          → abs(f(limitP) - f(y)) < tolerance / 2
+        Plane.distance(limit, y) < nearness
+          → abs(f(limit) - f(y)) < tolerance / 2
         as valuesClose;
     choose thresholdP such that
         ∀ (k : ℕ). thresholdP ≤ k →
-            Plane.distance(limitP, p(firstIndex(secondIndex(k)))) < nearness
-        as nearP from toLimitPThinned(nearness, nearnessPositive);
+            Plane.distance(limit, p(index(k))) < nearness
+        as nearP from toLimitP(nearness, nearnessPositive);
     choose thresholdQ such that
         ∀ (k : ℕ). thresholdQ ≤ k →
-            Plane.distance(limitQ, q(firstIndex(secondIndex(k)))) < nearness
+            Plane.distance(limit, q(index(k))) < nearness
         as nearQ from toLimitQ(nearness, nearnessPositive);
     let far : ℕ := Natural.maximum(thresholdP, thresholdQ);
     thresholdP ≤ far;
     thresholdQ ≤ far;
-    let deep : ℕ := firstIndex(secondIndex(far));
-    Plane.distance(limitP, p(deep)) < nearness
-        by nearP;
-    Plane.distance(limitQ, q(deep)) < nearness
-        by nearQ;
-    limitP = limitQ;
-    Plane.distance(limitP, q(deep)) < nearness;
-    abs(f(limitP) - f(p(deep))) < tolerance / 2
-        by valuesClose;
-    abs(f(limitP) - f(q(deep))) < tolerance / 2
-        by valuesClose;
-    abs(f(q(deep)) - f(limitP)) = abs(f(limitP) - f(q(deep)))
+    let deep : ℕ := index(far);
+    Plane.distance(limit, p(deep)) < nearness by nearP;
+    Plane.distance(limit, q(deep)) < nearness by nearQ;
+    abs(f(limit) - f(p(deep))) < tolerance / 2 by valuesClose;
+    abs(f(limit) - f(q(deep))) < tolerance / 2 by valuesClose;
+    abs(f(q(deep)) - f(limit)) = abs(f(limit) - f(q(deep)))
         by Real.absolute_value_subtract_swap;
     f(p(deep)) - f(q(deep))
-        = (f(p(deep)) - f(limitP)) + (f(limitP) - f(q(deep)))
+        = (f(p(deep)) - f(limit)) + (f(limit) - f(q(deep)))
         by ring as splitAtLimit;
-    abs(f(p(deep)) - f(limitP)) = abs(f(limitP) - f(p(deep)))
+    abs(f(p(deep)) - f(limit)) = abs(f(limit) - f(p(deep)))
         by Real.absolute_value_subtract_swap;
     tolerance / 2 + tolerance / 2 = tolerance by Real.divide_two_doubled;
     abs(f(p(deep)) - f(q(deep)))
-       = abs((f(p(deep)) - f(limitP)) + (f(limitP) - f(q(deep))))
+       = abs((f(p(deep)) - f(limit)) + (f(limit) - f(q(deep))))
              by splitAtLimit
-       ≤ abs(f(p(deep)) - f(limitP)) + abs(f(limitP) - f(q(deep)))
+       ≤ abs(f(p(deep)) - f(limit)) + abs(f(limit) - f(q(deep)))
              by Real.triangle_inequality
        < tolerance / 2 + tolerance / 2 by ordered_field
        = tolerance;

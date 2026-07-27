@@ -224,6 +224,63 @@ theorem Plane.equal_limits_of_closing
   done by Plane.equal_of_distance_zero
 }
 
+-- Two sequences in compact sets that close on each other share a limit,
+-- and one thinning reaches it along both. Thin the first sequence, thin
+-- the partner along that, and compose the two index maps: the composite
+-- is increasing, so it thins the already-convergent first sequence too,
+-- and both limits are then the limit of the same closing pairs.
+--
+-- Every proof that pushes a negation through "for every scale there is a
+-- pair" arrives here, so this is where the double thinning lives.
+theorem Plane.closing_pairs_share_a_limit
+        (regionA regionB : Set(Plane.Point))
+        (compactA : Plane.IsCompact(regionA))
+        (compactB : Plane.IsCompact(regionB))
+        (u v : ℕ → Plane.Point)
+        (insideA : ∀ (n : ℕ). u(n) ∈ regionA)
+        (insideB : ∀ (n : ℕ). v(n) ∈ regionB)
+        (closing : ∀ (n : ℕ).
+            Plane.distance(u(n), v(n)) < Real.harmonic_term(n))
+        : ∃ (index : ℕ → ℕ). ∃ (limit : Plane.Point).
+            (limit ∈ regionA ∧ limit ∈ regionB)
+            ∧ (Plane.SequenceConverges((k : ℕ) ↦ u(index(k)), limit)
+                   ∧ Plane.SequenceConverges((k : ℕ) ↦ v(index(k)), limit)) := {
+  choose firstIndex : ℕ → ℕ, limitU : Plane.Point such that
+      limitU ∈ regionA ∧ Plane.SubsequenceConverges(u, firstIndex, limitU)
+      from compactA;
+  Natural.IsStrictlyIncreasing(firstIndex)
+      by Plane.SubsequenceConverges.increasing;
+  limitU ∈ regionA;
+  Plane.SequenceConverges((k : ℕ) ↦ u(firstIndex(k)), limitU)
+      by Plane.SubsequenceConverges.converges;
+
+  choose secondIndex : ℕ → ℕ, limitV : Plane.Point such that
+      limitV ∈ regionB
+      ∧ Plane.SubsequenceConverges(
+            (k : ℕ) ↦ v(firstIndex(k)), secondIndex, limitV)
+      from compactB;
+  Natural.IsStrictlyIncreasing(secondIndex)
+      by Plane.SubsequenceConverges.increasing;
+  limitV ∈ regionB;
+  Plane.SequenceConverges(
+      (k : ℕ) ↦ v(firstIndex(secondIndex(k))), limitV);
+  Plane.SequenceConverges((k : ℕ) ↦ u(firstIndex(secondIndex(k))), limitU)
+      by Plane.SequenceConverges.subsequence(
+          s := (k : ℕ) ↦ u(firstIndex(k)));
+
+  Natural.IsStrictlyIncreasing((k : ℕ) ↦ firstIndex(secondIndex(k)))
+      by Natural.IsStrictlyIncreasing.compose;
+  limitU = limitV
+      by Plane.equal_limits_of_closing(
+          index := (k : ℕ) ↦ firstIndex(secondIndex(k)))
+      as limitsAgree;
+  limitU ∈ regionB by substituting limitsAgree;
+  Plane.SequenceConverges((k : ℕ) ↦ v(firstIndex(secondIndex(k))), limitU)
+      by substituting limitsAgree;
+  let composed : ℕ → ℕ := (k : ℕ) ↦ firstIndex(secondIndex(k));
+  done by { witness composed with { witness limitU with done } }
+}
+
 -- ----------------------------------------------------------------------
 -- The separation lemma.
 
@@ -328,43 +385,18 @@ theorem Plane.compact_separation (regionA regionB : Set(Plane.Point))
             partners);
     ∀ (m : ℕ). b(m) ∈ regionB by (m : ℕ) ↦ { done by chosenB };
 
-    -- Thin twice: once so `a` converges, once more so `b` does.
-    choose firstIndex : ℕ → ℕ, limitA : Plane.Point such that
-        limitA ∈ regionA
-        ∧ Plane.SubsequenceConverges(a, firstIndex, limitA)
-        from compactA;
-    Natural.IsStrictlyIncreasing(firstIndex)
-        by Plane.SubsequenceConverges.increasing;
-    limitA ∈ regionA;
-    Plane.SequenceConverges((k : ℕ) ↦ a(firstIndex(k)), limitA)
-        by Plane.SubsequenceConverges.converges;
-
-    choose secondIndex : ℕ → ℕ, limitB : Plane.Point such that
-        limitB ∈ regionB
-        ∧ Plane.SubsequenceConverges(
-              (k : ℕ) ↦ b(firstIndex(k)), secondIndex, limitB)
-        from compactB;
-    Natural.IsStrictlyIncreasing(secondIndex)
-        by Plane.SubsequenceConverges.increasing;
-    limitB ∈ regionB;
-    Plane.SequenceConverges(
-        (k : ℕ) ↦ b(firstIndex(secondIndex(k))), limitB);
-    Plane.SequenceConverges(
-        (k : ℕ) ↦ a(firstIndex(secondIndex(k))), limitA)
-        by Plane.SequenceConverges.subsequence(
-            s := (k : ℕ) ↦ a(firstIndex(k)));
-
-    -- The two limits coincide: the pairs were built to close on each
-    -- other, and both thinnings kept them in step.
+    -- The pairs close on each other, so they share a limit — which is
+    -- then a point of both regions, and they were disjoint.
     ∀ (n : ℕ). Plane.distance(a(n), b(n)) < Real.harmonic_term(n)
         by (n : ℕ) ↦ { done by chosenB };
-    Natural.IsStrictlyIncreasing((k : ℕ) ↦ firstIndex(secondIndex(k)))
-        by Natural.IsStrictlyIncreasing.compose;
-    limitA = limitB
-        by Plane.equal_limits_of_closing(
-            index := (k : ℕ) ↦ firstIndex(secondIndex(k)));
-    limitA ∈ regionB;
-    ¬(limitA ∈ regionB) by disjoint;
+    choose index : ℕ → ℕ, limit : Plane.Point such that
+        (limit ∈ regionA ∧ limit ∈ regionB)
+        ∧ (Plane.SequenceConverges((k : ℕ) ↦ a(index(k)), limit)
+               ∧ Plane.SequenceConverges((k : ℕ) ↦ b(index(k)), limit))
+        from Plane.closing_pairs_share_a_limit;
+    limit ∈ regionA;
+    limit ∈ regionB;
+    ¬(limit ∈ regionB) by disjoint;
     done
   };
   done
