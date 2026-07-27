@@ -66,7 +66,7 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
 - `Plane.InjectiveOn`, `Plane.HasContinuousInverseOn`,
   `Plane.IsHomeomorphismOn` — [homeomorphism.math](homeomorphism.math)
 - `Plane.IsArc`, `Plane.arc`, `Plane.arcStart`, `Plane.arcFinish`,
-  `Plane.IsJordanParametrisation`, `Plane.IsJordanCurve` —
+  `Plane.IsLoop`, `Plane.IsJordanCurve`, `Plane.IsJordanParametrisation` —
   [curve.math](curve.math)
 - `Plane.walkOnto`, `Plane.subarc`, `Plane.openUnitSegment`,
   `Plane.openArc` — [subarc.math](subarc.math)
@@ -133,8 +133,9 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
   `Plane.Component_is_reachable_set`, which identifies the components of an
   open set with the walk classes
 - `Plane.segment_IsCompact`, `Plane.squareBoundary_IsCompact`
-- **`Plane.IsHomeomorphismOn.of_continuous_injective_on_compact`** and
-  **`Plane.IsJordanCurve.homeomorphic_to_circle`** (H4)
+- **`Plane.IsHomeomorphismOn.of_continuous_injective_on_compact`** (H4's
+  engine) and `Plane.IsJordanParametrisation.IsHomeomorphismOn` — a
+  continuous injection on the circle is a homeomorphism onto its image
 - `Plane.ContinuousOn.compose`, `Plane.between_injective`, and
   **`Plane.IsArc.subarc`** — a subarc between distinct parameters is an arc,
   with `Plane.subarc_image` identifying its image as the arc restricted to
@@ -165,8 +166,9 @@ as the definition spares each of them a reductio — and the blueprint's own
 ## Arcs and curves are parametrised by plane sets
 
 An arc is a continuous injective map on `Plane.unitSegment`; a Jordan curve
-is a **set** carried onto by a continuous injection from `Plane.circle`.
-**Both model domains are subsets of the plane, not of ℝ.** That is what
+is a **set** carried onto by a **loop** on the same interval — continuous,
+returning to its start, injective until it does — which is the blueprint's
+definition. **Both model domains are subsets of the plane, not of ℝ.** That is what
 lets everything above apply unchanged: a
 parametrisation is an ordinary `Plane.Point → Plane.Point` map, its
 continuity is `ContinuousOn`, its image is `imageSet`, its compactness is
@@ -175,15 +177,18 @@ topology for real-domain maps, and a circle would need a quotient.
 
 Two consequences worth knowing before extending this area:
 
-- There are **two model curves, on purpose**. `Plane.circle` (`‖x‖ = 1`) is
-  what a Jordan curve is defined against, because that is the textbook
-  definition and a circle needs no trigonometry to *define* — only to
-  traverse. `Plane.squareBoundary` (`‖x‖∞ = 1`) is the working model
-  wherever a traversal is wanted, because its traversal is piecewise
-  affine. Both are level sets, so both are compact in three lines. The
-  radial-projection bridge between them (`x ↦ x/‖x‖`, `x ↦ x/‖x‖∞`) and
-  `∂Q`'s decomposition into four sides are **not** built yet; everything
-  needing the arc structure of a model curve waits on them.
+- **A Jordan curve is defined by a loop, not by the circle**, because the
+  parameters are what its theorems use: two points of the curve pull back
+  to two parameters, and the two arcs they determine are a subarc and a
+  concatenation. Against the circle those same arcs need a *traversal* of
+  the circle by an interval, which is the one thing the
+  trigonometry-free setting does not hand over.
+- `Plane.circle` (`‖x‖ = 1`) and `Plane.squareBoundary` (`‖x‖∞ = 1`) both
+  remain as model curves — level sets, so compact in three lines — and the
+  circle-side theorem (a continuous injection on it is a homeomorphism onto
+  its image) is proved. **Not built**: the bridge from a loop to such a
+  parametrisation, which needs `∂Q`'s decomposition into four sides plus
+  the radial projection (`x ↦ x/‖x‖`, `x ↦ x/‖x‖∞`).
 - The parameter of a point of the unit segment is its **first coordinate**
   (`Plane.unitSegment_at_first_coordinate`). The model interval runs along
   the axis for exactly this reason: a reparametrisation reads its parameter

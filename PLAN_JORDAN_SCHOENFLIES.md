@@ -288,13 +288,19 @@ continuous):
   Then the engine Layer 2 deferred: **a continuous injection on a compactum
   is a homeomorphism onto its image**.
 - **`Plane.circle`** as `{x : ‖x‖ = 1}` — no trigonometry needed to define
-  a circle, only to traverse one — so `Plane.IsJordanCurve(C)` is the
-  textbook definition: `C` is carried onto by a continuous injection from
-  the circle. A **set**, not a map; the parametrisation comes back by
-  `choose`, and `Plane.IsJordanParametrisation` names its property.
-- **H4, `Plane.IsJordanCurve.homeomorphic_to_circle`**, falls out of that
-  engine with nothing left to do. Arcs are compact, connected, and
-  homeomorphic copies of the unit segment.
+  a circle, only to traverse one. `Plane.IsJordanParametrisation` names a
+  continuous injection on it, and that it is a homeomorphism onto its image
+  is proved (H4's engine applied to the model curve).
+- **`Plane.IsJordanCurve` is the blueprint's LOOP definition** (revised
+  2026-07-26): `C` is the image of a continuous map on the model interval
+  that returns to its start and is injective until it does. A **set**, with
+  the loop recovered by `choose`. The reason is the parameters: two points
+  of the curve pull back to two parameters, and the two arcs they determine
+  are a subarc and a concatenation — both built. Against the circle those
+  same arcs need a *traversal* of the circle by an interval, which is
+  exactly what the trigonometry-free setting withholds.
+- Arcs are compact, connected, and homeomorphic copies of the unit segment;
+  Jordan curves are compact, connected and nonempty.
 - The parameter of a point of the unit segment is **its first coordinate**
   (`Plane.unitSegment_at_first_coordinate` and the two range lemmas) — the
   reason the model interval runs along the axis, and what makes a subarc's
@@ -344,21 +350,19 @@ case.
    vertices (see `fold_refactor_plan`) or define `IsPolygonal(f)` as "the
    arc is a finite union of segments" over `Lists`. Settle this before
    Layer 6, which needs polygonal edges as data.
-2. **The two arcs of a Jordan curve between two of its points**, and the
-   basis *for a curve*. Genuinely blocked on the **arc structure of
-   the model curve**: the circle minus two points has two components, each
-   an arc. Getting there wants `∂Q`'s decomposition into four sides (a
+2. **The loop-to-circle bridge** — that a loop induces a continuous
+   injection on the circle, which is what would restore
+   "every Jordan curve is homeomorphic to the circle" as a theorem about
+   `IsJordanCurve`. Blocked on the **traversal of a model curve by an
+   interval**: `∂Q`'s decomposition into four sides (a
    coordinate case analysis on `max(|x₁|, |x₂|) = 1`) plus the
    **radial-projection bridge** `∂Q ≅ circle` (`x ↦ x/‖x‖` one way,
    `x ↦ x/‖x‖∞` the other, both continuous on the level sets, a
    homeomorphism by Layer 4's own theorem). Neither level-set definition
    supplies that structure; both defer it.
-Also not built: the blueprint's **loop presentation** (`γ` on `[0,1]` with
-`γ(0) = γ(1)`, injective otherwise) and its bridge to `∂Q` through the
-four-side traversal `e`. That bridge is what *constructions* need — a
-polygonal closed curve arrives as a loop — so it is the next slice, not an
-optional extra. What H4 needs, it has: the ∂Q-parametrised definition is
-the standard one.
+The loop presentation is now the DEFINITION, so what was "also not built"
+above is exactly the bridge in item 2 — and constructions no longer wait on
+it, since a polygonal closed curve arrives as a loop already.
 
 **Definitions.** `Plane.Arc` (recommend bundling the parametrisation:
 a continuous injective map from `[0,1]`, with the image derived, not

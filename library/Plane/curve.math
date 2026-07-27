@@ -2,18 +2,16 @@
 --
 -- Arcs and Jordan curves. Layer 4.
 --
--- An arc is a continuous injective map on the unit segment; a Jordan curve
--- is one on the square's boundary. Both carry their parametrisation, as
--- the blueprint does — it slides between "the arc" and "the map" freely,
--- and subarcs and concatenation are painful set-first — while the point
--- set is derived (`Plane.arc`, `Plane.jordanCurve`).
+-- An arc is a continuous injective map on the unit segment. A Jordan curve
+-- is the image of a LOOP — a continuous map on the same interval that
+-- returns to where it started and is injective until it does — which is the
+-- blueprint's definition and the one its proofs run on.
 --
--- The blueprint's model-curve lemma comes out of Layer 4's homeomorphism
--- theorem with nothing left to do: a Jordan curve's parametrisation is a
--- continuous injection on a compactum, hence a homeomorphism from the
--- square's boundary onto the curve. Stated against `∂Q` rather than the
--- circle — the substitution Layer 0 settled — it needs no trigonometry and
--- no quotient.
+-- Arcs carry their parametrisation, as the blueprint does: it slides
+-- between "the arc" and "the map" freely, and subarcs and concatenation are
+-- painful set-first. A curve is a SET, because that is what the theorems
+-- about it say ("ℝ² ∖ C has two regions"), with the loop recovered by
+-- `choose` wherever a proof wants the parameters.
 
 module Plane.curve
 
@@ -104,59 +102,92 @@ theorem Plane.IsArc.IsHomeomorphismOn
 -- ----------------------------------------------------------------------
 -- Jordan curves.
 --
--- A Jordan curve is a SET: a subset of the plane carried onto by a
--- continuous injection from the circle, which is the textbook definition
--- and the one the theorems about it need — "ℝ² ∖ C has two regions" is a
--- statement about a set. The parametrisation is recovered by `choose`
--- wherever a proof wants it, and `Plane.IsJordanParametrisation` names the
--- property it has.
+-- The blueprint's definition, and the one its proofs run on: a Jordan
+-- curve is the image of a LOOP — a continuous map on the model interval
+-- that returns to where it started and is injective until it does. A curve
+-- is a SET, since that is what the theorems about it say ("ℝ² ∖ C has two
+-- regions"), and the loop is recovered by `choose` wherever a proof wants
+-- the parameters.
+--
+-- The parameters are the point of the loop presentation. Two points of the
+-- curve pull back to two parameters, and the two arcs they determine are
+-- the walk between them and the walk the other way round — which is a
+-- subarc and a concatenation, both already built. Against the circle those
+-- same two arcs need a traversal of the circle by an interval, and that is
+-- the one thing the trigonometry-free setting does not hand over.
+--
+-- `Plane.IsJordanParametrisation` below keeps the circle-side statement,
+-- which is still true and still proved: a continuous injection on the
+-- circle is a homeomorphism onto its image. What is NOT yet built is the
+-- bridge between the two presentations — that a loop induces such a
+-- parametrisation — because it needs exactly that traversal. See
+-- PLAN_JORDAN_SCHOENFLIES.md.
 
-definition Plane.IsJordanParametrisation
-        (parametrisation : Plane.Point → Plane.Point) : Proposition :=
-  Plane.ContinuousOn(parametrisation, Plane.circle)
-    ∧ Plane.InjectiveOn(parametrisation, Plane.circle)
+definition Plane.IsLoop (loop : Plane.Point → Plane.Point) : Proposition :=
+  Plane.ContinuousOn(loop, Plane.unitSegment)
+    ∧ loop(Plane.origin) = loop(Plane.Point.make(1, 0))
+    ∧ Plane.InjectiveOn(
+          loop,
+          Plane.unitSegment ∖ Set.singleton(Plane.Point, Plane.Point.make(1, 0)))
 
 definition Plane.IsJordanCurve (curve : Set(Plane.Point)) : Proposition :=
-  ∃ (parametrisation : Plane.Point → Plane.Point).
-    Plane.IsJordanParametrisation(parametrisation)
-      ∧ Plane.imageSet(parametrisation, Plane.circle) = curve
+  ∃ (loop : Plane.Point → Plane.Point).
+    Plane.IsLoop(loop) ∧ Plane.imageSet(loop, Plane.unitSegment) = curve
 
 theorem Plane.IsJordanCurve.IsCompact (curve : Set(Plane.Point))
         (isCurve : Plane.IsJordanCurve(curve))
         : Plane.IsCompact(curve) := {
-  choose parametrisation such that
-      Plane.IsJordanParametrisation(parametrisation)
-        ∧ Plane.imageSet(parametrisation, Plane.circle) = curve
+  choose loop such that
+      Plane.IsLoop(loop) ∧ Plane.imageSet(loop, Plane.unitSegment) = curve
       from isCurve;
-  Plane.imageSet(parametrisation, Plane.circle) = curve as carriesOnto;
-  Plane.ContinuousOn(parametrisation, Plane.circle);
-  Plane.IsCompact(Plane.circle) by Plane.circle_IsCompact;
-  Plane.IsCompact(Plane.imageSet(parametrisation, Plane.circle))
+  Plane.imageSet(loop, Plane.unitSegment) = curve as carriesOnto;
+  Plane.IsLoop(loop);
+  Plane.ContinuousOn(loop, Plane.unitSegment);
+  Plane.IsCompact(Plane.unitSegment) by Plane.unitSegment_IsCompact;
+  Plane.IsCompact(Plane.imageSet(loop, Plane.unitSegment))
       by Plane.IsCompact.image;
+  done by substituting carriesOnto
+}
+
+theorem Plane.IsJordanCurve.IsConnected (curve : Set(Plane.Point))
+        (isCurve : Plane.IsJordanCurve(curve))
+        : Plane.IsConnected(curve) := {
+  choose loop such that
+      Plane.IsLoop(loop) ∧ Plane.imageSet(loop, Plane.unitSegment) = curve
+      from isCurve;
+  Plane.imageSet(loop, Plane.unitSegment) = curve as carriesOnto;
+  Plane.IsLoop(loop);
+  Plane.ContinuousOn(loop, Plane.unitSegment);
+  Plane.IsConnected(Plane.unitSegment) by Plane.unitSegment_IsConnected;
+  Plane.IsConnected(Plane.imageSet(loop, Plane.unitSegment))
+      by Plane.IsConnected.image;
   done by substituting carriesOnto
 }
 
 theorem Plane.IsJordanCurve.IsNonempty (curve : Set(Plane.Point))
         (isCurve : Plane.IsJordanCurve(curve))
         : Set.IsNonempty(Plane.Point, curve) := {
-  choose parametrisation such that
-      Plane.IsJordanParametrisation(parametrisation)
-        ∧ Plane.imageSet(parametrisation, Plane.circle) = curve
+  choose loop such that
+      Plane.IsLoop(loop) ∧ Plane.imageSet(loop, Plane.unitSegment) = curve
       from isCurve;
-  Plane.imageSet(parametrisation, Plane.circle) = curve as carriesOnto;
-  Plane.Point.make(1, 0) ∈ Plane.circle by Plane.pole_in_circle;
-  parametrisation(Plane.Point.make(1, 0))
-      ∈ Plane.imageSet(parametrisation, Plane.circle)
-      by { witness Plane.Point.make(1, 0) with done };
-  parametrisation(Plane.Point.make(1, 0)) ∈ curve by substituting carriesOnto;
-  done by { witness parametrisation(Plane.Point.make(1, 0)) with done }
+  Plane.imageSet(loop, Plane.unitSegment) = curve as carriesOnto;
+  Plane.origin ∈ Plane.unitSegment by Plane.start_in_unitSegment;
+  loop(Plane.origin) ∈ Plane.imageSet(loop, Plane.unitSegment)
+      by { witness Plane.origin with done };
+  loop(Plane.origin) ∈ curve by substituting carriesOnto;
+  done by { witness loop(Plane.origin) with done }
 }
 
 -- ----------------------------------------------------------------------
--- The model-curve theorem, H4: a parametrisation of a Jordan curve is a
--- homeomorphism from the circle onto it. Nothing is left to do — a
--- continuous injection on a compactum is a homeomorphism onto its image,
--- and the circle is compact.
+-- The circle side, unchanged and still proved: a continuous injection on
+-- the circle is a homeomorphism onto its image. This is H4's engine
+-- applied to the model curve; what it does NOT say, until the traversal
+-- exists, is that a loop induces such a parametrisation.
+
+definition Plane.IsJordanParametrisation
+        (parametrisation : Plane.Point → Plane.Point) : Proposition :=
+  Plane.ContinuousOn(parametrisation, Plane.circle)
+    ∧ Plane.InjectiveOn(parametrisation, Plane.circle)
 
 theorem Plane.IsJordanParametrisation.IsHomeomorphismOn
         (parametrisation : Plane.Point → Plane.Point)
@@ -166,20 +197,4 @@ theorem Plane.IsJordanParametrisation.IsHomeomorphismOn
   Plane.InjectiveOn(parametrisation, Plane.circle);
   Plane.IsCompact(Plane.circle) by Plane.circle_IsCompact;
   done by Plane.IsHomeomorphismOn.of_continuous_injective_on_compact
-}
-
-theorem Plane.IsJordanCurve.homeomorphic_to_circle (curve : Set(Plane.Point))
-        (isCurve : Plane.IsJordanCurve(curve))
-        : ∃ (parametrisation : Plane.Point → Plane.Point).
-            Plane.IsHomeomorphismOn(parametrisation, Plane.circle)
-              ∧ Plane.imageSet(parametrisation, Plane.circle) = curve := {
-  choose parametrisation such that
-      Plane.IsJordanParametrisation(parametrisation)
-        ∧ Plane.imageSet(parametrisation, Plane.circle) = curve
-      from isCurve;
-  Plane.IsJordanParametrisation(parametrisation);
-  Plane.imageSet(parametrisation, Plane.circle) = curve;
-  Plane.IsHomeomorphismOn(parametrisation, Plane.circle)
-      by Plane.IsJordanParametrisation.IsHomeomorphismOn;
-  done by { witness parametrisation with done }
 }
