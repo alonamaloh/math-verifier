@@ -613,6 +613,62 @@ theorem Plane.upperHalf_at_start_is_midpoint
   done by Real.equal_of_multiply_left
 }
 
+-- Across the seam: the common value lies on both arcs, so it is the
+-- shared endpoint, and each half's injectivity pins its own parameter to
+-- the midpoint. Stated for a point of each half rather than for `x` and
+-- `y`, so that the two orderings of the case split are the same theorem.
+theorem Plane.concatenate_across_seam
+        (firstArc secondArc : Plane.Point → Plane.Point)
+        (firstInjective : Plane.InjectiveOn(firstArc, Plane.unitSegment))
+        (secondInjective : Plane.InjectiveOn(secondArc, Plane.unitSegment))
+        (sharedEndpoint
+            : Plane.arcFinish(firstArc) = Plane.arcStart(secondArc))
+        (meetOnlyThere
+            : ∀ (z : Plane.Point). z ∈ Plane.arc(firstArc) →
+                z ∈ Plane.arc(secondArc) → z = Plane.arcFinish(firstArc))
+        (low high : Plane.Point)
+        (lowInLower : low ∈ Plane.lowerHalf)
+        (highInUpper : high ∈ Plane.upperHalf)
+        (sameValue
+            : Plane.concatenate(firstArc, secondArc)(low)
+                  = Plane.concatenate(firstArc, secondArc)(high))
+        : low = high := {
+  low ∈ Plane.unitSegment;
+  high ∈ Plane.unitSegment;
+  Plane.retime(2, 0)(low) ∈ Plane.unitSegment
+      by Plane.lowerHalf_retime_lands;
+  Plane.retime(2, -(1 : ℝ))(high) ∈ Plane.unitSegment
+      by Plane.upperHalf_retime_lands;
+  Plane.concatenate(firstArc, secondArc)(low)
+      = firstArc(Plane.retime(2, 0)(low)) by Logic.if_positive as valueAtLow;
+  Plane.concatenate(firstArc, secondArc)(high)
+      = secondArc(Plane.retime(2, -(1 : ℝ))(high))
+      by Logic.if_negative as valueAtHigh;
+
+  let shared : Plane.Point := firstArc(Plane.retime(2, 0)(low));
+  shared ∈ Plane.arc(firstArc)
+      by { witness Plane.retime(2, 0)(low) with done };
+  shared
+     = Plane.concatenate(firstArc, secondArc)(low) by valueAtLow
+     = Plane.concatenate(firstArc, secondArc)(high) by sameValue
+     = secondArc(Plane.retime(2, -(1 : ℝ))(high)) by valueAtHigh
+     as sharedOnSecond;
+  secondArc(Plane.retime(2, -(1 : ℝ))(high)) = shared by Equality.symmetry;
+  shared ∈ Plane.arc(secondArc)
+      by { witness Plane.retime(2, -(1 : ℝ))(high) with done };
+  shared = Plane.arcFinish(firstArc) by meetOnlyThere;
+
+  firstArc(Plane.retime(2, 0)(low)) = Plane.arcFinish(firstArc);
+  Plane.Point.first(low) = 1 / 2 by Plane.lowerHalf_at_finish_is_midpoint;
+  secondArc(Plane.retime(2, -(1 : ℝ))(high)) = Plane.arcFinish(firstArc)
+      by substituting sharedOnSecond;
+  secondArc(Plane.retime(2, -(1 : ℝ))(high)) = Plane.arcStart(secondArc)
+      by sharedEndpoint;
+  Plane.Point.first(high) = 1 / 2 by Plane.upperHalf_at_start_is_midpoint;
+  Plane.Point.first(low) = Plane.Point.first(high);
+  done by Plane.unitSegment_equal_of_first_coordinate
+}
+
 -- Two arcs meeting only at the endpoint they share concatenate to an arc.
 theorem Plane.IsArc.concatenate
         (firstArc secondArc : Plane.Point → Plane.Point)
@@ -672,52 +728,17 @@ theorem Plane.IsArc.concatenate
                         by Logic.if_positive as valueAtY;
                     firstArc(Plane.retime(2, 0)(x))
                        = Plane.concatenate(firstArc, secondArc)(x)
-                                                   = Plane.concatenate(firstArc, secondArc)(y)
-                             by sameValue
+                       = Plane.concatenate(firstArc, secondArc)(y) by sameValue
                        = firstArc(Plane.retime(2, 0)(y)) by valueAtY;
                     Plane.retime(2, 0)(x) = Plane.retime(2, 0)(y)
                         by firstInjective;
                     done by lowerRetimeInjective
                   }
                 otherwise as yHigh: {
-                    -- Across the seam: the common value is on both arcs,
-                    -- so it is the shared endpoint and both parameters are
-                    -- the midpoint.
                     1 / 2 ≤ Plane.Point.first(y)
                         by Real.not_LessOrEqual_implies;
                     y ∈ Plane.upperHalf;
-                    Plane.retime(2, -(1 : ℝ))(y) ∈ Plane.unitSegment
-                        by Plane.upperHalf_retime_lands;
-                    Plane.concatenate(firstArc, secondArc)(y)
-                        = secondArc(Plane.retime(2, -(1 : ℝ))(y))
-                        by Logic.if_negative as valueAtY;
-                    let shared : Plane.Point := firstArc(Plane.retime(2, 0)(x));
-                    shared ∈ Plane.arc(firstArc)
-                        by { witness Plane.retime(2, 0)(x) with done };
-                    shared
-                       = Plane.concatenate(firstArc, secondArc)(x)
-                                                   = Plane.concatenate(firstArc, secondArc)(y)
-                             by sameValue
-                       = secondArc(Plane.retime(2, -(1 : ℝ))(y))
-                             by valueAtY as sharedOnSecond;
-                    secondArc(Plane.retime(2, -(1 : ℝ))(y)) = shared
-                        by Equality.symmetry;
-                    shared ∈ Plane.arc(secondArc)
-                        by { witness Plane.retime(2, -(1 : ℝ))(y) with done };
-                    shared = Plane.arcFinish(firstArc) by meetOnlyThere;
-                    firstArc(Plane.retime(2, 0)(x))
-                        = Plane.arcFinish(firstArc);
-                    Plane.Point.first(x) = 1 / 2
-                        by Plane.lowerHalf_at_finish_is_midpoint;
-                    secondArc(Plane.retime(2, -(1 : ℝ))(y))
-                        = Plane.arcFinish(firstArc)
-                        by substituting sharedOnSecond;
-                    secondArc(Plane.retime(2, -(1 : ℝ))(y))
-                        = Plane.arcStart(secondArc) by sharedEndpoint;
-                    Plane.Point.first(y) = 1 / 2
-                        by Plane.upperHalf_at_start_is_midpoint;
-                    Plane.Point.first(x) = Plane.Point.first(y);
-                    done by Plane.unitSegment_equal_of_first_coordinate
+                    done by Plane.concatenate_across_seam
                   }
               }
             }
@@ -727,43 +748,14 @@ theorem Plane.IsArc.concatenate
               Plane.retime(2, -(1 : ℝ))(x) ∈ Plane.unitSegment
                   by Plane.upperHalf_retime_lands;
               Plane.concatenate(firstArc, secondArc)(x)
-                  = secondArc(Plane.retime(2, -(1 : ℝ))(x))
-                  by Logic.if_negative as valueAtX;
+                  = secondArc(Plane.retime(2, -(1 : ℝ))(x)) by Logic.if_negative;
               done by cases {
                 case Plane.Point.first(y) ≤ 1 / 2 as yLow: {
-                    -- The mirror of the seam case, with the roles swapped.
                     y ∈ Plane.lowerHalf;
-                    Plane.retime(2, 0)(y) ∈ Plane.unitSegment
-                        by Plane.lowerHalf_retime_lands;
                     Plane.concatenate(firstArc, secondArc)(y)
-                        = firstArc(Plane.retime(2, 0)(y))
-                        by Logic.if_positive;
-                    let shared : Plane.Point := firstArc(Plane.retime(2, 0)(y));
-                    shared ∈ Plane.arc(firstArc)
-                        by { witness Plane.retime(2, 0)(y) with done };
-                    shared
-                       = Plane.concatenate(firstArc, secondArc)(y)
-                                                   = Plane.concatenate(firstArc, secondArc)(x)
-                                                   = secondArc(Plane.retime(2, -(1 : ℝ))(x))
-                             by valueAtX as sharedOnSecond;
-                    secondArc(Plane.retime(2, -(1 : ℝ))(x)) = shared
-                        by Equality.symmetry;
-                    shared ∈ Plane.arc(secondArc)
-                        by { witness Plane.retime(2, -(1 : ℝ))(x) with done };
-                    shared = Plane.arcFinish(firstArc) by meetOnlyThere;
-                    firstArc(Plane.retime(2, 0)(y))
-                        = Plane.arcFinish(firstArc);
-                    Plane.Point.first(y) = 1 / 2
-                        by Plane.lowerHalf_at_finish_is_midpoint;
-                    secondArc(Plane.retime(2, -(1 : ℝ))(x))
-                        = Plane.arcFinish(firstArc)
-                        by substituting sharedOnSecond;
-                    secondArc(Plane.retime(2, -(1 : ℝ))(x))
-                        = Plane.arcStart(secondArc) by sharedEndpoint;
-                    Plane.Point.first(x) = 1 / 2
-                        by Plane.upperHalf_at_start_is_midpoint;
-                    Plane.Point.first(x) = Plane.Point.first(y);
-                    done by Plane.unitSegment_equal_of_first_coordinate
+                        = Plane.concatenate(firstArc, secondArc)(x) by sameValue;
+                    y = x by Plane.concatenate_across_seam;
+                    done
                   }
                 otherwise as yHigh: {
                     -- Both in the second arc.
@@ -777,8 +769,7 @@ theorem Plane.IsArc.concatenate
                         by Logic.if_negative as valueAtY;
                     secondArc(Plane.retime(2, -(1 : ℝ))(x))
                        = Plane.concatenate(firstArc, secondArc)(x)
-                                                   = Plane.concatenate(firstArc, secondArc)(y)
-                             by sameValue
+                       = Plane.concatenate(firstArc, secondArc)(y) by sameValue
                        = secondArc(Plane.retime(2, -(1 : ℝ))(y)) by valueAtY;
                     Plane.retime(2, -(1 : ℝ))(x)
                         = Plane.retime(2, -(1 : ℝ))(y) by secondInjective;
