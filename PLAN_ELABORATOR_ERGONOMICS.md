@@ -274,6 +274,14 @@ VARIABLE is still rejected without an expected carrier, now verified with
 the whole tower in scope — `m` already has a type, and drifting an ℕ
 expression into ℤ unasked would trade an error at the site for a confusing
 one downstream, against the ℕ-narrowing discipline.
+
+**This split is PRELIMINARY, not settled** (owner, 2026-07-26): it is not
+obvious that `-1` landing in ℤ while `-m` stays rejected is less confusing
+than treating both the same way. The argument for the split is that a
+literal has no type to drift from and a variable does; the argument against
+is that a reader meets one rule with two answers. Revisit once there is use
+evidence — in particular, whether anyone writes `-m` meaning the integer
+and is surprised, or writes it by mistake and is glad of the error.
 `ErrorTest/unseeded_negative_natural` is the load-bearing control;
 `ErrorTest/unseeded_negative_numeral` was narrowed to "no signed carrier in
 scope at all"; `Test/negative_numeral` locks the new behaviour.
