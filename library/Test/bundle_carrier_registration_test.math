@@ -1,0 +1,66 @@
+-- Test/bundle_carrier_registration_test.math
+--
+-- `instance <bundle>` reads the bundle's carrier off the constructor's
+-- own telescope, so ANY bundle shaped like `Ring` registers — not only
+-- the four the elaborator once knew by name. The two instances below sit
+-- on different carriers, and the implicit `{g : Gauge}` of a generic
+-- definition is recovered from each.
+
+module Test.bundle_carrier_registration_test
+
+import Logic.basics
+import Equality.basics
+import Set.basics
+import Real.interface
+import Real.order
+import Real.absolute_value
+import Real.absolute_value_order
+import Natural.order
+
+definition Test.IsGauge (carrier : Type(0)) (size : carrier → ℝ) : Proposition :=
+  ∀ (x : carrier). size(x) ≥ 0
+
+inductive Gauge : Type(1) where
+  | Gauge.make
+      : (carrier : Type(0))
+        → (size : carrier → ℝ)
+        → Test.IsGauge(carrier, size)
+        → Gauge
+
+definition Gauge.carrier : Gauge → Type(0)
+  | Gauge.make(carrier, size, isGauge) => carrier
+
+definition Gauge.size {g : Gauge} : Gauge.carrier(g) → ℝ :=
+  let ⟨carrier, size, isGauge⟩ := g in
+    size
+
+definition Gauge.Small {g : Gauge} (subset : Set(Gauge.carrier(g))) : Proposition :=
+  ∀ (x : Gauge.carrier(g)). x ∈ subset → Gauge.size(x) < 1
+
+-- Two carriers, two instances.
+
+theorem Test.real_is_gauge : Test.IsGauge(ℝ, Real.absolute_value) := {
+  take x : ℝ;
+  done by Real.absolute_value_nonneg
+}
+
+definition Real.gauge : Gauge :=
+  Gauge.make(ℝ, Real.absolute_value, Test.real_is_gauge)
+
+instance Real.gauge
+
+theorem Test.natural_is_gauge : Test.IsGauge(ℕ, (n : ℕ) ↦ (0 : ℝ)) := {
+  take n : ℕ;
+  done
+}
+
+definition Natural.gauge : Gauge :=
+  Gauge.make(ℕ, (n : ℕ) ↦ (0 : ℝ), Test.natural_is_gauge)
+
+instance Natural.gauge
+
+-- The bundle is recovered from a bare `Set(ℝ)` / `Set(ℕ)`.
+
+definition Test.smallReals (subset : Set(ℝ)) : Proposition := Gauge.Small(subset)
+
+definition Test.smallNaturals (subset : Set(ℕ)) : Proposition := Gauge.Small(subset)

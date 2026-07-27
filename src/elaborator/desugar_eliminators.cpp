@@ -506,7 +506,9 @@ std::vector<std::string> Elaborator::carrierHeadCandidates(
         return candidates;
     }
 
-ExpressionPointer Elaborator::carrierProjectionField(ExpressionPointer type) {
+ExpressionPointer Elaborator::carrierProjectionField(ExpressionPointer type,
+                                                     int depth) {
+        if (depth > 8) return nullptr;
         auto* application = std::get_if<Application>(&type->node);
         if (!application) return nullptr;
         // The bundle is the projection's LAST argument — peel the spine
@@ -519,12 +521,17 @@ ExpressionPointer Elaborator::carrierProjectionField(ExpressionPointer type) {
         }
         auto* projector = std::get_if<Constant>(&projectorHead->node);
         if (!projector) return nullptr;
-        if (projector->name != "Ring.carrier"
-            && projector->name != "CommutativeRing.carrier"
-            && projector->name != "Field.carrier"
-            && projector->name != "VectorSpace.carrier") {
+        // Any bundle's carrier projection is `<Structure>.carrier`; the
+        // structure itself is whatever precedes the suffix.
+        static const std::string carrierSuffix = ".carrier";
+        if (projector->name.size() <= carrierSuffix.size()
+            || projector->name.compare(
+                   projector->name.size() - carrierSuffix.size(),
+                   carrierSuffix.size(), carrierSuffix) != 0) {
             return nullptr;
         }
+        std::string structureName = projector->name.substr(
+            0, projector->name.size() - carrierSuffix.size());
         ExpressionPointer bundle = weakHeadNormalForm(
             environment_, application->argument);
         std::vector<ExpressionPointer> arguments;
@@ -533,31 +540,49 @@ ExpressionPointer Elaborator::carrierProjectionField(ExpressionPointer type) {
             arguments.push_back(inner->argument);
             cursor = inner->function;
         }
-        auto* constructor = std::get_if<Constant>(&cursor->node);
-        if (!constructor) return nullptr;
+        auto* constructorConstant = std::get_if<Constant>(&cursor->node);
+        if (!constructorConstant) return nullptr;
         if (arguments.empty()) return nullptr;
-        // `Ring.make`'s first constructor argument IS the carrier type;
-        // each refinement bundle (`CommutativeRing`, `Field`) holds the
-        // next structure layer DOWN as its first argument, so the
-        // carrier is read by recursing through that layer's own
-        // carrier projection.
-        if (constructor->name == "Ring.make") {
-            return arguments.back();
+        const Declaration* declaration =
+            environment_.lookup(constructorConstant->name);
+        if (!declaration) return nullptr;
+        auto* constructor = std::get_if<Constructor>(declaration);
+        if (!constructor || constructor->inductiveName != structureName) {
+            return nullptr;
         }
-        if (constructor->name == "CommutativeRing.make") {
-            return carrierProjectionField(makeApplication(
-                makeConstant("Ring.carrier"), arguments.back()));
+        // Read the carrier off the constructor's own telescope rather than
+        // off a table of known bundles. A bundle either states its carrier
+        // (`Ring.make`'s `(carrier : Type(0))`, which may sit behind
+        // parameter binders as in `VectorSpace(f)`), or refines a bundle
+        // one layer down (`CommutativeRing.make` takes a `Ring`), in which
+        // case the carrier is that layer's.
+        std::vector<ExpressionPointer> domains;
+        ExpressionPointer walk = constructor->type;
+        while (auto* pi = std::get_if<Pi>(&walk->node)) {
+            if (domains.size() == arguments.size()) break;
+            domains.push_back(pi->domain);
+            walk = pi->codomain;
         }
-        if (constructor->name == "Field.make") {
-            return carrierProjectionField(makeApplication(
-                makeConstant("CommutativeRing.carrier"), arguments.back()));
+        auto argumentAt = [&](std::size_t position) {
+            return arguments[arguments.size() - 1 - position];
+        };
+        for (std::size_t position = 0; position < domains.size();
+             ++position) {
+            if (std::get_if<Sort>(&domains[position]->node)) {
+                return argumentAt(position);
+            }
         }
-        // `VectorSpace(f)` is a PARAMETERIZED inductive, so the make's
-        // first argument is the field parameter and the carrier type is
-        // the second.
-        if (constructor->name == "VectorSpace.make"
-            && arguments.size() >= 2) {
-            return arguments[arguments.size() - 2];
+        for (std::size_t position = 0; position < domains.size();
+             ++position) {
+            std::string domainHead = headConstantName(domains[position]);
+            if (domainHead == "<unknown>") continue;
+            if (environment_.lookup(domainHead + carrierSuffix) == nullptr) {
+                continue;
+            }
+            return carrierProjectionField(
+                makeApplication(makeConstant(domainHead + carrierSuffix),
+                                argumentAt(position)),
+                depth + 1);
         }
         return nullptr;
     }

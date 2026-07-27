@@ -6037,7 +6037,8 @@ private:
     // underlying `Quotient(…)` the way full WHNF would. An abstract
     // `Ring.carrier(s)` has a stuck bundle argument, so this returns
     // nullptr and the dispatch is unchanged.
-    ExpressionPointer carrierProjectionField(ExpressionPointer type);
+    ExpressionPointer carrierProjectionField(ExpressionPointer type,
+                                             int depth = 0);
 
     // Walk `signature`'s Pi chain; check that the first N domains have
     // the head-name listed in `argumentTypeNames`. Requires the chain
