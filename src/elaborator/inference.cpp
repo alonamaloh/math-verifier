@@ -1332,6 +1332,147 @@ ExpressionPointer Elaborator::citeCoreGoalWithExistsFlattening(
         return nullptr;
     }
 
+ExpressionPointer Elaborator::citeWithInferredArguments(
+        const SurfaceExpression& citation,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        bool requireUnambiguous,
+        bool reportErrors,
+        CitationFailure* failureOut) {
+        auto fail = [&](CitationFailure reason) -> ExpressionPointer {
+            if (failureOut) *failureOut = reason;
+            return nullptr;
+        };
+        if (failureOut) *failureOut = CitationFailure::None;
+        auto* identifier = std::get_if<SurfaceIdentifier>(&citation.node);
+        if (!identifier) return fail(CitationFailure::UnknownName);
+
+        // Resolve the cited statement's type. A LOCAL fact wins over a
+        // declaration of the same name (ordinary scoping), and the
+        // innermost binding wins among locals — a theorem premise, an
+        // earlier claim and a library lemma are all citable the same way.
+        ExpressionPointer citedType;
+        int implicitCount = 0;
+        int stackSize = static_cast<int>(localBinders.size());
+        for (int index = stackSize - 1; index >= 0; --index) {
+            if (localBinders[index].name == identifier->qualifiedName) {
+                citedType = liftBoundVariables(
+                    localBinders[index].type, stackSize - index, 0);
+                break;
+            }
+        }
+        if (!citedType) {
+            if (const Declaration* declaration =
+                    environment_.lookup(identifier->qualifiedName)) {
+                citedType = declarationType(*declaration);
+                implicitCount = environment_.implicitArgumentCount(
+                    identifier->qualifiedName);
+            }
+        }
+        if (!citedType) return fail(CitationFailure::UnknownName);
+
+        int explicitCount = countLeadingPis(citedType) - implicitCount;
+        // A definition-spelled conclusion (`pieceOpen : OpenIn(piece,
+        // wide)`) shows no Pi until WHNF opens it, so the syntactic count
+        // is 0 while the fact really does take arguments. Only when BOTH
+        // counts are empty is there nothing to infer.
+        int extendedCount =
+            countLeadingPisThroughWhnf(citedType) - implicitCount;
+        if (explicitCount <= 0 && extendedCount <= 0) {
+            return fail(CitationFailure::NoArgumentsToInfer);
+        }
+
+        auto elaborateWithHoles =
+            [&](int holeCount) -> ExpressionPointer {
+            std::vector<SurfaceArgument> holeArgs;
+            for (int i = 0; i < holeCount; ++i) {
+                holeArgs.push_back(
+                    {"", makeSurfaceHole(citation.line, citation.column)});
+            }
+            SurfaceExpressionPointer call = makeSurfaceApplication(
+                makeSurfaceIdentifier(
+                    identifier->qualifiedName, identifier->universeArgs,
+                    citation.line, citation.column),
+                std::move(holeArgs), citation.line, citation.column);
+            bool previousRequirement = requireUnambiguousDischarge_;
+            requireUnambiguousDischarge_ = requireUnambiguous;
+            try {
+                ExpressionPointer cited = elaborateExpression(
+                    *call, localBinders, expectedType);
+                requireUnambiguousDischarge_ = previousRequirement;
+                return cited;
+            } catch (...) {
+                requireUnambiguousDischarge_ = previousRequirement;
+                throw;
+            }
+        };
+        // A citation that resolves at a DIFFERENT type than the goal —
+        // e.g. the unapplied definition-spelled conclusion when a premise
+        // pinned every stated hole — is never useful; treat it as a
+        // failure for retry purposes.
+        auto typeMatchesExpected =
+            [&](ExpressionPointer term) -> bool {
+            if (!expectedType) return true;
+            try {
+                ExpressionPointer termType = inferTypeInLocalContext(
+                    localBinders, term);
+                ExpressionPointer expectedOpened = openOverLocalBinders(
+                    expectedType, localBinders, localBinders.size());
+                Context context = buildContextFromLocalBinders(localBinders);
+                return isDefinitionallyEqual(
+                    environment_, context, termType, expectedOpened);
+            } catch (const TypeError&) {
+                return true;  // can't judge — keep the old behaviour
+            } catch (const ElaborateError&) {
+                return true;
+            }
+        };
+
+        // The stated count stays primary: `Not(P)` also δ-unfolds to a Pi,
+        // and an eager extra hole would break every negation-concluding
+        // citation. On a failed retry the stated-form outcome stands — its
+        // diagnostics match what the user wrote.
+        if (explicitCount <= 0) {
+            try {
+                return elaborateWithHoles(extendedCount);
+            } catch (const ElaborateError&) {
+                if (reportErrors) throw;
+                return fail(CitationFailure::Unresolved);
+            } catch (const TypeError&) {
+                if (reportErrors) throw;
+                return fail(CitationFailure::Unresolved);
+            }
+        }
+        try {
+            ExpressionPointer stated = elaborateWithHoles(explicitCount);
+            if (extendedCount <= explicitCount
+                || typeMatchesExpected(stated)) {
+                return stated;
+            }
+            try {
+                ExpressionPointer extended =
+                    elaborateWithHoles(extendedCount);
+                if (typeMatchesExpected(extended)) return extended;
+            } catch (const ElaborateError&) {
+            } catch (const TypeError&) {
+            }
+            return stated;
+        } catch (const ElaborateError& statedError) {
+            if (extendedCount > explicitCount) {
+                try {
+                    return elaborateWithHoles(extendedCount);
+                } catch (const ElaborateError&) {
+                } catch (const TypeError&) {
+                }
+            }
+            if (reportErrors) throw statedError;
+            return fail(CitationFailure::Unresolved);
+        } catch (const TypeError&) {
+            if (reportErrors) throw;
+            return fail(CitationFailure::Unresolved);
+        }
+    }
+
 ExpressionPointer Elaborator::recoverClaimHint(
         const ExpressionPointer& hintTerm,
         const SurfaceExpression& byHint,
@@ -1544,44 +1685,16 @@ ExpressionPointer Elaborator::recoverClaimHint(
         // the goal-directed unifier. Cold path: only reached when the
         // alternative is the citation error, and a failure falls through to
         // that error unchanged.
-        if (auto* bareIdentifier =
-                std::get_if<SurfaceIdentifier>(&byHint.node)) {
-            ExpressionPointer lemmaTypeClosed;
-            int N = static_cast<int>(localBinders.size());
-            for (int b = N - 1; b >= 0; --b) {
-                if (localBinders[b].name == bareIdentifier->qualifiedName) {
-                    lemmaTypeClosed = liftBoundVariables(
-                        localBinders[b].type, N - b, 0);
-                    break;
-                }
-            }
-            if (!lemmaTypeClosed) {
-                if (const Declaration* declaration =
-                        environment_.lookup(bareIdentifier->qualifiedName)) {
-                    lemmaTypeClosed = declarationType(*declaration);
-                }
-            }
-            int leadingPis =
-                lemmaTypeClosed ? countLeadingPis(lemmaTypeClosed) : 0;
-            if (leadingPis > 0) {
-                std::vector<SurfaceExpressionPointer> holes;
-                for (int i = 0; i < leadingPis; ++i) {
-                    holes.push_back(makeSurfaceHole(line, 0));
-                }
-                SurfaceExpressionPointer allHolesCall =
-                    makeSurfaceApplication(
-                        std::make_shared<const SurfaceExpression>(byHint),
-                        std::move(holes), line, 0);
-                try {
-                    ExpressionPointer filled = elaborateExpression(
-                        *allHolesCall, localBinders, goalClosed);
-                    if (filled
-                        && bridgedResultProvesGoal(
-                               filled, goalClosed, localBinders)) {
-                        return filled;
-                    }
-                } catch (const ElaborateError&) {
-                } catch (const TypeError&) {}
+        if (std::get_if<SurfaceIdentifier>(&byHint.node)) {
+            // The goal validates the outcome, so an ambiguous premise
+            // discharge is safe; a failure falls through to the citation
+            // error unchanged.
+            ExpressionPointer filled = citeWithInferredArguments(
+                byHint, localBinders, goalClosed,
+                /*requireUnambiguous=*/false, /*reportErrors=*/false);
+            if (filled
+                && bridgedResultProvesGoal(filled, goalClosed, localBinders)) {
+                return filled;
             }
         }
         // Pi-typed goal (structurally, or after one WHNF step — `¬P` is

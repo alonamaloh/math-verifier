@@ -1107,8 +1107,53 @@ ExpressionPointer Elaborator::elaborateCalc(
                 bool proofIsUnapplied =
                     std::get_if<Pi>(&weakHeadNormalForm(
                         environment_, stepProofType)->node) != nullptr;
+                // A cited fact left unapplied is exactly what the shared
+                // citation path exists for: expand it to `name(?, …, ?)`
+                // and let the step's own relation pin the arguments, with
+                // the premises discharged from context. A stated fact and
+                // a `choose … from` have always read this way; a chain
+                // step used to be the one position where the same fact,
+                // cited the same way, had to be spelled out.
+                //
+                // The step's relation validates the outcome, so an
+                // ambiguous premise discharge is safe here (unlike the
+                // `from` path), and a failure falls through to the
+                // diagnostic below rather than replacing it.
+                if (proofIsUnapplied && step.stepProof) {
+                    ExpressionPointer instantiated =
+                        citeWithInferredArguments(
+                            *step.stepProof, localBinders, stepRelationType,
+                            /*requireUnambiguous=*/false,
+                            /*reportErrors=*/false);
+                    if (instantiated) {
+                        try {
+                            ExpressionPointer instantiatedType =
+                                inferTypeInLocalContext(
+                                    localBinders, instantiated);
+                            if (isDefinitionallyEqual(
+                                    environment_, stepContext,
+                                    instantiatedType,
+                                    stepRelationTypeOpened)) {
+                                stepProofKernel = instantiated;
+                                stepProofType = instantiatedType;
+                                proofIsUnapplied = false;
+                            }
+                        } catch (const TypeError&) {
+                        } catch (const ElaborateError&) {
+                        }
+                    }
+                }
+                // Empty message = the citation above resolved after all, so
+                // there is nothing to report and the step stands.
+                bool stepResolved =
+                    stepProofKernel
+                    && isDefinitionallyEqual(environment_, stepContext,
+                                             stepProofType,
+                                             stepRelationTypeOpened);
                 std::string mismatchMessage;
-                if (proofIsUnapplied) {
+                if (stepResolved) {
+                    // Nothing to say.
+                } else if (proofIsUnapplied) {
                     mismatchMessage =
                         "this step's justification is a lemma that was never "
                         "instantiated — its arguments could not be inferred "
@@ -1162,7 +1207,8 @@ ExpressionPointer Elaborator::elaborateCalc(
                                 || mentionsSubtractOrNegate(l->body);
                         return false;
                     };
-                if (mentionsSubtractOrNegate(stepRelationTypeOpened)) {
+                if (!mismatchMessage.empty()
+                    && mentionsSubtractOrNegate(stepRelationTypeOpened)) {
                     mismatchMessage +=
                         "\n  note: this step involves subtraction — `a - b` and "
                         "`a + -b` print alike and are ring-equal, but the matcher "
@@ -1171,7 +1217,7 @@ ExpressionPointer Elaborator::elaborateCalc(
                         "other. Write both sides the same way, or close the step "
                         "with `ring` (or a `by substituting` bridge).";
                 }
-                throwElaborate(mismatchMessage);
+                if (!mismatchMessage.empty()) throwElaborate(mismatchMessage);
             }
             steps.push_back({stepSymbol, stepBackward, stepProofKernel,
                              stepRelationName, stepRelationHead, stepSwapped,

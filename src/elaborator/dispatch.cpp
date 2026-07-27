@@ -304,132 +304,24 @@ ExpressionPointer Elaborator::elaborateExpression(
                 throwElaborate(
                     "`by <lemma>` (in obtain) expects a lemma name");
             }
-            const Declaration* decl =
-                environment_.lookup(identifier->qualifiedName);
-            ExpressionPointer declType;
-            int implicitCount = 0;
-            if (decl) {
-                declType = declarationType(*decl);
-                implicitCount = environment_.implicitArgumentCount(
-                    identifier->qualifiedName);
-            } else {
-                // A LOCAL fact cited the same way — `choose radius … from
-                // pieceOpen`, where `pieceOpen : ∀ x. x ∈ piece → ∃ r. …`.
-                // Its ∀/→ slots become holes exactly like a lemma's, so a
-                // citation reads the same whether the fact came from the
-                // statement, an earlier claim, or the library. Without
-                // this, every such source has to be spelled as a positional
-                // application of the hypothesis.
-                for (auto binder = localBinders.rbegin();
-                     binder != localBinders.rend(); ++binder) {
-                    if (binder->name == identifier->qualifiedName) {
-                        declType = binder->type;
-                        break;
-                    }
-                }
+            // No goal validates this citation's outcome (the obtained
+            // existential just flows onward), so a silently-guessed
+            // premise surfaces as a confusing failure far away — demand an
+            // unambiguous discharge. Errors are reported, not swallowed:
+            // there is no other path to fall back to here.
+            CitationFailure failure = CitationFailure::None;
+            if (ExpressionPointer cited = citeWithInferredArguments(
+                    *citeInferred->function, localBinders, expectedType,
+                    /*requireUnambiguous=*/true, /*reportErrors=*/true,
+                    &failure)) {
+                return cited;
             }
-            if (!declType) {
-                throwElaborate("unknown lemma '" + identifier->qualifiedName
-                               + "' in `by`-citation");
-            }
-            int totalPi = countLeadingPis(declType);
-            int explicitCount = totalPi - implicitCount;
-            // A definition-spelled conclusion (`pieceOpen : OpenIn(piece,
-            // wide)`) shows no Pi until WHNF opens it, so the syntactic
-            // count is 0 while the fact really does take arguments. Only
-            // when BOTH counts are empty is there nothing to infer.
-            int whnfExplicitCount =
-                countLeadingPisThroughWhnf(declType) - implicitCount;
-            if (explicitCount <= 0 && whnfExplicitCount <= 0) {
+            if (failure == CitationFailure::NoArgumentsToInfer) {
                 throwElaborate("lemma '" + identifier->qualifiedName
                                + "' takes no explicit arguments to infer");
             }
-            auto elaborateWithHoles =
-                [&](int holeCount) -> ExpressionPointer {
-                std::vector<SurfaceArgument> holeArgs;
-                for (int i = 0; i < holeCount; ++i) {
-                    holeArgs.push_back(
-                        {"", makeSurfaceHole(expression.line,
-                                             expression.column)});
-                }
-                SurfaceExpressionPointer call = makeSurfaceApplication(
-                    makeSurfaceIdentifier(
-                        identifier->qualifiedName, identifier->universeArgs,
-                        expression.line, expression.column),
-                    std::move(holeArgs), expression.line, expression.column);
-                // No goal validates this citation's outcome (the obtained
-                // existential just flows onward), so a silently-guessed
-                // premise surfaces as a confusing failure far away — demand
-                // an unambiguous discharge instead.
-                requireUnambiguousDischarge_ = true;
-                try {
-                    ExpressionPointer cited = elaborateExpression(
-                        *call, localBinders, expectedType);
-                    requireUnambiguousDischarge_ = false;
-                    return cited;
-                } catch (...) {
-                    requireUnambiguousDischarge_ = false;
-                    throw;
-                }
-            };
-            // The expected type here is the real destructure target (the
-            // choose paths build it), so a citation that resolves at a
-            // DIFFERENT type — e.g. the unapplied definition-spelled
-            // conclusion when a premise pinned every stated hole — is
-            // never useful; treat it like a failure for retry purposes.
-            auto typeMatchesExpected =
-                [&](ExpressionPointer term) -> bool {
-                if (!expectedType) return true;
-                try {
-                    ExpressionPointer termType = inferTypeInLocalContext(
-                        localBinders, term);
-                    ExpressionPointer expectedOpened = openOverLocalBinders(
-                        expectedType, localBinders, localBinders.size());
-                    Context context =
-                        buildContextFromLocalBinders(localBinders);
-                    return isDefinitionallyEqual(
-                        environment_, context, termType, expectedOpened);
-                } catch (const TypeError&) {
-                    return true;  // can't judge — keep the old behaviour
-                } catch (const ElaborateError&) {
-                    return true;
-                }
-            };
-            // Retry with holes for the premises a definition-spelled
-            // conclusion buries (`isCauchy : … → IsCauchy(f)` where
-            // IsCauchy(f) = ∀ ε. 0 < ε → ∃ N. … — the ε and positivity
-            // slots exist only after WHNF, so the syntactic count above
-            // never opened them). The stated count stays primary:
-            // `Not(P)` also δ-unfolds to a Pi, and an eager extra hole
-            // would break every negation-concluding citation. On a
-            // failed retry, the stated-form outcome stands — its
-            // diagnostics match what the user wrote.
-            int extendedCount = whnfExplicitCount;
-            if (explicitCount <= 0) {
-                return elaborateWithHoles(extendedCount);
-            }
-            try {
-                ExpressionPointer stated =
-                    elaborateWithHoles(explicitCount);
-                if (extendedCount <= explicitCount
-                    || typeMatchesExpected(stated)) {
-                    return stated;
-                }
-                try {
-                    ExpressionPointer extended =
-                        elaborateWithHoles(extendedCount);
-                    if (typeMatchesExpected(extended)) return extended;
-                } catch (const ElaborateError&) {
-                }
-                return stated;
-            } catch (const ElaborateError& statedError) {
-                if (extendedCount <= explicitCount) throw;
-                try {
-                    return elaborateWithHoles(extendedCount);
-                } catch (const ElaborateError&) {
-                    throw statedError;
-                }
-            }
+            throwElaborate("unknown lemma '" + identifier->qualifiedName
+                           + "' in `by`-citation");
         }
 
         if (auto* unfold =

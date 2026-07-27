@@ -2163,3 +2163,22 @@ STILL OPEN, different mechanism: a *chain step* citing a ∀-hypothesis
 (`… < tolerance / 2 by firstClose`) is not instantiated at all — "this
 step's justification is a lemma that was never instantiated". Two sites in
 `Plane/sequence.math` keep `firstClose(m, pastFirst)` for that reason.
+
+**CLOSED — a chain step now instantiates a cited ∀-hypothesis, like the
+other two citation positions.** Previously `… < tolerance / 2 by
+firstClose` reported "this step's justification is a lemma that was never
+instantiated"; the fix routes that detection into the shared citation
+path instead of reporting it. Five sites library-wide plus two in
+`Plane/sequence.math` dropped their arguments.
+
+The underlying defect was structural: three positions where a citation can
+stand — a stated fact's `by`, a `choose … from`, and a chain step — each
+carried its own copy of the expand-to-holes logic, and they had drifted
+apart in three different ways. They now share
+`Elaborator::citeWithInferredArguments`. Worth remembering the next time a
+citation "works here but not there": suspect a fourth copy before
+suspecting the mathematics.
+
+Equality chain steps still take their arguments, and that is not a gap:
+there the arguments choose WHICH occurrence to rewrite, which the step's
+endpoints alone do not determine.

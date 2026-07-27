@@ -5382,6 +5382,37 @@ private:
         const std::vector<LocalBinder>& localBinders,
         int line);
 
+    // Why a citation could not be expanded, for callers that own the
+    // wording. `Unresolved` means the name WAS citable but no assignment
+    // of its holes worked.
+    enum class CitationFailure {
+        None, UnknownName, NoArgumentsToInfer, Unresolved
+    };
+
+    // Cite a name with every explicit argument inferred: expand it to
+    // `name(?, …, ?)` and elaborate against `expectedType`, so the goal
+    // pins the data arguments and the context discharges the premises.
+    //
+    // ONE implementation for the three places a citation can stand — a
+    // stated fact's `by`, a `choose … from`, and a relation-chain step.
+    // Each of those grew its own copy, and they drifted: only one looked
+    // in the local context, only one counted implicit arguments, only one
+    // retried through WHNF for a definition-spelled conclusion, and the
+    // chain step had none of it, so the same fact cited the same way read
+    // bare in one position and needed its arguments spelled in another.
+    //
+    // Returns nullptr on failure. With `reportErrors` the elaboration
+    // error from the last attempt is rethrown instead (the caller wants
+    // the detail); without it, failure is silent and the caller falls
+    // back to its own path.
+    ExpressionPointer citeWithInferredArguments(
+        const SurfaceExpression& citation,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        bool requireUnambiguous,
+        bool reportErrors,
+        CitationFailure* failureOut = nullptr);
+
     // Like `inferLeadingArguments` but the holes can be at ANY position,
     // marked by `?` in the user's argument list. For each position:
     //   - If it's `?` (SurfaceHole): open a metavariable; resolve it
