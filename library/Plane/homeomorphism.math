@@ -162,15 +162,15 @@ theorem Plane.inverse_continuous_on_compact
           s(m) ∈ carrier
               ∧ (Plane.distance(f(x), f(s(m))) < Real.harmonic_term(m)
                      ∧ ¬(Plane.distance(x, s(m)) < tolerance))
-              by chosen(m);
+              by chosen;
           done
         }
         as inside;
 
     -- Thin them to a convergent sequence.
-    choose index, limit such that
+    choose index : ℕ → ℕ, limit : Plane.Point such that
         limit ∈ carrier ∧ Plane.SubsequenceConverges(s, index, limit)
-        from compact(s, inside);
+        from compact;
     Natural.IsStrictlyIncreasing(index);
     limit ∈ carrier as limitInCarrier;
     Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) as converges;
@@ -179,19 +179,20 @@ theorem Plane.inverse_continuous_on_compact
     -- gives the other.
     Plane.SequenceConverges((k : ℕ) ↦ f(s(index(k))), f(limit))
         by Plane.ContinuousAt.along_sequence(
-            f, carrier, limit, continuous(limit, limitInCarrier),
-            (k : ℕ) ↦ s(index(k)), (k : ℕ) ↦ inside(index(k)), converges);
+            continuous := continuous(limit, limitInCarrier),
+            s := (k : ℕ) ↦ s(index(k)),
+            inside := (k : ℕ) ↦ inside(index(k)));
     Plane.SequenceConverges((k : ℕ) ↦ f(s(index(k))), f(x))
         by (scale : ℝ) (scalePositive : scale > 0) ↦ {
           choose step such that Real.harmonic_term(step) < scale
-              from Real.exists_harmonic_term_below(scale, scalePositive);
+              from Real.exists_harmonic_term_below;
           witness step with
               (k : ℕ) (beyond : step ≤ k) ↦ {
                 s(index(k)) ∈ carrier
                     ∧ (Plane.distance(f(x), f(s(index(k))))
                            < Real.harmonic_term(index(k))
                            ∧ ¬(Plane.distance(x, s(index(k))) < tolerance))
-                    by chosen(index(k));
+                    by chosen;
                 Plane.distance(f(x), f(s(index(k))))
                     < Real.harmonic_term(index(k));
                 k ≤ index(k) by Natural.IsStrictlyIncreasing.LessOrEqual;
@@ -208,7 +209,7 @@ theorem Plane.inverse_continuous_on_compact
         by Plane.SequenceConverges.unique(
             s := (k : ℕ) ↦ f(s(index(k))));
     limit = x
-        by injective(limit, limitInCarrier, x, xInCarrier, { f(limit) = f(x) })
+        by injective
         as limitIsX;
 
     -- So the bad points converge to `x`, though every one of them was
@@ -216,16 +217,16 @@ theorem Plane.inverse_continuous_on_compact
     choose threshold such that
         ∀ (k : ℕ). threshold ≤ k →
             Plane.distance(limit, s(index(k))) < tolerance
-        as closeBeyond from converges(tolerance, tolerancePositive);
+        as closeBeyond from converges;
     Plane.distance(limit, s(index(threshold))) < tolerance
-        by closeBeyond(threshold, { threshold ≤ threshold });
+        by closeBeyond;
     Plane.distance(x, s(index(threshold))) < tolerance
         by substituting limitIsX;
     s(index(threshold)) ∈ carrier
         ∧ (Plane.distance(f(x), f(s(index(threshold))))
                < Real.harmonic_term(index(threshold))
                ∧ ¬(Plane.distance(x, s(index(threshold))) < tolerance))
-        by chosen(index(threshold));
+        by chosen;
     ¬(Plane.distance(x, s(index(threshold))) < tolerance);
     done
   };

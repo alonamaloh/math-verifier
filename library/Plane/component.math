@@ -42,13 +42,13 @@ theorem Plane.singleton_IsConnected (base : Plane.Point)
       Set.singleton(Plane.Point, base) ∖ piece,
       Set.singleton(Plane.Point, base));
   suppose Set.IsNonempty(Plane.Point, piece) as pieceNonempty;
-  choose start such that start ∈ piece as startInPiece from pieceNonempty;
+  choose start such that start ∈ piece from pieceNonempty;
   start ∈ Set.singleton(Plane.Point, base)
-      by pieceInside(start, startInPiece);
+      by pieceInside;
   start = base as startIsBase;
   base ∈ piece by substituting startIsBase;
   Set.singleton(Plane.Point, base) ⊆ piece
-      by Set.singleton_subset(base, piece, { base ∈ piece });
+      by Set.singleton_subset;
   done by Set.equal_of_same_members
 }
 
@@ -89,8 +89,8 @@ theorem Plane.Component_subset (region : Set(Plane.Point)) (base : Plane.Point)
       part ⊆ region ∧ Plane.IsConnected(part) ∧ base ∈ part ∧ x ∈ part
       from inComponent;
   part ⊆ region as partInside;
-  x ∈ part as xInPart;
-  done by partInside(x, xInPart)
+  x ∈ part;
+  done by partInside
 }
 
 theorem Plane.base_in_Component
@@ -123,21 +123,21 @@ theorem Plane.Component_IsConnected
 
   -- Whichever part witnesses a point of the piece is swallowed whole,
   -- and it holds the base point.
-  choose start such that start ∈ piece as startInPiece from pieceNonempty;
-  start ∈ Plane.Component(region, base) by pieceInside(start, startInPiece);
+  choose start such that start ∈ piece from pieceNonempty;
+  start ∈ Plane.Component(region, base) by pieceInside;
   choose startPart such that
       startPart ⊆ region ∧ Plane.IsConnected(startPart) ∧
         base ∈ startPart ∧ start ∈ startPart
       from { start ∈ Plane.Component(region, base) };
   startPart ⊆ region;
   Plane.IsConnected(startPart);
-  base ∈ startPart as baseInStartPart;
+  base ∈ startPart;
   start ∈ startPart;
   startPart ⊆ Plane.Component(region, base) by Plane.Component_contains;
   Set.IsNonempty(Plane.Point, piece ∩ startPart)
       by { witness start with done };
   startPart ⊆ piece by Plane.IsConnected.swallows as startPartInPiece;
-  base ∈ piece by startPartInPiece(base, baseInStartPart);
+  base ∈ piece by startPartInPiece;
 
   -- With the base point inside, every part through it is swallowed too.
   Plane.Component(region, base) ⊆ piece
@@ -149,12 +149,12 @@ theorem Plane.Component_IsConnected
         part ⊆ region;
         Plane.IsConnected(part);
         base ∈ part;
-        x ∈ part as xInPart;
+        x ∈ part;
         part ⊆ Plane.Component(region, base) by Plane.Component_contains;
         Set.IsNonempty(Plane.Point, piece ∩ part)
             by { witness base with done };
         part ⊆ piece by Plane.IsConnected.swallows as partInPiece;
-        done by partInPiece(x, xInPart)
+        done by partInPiece
       };
   done by Set.equal_of_same_members
 }
@@ -198,7 +198,7 @@ theorem Plane.Component.equal_of_member
         x ∈ bridge ∪ part by Set.subset_union_right;
         bridge ∪ part ⊆ Plane.Component(region, base)
             by Plane.Component_contains as unionInside;
-        done by unionInside(x, { x ∈ bridge ∪ part })
+        done by unionInside
       };
 
   Plane.Component(region, base) ⊆ Plane.Component(region, other)
@@ -219,7 +219,7 @@ theorem Plane.Component.equal_of_member
         x ∈ bridge ∪ part by Set.subset_union_right;
         bridge ∪ part ⊆ Plane.Component(region, other)
             by Plane.Component_contains as unionInside;
-        done by unionInside(x, { x ∈ bridge ∪ part })
+        done by unionInside
       };
   done by Set.equal_of_same_members
 }
@@ -265,7 +265,7 @@ theorem Plane.Component.recognize
         (baseInPart : base ∈ part)
         : part = Plane.Component(region, base) := {
   part ⊆ Plane.Component(region, base) by Plane.Component_contains;
-  base ∈ region by partInside(base, baseInPart);
+  base ∈ region by partInside;
   Plane.Component(region, base) ⊆ region by Plane.Component_subset;
   Plane.IsConnected(Plane.Component(region, base))
       by Plane.Component_IsConnected;
@@ -296,13 +296,13 @@ theorem Plane.Component_IsOpen
   part ⊆ region as partInside;
   Plane.IsConnected(part);
   base ∈ part;
-  x ∈ part as xInPart;
-  x ∈ region by partInside(x, xInPart);
+  x ∈ part;
+  x ∈ region by partInside;
   choose radius such that
       0 < radius ∧
         ∀ (y : Plane.Point). y ∈ Set.universe(Plane.Point) →
           Plane.distance(x, y) < radius → y ∈ region
-      from regionOpen(x, { x ∈ region });
+      from regionOpen;
   0 < radius;
   ∀ (y : Plane.Point). y ∈ Set.universe(Plane.Point) →
       Plane.distance(x, y) < radius → y ∈ region as nearbyInRegion;
@@ -311,8 +311,7 @@ theorem Plane.Component_IsOpen
       by (y : Plane.Point) (yInBall : y ∈ Plane.Ball(x, radius)) ↦ {
         Plane.distance(x, y) < radius;
         y ∈ Set.universe(Plane.Point) by Set.member_universe;
-        done by nearbyInRegion(y, { y ∈ Set.universe(Plane.Point) },
-                               { Plane.distance(x, y) < radius })
+        done by nearbyInRegion
       };
   Plane.distance(x, x) = 0 by Plane.distance_self;
   Plane.distance(x, x) < radius;
@@ -333,8 +332,8 @@ theorem Plane.Component_IsOpen
            (yClose : Plane.distance(x, y) < radius) ↦ {
           y ∈ Plane.Ball(x, radius);
           y ∈ part ∪ Plane.Ball(x, radius)
-              by Set.subset_union_right(part, Plane.Ball(x, radius));
-          done by unionInside(y, { y ∈ part ∪ Plane.Ball(x, radius) })
+              by Set.subset_union_right;
+          done by unionInside
         };
     done
   }
@@ -379,19 +378,18 @@ theorem Plane.Component_boundary_outside_region
           Plane.distance(x, y) < radius → y ∈ Plane.Component(region, x)
       from { Plane.IsOpen(Plane.Component(region, x)) }(
           x, { x ∈ Plane.Component(region, x) });
-  0 < radius as radiusPositive;
+  0 < radius;
   ∀ (y : Plane.Point). y ∈ Set.universe(Plane.Point) →
       Plane.distance(x, y) < radius → y ∈ Plane.Component(region, x)
       as nearbyInOwnComponent;
   choose near such that
       near ∈ Plane.Component(region, base) ∧ Plane.distance(x, near) < radius
-      from componentIsNear(radius, radiusPositive);
+      from componentIsNear;
   near ∈ Plane.Component(region, base);
   Plane.distance(x, near) < radius;
   near ∈ Set.universe(Plane.Point) by Set.member_universe;
   near ∈ Plane.Component(region, x)
-      by nearbyInOwnComponent(near, { near ∈ Set.universe(Plane.Point) },
-          { Plane.distance(x, near) < radius });
+      by nearbyInOwnComponent;
   Set.IsNonempty(Plane.Point,
       Plane.Component(region, x) ∩ Plane.Component(region, base))
       by { witness near with done };
