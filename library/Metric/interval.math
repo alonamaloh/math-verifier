@@ -5,6 +5,10 @@
 -- connected. This is the domain a mathematician gives a curve, and with
 -- the topology developed over a metric space it is available directly —
 -- no plane point has to stand in for a parameter.
+--
+-- Connectedness comes from convexity, and convexity is where the order
+-- completeness of ℝ enters: no metric space has this theorem, and the
+-- interval is where every curve argument gets it.
 
 module Metric.interval
 
@@ -24,7 +28,12 @@ import Real.absolute_value
 import Real.absolute_value_order
 import Real.convergence
 import Real.cluster
+import Real.division
+import Real.minimum
+import Real.order_multiplication
+import Real.supremum
 import Metric.space
+import Metric.connected
 import Metric.topology
 import Metric.sequence
 import Metric.compactness
@@ -87,3 +96,301 @@ theorem Real.unitInterval_IsCompact
   MetricSpace.SubsequenceConverges(s, index, limit);
   witness index with { witness limit }
 }
+
+-- ----------------------------------------------------------------------
+-- Convexity on the line, and the walk it is stated with.
+
+definition Real.between (a b : ℝ) (t : ℝ) : ℝ :=
+  a + t * (b - a)
+
+theorem Real.between_zero (a b : ℝ) : Real.between(a, b, 0) = a :=
+  Real.between(a, b, 0)
+     = a + 0 * (b - a)
+     = a by ring
+
+theorem Real.between_one (a b : ℝ) : Real.between(a, b, 1) = b :=
+  Real.between(a, b, 1)
+     = a + 1 * (b - a)
+     = b by ring
+
+theorem Real.between_difference (a b s t : ℝ)
+        : Real.between(a, b, s) - Real.between(a, b, t) = (s - t) * (b - a) :=
+  Real.between(a, b, s) - Real.between(a, b, t)
+     = (a + s * (b - a)) - (a + t * (b - a))
+     = (s - t) * (b - a) by ring
+
+-- A parameter gap of `g` moves the walk by `g · |b - a|`.
+theorem Real.between_distance (a b s t : ℝ)
+        : MetricSpace.distance(Real.between(a, b, s), Real.between(a, b, t))
+              = abs(t - s) * abs(b - a) :=
+  MetricSpace.distance(Real.between(a, b, s), Real.between(a, b, t))
+     = abs(Real.between(a, b, s) - Real.between(a, b, t))
+     = abs((s - t) * (b - a)) by Real.between_difference
+     = abs(s - t) * abs(b - a) by Real.absolute_value_multiplicative
+     = abs(t - s) * abs(b - a) by Real.absolute_value_subtract_swap
+
+definition Real.IsConvex (region : Set(ℝ)) : Proposition :=
+  ∀ (a : ℝ). a ∈ region →
+    ∀ (b : ℝ). b ∈ region →
+      ∀ (t : ℝ). 0 ≤ t → t ≤ 1 → Real.between(a, b, t) ∈ region
+
+theorem Real.unitInterval_IsConvex : Real.IsConvex(Real.unitInterval) := {
+  take a : ℝ;
+  suppose a ∈ Real.unitInterval as aInside;
+  take b : ℝ;
+  suppose b ∈ Real.unitInterval as bInside;
+  take t : ℝ;
+  suppose t ≥ 0 as tNonneg;
+  suppose t ≤ 1 as tAtMostOne;
+  a ≥ 0;
+  a ≤ 1;
+  b ≥ 0;
+  b ≤ 1;
+  Real.between(a, b, t) = (1 - t) * a + t * b by ring;
+  1 - t ≥ 0;
+  (1 - t) * a ≥ 0 by Real.multiply_nonneg;
+  t * b ≥ 0 by Real.multiply_nonneg;
+  Real.between(a, b, t) ≥ 0;
+  (1 - t) * a ≤ (1 - t) * 1 by Real.LessOrEqual.multiply_by_nonneg_left;
+  t * b ≤ t * 1 by Real.LessOrEqual.multiply_by_nonneg_left;
+  Real.between(a, b, t)
+     = (1 - t) * a + t * b
+     ≤ (1 - t) * 1 + t * 1
+     = 1 by ring;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- Convex sets on the line are connected.
+--
+-- Fix a point of the piece and any target of the region, and look at the
+-- set of parameters whose walk has landed in the piece:
+--
+--     reached = { t ∈ [0,1] : between(start, target, t) ∈ piece }.
+--
+-- It holds 0 and stops at 1, so it has a supremum. The walk at the
+-- supremum cannot be outside the piece — the piece's complement is open,
+-- and parameters just short of the supremum are already inside. And the
+-- supremum cannot be short of 1 — the piece is open, so parameters just
+-- past it would be inside too, and the supremum would not be one.
+--
+-- The estimate that turns "just short" into a distance is
+-- `Real.between_distance`: a parameter gap of `g` moves the walk by
+-- `g · |b - a|`, so `r / (1 + |b - a|)` is always a small enough gap.
+
+definition Real.reachedParameters (piece : Set(ℝ)) (a b : ℝ) : Set(ℝ) :=
+  (t : ℝ) ↦ (0 ≤ t ∧ t ≤ 1) ∧ Real.between(a, b, t) ∈ piece
+
+-- The parameter gap that keeps the walk inside a ball of radius `r`.
+definition Real.parameterGap (r a b : ℝ) : ℝ :=
+  r / (1 + abs(b - a))
+
+theorem Real.parameterGap_positive (r a b : ℝ) (radiusPositive : r > 0)
+        : Real.parameterGap(r, a, b) > 0 := {
+  abs(b - a) ≥ 0;
+  1 + abs(b - a) > 0;
+  1 + abs(b - a) ≠ 0;
+  done by Real.divide_positive
+}
+
+-- A gap below `parameterGap(r, a, b)` moves the walk less than `r`.
+theorem Real.between_close_of_gap (r a b s t : ℝ) (radiusPositive : r > 0)
+        (gapSmall : abs(t - s) < Real.parameterGap(r, a, b))
+        : MetricSpace.distance(Real.between(a, b, s), Real.between(a, b, t)) < r := {
+  abs(b - a) ≥ 0;
+  1 + abs(b - a) > 0;
+  1 + abs(b - a) ≠ 0;
+  Real.IsNonneg(abs(b - a));
+  abs(t - s) * abs(b - a) ≤ Real.parameterGap(r, a, b) * abs(b - a)
+      by Real.LessOrEqual.multiply_by_nonneg_right;
+  Real.parameterGap(r, a, b) > 0 by Real.parameterGap_positive;
+  abs(b - a) < 1 + abs(b - a);
+  abs(b - a) * Real.parameterGap(r, a, b)
+      < (1 + abs(b - a)) * Real.parameterGap(r, a, b)
+      by Real.LessThan.multiply_by_positive_right;
+  (1 + abs(b - a)) * Real.parameterGap(r, a, b) = r by Real.divide_cancel;
+  MetricSpace.distance(Real.between(a, b, s), Real.between(a, b, t))
+     = abs(t - s) * abs(b - a) by Real.between_distance
+     ≤ Real.parameterGap(r, a, b) * abs(b - a)
+     = abs(b - a) * Real.parameterGap(r, a, b)
+     < (1 + abs(b - a)) * Real.parameterGap(r, a, b)
+     = r;
+  done
+}
+
+-- The walk at the supremum has landed in the piece. If it had not, the
+-- complement is open around it, and parameters just short of the
+-- supremum — which the supremum guarantees exist — would be outside the
+-- piece too, though they were chosen for being inside it.
+theorem Real.reached_supremum_inside
+        (region piece : Set(ℝ)) (a b peak : ℝ)
+        (convex : Real.IsConvex(region))
+        (aInRegion : a ∈ region) (bInRegion : b ∈ region)
+        (restOpen : MetricSpace.OpenIn(region ∖ piece, region))
+        (isSupremum : Real.IsSupremum(Real.reachedParameters(piece, a, b), peak))
+        (peakLow : peak ≥ 0) (peakHigh : peak ≤ 1)
+        : Real.between(a, b, peak) ∈ piece := {
+  Real.IsUpperBound(Real.reachedParameters(piece, a, b), peak) as isUpperBound;
+  Real.between(a, b, peak) ∈ region by convex;
+  suppose ¬(Real.between(a, b, peak) ∈ piece) as outside for contradiction {
+    Real.between(a, b, peak) ∈ region ∖ piece;
+    choose radius such that
+        radius > 0 ∧
+        ∀ (y : ℝ). y ∈ region →
+          MetricSpace.distance(Real.between(a, b, peak), y) < radius
+            → y ∈ region ∖ piece
+        from restOpen(Real.between(a, b, peak),
+            { Real.between(a, b, peak) ∈ region ∖ piece });
+    radius > 0;
+    ∀ (y : ℝ). y ∈ region →
+        MetricSpace.distance(Real.between(a, b, peak), y) < radius
+          → y ∈ region ∖ piece as nearbyOutside;
+    Real.parameterGap(radius, a, b) > 0 by Real.parameterGap_positive;
+    peak - Real.parameterGap(radius, a, b) < peak;
+    choose t such that
+        t ∈ Real.reachedParameters(piece, a, b)
+        ∧ peak - Real.parameterGap(radius, a, b) < t
+        from Real.IsSupremum.exists_above(
+            u := peak - Real.parameterGap(radius, a, b));
+    t ∈ Real.reachedParameters(piece, a, b);
+    peak - Real.parameterGap(radius, a, b) < t;
+    t ≤ peak by isUpperBound;
+    (0 ≤ t ∧ t ≤ 1);
+    t ≥ 0;
+    t ≤ 1;
+    Real.between(a, b, t) ∈ piece;
+    Real.between(a, b, t) ∈ region by convex;
+    -Real.parameterGap(radius, a, b) < t - peak;
+    t - peak < Real.parameterGap(radius, a, b);
+    abs(t - peak) < Real.parameterGap(radius, a, b)
+        by Real.absolute_value_LessThan_of_bounds;
+    MetricSpace.distance(Real.between(a, b, peak), Real.between(a, b, t)) < radius
+        by Real.between_close_of_gap;
+    Real.between(a, b, t) ∈ region ∖ piece by nearbyOutside;
+    ¬(Real.between(a, b, t) ∈ piece);
+    Real.between(a, b, t) ∈ piece;
+    done
+  };
+  done
+}
+
+-- The supremum is 1. If it were short of 1 the piece is open around the
+-- walk there, so a parameter a little past the supremum lands in the
+-- piece too — and a parameter past the supremum that belongs to the set
+-- is not what a supremum allows.
+theorem Real.reached_supremum_is_one
+        (region piece : Set(ℝ)) (a b peak : ℝ)
+        (convex : Real.IsConvex(region))
+        (aInRegion : a ∈ region) (bInRegion : b ∈ region)
+        (pieceOpen : MetricSpace.OpenIn(piece, region))
+        (isSupremum : Real.IsSupremum(Real.reachedParameters(piece, a, b), peak))
+        (peakLow : peak ≥ 0) (peakHigh : peak ≤ 1)
+        (peakInside : Real.between(a, b, peak) ∈ piece)
+        : peak = 1 := {
+  Real.IsUpperBound(Real.reachedParameters(piece, a, b), peak) as isUpperBound;
+  suppose peak ≠ 1 as short for contradiction {
+    peak ≤ 1;
+    peak ≠ 1;
+    peak < 1;
+    1 - peak > 0;
+    choose radius such that
+        radius > 0 ∧
+        ∀ (y : ℝ). y ∈ region →
+          MetricSpace.distance(Real.between(a, b, peak), y) < radius → y ∈ piece
+        from pieceOpen(Real.between(a, b, peak), peakInside);
+    radius > 0;
+    ∀ (y : ℝ). y ∈ region →
+        MetricSpace.distance(Real.between(a, b, peak), y) < radius
+          → y ∈ piece as nearbyInside;
+    Real.parameterGap(radius, a, b) > 0 by Real.parameterGap_positive;
+
+    -- A step short of both the room left and the gap that keeps the walk
+    -- inside the ball. Halving is what makes both comparisons strict.
+    (2 : ℝ) ≠ 0;
+    let room : ℝ := min(1 - peak, Real.parameterGap(radius, a, b));
+    room > 0 by Real.minimum_positive;
+    room / 2 < room by Real.divide_two_less_than_self;
+    room ≤ 1 - peak by Real.minimum_LessOrEqual_left;
+    room ≤ Real.parameterGap(radius, a, b) by Real.minimum_LessOrEqual_right;
+    room / 2 < 1 - peak;
+    room / 2 < Real.parameterGap(radius, a, b);
+    room / 2 > 0 by Real.divide_positive;
+
+    peak + room / 2 ≥ 0;
+    peak + room / 2 ≤ 1;
+    Real.between(a, b, peak + room / 2) ∈ region by convex;
+    (peak + room / 2) - peak = room / 2 by ring as stepGap;
+    abs(room / 2) = room / 2 by Real.absolute_value_when_nonneg as absStep;
+    abs((peak + room / 2) - peak)
+       = abs(room / 2) by stepGap
+       = room / 2 by absStep
+       < Real.parameterGap(radius, a, b);
+    MetricSpace.distance(
+        Real.between(a, b, peak), Real.between(a, b, peak + room / 2))
+        < radius by Real.between_close_of_gap;
+    Real.between(a, b, peak + room / 2) ∈ piece by nearbyInside;
+    (0 ≤ peak + room / 2 ∧ peak + room / 2 ≤ 1);
+    peak + room / 2 ∈ Real.reachedParameters(piece, a, b);
+    peak + room / 2 ≤ peak by isUpperBound;
+    peak < peak + room / 2;
+    done
+  };
+  done
+}
+
+theorem Real.IsConvex.connected (region : Set(ℝ)) (convex : Real.IsConvex(region))
+        : MetricSpace.IsConnected(region) := {
+  take piece : Set(ℝ);
+  suppose piece ⊆ region as pieceInside;
+  suppose MetricSpace.OpenIn(piece, region) as pieceOpen;
+  suppose MetricSpace.OpenIn(region ∖ piece, region) as restOpen;
+  suppose Set.IsNonempty(ℝ, piece) as pieceNonempty;
+  choose start such that start ∈ piece from pieceNonempty;
+  start ∈ region by pieceInside;
+
+  region ⊆ piece
+      by (target : ℝ) (targetInRegion : target ∈ region) ↦ {
+        -- The parameters that have landed hold 0 and stop at 1.
+        Real.between(start, target, 0) = start by Real.between_zero;
+        (0 : ℝ) ∈ Real.reachedParameters(piece, start, target)
+            by { (0 : ℝ) ≤ 0;
+                 (0 : ℝ) ≤ 1;
+                 Real.between(start, target, 0) ∈ piece;
+                 done };
+        Set.IsNonempty(ℝ, Real.reachedParameters(piece, start, target))
+            by { witness (0 : ℝ) };
+        Real.IsUpperBound(Real.reachedParameters(piece, start, target), (1 : ℝ))
+            by (t : ℝ)
+               (reached : t ∈ Real.reachedParameters(piece, start, target)) ↦ {
+              (0 ≤ t ∧ t ≤ 1);
+              done
+            };
+        Real.IsBoundedAbove(Real.reachedParameters(piece, start, target))
+            by { witness (1 : ℝ) };
+        choose peak such that
+            Real.IsSupremum(Real.reachedParameters(piece, start, target), peak)
+            from Real.supremum_exists;
+        Real.IsUpperBound(Real.reachedParameters(piece, start, target), peak)
+            as isUpperBound;
+
+        -- It sits in the unit interval …
+        peak ≥ 0 by isUpperBound;
+        ∀ (otherBound : ℝ).
+            Real.IsUpperBound(
+                Real.reachedParameters(piece, start, target), otherBound)
+            → peak ≤ otherBound as isLeast;
+        peak ≤ 1 by isLeast;
+
+        -- … the walk there has landed, and it is the end of the walk.
+        Real.between(start, target, peak) ∈ piece by Real.reached_supremum_inside;
+        peak = 1 by Real.reached_supremum_is_one;
+        Real.between(start, target, 1) = target by Real.between_one;
+        Real.between(start, target, 1) ∈ piece;
+        done
+      };
+  done by Set.equal_of_same_members
+}
+
+theorem Real.unitInterval_IsConnected
+        : MetricSpace.IsConnected(Real.unitInterval) :=
+  done by Real.IsConvex.connected
