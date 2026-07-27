@@ -1,14 +1,15 @@
 # Metric spaces, and topology developed once
 
-**Status: steps 1–3 DONE 2026-07-27. Step 4 not started.**
+**Status: steps 1–3 DONE 2026-07-27; step 4 IN PROGRESS on the branch
+`metric-interval-parametrisation`. `main` is green.**
 
 | Step | State |
 | --- | --- |
 | 0. `instance` accepts the bundle | **done** — `carrierProjectionField` reads the carrier off the constructor's telescope instead of a four-name table (8a898f6a). Regression test: `library/Test/bundle_carrier_registration_test.math`. |
 | 1. `Metric/` : bundle, `IsMetric`, instances | **done** — `Metric/space.math`; instances `Real.metricSpace` (`Metric/real.math`) and `Plane.metricSpace` (`Plane/metric.math`). |
-| 2. Topology ported generically | **done** — `Metric/{topology,continuity,sequence,compactness,homeomorphism,connected}.math`. |
-| 3. `Plane.*` as thin aliases | **done** — `Plane/{topology,sequence,compact,compactness,homeomorphism,connected,extremum}.math` keep every name; the tree is green throughout. |
-| 4. Parametrisation domains → ℝ | **not started** — see "Where step 4 stands" below. |
+| 2. Topology ported generically | **done** — `Metric/{topology,continuity,sequence,compactness,homeomorphism,connected,separation,uniform}.math`. |
+| 3. `Plane.*` as thin aliases | **done** — `Plane/{topology,sequence,compact,compactness,homeomorphism,connected,separation,extremum}.math` keep every name; the tree is green throughout. |
+| 4. Parametrisation domains → ℝ | **prerequisites done on `main`; three files left, on a branch** — see "Where step 4 stands" below. |
 
 What the port actually removed: `Plane/topology.math` 830 → 260 lines,
 `Plane/connected.math` 853 → 486, `Plane/compactness.math` 425 → 130,
@@ -27,25 +28,50 @@ Two statements changed shape on the way, both for the better:
 
 ## Where step 4 stands
 
-Prerequisites, in order:
+The prerequisites are all **done and on `main`** (`Metric/interval.math`,
+537 lines):
 
-1. `Real.unitInterval : Set(ℝ)` — **done**, with
-   `Real.unitInterval_IsCompact` (`Metric/interval.math`).
-2. `MetricSpace.IsConnected(Real.unitInterval)` — **not done**. Two
-   routes. The honest one is the supremum argument written directly on
-   ℝ: it is `Plane.IsConvex.connected`'s argument with the walk replaced
-   by `a + t·(b - a)` and `parameterGap` by `r / (1 + |b - a|)`, so
-   noticeably shorter than the ~240 plane-specific lines it comes from,
-   but still a real proof. The cheap one is to push
-   `Plane.unitSegment_IsConnected` forward along `Plane.Point.first`,
-   which is continuous on the segment and has the interval as its image
-   — three lines, but it makes the interval's connectedness depend on
-   the plane, which is exactly the dependency this plan exists to cut.
-   Prefer the direct proof.
-3. Then the migration proper: `Plane.IsArc` / `Plane.arc` /
-   `Plane.IsLoop` / `Plane.IsJordanCurve` take `γ : ℝ → Plane.Point` on
-   `Real.unitInterval`, and `Plane/{curve,subarc,concatenate,twoarcs}`
-   follow. That is where the deletions the plan promises actually land.
+- `Real.unitInterval`, compact (Bolzano–Weierstrass plus the limit staying
+  between the same two bounds) and connected.
+- Connectedness comes from `Real.IsConvex.connected`, the supremum
+  argument written directly on ℝ — the honest route, not the three-line
+  push-forward along `Plane.Point.first`, which would have made the
+  interval's connectedness depend on the plane.
+- `Real.between`, `Real.segment`, and the ordered characterisation
+  `x ∈ Real.segment(a, b) ↔ a ≤ x ≤ b`. That last one is the whole
+  content of what `Plane/model.math` needed 130 lines of coordinate
+  detour for; over ℝ it is three short proofs.
+- `MetricSpace.UniformlyContinuousOn` and compact separation, ported
+  generically — the last of the step-2 gap.
+
+**The migration proper is in progress on the branch
+`metric-interval-parametrisation`, which does NOT build.** Converted
+there: `Plane/model.math` (the whole `unitSegment` / `walk` /
+`first_coordinate_*` section deleted, 612 → 354), `Plane/curve.math`
+(`Plane.IsArc`, `arc`, `arcStart`/`arcFinish`, `IsLoop`,
+`IsJordanCurve` all on `γ : ℝ → Plane.Point` over `Real.unitInterval`),
+and `Plane/subarc.math` (the reparametrisation is `Real.between(a, b)`,
+plain arithmetic; `Plane.walkOnto` is gone, and a plane segment is an arc
+directly via `Plane.between(a, b)`). Each of the three verifies on its
+own.
+
+Still on plane parameters, and what makes the branch red:
+
+| file | lines | what it needs |
+| --- | --- | --- |
+| `Plane/concatenate.math` | 954 | `retime` becomes `t ↦ scale·t + shift`; the halves become `Set(ℝ)`; every "a coordinate gap never exceeds the distance" step **disappears** — over ℝ the gap IS the distance |
+| `Plane/twoarcs.math` | 838 | 149 `Point.make(1, 0)` sites become `1`; the parameter-order characterisation becomes `Real.segment_atLeast`/`_atMost`/`member_segment_of_bounds` |
+| `Plane/polyline.math` | 213 | `Plane.walkOnto(a, b)` becomes `Plane.between(a, b)`; the lemmas it needs (`Plane.IsArc.between`, `Plane.arc_between`, `Plane.between_arcStart`/`_arcFinish`) are already on the branch |
+
+The transformation is uniform and mechanical: `Plane.unitSegment` →
+`Real.unitInterval`, `Plane.walk(t)` → `t`, `Plane.Point.first(x)` → `x`,
+`Plane.Point.make(1, 0)` → `1`, `Plane.origin` (as a parameter) → `0`,
+`Plane.distance` (between parameters) → `MetricSpace.distance`. Nothing
+found so far needs a new idea.
+
+Afterwards: retire the `Plane.*` aliases file by file, and add the
+`Plane/` files that now qualify to `scripts/clean_manifest.txt` — it
+still holds zero of them.
 
 ## The problem
 

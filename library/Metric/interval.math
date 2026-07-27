@@ -42,6 +42,25 @@ import Metric.real
 definition Real.unitInterval : Set(ℝ) :=
   (t : ℝ) ↦ t ≥ 0 ∧ t ≤ 1
 
+theorem Real.member_unitInterval (t : ℝ) (atLeastZero : t ≥ 0) (atMostOne : t ≤ 1)
+        : t ∈ Real.unitInterval := {
+  t ≥ 0;
+  t ≤ 1;
+  done
+}
+
+theorem Real.unitInterval_nonneg (t : ℝ) (inside : t ∈ Real.unitInterval)
+        : t ≥ 0 := {
+  t ≥ 0;
+  done
+}
+
+theorem Real.unitInterval_atMostOne (t : ℝ) (inside : t ∈ Real.unitInterval)
+        : t ≤ 1 := {
+  t ≤ 1;
+  done
+}
+
 theorem Real.zero_in_unitInterval : (0 : ℝ) ∈ Real.unitInterval := {
   (0 : ℝ) ≥ 0;
   (0 : ℝ) ≤ 1;
@@ -394,3 +413,125 @@ theorem Real.IsConvex.connected (region : Set(ℝ)) (convex : Real.IsConvex(regi
 theorem Real.unitInterval_IsConnected
         : MetricSpace.IsConnected(Real.unitInterval) :=
   done by Real.IsConvex.connected
+
+-- ----------------------------------------------------------------------
+-- Subintervals, named by their endpoints — the domain of a subarc.
+--
+-- Written parametrically, like the plane's `segment`, because a subarc
+-- may run either way round. When the endpoints ARE ordered the set is the
+-- closed interval between them, and the two directions of that are all a
+-- consumer ever needs.
+
+definition Real.segment (a b : ℝ) : Set(ℝ) :=
+  (x : ℝ) ↦ ∃ (t : ℝ). (0 ≤ t ∧ t ≤ 1) ∧ x = Real.between(a, b, t)
+
+theorem Real.left_in_segment (a b : ℝ) : a ∈ Real.segment(a, b) := {
+  Real.between(a, b, 0) = a by Real.between_zero;
+  a = Real.between(a, b, 0);
+  (0 : ℝ) ≤ 0;
+  (0 : ℝ) ≤ 1;
+  done by { witness (0 : ℝ) }
+}
+
+theorem Real.right_in_segment (a b : ℝ) : b ∈ Real.segment(a, b) := {
+  Real.between(a, b, 1) = b by Real.between_one;
+  b = Real.between(a, b, 1);
+  (1 : ℝ) ≤ 1;
+  (0 : ℝ) ≤ 1;
+  done by { witness (1 : ℝ) }
+}
+
+theorem Real.IsConvex.segment_inside (region : Set(ℝ))
+        (convex : Real.IsConvex(region))
+        (a b : ℝ) (aInside : a ∈ region) (bInside : b ∈ region)
+        : Real.segment(a, b) ⊆ region := {
+  take x : ℝ;
+  suppose x ∈ Real.segment(a, b) as onSegment;
+  choose t such that (0 ≤ t ∧ t ≤ 1) ∧ x = Real.between(a, b, t) from onSegment;
+  0 ≤ t;
+  t ≤ 1;
+  x = Real.between(a, b, t) as isWalkPoint;
+  Real.between(a, b, t) ∈ region by convex;
+  done by substituting isWalkPoint
+}
+
+-- The walk is injective in its parameter unless it never moves.
+theorem Real.between_injective (a b : ℝ) (distinct : a ≠ b) (s t : ℝ)
+        (sameWalk : Real.between(a, b, s) = Real.between(a, b, t))
+        : s = t := {
+  b - a ≠ 0 by (vanishes : b - a = 0) ↦ {
+    a = b - (b - a)
+      = b - 0 by substituting vanishes
+      = b by ring;
+    done
+  };
+  (s - t) * (b - a)
+     = Real.between(a, b, s) - Real.between(a, b, t) by Real.between_difference
+     = Real.between(a, b, t) - Real.between(a, b, t) by substituting sameWalk
+     = 0 by ring;
+  s - t = 0 by { suppose s - t ≠ 0 as gapNonzero for contradiction {
+                   (s - t) * (b - a) ≠ 0 by Real.multiply_nonzero;
+                   done
+                 };
+                 done } as gapVanishes;
+  done by linear_combination(gapVanishes)
+}
+
+-- ----------------------------------------------------------------------
+-- Ordered endpoints: the subinterval IS the closed interval between them.
+-- This is the whole content of what a plane model needed a coordinate
+-- characterisation for.
+
+theorem Real.segment_atLeast (a b x : ℝ) (ordered : a ≤ b)
+        (onSegment : x ∈ Real.segment(a, b))
+        : a ≤ x := {
+  choose t such that (0 ≤ t ∧ t ≤ 1) ∧ x = Real.between(a, b, t) from onSegment;
+  0 ≤ t;
+  b - a ≥ 0;
+  t * (b - a) ≥ 0 by Real.multiply_nonneg;
+  x = Real.between(a, b, t)
+    = a + t * (b - a);
+  done by ordered_field
+}
+
+theorem Real.segment_atMost (a b x : ℝ) (ordered : a ≤ b)
+        (onSegment : x ∈ Real.segment(a, b))
+        : x ≤ b := {
+  choose t such that (0 ≤ t ∧ t ≤ 1) ∧ x = Real.between(a, b, t) from onSegment;
+  t ≤ 1;
+  1 - t ≥ 0;
+  b - a ≥ 0;
+  (1 - t) * (b - a) ≥ 0 by Real.multiply_nonneg;
+  x = Real.between(a, b, t)
+    = a + t * (b - a);
+  done by ordered_field
+}
+
+theorem Real.member_segment_of_bounds (a b x : ℝ) (ordered : a ≤ b)
+        (atLeast : a ≤ x) (atMost : x ≤ b)
+        : x ∈ Real.segment(a, b) :=
+  done by cases {
+    case a = b as degenerate: {
+        x ≤ a by substituting degenerate;
+        x = a by Real.LessOrEqual.antisymmetric;
+        a ∈ Real.segment(a, b) by Real.left_in_segment;
+        done by substitution
+      }
+    otherwise as distinctEnds: {
+        b ≠ a;
+        a < b;
+        b - a > 0 by ordered_field;
+        b - a ≠ 0;
+        x - a ≥ 0 by ordered_field;
+        (x - a) / (b - a) ≥ 0 by Real.divide_nonneg;
+        x - a ≤ b - a by ordered_field;
+        (x - a) / (b - a) ≤ (b - a) / (b - a) by Real.LessOrEqual.divide_by_positive;
+        (b - a) / (b - a) = 1 by Real.divide_self;
+        (x - a) / (b - a) ≤ 1;
+        Real.between(a, b, (x - a) / (b - a))
+           = a + (x - a) / (b - a) * (b - a)
+           = x by field;
+        x = Real.between(a, b, (x - a) / (b - a));
+        done by { witness (x - a) / (b - a) }
+      }
+  }
