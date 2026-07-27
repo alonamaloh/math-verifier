@@ -2128,3 +2128,38 @@ Known limit of the citation itself, and the reason two sites keep the
 restatement: it projects a DIRECT leg only. `0 ≤ parameter(m)` out of
 `(0 ≤ t ∧ t ≤ 1) ∧ s(m) = …` is one level too deep, and reports
 "its conclusion is about `And` but the goal is about `Real.IsNonneg`".
+
+**CLOSED — the `converges(nearness, nearnessPositive)` ambiguity was a
+missing β step in the hole solver, not a real ambiguity.** The citation
+
+```math
+choose threshold such that
+    ∀ (m : ℕ). threshold ≤ m → Plane.distance(x, s(m)) < nearness
+    from converges;
+```
+
+reported `the premise 0 < ? is matched by several hypotheses that pin
+different arguments` and listed `0 < nearness` and `0 < tolerance`. The
+goal names `nearness`, so it always determined the answer.
+
+The cause: `Plane.SequenceConverges` concludes through `eventually`, and
+`Natural.Eventually(P) := ∃ N. ∀ m. N ≤ m → P(m)` applies its predicate
+ARGUMENT under the binders. δ-unfolding therefore leaves the conclusion
+pattern carrying `(λ m. … ?ε …)(m)` where the goal carries the reduced
+proposition, the structural walk stopped at the mismatched head, and `?ε`
+survived Step 2 — so premise discharge had to guess it. A citation whose
+conclusion is stated through ANY predicate-taking definition had the same
+hole.
+
+Fixed by a β-normalisation rung in `inferCallWithHoles`, fallback-only
+(the walk's first-order alignment `?s(m)` vs `f(m)` must get the first
+look — β-reducing eagerly breaks `Real.limits` and `Real.power`), skipped
+in the speculative context scan (as the ζ rung is — doing otherwise
+starved `Real.HasDerivativeAt.subtract`'s search), and a no-op when
+neither side carried a redex. Regression:
+`library/Test/citation_through_predicate_definition.math`.
+
+STILL OPEN, different mechanism: a *chain step* citing a ∀-hypothesis
+(`… < tolerance / 2 by firstClose`) is not instantiated at all — "this
+step's justification is a lemma that was never instantiated". Two sites in
+`Plane/sequence.math` keep `firstClose(m, pastFirst)` for that reason.

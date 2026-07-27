@@ -156,6 +156,43 @@ ExpressionPointer Elaborator::unfoldHeadConstantOneStep(ExpressionPointer expr) 
         return body;
     }
 
+// β-normalise: reduce every redex, under binders included. Unfolding a
+// definition that takes a predicate (`Natural.Eventually(P) := ∃ N. ∀ m.
+// N ≤ m → P(m)`) leaves `P` applied to a bound variable, so the citation's
+// conclusion carries `(λ m. … ?hole …)(m)` where the goal carries the
+// reduced proposition, and the structural walk stops at the mismatched
+// head with the hole unpinned.
+//
+// A FALLBACK only — never the first thing tried. The walk's first-order
+// alignment is load-bearing: a pattern `?s(m)` against a target `f(m)`
+// solves `?s := f` by decomposing the application, and β-reducing the
+// target first would destroy exactly that.
+ExpressionPointer betaNormalise(ExpressionPointer expression, int fuel) {
+    if (!expression || fuel <= 0) return expression;
+    if (auto* application = std::get_if<Application>(&expression->node)) {
+        ExpressionPointer function =
+            betaNormalise(application->function, fuel - 1);
+        ExpressionPointer argument =
+            betaNormalise(application->argument, fuel - 1);
+        if (auto* lambda = std::get_if<Lambda>(&function->node)) {
+            return betaNormalise(
+                substitute(lambda->body, 0, argument), fuel - 1);
+        }
+        return makeApplication(function, argument);
+    }
+    if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+        return makeLambda(lambda->displayHint,
+                          betaNormalise(lambda->domain, fuel - 1),
+                          betaNormalise(lambda->body, fuel - 1));
+    }
+    if (auto* pi = std::get_if<Pi>(&expression->node)) {
+        return makePi(pi->displayHint,
+                      betaNormalise(pi->domain, fuel - 1),
+                      betaNormalise(pi->codomain, fuel - 1));
+    }
+    return expression;
+}
+
 void Elaborator::unifyConstructorParameters(
         ExpressionPointer pattern,
         ExpressionPointer target,

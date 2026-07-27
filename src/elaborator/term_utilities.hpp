@@ -203,6 +203,10 @@ Context buildContextFromLocalBinders(
 ExpressionPointer substituteBoundVariable(
     ExpressionPointer body, ExpressionPointer argument, int target);
 
+// Reduce every β-redex, under binders included. A fallback for the hole
+// solver: see the comment at its definition in unification.cpp.
+ExpressionPointer betaNormalise(ExpressionPointer expression, int fuel);
+
 // Replace every occurrence of BoundVariable(target) with `replacement`,
 // WITHOUT removing a binder: all other indices stay as they are (unlike
 // substituteBoundVariable, which β-reduces a binder away and shifts).

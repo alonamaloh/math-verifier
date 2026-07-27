@@ -2127,6 +2127,41 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                                               expectedTypeNormalised,
                                               metavariableNames, assignment);
             }
+            // β-normalisation retry: δ-unfolding a definition that takes a
+            // PREDICATE (`Natural.Eventually(P) := ∃ N. ∀ m. N ≤ m → P(m)`)
+            // leaves the predicate applied under the binders, so the
+            // conclusion pattern carries `(λ m. … ?hole …)(m)` where the
+            // goal carries the reduced proposition. The structural walk
+            // stops at that mismatched head and the hole survives Step 2 —
+            // and then premise discharge has to guess it, which is
+            // ambiguous whenever two hypotheses fit the premise shape.
+            // Fallback-only: the walk's first-order alignment (`?s(m)` vs
+            // `f(m)` solving `?s := f`) must get the first look.
+            anyUnassigned = false;
+            for (const auto& name : metavariableNames) {
+                if (!assignment.count(name)) { anyUnassigned = true; break; }
+            }
+            // Not inside the speculative context-fact scan, for the same
+            // reason as the ζ rung below: there it would fire on every
+            // failing candidate of every claim.
+            if (anyUnassigned && !inSpeculativeContextScan_) {
+                ExpressionPointer patternNormalised =
+                    weakHeadNormalForm(environment_, resultTypePattern);
+                ExpressionPointer expectedNormalised =
+                    weakHeadNormalForm(environment_, expectedType);
+                ExpressionPointer patternBeta =
+                    betaNormalise(patternNormalised, 200);
+                ExpressionPointer expectedBeta =
+                    betaNormalise(expectedNormalised, 200);
+                // A no-op whenever neither side carried a redex, which is
+                // the overwhelming majority — pay nothing there.
+                if (!structurallyEqual(patternBeta, patternNormalised)
+                    || !structurallyEqual(expectedBeta, expectedNormalised)) {
+                    unifyConstructorParameters(
+                        patternBeta, expectedBeta,
+                        metavariableNames, assignment);
+                }
+            }
             // Equality-endpoint reduction retry: the citation's conclusion
             // and the goal may spell the same endpoint through different
             // defeq wrappers (`apply(swap(a,b),a)` vs `swapMap(a,b,a)`);

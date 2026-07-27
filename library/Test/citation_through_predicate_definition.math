@@ -1,0 +1,33 @@
+-- A citation whose conclusion is stated through a definition that takes a
+-- PREDICATE (`Natural.Eventually(P) := ∃ N. ∀ m. N ≤ m → P(m)`).
+--
+-- Unfolding it leaves the predicate applied under the binders, so the
+-- conclusion pattern carries `(λ m. … ?hole …)(m)` where the goal carries
+-- the reduced proposition. Before the hole solver's β rung, the structural
+-- walk stopped at that mismatched head, the hole survived, and premise
+-- discharge had to guess it from `0 < ?` — ambiguous here BY CONSTRUCTION,
+-- since both `nearness` and `tolerance` are positive and in scope.
+--
+-- The goal determines the answer (`… < nearness`), so the citation must
+-- resolve without being told.
+module Test.citation_through_predicate_definition
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.eventually
+import Real.interface
+import Real.order
+
+theorem Test.citation_through_predicate_definition (s : ℕ → ℝ)
+        (converges : ∀ (e : ℝ). 0 < e → eventually (m). s(m) < e)
+        (nearness tolerance : ℝ)
+        (nearnessPositive : 0 < nearness)
+        (tolerancePositive : 0 < tolerance)
+        : ∃ (t : ℕ). ∀ (m : ℕ). t ≤ m → s(m) < nearness := {
+  choose threshold such that ∀ (m : ℕ). threshold ≤ m → s(m) < nearness
+      from converges;
+  done by { witness threshold with done }
+}
