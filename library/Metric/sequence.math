@@ -1,0 +1,134 @@
+-- Metric/sequence.math
+--
+-- Sequences in a metric space: convergence, boundedness, and thinning.
+-- Nothing here is about any particular space — a limit is a point every
+-- tail eventually stays within ε of, and that is the same sentence on
+-- the line, in the plane, and on an arc.
+
+module Metric.sequence
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Natural.basics
+import Natural.order
+import Natural.maximum
+import Natural.eventually
+import Natural.subsequence
+import Real.interface
+import Real.order
+import Real.order_field
+import Real.convergence
+import Metric.space
+
+definition MetricSpace.SequenceConverges {m : MetricSpace}
+        (s : ℕ → MetricSpace.carrier(m)) (limit : MetricSpace.carrier(m))
+        : Proposition :=
+  ∀ (tolerance : ℝ). tolerance > 0 →
+    eventually (k). MetricSpace.distance(limit, s(k)) < tolerance
+
+definition MetricSpace.IsBounded {m : MetricSpace}
+        (region : Set(MetricSpace.carrier(m))) : Proposition :=
+  ∃ (center : MetricSpace.carrier(m)). ∃ (bound : ℝ).
+    ∀ (x : MetricSpace.carrier(m)). x ∈ region →
+      MetricSpace.distance(center, x) ≤ bound
+
+definition MetricSpace.SequenceIsBounded {m : MetricSpace}
+        (s : ℕ → MetricSpace.carrier(m)) : Proposition :=
+  ∃ (centre : MetricSpace.carrier(m)). ∃ (bound : ℝ).
+    ∀ (k : ℕ). MetricSpace.distance(centre, s(k)) ≤ bound
+
+-- ----------------------------------------------------------------------
+-- Limits are unique: two limits are closer than every tolerance, so at
+-- distance zero, so the same point. This is where separation earns its
+-- place among the axioms.
+
+theorem MetricSpace.SequenceConverges.unique (m : MetricSpace)
+        (s : ℕ → MetricSpace.carrier(m)) (limit other : MetricSpace.carrier(m))
+        (toLimit : MetricSpace.SequenceConverges(s, limit))
+        (toOther : MetricSpace.SequenceConverges(s, other))
+        : limit = other := {
+  MetricSpace.distance(limit, other) = 0 by {
+    suppose ¬(MetricSpace.distance(limit, other) = 0) for contradiction;
+    MetricSpace.distance(limit, other) ≥ 0 by MetricSpace.distance_nonneg;
+    MetricSpace.distance(limit, other) > 0;
+    MetricSpace.distance(limit, other) / 2 > 0;
+    choose limitThreshold such that
+        ∀ (k : ℕ). limitThreshold ≤ k →
+          MetricSpace.distance(limit, s(k)) < MetricSpace.distance(limit, other) / 2
+        as nearLimit from toLimit;
+    choose otherThreshold such that
+        ∀ (k : ℕ). otherThreshold ≤ k →
+          MetricSpace.distance(other, s(k)) < MetricSpace.distance(limit, other) / 2
+        as nearOther from toOther;
+    let far : ℕ := Natural.maximum(limitThreshold, otherThreshold);
+    limitThreshold ≤ far;
+    otherThreshold ≤ far;
+    MetricSpace.distance(limit, s(far)) < MetricSpace.distance(limit, other) / 2
+        by nearLimit;
+    MetricSpace.distance(other, s(far)) < MetricSpace.distance(limit, other) / 2
+        by nearOther;
+    MetricSpace.distance(s(far), other) = MetricSpace.distance(other, s(far))
+        by MetricSpace.distance_symmetric;
+    MetricSpace.distance(limit, other)
+       ≤ MetricSpace.distance(limit, s(far)) + MetricSpace.distance(s(far), other)
+             by MetricSpace.distance_triangle
+       = MetricSpace.distance(limit, s(far)) + MetricSpace.distance(other, s(far))
+       < MetricSpace.distance(limit, other) / 2 + MetricSpace.distance(limit, other) / 2
+       = MetricSpace.distance(limit, other);
+    done
+  };
+  done by MetricSpace.equal_of_distance_zero
+}
+
+-- ----------------------------------------------------------------------
+-- Thinning, as a named relation.
+
+definition MetricSpace.SubsequenceConverges {m : MetricSpace}
+        (s : ℕ → MetricSpace.carrier(m)) (index : ℕ → ℕ)
+        (limit : MetricSpace.carrier(m))
+        : Proposition :=
+  Natural.IsStrictlyIncreasing(index)
+  ∧ MetricSpace.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
+
+theorem MetricSpace.SubsequenceConverges.increasing (m : MetricSpace)
+        (s : ℕ → MetricSpace.carrier(m)) (index : ℕ → ℕ)
+        (limit : MetricSpace.carrier(m))
+        (thins : MetricSpace.SubsequenceConverges(s, index, limit))
+        : Natural.IsStrictlyIncreasing(index) :=
+  unfold MetricSpace.SubsequenceConverges in {
+    Natural.IsStrictlyIncreasing(index);
+    done
+  }
+
+theorem MetricSpace.SubsequenceConverges.converges (m : MetricSpace)
+        (s : ℕ → MetricSpace.carrier(m)) (index : ℕ → ℕ)
+        (limit : MetricSpace.carrier(m))
+        (thins : MetricSpace.SubsequenceConverges(s, index, limit))
+        : MetricSpace.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) :=
+  unfold MetricSpace.SubsequenceConverges in {
+    MetricSpace.SequenceConverges((k : ℕ) ↦ s(index(k)), limit);
+    done
+  }
+
+-- Thinning preserves a limit: an index map never falls behind its own
+-- index, so the subsequence reaches every threshold the sequence does.
+theorem MetricSpace.SequenceConverges.subsequence (m : MetricSpace)
+        (s : ℕ → MetricSpace.carrier(m)) (limit : MetricSpace.carrier(m))
+        (index : ℕ → ℕ)
+        (converges : MetricSpace.SequenceConverges(s, limit))
+        (increasing : Natural.IsStrictlyIncreasing(index))
+        : MetricSpace.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) := {
+  take tolerance : ℝ;
+  suppose tolerance > 0;
+  choose threshold such that
+      ∀ (k : ℕ). threshold ≤ k → MetricSpace.distance(limit, s(k)) < tolerance
+      as closeBeyond from converges;
+  witness threshold with
+      (k : ℕ) (beyond : threshold ≤ k) ↦ {
+        k ≤ index(k) by Natural.IsStrictlyIncreasing.LessOrEqual;
+        threshold ≤ index(k);
+        done by closeBeyond
+      }
+}

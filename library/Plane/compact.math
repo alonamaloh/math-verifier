@@ -29,17 +29,19 @@ import Real.absolute_value
 import Real.absolute_value_order
 import Real.convergence
 import Real.cluster
+import Metric.space
+import Metric.sequence
 import Plane.vector
 import Plane.point
 import Plane.norm
+import Plane.metric
 import Plane.sequence
 
 -- ----------------------------------------------------------------------
 -- Bounded sequences of points.
 
 definition Plane.SequenceIsBounded (s : ℕ → Plane.Point) : Proposition :=
-  ∃ (centre : Plane.Point). ∃ (bound : ℝ).
-    ∀ (m : ℕ). Plane.distance(centre, s(m)) ≤ bound
+  MetricSpace.SequenceIsBounded(s)
 
 -- Each coordinate of a bounded sequence is bounded, because a coordinate
 -- gap never exceeds the distance. The bound moves by the centre's own
@@ -93,32 +95,25 @@ theorem Plane.second_gap_below_distance (p q : Plane.Point)
 }
 
 -- ----------------------------------------------------------------------
--- Thinning, as a named relation — the plane twin of
--- `Real.SubsequenceConverges`.
+-- Thinning, as a named relation — the generic metric notion, at the
+-- plane.
 
 definition Plane.SubsequenceConverges
         (s : ℕ → Plane.Point) (index : ℕ → ℕ) (limit : Plane.Point)
         : Proposition :=
-  Natural.IsStrictlyIncreasing(index)
-  ∧ Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
+  MetricSpace.SubsequenceConverges(s, index, limit)
 
 theorem Plane.SubsequenceConverges.increasing
         (s : ℕ → Plane.Point) (index : ℕ → ℕ) (limit : Plane.Point)
         (thins : Plane.SubsequenceConverges(s, index, limit))
         : Natural.IsStrictlyIncreasing(index) :=
-  unfold Plane.SubsequenceConverges in {
-    Natural.IsStrictlyIncreasing(index);
-    done
-  }
+  done by MetricSpace.SubsequenceConverges.increasing
 
 theorem Plane.SubsequenceConverges.converges
         (s : ℕ → Plane.Point) (index : ℕ → ℕ) (limit : Plane.Point)
         (thins : Plane.SubsequenceConverges(s, index, limit))
         : Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) :=
-  unfold Plane.SubsequenceConverges in {
-    Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit);
-    done
-  }
+  done by MetricSpace.SubsequenceConverges.converges
 
 -- ----------------------------------------------------------------------
 -- Bolzano--Weierstrass in the plane.
@@ -131,7 +126,8 @@ theorem Plane.bolzano_weierstrass (s : ℕ → Plane.Point)
       ∃ (bound : ℝ). ∀ (m : ℕ). Plane.distance(centre, s(m)) ≤ bound
       as boundExists from bounded;
   choose bound such that ∀ (m : ℕ). Plane.distance(centre, s(m)) ≤ bound
-      as inside from boundExists;
+      from boundExists;
+  ∀ (m : ℕ). Plane.distance(centre, s(m)) ≤ bound as inside;
 
   -- Thin once, so the first coordinate converges.
   Real.SequenceIsBounded((m : ℕ) ↦ Plane.Point.first(s(m)))
@@ -197,25 +193,9 @@ theorem Plane.bolzano_weierstrass (s : ℕ → Plane.Point)
       { witness limit }
 }
 
--- ----------------------------------------------------------------------
--- Thinning preserves a limit here too — the same argument as on the
--- line, and for the same reason: an index map never falls behind its own
--- index, so the subsequence reaches every threshold the sequence does.
-
 theorem Plane.SequenceConverges.subsequence
         (s : ℕ → Plane.Point) (limit : Plane.Point) (index : ℕ → ℕ)
         (converges : Plane.SequenceConverges(s, limit))
         (increasing : Natural.IsStrictlyIncreasing(index))
-        : Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) := {
-  take tolerance : ℝ;
-  suppose tolerance > 0;
-  choose threshold such that
-      ∀ (m : ℕ). threshold ≤ m → Plane.distance(limit, s(m)) < tolerance
-      as closeBeyond from converges;
-  witness threshold with
-      (k : ℕ) (beyond : threshold ≤ k) ↦ {
-        k ≤ index(k) by Natural.IsStrictlyIncreasing.LessOrEqual;
-        threshold ≤ index(k);
-        done by closeBeyond
-      }
-}
+        : Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) :=
+  done by MetricSpace.SequenceConverges.subsequence

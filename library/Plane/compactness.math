@@ -30,132 +30,52 @@ import Real.order_field
 import Real.absolute_value
 import Real.harmonic_series
 import Real.archimedean
+import Metric.space
+import Metric.topology
+import Metric.continuity
+import Metric.sequence
+import Metric.compactness
 import Plane.vector
 import Plane.point
 import Plane.norm
 import Plane.segment
+import Plane.metric
 import Plane.topology
 import Plane.sequence
 import Plane.compact
 
 -- ----------------------------------------------------------------------
--- Compactness.
+-- Compactness and closure — the generic metric notions, at the plane.
 
 definition Plane.IsCompact (region : Set(Plane.Point)) : Proposition :=
-  ∀ (s : ℕ → Plane.Point). (∀ (m : ℕ). s(m) ∈ region) →
-    ∃ (index : ℕ → ℕ). ∃ (limit : Plane.Point).
-      limit ∈ region ∧ Plane.SubsequenceConverges(s, index, limit)
+  MetricSpace.IsCompact(region)
 
--- The closure of a set, taken in the whole plane.
 definition Plane.Closure (region : Set(Plane.Point)) : Set(Plane.Point) :=
-  Plane.ClosureIn(region, Set.universe(Plane.Point))
-
--- ----------------------------------------------------------------------
--- Closure and limits. The two directions are asymmetric: a limit of
--- points of the set lands in the closure by definition, while producing
--- the sequence from a point of the closure is a choice.
+  MetricSpace.Closure(region)
 
 theorem Plane.limit_in_Closure (region : Set(Plane.Point))
         (s : ℕ → Plane.Point) (inside : ∀ (m : ℕ). s(m) ∈ region)
         (limit : Plane.Point)
         (converges : Plane.SequenceConverges(s, limit))
-        : limit ∈ Plane.Closure(region) := {
-  limit ∈ Set.universe(Plane.Point) by Set.member_universe;
-  ∀ (radius : ℝ). 0 < radius →
-      ∃ (y : Plane.Point). y ∈ region ∧ Plane.distance(limit, y) < radius
-      by (radius : ℝ) (radiusPositive : 0 < radius) ↦ {
-        choose threshold such that
-            ∀ (m : ℕ). threshold ≤ m → Plane.distance(limit, s(m)) < radius
-            as closeBeyond
-            from converges;
-        s(threshold) ∈ region by inside;
-        Plane.distance(limit, s(threshold)) < radius
-            by closeBeyond;
-        witness s(threshold)
-      };
-  done
-}
+        : limit ∈ Plane.Closure(region) :=
+  done by MetricSpace.limit_in_Closure
 
--- A point of the closure is the limit of a sequence from the set. For
--- each `n` the closure offers a point within `1/(1+n)`; countable choice
--- turns that family of nonempty options into one sequence.
 theorem Plane.sequence_to_Closure_point (region : Set(Plane.Point))
         (x : Plane.Point) (inClosure : x ∈ Plane.Closure(region))
         : ∃ (s : ℕ → Plane.Point).
-            (∀ (m : ℕ). s(m) ∈ region) ∧ Plane.SequenceConverges(s, x) := {
-  ∀ (radius : ℝ). 0 < radius →
-      ∃ (y : Plane.Point). y ∈ region ∧ Plane.distance(x, y) < radius
-      as meetsEveryBall;
-  ∀ (n : ℕ). ∃ (y : Plane.Point).
-      y ∈ region ∧ Plane.distance(x, y) < Real.harmonic_term(n)
-      by {
-        take n : ℕ;
-        Real.harmonic_term(n) > 0 by Real.divide_positive;
-        done by meetsEveryBall
-      }
-      as closeAtEveryScale;
-  ∃ (chosen : ℕ → Plane.Point). ∀ (n : ℕ).
-      chosen(n) ∈ region ∧ Plane.distance(x, chosen(n)) < Real.harmonic_term(n)
-      by Logic.countable_choice(
-          Plane.Point,
-          (n : ℕ) (y : Plane.Point) ↦
-              y ∈ region ∧ Plane.distance(x, y) < Real.harmonic_term(n),
-          closeAtEveryScale)
-      as choiceMade;
-  choose s such that
-      ∀ (n : ℕ). s(n) ∈ region
-          ∧ Plane.distance(x, s(n)) < Real.harmonic_term(n)
-      as chosenClose from choiceMade;
-  ∀ (m : ℕ). s(m) ∈ region
-      by { take m : ℕ; done by chosenClose };
-  Plane.SequenceConverges(s, x)
-      by (tolerance : ℝ) (tolerancePositive : tolerance > 0) ↦ {
-        choose threshold such that Real.harmonic_term(threshold) < tolerance
-            from Real.exists_harmonic_term_below;
-        witness threshold with
-            (m : ℕ) (beyond : threshold ≤ m) ↦ {
-              s(m) ∈ region ∧ Plane.distance(x, s(m))
-                  < Real.harmonic_term(m) by chosenClose;
-              Plane.distance(x, s(m))
-                 < Real.harmonic_term(m)
-                 ≤ Real.harmonic_term(threshold)
-                       by Real.harmonic_term_antitone
-                 < tolerance;
-              done
-            }
-      };
-  witness s
-}
+            (∀ (m : ℕ). s(m) ∈ region) ∧ Plane.SequenceConverges(s, x) :=
+  done by MetricSpace.sequence_to_Closure_point
 
 -- ----------------------------------------------------------------------
 -- Heine--Borel. Closed is spelled `Closure(region) ⊆ region`: the
--- sequential form, which is what both directions actually use.
+-- sequential form, which is what both directions actually use. Only the
+-- converse below is about the plane in particular — it is the one that
+-- needs Bolzano--Weierstrass.
 
 theorem Plane.IsCompact.Closure_subset (region : Set(Plane.Point))
         (compact : Plane.IsCompact(region))
-        : Plane.Closure(region) ⊆ region := {
-  take x : Plane.Point;
-  suppose x ∈ Plane.Closure(region) as inClosure;
-  choose s : ℕ → Plane.Point such that
-      (∀ (m : ℕ). s(m) ∈ region) ∧ Plane.SequenceConverges(s, x)
-      from Plane.sequence_to_Closure_point;
-  ∀ (m : ℕ). s(m) ∈ region;
-  Plane.SequenceConverges(s, x);
-  choose index : ℕ → ℕ, limit : Plane.Point such that
-      limit ∈ region ∧ Plane.SubsequenceConverges(s, index, limit)
-      from compact;
-  Natural.IsStrictlyIncreasing(index)
-      by Plane.SubsequenceConverges.increasing;
-  limit ∈ region;
-  Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
-      by Plane.SubsequenceConverges.converges;
-  -- The thinned sequence still converges to `x`, so the two limits agree.
-  Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), x)
-      by Plane.SequenceConverges.subsequence;
-  x = limit
-      by Plane.SequenceConverges.unique(s := (k : ℕ) ↦ s(index(k)));
-  done
-}
+        : Plane.Closure(region) ⊆ region :=
+  done by MetricSpace.IsCompact.Closure_subset
 
 -- The converse direction, and the one the blueprint uses to GET
 -- compactness: a closed bounded set is compact. Bolzano--Weierstrass
@@ -193,233 +113,39 @@ theorem Plane.compact_of_closed_bounded (region : Set(Plane.Point))
 }
 
 -- The remaining direction, so the characterisation is an equivalence: a
--- compact set is bounded. If it were not, some point of it would escape
--- every distance from a fixed centre, and countable choice assembles
--- those escapes into a sequence. Compactness thins it to a convergent
--- one — but a convergent sequence stays within one unit of its limit
--- past some threshold, while the escapes pass every natural.
--- "The region is not bounded, so past every natural lies a point of it."
--- The block is what pushing the negation through the quantifiers costs;
--- quarantined here so the theorem below can just say the sentence.
-theorem Plane.point_past_every_scale (region : Set(Plane.Point))
-        (centre : Plane.Point)
-        (unbounded : ¬Plane.IsBounded(region))
-        (n : ℕ)
-        : ∃ (x : Plane.Point).
-            x ∈ region ∧ (1 + n : ℝ) < Plane.distance(centre, x) := {
-  suppose ¬(∃ (x : Plane.Point).
-      x ∈ region ∧ (1 + n : ℝ) < Plane.distance(centre, x))
-      as noneBeyond for contradiction {
-    ∀ (x : Plane.Point). x ∈ region →
-        Plane.distance(centre, x) ≤ (1 + n : ℝ)
-        by (x : Plane.Point) (inRegion : x ∈ region) ↦ {
-          suppose ¬(Plane.distance(centre, x) ≤ (1 + n : ℝ))
-              as far for contradiction {
-            (1 + n : ℝ) < Plane.distance(centre, x)
-                by Real.LessThan_of_not_LessOrEqual;
-            ∃ (x : Plane.Point). x ∈ region
-                ∧ (1 + n : ℝ) < Plane.distance(centre, x)
-                by { witness x };
-            done
-          };
-          done
-        };
-    Plane.IsBounded(region)
-        by { witness centre with { witness (1 + n : ℝ) } };
-    done
-  };
-  done
-}
-
+-- compact set is bounded. Boundedness is measured from somewhere, and a
+-- metric space has no distinguished point — the plane does, so this is
+-- where the generic theorem gets its centre.
 theorem Plane.IsCompact.bounded (region : Set(Plane.Point))
         (compact : Plane.IsCompact(region))
-        : Plane.IsBounded(region) := {
-  let centre : Plane.Point := Plane.Point.make(0, 0);
-  suppose ¬Plane.IsBounded(region) as unbounded for contradiction {
-    -- Past every natural, some point of the region.
-    ∀ (n : ℕ). ∃ (x : Plane.Point).
-        x ∈ region ∧ (1 + n : ℝ) < Plane.distance(centre, x)
-        by (n : ℕ) ↦
-             Plane.point_past_every_scale(region, centre, unbounded, n)
-        as escapes;
-    choose s such that
-        ∀ (n : ℕ). s(n) ∈ region
-            ∧ (1 + n : ℝ) < Plane.distance(centre, s(n))
-        as escapesAt
-        from Logic.countable_choice(
-            Plane.Point,
-            (n : ℕ) (x : Plane.Point) ↦
-                x ∈ region ∧ (1 + n : ℝ) < Plane.distance(centre, x),
-            escapes);
-    ∀ (m : ℕ). s(m) ∈ region
-        by { take m : ℕ; done by escapesAt };
-    choose index : ℕ → ℕ, limit : Plane.Point such that
-        limit ∈ region
-
-            ∧ Plane.SubsequenceConverges(s, index, limit)
-        from compact;
-    Natural.IsStrictlyIncreasing(index)
-        by Plane.SubsequenceConverges.increasing;
-    Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
-        by Plane.SubsequenceConverges.converges as converges;
-    (0 : ℝ) < 1;
-    choose threshold such that
-        ∀ (k : ℕ). threshold ≤ k →
-            Plane.distance(limit, s(index(k))) < 1
-        as closeBeyond from converges;
-    -- One index past both the convergence threshold and any natural
-    -- exceeding `distance(centre, limit) + 1` is a contradiction.
-    choose escape such that
-        Plane.distance(centre, limit) + 1 < (1 + escape : ℝ)
-        from Real.exists_natural_above;
-    let far : ℕ := Natural.maximum(threshold, escape);
-    threshold ≤ far;
-    escape ≤ far;
-    Plane.distance(limit, s(index(far))) < 1 by closeBeyond;
-    s(index(far)) ∈ region ∧ (1 + index(far) : ℝ)
-        < Plane.distance(centre, s(index(far))) by escapesAt;
-    (1 + index(far) : ℝ) < Plane.distance(centre, s(index(far)));
-    far ≤ index(far) by Natural.IsStrictlyIncreasing.LessOrEqual;
-    escape ≤ index(far);
-    (1 + escape : ℝ) ≤ (1 + index(far) : ℝ);
-    Plane.distance(centre, s(index(far)))
-        ≤ Plane.distance(centre, limit) + Plane.distance(limit, s(index(far)))
-        by Plane.distance_triangle;
-    Plane.distance(centre, limit) + 1
-       < (1 + escape : ℝ)
-       ≤ (1 + index(far) : ℝ)
-       < Plane.distance(centre, s(index(far)))
-       ≤ Plane.distance(centre, limit) + Plane.distance(limit, s(index(far)))
-       < Plane.distance(centre, limit) + 1;
-    done
-  };
-  done
-}
+        : Plane.IsBounded(region) :=
+  done by MetricSpace.IsCompact.bounded(centre := Plane.Point.make(0, 0))
 
 -- ----------------------------------------------------------------------
 -- Continuous images.
 
--- Point-valued continuity is sequential too, by the same three lines as
--- the real-valued case.
 theorem Plane.ContinuousAt.along_sequence
         (f : Plane.Point → Plane.Point) (carrier : Set(Plane.Point))
         (x : Plane.Point) (continuous : Plane.ContinuousAt(f, carrier, x))
         (s : ℕ → Plane.Point) (inside : ∀ (m : ℕ). s(m) ∈ carrier)
         (converges : Plane.SequenceConverges(s, x))
-        : Plane.SequenceConverges((m : ℕ) ↦ f(s(m)), f(x)) := {
-  take tolerance : ℝ;
-  suppose tolerance > 0;
-  choose nearness such that
-      0 < nearness ∧
-      ∀ (y : Plane.Point). y ∈ carrier →
-        Plane.distance(x, y) < nearness →
-          Plane.distance(f(x), f(y)) < tolerance
-      from continuous;
-  0 < nearness as nearnessPositive;
-  ∀ (y : Plane.Point). y ∈ carrier →
-      Plane.distance(x, y) < nearness →
-        Plane.distance(f(x), f(y)) < tolerance
-      as imagesClose;
-  choose threshold such that
-      ∀ (m : ℕ). threshold ≤ m → Plane.distance(x, s(m)) < nearness
-      as closeBeyond from converges;
-  witness threshold with
-      (m : ℕ) (beyond : threshold ≤ m) ↦ {
-        Plane.distance(x, s(m)) < nearness by closeBeyond;
-        s(m) ∈ carrier by inside;
-        done by imagesClose
-      }
-}
+        : Plane.SequenceConverges((m : ℕ) ↦ f(s(m)), f(x)) :=
+  done by MetricSpace.ContinuousAt.along_sequence
 
 definition Plane.imageSet
         (f : Plane.Point → Plane.Point) (region : Set(Plane.Point))
         : Set(Plane.Point) :=
-  (y : Plane.Point) ↦ ∃ (x : Plane.Point). x ∈ region ∧ f(x) = y
+  MetricSpace.imageSet(f, region)
 
--- Taking images commutes with union: a point of the image of a union came
--- from one side or the other.
 theorem Plane.imageSet_union (f : Plane.Point → Plane.Point)
         (left right : Set(Plane.Point))
         : Plane.imageSet(f, left ∪ right)
-              = Plane.imageSet(f, left) ∪ Plane.imageSet(f, right) := {
-  Plane.imageSet(f, left ∪ right) ⊆ Plane.imageSet(f, left) ∪ Plane.imageSet(f, right)
-      by (y : Plane.Point) (onImage : y ∈ Plane.imageSet(f, left ∪ right)) ↦ {
-        choose source such that source ∈ left ∪ right ∧ f(source) = y;
-        source ∈ left ∪ right;
-        f(source) = y;
-        done by cases {
-          case source ∈ left as fromLeft: {
-              y ∈ Plane.imageSet(f, left) by { witness source };
-              done
-            }
-          case source ∈ right as fromRight: {
-              y ∈ Plane.imageSet(f, right) by { witness source };
-              done
-            }
-        }
-      };
-  Plane.imageSet(f, left) ∪ Plane.imageSet(f, right) ⊆ Plane.imageSet(f, left ∪ right)
-      by (y : Plane.Point)
-         (onEither : y ∈ Plane.imageSet(f, left) ∪ Plane.imageSet(f, right)) ↦ {
-        done by cases {
-          case y ∈ Plane.imageSet(f, left) as onLeft: {
-              choose source such that source ∈ left ∧ f(source) = y from onLeft;
-              source ∈ left;
-              f(source) = y;
-              source ∈ left ∪ right;
-              done by { witness source }
-            }
-          case y ∈ Plane.imageSet(f, right) as onRight: {
-              choose source such that source ∈ right ∧ f(source) = y from onRight;
-              source ∈ right;
-              f(source) = y;
-              source ∈ left ∪ right;
-              done by { witness source }
-            }
-        }
-      };
-  done by Set.equal_of_same_members
-}
+              = Plane.imageSet(f, left) ∪ Plane.imageSet(f, right) :=
+  done by MetricSpace.imageSet_union
 
--- The continuous image of a compact set is compact. A sequence in the
--- image has preimages — countable choice again — which compactness thins
--- to a convergent one; continuity carries that convergence forward.
 theorem Plane.IsCompact.image
         (f : Plane.Point → Plane.Point) (region : Set(Plane.Point))
         (compact : Plane.IsCompact(region))
         (continuous : Plane.ContinuousOn(f, region))
-        : Plane.IsCompact(Plane.imageSet(f, region)) := {
-  take t : ℕ → Plane.Point;
-  suppose ∀ (m : ℕ). t(m) ∈ Plane.imageSet(f, region) as inImage;
-  ∀ (n : ℕ). ∃ (x : Plane.Point). x ∈ region ∧ f(x) = t(n)
-      by (n : ℕ) ↦ inImage(n)
-      as preimages;
-  choose s such that ∀ (n : ℕ). s(n) ∈ region ∧ f(s(n)) = t(n)
-      as chosen
-      from Logic.countable_choice(
-          Plane.Point,
-          (n : ℕ) (x : Plane.Point) ↦ x ∈ region ∧ f(x) = t(n),
-          preimages);
-  ∀ (m : ℕ). s(m) ∈ region
-      by { take m : ℕ; done by chosen }
-      as inside;
-  choose index : ℕ → ℕ, limit : Plane.Point such that
-      limit ∈ region ∧ Plane.SubsequenceConverges(s, index, limit)
-      from compact;
-  Natural.IsStrictlyIncreasing(index)
-      by Plane.SubsequenceConverges.increasing;
-  limit ∈ region as limitInside;
-  Plane.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
-      by Plane.SubsequenceConverges.converges as converges;
-  f(limit) ∈ Plane.imageSet(f, region) by { witness limit };
-  Plane.SequenceConverges((k : ℕ) ↦ f(s(index(k))), f(limit))
-      by Plane.ContinuousAt.along_sequence(
-          f, region, limit, continuous(limit, limitInside),
-          (k : ℕ) ↦ s(index(k)), (k : ℕ) ↦ inside(index(k)), converges);
-  ∀ (k : ℕ). f(s(index(k))) = t(index(k))
-      by { take k : ℕ; done by chosen };
-  ((k : ℕ) ↦ f(s(index(k)))) = ((k : ℕ) ↦ t(index(k)))
-      by Function.extensionality;
-  Plane.SequenceConverges((k : ℕ) ↦ t(index(k)), f(limit));
-  witness index with { witness f(limit) }
-}
+        : Plane.IsCompact(Plane.imageSet(f, region)) :=
+  done by MetricSpace.IsCompact.image

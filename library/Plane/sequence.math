@@ -32,21 +32,23 @@ import Real.division
 import Real.maximum
 import Real.absolute_value
 import Real.absolute_value_order
+import Metric.space
+import Metric.sequence
 import Plane.vector
 import Plane.point
 import Plane.norm
+import Plane.metric
 
 -- ----------------------------------------------------------------------
--- Convergence, and boundedness.
+-- Convergence, and boundedness — the generic metric notions, at the
+-- plane.
 
 definition Plane.SequenceConverges
         (s : ℕ → Plane.Point) (limit : Plane.Point) : Proposition :=
-  ∀ (tolerance : ℝ). tolerance > 0 →
-    eventually (m). Plane.distance(limit, s(m)) < tolerance
+  MetricSpace.SequenceConverges(s, limit)
 
 definition Plane.IsBounded (region : Set(Plane.Point)) : Proposition :=
-  ∃ (center : Plane.Point). ∃ (bound : ℝ).
-    ∀ (x : Plane.Point). x ∈ region → Plane.distance(center, x) ≤ bound
+  MetricSpace.IsBounded(region)
 
 -- ----------------------------------------------------------------------
 -- Backwards: each coordinate of a convergent sequence converges, because
@@ -157,32 +159,9 @@ theorem Plane.SequenceConverges.of_coordinates
       }
 }
 
--- ----------------------------------------------------------------------
--- With both directions in hand, uniqueness of limits is inherited one
--- coordinate at a time.
-
 theorem Plane.SequenceConverges.unique
         (s : ℕ → Plane.Point) (limit other : Plane.Point)
         (toLimit : Plane.SequenceConverges(s, limit))
         (toOther : Plane.SequenceConverges(s, other))
-        : limit = other := {
-  Plane.Point.first(limit) = Plane.Point.first(other) by {
-    Real.SequenceConverges(
-        (m : ℕ) ↦ Plane.Point.first(s(m)), Plane.Point.first(limit))
-        by Plane.SequenceConverges.first;
-    Real.SequenceConverges(
-        (m : ℕ) ↦ Plane.Point.first(s(m)), Plane.Point.first(other))
-        by Plane.SequenceConverges.first;
-    done by Real.SequenceConverges.unique
-  };
-  Plane.Point.second(limit) = Plane.Point.second(other) by {
-    Real.SequenceConverges(
-        (m : ℕ) ↦ Plane.Point.second(s(m)), Plane.Point.second(limit))
-        by Plane.SequenceConverges.second;
-    Real.SequenceConverges(
-        (m : ℕ) ↦ Plane.Point.second(s(m)), Plane.Point.second(other))
-        by Plane.SequenceConverges.second;
-    done by Real.SequenceConverges.unique
-  };
-  done by Plane.Point.equal_of_coordinates
-}
+        : limit = other :=
+  done by MetricSpace.SequenceConverges.unique
