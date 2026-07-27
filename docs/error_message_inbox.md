@@ -2056,3 +2056,26 @@ in a ~30-site conversion, INCLUDING: inductive constructors
 one argument is genuinely undetermined, `Lemma(name := value)` covers it.
 This is the single biggest readability lever in the language and the style
 guide should lead with it.
+
+**OPEN — an unanchored claim lands in ℚ (or ℕ) and the message doesn't say
+so.** Layer 4, `concatenate.math`. These two are the same statement to a
+reader and different theorems to the elaborator:
+
+```math
+2 * (1 / 2) + 0 = 1          -- every leaf a numeral → elaborated in ℚ
+2 * (1 / 2) + -(1 : ℝ) = 0   -- one ℝ leaf → elaborated in ℝ
+```
+
+Proving the first and then citing an ℝ fact at it fails with the goal
+printed as `(Integer.to_rational 2) * (Natural.divide 1 2 …) = …`, which is
+accurate but never says *you proved this in ℚ and the context is ℝ*. Note
+what is NOT the problem: `1 / 2` genuinely belongs in ℚ and lands there, and
+ℚ facts do lift to ℝ goals (`a = b` in ℚ discharges `(a : ℝ) = (b : ℝ)`).
+The problem is only that which theorem you just proved depends on whether
+some leaf happened to mention ℝ, and the message doesn't name the two types.
+
+Cheapest fix: when a cited fact and the goal differ only by which carrier
+they landed in, say both carriers. The deeper alternative — seed an
+unanchored claim from the ambient goal's carrier — is the same root cause as
+the numeral-arithmetic case fixed in `PLAN_ELABORATOR_ERGONOMICS` E2 and
+belongs with that work, not with a message change.
