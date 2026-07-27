@@ -1,17 +1,21 @@
--- PERMANENT negative control (PLAN_ELABORATOR_ERGONOMICS.md step E0).
+-- PERMANENT negative control, NARROWED 2026-07-26.
 --
--- `-1` with NOTHING to supply a carrier must stay rejected. E2 makes unary `-`
--- honor an expected carrier when one exists; it must not invent one when none
--- does.
+-- A negated numeral literal now lands in Integer whenever a signed carrier
+-- is reachable — `-1` means the integer −1, and the ℕ→ℤ→ℚ→ℝ coercions carry
+-- it on to whatever the position wants (locked by `Test/negative_numeral`).
+-- That reverses this file's original claim, from PLAN_ELABORATOR_ERGONOMICS
+-- step E0, that `-1` with nothing to supply a carrier must stay rejected: a
+-- literal has no intrinsic type, so there is nothing to invent.
 --
--- Note the message here is currently identical to the PENDING probe in
--- carrier_pending_unary_numeral.math. That is expected: the difference is not
--- the message but the context — there an Integer carrier is available and is
--- being missed, here there is none. After E2 the pending file is deleted and
--- this one still fails.
+-- What this file now locks: with **no signed carrier in scope at all** — no
+-- `Integer.negate`, no coercion into one — the operator still has nowhere to
+-- go, and says so naming the carrier it was left holding. Only `Natural` is
+-- imported here.
 --
--- An ordinary unseeded Natural expression such as `1 + 2` is of course legal
--- and is NOT what this control forbids.
+-- The companion control `unseeded_negative_natural.math` kept its full
+-- strength: a negated Natural VARIABLE is rejected even with the whole tower
+-- in scope, because `m` already has a type and reading `-m` as an integer
+-- would drift an ℕ expression into ℤ unasked.
 module ErrorTest.unseeded_negative_numeral
 
 import Natural.basics

@@ -1,12 +1,23 @@
--- PERMANENT negative control (PLAN_ELABORATOR_ERGONOMICS.md step E2).
+-- PERMANENT negative control (PLAN_ELABORATOR_ERGONOMICS.md step E2), and
+-- since 2026-07-26 the load-bearing half of the pair.
 --
 -- Expected-carrier propagation lifts a Natural variable through unary `-`
 -- only when the surrounding expression supplies a registered upper carrier.
 -- With no expected carrier, `-m` must remain rejected rather than guessing
 -- Integer (or any other carrier).
+--
+-- A negated numeral LITERAL is now different: `-1` lands in Integer, because
+-- a literal has no intrinsic type to drift away from. A variable does — `m`
+-- is a Natural — so reading `-m` as an integer would turn an error at the
+-- site into a confusing failure downstream, which is exactly what the
+-- ℕ-narrowing discipline is trying to avoid. The distinction is enforced in
+-- the unary dispatch and holds with the whole ℕ→ℤ→ℚ→ℝ tower in scope, not
+-- just in this file's narrow import set.
 module ErrorTest.unseeded_negative_natural
 
 import Natural.basics
 import Natural.arithmetic
+import Integer.basics
+import Real.interface
 
 definition ErrorTest.control (m : ℕ) : Proposition := -m = -m

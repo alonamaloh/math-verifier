@@ -2286,6 +2286,45 @@ ExpressionPointer Elaborator::elaborateExpression(
                         }
                     }
                 }
+                // A negated NUMERAL LITERAL lands in Integer. A literal has
+                // no intrinsic type — its type is whatever the position
+                // wants — and Integer is the smallest carrier holding a
+                // negative one, from which the ordinary coercions carry it
+                // on to ℚ or ℝ. Without this, `-1` is an error in any
+                // position whose expected type did not reach the leaf:
+                // numeral-only arithmetic types bottom-up as Natural, so
+                // `2 * 1 + -1` failed where `2 * 1 + 1` and a bare
+                // `-(1 : ℝ)` both worked.
+                //
+                // Restricted to literals ON PURPOSE. A negated Natural
+                // VARIABLE keeps its old rejection: `m` already has a type,
+                // so reading `-m` as an integer would silently drift an ℕ
+                // expression into ℤ and turn a crisp error at the site into
+                // a confusing one downstream. See the two permanent controls
+                // in `ErrorTest/unseeded_negative_*`.
+                const bool operandIsNumeralLiteral =
+                    std::get_if<SurfaceNumericLiteral>(
+                        &unary->operand->node) != nullptr;
+                if (negateFunction.empty() && operandIsNumeralLiteral) {
+                    if (environment_.lookup("Integer.negate") != nullptr) {
+                        ExpressionPointer integerType = makeConstant("Integer");
+                        ExpressionPointer lifted =
+                            coerceToExpectedTypeViaRegistry(
+                                localBinders, operandKernel, integerType);
+                        bool liftedToInteger = false;
+                        try {
+                            liftedToInteger =
+                                headConstantName(inferTypeInLocalContext(
+                                    localBinders, lifted)) == "Integer";
+                        } catch (const TypeError&) {
+                            liftedToInteger = false;
+                        }
+                        if (liftedToInteger) {
+                            operandKernel = std::move(lifted);
+                            negateFunction = "Integer.negate";
+                        }
+                    }
+                }
                 if (negateFunction.empty()) {
                     throw ElaborateError(
                         "unary operator '-' on type '"

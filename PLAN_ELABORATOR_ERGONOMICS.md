@@ -257,7 +257,26 @@ elaborated feature declaration and requires the non-vacuous
 
 ### E2. Let expected carriers reach the operand leaf
 
-Status: `[x]`
+Status: `[x]` — **extended 2026-07-26: a negated numeral literal now has a
+default carrier (Integer) when no expected one reaches it.**
+
+E0's control said `-1` "must not invent a carrier when none does" exist.
+That was too strong, and Layer 4 of the Jordan–Schönflies work is where it
+bit: numeral-only arithmetic types bottom-up as Natural, so in
+`Plane.between(…, 2 * 1 + -1)` the position's ℝ never reaches the `-1`
+leaf — `2 * 1 + 1` worked and `2 * 1 + -1` did not, which is not a
+distinction a reader can predict. A literal has no intrinsic type, so
+there is nothing to invent: `-1` means the integer −1, and the
+ℕ→ℤ→ℚ→ℝ coercions carry it wherever the position wants.
+
+**The line held**: only LITERALS get the default. A negated Natural
+VARIABLE is still rejected without an expected carrier, now verified with
+the whole tower in scope — `m` already has a type, and drifting an ℕ
+expression into ℤ unasked would trade an error at the site for a confusing
+one downstream, against the ℕ-narrowing discipline.
+`ErrorTest/unseeded_negative_natural` is the load-bearing control;
+`ErrorTest/unseeded_negative_numeral` was narrowed to "no signed carrier in
+scope at all"; `Test/negative_numeral` locks the new behaviour.
 
 **Baseline diagnosis.** The plumbing already existed: unary dispatch propagated
 an expected type only when it was a bare `Constant`. The failure was one level
