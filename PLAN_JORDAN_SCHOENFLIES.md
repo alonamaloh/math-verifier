@@ -325,22 +325,27 @@ arc's injectivity through the retiming, and across the halves the common
 value must be the shared endpoint, which pins both parameters to the
 midpoint (`lowerHalf_at_finish_is_midpoint`, `upperHalf_at_start_is_midpoint`).
 
+**The subarc basis is built.** `Plane.IsArc.image_OpenIn` — a
+parametrisation is an **open map onto its arc**, which is where the
+inverse's continuity finally earns its keep: it is exactly what turns a
+parameter-radius into a value-radius. With
+`Plane.IsArc.basic_piece_inside_ball` putting the image of a relatively
+open subsegment inside every neighbourhood, the two together say the images
+of relatively open subsegments are a basis of the arc's subspace topology.
+Stated for subsegments rather than subarcs because at an ENDPOINT the basic
+neighbourhood is half-open; `Plane.openArc` of a subarc is the interior
+case.
+
 **Not built.** In dependency order:
 
-1. **The subarc basis.** The homeomorphism already carries the topology
-   (`IsHomeomorphismOn`); what is missing is that relatively open
-   subsegments of the model interval have relatively open images. The
-   endpoints are the only subtlety — a basic neighbourhood of an endpoint
-   is a *half-open* subarc, which is why the faithful statement is about
-   relatively open subarcs.
-2. **`Plane.IsPolygonal`.** Blocked on a design decision, not on
+1. **`Plane.IsPolygonal`.** Blocked on a design decision, not on
    mathematics: it wants a **vertex list**, and `Plane.PolygonalReach` is a
    derivation rather than an object. Either give the walk a list of
    vertices (see `fold_refactor_plan`) or define `IsPolygonal(f)` as "the
    arc is a finite union of segments" over `Lists`. Settle this before
    Layer 6, which needs polygonal edges as data.
-3. **The two arcs of a Jordan curve between two of its points**, and the
-   subarc basis *for a curve*. Genuinely blocked on the **arc structure of
+2. **The two arcs of a Jordan curve between two of its points**, and the
+   basis *for a curve*. Genuinely blocked on the **arc structure of
    the model curve**: the circle minus two points has two components, each
    an arc. Getting there wants `∂Q`'s decomposition into four sides (a
    coordinate case analysis on `max(|x₁|, |x₂|) = 1`) plus the

@@ -145,6 +145,11 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
   closed halves (with `Plane.ContinuousOn.of_agreeing`, since the glued map only
   *agrees* with a composition on each); injectivity splits four ways, and
   the seam case is where the meet-only-there hypothesis is used
+- **`Plane.IsArc.image_OpenIn`** — a parametrisation is an open map onto its
+  arc (this is what the inverse's continuity is *for*), and
+  `Plane.IsArc.basic_piece_inside_ball` puts one such image inside every
+  neighbourhood: together, the images of relatively open subsegments are a
+  basis of the arc's topology
 
 ## Connectedness is the clopen criterion
 

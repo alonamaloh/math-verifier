@@ -419,3 +419,186 @@ theorem Plane.IsArc.openArc_is_arc_without_endpoints
       };
   done by Set.equal_of_same_members
 }
+
+-- ----------------------------------------------------------------------
+-- The subarc basis.
+--
+-- A parametrisation is an OPEN map onto its arc: this is where the
+-- inverse's continuity earns its keep, since it is exactly what turns a
+-- parameter-radius into a value-radius. With it, the images of the
+-- relatively open subsegments are relatively open in the arc, and the ball
+-- argument below puts one inside every neighbourhood — so they are a basis
+-- of the arc's subspace topology.
+--
+-- Stated for relatively open SUBSEGMENTS rather than for subarcs, because
+-- at an endpoint the basic neighbourhood is half-open: `Plane.openArc` of a
+-- subarc is the interior case, and this covers both.
+
+theorem Plane.IsArc.image_OpenIn
+        (parametrisation : Plane.Point → Plane.Point)
+        (isArc : Plane.IsArc(parametrisation))
+        (piece : Set(Plane.Point))
+        (pieceInside : piece ⊆ Plane.unitSegment)
+        (pieceOpen : Plane.OpenIn(piece, Plane.unitSegment))
+        : Plane.OpenIn(
+              Plane.imageSet(parametrisation, piece),
+              Plane.arc(parametrisation)) := {
+  Plane.IsHomeomorphismOn(parametrisation, Plane.unitSegment)
+      by Plane.IsArc.IsHomeomorphismOn;
+  Plane.HasContinuousInverseOn(parametrisation, Plane.unitSegment)
+      as inverseContinuous;
+  take value : Plane.Point;
+  suppose value ∈ Plane.imageSet(parametrisation, piece) as inImage;
+  choose source such that
+      source ∈ piece ∧ parametrisation(source) = value from inImage;
+  source ∈ piece as sourceInPiece;
+  source ∈ Plane.unitSegment by pieceInside;
+  parametrisation(source) = value as valueAtSource;
+
+  -- The piece gives a parameter-radius, and the inverse's continuity turns
+  -- it into a value-radius.
+  choose parameterRadius such that
+      0 < parameterRadius ∧
+        ∀ (other : Plane.Point). other ∈ Plane.unitSegment →
+          Plane.distance(source, other) < parameterRadius → other ∈ piece
+      from pieceOpen(source, sourceInPiece);
+  0 < parameterRadius as parameterRadiusPositive;
+  ∀ (other : Plane.Point). other ∈ Plane.unitSegment →
+      Plane.distance(source, other) < parameterRadius → other ∈ piece
+      as nearParametersInPiece;
+  choose valueRadius such that
+      0 < valueRadius ∧
+        ∀ (other : Plane.Point). other ∈ Plane.unitSegment →
+          Plane.distance(parametrisation(source), parametrisation(other))
+              < valueRadius →
+            Plane.distance(source, other) < parameterRadius
+      from inverseContinuous(
+          source, { source ∈ Plane.unitSegment }, parameterRadius,
+          parameterRadiusPositive);
+  0 < valueRadius;
+  ∀ (other : Plane.Point). other ∈ Plane.unitSegment →
+      Plane.distance(parametrisation(source), parametrisation(other))
+          < valueRadius →
+        Plane.distance(source, other) < parameterRadius
+      as nearValuesComeFromNearParameters;
+
+  witness valueRadius with {
+    0 < valueRadius;
+    ∀ (other : Plane.Point). other ∈ Plane.arc(parametrisation) →
+        Plane.distance(value, other) < valueRadius →
+          other ∈ Plane.imageSet(parametrisation, piece)
+        by (other : Plane.Point)
+           (onArc : other ∈ Plane.arc(parametrisation))
+           (near : Plane.distance(value, other) < valueRadius) ↦ {
+          choose otherSource such that
+              otherSource ∈ Plane.unitSegment
+                ∧ parametrisation(otherSource) = other
+              from onArc;
+          otherSource ∈ Plane.unitSegment;
+          parametrisation(otherSource) = other as valueAtOtherSource;
+          Plane.distance(
+              parametrisation(source), parametrisation(otherSource))
+             = Plane.distance(value, parametrisation(otherSource))
+                   by substituting valueAtSource
+             = Plane.distance(value, other)
+                   by substituting valueAtOtherSource
+             < valueRadius;
+          Plane.distance(source, otherSource) < parameterRadius
+              by nearValuesComeFromNearParameters;
+          otherSource ∈ piece by nearParametersInPiece;
+          done by { witness otherSource with done }
+        };
+    done
+  }
+}
+
+-- Every neighbourhood of a point of the arc contains the image of a
+-- relatively open subsegment around its parameter — so those images are a
+-- basis. The piece is the model interval cut by a ball, which is open in it
+-- for the same reason a ball is open in the plane.
+theorem Plane.IsArc.basic_piece_inside_ball
+        (parametrisation : Plane.Point → Plane.Point)
+        (isArc : Plane.IsArc(parametrisation))
+        (value : Plane.Point)
+        (onArc : value ∈ Plane.arc(parametrisation))
+        (radius : ℝ) (radiusPositive : 0 < radius)
+        : ∃ (piece : Set(Plane.Point)).
+            (piece ⊆ Plane.unitSegment ∧ Plane.OpenIn(piece, Plane.unitSegment))
+              ∧ (value ∈ Plane.imageSet(parametrisation, piece)
+                     ∧ Plane.imageSet(parametrisation, piece)
+                           ⊆ Plane.Ball(value, radius)) := {
+  Plane.ContinuousOn(parametrisation, Plane.unitSegment) as continuous;
+  choose source such that
+      source ∈ Plane.unitSegment ∧ parametrisation(source) = value
+      from onArc;
+  source ∈ Plane.unitSegment as sourceOnSegment;
+  parametrisation(source) = value as valueAtSource;
+  choose parameterRadius such that
+      0 < parameterRadius ∧
+        ∀ (other : Plane.Point). other ∈ Plane.unitSegment →
+          Plane.distance(source, other) < parameterRadius →
+            Plane.distance(parametrisation(source), parametrisation(other))
+                < radius
+      from continuous(source, sourceOnSegment, radius, radiusPositive);
+  0 < parameterRadius;
+  ∀ (other : Plane.Point). other ∈ Plane.unitSegment →
+      Plane.distance(source, other) < parameterRadius →
+        Plane.distance(parametrisation(source), parametrisation(other))
+            < radius
+      as nearParametersHaveNearValues;
+
+  -- The piece is written out rather than bound with `let`: the citation
+  -- below has to match it against `piece ∩ smaller`, and the binding hides
+  -- that shape.
+  Plane.Ball(source, parameterRadius) ∩ Plane.unitSegment ⊆ Plane.unitSegment
+      by Set.intersection_subset_right;
+  Plane.IsOpen(Plane.Ball(source, parameterRadius)) by Plane.Ball_IsOpen;
+  Plane.unitSegment ⊆ Set.universe(Plane.Point) by Set.subset_universe;
+  Plane.OpenIn(
+      Plane.Ball(source, parameterRadius) ∩ Plane.unitSegment,
+      Plane.unitSegment)
+      by Plane.OpenIn.restrict(carrier := Set.universe(Plane.Point));
+
+  Plane.distance(source, source) = 0 by Plane.distance_self;
+  Plane.distance(source, source) < parameterRadius;
+  source ∈ Plane.Ball(source, parameterRadius);
+  source ∈ Plane.Ball(source, parameterRadius) ∩ Plane.unitSegment;
+  value ∈ Plane.imageSet(
+      parametrisation,
+      Plane.Ball(source, parameterRadius) ∩ Plane.unitSegment)
+      by { witness source with done };
+
+  Plane.imageSet(
+      parametrisation,
+      Plane.Ball(source, parameterRadius) ∩ Plane.unitSegment)
+        ⊆ Plane.Ball(value, radius)
+      by (other : Plane.Point)
+         (inImage : other ∈ Plane.imageSet(
+              parametrisation,
+              Plane.Ball(source, parameterRadius) ∩ Plane.unitSegment)) ↦ {
+        choose otherSource such that
+            otherSource ∈ Plane.Ball(source, parameterRadius)
+                            ∩ Plane.unitSegment
+              ∧ parametrisation(otherSource) = other
+            from inImage;
+        otherSource ∈ Plane.Ball(source, parameterRadius)
+                        ∩ Plane.unitSegment;
+        parametrisation(otherSource) = other as valueAtOtherSource;
+        otherSource ∈ Plane.Ball(source, parameterRadius)
+            by Set.intersection_member_left;
+        otherSource ∈ Plane.unitSegment by Set.intersection_member_right;
+        Plane.distance(source, otherSource) < parameterRadius;
+        Plane.distance(parametrisation(source), parametrisation(otherSource))
+            < radius by nearParametersHaveNearValues;
+        Plane.distance(value, other)
+           = Plane.distance(parametrisation(source), other)
+                 by substituting valueAtSource
+           = Plane.distance(
+                 parametrisation(source), parametrisation(otherSource))
+                 by substituting valueAtOtherSource
+           < radius;
+        done
+      };
+  done by { witness Plane.Ball(source, parameterRadius) ∩ Plane.unitSegment
+              with done }
+}
