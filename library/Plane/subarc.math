@@ -2,13 +2,11 @@
 --
 -- Subarcs, and the arc without its endpoints. Layer 4.
 --
--- A subarc is the arc restricted to a subsegment of the model interval —
--- but an arc is a map ON the unit segment, so the restriction has to be
--- reparametrised back onto it. `Plane.walkOnto(a, b)` is that
--- reparametrisation: it reads a point's parameter off its first coordinate
--- and walks that fraction of the way from `a` to `b`. The unit segment lies
--- along the axis precisely so that this reads the parameter with no inverse
--- to construct and no choice to make.
+-- A subarc is the arc restricted to a subinterval of the parameter
+-- interval — but an arc is a map ON `[0,1]`, so the restriction has to be
+-- reparametrised back onto it. That reparametrisation is
+-- `Real.between(a, b)`, the affine map `t ↦ a + t·(b - a)`: arithmetic,
+-- with no inverse to construct and no choice to make.
 --
 -- With it, a subarc is a composition, and the two things an arc must be —
 -- continuous and injective — are the two things a composition inherits.
@@ -25,9 +23,19 @@ import Real.order
 import Real.order_field
 import Real.absolute_value
 import Real.absolute_value_order
+import Metric.space
+import Metric.real
+import Metric.topology
+import Metric.continuity
+import Metric.sequence
+import Metric.compactness
+import Metric.connected
+import Metric.homeomorphism
+import Metric.interval
 import Plane.vector
 import Plane.point
 import Plane.norm
+import Plane.metric
 import Plane.segment
 import Plane.topology
 import Plane.compactness
@@ -38,10 +46,486 @@ import Plane.homeomorphism
 import Plane.curve
 
 -- ----------------------------------------------------------------------
--- The walk is injective in its parameter, unless it never moves.
+-- Reparametrising the unit interval onto a subinterval.
 
-theorem Plane.between_injective (a b : Plane.Point) (distinct : a ≠ b)
-        (s t : ℝ)
+theorem Real.between_lands (a b t : ℝ) (atLeastZero : 0 ≤ t) (atMostOne : t ≤ 1)
+        : Real.between(a, b, t) ∈ Real.segment(a, b) :=
+  witness t
+
+theorem Real.between_ContinuousOn (a b : ℝ)
+        : MetricSpace.ContinuousOn(Real.between(a, b), Real.unitInterval) := {
+  take x : ℝ;
+  suppose x ∈ Real.unitInterval;
+  take tolerance : ℝ;
+  suppose tolerance > 0 as tolerancePositive;
+  Real.parameterGap(tolerance, a, b) > 0 by Real.parameterGap_positive;
+  witness Real.parameterGap(tolerance, a, b) with {
+    Real.parameterGap(tolerance, a, b) > 0;
+    ∀ (y : ℝ). y ∈ Real.unitInterval →
+        MetricSpace.distance(x, y) < Real.parameterGap(tolerance, a, b) →
+          MetricSpace.distance(Real.between(a, b, x), Real.between(a, b, y))
+              < tolerance
+        by (y : ℝ) (inside : y ∈ Real.unitInterval)
+           (near : MetricSpace.distance(x, y)
+                       < Real.parameterGap(tolerance, a, b)) ↦ {
+          abs(y - x)
+             = abs(x - y) by Real.absolute_value_subtract_swap
+             = MetricSpace.distance(x, y)
+             < Real.parameterGap(tolerance, a, b);
+          done by Real.between_close_of_gap
+        };
+    done
+  }
+}
+
+theorem Real.between_InjectiveOn (a b : ℝ) (distinct : a ≠ b)
+        : MetricSpace.InjectiveOn(Real.between(a, b), Real.unitInterval) := {
+  take x : ℝ;
+  suppose x ∈ Real.unitInterval as xInside;
+  take y : ℝ;
+  suppose y ∈ Real.unitInterval as yInside;
+  suppose Real.between(a, b, x) = Real.between(a, b, y) as sameWalk;
+  done by Real.between_injective
+}
+
+-- ----------------------------------------------------------------------
+-- Subarcs.
+
+definition Plane.subarc (parametrisation : ℝ → Plane.Point) (a b : ℝ)
+        : ℝ → Plane.Point :=
+  (t : ℝ) ↦ parametrisation(Real.between(a, b, t))
+
+theorem Plane.subarc_start (parametrisation : ℝ → Plane.Point) (a b : ℝ)
+        : Plane.arcStart(Plane.subarc(parametrisation, a, b))
+              = parametrisation(a) := {
+  Real.between(a, b, 0) = a by Real.between_zero;
+  done by substituting Real.between(a, b, 0) = a
+}
+
+theorem Plane.subarc_finish (parametrisation : ℝ → Plane.Point) (a b : ℝ)
+        : Plane.arcFinish(Plane.subarc(parametrisation, a, b))
+              = parametrisation(b) := {
+  Real.between(a, b, 1) = b by Real.between_one;
+  done by substituting Real.between(a, b, 1) = b
+}
+
+-- A subarc between two distinct parameters is an arc: the
+-- reparametrisation is continuous and injective onto a subinterval, and
+-- the unit interval is convex, so that subinterval is where the arc still
+-- lives. Injectivity is needed only where the subarc runs — a loop has it
+-- everywhere but its finish, which is what the two arcs of a Jordan curve
+-- are cut from.
+theorem Plane.IsArc.subarc_on_subsegment (parametrisation : ℝ → Plane.Point)
+        (continuous : MetricSpace.ContinuousOn(parametrisation, Real.unitInterval))
+        (a b : ℝ)
+        (aInside : a ∈ Real.unitInterval)
+        (bInside : b ∈ Real.unitInterval)
+        (distinct : a ≠ b)
+        (injective : MetricSpace.InjectiveOn(parametrisation, Real.segment(a, b)))
+        : Plane.IsArc(Plane.subarc(parametrisation, a, b)) := {
+  Real.IsConvex(Real.unitInterval) by Real.unitInterval_IsConvex;
+  Real.segment(a, b) ⊆ Real.unitInterval
+      by Real.IsConvex.segment_inside as subsegmentInside;
+  ∀ (t : ℝ). t ∈ Real.unitInterval → Real.between(a, b, t) ∈ Real.segment(a, b)
+      by (t : ℝ) (inside : t ∈ Real.unitInterval) ↦ {
+        t ≥ 0 by Real.unitInterval_nonneg;
+        t ≤ 1 by Real.unitInterval_atMostOne;
+        done by Real.between_lands
+      }
+      as landsInSubsegment;
+  ∀ (t : ℝ). t ∈ Real.unitInterval → Real.between(a, b, t) ∈ Real.unitInterval
+      by (t : ℝ) (inside : t ∈ Real.unitInterval) ↦ {
+        Real.between(a, b, t) ∈ Real.segment(a, b) by landsInSubsegment;
+        done by subsegmentInside
+      };
+
+  MetricSpace.ContinuousOn(Real.between(a, b), Real.unitInterval)
+      by Real.between_ContinuousOn;
+  MetricSpace.ContinuousOn(
+      Plane.subarc(parametrisation, a, b), Real.unitInterval)
+      by MetricSpace.ContinuousOn.compose(
+          inner := Real.between(a, b), outer := parametrisation,
+          region := Real.unitInterval);
+
+  MetricSpace.InjectiveOn(Real.between(a, b), Real.unitInterval)
+      by Real.between_InjectiveOn as walkInjective;
+  MetricSpace.InjectiveOn(
+      Plane.subarc(parametrisation, a, b), Real.unitInterval)
+      by (x : ℝ) (xInside : x ∈ Real.unitInterval)
+         (y : ℝ) (yInside : y ∈ Real.unitInterval)
+         (sameValue : Plane.subarc(parametrisation, a, b)(x)
+                          = Plane.subarc(parametrisation, a, b)(y)) ↦ {
+        Real.between(a, b, x) ∈ Real.segment(a, b) by landsInSubsegment;
+        Real.between(a, b, y) ∈ Real.segment(a, b) by landsInSubsegment;
+        parametrisation(Real.between(a, b, x))
+            = parametrisation(Real.between(a, b, y)) by sameValue;
+        Real.between(a, b, x) = Real.between(a, b, y) by injective;
+        done by walkInjective
+      };
+  done
+}
+
+theorem Plane.IsArc.subarc (parametrisation : ℝ → Plane.Point)
+        (isArc : Plane.IsArc(parametrisation))
+        (a b : ℝ)
+        (aInside : a ∈ Real.unitInterval)
+        (bInside : b ∈ Real.unitInterval)
+        (distinct : a ≠ b)
+        : Plane.IsArc(Plane.subarc(parametrisation, a, b)) := {
+  MetricSpace.ContinuousOn(parametrisation, Real.unitInterval);
+  MetricSpace.InjectiveOn(parametrisation, Real.unitInterval) as injective;
+  Real.IsConvex(Real.unitInterval) by Real.unitInterval_IsConvex;
+  Real.segment(a, b) ⊆ Real.unitInterval
+      by Real.IsConvex.segment_inside as subsegmentInside;
+  MetricSpace.InjectiveOn(parametrisation, Real.segment(a, b))
+      by (x : ℝ) (xOnSubsegment : x ∈ Real.segment(a, b))
+         (y : ℝ) (yOnSubsegment : y ∈ Real.segment(a, b))
+         (sameValue : parametrisation(x) = parametrisation(y)) ↦ {
+        x ∈ Real.unitInterval by subsegmentInside;
+        y ∈ Real.unitInterval by subsegmentInside;
+        done by injective
+      };
+  done by Plane.IsArc.subarc_on_subsegment
+}
+
+-- The subarc's image is the arc restricted to the subinterval — which is
+-- what "sub" means, and the form every consumer wants.
+theorem Plane.subarc_image (parametrisation : ℝ → Plane.Point) (a b : ℝ)
+        : Plane.arc(Plane.subarc(parametrisation, a, b))
+              = MetricSpace.imageSet(parametrisation, Real.segment(a, b)) := {
+  Plane.arc(Plane.subarc(parametrisation, a, b))
+      ⊆ MetricSpace.imageSet(parametrisation, Real.segment(a, b))
+      by (y : Plane.Point)
+         (onSubarc : y ∈ Plane.arc(Plane.subarc(parametrisation, a, b))) ↦ {
+        choose source : ℝ such that
+            source ∈ Real.unitInterval
+              ∧ Plane.subarc(parametrisation, a, b)(source) = y
+            from onSubarc;
+        source ∈ Real.unitInterval;
+        parametrisation(Real.between(a, b, source)) = y;
+        source ≥ 0 by Real.unitInterval_nonneg;
+        source ≤ 1 by Real.unitInterval_atMostOne;
+        Real.between(a, b, source) ∈ Real.segment(a, b) by Real.between_lands;
+        done by { witness Real.between(a, b, source) }
+      };
+  MetricSpace.imageSet(parametrisation, Real.segment(a, b))
+      ⊆ Plane.arc(Plane.subarc(parametrisation, a, b))
+      by (y : Plane.Point)
+         (onRestriction :
+              y ∈ MetricSpace.imageSet(parametrisation, Real.segment(a, b))) ↦ {
+        choose middle : ℝ such that
+            middle ∈ Real.segment(a, b) ∧ parametrisation(middle) = y
+            from onRestriction;
+        middle ∈ Real.segment(a, b);
+        parametrisation(middle) = y as valueAtMiddle;
+        choose source such that
+            (0 ≤ source ∧ source ≤ 1) ∧ middle = Real.between(a, b, source)
+            from { middle ∈ Real.segment(a, b) };
+        0 ≤ source;
+        source ≤ 1;
+        middle = Real.between(a, b, source) as walksToMiddle;
+        source ∈ Real.unitInterval by Real.member_unitInterval;
+        Plane.subarc(parametrisation, a, b)(source)
+           = parametrisation(Real.between(a, b, source))
+           = parametrisation(middle) by walksToMiddle
+           = y by valueAtMiddle;
+        done by { witness source }
+      };
+  done by Set.equal_of_same_members
+}
+
+-- ----------------------------------------------------------------------
+-- The arc without its endpoints — the blueprint's `P°`.
+--
+-- Taken on the parameter side, as the image of the open unit interval,
+-- because that is the form the subarc basis argument needs: an open subarc
+-- is the image of an open subinterval. Injectivity then says it is also
+-- the arc minus the two endpoint VALUES, which is how the blueprint reads
+-- it.
+
+definition Real.openUnitInterval : Set(ℝ) :=
+  (t : ℝ) ↦ t ∈ Real.unitInterval ∧ t ≠ 0 ∧ t ≠ 1
+
+definition Plane.openArc (parametrisation : ℝ → Plane.Point)
+        : Set(Plane.Point) :=
+  MetricSpace.imageSet(parametrisation, Real.openUnitInterval)
+
+theorem Real.openUnitInterval_subset
+        : Real.openUnitInterval ⊆ Real.unitInterval := {
+  take t : ℝ;
+  suppose t ∈ Real.openUnitInterval as inside;
+  done
+}
+
+-- On an arc the two readings agree: dropping the endpoints of the
+-- interval drops exactly the two endpoint values, since no other parameter
+-- shares their images.
+theorem Plane.IsArc.openArc_is_arc_without_endpoints
+        (parametrisation : ℝ → Plane.Point)
+        (isArc : Plane.IsArc(parametrisation))
+        : Plane.openArc(parametrisation)
+              = Plane.arc(parametrisation)
+                    ∖ Set.singleton(
+                          Plane.Point, Plane.arcStart(parametrisation))
+                    ∖ Set.singleton(
+                          Plane.Point, Plane.arcFinish(parametrisation)) := {
+  MetricSpace.InjectiveOn(parametrisation, Real.unitInterval) as injective;
+  (0 : ℝ) ∈ Real.unitInterval by Real.zero_in_unitInterval;
+  (1 : ℝ) ∈ Real.unitInterval by Real.one_in_unitInterval;
+
+  Plane.openArc(parametrisation)
+      ⊆ Plane.arc(parametrisation)
+            ∖ Set.singleton(Plane.Point, Plane.arcStart(parametrisation))
+            ∖ Set.singleton(Plane.Point, Plane.arcFinish(parametrisation))
+      by (y : Plane.Point) (onOpenArc : y ∈ Plane.openArc(parametrisation)) ↦ {
+        choose source : ℝ such that
+            source ∈ Real.openUnitInterval ∧ parametrisation(source) = y
+            from onOpenArc;
+        source ∈ Real.openUnitInterval;
+        source ∈ Real.unitInterval by Real.openUnitInterval_subset;
+        source ≠ 0;
+        source ≠ 1;
+        parametrisation(source) = y;
+        y ∈ Plane.arc(parametrisation) by { witness source };
+        suppose y = Plane.arcStart(parametrisation) for contradiction {
+          parametrisation(source) = parametrisation(0);
+          source = 0 by injective;
+          done
+        };
+        suppose y = Plane.arcFinish(parametrisation) for contradiction {
+          parametrisation(source) = parametrisation(1);
+          source = 1 by injective;
+          done
+        };
+        ¬(y ∈ Set.singleton(Plane.Point, Plane.arcStart(parametrisation)));
+        ¬(y ∈ Set.singleton(Plane.Point, Plane.arcFinish(parametrisation)));
+        done
+      };
+
+  Plane.arc(parametrisation)
+        ∖ Set.singleton(Plane.Point, Plane.arcStart(parametrisation))
+        ∖ Set.singleton(Plane.Point, Plane.arcFinish(parametrisation))
+      ⊆ Plane.openArc(parametrisation)
+      by (y : Plane.Point)
+         (onTrimmedArc :
+              y ∈ Plane.arc(parametrisation)
+                    ∖ Set.singleton(
+                          Plane.Point, Plane.arcStart(parametrisation))
+                    ∖ Set.singleton(
+                          Plane.Point, Plane.arcFinish(parametrisation))) ↦ {
+        y ∈ Plane.arc(parametrisation)
+              ∖ Set.singleton(Plane.Point, Plane.arcStart(parametrisation));
+        y ∈ Plane.arc(parametrisation) as onArc;
+        ¬(y ∈ Set.singleton(Plane.Point, Plane.arcStart(parametrisation)));
+        ¬(y ∈ Set.singleton(Plane.Point, Plane.arcFinish(parametrisation)));
+        choose source : ℝ such that
+            source ∈ Real.unitInterval ∧ parametrisation(source) = y
+            from onArc;
+        source ∈ Real.unitInterval;
+        parametrisation(source) = y as valueAtSource;
+        suppose source = 0 as isStart for contradiction {
+          y = parametrisation(0) by substituting valueAtSource;
+          y = Plane.arcStart(parametrisation);
+          y ∈ Set.singleton(Plane.Point, Plane.arcStart(parametrisation));
+          done
+        };
+        suppose source = 1 as isFinish for contradiction {
+          y = parametrisation(1) by substituting valueAtSource;
+          y = Plane.arcFinish(parametrisation);
+          y ∈ Set.singleton(Plane.Point, Plane.arcFinish(parametrisation));
+          done
+        };
+        source ∈ Real.openUnitInterval;
+        done by { witness source }
+      };
+  done by Set.equal_of_same_members
+}
+
+-- ----------------------------------------------------------------------
+-- The subarc basis.
+--
+-- A parametrisation is an OPEN map onto its arc: this is where the
+-- inverse's continuity earns its keep, since it is exactly what turns a
+-- parameter-radius into a value-radius. With it, the images of the
+-- relatively open subintervals are relatively open in the arc, and the
+-- ball argument below puts one inside every neighbourhood — so they are a
+-- basis of the arc's subspace topology.
+--
+-- Stated for relatively open SUBINTERVALS rather than for subarcs, because
+-- at an endpoint the basic neighbourhood is half-open: `Plane.openArc` of
+-- a subarc is the interior case, and this covers both.
+
+theorem Plane.IsArc.image_OpenIn (parametrisation : ℝ → Plane.Point)
+        (isArc : Plane.IsArc(parametrisation))
+        (piece : Set(ℝ))
+        (pieceInside : piece ⊆ Real.unitInterval)
+        (pieceOpen : MetricSpace.OpenIn(piece, Real.unitInterval))
+        : Plane.OpenIn(
+              MetricSpace.imageSet(parametrisation, piece),
+              Plane.arc(parametrisation)) := {
+  MetricSpace.IsHomeomorphismOn(parametrisation, Real.unitInterval)
+      by Plane.IsArc.IsHomeomorphismOn;
+  MetricSpace.HasContinuousInverseOn(parametrisation, Real.unitInterval)
+      as inverseContinuous;
+  take value : Plane.Point;
+  suppose value ∈ MetricSpace.imageSet(parametrisation, piece) as inImage;
+  choose source : ℝ such that
+      source ∈ piece ∧ parametrisation(source) = value from inImage;
+  source ∈ piece;
+  source ∈ Real.unitInterval by pieceInside;
+  parametrisation(source) = value as valueAtSource;
+
+  -- The piece gives a parameter-radius, and the inverse's continuity turns
+  -- it into a value-radius.
+  choose parameterRadius such that
+      parameterRadius > 0 ∧
+        ∀ (other : ℝ). other ∈ Real.unitInterval →
+          MetricSpace.distance(source, other) < parameterRadius → other ∈ piece
+      from pieceOpen;
+  parameterRadius > 0;
+  ∀ (other : ℝ). other ∈ Real.unitInterval →
+      MetricSpace.distance(source, other) < parameterRadius → other ∈ piece
+      as nearParametersInPiece;
+  choose valueRadius such that
+      valueRadius > 0 ∧
+        ∀ (other : ℝ). other ∈ Real.unitInterval →
+          MetricSpace.distance(parametrisation(source), parametrisation(other))
+              < valueRadius →
+            MetricSpace.distance(source, other) < parameterRadius
+      from inverseContinuous;
+  valueRadius > 0;
+  ∀ (other : ℝ). other ∈ Real.unitInterval →
+      MetricSpace.distance(parametrisation(source), parametrisation(other))
+          < valueRadius →
+        MetricSpace.distance(source, other) < parameterRadius
+      as nearValuesComeFromNearParameters;
+
+  witness valueRadius with {
+    valueRadius > 0;
+    ∀ (other : Plane.Point). other ∈ Plane.arc(parametrisation) →
+        Plane.distance(value, other) < valueRadius →
+          other ∈ MetricSpace.imageSet(parametrisation, piece)
+        by (other : Plane.Point)
+           (onArc : other ∈ Plane.arc(parametrisation))
+           (near : Plane.distance(value, other) < valueRadius) ↦ {
+          choose otherSource : ℝ such that
+              otherSource ∈ Real.unitInterval
+                ∧ parametrisation(otherSource) = other
+              from onArc;
+          otherSource ∈ Real.unitInterval;
+          parametrisation(otherSource) = other as valueAtOtherSource;
+          MetricSpace.distance(
+              parametrisation(source), parametrisation(otherSource))
+             = Plane.distance(value, parametrisation(otherSource))
+                   by substituting valueAtSource
+             = Plane.distance(value, other)
+                   by substituting valueAtOtherSource
+             < valueRadius;
+          MetricSpace.distance(source, otherSource) < parameterRadius
+              by nearValuesComeFromNearParameters;
+          otherSource ∈ piece by nearParametersInPiece;
+          done by { witness otherSource }
+        };
+    done
+  }
+}
+
+-- Every neighbourhood of a point of the arc contains the image of a
+-- relatively open subinterval around its parameter — so those images are a
+-- basis. The piece is the unit interval cut by a ball, which is open in it
+-- for the same reason a ball is open in the plane.
+theorem Plane.IsArc.basic_piece_inside_ball (parametrisation : ℝ → Plane.Point)
+        (isArc : Plane.IsArc(parametrisation))
+        (value : Plane.Point)
+        (onArc : value ∈ Plane.arc(parametrisation))
+        (radius : ℝ) (radiusPositive : radius > 0)
+        : ∃ (piece : Set(ℝ)).
+            (piece ⊆ Real.unitInterval
+                 ∧ MetricSpace.OpenIn(piece, Real.unitInterval))
+              ∧ (value ∈ MetricSpace.imageSet(parametrisation, piece)
+                     ∧ MetricSpace.imageSet(parametrisation, piece)
+                           ⊆ Plane.Ball(value, radius)) := {
+  MetricSpace.ContinuousOn(parametrisation, Real.unitInterval) as continuous;
+  choose source : ℝ such that
+      source ∈ Real.unitInterval ∧ parametrisation(source) = value
+      from onArc;
+  source ∈ Real.unitInterval;
+  parametrisation(source) = value as valueAtSource;
+  choose parameterRadius such that
+      parameterRadius > 0 ∧
+        ∀ (other : ℝ). other ∈ Real.unitInterval →
+          MetricSpace.distance(source, other) < parameterRadius →
+            MetricSpace.distance(parametrisation(source), parametrisation(other))
+                < radius
+      from continuous;
+  parameterRadius > 0;
+  ∀ (other : ℝ). other ∈ Real.unitInterval →
+      MetricSpace.distance(source, other) < parameterRadius →
+        MetricSpace.distance(parametrisation(source), parametrisation(other))
+            < radius
+      as nearParametersHaveNearValues;
+
+  -- The piece is written out rather than bound with `let`: the citation
+  -- below has to match it against `piece ∩ smaller`, and the binding hides
+  -- that shape.
+  MetricSpace.Ball(source, parameterRadius) ∩ Real.unitInterval
+      ⊆ Real.unitInterval by Set.intersection_subset_right;
+  MetricSpace.IsOpen(MetricSpace.Ball(source, parameterRadius))
+      by MetricSpace.Ball_IsOpen;
+  Real.unitInterval ⊆ Set.universe(ℝ) by Set.subset_universe;
+  MetricSpace.OpenIn(
+      MetricSpace.Ball(source, parameterRadius) ∩ Real.unitInterval,
+      Real.unitInterval)
+      by MetricSpace.OpenIn.restrict(carrier := Set.universe(ℝ));
+
+  source ∈ MetricSpace.Ball(source, parameterRadius)
+      by MetricSpace.center_Ball;
+  source ∈ MetricSpace.Ball(source, parameterRadius) ∩ Real.unitInterval;
+  value ∈ MetricSpace.imageSet(
+      parametrisation,
+      MetricSpace.Ball(source, parameterRadius) ∩ Real.unitInterval)
+      by { witness source };
+
+  MetricSpace.imageSet(
+      parametrisation,
+      MetricSpace.Ball(source, parameterRadius) ∩ Real.unitInterval)
+        ⊆ Plane.Ball(value, radius)
+      by (other : Plane.Point)
+         (inImage : other ∈ MetricSpace.imageSet(
+              parametrisation,
+              MetricSpace.Ball(source, parameterRadius) ∩ Real.unitInterval)) ↦ {
+        choose otherSource : ℝ such that
+            otherSource ∈ MetricSpace.Ball(source, parameterRadius)
+                            ∩ Real.unitInterval
+              ∧ parametrisation(otherSource) = other
+            from inImage;
+        parametrisation(otherSource) = other as valueAtOtherSource;
+        otherSource ∈ MetricSpace.Ball(source, parameterRadius);
+        otherSource ∈ Real.unitInterval;
+        MetricSpace.distance(source, otherSource) < parameterRadius
+            by MetricSpace.member_Ball;
+        MetricSpace.distance(parametrisation(source), parametrisation(otherSource))
+            < radius by nearParametersHaveNearValues;
+        Plane.distance(value, other)
+           = MetricSpace.distance(parametrisation(source), other)
+                 by substituting valueAtSource
+           = MetricSpace.distance(
+                 parametrisation(source), parametrisation(otherSource))
+                 by substituting valueAtOtherSource
+           < radius;
+        done
+      };
+  done by {
+    witness MetricSpace.Ball(source, parameterRadius) ∩ Real.unitInterval
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- A plane segment, as an arc. The walk from `a` to `b` is already a map
+-- on the parameter interval, so it needs no reparametrisation at all —
+-- it IS the arc, once `a` and `b` are distinct.
+
+theorem Plane.between_injective (a b : Plane.Point) (distinct : a ≠ b) (s t : ℝ)
         (sameWalk : Plane.between(a, b, s) = Plane.between(a, b, t))
         : s = t := {
   suppose Plane.distance(a, b) = 0 for contradiction {
@@ -80,81 +564,25 @@ theorem Plane.between_injective (a b : Plane.Point) (distinct : a ≠ b)
   done
 }
 
--- ----------------------------------------------------------------------
--- Reparametrising the unit segment onto any segment.
-
-definition Plane.walkOnto (a b : Plane.Point) : Plane.Point → Plane.Point :=
-  (x : Plane.Point) ↦ Plane.between(a, b, Plane.Point.first(x))
-
-theorem Plane.walkOnto_start (a b : Plane.Point)
-        : Plane.walkOnto(a, b)(Plane.origin) = a :=
-  Plane.between(a, b, Plane.Point.first(Plane.origin))
-     = Plane.between(a, b, 0)
-     = a by Plane.between_zero
-
-theorem Plane.walkOnto_finish (a b : Plane.Point)
-        : Plane.walkOnto(a, b)(Plane.Point.make(1, 0)) = b :=
-  Plane.between(a, b, Plane.Point.first(Plane.Point.make(1, 0)))
-     = Plane.between(a, b, 1)
-     = b by Plane.between_one
-
--- The reparametrisation lands in the segment it names, so a subarc of an
--- arc is the arc restricted to that segment.
-theorem Plane.walkOnto_lands (a b : Plane.Point) (x : Plane.Point)
-        (onSegment : x ∈ Plane.unitSegment)
-        : Plane.walkOnto(a, b)(x) ∈ Plane.segment(a, b) := {
-  0 ≤ Plane.Point.first(x) by Plane.first_coordinate_nonneg_on_unitSegment;
-  Plane.Point.first(x) ≤ 1
-      by Plane.first_coordinate_atMostOne_on_unitSegment;
-  done by { witness Plane.Point.first(x) }
-}
-
--- And it reaches every point of that segment: the parameter of the target
--- names the point of the unit segment that walks to it.
-theorem Plane.walkOnto_reaches (a b : Plane.Point) (y : Plane.Point)
-        (onSegment : y ∈ Plane.segment(a, b))
-        : ∃ (x : Plane.Point). x ∈ Plane.unitSegment
-            ∧ Plane.walkOnto(a, b)(x) = y := {
-  choose parameter such that
-      (0 ≤ parameter ∧ parameter ≤ 1) ∧ y = Plane.between(a, b, parameter)
-      from onSegment;
-  0 ≤ parameter;
-  parameter ≤ 1;
-  y = Plane.between(a, b, parameter);
-  let source : Plane.Point := Plane.walk(parameter);
-  source ∈ Plane.unitSegment by Plane.walk_in_unitSegment;
-  Plane.Point.first(source) = parameter
-      by Plane.first_coordinate_of_unitSegment;
-  Plane.walkOnto(a, b)(source)
-     = Plane.between(a, b, Plane.Point.first(source))
-     = Plane.between(a, b, parameter)
-     = y by Equality.symmetry;
-  done by { witness source }
-}
-
-theorem Plane.walkOnto_ContinuousOn (a b : Plane.Point)
-        : Plane.ContinuousOn(Plane.walkOnto(a, b), Plane.unitSegment) := {
-  take x : Plane.Point;
-  suppose x ∈ Plane.unitSegment;
+theorem Plane.between_ContinuousOn (a b : Plane.Point)
+        : MetricSpace.ContinuousOn(Plane.between(a, b), Real.unitInterval) := {
+  take x : ℝ;
+  suppose x ∈ Real.unitInterval;
   take tolerance : ℝ;
-  suppose 0 < tolerance as tolerancePositive;
-  0 < Plane.parameterGap(tolerance, a, b);
+  suppose tolerance > 0 as tolerancePositive;
+  Plane.parameterGap(tolerance, a, b) > 0 by Plane.parameterGap_positive;
   witness Plane.parameterGap(tolerance, a, b) with {
-    0 < Plane.parameterGap(tolerance, a, b);
-    ∀ (y : Plane.Point). y ∈ Plane.unitSegment →
-        Plane.distance(x, y) < Plane.parameterGap(tolerance, a, b) →
-          Plane.distance(
-              Plane.walkOnto(a, b)(x), Plane.walkOnto(a, b)(y)) < tolerance
-        by (y : Plane.Point) (onSegment : y ∈ Plane.unitSegment)
-           (near : Plane.distance(x, y)
+    Plane.parameterGap(tolerance, a, b) > 0;
+    ∀ (y : ℝ). y ∈ Real.unitInterval →
+        MetricSpace.distance(x, y) < Plane.parameterGap(tolerance, a, b) →
+          MetricSpace.distance(Plane.between(a, b, x), Plane.between(a, b, y))
+              < tolerance
+        by (y : ℝ) (inside : y ∈ Real.unitInterval)
+           (near : MetricSpace.distance(x, y)
                        < Plane.parameterGap(tolerance, a, b)) ↦ {
-          -- A coordinate gap never exceeds the distance, so the parameters
-          -- are as close as the points.
-          abs(Plane.Point.first(y) - Plane.Point.first(x))
-             = abs(Plane.Vector.first(y - x)) by Plane.Point.first_difference
-             ≤ Plane.Vector.norm(y - x)
-                   by Plane.Vector.absolute_first_LessOrEqual_norm
-             = Plane.distance(x, y)
+          abs(y - x)
+             = abs(x - y) by Real.absolute_value_subtract_swap
+             = MetricSpace.distance(x, y)
              < Plane.parameterGap(tolerance, a, b);
           done by Plane.between_close_of_gap
         };
@@ -162,451 +590,57 @@ theorem Plane.walkOnto_ContinuousOn (a b : Plane.Point)
   }
 }
 
-theorem Plane.walkOnto_InjectiveOn (a b : Plane.Point) (distinct : a ≠ b)
-        : Plane.InjectiveOn(Plane.walkOnto(a, b), Plane.unitSegment) := {
-  take x : Plane.Point;
-  suppose x ∈ Plane.unitSegment as xOnSegment;
-  take y : Plane.Point;
-  suppose y ∈ Plane.unitSegment as yOnSegment;
-  suppose Plane.walkOnto(a, b)(x) = Plane.walkOnto(a, b)(y) as sameWalk;
-  Plane.between(a, b, Plane.Point.first(x))
-      = Plane.between(a, b, Plane.Point.first(y)) by sameWalk;
-  Plane.Point.first(x) = Plane.Point.first(y) by Plane.between_injective;
-  done by Plane.unitSegment_equal_of_first_coordinate
+theorem Plane.between_InjectiveOn (a b : Plane.Point) (distinct : a ≠ b)
+        : MetricSpace.InjectiveOn(Plane.between(a, b), Real.unitInterval) := {
+  take x : ℝ;
+  suppose x ∈ Real.unitInterval as xInside;
+  take y : ℝ;
+  suppose y ∈ Real.unitInterval as yInside;
+  suppose Plane.between(a, b, x) = Plane.between(a, b, y) as sameWalk;
+  done by Plane.between_injective
 }
 
--- ----------------------------------------------------------------------
--- Subarcs.
-
-definition Plane.subarc (parametrisation : Plane.Point → Plane.Point)
-        (a b : Plane.Point) : Plane.Point → Plane.Point :=
-  (x : Plane.Point) ↦ parametrisation(Plane.walkOnto(a, b)(x))
-
-theorem Plane.subarc_start (parametrisation : Plane.Point → Plane.Point)
-        (a b : Plane.Point)
-        : Plane.arcStart(Plane.subarc(parametrisation, a, b))
-              = parametrisation(a) := {
-  Plane.walkOnto(a, b)(Plane.origin) = a by Plane.walkOnto_start;
-  done by substituting Plane.walkOnto(a, b)(Plane.origin) = a
-}
-
-theorem Plane.subarc_finish (parametrisation : Plane.Point → Plane.Point)
-        (a b : Plane.Point)
-        : Plane.arcFinish(Plane.subarc(parametrisation, a, b))
-              = parametrisation(b) := {
-  Plane.walkOnto(a, b)(Plane.Point.make(1, 0)) = b by Plane.walkOnto_finish;
-  done by substituting Plane.walkOnto(a, b)(Plane.Point.make(1, 0)) = b
-}
-
--- A subarc between two distinct points of the model interval is an arc:
--- the reparametrisation is continuous and injective onto a subsegment, and
--- the unit segment is convex, so that subsegment is where the arc still
--- lives. Injectivity is needed only where the subarc runs — a loop has it
--- everywhere but its finish, which is what the two arcs of a Jordan curve
--- are cut from.
-theorem Plane.IsArc.subarc_on_subsegment
-        (parametrisation : Plane.Point → Plane.Point)
-        (continuous : Plane.ContinuousOn(parametrisation, Plane.unitSegment))
-        (a b : Plane.Point)
-        (aOnSegment : a ∈ Plane.unitSegment)
-        (bOnSegment : b ∈ Plane.unitSegment)
-        (distinct : a ≠ b)
-        (injective
-            : Plane.InjectiveOn(parametrisation, Plane.segment(a, b)))
-        : Plane.IsArc(Plane.subarc(parametrisation, a, b)) := {
-  Plane.IsConvex(Plane.unitSegment) by Plane.unitSegment_IsConvex;
-  Plane.segment(a, b) ⊆ Plane.unitSegment
-      by Plane.IsConvex.segment_inside as subsegmentInside;
-  ∀ (x : Plane.Point). x ∈ Plane.unitSegment →
-      Plane.walkOnto(a, b)(x) ∈ Plane.segment(a, b)
-      by (x : Plane.Point) (onSegment : x ∈ Plane.unitSegment) ↦
-           Plane.walkOnto_lands(a, b, x, onSegment)
-      as landsInSubsegment;
-  ∀ (x : Plane.Point). x ∈ Plane.unitSegment →
-      Plane.walkOnto(a, b)(x) ∈ Plane.unitSegment
-      by (x : Plane.Point) (onSegment : x ∈ Plane.unitSegment) ↦ {
-        Plane.walkOnto(a, b)(x) ∈ Plane.segment(a, b)
-            by landsInSubsegment;
-        done by subsegmentInside
-      };
-
-  Plane.ContinuousOn(Plane.walkOnto(a, b), Plane.unitSegment)
-      by Plane.walkOnto_ContinuousOn;
-  Plane.ContinuousOn(
-      Plane.subarc(parametrisation, a, b), Plane.unitSegment)
-      by Plane.ContinuousOn.compose(
-          inner := Plane.walkOnto(a, b), outer := parametrisation,
-          target := Plane.unitSegment);
-
-  Plane.InjectiveOn(Plane.walkOnto(a, b), Plane.unitSegment)
-      by Plane.walkOnto_InjectiveOn as walkInjective;
-  Plane.InjectiveOn(
-      Plane.subarc(parametrisation, a, b), Plane.unitSegment)
-      by (x : Plane.Point) (xOnSegment : x ∈ Plane.unitSegment)
-         (y : Plane.Point) (yOnSegment : y ∈ Plane.unitSegment)
-         (sameValue : Plane.subarc(parametrisation, a, b)(x)
-                          = Plane.subarc(parametrisation, a, b)(y)) ↦ {
-        Plane.walkOnto(a, b)(x) ∈ Plane.segment(a, b) by landsInSubsegment;
-        Plane.walkOnto(a, b)(y) ∈ Plane.segment(a, b) by landsInSubsegment;
-        parametrisation(Plane.walkOnto(a, b)(x))
-            = parametrisation(Plane.walkOnto(a, b)(y)) by sameValue;
-        Plane.walkOnto(a, b)(x) = Plane.walkOnto(a, b)(y) by injective;
-        done by walkInjective
-      };
+theorem Plane.IsArc.between (a b : Plane.Point) (distinct : a ≠ b)
+        : Plane.IsArc(Plane.between(a, b)) := {
+  MetricSpace.ContinuousOn(Plane.between(a, b), Real.unitInterval)
+      by Plane.between_ContinuousOn;
+  MetricSpace.InjectiveOn(Plane.between(a, b), Real.unitInterval)
+      by Plane.between_InjectiveOn;
   done
 }
 
-theorem Plane.IsArc.subarc (parametrisation : Plane.Point → Plane.Point)
-        (isArc : Plane.IsArc(parametrisation))
-        (a b : Plane.Point)
-        (aOnSegment : a ∈ Plane.unitSegment)
-        (bOnSegment : b ∈ Plane.unitSegment)
-        (distinct : a ≠ b)
-        : Plane.IsArc(Plane.subarc(parametrisation, a, b)) := {
-  Plane.ContinuousOn(parametrisation, Plane.unitSegment);
-  Plane.InjectiveOn(parametrisation, Plane.unitSegment) as injective;
-  Plane.IsConvex(Plane.unitSegment) by Plane.unitSegment_IsConvex;
-  Plane.segment(a, b) ⊆ Plane.unitSegment
-      by Plane.IsConvex.segment_inside as subsegmentInside;
-  Plane.InjectiveOn(parametrisation, Plane.segment(a, b))
-      by (x : Plane.Point) (xOnSubsegment : x ∈ Plane.segment(a, b))
-         (y : Plane.Point) (yOnSubsegment : y ∈ Plane.segment(a, b))
-         (sameValue : parametrisation(x) = parametrisation(y)) ↦ {
-        x ∈ Plane.unitSegment by subsegmentInside;
-        y ∈ Plane.unitSegment by subsegmentInside;
-        done by injective
-      };
-  done by Plane.IsArc.subarc_on_subsegment
-}
+theorem Plane.between_arcStart (a b : Plane.Point)
+        : Plane.arcStart(Plane.between(a, b)) = a :=
+  done by Plane.between_zero
 
--- The subarc's image is the arc restricted to the subsegment — which is
--- what "sub" means, and the form every consumer wants.
-theorem Plane.subarc_image (parametrisation : Plane.Point → Plane.Point)
-        (a b : Plane.Point)
-        : Plane.arc(Plane.subarc(parametrisation, a, b))
-              = Plane.imageSet(parametrisation, Plane.segment(a, b)) := {
-  Plane.arc(Plane.subarc(parametrisation, a, b))
-      ⊆ Plane.imageSet(parametrisation, Plane.segment(a, b))
-      by (y : Plane.Point)
-         (onSubarc : y ∈ Plane.arc(Plane.subarc(parametrisation, a, b))) ↦ {
-        choose source such that
-            source ∈ Plane.unitSegment
-              ∧ Plane.subarc(parametrisation, a, b)(source) = y
-            from onSubarc;
-        source ∈ Plane.unitSegment;
-        parametrisation(Plane.walkOnto(a, b)(source)) = y;
-        Plane.walkOnto(a, b)(source) ∈ Plane.segment(a, b)
-            by Plane.walkOnto_lands;
-        done by { witness Plane.walkOnto(a, b)(source) }
-      };
-  Plane.imageSet(parametrisation, Plane.segment(a, b))
-      ⊆ Plane.arc(Plane.subarc(parametrisation, a, b))
-      by (y : Plane.Point)
-         (onRestriction :
-              y ∈ Plane.imageSet(parametrisation, Plane.segment(a, b))) ↦ {
-        choose middle such that
-            middle ∈ Plane.segment(a, b) ∧ parametrisation(middle) = y
-            from onRestriction;
-        middle ∈ Plane.segment(a, b);
-        parametrisation(middle) = y as valueAtMiddle;
-        choose source such that
-            source ∈ Plane.unitSegment ∧ Plane.walkOnto(a, b)(source) = middle
-            from Plane.walkOnto_reaches;
-        source ∈ Plane.unitSegment;
-        Plane.walkOnto(a, b)(source) = middle as walksToMiddle;
-        Plane.subarc(parametrisation, a, b)(source)
-           = parametrisation(Plane.walkOnto(a, b)(source))
-           = parametrisation(middle) by substituting walksToMiddle
-           = y by valueAtMiddle;
-        done by { witness source }
-      };
-  done by Set.equal_of_same_members
-}
+theorem Plane.between_arcFinish (a b : Plane.Point)
+        : Plane.arcFinish(Plane.between(a, b)) = b :=
+  done by Plane.between_one
 
--- ----------------------------------------------------------------------
--- The arc without its endpoints — the blueprint's `P°`.
---
--- Taken on the parameter side, as the image of the model interval minus
--- its two ends, because that is the form the subarc basis argument needs:
--- an open subarc is the image of an open subsegment. Injectivity then says
--- it is also the arc minus the two endpoint VALUES, which is how the
--- blueprint reads it.
-
-definition Plane.openUnitSegment : Set(Plane.Point) :=
-  (x : Plane.Point) ↦ x ∈ Plane.unitSegment
-    ∧ x ≠ Plane.origin ∧ x ≠ Plane.Point.make(1, 0)
-
-definition Plane.openArc (parametrisation : Plane.Point → Plane.Point)
-        : Set(Plane.Point) :=
-  Plane.imageSet(parametrisation, Plane.openUnitSegment)
-
-theorem Plane.openUnitSegment_subset
-        : Plane.openUnitSegment ⊆ Plane.unitSegment := {
-  take x : Plane.Point;
-  suppose x ∈ Plane.openUnitSegment as inside;
-  done
-}
-
--- On an arc the two readings agree: dropping the endpoints of the model
--- interval drops exactly the two endpoint values, since no other parameter
--- shares their images.
-theorem Plane.IsArc.openArc_is_arc_without_endpoints
-        (parametrisation : Plane.Point → Plane.Point)
-        (isArc : Plane.IsArc(parametrisation))
-        : Plane.openArc(parametrisation)
-              = Plane.arc(parametrisation)
-                    ∖ Set.singleton(
-                          Plane.Point, Plane.arcStart(parametrisation))
-                    ∖ Set.singleton(
-                          Plane.Point, Plane.arcFinish(parametrisation)) := {
-  Plane.InjectiveOn(parametrisation, Plane.unitSegment) as injective;
-  Plane.origin ∈ Plane.unitSegment by Plane.start_in_unitSegment;
-  Plane.Point.make(1, 0) ∈ Plane.unitSegment by Plane.finish_in_unitSegment;
-
-  Plane.openArc(parametrisation)
-      ⊆ Plane.arc(parametrisation)
-            ∖ Set.singleton(Plane.Point, Plane.arcStart(parametrisation))
-            ∖ Set.singleton(Plane.Point, Plane.arcFinish(parametrisation))
-      by (y : Plane.Point) (onOpenArc : y ∈ Plane.openArc(parametrisation)) ↦ {
-        choose source such that
-            source ∈ Plane.openUnitSegment ∧ parametrisation(source) = y
-            from onOpenArc;
-        source ∈ Plane.openUnitSegment;
-        source ∈ Plane.unitSegment by Plane.openUnitSegment_subset;
-        source ≠ Plane.origin;
-        source ≠ Plane.Point.make(1, 0);
-        parametrisation(source) = y;
-        y ∈ Plane.arc(parametrisation) by { witness source };
-        suppose y = Plane.arcStart(parametrisation) for contradiction {
-          parametrisation(source) = parametrisation(Plane.origin);
-          source = Plane.origin by injective;
-          done
-        };
-        suppose y = Plane.arcFinish(parametrisation) for contradiction {
-          parametrisation(source) = parametrisation(Plane.Point.make(1, 0));
-          source = Plane.Point.make(1, 0) by injective;
-          done
-        };
-        ¬(y ∈ Set.singleton(Plane.Point, Plane.arcStart(parametrisation)));
-        ¬(y ∈ Set.singleton(Plane.Point, Plane.arcFinish(parametrisation)));
-        done
-      };
-
-  Plane.arc(parametrisation)
-        ∖ Set.singleton(Plane.Point, Plane.arcStart(parametrisation))
-        ∖ Set.singleton(Plane.Point, Plane.arcFinish(parametrisation))
-      ⊆ Plane.openArc(parametrisation)
-      by (y : Plane.Point)
-         (onTrimmedArc :
-              y ∈ Plane.arc(parametrisation)
-                    ∖ Set.singleton(
-                          Plane.Point, Plane.arcStart(parametrisation))
-                    ∖ Set.singleton(
-                          Plane.Point, Plane.arcFinish(parametrisation))) ↦ {
-        y ∈ Plane.arc(parametrisation)
-              ∖ Set.singleton(Plane.Point, Plane.arcStart(parametrisation));
-        y ∈ Plane.arc(parametrisation) as onArc;
-        ¬(y ∈ Set.singleton(Plane.Point, Plane.arcStart(parametrisation)));
-        ¬(y ∈ Set.singleton(Plane.Point, Plane.arcFinish(parametrisation)));
-        choose source such that
-            source ∈ Plane.unitSegment ∧ parametrisation(source) = y
+theorem Plane.arc_between (a b : Plane.Point)
+        : Plane.arc(Plane.between(a, b)) = Plane.segment(a, b) := {
+  Plane.arc(Plane.between(a, b)) ⊆ Plane.segment(a, b)
+      by (y : Plane.Point) (onArc : y ∈ Plane.arc(Plane.between(a, b))) ↦ {
+        choose source : ℝ such that
+            source ∈ Real.unitInterval ∧ Plane.between(a, b, source) = y
             from onArc;
-        source ∈ Plane.unitSegment;
-        parametrisation(source) = y as valueAtSource;
-        suppose source = Plane.origin as isOrigin for contradiction {
-          y = parametrisation(Plane.origin) by substituting valueAtSource;
-          y = Plane.arcStart(parametrisation);
-          y ∈ Set.singleton(Plane.Point, Plane.arcStart(parametrisation));
-          done
-        };
-        suppose source = Plane.Point.make(1, 0) as isFinish for contradiction {
-          y = parametrisation(Plane.Point.make(1, 0)) by substituting valueAtSource;
-          y = Plane.arcFinish(parametrisation);
-          y ∈ Set.singleton(Plane.Point, Plane.arcFinish(parametrisation));
-          done
-        };
-        source ∈ Plane.openUnitSegment;
+        source ≥ 0 by Real.unitInterval_nonneg;
+        source ≤ 1 by Real.unitInterval_atMostOne;
+        Plane.between(a, b, source) = y as valueAtSource;
+        Plane.between(a, b, source) ∈ Plane.segment(a, b) by { witness source };
+        done by substituting valueAtSource
+      };
+  Plane.segment(a, b) ⊆ Plane.arc(Plane.between(a, b))
+      by (y : Plane.Point) (onSegment : y ∈ Plane.segment(a, b)) ↦ {
+        choose source such that
+            (0 ≤ source ∧ source ≤ 1) ∧ y = Plane.between(a, b, source)
+            from onSegment;
+        0 ≤ source;
+        source ≤ 1;
+        y = Plane.between(a, b, source);
+        source ∈ Real.unitInterval by Real.member_unitInterval;
+        Plane.between(a, b, source) = y;
         done by { witness source }
       };
   done by Set.equal_of_same_members
-}
-
--- ----------------------------------------------------------------------
--- The subarc basis.
---
--- A parametrisation is an OPEN map onto its arc: this is where the
--- inverse's continuity earns its keep, since it is exactly what turns a
--- parameter-radius into a value-radius. With it, the images of the
--- relatively open subsegments are relatively open in the arc, and the ball
--- argument below puts one inside every neighbourhood — so they are a basis
--- of the arc's subspace topology.
---
--- Stated for relatively open SUBSEGMENTS rather than for subarcs, because
--- at an endpoint the basic neighbourhood is half-open: `Plane.openArc` of a
--- subarc is the interior case, and this covers both.
-
-theorem Plane.IsArc.image_OpenIn
-        (parametrisation : Plane.Point → Plane.Point)
-        (isArc : Plane.IsArc(parametrisation))
-        (piece : Set(Plane.Point))
-        (pieceInside : piece ⊆ Plane.unitSegment)
-        (pieceOpen : Plane.OpenIn(piece, Plane.unitSegment))
-        : Plane.OpenIn(
-              Plane.imageSet(parametrisation, piece),
-              Plane.arc(parametrisation)) := {
-  Plane.IsHomeomorphismOn(parametrisation, Plane.unitSegment)
-      by Plane.IsArc.IsHomeomorphismOn;
-  Plane.HasContinuousInverseOn(parametrisation, Plane.unitSegment)
-      as inverseContinuous;
-  take value : Plane.Point;
-  suppose value ∈ Plane.imageSet(parametrisation, piece) as inImage;
-  choose source such that
-      source ∈ piece ∧ parametrisation(source) = value from inImage;
-  source ∈ piece;
-  source ∈ Plane.unitSegment by pieceInside;
-  parametrisation(source) = value as valueAtSource;
-
-  -- The piece gives a parameter-radius, and the inverse's continuity turns
-  -- it into a value-radius.
-  choose parameterRadius such that
-      0 < parameterRadius ∧
-        ∀ (other : Plane.Point). other ∈ Plane.unitSegment →
-          Plane.distance(source, other) < parameterRadius → other ∈ piece
-      from pieceOpen;
-  0 < parameterRadius;
-  ∀ (other : Plane.Point). other ∈ Plane.unitSegment →
-      Plane.distance(source, other) < parameterRadius → other ∈ piece
-      as nearParametersInPiece;
-  choose valueRadius such that
-      0 < valueRadius ∧
-        ∀ (other : Plane.Point). other ∈ Plane.unitSegment →
-          Plane.distance(parametrisation(source), parametrisation(other))
-              < valueRadius →
-            Plane.distance(source, other) < parameterRadius
-      from inverseContinuous;
-  0 < valueRadius;
-  ∀ (other : Plane.Point). other ∈ Plane.unitSegment →
-      Plane.distance(parametrisation(source), parametrisation(other))
-          < valueRadius →
-        Plane.distance(source, other) < parameterRadius
-      as nearValuesComeFromNearParameters;
-
-  witness valueRadius with {
-    0 < valueRadius;
-    ∀ (other : Plane.Point). other ∈ Plane.arc(parametrisation) →
-        Plane.distance(value, other) < valueRadius →
-          other ∈ Plane.imageSet(parametrisation, piece)
-        by (other : Plane.Point)
-           (onArc : other ∈ Plane.arc(parametrisation))
-           (near : Plane.distance(value, other) < valueRadius) ↦ {
-          choose otherSource such that
-              otherSource ∈ Plane.unitSegment
-                ∧ parametrisation(otherSource) = other
-              from onArc;
-          otherSource ∈ Plane.unitSegment;
-          parametrisation(otherSource) = other as valueAtOtherSource;
-          Plane.distance(
-              parametrisation(source), parametrisation(otherSource))
-             = Plane.distance(value, parametrisation(otherSource))
-                   by substituting valueAtSource
-             = Plane.distance(value, other)
-                   by substituting valueAtOtherSource
-             < valueRadius;
-          Plane.distance(source, otherSource) < parameterRadius
-              by nearValuesComeFromNearParameters;
-          otherSource ∈ piece by nearParametersInPiece;
-          done by { witness otherSource }
-        };
-    done
-  }
-}
-
--- Every neighbourhood of a point of the arc contains the image of a
--- relatively open subsegment around its parameter — so those images are a
--- basis. The piece is the model interval cut by a ball, which is open in it
--- for the same reason a ball is open in the plane.
-theorem Plane.IsArc.basic_piece_inside_ball
-        (parametrisation : Plane.Point → Plane.Point)
-        (isArc : Plane.IsArc(parametrisation))
-        (value : Plane.Point)
-        (onArc : value ∈ Plane.arc(parametrisation))
-        (radius : ℝ) (radiusPositive : 0 < radius)
-        : ∃ (piece : Set(Plane.Point)).
-            (piece ⊆ Plane.unitSegment ∧ Plane.OpenIn(piece, Plane.unitSegment))
-              ∧ (value ∈ Plane.imageSet(parametrisation, piece)
-                     ∧ Plane.imageSet(parametrisation, piece)
-                           ⊆ Plane.Ball(value, radius)) := {
-  Plane.ContinuousOn(parametrisation, Plane.unitSegment) as continuous;
-  choose source such that
-      source ∈ Plane.unitSegment ∧ parametrisation(source) = value
-      from onArc;
-  source ∈ Plane.unitSegment;
-  parametrisation(source) = value as valueAtSource;
-  choose parameterRadius such that
-      0 < parameterRadius ∧
-        ∀ (other : Plane.Point). other ∈ Plane.unitSegment →
-          Plane.distance(source, other) < parameterRadius →
-            Plane.distance(parametrisation(source), parametrisation(other))
-                < radius
-      from continuous;
-  0 < parameterRadius;
-  ∀ (other : Plane.Point). other ∈ Plane.unitSegment →
-      Plane.distance(source, other) < parameterRadius →
-        Plane.distance(parametrisation(source), parametrisation(other))
-            < radius
-      as nearParametersHaveNearValues;
-
-  -- The piece is written out rather than bound with `let`: the citation
-  -- below has to match it against `piece ∩ smaller`, and the binding hides
-  -- that shape.
-  Plane.Ball(source, parameterRadius) ∩ Plane.unitSegment ⊆ Plane.unitSegment
-      by Set.intersection_subset_right;
-  Plane.IsOpen(Plane.Ball(source, parameterRadius)) by Plane.Ball_IsOpen;
-  Plane.unitSegment ⊆ Set.universe(Plane.Point) by Set.subset_universe;
-  Plane.OpenIn(
-      Plane.Ball(source, parameterRadius) ∩ Plane.unitSegment,
-      Plane.unitSegment)
-      by Plane.OpenIn.restrict(carrier := Set.universe(Plane.Point));
-
-  Plane.distance(source, source) = 0 by Plane.distance_self;
-  Plane.distance(source, source) < parameterRadius;
-  source ∈ Plane.Ball(source, parameterRadius);
-  source ∈ Plane.Ball(source, parameterRadius) ∩ Plane.unitSegment;
-  value ∈ Plane.imageSet(
-      parametrisation,
-      Plane.Ball(source, parameterRadius) ∩ Plane.unitSegment)
-      by { witness source };
-
-  Plane.imageSet(
-      parametrisation,
-      Plane.Ball(source, parameterRadius) ∩ Plane.unitSegment)
-        ⊆ Plane.Ball(value, radius)
-      by (other : Plane.Point)
-         (inImage : other ∈ Plane.imageSet(
-              parametrisation,
-              Plane.Ball(source, parameterRadius) ∩ Plane.unitSegment)) ↦ {
-        choose otherSource such that
-            otherSource ∈ Plane.Ball(source, parameterRadius)
-                            ∩ Plane.unitSegment
-              ∧ parametrisation(otherSource) = other
-            from inImage;
-        otherSource ∈ Plane.Ball(source, parameterRadius)
-                        ∩ Plane.unitSegment;
-        parametrisation(otherSource) = other as valueAtOtherSource;
-        otherSource ∈ Plane.Ball(source, parameterRadius)
-            by Set.intersection_member_left;
-        otherSource ∈ Plane.unitSegment by Set.intersection_member_right;
-        Plane.distance(source, otherSource) < parameterRadius;
-        Plane.distance(parametrisation(source), parametrisation(otherSource))
-            < radius by nearParametersHaveNearValues;
-        Plane.distance(value, other)
-           = Plane.distance(parametrisation(source), other)
-                 by substituting valueAtSource
-           = Plane.distance(
-                 parametrisation(source), parametrisation(otherSource))
-                 by substituting valueAtOtherSource
-           < radius;
-        done
-      };
-  done by { witness Plane.Ball(source, parameterRadius) ∩ Plane.unitSegment }
 }

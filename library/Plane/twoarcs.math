@@ -5,14 +5,15 @@
 -- The whole argument is carried by the loop's parameters. Pull the two
 -- points back to parameters `s` and `t` short of the finish, with `s`
 -- first; then the two arcs are what the loop makes of the parameters
--- between them and of the parameters outside them — a subsegment, and the
+-- between them and of the parameters outside them — a subinterval, and the
 -- two end pieces glued at the point where the loop closes up.
 --
--- Both halves of the statement are then facts about intervals of reals:
--- a parameter lies inside `[s,t]` or outside it, and two parameters
--- carrying the same point are equal unless one of them is the finish.
--- That is why the model interval runs along the axis (`Plane/model.math`)
--- and why the loop is injective off exactly one point.
+-- Both halves of the statement are then facts about intervals of reals: a
+-- parameter lies inside `[s,t]` or outside it, and two parameters carrying
+-- the same point are equal unless one of them is the finish. Now that a
+-- parameter IS a real number, that is all the file says — the ordered
+-- reading of `Real.segment` does the work a coordinate characterisation
+-- used to.
 
 module Plane.twoarcs
 
@@ -25,8 +26,16 @@ import Set.algebra
 import Real.interface
 import Real.order
 import Real.order_field
+import Real.linearity
+import Metric.space
+import Metric.real
+import Metric.topology
+import Metric.compactness
+import Metric.homeomorphism
+import Metric.interval
 import Plane.vector
 import Plane.point
+import Plane.metric
 import Plane.segment
 import Plane.topology
 import Plane.compactness
@@ -38,60 +47,41 @@ import Plane.subarc
 import Plane.concatenate
 
 -- ----------------------------------------------------------------------
--- Where a parameter sits, in coordinates.
-
--- Short of the finish means strictly short of it: the finish is the only
--- point of the interval whose parameter is 1.
-theorem Plane.first_coordinate_below_one (x : Plane.Point) (onSegment : x ∈ Plane.unitSegment)
-        (beforeFinish : x ≠ Plane.Point.make(1, 0))
-        : Plane.Point.first(x) < 1 := {
-  Plane.Point.first(x) ≤ 1 by Plane.first_coordinate_atMostOne_on_unitSegment;
-  suppose Plane.Point.first(x) = 1 as atOne for contradiction {
-    Plane.Point.make(1, 0) ∈ Plane.unitSegment by Plane.finish_in_unitSegment;
-    Plane.Point.first(x) = Plane.Point.first(Plane.Point.make(1, 0)) by atOne;
-    x = Plane.Point.make(1, 0) by Plane.unitSegment_equal_of_first_coordinate;
-    done
-  };
-  done
-}
-
--- ----------------------------------------------------------------------
 -- What the loop covers.
 
 -- Every parameter is inside `[s,t]`, before `s`, or after `t` — so the
 -- loop's image splits the same way. The three-way split is the linearity
 -- of the order on the parameters, and nothing else.
-theorem Plane.unitSegment_split (s t : Plane.Point) (sOnSegment : s ∈ Plane.unitSegment)
-        (tOnSegment : t ∈ Plane.unitSegment) (ordered : Plane.Point.first(s) ≤ Plane.Point.first(t))
-        : Plane.unitSegment
-              = Plane.segment(s, t) ∪ (Plane.segment(Plane.origin, s) ∪ Plane.segment(t, Plane.Point.make(1, 0))) := {
-  Plane.origin ∈ Plane.unitSegment by Plane.start_in_unitSegment;
-  Plane.Point.make(1, 0) ∈ Plane.unitSegment by Plane.finish_in_unitSegment;
-  Plane.IsConvex(Plane.unitSegment) by Plane.unitSegment_IsConvex;
+theorem Real.unitInterval_split (s t : ℝ)
+        (sInside : s ∈ Real.unitInterval) (tInside : t ∈ Real.unitInterval)
+        (ordered : s ≤ t)
+        : Real.unitInterval
+              = Real.segment(s, t) ∪ (Real.segment(0, s) ∪ Real.segment(t, 1)) := {
+  Real.IsConvex(Real.unitInterval) by Real.unitInterval_IsConvex;
+  (0 : ℝ) ∈ Real.unitInterval by Real.zero_in_unitInterval;
+  (1 : ℝ) ∈ Real.unitInterval by Real.one_in_unitInterval;
+  s ≥ 0 by Real.unitInterval_nonneg;
+  t ≤ 1 by Real.unitInterval_atMostOne;
 
-  Plane.unitSegment ⊆ Plane.segment(s, t) ∪ (Plane.segment(Plane.origin, s) ∪ Plane.segment(t, Plane.Point.make(1, 0)))
-      by (x : Plane.Point) (xOnSegment : x ∈ Plane.unitSegment) ↦ {
-        0 ≤ Plane.Point.first(x) by Plane.first_coordinate_nonneg_on_unitSegment;
-        Plane.Point.first(x) ≤ 1 by Plane.first_coordinate_atMostOne_on_unitSegment;
-        Plane.Point.first(Plane.origin) = 0;
-        Plane.Point.first(Plane.Point.make(1, 0)) = 1;
+  Real.unitInterval ⊆ Real.segment(s, t) ∪ (Real.segment(0, s) ∪ Real.segment(t, 1))
+      by (x : ℝ) (xInside : x ∈ Real.unitInterval) ↦ {
+        x ≥ 0 by Real.unitInterval_nonneg;
+        x ≤ 1 by Real.unitInterval_atMostOne;
         done by cases {
-          case Plane.Point.first(x) ≤ Plane.Point.first(s) as beforeStart: {
-              Plane.Point.first(Plane.origin) ≤ Plane.Point.first(x);
-              x ∈ Plane.segment(Plane.origin, s) by Plane.member_segment_of_first_coordinate;
+          case x ≤ s as beforeStart: {
+              x ∈ Real.segment(0, s) by Real.member_segment_of_bounds;
               done
             }
           otherwise as afterStart: {
-              Plane.Point.first(s) ≤ Plane.Point.first(x) by Real.not_LessOrEqual_implies;
+              s ≤ x by Real.not_LessOrEqual_implies;
               done by cases {
-                case Plane.Point.first(x) ≤ Plane.Point.first(t) as insideMiddle: {
-                    x ∈ Plane.segment(s, t) by Plane.member_segment_of_first_coordinate;
+                case x ≤ t as insideMiddle: {
+                    x ∈ Real.segment(s, t) by Real.member_segment_of_bounds;
                     done
                   }
                 otherwise as afterEnd: {
-                    Plane.Point.first(t) ≤ Plane.Point.first(x) by Real.not_LessOrEqual_implies;
-                    Plane.Point.first(x) ≤ Plane.Point.first(Plane.Point.make(1, 0));
-                    x ∈ Plane.segment(t, Plane.Point.make(1, 0)) by Plane.member_segment_of_first_coordinate;
+                    t ≤ x by Real.not_LessOrEqual_implies;
+                    x ∈ Real.segment(t, 1) by Real.member_segment_of_bounds;
                     done
                   }
               }
@@ -99,36 +89,23 @@ theorem Plane.unitSegment_split (s t : Plane.Point) (sOnSegment : s ∈ Plane.un
         }
       };
 
-  Plane.segment(s, t) ⊆ Plane.unitSegment by Plane.IsConvex.segment_inside;
-  Plane.segment(Plane.origin, s) ⊆ Plane.unitSegment by Plane.IsConvex.segment_inside;
-  Plane.segment(t, Plane.Point.make(1, 0)) ⊆ Plane.unitSegment by Plane.IsConvex.segment_inside;
-  Plane.segment(s, t) ∪ (Plane.segment(Plane.origin, s) ∪ Plane.segment(t, Plane.Point.make(1, 0))) ⊆ Plane.unitSegment
-      by (x : Plane.Point)
-         (onPieces : x ∈ Plane.segment(s, t) ∪ (Plane.segment(Plane.origin, s) ∪ Plane.segment(t, Plane.Point.make(1, 0)))) ↦ {
+  Real.segment(s, t) ⊆ Real.unitInterval by Real.IsConvex.segment_inside;
+  Real.segment(0, s) ⊆ Real.unitInterval by Real.IsConvex.segment_inside;
+  Real.segment(t, 1) ⊆ Real.unitInterval by Real.IsConvex.segment_inside;
+  Real.segment(s, t) ∪ (Real.segment(0, s) ∪ Real.segment(t, 1)) ⊆ Real.unitInterval
+      by (x : ℝ)
+         (onPieces : x ∈ Real.segment(s, t) ∪ (Real.segment(0, s) ∪ Real.segment(t, 1))) ↦ {
         done by cases {
-          case x ∈ Plane.segment(s, t) as inMiddle: done
-          case x ∈ Plane.segment(Plane.origin, s) ∪ Plane.segment(t, Plane.Point.make(1, 0)) as inEnds: {
+          case x ∈ Real.segment(s, t) as inMiddle: done
+          case x ∈ Real.segment(0, s) ∪ Real.segment(t, 1) as inEnds: {
               done by cases {
-                case x ∈ Plane.segment(Plane.origin, s) as inFront: done
-                case x ∈ Plane.segment(t, Plane.Point.make(1, 0)) as inBack: done
+                case x ∈ Real.segment(0, s) as inFront: done
+                case x ∈ Real.segment(t, 1) as inBack: done
               }
             }
         }
       };
   done by Set.equal_of_same_members
-}
-
--- The mirror of `first_coordinate_below_one`, for reading a parameter's
--- position back off its coordinate.
-theorem Plane.before_finish_of_first_coordinate (x : Plane.Point) (below : Plane.Point.first(x) < 1)
-        : x ≠ Plane.Point.make(1, 0) := {
-  suppose x = Plane.Point.make(1, 0) as atFinish for contradiction {
-    Plane.Point.first(x) = Plane.Point.first(Plane.Point.make(1, 0)) by substituting atFinish;
-    Plane.Point.first(x) = 1;
-    (1 : ℝ) < 1;
-    done
-  };
-  done
 }
 
 -- ----------------------------------------------------------------------
@@ -140,90 +117,88 @@ theorem Plane.before_finish_of_first_coordinate (x : Plane.Point) (below : Plane
 -- of the loop plus the order on the parameters; the one place the closing
 -- condition enters is the parameter at the finish, which carries the same
 -- point as the start.
-theorem Plane.IsLoop.pieces_meet_at_ends (loop : Plane.Point → Plane.Point) (isLoop : Plane.IsLoop(loop))
-        (s t : Plane.Point) (sOnSegment : s ∈ Plane.unitSegment) (tOnSegment : t ∈ Plane.unitSegment)
-        (sBeforeFinish : s ≠ Plane.Point.make(1, 0)) (tBeforeFinish : t ≠ Plane.Point.make(1, 0))
-        (ordered : Plane.Point.first(s) < Plane.Point.first(t))
-        : Plane.imageSet(loop, Plane.segment(s, t))
-              ∩ (Plane.imageSet(loop, Plane.segment(Plane.origin, s))
-                     ∪ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))))
+theorem Plane.IsLoop.pieces_meet_at_ends (loop : ℝ → Plane.Point) (isLoop : Plane.IsLoop(loop))
+        (s t : ℝ) (sInside : s ∈ Real.unitInterval) (tInside : t ∈ Real.unitInterval)
+        (sBeforeFinish : s ≠ 1) (tBeforeFinish : t ≠ 1) (ordered : s < t)
+        : MetricSpace.imageSet(loop, Real.segment(s, t))
+              ∩ (MetricSpace.imageSet(loop, Real.segment(0, s))
+                     ∪ MetricSpace.imageSet(loop, Real.segment(t, 1)))
               = Set.singleton(Plane.Point, loop(s)) ∪ Set.singleton(Plane.Point, loop(t)) := {
-  Plane.origin ∈ Plane.unitSegment by Plane.start_in_unitSegment;
-  Plane.Point.make(1, 0) ∈ Plane.unitSegment by Plane.finish_in_unitSegment;
-  Plane.IsConvex(Plane.unitSegment) by Plane.unitSegment_IsConvex;
-  Plane.segment(s, t) ⊆ Plane.unitSegment by Plane.IsConvex.segment_inside as middleInside;
-  Plane.segment(Plane.origin, s) ⊆ Plane.unitSegment by Plane.IsConvex.segment_inside as frontInside;
-  Plane.segment(t, Plane.Point.make(1, 0)) ⊆ Plane.unitSegment by Plane.IsConvex.segment_inside as backInside;
-  Plane.Point.first(s) ≤ Plane.Point.first(t) by Real.LessThan.weaken;
-  Plane.Point.first(s) < 1 by Plane.first_coordinate_below_one;
-  Plane.Point.first(t) < 1 by Plane.first_coordinate_below_one;
-  Plane.Point.first(Plane.origin) = 0;
-  Plane.Point.first(Plane.Point.make(1, 0)) = 1;
-  0 ≤ Plane.Point.first(s) by Plane.first_coordinate_nonneg_on_unitSegment;
-  loop(Plane.origin) = loop(Plane.Point.make(1, 0)) as closesUp;
+  Real.IsConvex(Real.unitInterval) by Real.unitInterval_IsConvex;
+  (0 : ℝ) ∈ Real.unitInterval by Real.zero_in_unitInterval;
+  (1 : ℝ) ∈ Real.unitInterval by Real.one_in_unitInterval;
+  Real.segment(s, t) ⊆ Real.unitInterval by Real.IsConvex.segment_inside as middleInside;
+  Real.segment(0, s) ⊆ Real.unitInterval by Real.IsConvex.segment_inside as frontInside;
+  Real.segment(t, 1) ⊆ Real.unitInterval by Real.IsConvex.segment_inside as backInside;
+  s ≤ t by Real.LessThan.weaken;
+  s ≥ 0 by Real.unitInterval_nonneg;
+  s ≤ 1 by Real.unitInterval_atMostOne;
+  t ≤ 1 by Real.unitInterval_atMostOne;
+  s < 1;
+  t < 1;
+  loop(0) = loop(1) as closesUp;
 
-  Plane.imageSet(loop, Plane.segment(s, t))
-      ∩ (Plane.imageSet(loop, Plane.segment(Plane.origin, s))
-             ∪ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))))
+  MetricSpace.imageSet(loop, Real.segment(s, t))
+      ∩ (MetricSpace.imageSet(loop, Real.segment(0, s))
+             ∪ MetricSpace.imageSet(loop, Real.segment(t, 1)))
       ⊆ Set.singleton(Plane.Point, loop(s)) ∪ Set.singleton(Plane.Point, loop(t))
       by (z : Plane.Point)
-         (onBoth : z ∈ Plane.imageSet(loop, Plane.segment(s, t))
-                       ∩ (Plane.imageSet(loop, Plane.segment(Plane.origin, s))
-                              ∪ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))))) ↦ {
-        z ∈ Plane.imageSet(loop, Plane.segment(s, t));
-        choose middle such that middle ∈ Plane.segment(s, t) ∧ loop(middle) = z;
-        middle ∈ Plane.segment(s, t);
+         (onBoth : z ∈ MetricSpace.imageSet(loop, Real.segment(s, t))
+                       ∩ (MetricSpace.imageSet(loop, Real.segment(0, s))
+                              ∪ MetricSpace.imageSet(loop, Real.segment(t, 1)))) ↦ {
+        z ∈ MetricSpace.imageSet(loop, Real.segment(s, t));
+        choose middle : ℝ such that middle ∈ Real.segment(s, t) ∧ loop(middle) = z;
+        middle ∈ Real.segment(s, t);
         loop(middle) = z as middleCarries;
-        middle ∈ Plane.unitSegment by middleInside;
-        Plane.Point.first(s) ≤ Plane.Point.first(middle) by Plane.first_coordinate_atLeast_on_segment;
-        Plane.Point.first(middle) ≤ Plane.Point.first(t) by Plane.first_coordinate_atMost_on_segment;
-        Plane.Point.first(middle) < 1;
-        middle ≠ Plane.Point.make(1, 0) by Plane.before_finish_of_first_coordinate;
+        middle ∈ Real.unitInterval by middleInside;
+        s ≤ middle by Real.segment_atLeast(b := t);
+        middle ≤ t by Real.segment_atMost(a := s);
+        middle < 1;
+        middle ≠ 1 by Real.LessThan.distinct;
 
-        z ∈ Plane.imageSet(loop, Plane.segment(Plane.origin, s))
-            ∪ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0)));
+        z ∈ MetricSpace.imageSet(loop, Real.segment(0, s))
+            ∪ MetricSpace.imageSet(loop, Real.segment(t, 1));
         done by cases {
-          case z ∈ Plane.imageSet(loop, Plane.segment(Plane.origin, s)) as onFront: {
-              choose outside such that outside ∈ Plane.segment(Plane.origin, s) ∧ loop(outside) = z from onFront;
-              outside ∈ Plane.segment(Plane.origin, s);
+          case z ∈ MetricSpace.imageSet(loop, Real.segment(0, s)) as onFront: {
+              choose outside : ℝ such that
+                  outside ∈ Real.segment(0, s) ∧ loop(outside) = z from onFront;
+              outside ∈ Real.segment(0, s);
               loop(outside) = z;
-              outside ∈ Plane.unitSegment by frontInside;
-              Plane.Point.first(outside) ≤ Plane.Point.first(s) by Plane.first_coordinate_atMost_on_segment;
-              Plane.Point.first(outside) < 1;
-              outside ≠ Plane.Point.make(1, 0) by Plane.before_finish_of_first_coordinate;
+              outside ∈ Real.unitInterval by frontInside;
+              outside ≤ s by Real.segment_atMost(a := 0);
+              outside < 1;
+              outside ≠ 1 by Real.LessThan.distinct;
               loop(middle) = loop(outside) by middleCarries;
               middle = outside by Plane.IsLoop.injective_before_finish;
-              Plane.Point.first(middle) ≤ Plane.Point.first(s) by substituting (middle = outside);
-              Plane.Point.first(middle) = Plane.Point.first(s) by Real.LessOrEqual.antisymmetric;
-              middle = s by Plane.unitSegment_equal_of_first_coordinate;
+              middle ≤ s by substituting (middle = outside);
+              middle = s by Real.LessOrEqual.antisymmetric;
               loop(s) = z by substituting (middle = s);
               z = loop(s);
               z ∈ Set.singleton(Plane.Point, loop(s));
               done
             }
-          case z ∈ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))) as onBack: {
-              choose outside such that outside ∈ Plane.segment(t, Plane.Point.make(1, 0)) ∧ loop(outside) = z from onBack;
-              outside ∈ Plane.segment(t, Plane.Point.make(1, 0));
+          case z ∈ MetricSpace.imageSet(loop, Real.segment(t, 1)) as onBack: {
+              choose outside : ℝ such that
+                  outside ∈ Real.segment(t, 1) ∧ loop(outside) = z from onBack;
+              outside ∈ Real.segment(t, 1);
               loop(outside) = z as outsideCarries;
-              outside ∈ Plane.unitSegment by backInside;
-              Plane.Point.first(t) ≤ Plane.Point.first(outside) by Plane.first_coordinate_atLeast_on_segment;
+              outside ∈ Real.unitInterval by backInside;
+              t ≤ outside by Real.segment_atLeast(b := 1);
               done by cases {
-                case outside = Plane.Point.make(1, 0) as atFinish: {
+                case outside = 1 as atFinish: {
                     -- The far end carries the same point as the start, and
                     -- the start is short of the finish, so the middle
                     -- parameter is the start — which forces `s` to be it.
-                    loop(Plane.origin)
-                       = loop(Plane.Point.make(1, 0)) by closesUp
+                    loop(0)
+                       = loop(1) by closesUp
                        = loop(outside) by substituting atFinish
                        = z by outsideCarries;
-                    Plane.origin ≠ Plane.Point.make(1, 0) by Plane.start_not_finish;
-                    loop(middle) = loop(Plane.origin) by middleCarries;
-                    middle = Plane.origin by Plane.IsLoop.injective_before_finish;
-                    Plane.Point.first(middle) = 0 by substituting (middle = Plane.origin);
-                    Plane.Point.first(s) ≤ 0;
-                    Plane.Point.first(s) = 0 by Real.LessOrEqual.antisymmetric;
-                    Plane.Point.first(middle) = Plane.Point.first(s);
-                    middle = s by Plane.unitSegment_equal_of_first_coordinate;
+                    (0 : ℝ) ≠ 1;
+                    loop(middle) = loop(0) by middleCarries;
+                    middle = 0 by Plane.IsLoop.injective_before_finish;
+                    s ≤ 0 by substituting (middle = 0);
+                    s = 0 by Real.LessOrEqual.antisymmetric;
+                    middle = s;
                     loop(s) = z by substituting (middle = s);
                     z = loop(s);
                     z ∈ Set.singleton(Plane.Point, loop(s));
@@ -232,9 +207,8 @@ theorem Plane.IsLoop.pieces_meet_at_ends (loop : Plane.Point → Plane.Point) (i
                 otherwise as beforeFinish: {
                     loop(middle) = loop(outside) by middleCarries;
                     middle = outside by Plane.IsLoop.injective_before_finish;
-                    Plane.Point.first(t) ≤ Plane.Point.first(middle) by substituting (middle = outside);
-                    Plane.Point.first(middle) = Plane.Point.first(t) by Real.LessOrEqual.antisymmetric;
-                    middle = t by Plane.unitSegment_equal_of_first_coordinate;
+                    t ≤ middle by substituting (middle = outside);
+                    middle = t by Real.LessOrEqual.antisymmetric;
                     loop(t) = z by substituting (middle = t);
                     z = loop(t);
                     z ∈ Set.singleton(Plane.Point, loop(t));
@@ -245,35 +219,40 @@ theorem Plane.IsLoop.pieces_meet_at_ends (loop : Plane.Point → Plane.Point) (i
         }
       };
 
-  s ∈ Plane.segment(s, t) by Plane.left_in_segment;
-  t ∈ Plane.segment(s, t) by Plane.right_in_segment;
-  s ∈ Plane.segment(Plane.origin, s) by Plane.right_in_segment;
-  t ∈ Plane.segment(t, Plane.Point.make(1, 0)) by Plane.left_in_segment;
-  loop(s) ∈ Plane.imageSet(loop, Plane.segment(s, t)) by { witness s };
-  loop(t) ∈ Plane.imageSet(loop, Plane.segment(s, t)) by { witness t };
-  loop(s) ∈ Plane.imageSet(loop, Plane.segment(Plane.origin, s)) by { witness s };
-  loop(t) ∈ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))) by { witness t };
+  s ∈ Real.segment(s, t) by Real.left_in_segment;
+  t ∈ Real.segment(s, t) by Real.right_in_segment;
+  s ∈ Real.segment(0, s) by Real.right_in_segment;
+  t ∈ Real.segment(t, 1) by Real.left_in_segment;
+  loop(s) ∈ MetricSpace.imageSet(loop, Real.segment(s, t)) by { witness s };
+  loop(t) ∈ MetricSpace.imageSet(loop, Real.segment(s, t)) by { witness t };
+  loop(s) ∈ MetricSpace.imageSet(loop, Real.segment(0, s)) by { witness s };
+  loop(t) ∈ MetricSpace.imageSet(loop, Real.segment(t, 1)) by { witness t };
   Set.singleton(Plane.Point, loop(s)) ∪ Set.singleton(Plane.Point, loop(t))
-      ⊆ Plane.imageSet(loop, Plane.segment(s, t))
-            ∩ (Plane.imageSet(loop, Plane.segment(Plane.origin, s))
-                   ∪ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))))
+      ⊆ MetricSpace.imageSet(loop, Real.segment(s, t))
+            ∩ (MetricSpace.imageSet(loop, Real.segment(0, s))
+                   ∪ MetricSpace.imageSet(loop, Real.segment(t, 1)))
       by (z : Plane.Point)
-         (onEnds : z ∈ Set.singleton(Plane.Point, loop(s)) ∪ Set.singleton(Plane.Point, loop(t))) ↦ {
+         (onEnds : z ∈ Set.singleton(Plane.Point, loop(s))
+                       ∪ Set.singleton(Plane.Point, loop(t))) ↦ {
         done by cases {
           case z ∈ Set.singleton(Plane.Point, loop(s)) as atStart: {
               z = loop(s);
-              z ∈ Plane.imageSet(loop, Plane.segment(s, t)) by substituting (z = loop(s));
-              z ∈ Plane.imageSet(loop, Plane.segment(Plane.origin, s)) by substituting (z = loop(s));
-              z ∈ Plane.imageSet(loop, Plane.segment(Plane.origin, s))
-                  ∪ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0)));
+              z ∈ MetricSpace.imageSet(loop, Real.segment(s, t))
+                  by substituting (z = loop(s));
+              z ∈ MetricSpace.imageSet(loop, Real.segment(0, s))
+                  by substituting (z = loop(s));
+              z ∈ MetricSpace.imageSet(loop, Real.segment(0, s))
+                  ∪ MetricSpace.imageSet(loop, Real.segment(t, 1));
               done
             }
           case z ∈ Set.singleton(Plane.Point, loop(t)) as atEnd: {
               z = loop(t);
-              z ∈ Plane.imageSet(loop, Plane.segment(s, t)) by substituting (z = loop(t));
-              z ∈ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))) by substituting (z = loop(t));
-              z ∈ Plane.imageSet(loop, Plane.segment(Plane.origin, s))
-                  ∪ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0)));
+              z ∈ MetricSpace.imageSet(loop, Real.segment(s, t))
+                  by substituting (z = loop(t));
+              z ∈ MetricSpace.imageSet(loop, Real.segment(t, 1))
+                  by substituting (z = loop(t));
+              z ∈ MetricSpace.imageSet(loop, Real.segment(0, s))
+                  ∪ MetricSpace.imageSet(loop, Real.segment(t, 1));
               done
             }
         }
@@ -287,113 +266,110 @@ theorem Plane.IsLoop.pieces_meet_at_ends (loop : Plane.Point → Plane.Point) (i
 -- Each needs the loop to be injective on its own parameters. On the middle
 -- and the front that is injectivity off the finish, since neither contains
 -- it. The back piece DOES contain the finish, and there the argument is
--- that the only other parameter carrying `loop(finish)` is the start,
--- which lies strictly before `t`.
+-- that the only other parameter carrying `loop(1)` is the start, which
+-- lies strictly before `t`.
 
-theorem Plane.IsLoop.injective_on_front (loop : Plane.Point → Plane.Point) (isLoop : Plane.IsLoop(loop))
-        (s : Plane.Point) (sOnSegment : s ∈ Plane.unitSegment) (sBeforeFinish : s ≠ Plane.Point.make(1, 0))
-        : Plane.InjectiveOn(loop, Plane.segment(Plane.origin, s)) := {
-  Plane.origin ∈ Plane.unitSegment by Plane.start_in_unitSegment;
-  Plane.IsConvex(Plane.unitSegment) by Plane.unitSegment_IsConvex;
-  Plane.segment(Plane.origin, s) ⊆ Plane.unitSegment by Plane.IsConvex.segment_inside as frontInside;
-  Plane.Point.first(s) < 1 by Plane.first_coordinate_below_one;
-  Plane.Point.first(Plane.origin) = 0;
-  0 ≤ Plane.Point.first(s) by Plane.first_coordinate_nonneg_on_unitSegment;
-  take u : Plane.Point;
-  suppose u ∈ Plane.segment(Plane.origin, s) as uOnFront;
-  take v : Plane.Point;
-  suppose v ∈ Plane.segment(Plane.origin, s) as vOnFront;
+theorem Plane.IsLoop.injective_on_front (loop : ℝ → Plane.Point) (isLoop : Plane.IsLoop(loop))
+        (s : ℝ) (sInside : s ∈ Real.unitInterval) (sBeforeFinish : s ≠ 1)
+        : MetricSpace.InjectiveOn(loop, Real.segment(0, s)) := {
+  Real.IsConvex(Real.unitInterval) by Real.unitInterval_IsConvex;
+  (0 : ℝ) ∈ Real.unitInterval by Real.zero_in_unitInterval;
+  Real.segment(0, s) ⊆ Real.unitInterval by Real.IsConvex.segment_inside as frontInside;
+  s ≥ 0 by Real.unitInterval_nonneg;
+  s ≤ 1 by Real.unitInterval_atMostOne;
+  s < 1;
+  take u : ℝ;
+  suppose u ∈ Real.segment(0, s) as uOnFront;
+  take v : ℝ;
+  suppose v ∈ Real.segment(0, s) as vOnFront;
   suppose loop(u) = loop(v) as samePoint;
-  u ∈ Plane.unitSegment by frontInside;
-  v ∈ Plane.unitSegment by frontInside;
-  Plane.Point.first(u) ≤ Plane.Point.first(s) by Plane.first_coordinate_atMost_on_segment;
-  Plane.Point.first(v) ≤ Plane.Point.first(s) by Plane.first_coordinate_atMost_on_segment;
-  Plane.Point.first(u) < 1;
-  Plane.Point.first(v) < 1;
-  u ≠ Plane.Point.make(1, 0) by Plane.before_finish_of_first_coordinate;
-  v ≠ Plane.Point.make(1, 0) by Plane.before_finish_of_first_coordinate;
+  u ∈ Real.unitInterval by frontInside;
+  v ∈ Real.unitInterval by frontInside;
+  u ≤ s by Real.segment_atMost(a := 0);
+  v ≤ s by Real.segment_atMost(a := 0);
+  u < 1;
+  v < 1;
+  u ≠ 1 by Real.LessThan.distinct;
+  v ≠ 1 by Real.LessThan.distinct;
   done by Plane.IsLoop.injective_before_finish
 }
 
-theorem Plane.IsLoop.injective_on_middle (loop : Plane.Point → Plane.Point) (isLoop : Plane.IsLoop(loop))
-        (s t : Plane.Point) (sOnSegment : s ∈ Plane.unitSegment) (tOnSegment : t ∈ Plane.unitSegment)
-        (tBeforeFinish : t ≠ Plane.Point.make(1, 0)) (ordered : Plane.Point.first(s) ≤ Plane.Point.first(t))
-        : Plane.InjectiveOn(loop, Plane.segment(s, t)) := {
-  Plane.IsConvex(Plane.unitSegment) by Plane.unitSegment_IsConvex;
-  Plane.segment(s, t) ⊆ Plane.unitSegment by Plane.IsConvex.segment_inside as middleInside;
-  Plane.Point.first(t) < 1 by Plane.first_coordinate_below_one;
-  take u : Plane.Point;
-  suppose u ∈ Plane.segment(s, t) as uOnMiddle;
-  take v : Plane.Point;
-  suppose v ∈ Plane.segment(s, t) as vOnMiddle;
+theorem Plane.IsLoop.injective_on_middle (loop : ℝ → Plane.Point) (isLoop : Plane.IsLoop(loop))
+        (s t : ℝ) (sInside : s ∈ Real.unitInterval) (tInside : t ∈ Real.unitInterval)
+        (tBeforeFinish : t ≠ 1) (ordered : s ≤ t)
+        : MetricSpace.InjectiveOn(loop, Real.segment(s, t)) := {
+  Real.IsConvex(Real.unitInterval) by Real.unitInterval_IsConvex;
+  Real.segment(s, t) ⊆ Real.unitInterval by Real.IsConvex.segment_inside as middleInside;
+  t ≤ 1 by Real.unitInterval_atMostOne;
+  t < 1;
+  take u : ℝ;
+  suppose u ∈ Real.segment(s, t) as uOnMiddle;
+  take v : ℝ;
+  suppose v ∈ Real.segment(s, t) as vOnMiddle;
   suppose loop(u) = loop(v) as samePoint;
-  u ∈ Plane.unitSegment by middleInside;
-  v ∈ Plane.unitSegment by middleInside;
-  Plane.Point.first(u) ≤ Plane.Point.first(t) by Plane.first_coordinate_atMost_on_segment;
-  Plane.Point.first(v) ≤ Plane.Point.first(t) by Plane.first_coordinate_atMost_on_segment;
-  Plane.Point.first(u) < 1;
-  Plane.Point.first(v) < 1;
-  u ≠ Plane.Point.make(1, 0) by Plane.before_finish_of_first_coordinate;
-  v ≠ Plane.Point.make(1, 0) by Plane.before_finish_of_first_coordinate;
+  u ∈ Real.unitInterval by middleInside;
+  v ∈ Real.unitInterval by middleInside;
+  u ≤ t by Real.segment_atMost(a := s);
+  v ≤ t by Real.segment_atMost(a := s);
+  u < 1;
+  v < 1;
+  u ≠ 1 by Real.LessThan.distinct;
+  v ≠ 1 by Real.LessThan.distinct;
   done by Plane.IsLoop.injective_before_finish
 }
 
 -- The back piece runs up to the finish, so injectivity off the finish is
--- not enough on its own: a parameter carrying `loop(finish)` could be the
--- start instead. It cannot be, because the start is strictly before `t`.
-theorem Plane.IsLoop.injective_on_back (loop : Plane.Point → Plane.Point) (isLoop : Plane.IsLoop(loop))
-        (t : Plane.Point) (tOnSegment : t ∈ Plane.unitSegment) (tPositive : 0 < Plane.Point.first(t))
-        : Plane.InjectiveOn(loop, Plane.segment(t, Plane.Point.make(1, 0))) := {
-  Plane.Point.make(1, 0) ∈ Plane.unitSegment by Plane.finish_in_unitSegment;
-  Plane.origin ∈ Plane.unitSegment by Plane.start_in_unitSegment;
-  Plane.origin ≠ Plane.Point.make(1, 0) by Plane.start_not_finish;
-  Plane.IsConvex(Plane.unitSegment) by Plane.unitSegment_IsConvex;
-  Plane.segment(t, Plane.Point.make(1, 0)) ⊆ Plane.unitSegment by Plane.IsConvex.segment_inside as backInside;
-  Plane.Point.first(t) ≤ 1 by Plane.first_coordinate_atMostOne_on_unitSegment;
-  Plane.Point.first(Plane.Point.make(1, 0)) = 1;
-  Plane.Point.first(Plane.origin) = 0;
-  loop(Plane.origin) = loop(Plane.Point.make(1, 0)) as closesUp;
-  take u : Plane.Point;
-  suppose u ∈ Plane.segment(t, Plane.Point.make(1, 0)) as uOnBack;
-  take v : Plane.Point;
-  suppose v ∈ Plane.segment(t, Plane.Point.make(1, 0)) as vOnBack;
+-- not enough on its own: a parameter carrying `loop(1)` could be the start
+-- instead. It cannot be, because the start is strictly before `t`.
+theorem Plane.IsLoop.injective_on_back (loop : ℝ → Plane.Point) (isLoop : Plane.IsLoop(loop))
+        (t : ℝ) (tInside : t ∈ Real.unitInterval) (tPositive : t > 0)
+        : MetricSpace.InjectiveOn(loop, Real.segment(t, 1)) := {
+  Real.IsConvex(Real.unitInterval) by Real.unitInterval_IsConvex;
+  (0 : ℝ) ∈ Real.unitInterval by Real.zero_in_unitInterval;
+  (1 : ℝ) ∈ Real.unitInterval by Real.one_in_unitInterval;
+  (0 : ℝ) ≠ 1;
+  t ≤ 1 by Real.unitInterval_atMostOne;
+  Real.segment(t, 1) ⊆ Real.unitInterval by Real.IsConvex.segment_inside as backInside;
+  loop(0) = loop(1) as closesUp;
+  take u : ℝ;
+  suppose u ∈ Real.segment(t, 1) as uOnBack;
+  take v : ℝ;
+  suppose v ∈ Real.segment(t, 1) as vOnBack;
   suppose loop(u) = loop(v) as samePoint;
-  u ∈ Plane.unitSegment by backInside;
-  v ∈ Plane.unitSegment by backInside;
-  Plane.Point.first(t) ≤ Plane.Point.first(u) by Plane.first_coordinate_atLeast_on_segment;
-  Plane.Point.first(t) ≤ Plane.Point.first(v) by Plane.first_coordinate_atLeast_on_segment;
+  u ∈ Real.unitInterval by backInside;
+  v ∈ Real.unitInterval by backInside;
+  t ≤ u by Real.segment_atLeast(b := 1);
+  t ≤ v by Real.segment_atLeast(b := 1);
+
   -- A parameter of this piece is the finish, or is short of it and so is
   -- pinned by injectivity. The start is excluded by lying before `t`.
-  ∀ (w : Plane.Point). w ∈ Plane.unitSegment → Plane.Point.first(t) ≤ Plane.Point.first(w) →
-      loop(w) = loop(Plane.Point.make(1, 0)) → w = Plane.Point.make(1, 0)
+  ∀ (w : ℝ). w ∈ Real.unitInterval → t ≤ w → loop(w) = loop(1) → w = 1
       by {
-        take w : Plane.Point;
-        suppose w ∈ Plane.unitSegment as wOnSegment;
-        suppose Plane.Point.first(t) ≤ Plane.Point.first(w) as wPastT;
-        suppose loop(w) = loop(Plane.Point.make(1, 0)) as wAtFinishValue;
-        suppose w ≠ Plane.Point.make(1, 0) as wBeforeFinish for contradiction {
-          loop(w) = loop(Plane.origin) by { loop(w) = loop(Plane.Point.make(1, 0)) by wAtFinishValue; done by closesUp };
-          w = Plane.origin by Plane.IsLoop.injective_before_finish;
-          Plane.Point.first(w) = 0 by substituting (w = Plane.origin);
-          Plane.Point.first(t) ≤ 0;
+        take w : ℝ;
+        suppose w ∈ Real.unitInterval as wInside;
+        suppose t ≤ w as wPastT;
+        suppose loop(w) = loop(1) as wAtFinishValue;
+        suppose w ≠ 1 as wBeforeFinish for contradiction {
+          loop(w) = loop(0) by { loop(w) = loop(1) by wAtFinishValue; done by closesUp };
+          w = 0 by Plane.IsLoop.injective_before_finish;
+          t ≤ 0 by substituting (w = 0);
           done
         };
         done
       }
       as onlyFinishCarriesIt;
   done by cases {
-    case u = Plane.Point.make(1, 0) as uAtFinish: {
-        loop(v) = loop(Plane.Point.make(1, 0))
-            by { loop(v) = loop(u) by samePoint; done by substituting uAtFinish };
-        v = Plane.Point.make(1, 0) by onlyFinishCarriesIt;
+    case u = 1 as uAtFinish: {
+        loop(v) = loop(1) by { loop(v) = loop(u) by samePoint; done by substituting uAtFinish };
+        v = 1 by onlyFinishCarriesIt;
         done by substituting uAtFinish
       }
     otherwise as uBeforeFinish: {
         done by cases {
-          case v = Plane.Point.make(1, 0) as vAtFinish: {
-              loop(u) = loop(Plane.Point.make(1, 0))
+          case v = 1 as vAtFinish: {
+              loop(u) = loop(1)
                   by { loop(u) = loop(v) by samePoint; done by substituting vAtFinish };
-              u = Plane.Point.make(1, 0) by onlyFinishCarriesIt;
+              u = 1 by onlyFinishCarriesIt;
               done
             }
           otherwise as vBeforeFinish: done by Plane.IsLoop.injective_before_finish
@@ -411,77 +387,61 @@ theorem Plane.IsLoop.injective_on_back (loop : Plane.Point → Plane.Point) (isL
 -- continuity and injectivity instead — measured at ~90k kernel steps a
 -- site, against nothing for the projection.
 definition Plane.IsArcBetween (piece : Set(Plane.Point)) (p q : Plane.Point) : Proposition :=
-  ∃ (parametrisation : Plane.Point → Plane.Point).
+  ∃ (parametrisation : ℝ → Plane.Point).
     Plane.IsArc(parametrisation)
       ∧ (Plane.arc(parametrisation) = piece
              ∧ (Plane.arcStart(parametrisation) = p ∧ Plane.arcFinish(parametrisation) = q))
-
--- Distinct parameters, read off distinct coordinates.
-theorem Plane.distinct_of_first_coordinate (a b : Plane.Point) (ordered : Plane.Point.first(a) < Plane.Point.first(b))
-        : a ≠ b := {
-  suppose a = b as same for contradiction {
-    Plane.Point.first(a) = Plane.Point.first(b) by substituting same;
-    Plane.Point.first(a) < Plane.Point.first(a);
-    done
-  };
-  done
-}
 
 -- Each piece of parameters carries an arc, by the subarc reparametrisation
 -- and the injectivity established above. `subarc_on_subsegment` is what
 -- makes this available for a LOOP: it asks for injectivity only where the
 -- subarc runs, which is exactly what each piece has.
-theorem Plane.IsLoop.middle_IsArcBetween (loop : Plane.Point → Plane.Point) (isLoop : Plane.IsLoop(loop))
-        (s t : Plane.Point) (sOnSegment : s ∈ Plane.unitSegment) (tOnSegment : t ∈ Plane.unitSegment)
-        (tBeforeFinish : t ≠ Plane.Point.make(1, 0)) (ordered : Plane.Point.first(s) < Plane.Point.first(t))
-        : Plane.IsArcBetween(Plane.imageSet(loop, Plane.segment(s, t)), loop(s), loop(t)) := {
-  Plane.ContinuousOn(loop, Plane.unitSegment);
-  Plane.Point.first(s) ≤ Plane.Point.first(t) by Real.LessThan.weaken;
-  s ≠ t by Plane.distinct_of_first_coordinate;
-  Plane.InjectiveOn(loop, Plane.segment(s, t)) by Plane.IsLoop.injective_on_middle;
+theorem Plane.IsLoop.middle_IsArcBetween (loop : ℝ → Plane.Point) (isLoop : Plane.IsLoop(loop))
+        (s t : ℝ) (sInside : s ∈ Real.unitInterval) (tInside : t ∈ Real.unitInterval)
+        (tBeforeFinish : t ≠ 1) (ordered : s < t)
+        : Plane.IsArcBetween(MetricSpace.imageSet(loop, Real.segment(s, t)), loop(s), loop(t)) := {
+  MetricSpace.ContinuousOn(loop, Real.unitInterval);
+  s ≤ t by Real.LessThan.weaken;
+  s ≠ t by Real.LessThan.distinct;
+  MetricSpace.InjectiveOn(loop, Real.segment(s, t)) by Plane.IsLoop.injective_on_middle;
   Plane.IsArc(Plane.subarc(loop, s, t)) by Plane.IsArc.subarc_on_subsegment;
-  Plane.arc(Plane.subarc(loop, s, t)) = Plane.imageSet(loop, Plane.segment(s, t)) by Plane.subarc_image;
+  Plane.arc(Plane.subarc(loop, s, t))
+      = MetricSpace.imageSet(loop, Real.segment(s, t)) by Plane.subarc_image;
   Plane.arcStart(Plane.subarc(loop, s, t)) = loop(s) by Plane.subarc_start;
   Plane.arcFinish(Plane.subarc(loop, s, t)) = loop(t) by Plane.subarc_finish;
   done by { witness Plane.subarc(loop, s, t) }
 }
 
-theorem Plane.IsLoop.front_IsArcBetween (loop : Plane.Point → Plane.Point) (isLoop : Plane.IsLoop(loop))
-        (s : Plane.Point) (sOnSegment : s ∈ Plane.unitSegment) (sBeforeFinish : s ≠ Plane.Point.make(1, 0))
-        (sPositive : 0 < Plane.Point.first(s))
+theorem Plane.IsLoop.front_IsArcBetween (loop : ℝ → Plane.Point) (isLoop : Plane.IsLoop(loop))
+        (s : ℝ) (sInside : s ∈ Real.unitInterval) (sBeforeFinish : s ≠ 1) (sPositive : s > 0)
         : Plane.IsArcBetween(
-              Plane.imageSet(loop, Plane.segment(Plane.origin, s)), loop(Plane.origin), loop(s)) := {
-  Plane.ContinuousOn(loop, Plane.unitSegment);
-  Plane.origin ∈ Plane.unitSegment by Plane.start_in_unitSegment;
-  Plane.Point.first(Plane.origin) = 0;
-  Plane.Point.first(Plane.origin) < Plane.Point.first(s);
-  Plane.origin ≠ s by Plane.distinct_of_first_coordinate;
-  Plane.InjectiveOn(loop, Plane.segment(Plane.origin, s)) by Plane.IsLoop.injective_on_front;
-  Plane.IsArc(Plane.subarc(loop, Plane.origin, s)) by Plane.IsArc.subarc_on_subsegment;
-  Plane.arc(Plane.subarc(loop, Plane.origin, s))
-      = Plane.imageSet(loop, Plane.segment(Plane.origin, s)) by Plane.subarc_image;
-  Plane.arcStart(Plane.subarc(loop, Plane.origin, s)) = loop(Plane.origin) by Plane.subarc_start;
-  Plane.arcFinish(Plane.subarc(loop, Plane.origin, s)) = loop(s) by Plane.subarc_finish;
-  done by { witness Plane.subarc(loop, Plane.origin, s) }
+              MetricSpace.imageSet(loop, Real.segment(0, s)), loop(0), loop(s)) := {
+  MetricSpace.ContinuousOn(loop, Real.unitInterval);
+  (0 : ℝ) ∈ Real.unitInterval by Real.zero_in_unitInterval;
+  (0 : ℝ) ≠ s by Real.LessThan.distinct;
+  MetricSpace.InjectiveOn(loop, Real.segment(0, s)) by Plane.IsLoop.injective_on_front;
+  Plane.IsArc(Plane.subarc(loop, 0, s)) by Plane.IsArc.subarc_on_subsegment;
+  Plane.arc(Plane.subarc(loop, 0, s))
+      = MetricSpace.imageSet(loop, Real.segment(0, s)) by Plane.subarc_image;
+  Plane.arcStart(Plane.subarc(loop, 0, s)) = loop(0) by Plane.subarc_start;
+  Plane.arcFinish(Plane.subarc(loop, 0, s)) = loop(s) by Plane.subarc_finish;
+  done by { witness Plane.subarc(loop, 0, s) }
 }
 
-theorem Plane.IsLoop.back_IsArcBetween (loop : Plane.Point → Plane.Point) (isLoop : Plane.IsLoop(loop))
-        (t : Plane.Point) (tOnSegment : t ∈ Plane.unitSegment) (tBeforeFinish : t ≠ Plane.Point.make(1, 0))
-        (tPositive : 0 < Plane.Point.first(t))
+theorem Plane.IsLoop.back_IsArcBetween (loop : ℝ → Plane.Point) (isLoop : Plane.IsLoop(loop))
+        (t : ℝ) (tInside : t ∈ Real.unitInterval) (tBeforeFinish : t ≠ 1) (tPositive : t > 0)
         : Plane.IsArcBetween(
-              Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))),
-              loop(t), loop(Plane.Point.make(1, 0))) := {
-  Plane.ContinuousOn(loop, Plane.unitSegment);
-  Plane.Point.make(1, 0) ∈ Plane.unitSegment by Plane.finish_in_unitSegment;
-  t ≠ Plane.Point.make(1, 0);
-  Plane.InjectiveOn(loop, Plane.segment(t, Plane.Point.make(1, 0))) by Plane.IsLoop.injective_on_back;
-  Plane.IsArc(Plane.subarc(loop, t, Plane.Point.make(1, 0))) by Plane.IsArc.subarc_on_subsegment;
-  Plane.arc(Plane.subarc(loop, t, Plane.Point.make(1, 0)))
-      = Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))) by Plane.subarc_image;
-  Plane.arcStart(Plane.subarc(loop, t, Plane.Point.make(1, 0))) = loop(t) by Plane.subarc_start;
-  Plane.arcFinish(Plane.subarc(loop, t, Plane.Point.make(1, 0)))
-      = loop(Plane.Point.make(1, 0)) by Plane.subarc_finish;
-  done by { witness Plane.subarc(loop, t, Plane.Point.make(1, 0)) }
+              MetricSpace.imageSet(loop, Real.segment(t, 1)), loop(t), loop(1)) := {
+  MetricSpace.ContinuousOn(loop, Real.unitInterval);
+  (1 : ℝ) ∈ Real.unitInterval by Real.one_in_unitInterval;
+  t ≠ 1;
+  MetricSpace.InjectiveOn(loop, Real.segment(t, 1)) by Plane.IsLoop.injective_on_back;
+  Plane.IsArc(Plane.subarc(loop, t, 1)) by Plane.IsArc.subarc_on_subsegment;
+  Plane.arc(Plane.subarc(loop, t, 1))
+      = MetricSpace.imageSet(loop, Real.segment(t, 1)) by Plane.subarc_image;
+  Plane.arcStart(Plane.subarc(loop, t, 1)) = loop(t) by Plane.subarc_start;
+  Plane.arcFinish(Plane.subarc(loop, t, 1)) = loop(1) by Plane.subarc_finish;
+  done by { witness Plane.subarc(loop, t, 1) }
 }
 
 -- ----------------------------------------------------------------------
@@ -493,190 +453,177 @@ theorem Plane.IsLoop.back_IsArcBetween (loop : Plane.Point → Plane.Point) (isL
 -- the outside is the back piece alone — its far end already carries the
 -- point that the front piece would have contributed.
 
-theorem Plane.IsLoop.outside_IsArcBetween (loop : Plane.Point → Plane.Point) (isLoop : Plane.IsLoop(loop))
-        (s t : Plane.Point) (sOnSegment : s ∈ Plane.unitSegment) (tOnSegment : t ∈ Plane.unitSegment)
-        (sBeforeFinish : s ≠ Plane.Point.make(1, 0)) (tBeforeFinish : t ≠ Plane.Point.make(1, 0))
-        (ordered : Plane.Point.first(s) < Plane.Point.first(t))
+theorem Plane.IsLoop.outside_IsArcBetween (loop : ℝ → Plane.Point) (isLoop : Plane.IsLoop(loop))
+        (s t : ℝ) (sInside : s ∈ Real.unitInterval) (tInside : t ∈ Real.unitInterval)
+        (sBeforeFinish : s ≠ 1) (tBeforeFinish : t ≠ 1) (ordered : s < t)
         : Plane.IsArcBetween(
-              Plane.imageSet(loop, Plane.segment(Plane.origin, s))
-                  ∪ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))),
+              MetricSpace.imageSet(loop, Real.segment(0, s))
+                  ∪ MetricSpace.imageSet(loop, Real.segment(t, 1)),
               loop(t), loop(s)) := {
-  Plane.origin ∈ Plane.unitSegment by Plane.start_in_unitSegment;
-  Plane.Point.make(1, 0) ∈ Plane.unitSegment by Plane.finish_in_unitSegment;
-  Plane.IsConvex(Plane.unitSegment) by Plane.unitSegment_IsConvex;
-  Plane.segment(Plane.origin, s) ⊆ Plane.unitSegment by Plane.IsConvex.segment_inside as frontInside;
-  Plane.segment(t, Plane.Point.make(1, 0)) ⊆ Plane.unitSegment by Plane.IsConvex.segment_inside as backInside;
-  Plane.Point.first(Plane.origin) = 0;
-  0 ≤ Plane.Point.first(s) by Plane.first_coordinate_nonneg_on_unitSegment;
-  0 < Plane.Point.first(t);
-  Plane.Point.first(s) < 1 by Plane.first_coordinate_below_one;
-  loop(Plane.origin) = loop(Plane.Point.make(1, 0)) as closesUp;
-  Plane.Point.make(1, 0) ∈ Plane.segment(t, Plane.Point.make(1, 0)) by Plane.right_in_segment;
-  loop(Plane.Point.make(1, 0)) ∈ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0)))
-      by { witness Plane.Point.make(1, 0) };
+  Real.IsConvex(Real.unitInterval) by Real.unitInterval_IsConvex;
+  (0 : ℝ) ∈ Real.unitInterval by Real.zero_in_unitInterval;
+  (1 : ℝ) ∈ Real.unitInterval by Real.one_in_unitInterval;
+  Real.segment(0, s) ⊆ Real.unitInterval by Real.IsConvex.segment_inside as frontInside;
+  Real.segment(t, 1) ⊆ Real.unitInterval by Real.IsConvex.segment_inside as backInside;
+  s ≥ 0 by Real.unitInterval_nonneg;
+  t > 0;
+  loop(0) = loop(1) as closesUp;
+  (1 : ℝ) ∈ Real.segment(t, 1) by Real.right_in_segment;
+  loop(1) ∈ MetricSpace.imageSet(loop, Real.segment(t, 1)) by { witness (1 : ℝ) };
   done by cases {
-    case s = Plane.origin as startsAtOrigin: {
-        -- The front interval is the single parameter `origin`, whose point
-        -- the back piece already carries at its far end.
-        Plane.imageSet(loop, Plane.segment(Plane.origin, s))
-            ⊆ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0)))
-            by (z : Plane.Point) (onFront : z ∈ Plane.imageSet(loop, Plane.segment(Plane.origin, s))) ↦ {
-              choose source such that source ∈ Plane.segment(Plane.origin, s) ∧ loop(source) = z from onFront;
-              source ∈ Plane.segment(Plane.origin, s);
+    case s = 0 as startsAtOrigin: {
+        -- The front interval is the single parameter 0, whose point the
+        -- back piece already carries at its far end.
+        MetricSpace.imageSet(loop, Real.segment(0, s))
+            ⊆ MetricSpace.imageSet(loop, Real.segment(t, 1))
+            by (z : Plane.Point)
+               (onFront : z ∈ MetricSpace.imageSet(loop, Real.segment(0, s))) ↦ {
+              choose source : ℝ such that
+                  source ∈ Real.segment(0, s) ∧ loop(source) = z from onFront;
+              source ∈ Real.segment(0, s);
               loop(source) = z as carriesToZ;
-              source ∈ Plane.unitSegment by frontInside;
-              Plane.Point.first(source) ≤ Plane.Point.first(s) by Plane.first_coordinate_atMost_on_segment;
-              Plane.Point.first(s) = 0 by substituting startsAtOrigin;
-              Plane.Point.first(source) ≤ 0;
-              0 ≤ Plane.Point.first(source) by Plane.first_coordinate_nonneg_on_unitSegment;
-              Plane.Point.first(source) = 0 by Real.LessOrEqual.antisymmetric;
-              Plane.Point.first(source) = Plane.Point.first(Plane.origin);
-              source = Plane.origin by Plane.unitSegment_equal_of_first_coordinate;
-              z = loop(Plane.Point.make(1, 0))
-                 by { loop(Plane.Point.make(1, 0))
-                        = loop(Plane.origin) by closesUp
-                        = loop(source) by substituting (source = Plane.origin)
+              source ∈ Real.unitInterval by frontInside;
+              source ≤ s by Real.segment_atMost(a := 0);
+              source ≤ 0 by substituting startsAtOrigin;
+              source ≥ 0 by Real.unitInterval_nonneg;
+              source = 0 by Real.LessOrEqual.antisymmetric;
+              z = loop(1)
+                 by { loop(1)
+                        = loop(0) by closesUp
+                        = loop(source) by substituting (source = 0)
                         = z by carriesToZ };
-              done by substituting (z = loop(Plane.Point.make(1, 0)))
+              done by substituting (z = loop(1))
             };
-        Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0)))
-            ⊆ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))) by Set.subset.reflexive;
-        Plane.imageSet(loop, Plane.segment(Plane.origin, s))
-            ∪ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0)))
-            ⊆ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))) by Set.union_subset;
-        Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0)))
-            ⊆ Plane.imageSet(loop, Plane.segment(Plane.origin, s))
-                  ∪ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0)))
+        MetricSpace.imageSet(loop, Real.segment(t, 1))
+            ⊆ MetricSpace.imageSet(loop, Real.segment(t, 1)) by Set.subset.reflexive;
+        MetricSpace.imageSet(loop, Real.segment(0, s))
+            ∪ MetricSpace.imageSet(loop, Real.segment(t, 1))
+            ⊆ MetricSpace.imageSet(loop, Real.segment(t, 1)) by Set.union_subset;
+        MetricSpace.imageSet(loop, Real.segment(t, 1))
+            ⊆ MetricSpace.imageSet(loop, Real.segment(0, s))
+                  ∪ MetricSpace.imageSet(loop, Real.segment(t, 1))
             by Set.subset_union_right;
-        Plane.imageSet(loop, Plane.segment(Plane.origin, s))
-            ∪ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0)))
-            = Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0)))
+        MetricSpace.imageSet(loop, Real.segment(0, s))
+            ∪ MetricSpace.imageSet(loop, Real.segment(t, 1))
+            = MetricSpace.imageSet(loop, Real.segment(t, 1))
             by Set.equal_of_same_members as outsideIsBack;
-        loop(Plane.Point.make(1, 0)) = loop(s)
-            by { loop(Plane.Point.make(1, 0)) = loop(Plane.origin) by closesUp;
+        loop(1) = loop(s)
+            by { loop(1) = loop(0) by closesUp;
                  done by substituting startsAtOrigin }
             as finishIsS;
         Plane.IsArcBetween(
-            Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))),
-            loop(t), loop(Plane.Point.make(1, 0)))
+            MetricSpace.imageSet(loop, Real.segment(t, 1)), loop(t), loop(1))
             by Plane.IsLoop.back_IsArcBetween;
         choose back such that
             Plane.IsArc(back)
-              ∧ (Plane.arc(back) = Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0)))
-                     ∧ (Plane.arcStart(back) = loop(t)
-                            ∧ Plane.arcFinish(back) = loop(Plane.Point.make(1, 0))));
+              ∧ (Plane.arc(back) = MetricSpace.imageSet(loop, Real.segment(t, 1))
+                     ∧ (Plane.arcStart(back) = loop(t) ∧ Plane.arcFinish(back) = loop(1)));
         Plane.IsArc(back);
-        Plane.arc(back) = Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))) as backImage;
+        Plane.arc(back) = MetricSpace.imageSet(loop, Real.segment(t, 1)) as backImage;
         Plane.arcStart(back) = loop(t);
-        Plane.arcFinish(back) = loop(Plane.Point.make(1, 0)) as backEnds;
-        Plane.arcFinish(back) = loop(s) by { Plane.arcFinish(back) = loop(Plane.Point.make(1, 0)) by backEnds;
-                                            done by finishIsS };
+        Plane.arcFinish(back) = loop(1) as backEnds;
+        Plane.arcFinish(back) = loop(s)
+            by { Plane.arcFinish(back) = loop(1) by backEnds; done by finishIsS };
         Plane.arc(back)
-           = Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))) by backImage
-           = Plane.imageSet(loop, Plane.segment(Plane.origin, s))
-                 ∪ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))) by outsideIsBack;
+           = MetricSpace.imageSet(loop, Real.segment(t, 1)) by backImage
+           = MetricSpace.imageSet(loop, Real.segment(0, s))
+                 ∪ MetricSpace.imageSet(loop, Real.segment(t, 1)) by outsideIsBack;
         done by { witness back }
       }
     otherwise as startsLater: {
-        Plane.Point.first(s) ≠ 0
-            by { suppose Plane.Point.first(s) = 0 as atZero for contradiction {
-                   Plane.Point.first(s) = Plane.Point.first(Plane.origin) by atZero;
-                   s = Plane.origin by Plane.unitSegment_equal_of_first_coordinate;
-                   done
-                 };
-                 done };
-        0 < Plane.Point.first(s);
+        s > 0;
         Plane.IsArcBetween(
-            Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))),
-            loop(t), loop(Plane.Point.make(1, 0)))
+            MetricSpace.imageSet(loop, Real.segment(t, 1)), loop(t), loop(1))
             by Plane.IsLoop.back_IsArcBetween;
         choose back such that
             Plane.IsArc(back)
-              ∧ (Plane.arc(back) = Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0)))
-                     ∧ (Plane.arcStart(back) = loop(t)
-                            ∧ Plane.arcFinish(back) = loop(Plane.Point.make(1, 0))))
+              ∧ (Plane.arc(back) = MetricSpace.imageSet(loop, Real.segment(t, 1))
+                     ∧ (Plane.arcStart(back) = loop(t) ∧ Plane.arcFinish(back) = loop(1)))
             as backFacts;
         Plane.IsArc(back) by backFacts;
-        Plane.arc(back) = Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))) as backImage;
+        Plane.arc(back) = MetricSpace.imageSet(loop, Real.segment(t, 1)) as backImage;
         Plane.arcStart(back) = loop(t);
-        Plane.arcFinish(back) = loop(Plane.Point.make(1, 0)) as backEnds;
+        Plane.arcFinish(back) = loop(1) as backEnds;
 
         Plane.IsArcBetween(
-            Plane.imageSet(loop, Plane.segment(Plane.origin, s)), loop(Plane.origin), loop(s))
+            MetricSpace.imageSet(loop, Real.segment(0, s)), loop(0), loop(s))
             by Plane.IsLoop.front_IsArcBetween;
         choose front such that
             Plane.IsArc(front)
-              ∧ (Plane.arc(front) = Plane.imageSet(loop, Plane.segment(Plane.origin, s))
-                     ∧ (Plane.arcStart(front) = loop(Plane.origin) ∧ Plane.arcFinish(front) = loop(s)))
+              ∧ (Plane.arc(front) = MetricSpace.imageSet(loop, Real.segment(0, s))
+                     ∧ (Plane.arcStart(front) = loop(0) ∧ Plane.arcFinish(front) = loop(s)))
             as frontFacts;
         Plane.IsArc(front) by frontFacts;
-        Plane.arc(front) = Plane.imageSet(loop, Plane.segment(Plane.origin, s)) as frontImage;
-        Plane.arcStart(front) = loop(Plane.origin) as frontStarts;
+        Plane.arc(front) = MetricSpace.imageSet(loop, Real.segment(0, s)) as frontImage;
+        Plane.arcStart(front) = loop(0) as frontStarts;
         Plane.arcFinish(front) = loop(s);
 
         Plane.arcFinish(back) = Plane.arcStart(front)
             by { Plane.arcFinish(back)
-                   = loop(Plane.Point.make(1, 0)) by backEnds
-                   = loop(Plane.origin) by closesUp
+                   = loop(1) by backEnds
+                   = loop(0) by closesUp
                    = Plane.arcStart(front) by frontStarts };
 
         -- The two run over disjoint parameter ranges apart from the seam:
         -- a point on both comes from a parameter at or past `t` and from
         -- one at or before `s`, and only the finish can be both.
-        ∀ (z : Plane.Point). z ∈ Plane.arc(back) → z ∈ Plane.arc(front) → z = Plane.arcFinish(back)
+        ∀ (z : Plane.Point). z ∈ Plane.arc(back) → z ∈ Plane.arc(front)
+            → z = Plane.arcFinish(back)
             by {
               take z : Plane.Point;
               suppose z ∈ Plane.arc(back) as onBack;
               suppose z ∈ Plane.arc(front) as onFront;
-              z ∈ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))) by substituting backImage;
-              z ∈ Plane.imageSet(loop, Plane.segment(Plane.origin, s)) by substituting frontImage;
-              choose backSource such that
-                  backSource ∈ Plane.segment(t, Plane.Point.make(1, 0)) ∧ loop(backSource) = z
-                  from (z ∈ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))));
-              backSource ∈ Plane.segment(t, Plane.Point.make(1, 0));
+              z ∈ MetricSpace.imageSet(loop, Real.segment(t, 1)) by substituting backImage;
+              z ∈ MetricSpace.imageSet(loop, Real.segment(0, s)) by substituting frontImage;
+              choose backSource : ℝ such that
+                  backSource ∈ Real.segment(t, 1) ∧ loop(backSource) = z
+                  from (z ∈ MetricSpace.imageSet(loop, Real.segment(t, 1)));
+              backSource ∈ Real.segment(t, 1);
               loop(backSource) = z as backCarries;
-              choose frontSource such that
-                  frontSource ∈ Plane.segment(Plane.origin, s) ∧ loop(frontSource) = z
-                  from (z ∈ Plane.imageSet(loop, Plane.segment(Plane.origin, s)));
-              frontSource ∈ Plane.segment(Plane.origin, s);
+              choose frontSource : ℝ such that
+                  frontSource ∈ Real.segment(0, s) ∧ loop(frontSource) = z
+                  from (z ∈ MetricSpace.imageSet(loop, Real.segment(0, s)));
+              frontSource ∈ Real.segment(0, s);
               loop(frontSource) = z as frontCarries;
-              backSource ∈ Plane.unitSegment by backInside;
-              frontSource ∈ Plane.unitSegment by frontInside;
-              Plane.Point.first(t) ≤ Plane.Point.first(backSource) by Plane.first_coordinate_atLeast_on_segment;
-              Plane.Point.first(frontSource) ≤ Plane.Point.first(s) by Plane.first_coordinate_atMost_on_segment;
-              Plane.Point.first(frontSource) < 1;
-              frontSource ≠ Plane.Point.make(1, 0) by Plane.before_finish_of_first_coordinate;
-              suppose backSource ≠ Plane.Point.make(1, 0) as backBeforeFinish for contradiction {
-                loop(backSource) = loop(frontSource) by { loop(backSource) = z by backCarries; done by frontCarries };
+              backSource ∈ Real.unitInterval by backInside;
+              frontSource ∈ Real.unitInterval by frontInside;
+              t ≤ backSource by Real.segment_atLeast(b := 1);
+              frontSource ≤ s by Real.segment_atMost(a := 0);
+              s ≤ 1 by Real.unitInterval_atMostOne;
+              s < 1;
+              frontSource < 1;
+              frontSource ≠ 1 by Real.LessThan.distinct;
+              suppose backSource ≠ 1 as backBeforeFinish for contradiction {
+                loop(backSource) = loop(frontSource)
+                    by { loop(backSource) = z by backCarries; done by frontCarries };
                 backSource = frontSource by Plane.IsLoop.injective_before_finish;
-                Plane.Point.first(t) ≤ Plane.Point.first(frontSource) by substituting (backSource = frontSource);
-                Plane.Point.first(t) ≤ Plane.Point.first(s);
-                Plane.Point.first(s) < Plane.Point.first(s);
+                t ≤ frontSource by substituting (backSource = frontSource);
+                t ≤ s;
+                s < s;
                 done
               };
-              backSource = Plane.Point.make(1, 0);
-              z = loop(Plane.Point.make(1, 0))
-                  by { loop(Plane.Point.make(1, 0))
-                         = loop(backSource) by substituting (backSource = Plane.Point.make(1, 0))
+              backSource = 1;
+              z = loop(1)
+                  by { loop(1)
+                         = loop(backSource) by substituting (backSource = 1)
                          = z by backCarries };
               done by backEnds
             };
 
         Plane.IsArc(Plane.concatenate(back, front)) by Plane.IsArc.concatenate;
-        Plane.arc(Plane.concatenate(back, front)) = Plane.arc(back) ∪ Plane.arc(front)
-            by Plane.arc_concatenate;
         Plane.arc(Plane.concatenate(back, front))
            = Plane.arc(back) ∪ Plane.arc(front) by Plane.arc_concatenate
-           = Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))) ∪ Plane.arc(front)
+           = MetricSpace.imageSet(loop, Real.segment(t, 1)) ∪ Plane.arc(front)
                  by substituting backImage
-           = Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0)))
-                 ∪ Plane.imageSet(loop, Plane.segment(Plane.origin, s)) by substituting frontImage
-           = Plane.imageSet(loop, Plane.segment(Plane.origin, s))
-                 ∪ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0)))
-                 by Set.union_commutative;
-        Plane.arcStart(Plane.concatenate(back, front)) = Plane.arcStart(back) by Plane.concatenate_start;
+           = MetricSpace.imageSet(loop, Real.segment(t, 1))
+                 ∪ MetricSpace.imageSet(loop, Real.segment(0, s)) by substituting frontImage
+           = MetricSpace.imageSet(loop, Real.segment(0, s))
+                 ∪ MetricSpace.imageSet(loop, Real.segment(t, 1)) by Set.union_commutative;
+        Plane.arcStart(Plane.concatenate(back, front))
+            = Plane.arcStart(back) by Plane.concatenate_start;
         Plane.arcStart(Plane.concatenate(back, front)) = loop(t);
-        Plane.arcFinish(Plane.concatenate(back, front)) = Plane.arcFinish(front) by Plane.concatenate_finish;
+        Plane.arcFinish(Plane.concatenate(back, front))
+            = Plane.arcFinish(front) by Plane.concatenate_finish;
         Plane.arcFinish(Plane.concatenate(back, front)) = loop(s);
         done by { witness Plane.concatenate(back, front) }
       }
@@ -691,51 +638,47 @@ theorem Plane.IsLoop.outside_IsArcBetween (loop : Plane.Point → Plane.Point) (
 -- the parameters cover the interval, and they meet only at the two points
 -- because the parameters meet only at `s` and `t`.
 
-theorem Plane.IsLoop.two_arcs_at_parameters (loop : Plane.Point → Plane.Point) (isLoop : Plane.IsLoop(loop))
-        (s t : Plane.Point) (sOnSegment : s ∈ Plane.unitSegment) (tOnSegment : t ∈ Plane.unitSegment)
-        (sBeforeFinish : s ≠ Plane.Point.make(1, 0)) (tBeforeFinish : t ≠ Plane.Point.make(1, 0))
-        (ordered : Plane.Point.first(s) < Plane.Point.first(t))
+theorem Plane.IsLoop.two_arcs_at_parameters (loop : ℝ → Plane.Point) (isLoop : Plane.IsLoop(loop))
+        (s t : ℝ) (sInside : s ∈ Real.unitInterval) (tInside : t ∈ Real.unitInterval)
+        (sBeforeFinish : s ≠ 1) (tBeforeFinish : t ≠ 1) (ordered : s < t)
         : ∃ (middle : Set(Plane.Point)). ∃ (outside : Set(Plane.Point)).
-            (Plane.IsArcBetween(middle, loop(s), loop(t)) ∧ Plane.IsArcBetween(outside, loop(t), loop(s)))
-              ∧ (middle ∪ outside = Plane.imageSet(loop, Plane.unitSegment)
+            (Plane.IsArcBetween(middle, loop(s), loop(t))
+                 ∧ Plane.IsArcBetween(outside, loop(t), loop(s)))
+              ∧ (middle ∪ outside = MetricSpace.imageSet(loop, Real.unitInterval)
                      ∧ middle ∩ outside
-                           = Set.singleton(Plane.Point, loop(s)) ∪ Set.singleton(Plane.Point, loop(t))) := {
-  Plane.Point.first(s) ≤ Plane.Point.first(t) by Real.LessThan.weaken;
-  Plane.IsArcBetween(Plane.imageSet(loop, Plane.segment(s, t)), loop(s), loop(t))
+                           = Set.singleton(Plane.Point, loop(s))
+                                 ∪ Set.singleton(Plane.Point, loop(t))) := {
+  s ≤ t by Real.LessThan.weaken;
+  Plane.IsArcBetween(MetricSpace.imageSet(loop, Real.segment(s, t)), loop(s), loop(t))
       by Plane.IsLoop.middle_IsArcBetween;
   Plane.IsArcBetween(
-      Plane.imageSet(loop, Plane.segment(Plane.origin, s))
-          ∪ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))),
+      MetricSpace.imageSet(loop, Real.segment(0, s))
+          ∪ MetricSpace.imageSet(loop, Real.segment(t, 1)),
       loop(t), loop(s))
       by Plane.IsLoop.outside_IsArcBetween;
 
-  Plane.unitSegment
-      = Plane.segment(s, t)
-            ∪ (Plane.segment(Plane.origin, s) ∪ Plane.segment(t, Plane.Point.make(1, 0)))
-      by Plane.unitSegment_split as splitParameters;
-  Plane.imageSet(loop, Plane.unitSegment)
-     = Plane.imageSet(
-           loop,
-           Plane.segment(s, t)
-               ∪ (Plane.segment(Plane.origin, s) ∪ Plane.segment(t, Plane.Point.make(1, 0))))
+  Real.unitInterval = Real.segment(s, t) ∪ (Real.segment(0, s) ∪ Real.segment(t, 1))
+      by Real.unitInterval_split as splitParameters;
+  MetricSpace.imageSet(loop, Real.unitInterval)
+     = MetricSpace.imageSet(
+           loop, Real.segment(s, t) ∪ (Real.segment(0, s) ∪ Real.segment(t, 1)))
            by substituting splitParameters
-     = Plane.imageSet(loop, Plane.segment(s, t))
-           ∪ Plane.imageSet(
-                 loop, Plane.segment(Plane.origin, s) ∪ Plane.segment(t, Plane.Point.make(1, 0)))
-           by Plane.imageSet_union
-     = Plane.imageSet(loop, Plane.segment(s, t))
-           ∪ (Plane.imageSet(loop, Plane.segment(Plane.origin, s))
-                  ∪ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))))
-           by Plane.imageSet_union;
+     = MetricSpace.imageSet(loop, Real.segment(s, t))
+           ∪ MetricSpace.imageSet(loop, Real.segment(0, s) ∪ Real.segment(t, 1))
+           by MetricSpace.imageSet_union
+     = MetricSpace.imageSet(loop, Real.segment(s, t))
+           ∪ (MetricSpace.imageSet(loop, Real.segment(0, s))
+                  ∪ MetricSpace.imageSet(loop, Real.segment(t, 1)))
+           by MetricSpace.imageSet_union;
 
-  Plane.imageSet(loop, Plane.segment(s, t))
-      ∩ (Plane.imageSet(loop, Plane.segment(Plane.origin, s))
-             ∪ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))))
+  MetricSpace.imageSet(loop, Real.segment(s, t))
+      ∩ (MetricSpace.imageSet(loop, Real.segment(0, s))
+             ∪ MetricSpace.imageSet(loop, Real.segment(t, 1)))
       = Set.singleton(Plane.Point, loop(s)) ∪ Set.singleton(Plane.Point, loop(t))
       by Plane.IsLoop.pieces_meet_at_ends;
-  done by { witness Plane.imageSet(loop, Plane.segment(s, t)) with
-              { witness Plane.imageSet(loop, Plane.segment(Plane.origin, s))
-                            ∪ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))) } }
+  done by { witness MetricSpace.imageSet(loop, Real.segment(s, t)) with
+              { witness MetricSpace.imageSet(loop, Real.segment(0, s))
+                            ∪ MetricSpace.imageSet(loop, Real.segment(t, 1)) } }
 }
 
 -- ----------------------------------------------------------------------
@@ -748,81 +691,89 @@ theorem Plane.IsLoop.two_arcs_at_parameters (loop : Plane.Point → Plane.Point)
 -- and the conclusion is symmetric in them, so the second case is the first
 -- with the two points exchanged — the two arcs swap roles and the union
 -- and intersection commute.
-theorem Plane.IsJordanCurve.two_arcs (curve : Set(Plane.Point)) (isCurve : Plane.IsJordanCurve(curve))
+theorem Plane.IsJordanCurve.two_arcs (curve : Set(Plane.Point))
+        (isCurve : Plane.IsJordanCurve(curve))
         (p q : Plane.Point) (pOnCurve : p ∈ curve) (qOnCurve : q ∈ curve) (distinct : p ≠ q)
         : ∃ (firstPiece : Set(Plane.Point)). ∃ (secondPiece : Set(Plane.Point)).
             (Plane.IsArcBetween(firstPiece, p, q) ∧ Plane.IsArcBetween(secondPiece, q, p))
               ∧ (firstPiece ∪ secondPiece = curve
                      ∧ firstPiece ∩ secondPiece
                            = Set.singleton(Plane.Point, p) ∪ Set.singleton(Plane.Point, q)) := {
-  choose loop such that Plane.IsLoop(loop) ∧ Plane.imageSet(loop, Plane.unitSegment) = curve from isCurve;
+  choose loop such that
+      Plane.IsLoop(loop) ∧ MetricSpace.imageSet(loop, Real.unitInterval) = curve from isCurve;
   Plane.IsLoop(loop);
-  Plane.imageSet(loop, Plane.unitSegment) = curve as carriesOnto;
-  p ∈ Plane.imageSet(loop, Plane.unitSegment) by substituting carriesOnto;
-  q ∈ Plane.imageSet(loop, Plane.unitSegment) by substituting carriesOnto;
+  MetricSpace.imageSet(loop, Real.unitInterval) = curve as carriesOnto;
+  p ∈ MetricSpace.imageSet(loop, Real.unitInterval) by substituting carriesOnto;
+  q ∈ MetricSpace.imageSet(loop, Real.unitInterval) by substituting carriesOnto;
 
-  choose s such that (s ∈ Plane.unitSegment ∧ s ≠ Plane.Point.make(1, 0)) ∧ loop(s) = p
+  choose s such that (s ∈ Real.unitInterval ∧ s ≠ 1) ∧ loop(s) = p
       from Plane.IsLoop.parameter_before_finish(p := p);
-  s ∈ Plane.unitSegment;
-  s ≠ Plane.Point.make(1, 0);
+  s ∈ Real.unitInterval;
+  s ≠ 1;
   loop(s) = p as sCarriesP;
-  choose t such that (t ∈ Plane.unitSegment ∧ t ≠ Plane.Point.make(1, 0)) ∧ loop(t) = q
+  choose t such that (t ∈ Real.unitInterval ∧ t ≠ 1) ∧ loop(t) = q
       from Plane.IsLoop.parameter_before_finish(p := q);
-  t ∈ Plane.unitSegment;
-  t ≠ Plane.Point.make(1, 0);
+  t ∈ Real.unitInterval;
+  t ≠ 1;
   loop(t) = q as tCarriesQ;
 
   -- Distinct points, so distinct parameters, so one comes first.
-  Plane.Point.first(s) ≠ Plane.Point.first(t)
-      by { suppose Plane.Point.first(s) = Plane.Point.first(t) as sameParameter for contradiction {
-             s = t by Plane.unitSegment_equal_of_first_coordinate;
-             p = loop(t) by { p = loop(s) by sCarriesP; done by substituting (s = t) };
-             p = q by tCarriesQ;
-             done
-           };
+  s ≠ t
+      by { suppose s = t as sameParameter;
+           p = loop(t) by { p = loop(s) by sCarriesP; done by substituting sameParameter };
+           p = q by tCarriesQ;
            done };
   done by cases {
-    case Plane.Point.first(s) < Plane.Point.first(t) as sFirst: {
+    case s < t as sFirst: {
         choose middle : Set(Plane.Point), outside : Set(Plane.Point) such that
-            (Plane.IsArcBetween(middle, loop(s), loop(t)) ∧ Plane.IsArcBetween(outside, loop(t), loop(s)))
-              ∧ (middle ∪ outside = Plane.imageSet(loop, Plane.unitSegment)
+            (Plane.IsArcBetween(middle, loop(s), loop(t))
+                 ∧ Plane.IsArcBetween(outside, loop(t), loop(s)))
+              ∧ (middle ∪ outside = MetricSpace.imageSet(loop, Real.unitInterval)
                      ∧ middle ∩ outside
-                           = Set.singleton(Plane.Point, loop(s)) ∪ Set.singleton(Plane.Point, loop(t)))
+                           = Set.singleton(Plane.Point, loop(s))
+                                 ∪ Set.singleton(Plane.Point, loop(t)))
             from Plane.IsLoop.two_arcs_at_parameters;
         Plane.IsArcBetween(middle, loop(s), loop(t));
         Plane.IsArcBetween(outside, loop(t), loop(s));
-        middle ∪ outside = Plane.imageSet(loop, Plane.unitSegment) as covers;
-        middle ∩ outside = Set.singleton(Plane.Point, loop(s)) ∪ Set.singleton(Plane.Point, loop(t)) as meets;
+        middle ∪ outside = MetricSpace.imageSet(loop, Real.unitInterval) as covers;
+        middle ∩ outside
+            = Set.singleton(Plane.Point, loop(s)) ∪ Set.singleton(Plane.Point, loop(t)) as meets;
         Plane.IsArcBetween(middle, p, q) by substituting sCarriesP;
         Plane.IsArcBetween(outside, q, p) by substituting sCarriesP;
-        middle ∪ outside = curve by { middle ∪ outside = Plane.imageSet(loop, Plane.unitSegment) by covers;
-                                      done by carriesOnto };
+        middle ∪ outside = curve
+            by { middle ∪ outside = MetricSpace.imageSet(loop, Real.unitInterval) by covers;
+                 done by carriesOnto };
         middle ∩ outside
            = Set.singleton(Plane.Point, loop(s)) ∪ Set.singleton(Plane.Point, loop(t)) by meets
-           = Set.singleton(Plane.Point, p) ∪ Set.singleton(Plane.Point, loop(t)) by substituting sCarriesP
-           = Set.singleton(Plane.Point, p) ∪ Set.singleton(Plane.Point, q) by substituting tCarriesQ;
+           = Set.singleton(Plane.Point, p) ∪ Set.singleton(Plane.Point, loop(t))
+                 by substituting sCarriesP
+           = Set.singleton(Plane.Point, p) ∪ Set.singleton(Plane.Point, q)
+                 by substituting tCarriesQ;
         done by { witness middle with { witness outside } }
       }
     otherwise as tFirst: {
-        Plane.Point.first(t) ≤ Plane.Point.first(s) by Real.LessOrEqual_of_not_LessThan;
-        Plane.Point.first(t) ≠ Plane.Point.first(s);
-        Plane.Point.first(t) < Plane.Point.first(s);
+        t ≤ s by Real.LessOrEqual_of_not_LessThan;
+        t ≠ s;
+        t < s;
         choose middle : Set(Plane.Point), outside : Set(Plane.Point) such that
-            (Plane.IsArcBetween(middle, loop(t), loop(s)) ∧ Plane.IsArcBetween(outside, loop(s), loop(t)))
-              ∧ (middle ∪ outside = Plane.imageSet(loop, Plane.unitSegment)
+            (Plane.IsArcBetween(middle, loop(t), loop(s))
+                 ∧ Plane.IsArcBetween(outside, loop(s), loop(t)))
+              ∧ (middle ∪ outside = MetricSpace.imageSet(loop, Real.unitInterval)
                      ∧ middle ∩ outside
-                           = Set.singleton(Plane.Point, loop(t)) ∪ Set.singleton(Plane.Point, loop(s)))
+                           = Set.singleton(Plane.Point, loop(t))
+                                 ∪ Set.singleton(Plane.Point, loop(s)))
             from Plane.IsLoop.two_arcs_at_parameters;
         Plane.IsArcBetween(middle, loop(t), loop(s));
         Plane.IsArcBetween(outside, loop(s), loop(t));
-        middle ∪ outside = Plane.imageSet(loop, Plane.unitSegment) as covers;
-        middle ∩ outside = Set.singleton(Plane.Point, loop(t)) ∪ Set.singleton(Plane.Point, loop(s)) as meets;
+        middle ∪ outside = MetricSpace.imageSet(loop, Real.unitInterval) as covers;
+        middle ∩ outside
+            = Set.singleton(Plane.Point, loop(t)) ∪ Set.singleton(Plane.Point, loop(s)) as meets;
         -- The middle runs from `q` to `p`, so it is the SECOND piece here.
         Plane.IsArcBetween(middle, q, p) by substituting tCarriesQ;
         Plane.IsArcBetween(outside, p, q) by substituting tCarriesQ;
         outside ∪ middle
            = middle ∪ outside by Set.union_commutative
-           = Plane.imageSet(loop, Plane.unitSegment) by covers
+           = MetricSpace.imageSet(loop, Real.unitInterval) by covers
            = curve by carriesOnto;
         outside ∩ middle
            = middle ∩ outside by Set.intersection_commutative
@@ -831,7 +782,8 @@ theorem Plane.IsJordanCurve.two_arcs (curve : Set(Plane.Point)) (isCurve : Plane
                  by Set.union_commutative
            = Set.singleton(Plane.Point, p) ∪ Set.singleton(Plane.Point, loop(t))
                  by substituting sCarriesP
-           = Set.singleton(Plane.Point, p) ∪ Set.singleton(Plane.Point, q) by substituting tCarriesQ;
+           = Set.singleton(Plane.Point, p) ∪ Set.singleton(Plane.Point, q)
+                 by substituting tCarriesQ;
         done by { witness outside with { witness middle } }
       }
   }

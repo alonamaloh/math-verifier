@@ -1,7 +1,6 @@
 # Metric spaces, and topology developed once
 
-**Status: steps 1–3 DONE 2026-07-27; step 4 IN PROGRESS on the branch
-`metric-interval-parametrisation`. `main` is green.**
+**Status: steps 1–4 DONE 2026-07-27. `main` is green.**
 
 | Step | State |
 | --- | --- |
@@ -9,7 +8,7 @@
 | 1. `Metric/` : bundle, `IsMetric`, instances | **done** — `Metric/space.math`; instances `Real.metricSpace` (`Metric/real.math`) and `Plane.metricSpace` (`Plane/metric.math`). |
 | 2. Topology ported generically | **done** — `Metric/{topology,continuity,sequence,compactness,homeomorphism,connected,separation,uniform}.math`. |
 | 3. `Plane.*` as thin aliases | **done** — `Plane/{topology,sequence,compact,compactness,homeomorphism,connected,separation,extremum}.math` keep every name; the tree is green throughout. |
-| 4. Parametrisation domains → ℝ | **prerequisites done on `main`; three files left, on a branch** — see "Where step 4 stands" below. |
+| 4. Parametrisation domains → ℝ | **done** — every parametrisation is `γ : ℝ → Plane.Point` on `Real.unitInterval`; see "What step 4 removed" below. |
 
 What the port actually removed: `Plane/topology.math` 830 → 260 lines,
 `Plane/connected.math` 853 → 486, `Plane/compactness.math` 425 → 130,
@@ -26,10 +25,9 @@ Two statements changed shape on the way, both for the better:
   space has none at all), so this is not a generic theorem without one;
   the plane supplies the origin at the call site.
 
-## Where step 4 stands
+## What step 4 removed
 
-The prerequisites are all **done and on `main`** (`Metric/interval.math`,
-537 lines):
+The prerequisites went in first (`Metric/interval.math`, 537 lines):
 
 - `Real.unitInterval`, compact (Bolzano–Weierstrass plus the limit staying
   between the same two bounds) and connected.
@@ -44,32 +42,21 @@ The prerequisites are all **done and on `main`** (`Metric/interval.math`,
 - `MetricSpace.UniformlyContinuousOn` and compact separation, ported
   generically — the last of the step-2 gap.
 
-**The migration proper is in progress on the branch
-`metric-interval-parametrisation`, which does NOT build.** Converted
-there: `Plane/model.math` (the whole `unitSegment` / `walk` /
-`first_coordinate_*` section deleted, 612 → 354), `Plane/curve.math`
-(`Plane.IsArc`, `arc`, `arcStart`/`arcFinish`, `IsLoop`,
-`IsJordanCurve` all on `γ : ℝ → Plane.Point` over `Real.unitInterval`),
-and `Plane/subarc.math` (the reparametrisation is `Real.between(a, b)`,
-plain arithmetic; `Plane.walkOnto` is gone, and a plane segment is an arc
-directly via `Plane.between(a, b)`). Each of the three verifies on its
-own.
+Then the six parametrisation files, in dependency order:
 
-Still on plane parameters, and what makes the branch red:
-
-| file | lines | what it needs |
+| file | lines | what happened |
 | --- | --- | --- |
-| `Plane/concatenate.math` | 954 | `retime` becomes `t ↦ scale·t + shift`; the halves become `Set(ℝ)`; every "a coordinate gap never exceeds the distance" step **disappears** — over ℝ the gap IS the distance |
-| `Plane/twoarcs.math` | 838 | 149 `Point.make(1, 0)` sites become `1`; the parameter-order characterisation becomes `Real.segment_atLeast`/`_atMost`/`member_segment_of_bounds` |
-| `Plane/polyline.math` | 213 | `Plane.walkOnto(a, b)` becomes `Plane.between(a, b)`; the lemmas it needs (`Plane.IsArc.between`, `Plane.arc_between`, `Plane.between_arcStart`/`_arcFinish`) are already on the branch |
+| `Plane/model.math` | 612 → 354 | the whole `unitSegment` / `walk` / `first_coordinate_*` / `unitSegment_at_first_coordinate` / `unitSegment_equal_of_first_coordinate` section deleted — all of it existed to move between a parameter and the plane point encoding it. What remains is the circle side. |
+| `Plane/curve.math` | 252 → 267 | `IsArc`, `arc`, `arcStart`/`arcFinish`, `IsLoop`, `IsJordanCurve` on `γ : ℝ → Plane.Point`. `arcStart` is `γ(0)`, not `γ(Point.make(0, 0))`. |
+| `Plane/subarc.math` | 612 → 646 | the reparametrisation is `Real.between(a, b)`, plain arithmetic; `Plane.walkOnto` is gone, and a plane segment is an arc directly via `Plane.between(a, b)`. |
+| `Plane/concatenate.math` | 954 → 735 | the glued map is literally `t ↦ γ₁(2t)` / `t ↦ γ₂(2t - 1)`; `Plane.retime` is gone, and the two doublings are walks (`Real.between(0, 2)`, `Real.between(-1, 1)`), so their continuity is the walk's. Every "a coordinate gap never exceeds the distance" step disappeared — over ℝ the gap IS the distance. |
+| `Plane/twoarcs.math` | 838 → 790 | the parameter-order characterisation is `Real.segment_atLeast`/`_atMost`/`member_segment_of_bounds`; the whole "where a parameter sits, in coordinates" section is gone, and so is `distinct_of_first_coordinate` (`a < b → a ≠ b` needs no plane). The line count barely moves because the old file ran well past column 140 and the new one does not. |
+| `Plane/polyline.math` | 213 → 176 | a leg is `Plane.between(a, b)` directly, so the four `walkOnto` adapters are gone. |
 
-The transformation is uniform and mechanical: `Plane.unitSegment` →
-`Real.unitInterval`, `Plane.walk(t)` → `t`, `Plane.Point.first(x)` → `x`,
-`Plane.Point.make(1, 0)` → `1`, `Plane.origin` (as a parameter) → `0`,
-`Plane.distance` (between parameters) → `MetricSpace.distance`. Nothing
-found so far needs a new idea.
+Net: 3,481 → 2,968 lines across the six, and the encoding — 477
+`Point.first` unpackings, 109 `Point.make(1, 0)`s — is gone entirely.
 
-Afterwards: retire the `Plane.*` aliases file by file, and add the
+Remaining: retire the `Plane.*` aliases file by file, and add the
 `Plane/` files that now qualify to `scripts/clean_manifest.txt` — it
 still holds zero of them.
 
@@ -199,6 +186,39 @@ Verified against the real kernel, not assumed:
 - **`let` in a proof block requires its type**: `let far := Natural.maximum(a, b);`
   is a parse error, `let far : ℕ := …` is fine. Inferring it from the
   right-hand side would remove a piece of pure bureaucracy.
+
+### From the last leg (concatenate / twoarcs / polyline)
+
+- **`1 / 2` and `(1 : ℝ) / 2` are different terms.** The first elaborates
+  to a *rational* literal cast into ℝ, the second to `Real.divide`. A fact
+  stated with one spelling does not discharge a goal stated with the
+  other, and `ordered_field` reports them as unrelated atoms. Every `1/2`
+  in `concatenate.math` is therefore the bare spelling, with the ambient
+  type pinned on the *other* operand (`1 / 2 > (0 : ℝ)`). Two spellings of
+  the same number is the F-queue's "equal spellings treated differently"
+  exactly.
+- **`-(1 : ℝ)` and `(-1 : ℝ)` are also different terms**, and only the
+  first is one `ring` can read: `(-1 : ℝ)` is a negative *integer* literal
+  cast into ℝ, which ring treats as an opaque atom, so
+  `2·t - 1 = (-1 : ℝ) + t·(1 - (-1 : ℝ))` fails while the same identity
+  spelled `-(1 : ℝ)` closes. The negation-of-a-cast spelling is the one to
+  write, which is a shame — `(-1 : ℝ)` is what a reader would.
+- **A `witness` at a compound arithmetic parameter is expensive.**
+  `value ∈ Plane.arc(γ) by { witness 2·source }` costs nothing;
+  `witness 2·source - 1`, with both halves of the membership already
+  stated in context, costs ~300k kernel-steps through the
+  `conjunctionIntro` search — the subtraction alone is the difference.
+  Naming the step (`Plane.member_arc`, added to `Plane/curve.math`) fixes
+  it and reads better besides, but the underlying cost is worth a look:
+  nothing about `2·s - 1` should make an already-stated conjunction hard.
+- **`Real.segment_atLeast`/`_atMost` need their far endpoint named.** The
+  goal `a ≤ x` does not mention `b`, and having `x ∈ Real.segment(a, b)`
+  in context is not enough for the citation to pin it — the premise is
+  only matched once the arguments are known, not the other way round. So
+  every site reads `by Real.segment_atMost(a := 0)`. This is the deferred-
+  premise-argument friction (QUIRK Q13) at a new lemma family; it is also
+  arguably the right thing to write, since the conclusion genuinely does
+  not mention which segment.
 
 ## Staged migration (keeps the tree green throughout)
 

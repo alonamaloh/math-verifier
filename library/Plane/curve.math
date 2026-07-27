@@ -2,16 +2,23 @@
 --
 -- Arcs and Jordan curves. Layer 4.
 --
--- An arc is a continuous injective map on the unit segment. A Jordan curve
--- is the image of a LOOP — a continuous map on the same interval that
--- returns to where it started and is injective until it does — which is the
--- blueprint's definition and the one its proofs run on.
+-- An arc is a continuous injective map on the unit interval. A Jordan
+-- curve is the image of a LOOP — a continuous map on the same interval
+-- that returns to where it started and is injective until it does — which
+-- is the blueprint's definition and the one its proofs run on.
+--
+-- The interval is `Real.unitInterval`, a set of REALS, and a
+-- parametrisation is `γ : ℝ → Plane.Point`. That is what a mathematician
+-- writes, and it is available because the topology of `Metric/` is
+-- developed over a metric space with separate source and target: the
+-- continuity of `γ` is the same `ContinuousOn` as the continuity of a
+-- plane-to-plane map, read at two instances instead of one.
 --
 -- Arcs carry their parametrisation, as the blueprint does: it slides
--- between "the arc" and "the map" freely, and subarcs and concatenation are
--- painful set-first. A curve is a SET, because that is what the theorems
--- about it say ("ℝ² ∖ C has two regions"), with the loop recovered by
--- `choose` wherever a proof wants the parameters.
+-- between "the arc" and "the map" freely, and subarcs and concatenation
+-- are painful set-first. A curve is a SET, because that is what the
+-- theorems about it say ("ℝ² ∖ C has two regions"), with the loop
+-- recovered by `choose` wherever a proof wants the parameters.
 
 module Plane.curve
 
@@ -22,9 +29,19 @@ import Set.basics
 import Set.algebra
 import Real.interface
 import Real.order
+import Metric.space
+import Metric.real
+import Metric.topology
+import Metric.continuity
+import Metric.sequence
+import Metric.compactness
+import Metric.connected
+import Metric.homeomorphism
+import Metric.interval
 import Plane.vector
 import Plane.point
 import Plane.norm
+import Plane.metric
 import Plane.segment
 import Plane.topology
 import Plane.compact
@@ -36,74 +53,76 @@ import Plane.homeomorphism
 -- ----------------------------------------------------------------------
 -- Arcs.
 
-definition Plane.IsArc (parametrisation : Plane.Point → Plane.Point)
-        : Proposition :=
-  Plane.ContinuousOn(parametrisation, Plane.unitSegment)
-    ∧ Plane.InjectiveOn(parametrisation, Plane.unitSegment)
+definition Plane.IsArc (parametrisation : ℝ → Plane.Point) : Proposition :=
+  MetricSpace.ContinuousOn(parametrisation, Real.unitInterval)
+    ∧ MetricSpace.InjectiveOn(parametrisation, Real.unitInterval)
 
-definition Plane.arc (parametrisation : Plane.Point → Plane.Point)
-        : Set(Plane.Point) :=
-  Plane.imageSet(parametrisation, Plane.unitSegment)
+definition Plane.arc (parametrisation : ℝ → Plane.Point) : Set(Plane.Point) :=
+  MetricSpace.imageSet(parametrisation, Real.unitInterval)
 
-definition Plane.arcStart (parametrisation : Plane.Point → Plane.Point)
-        : Plane.Point :=
-  parametrisation(Plane.origin)
+definition Plane.arcStart (parametrisation : ℝ → Plane.Point) : Plane.Point :=
+  parametrisation(0)
 
-definition Plane.arcFinish (parametrisation : Plane.Point → Plane.Point)
-        : Plane.Point :=
-  parametrisation(Plane.Point.make(1, 0))
+definition Plane.arcFinish (parametrisation : ℝ → Plane.Point) : Plane.Point :=
+  parametrisation(1)
 
-theorem Plane.arcStart_in_arc (parametrisation : Plane.Point → Plane.Point)
+theorem Plane.arcStart_in_arc (parametrisation : ℝ → Plane.Point)
         : Plane.arcStart(parametrisation) ∈ Plane.arc(parametrisation) :=
-  witness Plane.origin with {
-    Plane.origin ∈ Plane.unitSegment by Plane.start_in_unitSegment;
-    parametrisation(Plane.origin) = Plane.arcStart(parametrisation);
+  witness (0 : ℝ) with {
+    (0 : ℝ) ∈ Real.unitInterval by Real.zero_in_unitInterval;
+    parametrisation(0) = Plane.arcStart(parametrisation);
     done
   }
 
-theorem Plane.arcFinish_in_arc (parametrisation : Plane.Point → Plane.Point)
+theorem Plane.arcFinish_in_arc (parametrisation : ℝ → Plane.Point)
         : Plane.arcFinish(parametrisation) ∈ Plane.arc(parametrisation) :=
-  witness Plane.Point.make(1, 0) with {
-    Plane.Point.make(1, 0) ∈ Plane.unitSegment
-        by Plane.finish_in_unitSegment;
-    parametrisation(Plane.Point.make(1, 0))
-        = Plane.arcFinish(parametrisation);
+  witness (1 : ℝ) with {
+    (1 : ℝ) ∈ Real.unitInterval by Real.one_in_unitInterval;
+    parametrisation(1) = Plane.arcFinish(parametrisation);
     done
   }
 
-theorem Plane.IsArc.IsCompact (parametrisation : Plane.Point → Plane.Point)
+-- A parameter of the interval carries its value onto the arc. This is what
+-- every "the point is on the arc" step says, and naming it keeps the two
+-- halves of the membership off the page.
+theorem Plane.member_arc (parametrisation : ℝ → Plane.Point)
+        (t : ℝ) (inside : t ∈ Real.unitInterval)
+        (value : Plane.Point) (carries : parametrisation(t) = value)
+        : value ∈ Plane.arc(parametrisation) :=
+  witness t
+
+theorem Plane.IsArc.IsCompact (parametrisation : ℝ → Plane.Point)
         (isArc : Plane.IsArc(parametrisation))
         : Plane.IsCompact(Plane.arc(parametrisation)) := {
-  Plane.ContinuousOn(parametrisation, Plane.unitSegment);
-  Plane.IsCompact(Plane.unitSegment) by Plane.unitSegment_IsCompact;
-  done by Plane.IsCompact.image
+  MetricSpace.ContinuousOn(parametrisation, Real.unitInterval);
+  MetricSpace.IsCompact(Real.unitInterval) by Real.unitInterval_IsCompact;
+  done by MetricSpace.IsCompact.image
 }
 
-theorem Plane.IsArc.IsConnected (parametrisation : Plane.Point → Plane.Point)
+theorem Plane.IsArc.IsConnected (parametrisation : ℝ → Plane.Point)
         (isArc : Plane.IsArc(parametrisation))
         : Plane.IsConnected(Plane.arc(parametrisation)) := {
-  Plane.ContinuousOn(parametrisation, Plane.unitSegment);
-  Plane.IsConnected(Plane.unitSegment) by Plane.unitSegment_IsConnected;
-  done by Plane.IsConnected.image
+  MetricSpace.ContinuousOn(parametrisation, Real.unitInterval);
+  MetricSpace.IsConnected(Real.unitInterval) by Real.unitInterval_IsConnected;
+  done by MetricSpace.IsConnected.image
 }
 
--- An arc is a homeomorphic copy of the unit segment: the parametrisation
+-- An arc is a homeomorphic copy of the unit interval: the parametrisation
 -- is a continuous injection on a compactum.
-theorem Plane.IsArc.IsHomeomorphismOn
-        (parametrisation : Plane.Point → Plane.Point)
+theorem Plane.IsArc.IsHomeomorphismOn (parametrisation : ℝ → Plane.Point)
         (isArc : Plane.IsArc(parametrisation))
-        : Plane.IsHomeomorphismOn(parametrisation, Plane.unitSegment) := {
-  Plane.ContinuousOn(parametrisation, Plane.unitSegment);
-  Plane.InjectiveOn(parametrisation, Plane.unitSegment);
-  Plane.IsCompact(Plane.unitSegment) by Plane.unitSegment_IsCompact;
-  done by Plane.IsHomeomorphismOn.of_continuous_injective_on_compact
+        : MetricSpace.IsHomeomorphismOn(parametrisation, Real.unitInterval) := {
+  MetricSpace.ContinuousOn(parametrisation, Real.unitInterval);
+  MetricSpace.InjectiveOn(parametrisation, Real.unitInterval);
+  MetricSpace.IsCompact(Real.unitInterval) by Real.unitInterval_IsCompact;
+  done by MetricSpace.IsHomeomorphismOn.of_continuous_injective_on_compact
 }
 
 -- ----------------------------------------------------------------------
 -- Jordan curves.
 --
 -- The blueprint's definition, and the one its proofs run on: a Jordan
--- curve is the image of a LOOP — a continuous map on the model interval
+-- curve is the image of a LOOP — a continuous map on the unit interval
 -- that returns to where it started and is injective until it does. A curve
 -- is a SET, since that is what the theorems about it say ("ℝ² ∖ C has two
 -- regions"), and the loop is recovered by `choose` wherever a proof wants
@@ -123,41 +142,31 @@ theorem Plane.IsArc.IsHomeomorphismOn
 -- parametrisation — because it needs exactly that traversal. See
 -- PLAN_JORDAN_SCHOENFLIES.md.
 
-definition Plane.IsLoop (loop : Plane.Point → Plane.Point) : Proposition :=
-  Plane.ContinuousOn(loop, Plane.unitSegment)
-    ∧ loop(Plane.origin) = loop(Plane.Point.make(1, 0))
-    ∧ Plane.InjectiveOn(
-          loop,
-          Plane.unitSegment ∖ Set.singleton(Plane.Point, Plane.Point.make(1, 0)))
+definition Plane.IsLoop (loop : ℝ → Plane.Point) : Proposition :=
+  MetricSpace.ContinuousOn(loop, Real.unitInterval)
+    ∧ loop(0) = loop(1)
+    ∧ MetricSpace.InjectiveOn(
+          loop, Real.unitInterval ∖ Set.singleton(ℝ, 1))
 
 definition Plane.IsJordanCurve (curve : Set(Plane.Point)) : Proposition :=
-  ∃ (loop : Plane.Point → Plane.Point).
-    Plane.IsLoop(loop) ∧ Plane.imageSet(loop, Plane.unitSegment) = curve
-
--- The model interval does not close up: its two ends are different points.
-theorem Plane.start_not_finish : Plane.origin ≠ Plane.Point.make(1, 0) := {
-  suppose Plane.origin = Plane.Point.make(1, 0) as closedUp for contradiction {
-    Plane.Point.first(Plane.origin) = Plane.Point.first(Plane.Point.make(1, 0)) by substituting closedUp;
-    (0 : ℝ) = 1;
-    (0 : ℝ) ≠ 1;
-    done
-  };
-  done
-}
+  ∃ (loop : ℝ → Plane.Point).
+    Plane.IsLoop(loop) ∧ MetricSpace.imageSet(loop, Real.unitInterval) = curve
 
 -- A loop is injective off its finish, so two parameters short of the end
 -- that carry the same point are the same parameter. The membership side
 -- of `∖` is what every use would otherwise spell out.
-theorem Plane.IsLoop.injective_before_finish (loop : Plane.Point → Plane.Point) (isLoop : Plane.IsLoop(loop))
-        (u v : Plane.Point) (uOnSegment : u ∈ Plane.unitSegment) (vOnSegment : v ∈ Plane.unitSegment)
-        (uBeforeFinish : u ≠ Plane.Point.make(1, 0)) (vBeforeFinish : v ≠ Plane.Point.make(1, 0))
+theorem Plane.IsLoop.injective_before_finish (loop : ℝ → Plane.Point)
+        (isLoop : Plane.IsLoop(loop))
+        (u v : ℝ) (uInside : u ∈ Real.unitInterval) (vInside : v ∈ Real.unitInterval)
+        (uBeforeFinish : u ≠ 1) (vBeforeFinish : v ≠ 1)
         (samePoint : loop(u) = loop(v))
         : u = v := {
-  Plane.InjectiveOn(loop, Plane.unitSegment ∖ Set.singleton(Plane.Point, Plane.Point.make(1, 0))) as injective;
-  ¬(u ∈ Set.singleton(Plane.Point, Plane.Point.make(1, 0)));
-  ¬(v ∈ Set.singleton(Plane.Point, Plane.Point.make(1, 0)));
-  u ∈ Plane.unitSegment ∖ Set.singleton(Plane.Point, Plane.Point.make(1, 0));
-  v ∈ Plane.unitSegment ∖ Set.singleton(Plane.Point, Plane.Point.make(1, 0));
+  MetricSpace.InjectiveOn(loop, Real.unitInterval ∖ Set.singleton(ℝ, 1))
+      as injective;
+  ¬(u ∈ Set.singleton(ℝ, 1));
+  ¬(v ∈ Set.singleton(ℝ, 1));
+  u ∈ Real.unitInterval ∖ Set.singleton(ℝ, 1);
+  v ∈ Real.unitInterval ∖ Set.singleton(ℝ, 1);
   done by injective
 }
 
@@ -165,20 +174,23 @@ theorem Plane.IsLoop.injective_before_finish (loop : Plane.Point → Plane.Point
 -- lands on the finish can be replaced by the start, which the loop carries
 -- to the same point. This is the only use the closing condition gets, and
 -- it is what lets the two arcs below be cut at honest interior parameters.
-theorem Plane.IsLoop.parameter_before_finish (loop : Plane.Point → Plane.Point) (isLoop : Plane.IsLoop(loop))
-        (p : Plane.Point) (onCurve : p ∈ Plane.imageSet(loop, Plane.unitSegment))
-        : ∃ (s : Plane.Point). (s ∈ Plane.unitSegment ∧ s ≠ Plane.Point.make(1, 0)) ∧ loop(s) = p := {
-  choose parameter such that parameter ∈ Plane.unitSegment ∧ loop(parameter) = p from onCurve;
-  parameter ∈ Plane.unitSegment;
+theorem Plane.IsLoop.parameter_before_finish (loop : ℝ → Plane.Point)
+        (isLoop : Plane.IsLoop(loop))
+        (p : Plane.Point)
+        (onCurve : p ∈ MetricSpace.imageSet(loop, Real.unitInterval))
+        : ∃ (s : ℝ). (s ∈ Real.unitInterval ∧ s ≠ 1) ∧ loop(s) = p := {
+  choose parameter : ℝ such that
+      parameter ∈ Real.unitInterval ∧ loop(parameter) = p from onCurve;
+  parameter ∈ Real.unitInterval;
   loop(parameter) = p as carriesToP;
-  loop(Plane.origin) = loop(Plane.Point.make(1, 0)) as closesUp;
+  loop(0) = loop(1);
   done by cases {
-    case parameter = Plane.Point.make(1, 0) as atFinish: {
-        Plane.origin ∈ Plane.unitSegment by Plane.start_in_unitSegment;
-        Plane.origin ≠ Plane.Point.make(1, 0) by Plane.start_not_finish;
-        loop(Plane.origin) = loop(parameter) by substituting atFinish;
-        loop(Plane.origin) = p by carriesToP;
-        done by { witness Plane.origin }
+    case parameter = 1 as atFinish: {
+        (0 : ℝ) ∈ Real.unitInterval by Real.zero_in_unitInterval;
+        (0 : ℝ) ≠ 1;
+        loop(0) = loop(parameter) by substituting atFinish;
+        loop(0) = p by carriesToP;
+        done by { witness (0 : ℝ) }
       }
     otherwise as beforeFinish: {
         done by { witness parameter }
@@ -190,14 +202,15 @@ theorem Plane.IsJordanCurve.IsCompact (curve : Set(Plane.Point))
         (isCurve : Plane.IsJordanCurve(curve))
         : Plane.IsCompact(curve) := {
   choose loop such that
-      Plane.IsLoop(loop) ∧ Plane.imageSet(loop, Plane.unitSegment) = curve
+      Plane.IsLoop(loop)
+      ∧ MetricSpace.imageSet(loop, Real.unitInterval) = curve
       from isCurve;
-  Plane.imageSet(loop, Plane.unitSegment) = curve as carriesOnto;
+  MetricSpace.imageSet(loop, Real.unitInterval) = curve as carriesOnto;
   Plane.IsLoop(loop);
-  Plane.ContinuousOn(loop, Plane.unitSegment);
-  Plane.IsCompact(Plane.unitSegment) by Plane.unitSegment_IsCompact;
-  Plane.IsCompact(Plane.imageSet(loop, Plane.unitSegment))
-      by Plane.IsCompact.image;
+  MetricSpace.ContinuousOn(loop, Real.unitInterval);
+  MetricSpace.IsCompact(Real.unitInterval) by Real.unitInterval_IsCompact;
+  MetricSpace.IsCompact(MetricSpace.imageSet(loop, Real.unitInterval))
+      by MetricSpace.IsCompact.image;
   done by substituting carriesOnto
 }
 
@@ -205,14 +218,15 @@ theorem Plane.IsJordanCurve.IsConnected (curve : Set(Plane.Point))
         (isCurve : Plane.IsJordanCurve(curve))
         : Plane.IsConnected(curve) := {
   choose loop such that
-      Plane.IsLoop(loop) ∧ Plane.imageSet(loop, Plane.unitSegment) = curve
+      Plane.IsLoop(loop)
+      ∧ MetricSpace.imageSet(loop, Real.unitInterval) = curve
       from isCurve;
-  Plane.imageSet(loop, Plane.unitSegment) = curve as carriesOnto;
+  MetricSpace.imageSet(loop, Real.unitInterval) = curve as carriesOnto;
   Plane.IsLoop(loop);
-  Plane.ContinuousOn(loop, Plane.unitSegment);
-  Plane.IsConnected(Plane.unitSegment) by Plane.unitSegment_IsConnected;
-  Plane.IsConnected(Plane.imageSet(loop, Plane.unitSegment))
-      by Plane.IsConnected.image;
+  MetricSpace.ContinuousOn(loop, Real.unitInterval);
+  MetricSpace.IsConnected(Real.unitInterval) by Real.unitInterval_IsConnected;
+  MetricSpace.IsConnected(MetricSpace.imageSet(loop, Real.unitInterval))
+      by MetricSpace.IsConnected.image;
   done by substituting carriesOnto
 }
 
@@ -220,14 +234,15 @@ theorem Plane.IsJordanCurve.IsNonempty (curve : Set(Plane.Point))
         (isCurve : Plane.IsJordanCurve(curve))
         : Set.IsNonempty(Plane.Point, curve) := {
   choose loop such that
-      Plane.IsLoop(loop) ∧ Plane.imageSet(loop, Plane.unitSegment) = curve
+      Plane.IsLoop(loop)
+      ∧ MetricSpace.imageSet(loop, Real.unitInterval) = curve
       from isCurve;
-  Plane.imageSet(loop, Plane.unitSegment) = curve as carriesOnto;
-  Plane.origin ∈ Plane.unitSegment by Plane.start_in_unitSegment;
-  loop(Plane.origin) ∈ Plane.imageSet(loop, Plane.unitSegment)
-      by { witness Plane.origin };
-  loop(Plane.origin) ∈ curve by substituting carriesOnto;
-  done by { witness loop(Plane.origin) }
+  MetricSpace.imageSet(loop, Real.unitInterval) = curve as carriesOnto;
+  (0 : ℝ) ∈ Real.unitInterval by Real.zero_in_unitInterval;
+  loop(0) ∈ MetricSpace.imageSet(loop, Real.unitInterval)
+      by { witness (0 : ℝ) };
+  loop(0) ∈ curve by substituting carriesOnto;
+  done by { witness loop(0) }
 }
 
 -- ----------------------------------------------------------------------
