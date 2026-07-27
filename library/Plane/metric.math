@@ -1,0 +1,47 @@
+-- Plane/metric.math
+--
+-- The plane as a metric space, under the Euclidean distance. Registering
+-- it as the canonical `MetricSpace` for `Plane.Point` is what lets the
+-- generic relative topology of `Metric/` be read at a bare
+-- `Set(Plane.Point)`, so that `Plane.OpenIn` and its relatives become
+-- names for the generic notions rather than a second copy of them.
+
+module Plane.metric
+
+import Logic.basics
+import Equality.basics
+import Real.interface
+import Metric.space
+import Plane.vector
+import Plane.point
+import Plane.norm
+
+theorem Plane.is_metric : IsMetric(Plane.Point, Plane.distance) := {
+  ∀ (p : Plane.Point). Plane.distance(p, p) = 0
+      by { take p : Plane.Point; done by Plane.distance_self };
+  ∀ (p q : Plane.Point). Plane.distance(p, q) = 0 → p = q
+      by { take p : Plane.Point;
+           take q : Plane.Point;
+           suppose Plane.distance(p, q) = 0;
+           done by Plane.equal_of_distance_zero };
+  ∀ (p q : Plane.Point). Plane.distance(p, q) = Plane.distance(q, p)
+      by { take p : Plane.Point;
+           take q : Plane.Point;
+           done by Plane.distance_symmetric };
+  ∀ (p q r : Plane.Point). Plane.distance(p, r) ≤ Plane.distance(p, q) + Plane.distance(q, r)
+      by { take p : Plane.Point;
+           take q : Plane.Point;
+           take r : Plane.Point;
+           done by Plane.distance_triangle };
+  done
+}
+
+definition Plane.metricSpace : MetricSpace :=
+  MetricSpace.make(Plane.Point, Plane.distance, Plane.is_metric)
+
+instance Plane.metricSpace
+
+-- The distance projection at the plane IS `Plane.distance`.
+theorem Plane.metric_distance (p q : Plane.Point)
+        : MetricSpace.distance(p, q) = Plane.distance(p, q) :=
+  reflexivity(ℝ, Plane.distance(p, q))

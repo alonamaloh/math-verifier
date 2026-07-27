@@ -1,0 +1,71 @@
+-- Metric/real.math
+--
+-- The real line as a metric space, `distance(x, y) = |x - y|`. Registering
+-- it as the canonical `MetricSpace` for ℝ is what lets `OpenIn`,
+-- `ContinuousOn` and the rest be read at a bare `Set(ℝ)` — in particular
+-- at the unit interval, the natural domain of a parametrised curve.
+
+module Metric.real
+
+import Logic.basics
+import Equality.basics
+import Real.interface
+import Real.order
+import Real.order_field
+import Real.absolute_value
+import Real.absolute_value_order
+import Metric.space
+
+definition Real.distance (x y : ℝ) : ℝ := abs(x - y)
+
+theorem Real.is_metric : IsMetric(ℝ, Real.distance) := {
+  ∀ (x : ℝ). Real.distance(x, x) = 0
+      by { take x : ℝ;
+           Real.distance(x, x)
+              = abs(x - x)
+              = abs((0 : ℝ))
+              = 0;
+           done };
+  ∀ (x y : ℝ). Real.distance(x, y) = 0 → x = y
+      by { take x : ℝ;
+           take y : ℝ;
+           suppose Real.distance(x, y) = 0 as vanishes;
+           abs(x - y) = 0;
+           x - y = 0 by { suppose ¬(x - y = 0) for contradiction;
+                          abs(x - y) > 0 by Real.absolute_value_positive;
+                          done } as differenceVanishes;
+           x = (x - y) + y
+             = 0 + y by substituting differenceVanishes
+             = y;
+           done };
+  ∀ (x y : ℝ). Real.distance(x, y) = Real.distance(y, x)
+      by { take x : ℝ;
+           take y : ℝ;
+           Real.distance(x, y)
+              = abs(x - y)
+              = abs(y - x) by Real.absolute_value_subtract_swap
+              = Real.distance(y, x);
+           done };
+  ∀ (x y z : ℝ). Real.distance(x, z) ≤ Real.distance(x, y) + Real.distance(y, z)
+      by { take x : ℝ;
+           take y : ℝ;
+           take z : ℝ;
+           Real.distance(x, z)
+              = abs(x - z)
+              = abs((x - y) + (y - z))
+              ≤ abs(x - y) + abs(y - z) by Real.triangle_inequality
+              = Real.distance(x, y) + Real.distance(y, z);
+           done };
+  done
+}
+
+definition Real.metricSpace : MetricSpace :=
+  MetricSpace.make(ℝ, Real.distance, Real.is_metric)
+
+instance Real.metricSpace
+
+-- The distance projection at ℝ IS the absolute value of the difference.
+-- Consumers state the arithmetic form and this bridges it.
+theorem Real.metric_distance (x y : ℝ)
+        : MetricSpace.distance(x, y) = abs(x - y) :=
+  reflexivity(ℝ, abs(x - y))

@@ -1,0 +1,138 @@
+-- Metric/space.math
+--
+-- A metric space, bundled: one value `m : MetricSpace` carries its
+-- carrier type, its distance function, and the four axioms together.
+-- This is the layer the whole relative topology is developed over, so
+-- that `OpenIn` / `IsCompact` / `ContinuousOn` are written once and read
+-- at ℝ, at the plane, and at anything else that supplies a metric.
+--
+-- The bundling idiom is `Algebra/ring_bundle.math`'s: a `Type(1)`
+-- single-constructor inductive whose first field is the `Type(0)`
+-- carrier, projections that take the bundle implicitly so they read as
+-- operations on the carrier, and an `instance` per carrier so an
+-- implicit `{m : MetricSpace}` resolves from a concrete
+-- `Set(Plane.Point)` or `Set(ℝ)`.
+
+module Metric.space
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Real.interface
+import Real.order
+import Real.order_field
+
+-- The four axioms, unbundled. Separation is stated in the direction a
+-- proof uses it: two points at distance zero are the same point.
+definition IsMetric (carrier : Type(0)) (distance : carrier → carrier → ℝ) : Proposition :=
+  (∀ (x : carrier). distance(x, x) = 0)
+  ∧ (∀ (x y : carrier). distance(x, y) = 0 → x = y)
+  ∧ (∀ (x y : carrier). distance(x, y) = distance(y, x))
+  ∧ (∀ (x y z : carrier). distance(x, z) ≤ distance(x, y) + distance(y, z))
+
+inductive MetricSpace : Type(1) where
+  | MetricSpace.make
+      : (carrier : Type(0))
+        → (distance : carrier → carrier → ℝ)
+        → IsMetric(carrier, distance)
+        → MetricSpace
+
+-- ----------------------------------------------------------------------
+-- Field projections.
+
+definition MetricSpace.carrier : MetricSpace → Type(0)
+  | MetricSpace.make(carrier, distance, isMetric) => carrier
+
+-- The distance takes its space implicitly, recovered from the type of
+-- either point, so it reads as an operation on points rather than on a
+-- space. Written with a destructuring `let ⟨…⟩ := m in …` because the
+-- return type mentions `MetricSpace.carrier(m)` (the dependent motive a
+-- pattern-match definition cannot yet build).
+definition MetricSpace.distance {m : MetricSpace}
+        : MetricSpace.carrier(m) → MetricSpace.carrier(m) → ℝ :=
+  let ⟨carrier, distance, isMetric⟩ := m in
+    distance
+
+definition MetricSpace.is_metric (m : MetricSpace)
+        : IsMetric(MetricSpace.carrier(m), MetricSpace.distance) :=
+  let ⟨carrier, distance, isMetric⟩ := m in
+    isMetric
+
+-- ----------------------------------------------------------------------
+-- The axioms, flattened out of the bundled conjunction once so that no
+-- consumer walks the hierarchy by hand.
+
+theorem MetricSpace.distance_self (m : MetricSpace) (x : MetricSpace.carrier(m))
+        : MetricSpace.distance(x, x) = 0 := {
+  IsMetric(MetricSpace.carrier(m), MetricSpace.distance);
+  done
+}
+
+theorem MetricSpace.equal_of_distance_zero (m : MetricSpace)
+        (x y : MetricSpace.carrier(m))
+        (apart : MetricSpace.distance(x, y) = 0)
+        : x = y := {
+  IsMetric(MetricSpace.carrier(m), MetricSpace.distance);
+  done
+}
+
+theorem MetricSpace.distance_symmetric (m : MetricSpace)
+        (x y : MetricSpace.carrier(m))
+        : MetricSpace.distance(x, y) = MetricSpace.distance(y, x) := {
+  IsMetric(MetricSpace.carrier(m), MetricSpace.distance);
+  done
+}
+
+theorem MetricSpace.distance_triangle (m : MetricSpace)
+        (x y z : MetricSpace.carrier(m))
+        : MetricSpace.distance(x, z)
+              ≤ MetricSpace.distance(x, y) + MetricSpace.distance(y, z) := {
+  IsMetric(MetricSpace.carrier(m), MetricSpace.distance);
+  done
+}
+
+-- Distances are nonnegative: the triangle inequality from x to x through
+-- y says twice the distance is at least zero.
+theorem MetricSpace.distance_nonneg (m : MetricSpace)
+        (x y : MetricSpace.carrier(m))
+        : MetricSpace.distance(x, y) ≥ 0 := {
+  (0 : ℝ)
+     = MetricSpace.distance(x, x) by MetricSpace.distance_self
+     ≤ MetricSpace.distance(x, y) + MetricSpace.distance(y, x)
+           by MetricSpace.distance_triangle
+     = MetricSpace.distance(x, y) + MetricSpace.distance(x, y)
+           by substituting MetricSpace.distance_symmetric(m, y, x);
+  done by ordered_field
+}
+
+-- ----------------------------------------------------------------------
+-- Balls. The open ball is what makes the ε-δ definitions below readable,
+-- and the one place the topology needs a set builder.
+
+definition MetricSpace.Ball {m : MetricSpace}
+        (center : MetricSpace.carrier(m)) (radius : ℝ)
+        : Set(MetricSpace.carrier(m)) :=
+  (x : MetricSpace.carrier(m)) ↦ MetricSpace.distance(center, x) < radius
+
+theorem MetricSpace.member_Ball (m : MetricSpace)
+        (center x : MetricSpace.carrier(m)) (radius : ℝ)
+        (inside : x ∈ MetricSpace.Ball(center, radius))
+        : MetricSpace.distance(center, x) < radius :=
+  inside
+
+theorem MetricSpace.Ball_of_distance (m : MetricSpace)
+        (center x : MetricSpace.carrier(m)) (radius : ℝ)
+        (near : MetricSpace.distance(center, x) < radius)
+        : x ∈ MetricSpace.Ball(center, radius) :=
+  near
+
+theorem MetricSpace.center_Ball (m : MetricSpace)
+        (center : MetricSpace.carrier(m)) (radius : ℝ)
+        (radiusPositive : radius > 0)
+        : center ∈ MetricSpace.Ball(center, radius) := {
+  MetricSpace.distance(center, center)
+     = 0 by MetricSpace.distance_self
+     < radius;
+  done
+}

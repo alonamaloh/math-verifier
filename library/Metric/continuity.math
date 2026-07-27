@@ -1,0 +1,306 @@
+-- Metric/continuity.math
+--
+-- Continuity between metric spaces, relative to a carrier set in the
+-- domain. The source and target spaces are separate bundles, so ONE
+-- definition covers every combination a curve argument needs: ℝ → ℝ,
+-- ℝ → the plane, the plane → the plane, the plane → ℝ.
+--
+-- A map is continuous on a carrier when the usual ε-δ condition holds
+-- with both quantifiers restricted to it. Nothing is asked of the map
+-- off the carrier.
+
+module Metric.continuity
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Set.algebra
+import Real.interface
+import Real.minimum
+import Metric.space
+import Metric.topology
+
+definition MetricSpace.ContinuousAt {source target : MetricSpace}
+        (f : MetricSpace.carrier(source) → MetricSpace.carrier(target))
+        (carrier : Set(MetricSpace.carrier(source)))
+        (x : MetricSpace.carrier(source)) : Proposition :=
+  ∀ (tolerance : ℝ). tolerance > 0 →
+    ∃ (nearness : ℝ). nearness > 0 ∧
+      ∀ (y : MetricSpace.carrier(source)). y ∈ carrier →
+        MetricSpace.distance(x, y) < nearness →
+          MetricSpace.distance(f(x), f(y)) < tolerance
+
+definition MetricSpace.ContinuousOn {source target : MetricSpace}
+        (f : MetricSpace.carrier(source) → MetricSpace.carrier(target))
+        (carrier : Set(MetricSpace.carrier(source)))
+        : Proposition :=
+  ∀ (x : MetricSpace.carrier(source)). x ∈ carrier →
+    MetricSpace.ContinuousAt(f, carrier, x)
+
+-- Continuity only sees the values on the carrier, so a map that agrees
+-- with a continuous one there is continuous there. This is what lets a
+-- glued map be pasted: on each piece it agrees with that piece's map.
+theorem MetricSpace.ContinuousOn.of_agreeing (source target : MetricSpace)
+        (f g : MetricSpace.carrier(source) → MetricSpace.carrier(target))
+        (carrier : Set(MetricSpace.carrier(source)))
+        (agree : ∀ (x : MetricSpace.carrier(source)). x ∈ carrier → f(x) = g(x))
+        (gContinuous : MetricSpace.ContinuousOn(g, carrier))
+        : MetricSpace.ContinuousOn(f, carrier) := {
+  take x : MetricSpace.carrier(source);
+  suppose x ∈ carrier as xInCarrier;
+  take tolerance : ℝ;
+  suppose tolerance > 0 as tolerancePositive;
+  choose nearness such that
+      nearness > 0 ∧
+        ∀ (y : MetricSpace.carrier(source)). y ∈ carrier →
+          MetricSpace.distance(x, y) < nearness →
+            MetricSpace.distance(g(x), g(y)) < tolerance
+      from gContinuous;
+  nearness > 0;
+  ∀ (y : MetricSpace.carrier(source)). y ∈ carrier →
+      MetricSpace.distance(x, y) < nearness →
+        MetricSpace.distance(g(x), g(y)) < tolerance as valuesClose;
+  f(x) = g(x) by agree as valueAtCentre;
+  witness nearness with {
+    nearness > 0;
+    ∀ (y : MetricSpace.carrier(source)). y ∈ carrier →
+        MetricSpace.distance(x, y) < nearness →
+          MetricSpace.distance(f(x), f(y)) < tolerance
+        by (y : MetricSpace.carrier(source)) (yInCarrier : y ∈ carrier)
+           (near : MetricSpace.distance(x, y) < nearness) ↦ {
+          f(y) = g(y) by agree as valueAtPoint;
+          MetricSpace.distance(g(x), g(y)) < tolerance by valuesClose;
+          MetricSpace.distance(f(x), f(y))
+             = MetricSpace.distance(g(x), f(y)) by substituting valueAtCentre
+             = MetricSpace.distance(g(x), g(y)) by substituting valueAtPoint
+             < tolerance;
+          done
+        };
+    done
+  }
+}
+
+-- Continuity composes. The outer map's tolerance chooses the nearness the
+-- inner map must meet, and the inner map's nearness answers for the
+-- composite — provided the inner map lands where the outer one is
+-- continuous.
+theorem MetricSpace.ContinuousOn.compose (source middle target : MetricSpace)
+        (inner : MetricSpace.carrier(source) → MetricSpace.carrier(middle))
+        (outer : MetricSpace.carrier(middle) → MetricSpace.carrier(target))
+        (carrier : Set(MetricSpace.carrier(source)))
+        (region : Set(MetricSpace.carrier(middle)))
+        (innerContinuous : MetricSpace.ContinuousOn(inner, carrier))
+        (lands : ∀ (x : MetricSpace.carrier(source)). x ∈ carrier → inner(x) ∈ region)
+        (outerContinuous : MetricSpace.ContinuousOn(outer, region))
+        : MetricSpace.ContinuousOn(
+              (x : MetricSpace.carrier(source)) ↦ outer(inner(x)), carrier) := {
+  take x : MetricSpace.carrier(source);
+  suppose x ∈ carrier as xInCarrier;
+  take tolerance : ℝ;
+  suppose tolerance > 0 as tolerancePositive;
+  inner(x) ∈ region by lands;
+  choose middleNearness such that
+      middleNearness > 0 ∧
+        ∀ (y : MetricSpace.carrier(middle)). y ∈ region →
+          MetricSpace.distance(inner(x), y) < middleNearness →
+            MetricSpace.distance(outer(inner(x)), outer(y)) < tolerance
+      from outerContinuous;
+  middleNearness > 0;
+  ∀ (y : MetricSpace.carrier(middle)). y ∈ region →
+      MetricSpace.distance(inner(x), y) < middleNearness →
+        MetricSpace.distance(outer(inner(x)), outer(y)) < tolerance
+      as outerAnswers;
+  choose nearness such that
+      nearness > 0 ∧
+        ∀ (y : MetricSpace.carrier(source)). y ∈ carrier →
+          MetricSpace.distance(x, y) < nearness →
+            MetricSpace.distance(inner(x), inner(y)) < middleNearness
+      from innerContinuous;
+  nearness > 0;
+  ∀ (y : MetricSpace.carrier(source)). y ∈ carrier →
+      MetricSpace.distance(x, y) < nearness →
+        MetricSpace.distance(inner(x), inner(y)) < middleNearness
+      as innerAnswers;
+  witness nearness with {
+    nearness > 0;
+    ∀ (y : MetricSpace.carrier(source)). y ∈ carrier →
+        MetricSpace.distance(x, y) < nearness →
+          MetricSpace.distance(outer(inner(x)), outer(inner(y))) < tolerance
+        by (y : MetricSpace.carrier(source)) (yInCarrier : y ∈ carrier)
+           (near : MetricSpace.distance(x, y) < nearness) ↦ {
+          MetricSpace.distance(inner(x), inner(y)) < middleNearness by innerAnswers;
+          inner(y) ∈ region by lands;
+          done by outerAnswers
+        };
+    done
+  }
+}
+
+-- Restricting the carrier only weakens the condition.
+theorem MetricSpace.ContinuousOn.restrict (source target : MetricSpace)
+        (f : MetricSpace.carrier(source) → MetricSpace.carrier(target))
+        (smaller larger : Set(MetricSpace.carrier(source)))
+        (smallerInLarger : smaller ⊆ larger)
+        (continuousOnLarger : MetricSpace.ContinuousOn(f, larger))
+        : MetricSpace.ContinuousOn(f, smaller) := {
+  take x : MetricSpace.carrier(source);
+  suppose x ∈ smaller as xInSmaller;
+  x ∈ larger by smallerInLarger;
+  take tolerance : ℝ;
+  suppose tolerance > 0 as tolerancePositive;
+  choose nearness such that nearness > 0 ∧
+      ∀ (y : MetricSpace.carrier(source)). y ∈ larger →
+        MetricSpace.distance(x, y) < nearness →
+          MetricSpace.distance(f(x), f(y)) < tolerance
+      from continuousOnLarger;
+  nearness > 0;
+  ∀ (y : MetricSpace.carrier(source)). y ∈ larger →
+      MetricSpace.distance(x, y) < nearness →
+        MetricSpace.distance(f(x), f(y)) < tolerance as largerBall;
+  witness nearness with {
+    nearness > 0;
+    ∀ (y : MetricSpace.carrier(source)). y ∈ smaller →
+        MetricSpace.distance(x, y) < nearness →
+          MetricSpace.distance(f(x), f(y)) < tolerance
+        by (y : MetricSpace.carrier(source)) (yInSmaller : y ∈ smaller)
+           (yClose : MetricSpace.distance(x, y) < nearness) ↦ {
+             y ∈ larger by smallerInLarger;
+             done by largerBall
+           };
+    done
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- The pasting lemma.
+--
+-- Each piece supplies a radius at every point of the union, by one of two
+-- routes. If the point is IN the piece, continuity on that piece supplies
+-- it. If the point is NOT in the piece, the piece being closed in the
+-- union supplies a radius within which no point of the union is in the
+-- piece at all, so the requirement is vacuous. Both routes give the same
+-- statement, which is what lets the main proof avoid a four-way split.
+
+theorem MetricSpace.pasteRadius (source target : MetricSpace)
+        (f : MetricSpace.carrier(source) → MetricSpace.carrier(target))
+        (piece union : Set(MetricSpace.carrier(source)))
+        (pieceClosed : MetricSpace.ClosedIn(piece, union))
+        (pieceContinuous : MetricSpace.ContinuousOn(f, piece))
+        (x : MetricSpace.carrier(source)) (xInUnion : x ∈ union)
+        (tolerance : ℝ) (tolerancePositive : tolerance > 0)
+        : ∃ (nearness : ℝ). nearness > 0 ∧
+            ∀ (y : MetricSpace.carrier(source)). y ∈ union → y ∈ piece →
+              MetricSpace.distance(x, y) < nearness →
+                MetricSpace.distance(f(x), f(y)) < tolerance :=
+  done by cases {
+    case x ∈ piece: {
+        choose nearness such that nearness > 0 ∧
+            ∀ (y : MetricSpace.carrier(source)). y ∈ piece →
+              MetricSpace.distance(x, y) < nearness →
+                MetricSpace.distance(f(x), f(y)) < tolerance
+            from pieceContinuous;
+        nearness > 0;
+        ∀ (y : MetricSpace.carrier(source)). y ∈ piece →
+            MetricSpace.distance(x, y) < nearness →
+              MetricSpace.distance(f(x), f(y)) < tolerance as pieceBall;
+        witness nearness with {
+          nearness > 0;
+          ∀ (y : MetricSpace.carrier(source)). y ∈ union → y ∈ piece →
+              MetricSpace.distance(x, y) < nearness →
+                MetricSpace.distance(f(x), f(y)) < tolerance
+              by (y : MetricSpace.carrier(source)) (yInUnion : y ∈ union)
+                 (yInPiece : y ∈ piece)
+                 (yClose : MetricSpace.distance(x, y) < nearness) ↦
+                   pieceBall(y, yInPiece, yClose);
+          done
+        }
+      }
+    otherwise as xOutsidePiece: {
+        x ∈ union ∖ piece;
+        choose nearness such that nearness > 0 ∧
+            ∀ (y : MetricSpace.carrier(source)). y ∈ union →
+              MetricSpace.distance(x, y) < nearness →
+                y ∈ union ∖ piece
+            from pieceClosed;
+        nearness > 0;
+        ∀ (y : MetricSpace.carrier(source)). y ∈ union →
+            MetricSpace.distance(x, y) < nearness →
+              y ∈ union ∖ piece as avoidsPiece;
+        witness nearness with {
+          nearness > 0;
+          ∀ (y : MetricSpace.carrier(source)). y ∈ union → y ∈ piece →
+              MetricSpace.distance(x, y) < nearness →
+                MetricSpace.distance(f(x), f(y)) < tolerance
+              by (y : MetricSpace.carrier(source)) (yInUnion : y ∈ union)
+                 (yInPiece : y ∈ piece)
+                 (yClose : MetricSpace.distance(x, y) < nearness) ↦ {
+                   y ∈ union ∖ piece by avoidsPiece;
+                   ¬(y ∈ piece);
+                   False;
+                   done
+                 };
+          done
+        }
+      }
+  }
+
+-- A map continuous on each of two relatively closed pieces is continuous
+-- on their union. This is what glues the interior and exterior extensions
+-- of the main theorem along the curve they share.
+theorem MetricSpace.ContinuousOn.paste (source target : MetricSpace)
+        (f : MetricSpace.carrier(source) → MetricSpace.carrier(target))
+        (first second : Set(MetricSpace.carrier(source)))
+        (firstClosed : MetricSpace.ClosedIn(first, first ∪ second))
+        (secondClosed : MetricSpace.ClosedIn(second, first ∪ second))
+        (firstContinuous : MetricSpace.ContinuousOn(f, first))
+        (secondContinuous : MetricSpace.ContinuousOn(f, second))
+        : MetricSpace.ContinuousOn(f, first ∪ second) := {
+  take x : MetricSpace.carrier(source);
+  suppose x ∈ first ∪ second as xInUnion;
+  take tolerance : ℝ;
+  suppose tolerance > 0 as tolerancePositive;
+  choose firstNearness such that firstNearness > 0 ∧
+      ∀ (y : MetricSpace.carrier(source)). y ∈ first ∪ second → y ∈ first →
+        MetricSpace.distance(x, y) < firstNearness →
+          MetricSpace.distance(f(x), f(y)) < tolerance
+      from MetricSpace.pasteRadius(piece := first);
+  choose secondNearness such that secondNearness > 0 ∧
+      ∀ (y : MetricSpace.carrier(source)). y ∈ first ∪ second → y ∈ second →
+        MetricSpace.distance(x, y) < secondNearness →
+          MetricSpace.distance(f(x), f(y)) < tolerance
+      from MetricSpace.pasteRadius(piece := second);
+  firstNearness > 0;
+  secondNearness > 0;
+  ∀ (y : MetricSpace.carrier(source)). y ∈ first ∪ second → y ∈ first →
+      MetricSpace.distance(x, y) < firstNearness →
+        MetricSpace.distance(f(x), f(y)) < tolerance as firstBall;
+  ∀ (y : MetricSpace.carrier(source)). y ∈ first ∪ second → y ∈ second →
+      MetricSpace.distance(x, y) < secondNearness →
+        MetricSpace.distance(f(x), f(y)) < tolerance as secondBall;
+  witness min(firstNearness, secondNearness) with {
+    min(firstNearness, secondNearness) > 0;
+    ∀ (y : MetricSpace.carrier(source)). y ∈ first ∪ second →
+        MetricSpace.distance(x, y) < min(firstNearness, secondNearness) →
+          MetricSpace.distance(f(x), f(y)) < tolerance
+        by (y : MetricSpace.carrier(source)) (yInUnion : y ∈ first ∪ second)
+           (yClose : MetricSpace.distance(x, y)
+               < min(firstNearness, secondNearness)) ↦ {
+             MetricSpace.distance(x, y)
+                < min(firstNearness, secondNearness)
+                ≤ firstNearness;
+             MetricSpace.distance(x, y)
+                < min(firstNearness, secondNearness)
+                ≤ secondNearness;
+             done by cases {
+               case y ∈ first as yInFirst:
+                   firstBall(y, yInUnion, yInFirst,
+                       { MetricSpace.distance(x, y) < firstNearness })
+               case y ∈ second as yInSecond:
+                   secondBall(y, yInUnion, yInSecond,
+                       { MetricSpace.distance(x, y) < secondNearness })
+             }
+           };
+    done
+  }
+}
