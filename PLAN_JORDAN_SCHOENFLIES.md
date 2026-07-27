@@ -385,6 +385,51 @@ two points meet exactly in those points; open subarcs form a basis.
 
 **Size:** 4–7k lines.
 
+### Two arcs between two points — state as of 2026-07-27
+
+The remaining Layer 4 item, being built in `Plane/twoarcs.math`. Two points
+cut a Jordan curve into two arcs meeting exactly in those two points.
+
+The whole argument runs on the loop's PARAMETERS: pull the two points back
+to parameters `s` and `t` short of the finish, with `s` first; the two arcs
+are then the loop's image of the parameters between them, and of the
+parameters outside them.
+
+Done and in the kernel:
+
+- `Plane.first_coordinate_atLeast_on_segment` / `…_atMost_on_segment` and
+  `Plane.member_segment_of_first_coordinate` (`model.math`) — a point of
+  the interval lies between two others exactly when its coordinate does.
+  The converse is the substantive one; its parameter is the fraction of the
+  span the point has covered, which is what needs
+  `Real.LessOrEqual.divide_by_positive`.
+- `Plane.IsLoop.parameter_before_finish`, `…injective_before_finish`,
+  `Plane.start_not_finish` (`curve.math`) — every point of the curve has a
+  parameter short of the finish, by replacing a parameter AT the finish
+  with the start. This is the only use the closing condition gets.
+- `Plane.unitSegment_split` — the interval splits three ways around any two
+  parameters (linearity of the order, nothing more).
+- `Plane.IsLoop.pieces_meet_at_ends` — the loop's images of the middle and
+  of the outside meet EXACTLY at the two chosen points. Three cases; the
+  one that matters is the outside parameter being the finish, which carries
+  the same point as the start and so lands back on `s`. That case is why
+  the argument needs a loop rather than an arc.
+
+What remains — the assembly:
+
+1. Pull `p`, `q` back to parameters and order them. The ordering wants a
+   symmetric conclusion so the second case is the first applied to `(q, p)`
+   rather than a second copy of the proof.
+2. The middle piece is an arc by `IsArc.subarc_on_subsegment` (which is why
+   that lemma was relaxed to need injectivity only on the subsegment).
+3. The outside piece is `IsArc.concatenate` of `subarc(γ, t, finish)` and
+   `subarc(γ, origin, s)`, sharing the endpoint where the loop closes.
+   **Case split when `s = origin`**: the second piece degenerates to a
+   constant, and the arc is just `subarc(γ, t, finish)` — the missing point
+   is already on it, since `γ(origin) = γ(finish)`. Keep this split inside
+   the "exhibit a parametrisation" step only; the set-level covering and
+   meeting facts above hold uniformly and must not be duplicated.
+
 ## Layer 5 — `Graph/` : finite graphs
 
 Abstract, no geometry. Keep it that way — Layer 6 maps into it.
