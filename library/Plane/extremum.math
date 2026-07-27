@@ -70,7 +70,7 @@ theorem Plane.RealContinuousOn.negate
       0 < nearness ∧
       ∀ (y : Plane.Point). y ∈ carrier →
         Plane.distance(x, y) < nearness → abs(f(x) - f(y)) < tolerance
-      from continuous(x, inCarrier, tolerance, { 0 < tolerance });
+      from continuous;
   0 < nearness;
   ∀ (y : Plane.Point). y ∈ carrier →
       Plane.distance(x, y) < nearness → abs(f(x) - f(y)) < tolerance
@@ -81,7 +81,7 @@ theorem Plane.RealContinuousOn.negate
         Plane.distance(x, y) < nearness → abs(-f(x) - -f(y)) < tolerance
         by (y : Plane.Point) (inCarrierY : y ∈ carrier)
            (near : Plane.distance(x, y) < nearness) ↦ {
-             abs(f(x) - f(y)) < tolerance by valuesClose(y, inCarrierY, near);
+             abs(f(x) - f(y)) < tolerance by valuesClose;
              -f(x) - -f(y) = -(f(x) - f(y)) by ring;
              abs(-f(x) - -f(y))
                 = abs(-(f(x) - f(y)))
@@ -107,7 +107,7 @@ theorem Plane.RealContinuousAt.along_sequence
       0 < nearness ∧
       ∀ (y : Plane.Point). y ∈ carrier →
         Plane.distance(x, y) < nearness → abs(f(x) - f(y)) < tolerance
-      from continuous(tolerance, { 0 < tolerance });
+      from continuous;
   0 < nearness as nearnessPositive;
   ∀ (y : Plane.Point). y ∈ carrier →
       Plane.distance(x, y) < nearness → abs(f(x) - f(y)) < tolerance
@@ -117,11 +117,9 @@ theorem Plane.RealContinuousAt.along_sequence
       as closeBeyond from converges(nearness, nearnessPositive);
   witness threshold with
       (m : ℕ) (beyond : threshold ≤ m) ↦ {
-        Plane.distance(x, s(m)) < nearness
-            by closeBeyond(m, { threshold ≤ m });
-        abs(f(x) - f(s(m))) < tolerance
-            by valuesClose(s(m), inside(m),
-                { Plane.distance(x, s(m)) < nearness });
+        Plane.distance(x, s(m)) < nearness by closeBeyond;
+        s(m) ∈ carrier by inside;
+        abs(f(x) - f(s(m))) < tolerance by valuesClose;
         abs(f(s(m)) - f(x))
            = abs(f(x) - f(s(m))) by Real.absolute_value_subtract_swap
            < tolerance;
@@ -182,8 +180,7 @@ theorem Plane.image_bounded_above (f : Plane.Point → ℝ)
   suppose ¬Real.IsBoundedAbove(Plane.image(f, region))
       as unbounded for contradiction {
     ∀ (n : ℕ). ∃ (x : Plane.Point). x ∈ region ∧ (1 + n : ℝ) < f(x)
-        by (n : ℕ) ↦
-             Plane.value_past_every_scale(f, region, unbounded, n)
+        by (n : ℕ) ↦ Plane.value_past_every_scale(n := n)
         as escapes;
     choose s such that
         ∀ (n : ℕ). s(n) ∈ region ∧ (1 + n : ℝ) < f(s(n))
@@ -194,12 +191,12 @@ theorem Plane.image_bounded_above (f : Plane.Point → ℝ)
             escapes);
     ∀ (m : ℕ). s(m) ∈ region
         by (m : ℕ) ↦ { s(m) ∈ region ∧ (1 + m : ℝ) < f(s(m))
-                           by escapesAt(m);
+                           by escapesAt;
                        done }
         as inside;
-    choose index, limit such that
+    choose index : ℕ → ℕ, limit : Plane.Point such that
         limit ∈ region ∧ Plane.SubsequenceConverges(s, index, limit)
-        from compact(s, inside);
+        from compact;
     Natural.IsStrictlyIncreasing(index)
         by Plane.SubsequenceConverges.increasing;
     limit ∈ region as limitInRegion;
@@ -214,18 +211,18 @@ theorem Plane.image_bounded_above (f : Plane.Point → ℝ)
     (0 : ℝ) < 1;
     choose threshold such that
         ∀ (k : ℕ). threshold ≤ k → abs(f(s(index(k))) - f(limit)) < 1
-        as closeBeyond from valuesConverge(1, { (0 : ℝ) < 1 });
+        as closeBeyond from valuesConverge;
     choose escape such that f(limit) + 1 < (1 + escape : ℝ)
-        from Real.exists_natural_above(f(limit) + 1);
+        from Real.exists_natural_above;
     let far : ℕ := Natural.maximum(threshold, escape);
     threshold ≤ far;
     escape ≤ far;
     abs(f(s(index(far))) - f(limit)) < 1
-        by closeBeyond(far, { threshold ≤ far });
+        by closeBeyond;
     f(s(index(far))) - f(limit) ≤ abs(f(s(index(far))) - f(limit))
         by Real.LessOrEqual_absolute_value;
     s(index(far)) ∈ region ∧ (1 + index(far) : ℝ) < f(s(index(far)))
-        by escapesAt(index(far));
+        by escapesAt;
     (1 + index(far) : ℝ) < f(s(index(far)));
     far ≤ index(far) by Natural.IsStrictlyIncreasing.LessOrEqual;
     escape ≤ index(far);
@@ -256,16 +253,12 @@ theorem Plane.attains_maximum (f : Plane.Point → ℝ)
       by { witness f(start) with { witness start with done } };
   Real.IsBoundedAbove(Plane.image(f, region)) by Plane.image_bounded_above;
   choose peak such that Real.IsSupremum(Plane.image(f, region), peak)
-      as isSupremum
-      from Real.supremum_exists(
-          Plane.image(f, region),
-          { Set.IsNonempty(ℝ, Plane.image(f, region)) },
-          { Real.IsBoundedAbove(Plane.image(f, region)) });
+      from Real.supremum_exists;
   Real.IsUpperBound(Plane.image(f, region), peak) as isUpperBound;
   ∀ (x : Plane.Point). x ∈ region → f(x) ≤ peak
       by (x : Plane.Point) (inRegion : x ∈ region) ↦ {
         f(x) ∈ Plane.image(f, region) by { witness x with done };
-        done by isUpperBound(f(x), { f(x) ∈ Plane.image(f, region) })
+        done by isUpperBound
       }
       as belowPeak;
 
@@ -280,10 +273,7 @@ theorem Plane.attains_maximum (f : Plane.Point → ℝ)
         choose value such that
             value ∈ Plane.image(f, region)
             ∧ peak - Real.harmonic_term(n) < value
-            from Real.IsSupremum.exists_above(
-                Plane.image(f, region), peak,
-                peak - Real.harmonic_term(n), isSupremum,
-                { peak - Real.harmonic_term(n) < peak });
+            from Real.IsSupremum.exists_above;
         value ∈ Plane.image(f, region) as inImage;
         peak - Real.harmonic_term(n) < value;
         choose x such that x ∈ region ∧ f(x) = value from inImage;
@@ -304,13 +294,13 @@ theorem Plane.attains_maximum (f : Plane.Point → ℝ)
   ∀ (m : ℕ). s(m) ∈ region
       by (m : ℕ) ↦ { s(m) ∈ region
                          ∧ peak - Real.harmonic_term(m) < f(s(m))
-                         by climbs(m);
+                         by climbs;
                      done }
       as inside;
 
-  choose index, p such that
+  choose index : ℕ → ℕ, p : Plane.Point such that
       p ∈ region ∧ Plane.SubsequenceConverges(s, index, p)
-      from compact(s, inside);
+      from compact;
   Natural.IsStrictlyIncreasing(index)
       by Plane.SubsequenceConverges.increasing;
   p ∈ region as inRegion;
@@ -327,14 +317,14 @@ theorem Plane.attains_maximum (f : Plane.Point → ℝ)
   Real.SequenceConverges((k : ℕ) ↦ f(s(index(k))), peak)
       by (tolerance : ℝ) (tolerancePositive : tolerance > 0) ↦ {
         choose scale such that Real.harmonic_term(scale) < tolerance
-            from Real.exists_harmonic_term_below(tolerance, tolerancePositive);
+            from Real.exists_harmonic_term_below;
         witness scale with
             (k : ℕ) (beyond : scale ≤ k) ↦ {
               s(index(k)) ∈ region
                   ∧ peak - Real.harmonic_term(index(k)) < f(s(index(k)))
-                  by climbs(index(k));
+                  by climbs;
               peak - Real.harmonic_term(index(k)) < f(s(index(k)));
-              f(s(index(k))) ≤ peak by belowPeak(s(index(k)), inside(index(k)));
+              f(s(index(k))) ≤ peak by belowPeak;
               k ≤ index(k) by Natural.IsStrictlyIncreasing.LessOrEqual;
               Real.harmonic_term(index(k)) ≤ Real.harmonic_term(k)
                   by Real.harmonic_term_antitone;
@@ -350,7 +340,7 @@ theorem Plane.attains_maximum (f : Plane.Point → ℝ)
       by Real.SequenceConverges.unique(s := (k : ℕ) ↦ f(s(index(k))));
   ∀ (x : Plane.Point). x ∈ region → f(x) ≤ f(p)
       by (x : Plane.Point) (inRegionX : x ∈ region) ↦ {
-        f(x) ≤ peak by belowPeak(x, inRegionX);
+        f(x) ≤ peak by belowPeak;
         f(p) = peak;
         done
       };
@@ -369,14 +359,12 @@ theorem Plane.attains_minimum (f : Plane.Point → ℝ)
       by Plane.RealContinuousOn.negate;
   choose p such that
       p ∈ region ∧ ∀ (x : Plane.Point). x ∈ region → -f(x) ≤ -f(p)
-      from Plane.attains_maximum(
-          (x : Plane.Point) ↦ -f(x), region, compact, nonempty,
-          { Plane.RealContinuousOn((x : Plane.Point) ↦ -f(x), region) });
+      from Plane.attains_maximum(f := (x : Plane.Point) ↦ -f(x));
   p ∈ region;
   ∀ (x : Plane.Point). x ∈ region → -f(x) ≤ -f(p) as negatedBelow;
   ∀ (x : Plane.Point). x ∈ region → f(p) ≤ f(x)
       by (x : Plane.Point) (inRegionX : x ∈ region) ↦ {
-        -f(x) ≤ -f(p) by negatedBelow(x, inRegionX);
+        -f(x) ≤ -f(p) by negatedBelow;
         done
       };
   witness p with done
@@ -497,9 +485,8 @@ theorem Plane.uniformly_continuous_on_compact
                          ∃ (q : Plane.Point). q ∈ region
                              ∧ (Plane.distance(p(m), q) < Real.harmonic_term(m)
                                     ∧ ¬(abs(f(p(m)) - f(q)) < tolerance))
-                         by chosenP(m);
-                       done }
-        as insideP;
+                         by chosenP;
+                       done };
     ∀ (n : ℕ). ∃ (z : Plane.Point). z ∈ region
         ∧ (Plane.distance(p(n), z) < Real.harmonic_term(n)
                ∧ ¬(abs(f(p(n)) - f(z)) < tolerance))
@@ -508,7 +495,7 @@ theorem Plane.uniformly_continuous_on_compact
               ∃ (q : Plane.Point). q ∈ region
                   ∧ (Plane.distance(p(n), q) < Real.harmonic_term(n)
                          ∧ ¬(abs(f(p(n)) - f(q)) < tolerance))
-              by chosenP(n);
+              by chosenP;
           done
         }
         as partners;
@@ -528,25 +515,23 @@ theorem Plane.uniformly_continuous_on_compact
                            ∧ (Plane.distance(p(m), q(m))
                                   < Real.harmonic_term(m)
                               ∧ ¬(abs(f(p(m)) - f(q(m))) < tolerance))
-                           by chosenQ(m);
-                       done }
-        as insideQ;
+                           by chosenQ;
+                       done };
 
     -- Thin twice, and the two limits coincide.
-    choose firstIndex, limitP such that
+    choose firstIndex : ℕ → ℕ, limitP : Plane.Point such that
         limitP ∈ region ∧ Plane.SubsequenceConverges(p, firstIndex, limitP)
-        from compact(p, insideP);
+        from compact;
     Natural.IsStrictlyIncreasing(firstIndex)
         by Plane.SubsequenceConverges.increasing as firstIncreasing;
-    limitP ∈ region as limitInside;
+    limitP ∈ region;
     Plane.SequenceConverges((k : ℕ) ↦ p(firstIndex(k)), limitP)
         by Plane.SubsequenceConverges.converges as toLimitP;
-    choose secondIndex, limitQ such that
+    choose secondIndex : ℕ → ℕ, limitQ : Plane.Point such that
         limitQ ∈ region
         ∧ Plane.SubsequenceConverges(
               (k : ℕ) ↦ q(firstIndex(k)), secondIndex, limitQ)
-        from compact((k : ℕ) ↦ q(firstIndex(k)),
-                     (k : ℕ) ↦ insideQ(firstIndex(k)));
+        from compact;
     Natural.IsStrictlyIncreasing(secondIndex)
         by Plane.SubsequenceConverges.increasing as secondIncreasing;
     Plane.SequenceConverges(
@@ -565,7 +550,7 @@ theorem Plane.uniformly_continuous_on_compact
           q(n) ∈ region
               ∧ (Plane.distance(p(n), q(n)) < Real.harmonic_term(n)
                      ∧ ¬(abs(f(p(n)) - f(q(n))) < tolerance))
-              by chosenQ(n);
+              by chosenQ;
           done
         }
         as closing;
@@ -584,8 +569,7 @@ theorem Plane.uniformly_continuous_on_compact
         ∀ (y : Plane.Point). y ∈ region →
           Plane.distance(limitP, y) < nearness
             → abs(f(limitP) - f(y)) < tolerance / 2
-        from continuous(limitP, limitInside, tolerance / 2,
-                        { 0 < tolerance / 2 });
+        from continuous;
     0 < nearness as nearnessPositive;
     ∀ (y : Plane.Point). y ∈ region →
         Plane.distance(limitP, y) < nearness
@@ -604,17 +588,15 @@ theorem Plane.uniformly_continuous_on_compact
     thresholdQ ≤ far;
     let deep : ℕ := firstIndex(secondIndex(far));
     Plane.distance(limitP, p(deep)) < nearness
-        by nearP(far, { thresholdP ≤ far });
+        by nearP;
     Plane.distance(limitQ, q(deep)) < nearness
-        by nearQ(far, { thresholdQ ≤ far });
+        by nearQ;
     limitP = limitQ;
     Plane.distance(limitP, q(deep)) < nearness;
     abs(f(limitP) - f(p(deep))) < tolerance / 2
-        by valuesClose(p(deep), insideP(deep),
-            { Plane.distance(limitP, p(deep)) < nearness });
+        by valuesClose;
     abs(f(limitP) - f(q(deep))) < tolerance / 2
-        by valuesClose(q(deep), insideQ(deep),
-            { Plane.distance(limitP, q(deep)) < nearness });
+        by valuesClose;
     abs(f(q(deep)) - f(limitP)) = abs(f(limitP) - f(q(deep)))
         by Real.absolute_value_subtract_swap;
     f(p(deep)) - f(q(deep))
@@ -633,7 +615,7 @@ theorem Plane.uniformly_continuous_on_compact
     q(deep) ∈ region
         ∧ (Plane.distance(p(deep), q(deep)) < Real.harmonic_term(deep)
                ∧ ¬(abs(f(p(deep)) - f(q(deep))) < tolerance))
-        by chosenQ(deep);
+        by chosenQ;
     ¬(abs(f(p(deep)) - f(q(deep))) < tolerance);
     done
   };
