@@ -387,55 +387,17 @@ theorem Plane.upperHalf_retime_lands (x : Plane.Point)
 -- ----------------------------------------------------------------------
 -- Continuity: each half carries a composition, and the halves are closed.
 
-theorem Plane.concatenate_ContinuousOn
+-- On the upper half the glued map IS the second arc, retimed — including
+-- at the midpoint, where the `if` still takes the first branch. There the
+-- two branches agree, and only because the arcs share that endpoint: this
+-- is what makes the glued map well defined rather than merely continuous.
+theorem Plane.concatenate_value_on_upperHalf
         (firstArc secondArc : Plane.Point → Plane.Point)
-        (firstContinuous : Plane.ContinuousOn(firstArc, Plane.unitSegment))
-        (secondContinuous : Plane.ContinuousOn(secondArc, Plane.unitSegment))
         (sharedEndpoint
             : Plane.arcFinish(firstArc) = Plane.arcStart(secondArc))
-        : Plane.ContinuousOn(
-              Plane.concatenate(firstArc, secondArc), Plane.unitSegment) := {
-  -- On the lower half the glued map IS the first arc, retimed.
-  ∀ (x : Plane.Point). x ∈ Plane.lowerHalf →
-      Plane.retime(2, 0)(x) ∈ Plane.unitSegment
-      by (x : Plane.Point) (inLower : x ∈ Plane.lowerHalf) ↦
-           Plane.lowerHalf_retime_lands(x, inLower);
-  Plane.ContinuousOn(Plane.retime(2, 0), Plane.lowerHalf)
-      by Plane.retime_ContinuousOn;
-  Plane.ContinuousOn(
-      (x : Plane.Point) ↦ firstArc(Plane.retime(2, 0)(x)), Plane.lowerHalf)
-      by Plane.ContinuousOn.compose(
-          inner := Plane.retime(2, 0), outer := firstArc,
-          target := Plane.unitSegment);
-  ∀ (x : Plane.Point). x ∈ Plane.lowerHalf →
-      Plane.concatenate(firstArc, secondArc)(x)
-          = firstArc(Plane.retime(2, 0)(x))
-      by (x : Plane.Point) (inLower : x ∈ Plane.lowerHalf) ↦
-           Plane.concatenate_on_lowerHalf(firstArc, secondArc, x, inLower);
-  Plane.ContinuousOn(
-      Plane.concatenate(firstArc, secondArc), Plane.lowerHalf)
-      by Plane.ContinuousOn.of_agreeing(
-          g := (x : Plane.Point) ↦ firstArc(Plane.retime(2, 0)(x)));
-
-  -- On the upper half it is the second arc, retimed — including at the
-  -- midpoint, where the `if` still takes the first branch but the two arcs
-  -- agree because they share that endpoint.
-  ∀ (x : Plane.Point). x ∈ Plane.upperHalf →
-      Plane.retime(2, -(1 : ℝ))(x) ∈ Plane.unitSegment
-      by (x : Plane.Point) (inUpper : x ∈ Plane.upperHalf) ↦
-           Plane.upperHalf_retime_lands(x, inUpper);
-  Plane.ContinuousOn(Plane.retime(2, -(1 : ℝ)), Plane.upperHalf)
-      by Plane.retime_ContinuousOn;
-  Plane.ContinuousOn(
-      (x : Plane.Point) ↦ secondArc(Plane.retime(2, -(1 : ℝ))(x)),
-      Plane.upperHalf)
-      by Plane.ContinuousOn.compose(
-          inner := Plane.retime(2, -(1 : ℝ)), outer := secondArc,
-          target := Plane.unitSegment);
-  ∀ (x : Plane.Point). x ∈ Plane.upperHalf →
-      Plane.concatenate(firstArc, secondArc)(x)
-          = secondArc(Plane.retime(2, -(1 : ℝ))(x))
-      by (x : Plane.Point) (inUpper : x ∈ Plane.upperHalf) ↦ {
+        (x : Plane.Point) (inUpper : x ∈ Plane.upperHalf)
+        : Plane.concatenate(firstArc, secondArc)(x)
+              = secondArc(Plane.retime(2, -(1 : ℝ))(x)) := {
         done by cases {
           case Plane.Point.first(x) ≤ 1 / 2 as atMidpoint: {
               -- The only such point is the midpoint: there the first arc
@@ -486,7 +448,59 @@ theorem Plane.concatenate_ContinuousOn
                   firstArc, secondArc, x, inUpper, aboveMidpoint)
             }
         }
-      };
+}
+
+theorem Plane.concatenate_ContinuousOn
+        (firstArc secondArc : Plane.Point → Plane.Point)
+        (firstContinuous : Plane.ContinuousOn(firstArc, Plane.unitSegment))
+        (secondContinuous : Plane.ContinuousOn(secondArc, Plane.unitSegment))
+        (sharedEndpoint
+            : Plane.arcFinish(firstArc) = Plane.arcStart(secondArc))
+        : Plane.ContinuousOn(
+              Plane.concatenate(firstArc, secondArc), Plane.unitSegment) := {
+  -- On the lower half the glued map IS the first arc, retimed.
+  ∀ (x : Plane.Point). x ∈ Plane.lowerHalf →
+      Plane.retime(2, 0)(x) ∈ Plane.unitSegment
+      by (x : Plane.Point) (inLower : x ∈ Plane.lowerHalf) ↦
+           Plane.lowerHalf_retime_lands(x, inLower);
+  Plane.ContinuousOn(Plane.retime(2, 0), Plane.lowerHalf)
+      by Plane.retime_ContinuousOn;
+  Plane.ContinuousOn(
+      (x : Plane.Point) ↦ firstArc(Plane.retime(2, 0)(x)), Plane.lowerHalf)
+      by Plane.ContinuousOn.compose(
+          inner := Plane.retime(2, 0), outer := firstArc,
+          target := Plane.unitSegment);
+  ∀ (x : Plane.Point). x ∈ Plane.lowerHalf →
+      Plane.concatenate(firstArc, secondArc)(x)
+          = firstArc(Plane.retime(2, 0)(x))
+      by (x : Plane.Point) (inLower : x ∈ Plane.lowerHalf) ↦
+           Plane.concatenate_on_lowerHalf(firstArc, secondArc, x, inLower);
+  Plane.ContinuousOn(
+      Plane.concatenate(firstArc, secondArc), Plane.lowerHalf)
+      by Plane.ContinuousOn.of_agreeing(
+          g := (x : Plane.Point) ↦ firstArc(Plane.retime(2, 0)(x)));
+
+  -- On the upper half it is the second arc, retimed — including at the
+  -- midpoint, where the `if` still takes the first branch but the two arcs
+  -- agree because they share that endpoint.
+  ∀ (x : Plane.Point). x ∈ Plane.upperHalf →
+      Plane.retime(2, -(1 : ℝ))(x) ∈ Plane.unitSegment
+      by (x : Plane.Point) (inUpper : x ∈ Plane.upperHalf) ↦
+           Plane.upperHalf_retime_lands(x, inUpper);
+  Plane.ContinuousOn(Plane.retime(2, -(1 : ℝ)), Plane.upperHalf)
+      by Plane.retime_ContinuousOn;
+  Plane.ContinuousOn(
+      (x : Plane.Point) ↦ secondArc(Plane.retime(2, -(1 : ℝ))(x)),
+      Plane.upperHalf)
+      by Plane.ContinuousOn.compose(
+          inner := Plane.retime(2, -(1 : ℝ)), outer := secondArc,
+          target := Plane.unitSegment);
+  ∀ (x : Plane.Point). x ∈ Plane.upperHalf →
+      Plane.concatenate(firstArc, secondArc)(x)
+          = secondArc(Plane.retime(2, -(1 : ℝ))(x))
+      by (x : Plane.Point) (inUpper : x ∈ Plane.upperHalf) ↦
+           Plane.concatenate_value_on_upperHalf(
+               firstArc, secondArc, sharedEndpoint, x, inUpper);
   Plane.ContinuousOn(
       Plane.concatenate(firstArc, secondArc), Plane.upperHalf)
       by Plane.ContinuousOn.of_agreeing(
@@ -827,4 +841,191 @@ theorem Plane.IsArc.concatenate
         }
       };
   done
+}
+
+-- ----------------------------------------------------------------------
+-- What the concatenation covers.
+--
+-- Each half retimes ONTO the whole model interval — the point at half the
+-- parameter is the one that doubles to it — so the glued map's image is
+-- exactly the two arcs together.
+
+theorem Plane.lowerHalf_retime_onto (u : Plane.Point)
+        (onSegment : u ∈ Plane.unitSegment)
+        : ∃ (x : Plane.Point). x ∈ Plane.lowerHalf
+            ∧ Plane.retime(2, 0)(x) = u := {
+  -- Half a parameter is written as a product, not a quotient: a division
+  -- carries its nonzero proof and the sign battery reads it as an atom.
+  0 ≤ Plane.Point.first(u) by Plane.first_coordinate_nonneg_on_unitSegment;
+  Plane.Point.first(u) ≤ 1
+      by Plane.first_coordinate_atMostOne_on_unitSegment;
+  (2 : ℝ) ≠ 0;
+  (2 : ℝ) * (1 / 2) = 1 by Real.divide_cancel as halfDoubles;
+  (0 : ℝ) < 1 / 2 by Plane.midpoint_positive;
+  Real.IsNonneg(1 / 2);
+  Real.IsNonneg(Plane.Point.first(u));
+  0 ≤ Plane.Point.first(u) * (1 / 2);
+  Plane.Point.first(u) * (1 / 2) ≤ 1 * (1 / 2)
+      by Real.LessOrEqual.multiply_by_nonneg_right;
+  (1 : ℝ) * (1 / 2) ≤ 1 by ordered_field;
+  Plane.Point.first(u) * (1 / 2) ≤ 1;
+  let source : Plane.Point :=
+      Plane.between(
+          Plane.origin, Plane.Point.make(1, 0),
+          Plane.Point.first(u) * (1 / 2));
+  source ∈ Plane.unitSegment
+      by { witness Plane.Point.first(u) * (1 / 2) with done };
+  Plane.Point.first(source) = Plane.Point.first(u) * (1 / 2)
+      by Plane.first_of_walk as sourceParameter;
+  Plane.Point.first(source) ≤ 1 / 2;
+  source ∈ Plane.lowerHalf;
+  2 * Plane.Point.first(source) + 0 = Plane.Point.first(u)
+      by linear_combination(
+          2 * sourceParameter + Plane.Point.first(u) * halfDoubles)
+      as doubledParameter;
+  Plane.retime(2, 0)(source)
+     = Plane.between(
+           Plane.origin, Plane.Point.make(1, 0),
+           2 * Plane.Point.first(source) + 0)
+     = Plane.between(
+           Plane.origin, Plane.Point.make(1, 0), Plane.Point.first(u))
+           by substituting doubledParameter
+     = u by Plane.unitSegment_at_first_coordinate;
+  done by { witness source with done }
+}
+
+theorem Plane.upperHalf_retime_onto (u : Plane.Point)
+        (onSegment : u ∈ Plane.unitSegment)
+        : ∃ (x : Plane.Point). x ∈ Plane.upperHalf
+            ∧ Plane.retime(2, -(1 : ℝ))(x) = u := {
+  0 ≤ Plane.Point.first(u) by Plane.first_coordinate_nonneg_on_unitSegment;
+  Plane.Point.first(u) ≤ 1
+      by Plane.first_coordinate_atMostOne_on_unitSegment;
+  (2 : ℝ) ≠ 0;
+  (2 : ℝ) * (1 / 2) = 1 by Real.divide_cancel as halfDoubles;
+  (0 : ℝ) < 1 / 2 by Plane.midpoint_positive;
+  Real.IsNonneg(1 / 2);
+  Real.IsNonneg(Plane.Point.first(u));
+  0 ≤ Plane.Point.first(u) * (1 / 2);
+  Plane.Point.first(u) * (1 / 2) ≤ 1 * (1 / 2)
+      by Real.LessOrEqual.multiply_by_nonneg_right;
+  0 ≤ Plane.Point.first(u) * (1 / 2) + 1 / 2 by ordered_field;
+  Plane.Point.first(u) * (1 / 2) + 1 / 2 ≤ 1 by ordered_field;
+  let source : Plane.Point :=
+      Plane.between(
+          Plane.origin, Plane.Point.make(1, 0),
+          Plane.Point.first(u) * (1 / 2) + 1 / 2);
+  source ∈ Plane.unitSegment
+      by { witness Plane.Point.first(u) * (1 / 2) + 1 / 2 with done };
+  Plane.Point.first(source) = Plane.Point.first(u) * (1 / 2) + 1 / 2
+      by Plane.first_of_walk as sourceParameter;
+  1 / 2 ≤ Plane.Point.first(source) by ordered_field;
+  source ∈ Plane.upperHalf;
+  2 * Plane.Point.first(source) + -(1 : ℝ) = Plane.Point.first(u)
+      by linear_combination(
+          2 * sourceParameter + Plane.Point.first(u) * halfDoubles
+              + halfDoubles)
+      as doubledParameter;
+  Plane.retime(2, -(1 : ℝ))(source)
+     = Plane.between(
+           Plane.origin, Plane.Point.make(1, 0),
+           2 * Plane.Point.first(source) + -(1 : ℝ))
+     = Plane.between(
+           Plane.origin, Plane.Point.make(1, 0), Plane.Point.first(u))
+           by substituting doubledParameter
+     = u by Plane.unitSegment_at_first_coordinate;
+  done by { witness source with done }
+}
+
+-- The glued arc covers exactly the two it was glued from.
+theorem Plane.arc_concatenate
+        (firstArc secondArc : Plane.Point → Plane.Point)
+        (sharedEndpoint
+            : Plane.arcFinish(firstArc) = Plane.arcStart(secondArc))
+        : Plane.arc(Plane.concatenate(firstArc, secondArc))
+              = Plane.arc(firstArc) ∪ Plane.arc(secondArc) := {
+  Plane.arc(Plane.concatenate(firstArc, secondArc))
+      ⊆ Plane.arc(firstArc) ∪ Plane.arc(secondArc)
+      by (value : Plane.Point)
+         (onGlued : value ∈ Plane.arc(Plane.concatenate(firstArc, secondArc))) ↦ {
+        choose source such that
+            source ∈ Plane.unitSegment
+              ∧ Plane.concatenate(firstArc, secondArc)(source) = value
+            from onGlued;
+        source ∈ Plane.unitSegment;
+        Plane.concatenate(firstArc, secondArc)(source) = value;
+        done by cases {
+          case Plane.Point.first(source) ≤ 1 / 2 as low: {
+              source ∈ Plane.lowerHalf;
+              Plane.retime(2, 0)(source) ∈ Plane.unitSegment
+                  by Plane.lowerHalf_retime_lands;
+              firstArc(Plane.retime(2, 0)(source)) = value
+                  by Logic.if_positive;
+              value ∈ Plane.arc(firstArc)
+                  by { witness Plane.retime(2, 0)(source) with done };
+              done
+            }
+          otherwise as high: {
+              1 / 2 ≤ Plane.Point.first(source)
+                  by Real.not_LessOrEqual_implies;
+              source ∈ Plane.upperHalf;
+              Plane.retime(2, -(1 : ℝ))(source) ∈ Plane.unitSegment
+                  by Plane.upperHalf_retime_lands;
+              secondArc(Plane.retime(2, -(1 : ℝ))(source)) = value
+                  by Logic.if_negative;
+              value ∈ Plane.arc(secondArc)
+                  by { witness Plane.retime(2, -(1 : ℝ))(source) with done };
+              done
+            }
+        }
+      };
+
+  Plane.arc(firstArc) ∪ Plane.arc(secondArc)
+      ⊆ Plane.arc(Plane.concatenate(firstArc, secondArc))
+      by (value : Plane.Point)
+         (onEither : value ∈ Plane.arc(firstArc) ∪ Plane.arc(secondArc)) ↦ {
+        done by cases {
+          case value ∈ Plane.arc(firstArc) as onFirst: {
+              choose source such that
+                  source ∈ Plane.unitSegment ∧ firstArc(source) = value
+                  from onFirst;
+              source ∈ Plane.unitSegment as sourceOnSegment;
+              firstArc(source) = value as valueAtSource;
+              choose glued such that
+                  glued ∈ Plane.lowerHalf ∧ Plane.retime(2, 0)(glued) = source
+                  from Plane.lowerHalf_retime_onto(source, sourceOnSegment);
+              glued ∈ Plane.lowerHalf;
+              Plane.retime(2, 0)(glued) = source as retimesToSource;
+              glued ∈ Plane.unitSegment;
+              Plane.concatenate(firstArc, secondArc)(glued)
+                 = firstArc(Plane.retime(2, 0)(glued)) by Logic.if_positive
+                 = firstArc(source) by substituting retimesToSource
+                 = value by valueAtSource;
+              done by { witness glued with done }
+            }
+          case value ∈ Plane.arc(secondArc) as onSecond: {
+              choose source such that
+                  source ∈ Plane.unitSegment ∧ secondArc(source) = value
+                  from onSecond;
+              source ∈ Plane.unitSegment as sourceOnSegment;
+              secondArc(source) = value as valueAtSource;
+              choose glued such that
+                  glued ∈ Plane.upperHalf
+                    ∧ Plane.retime(2, -(1 : ℝ))(glued) = source
+                  from Plane.upperHalf_retime_onto(source, sourceOnSegment);
+              glued ∈ Plane.upperHalf as gluedInUpper;
+              Plane.retime(2, -(1 : ℝ))(glued) = source as retimesToSource;
+              glued ∈ Plane.unitSegment;
+              Plane.concatenate(firstArc, secondArc)(glued)
+                 = secondArc(Plane.retime(2, -(1 : ℝ))(glued))
+                  by Plane.concatenate_value_on_upperHalf(
+                      firstArc, secondArc, sharedEndpoint, glued,
+                      gluedInUpper)
+                 = secondArc(source) by substituting retimesToSource
+                 = value by valueAtSource;
+              done by { witness glued with done }
+            }
+        }
+      };
+  done by Set.equal_of_same_members
 }
