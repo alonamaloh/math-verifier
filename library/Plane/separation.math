@@ -174,11 +174,11 @@ theorem Plane.equal_limits_of_closing
         scale ≤ far;
         let deep : ℕ := index(far);
         Plane.distance(limitU, u(deep)) < tolerance / 4
-            by closeU(far, { thresholdU ≤ far });
+            by closeU;
         Plane.distance(limitV, v(deep)) < tolerance / 4
-            by closeV(far, { thresholdV ≤ far });
+            by closeV;
         Plane.distance(u(deep), v(deep)) < Real.harmonic_term(deep)
-            by closing(deep);
+            by closing;
         far ≤ deep by Natural.IsStrictlyIncreasing.LessOrEqual;
         scale ≤ deep;
         Real.harmonic_term(deep) ≤ Real.harmonic_term(scale)
@@ -216,7 +216,7 @@ theorem Plane.equal_limits_of_closing
       abs(Plane.distance(limitU, limitV)) < tolerance
       by (tolerance : ℝ) (tolerancePositive : 0 < tolerance) ↦ {
         Plane.distance(limitU, limitV) < tolerance
-            by arbitrarilyClose(tolerance, tolerancePositive);
+            by arbitrarilyClose;
         done
       };
   Plane.distance(limitU, limitV) = 0
@@ -314,9 +314,8 @@ theorem Plane.compact_separation (regionA regionB : Set(Plane.Point))
         by (m : ℕ) ↦ { a(m) ∈ regionA ∧
                          ∃ (b : Plane.Point). b ∈ regionB
                              ∧ Plane.distance(a(m), b)
-                                   < Real.harmonic_term(m) by chosenA(m);
-                       done }
-        as insideA;
+                                   < Real.harmonic_term(m) by chosenA;
+                       done };
 
     -- Second choice: its partner in `B`.
     ∀ (n : ℕ). ∃ (y : Plane.Point). y ∈ regionB
@@ -325,7 +324,7 @@ theorem Plane.compact_separation (regionA regionB : Set(Plane.Point))
           a(n) ∈ regionA ∧
               ∃ (b : Plane.Point). b ∈ regionB
                   ∧ Plane.distance(a(n), b) < Real.harmonic_term(n)
-              by chosenA(n);
+              by chosenA;
           done
         }
         as partners;
@@ -341,56 +340,50 @@ theorem Plane.compact_separation (regionA regionB : Set(Plane.Point))
     ∀ (m : ℕ). b(m) ∈ regionB
         by (m : ℕ) ↦ { b(m) ∈ regionB
                            ∧ Plane.distance(a(m), b(m))
-                                 < Real.harmonic_term(m) by chosenB(m);
-                       done }
-        as insideB;
+                                 < Real.harmonic_term(m) by chosenB;
+                       done };
 
     -- Thin twice: once so `a` converges, once more so `b` does.
-    choose firstIndex, limitA such that
+    choose firstIndex : ℕ → ℕ, limitA : Plane.Point such that
         limitA ∈ regionA
         ∧ Plane.SubsequenceConverges(a, firstIndex, limitA)
-        from compactA(a, insideA);
+        from compactA;
     Natural.IsStrictlyIncreasing(firstIndex)
-        by Plane.SubsequenceConverges.increasing as firstIncreasing;
-    limitA ∈ regionA as limitAInside;
+        by Plane.SubsequenceConverges.increasing;
+    limitA ∈ regionA;
     Plane.SequenceConverges((k : ℕ) ↦ a(firstIndex(k)), limitA)
-        by Plane.SubsequenceConverges.converges as toLimitA;
+        by Plane.SubsequenceConverges.converges;
 
-    choose secondIndex, limitB such that
+    choose secondIndex : ℕ → ℕ, limitB : Plane.Point such that
         limitB ∈ regionB
         ∧ Plane.SubsequenceConverges(
               (k : ℕ) ↦ b(firstIndex(k)), secondIndex, limitB)
-        from compactB((k : ℕ) ↦ b(firstIndex(k)),
-                      (k : ℕ) ↦ insideB(firstIndex(k)));
+        from compactB;
     Natural.IsStrictlyIncreasing(secondIndex)
-        by Plane.SubsequenceConverges.increasing as secondIncreasing;
+        by Plane.SubsequenceConverges.increasing;
     limitB ∈ regionB;
     Plane.SequenceConverges(
-        (k : ℕ) ↦ b(firstIndex(secondIndex(k))), limitB) as toLimitB;
+        (k : ℕ) ↦ b(firstIndex(secondIndex(k))), limitB);
     Plane.SequenceConverges(
         (k : ℕ) ↦ a(firstIndex(secondIndex(k))), limitA)
         by Plane.SequenceConverges.subsequence(
-            (k : ℕ) ↦ a(firstIndex(k)), limitA, secondIndex,
-            toLimitA, secondIncreasing)
-        as toLimitAThinned;
+            s := (k : ℕ) ↦ a(firstIndex(k)));
 
     -- The two limits coincide: the pairs were built to close on each
     -- other, and both thinnings kept them in step.
     ∀ (n : ℕ). Plane.distance(a(n), b(n)) < Real.harmonic_term(n)
         by (n : ℕ) ↦ {
           b(n) ∈ regionB ∧ Plane.distance(a(n), b(n))
-              < Real.harmonic_term(n) by chosenB(n);
+              < Real.harmonic_term(n) by chosenB;
           done
-        }
-        as closing;
+        };
+    Natural.IsStrictlyIncreasing((k : ℕ) ↦ firstIndex(secondIndex(k)))
+        by Natural.IsStrictlyIncreasing.compose;
     limitA = limitB
         by Plane.equal_limits_of_closing(
-            a, b, (k : ℕ) ↦ firstIndex(secondIndex(k)), limitA, limitB,
-            Natural.IsStrictlyIncreasing.compose(
-                firstIndex, secondIndex, firstIncreasing, secondIncreasing),
-            toLimitAThinned, toLimitB, closing);
+            index := (k : ℕ) ↦ firstIndex(secondIndex(k)));
     limitA ∈ regionB;
-    ¬(limitA ∈ regionB) by disjoint(limitA, limitAInside);
+    ¬(limitA ∈ regionB) by disjoint;
     done
   };
   done
