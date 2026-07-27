@@ -44,11 +44,10 @@ theorem Plane.between_injective (a b : Plane.Point) (distinct : a ≠ b)
         (s t : ℝ)
         (sameWalk : Plane.between(a, b, s) = Plane.between(a, b, t))
         : s = t := {
-  Plane.distance(a, b) ≠ 0
-      by (noDistance : Plane.distance(a, b) = 0) ↦ {
-        a = b by Plane.equal_of_distance_zero;
-        done
-      };
+  suppose Plane.distance(a, b) = 0 for contradiction {
+    a = b by Plane.equal_of_distance_zero;
+    done
+  };
   Plane.distance(Plane.between(a, b, s), Plane.between(a, b, t))
       = Plane.distance(Plane.between(a, b, s), Plane.between(a, b, s))
       by substituting sameWalk;
@@ -378,19 +377,16 @@ theorem Plane.IsArc.openArc_is_arc_without_endpoints
         source ≠ Plane.Point.make(1, 0);
         parametrisation(source) = y;
         y ∈ Plane.arc(parametrisation) by { witness source with done };
-        y ≠ Plane.arcStart(parametrisation)
-            by (isStart : y = Plane.arcStart(parametrisation)) ↦ {
-              parametrisation(source) = parametrisation(Plane.origin);
-              source = Plane.origin by injective;
-              done
-            };
-        y ≠ Plane.arcFinish(parametrisation)
-            by (isFinish : y = Plane.arcFinish(parametrisation)) ↦ {
-              parametrisation(source)
-                  = parametrisation(Plane.Point.make(1, 0));
-              source = Plane.Point.make(1, 0) by injective;
-              done
-            };
+        suppose y = Plane.arcStart(parametrisation) for contradiction {
+          parametrisation(source) = parametrisation(Plane.origin);
+          source = Plane.origin by injective;
+          done
+        };
+        suppose y = Plane.arcFinish(parametrisation) for contradiction {
+          parametrisation(source) = parametrisation(Plane.Point.make(1, 0));
+          source = Plane.Point.make(1, 0) by injective;
+          done
+        };
         ¬(y ∈ Set.singleton(Plane.Point, Plane.arcStart(parametrisation)));
         ¬(y ∈ Set.singleton(Plane.Point, Plane.arcFinish(parametrisation)));
         done
@@ -417,21 +413,18 @@ theorem Plane.IsArc.openArc_is_arc_without_endpoints
             from onArc;
         source ∈ Plane.unitSegment;
         parametrisation(source) = y as valueAtSource;
-        source ≠ Plane.origin
-            by (isOrigin : source = Plane.origin) ↦ {
-              y = parametrisation(Plane.origin) by substituting valueAtSource;
-              y = Plane.arcStart(parametrisation);
-              y ∈ Set.singleton(Plane.Point, Plane.arcStart(parametrisation));
-              done
-            };
-        source ≠ Plane.Point.make(1, 0)
-            by (isFinish : source = Plane.Point.make(1, 0)) ↦ {
-              y = parametrisation(Plane.Point.make(1, 0))
-                  by substituting valueAtSource;
-              y = Plane.arcFinish(parametrisation);
-              y ∈ Set.singleton(Plane.Point, Plane.arcFinish(parametrisation));
-              done
-            };
+        suppose source = Plane.origin as isOrigin for contradiction {
+          y = parametrisation(Plane.origin) by substituting valueAtSource;
+          y = Plane.arcStart(parametrisation);
+          y ∈ Set.singleton(Plane.Point, Plane.arcStart(parametrisation));
+          done
+        };
+        suppose source = Plane.Point.make(1, 0) as isFinish for contradiction {
+          y = parametrisation(Plane.Point.make(1, 0)) by substituting valueAtSource;
+          y = Plane.arcFinish(parametrisation);
+          y ∈ Set.singleton(Plane.Point, Plane.arcFinish(parametrisation));
+          done
+        };
         source ∈ Plane.openUnitSegment;
         done by { witness source with done }
       };
