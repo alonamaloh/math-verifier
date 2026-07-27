@@ -281,6 +281,135 @@ theorem Plane.first_coordinate_atMostOne_on_unitSegment (x : Plane.Point)
 }
 
 -- ----------------------------------------------------------------------
+-- Subsegments of the model interval, read by parameter.
+--
+-- A point of the interval lies between two others exactly when its
+-- parameter does. That is the bridge every statement about "the arc
+-- between these two points" needs: the walk from `a` to `b` is a set of
+-- points, and the argument about it is an argument about an interval of
+-- reals.
+
+theorem Plane.first_coordinate_atLeast_on_segment (a b x : Plane.Point)
+        (ordered : Plane.Point.first(a) ≤ Plane.Point.first(b))
+        (onSubsegment : x ∈ Plane.segment(a, b))
+        : Plane.Point.first(a) ≤ Plane.Point.first(x) := {
+  choose parameter such that
+      (0 ≤ parameter ∧ parameter ≤ 1) ∧ x = Plane.between(a, b, parameter)
+      from onSubsegment;
+  0 ≤ parameter;
+  x = Plane.between(a, b, parameter) as isWalkPoint;
+  Real.IsNonneg(parameter);
+  Real.IsNonneg(Plane.Point.first(b) - Plane.Point.first(a));
+  Real.IsNonneg(
+      parameter * (Plane.Point.first(b) - Plane.Point.first(a)))
+      by Real.IsNonneg.multiply;
+  Plane.Point.first(a)
+      ≤ Plane.Point.first(a)
+            + parameter * (Plane.Point.first(b) - Plane.Point.first(a));
+  Plane.Point.first(x)
+     = Plane.Point.first(Plane.between(a, b, parameter))
+           by substituting isWalkPoint
+     = Plane.Point.first(a)
+           + parameter * (Plane.Point.first(b) - Plane.Point.first(a))
+           by Plane.Point.first_between;
+  done
+}
+
+theorem Plane.first_coordinate_atMost_on_segment (a b x : Plane.Point)
+        (ordered : Plane.Point.first(a) ≤ Plane.Point.first(b))
+        (onSubsegment : x ∈ Plane.segment(a, b))
+        : Plane.Point.first(x) ≤ Plane.Point.first(b) := {
+  choose parameter such that
+      (0 ≤ parameter ∧ parameter ≤ 1) ∧ x = Plane.between(a, b, parameter)
+      from onSubsegment;
+  parameter ≤ 1;
+  x = Plane.between(a, b, parameter) as isWalkPoint;
+  Real.IsNonneg(1 - parameter);
+  Real.IsNonneg(Plane.Point.first(b) - Plane.Point.first(a));
+  Real.IsNonneg(
+      (1 - parameter) * (Plane.Point.first(b) - Plane.Point.first(a)))
+      by Real.IsNonneg.multiply;
+  Plane.Point.first(b)
+      - (Plane.Point.first(a)
+             + parameter * (Plane.Point.first(b) - Plane.Point.first(a)))
+      = (1 - parameter) * (Plane.Point.first(b) - Plane.Point.first(a))
+      by ring as remainder;
+  Real.IsNonneg(
+      Plane.Point.first(b)
+          - (Plane.Point.first(a)
+                 + parameter
+                       * (Plane.Point.first(b) - Plane.Point.first(a))))
+      by substituting remainder;
+  Plane.Point.first(a)
+      + parameter * (Plane.Point.first(b) - Plane.Point.first(a))
+      ≤ Plane.Point.first(b);
+  Plane.Point.first(x)
+     = Plane.Point.first(Plane.between(a, b, parameter))
+           by substituting isWalkPoint
+     = Plane.Point.first(a)
+           + parameter * (Plane.Point.first(b) - Plane.Point.first(a))
+           by Plane.Point.first_between;
+  done
+}
+
+-- The converse. The parameter that puts `x` on the walk is the fraction
+-- of the way its own coordinate has travelled — which is why the walk has
+-- to be along the axis for any of this to be free.
+theorem Plane.member_segment_of_first_coordinate (a b x : Plane.Point)
+        (aOnSegment : a ∈ Plane.unitSegment)
+        (bOnSegment : b ∈ Plane.unitSegment)
+        (xOnSegment : x ∈ Plane.unitSegment)
+        (atLeast : Plane.Point.first(a) ≤ Plane.Point.first(x))
+        (atMost : Plane.Point.first(x) ≤ Plane.Point.first(b))
+        : x ∈ Plane.segment(a, b) :=
+  done by cases {
+    case Plane.Point.first(a) = Plane.Point.first(b) as degenerate: {
+        Plane.Point.first(x) ≤ Plane.Point.first(a)
+            by substituting degenerate;
+        Plane.Point.first(x) = Plane.Point.first(a)
+            by Real.LessOrEqual.antisymmetric;
+        x = a by Plane.unitSegment_equal_of_first_coordinate;
+        a ∈ Plane.segment(a, b) by Plane.left_in_segment;
+        done by substitution
+      }
+    otherwise as distinctEnds: {
+        -- The span is positive, so the fraction of it that `x` has covered
+        -- is a parameter of the unit interval, and walking that fraction
+        -- from `a` lands on `x`'s coordinate — hence on `x`.
+        Plane.Point.first(a) ≤ Plane.Point.first(b);
+        ¬(Plane.Point.first(b) = Plane.Point.first(a));
+        Plane.Point.first(a) < Plane.Point.first(b);
+        0 < Plane.Point.first(b) - Plane.Point.first(a) by ordered_field;
+        Plane.Point.first(b) - Plane.Point.first(a) ≠ 0;
+        0 ≤ Plane.Point.first(x) - Plane.Point.first(a) by ordered_field;
+        0 ≤ (Plane.Point.first(x) - Plane.Point.first(a)) / (Plane.Point.first(b) - Plane.Point.first(a)) by Real.divide_nonneg;
+        Plane.Point.first(x) - Plane.Point.first(a) ≤ Plane.Point.first(b) - Plane.Point.first(a) by ordered_field;
+        (Plane.Point.first(x) - Plane.Point.first(a)) / (Plane.Point.first(b) - Plane.Point.first(a))
+            ≤ (Plane.Point.first(b) - Plane.Point.first(a)) / (Plane.Point.first(b) - Plane.Point.first(a))
+            by Real.LessOrEqual.divide_by_positive;
+        (Plane.Point.first(b) - Plane.Point.first(a)) / (Plane.Point.first(b) - Plane.Point.first(a)) = 1 by Real.divide_self;
+        (Plane.Point.first(x) - Plane.Point.first(a)) / (Plane.Point.first(b) - Plane.Point.first(a)) ≤ 1;
+        (Plane.Point.first(x) - Plane.Point.first(a)) / (Plane.Point.first(b) - Plane.Point.first(a))
+                * (Plane.Point.first(b) - Plane.Point.first(a))
+            = Plane.Point.first(x) - Plane.Point.first(a)
+            by field as coveredSpan;
+        Plane.between(a, b, (Plane.Point.first(x) - Plane.Point.first(a)) / (Plane.Point.first(b) - Plane.Point.first(a)))
+            ∈ Plane.unitSegment by Plane.unitSegment_IsConvex;
+        Plane.Point.first(
+            Plane.between(a, b, (Plane.Point.first(x) - Plane.Point.first(a)) / (Plane.Point.first(b) - Plane.Point.first(a))))
+           = Plane.Point.first(a)
+                 + (Plane.Point.first(x) - Plane.Point.first(a)) / (Plane.Point.first(b) - Plane.Point.first(a))
+                       * (Plane.Point.first(b) - Plane.Point.first(a)) by Plane.Point.first_between
+           = Plane.Point.first(a) + (Plane.Point.first(x) - Plane.Point.first(a)) by substituting coveredSpan
+           = Plane.Point.first(x) by ring;
+        Plane.between(a, b, (Plane.Point.first(x) - Plane.Point.first(a)) / (Plane.Point.first(b) - Plane.Point.first(a))) = x
+            by Plane.unitSegment_equal_of_first_coordinate;
+        x = Plane.between(a, b, (Plane.Point.first(x) - Plane.Point.first(a)) / (Plane.Point.first(b) - Plane.Point.first(a)));
+        done by { witness (Plane.Point.first(x) - Plane.Point.first(a)) / (Plane.Point.first(b) - Plane.Point.first(a)) with done }
+      }
+  }
+
+-- ----------------------------------------------------------------------
 -- The square's boundary: the model curve.
 
 definition Plane.squareBoundary : Set(Plane.Point) :=

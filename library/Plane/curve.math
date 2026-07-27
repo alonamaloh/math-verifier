@@ -134,6 +134,56 @@ definition Plane.IsJordanCurve (curve : Set(Plane.Point)) : Proposition :=
   ∃ (loop : Plane.Point → Plane.Point).
     Plane.IsLoop(loop) ∧ Plane.imageSet(loop, Plane.unitSegment) = curve
 
+-- The model interval does not close up: its two ends are different points.
+theorem Plane.start_not_finish : ¬(Plane.origin = Plane.Point.make(1, 0)) :=
+  (closedUp : Plane.origin = Plane.Point.make(1, 0)) ↦ {
+    Plane.Point.first(Plane.origin) = Plane.Point.first(Plane.Point.make(1, 0)) by substituting closedUp;
+    (0 : ℝ) = 1;
+    ¬((0 : ℝ) = 1);
+    done
+  }
+
+-- A loop is injective off its finish, so two parameters short of the end
+-- that carry the same point are the same parameter. The membership side
+-- of `∖` is what every use would otherwise spell out.
+theorem Plane.IsLoop.injective_before_finish (loop : Plane.Point → Plane.Point) (isLoop : Plane.IsLoop(loop))
+        (u v : Plane.Point) (uOnSegment : u ∈ Plane.unitSegment) (vOnSegment : v ∈ Plane.unitSegment)
+        (uBeforeFinish : ¬(u = Plane.Point.make(1, 0))) (vBeforeFinish : ¬(v = Plane.Point.make(1, 0)))
+        (samePoint : loop(u) = loop(v))
+        : u = v := {
+  Plane.InjectiveOn(loop, Plane.unitSegment ∖ Set.singleton(Plane.Point, Plane.Point.make(1, 0))) as injective;
+  ¬(u ∈ Set.singleton(Plane.Point, Plane.Point.make(1, 0)));
+  ¬(v ∈ Set.singleton(Plane.Point, Plane.Point.make(1, 0)));
+  u ∈ Plane.unitSegment ∖ Set.singleton(Plane.Point, Plane.Point.make(1, 0));
+  v ∈ Plane.unitSegment ∖ Set.singleton(Plane.Point, Plane.Point.make(1, 0));
+  done by injective
+}
+
+-- Every point of the curve is reached before the finish: a parameter that
+-- lands on the finish can be replaced by the start, which the loop carries
+-- to the same point. This is the only use the closing condition gets, and
+-- it is what lets the two arcs below be cut at honest interior parameters.
+theorem Plane.IsLoop.parameter_before_finish (loop : Plane.Point → Plane.Point) (isLoop : Plane.IsLoop(loop))
+        (p : Plane.Point) (onCurve : p ∈ Plane.imageSet(loop, Plane.unitSegment))
+        : ∃ (s : Plane.Point). (s ∈ Plane.unitSegment ∧ ¬(s = Plane.Point.make(1, 0))) ∧ loop(s) = p := {
+  choose parameter such that parameter ∈ Plane.unitSegment ∧ loop(parameter) = p from onCurve;
+  parameter ∈ Plane.unitSegment;
+  loop(parameter) = p as carriesToP;
+  loop(Plane.origin) = loop(Plane.Point.make(1, 0)) as closesUp;
+  done by cases {
+    case parameter = Plane.Point.make(1, 0) as atFinish: {
+        Plane.origin ∈ Plane.unitSegment by Plane.start_in_unitSegment;
+        ¬(Plane.origin = Plane.Point.make(1, 0)) by Plane.start_not_finish;
+        loop(Plane.origin) = loop(parameter) by substituting atFinish;
+        loop(Plane.origin) = p by carriesToP;
+        done by { witness Plane.origin with done }
+      }
+    otherwise as beforeFinish: {
+        done by { witness parameter with done }
+      }
+  }
+}
+
 theorem Plane.IsJordanCurve.IsCompact (curve : Set(Plane.Point))
         (isCurve : Plane.IsJordanCurve(curve))
         : Plane.IsCompact(curve) := {

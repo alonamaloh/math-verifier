@@ -1,0 +1,281 @@
+-- Plane/twoarcs.math
+--
+-- Two points cut a Jordan curve into two arcs. Layer 4.
+--
+-- The whole argument is carried by the loop's parameters. Pull the two
+-- points back to parameters `s` and `t` short of the finish, with `s`
+-- first; then the two arcs are what the loop makes of the parameters
+-- between them and of the parameters outside them — a subsegment, and the
+-- two end pieces glued at the point where the loop closes up.
+--
+-- Both halves of the statement are then facts about intervals of reals:
+-- a parameter lies inside `[s,t]` or outside it, and two parameters
+-- carrying the same point are equal unless one of them is the finish.
+-- That is why the model interval runs along the axis (`Plane/model.math`)
+-- and why the loop is injective off exactly one point.
+
+module Plane.twoarcs
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import axioms
+import Set.basics
+import Set.algebra
+import Real.interface
+import Real.order
+import Real.order_field
+import Plane.vector
+import Plane.point
+import Plane.segment
+import Plane.topology
+import Plane.compactness
+import Plane.connected
+import Plane.model
+import Plane.homeomorphism
+import Plane.curve
+import Plane.subarc
+import Plane.concatenate
+
+-- ----------------------------------------------------------------------
+-- Where a parameter sits, in coordinates.
+
+-- Short of the finish means strictly short of it: the finish is the only
+-- point of the interval whose parameter is 1.
+theorem Plane.first_coordinate_below_one (x : Plane.Point) (onSegment : x ∈ Plane.unitSegment)
+        (beforeFinish : ¬(x = Plane.Point.make(1, 0)))
+        : Plane.Point.first(x) < 1 := {
+  Plane.Point.first(x) ≤ 1 by Plane.first_coordinate_atMostOne_on_unitSegment;
+  ¬(Plane.Point.first(x) = 1)
+      by (atOne : Plane.Point.first(x) = 1) ↦ {
+        Plane.Point.make(1, 0) ∈ Plane.unitSegment by Plane.finish_in_unitSegment;
+        Plane.Point.first(x) = Plane.Point.first(Plane.Point.make(1, 0)) by atOne;
+        x = Plane.Point.make(1, 0) by Plane.unitSegment_equal_of_first_coordinate;
+        done
+      };
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- What the loop covers.
+
+-- Every parameter is inside `[s,t]`, before `s`, or after `t` — so the
+-- loop's image splits the same way. The three-way split is the linearity
+-- of the order on the parameters, and nothing else.
+theorem Plane.unitSegment_split (s t : Plane.Point) (sOnSegment : s ∈ Plane.unitSegment)
+        (tOnSegment : t ∈ Plane.unitSegment) (ordered : Plane.Point.first(s) ≤ Plane.Point.first(t))
+        : Plane.unitSegment
+              = Plane.segment(s, t) ∪ (Plane.segment(Plane.origin, s) ∪ Plane.segment(t, Plane.Point.make(1, 0))) := {
+  Plane.origin ∈ Plane.unitSegment by Plane.start_in_unitSegment;
+  Plane.Point.make(1, 0) ∈ Plane.unitSegment by Plane.finish_in_unitSegment;
+  Plane.IsConvex(Plane.unitSegment) by Plane.unitSegment_IsConvex;
+
+  Plane.unitSegment ⊆ Plane.segment(s, t) ∪ (Plane.segment(Plane.origin, s) ∪ Plane.segment(t, Plane.Point.make(1, 0)))
+      by (x : Plane.Point) (xOnSegment : x ∈ Plane.unitSegment) ↦ {
+        0 ≤ Plane.Point.first(x) by Plane.first_coordinate_nonneg_on_unitSegment;
+        Plane.Point.first(x) ≤ 1 by Plane.first_coordinate_atMostOne_on_unitSegment;
+        Plane.Point.first(Plane.origin) = 0;
+        Plane.Point.first(Plane.Point.make(1, 0)) = 1;
+        done by cases {
+          case Plane.Point.first(x) ≤ Plane.Point.first(s) as beforeStart: {
+              Plane.Point.first(Plane.origin) ≤ Plane.Point.first(x);
+              x ∈ Plane.segment(Plane.origin, s) by Plane.member_segment_of_first_coordinate;
+              done
+            }
+          otherwise as afterStart: {
+              Plane.Point.first(s) ≤ Plane.Point.first(x) by Real.not_LessOrEqual_implies;
+              done by cases {
+                case Plane.Point.first(x) ≤ Plane.Point.first(t) as insideMiddle: {
+                    x ∈ Plane.segment(s, t) by Plane.member_segment_of_first_coordinate;
+                    done
+                  }
+                otherwise as afterEnd: {
+                    Plane.Point.first(t) ≤ Plane.Point.first(x) by Real.not_LessOrEqual_implies;
+                    Plane.Point.first(x) ≤ Plane.Point.first(Plane.Point.make(1, 0));
+                    x ∈ Plane.segment(t, Plane.Point.make(1, 0)) by Plane.member_segment_of_first_coordinate;
+                    done
+                  }
+              }
+            }
+        }
+      };
+
+  Plane.segment(s, t) ⊆ Plane.unitSegment by Plane.IsConvex.segment_inside;
+  Plane.segment(Plane.origin, s) ⊆ Plane.unitSegment by Plane.IsConvex.segment_inside;
+  Plane.segment(t, Plane.Point.make(1, 0)) ⊆ Plane.unitSegment by Plane.IsConvex.segment_inside;
+  Plane.segment(s, t) ∪ (Plane.segment(Plane.origin, s) ∪ Plane.segment(t, Plane.Point.make(1, 0))) ⊆ Plane.unitSegment
+      by (x : Plane.Point)
+         (onPieces : x ∈ Plane.segment(s, t) ∪ (Plane.segment(Plane.origin, s) ∪ Plane.segment(t, Plane.Point.make(1, 0)))) ↦ {
+        done by cases {
+          case x ∈ Plane.segment(s, t) as inMiddle: done
+          case x ∈ Plane.segment(Plane.origin, s) ∪ Plane.segment(t, Plane.Point.make(1, 0)) as inEnds: {
+              done by cases {
+                case x ∈ Plane.segment(Plane.origin, s) as inFront: done
+                case x ∈ Plane.segment(t, Plane.Point.make(1, 0)) as inBack: done
+              }
+            }
+        }
+      };
+  done by Set.equal_of_same_members
+}
+
+-- The mirror of `first_coordinate_below_one`, for reading a parameter's
+-- position back off its coordinate.
+theorem Plane.before_finish_of_first_coordinate (x : Plane.Point) (below : Plane.Point.first(x) < 1)
+        : ¬(x = Plane.Point.make(1, 0)) :=
+  (atFinish : x = Plane.Point.make(1, 0)) ↦ {
+    Plane.Point.first(x) = Plane.Point.first(Plane.Point.make(1, 0)) by substituting atFinish;
+    Plane.Point.first(x) = 1;
+    (1 : ℝ) < 1;
+    done
+  }
+
+-- ----------------------------------------------------------------------
+-- Where the pieces meet.
+
+-- The parameters between `s` and `t` and the parameters outside them
+-- overlap only at `s` and `t` themselves, so the loop's images of the two
+-- meet only at the two chosen points. Everything below is the injectivity
+-- of the loop plus the order on the parameters; the one place the closing
+-- condition enters is the parameter at the finish, which carries the same
+-- point as the start.
+theorem Plane.IsLoop.pieces_meet_at_ends (loop : Plane.Point → Plane.Point) (isLoop : Plane.IsLoop(loop))
+        (s t : Plane.Point) (sOnSegment : s ∈ Plane.unitSegment) (tOnSegment : t ∈ Plane.unitSegment)
+        (sBeforeFinish : ¬(s = Plane.Point.make(1, 0))) (tBeforeFinish : ¬(t = Plane.Point.make(1, 0)))
+        (ordered : Plane.Point.first(s) < Plane.Point.first(t))
+        : Plane.imageSet(loop, Plane.segment(s, t))
+              ∩ (Plane.imageSet(loop, Plane.segment(Plane.origin, s))
+                     ∪ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))))
+              = Set.singleton(Plane.Point, loop(s)) ∪ Set.singleton(Plane.Point, loop(t)) := {
+  Plane.origin ∈ Plane.unitSegment by Plane.start_in_unitSegment;
+  Plane.Point.make(1, 0) ∈ Plane.unitSegment by Plane.finish_in_unitSegment;
+  Plane.IsConvex(Plane.unitSegment) by Plane.unitSegment_IsConvex;
+  Plane.segment(s, t) ⊆ Plane.unitSegment by Plane.IsConvex.segment_inside as middleInside;
+  Plane.segment(Plane.origin, s) ⊆ Plane.unitSegment by Plane.IsConvex.segment_inside as frontInside;
+  Plane.segment(t, Plane.Point.make(1, 0)) ⊆ Plane.unitSegment by Plane.IsConvex.segment_inside as backInside;
+  Plane.Point.first(s) ≤ Plane.Point.first(t) by Real.LessThan.weaken;
+  Plane.Point.first(s) < 1 by Plane.first_coordinate_below_one;
+  Plane.Point.first(t) < 1 by Plane.first_coordinate_below_one;
+  Plane.Point.first(Plane.origin) = 0;
+  Plane.Point.first(Plane.Point.make(1, 0)) = 1;
+  0 ≤ Plane.Point.first(s) by Plane.first_coordinate_nonneg_on_unitSegment;
+  loop(Plane.origin) = loop(Plane.Point.make(1, 0)) as closesUp;
+
+  Plane.imageSet(loop, Plane.segment(s, t))
+      ∩ (Plane.imageSet(loop, Plane.segment(Plane.origin, s))
+             ∪ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))))
+      ⊆ Set.singleton(Plane.Point, loop(s)) ∪ Set.singleton(Plane.Point, loop(t))
+      by (z : Plane.Point)
+         (onBoth : z ∈ Plane.imageSet(loop, Plane.segment(s, t))
+                       ∩ (Plane.imageSet(loop, Plane.segment(Plane.origin, s))
+                              ∪ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))))) ↦ {
+        z ∈ Plane.imageSet(loop, Plane.segment(s, t));
+        choose middle such that middle ∈ Plane.segment(s, t) ∧ loop(middle) = z;
+        middle ∈ Plane.segment(s, t);
+        loop(middle) = z as middleCarries;
+        middle ∈ Plane.unitSegment by middleInside;
+        Plane.Point.first(s) ≤ Plane.Point.first(middle) by Plane.first_coordinate_atLeast_on_segment;
+        Plane.Point.first(middle) ≤ Plane.Point.first(t) by Plane.first_coordinate_atMost_on_segment;
+        Plane.Point.first(middle) < 1;
+        ¬(middle = Plane.Point.make(1, 0)) by Plane.before_finish_of_first_coordinate;
+
+        z ∈ Plane.imageSet(loop, Plane.segment(Plane.origin, s))
+            ∪ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0)));
+        done by cases {
+          case z ∈ Plane.imageSet(loop, Plane.segment(Plane.origin, s)) as onFront: {
+              choose outside such that outside ∈ Plane.segment(Plane.origin, s) ∧ loop(outside) = z from onFront;
+              outside ∈ Plane.segment(Plane.origin, s);
+              loop(outside) = z;
+              outside ∈ Plane.unitSegment by frontInside;
+              Plane.Point.first(outside) ≤ Plane.Point.first(s) by Plane.first_coordinate_atMost_on_segment;
+              Plane.Point.first(outside) < 1;
+              ¬(outside = Plane.Point.make(1, 0)) by Plane.before_finish_of_first_coordinate;
+              loop(middle) = loop(outside) by middleCarries;
+              middle = outside by Plane.IsLoop.injective_before_finish;
+              Plane.Point.first(middle) ≤ Plane.Point.first(s) by substituting (middle = outside);
+              Plane.Point.first(middle) = Plane.Point.first(s) by Real.LessOrEqual.antisymmetric;
+              middle = s by Plane.unitSegment_equal_of_first_coordinate;
+              loop(s) = z by substituting (middle = s);
+              z = loop(s);
+              z ∈ Set.singleton(Plane.Point, loop(s));
+              done
+            }
+          case z ∈ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))) as onBack: {
+              choose outside such that outside ∈ Plane.segment(t, Plane.Point.make(1, 0)) ∧ loop(outside) = z from onBack;
+              outside ∈ Plane.segment(t, Plane.Point.make(1, 0));
+              loop(outside) = z as outsideCarries;
+              outside ∈ Plane.unitSegment by backInside;
+              Plane.Point.first(t) ≤ Plane.Point.first(outside) by Plane.first_coordinate_atLeast_on_segment;
+              done by cases {
+                case outside = Plane.Point.make(1, 0) as atFinish: {
+                    -- The far end carries the same point as the start, and
+                    -- the start is short of the finish, so the middle
+                    -- parameter is the start — which forces `s` to be it.
+                    loop(Plane.origin)
+                       = loop(Plane.Point.make(1, 0)) by closesUp
+                       = loop(outside) by substituting atFinish
+                       = z by outsideCarries;
+                    ¬(Plane.origin = Plane.Point.make(1, 0)) by Plane.start_not_finish;
+                    loop(middle) = loop(Plane.origin) by middleCarries;
+                    middle = Plane.origin by Plane.IsLoop.injective_before_finish;
+                    Plane.Point.first(middle) = 0 by substituting (middle = Plane.origin);
+                    Plane.Point.first(s) ≤ 0;
+                    Plane.Point.first(s) = 0 by Real.LessOrEqual.antisymmetric;
+                    Plane.Point.first(middle) = Plane.Point.first(s);
+                    middle = s by Plane.unitSegment_equal_of_first_coordinate;
+                    loop(s) = z by substituting (middle = s);
+                    z = loop(s);
+                    z ∈ Set.singleton(Plane.Point, loop(s));
+                    done
+                  }
+                otherwise as beforeFinish: {
+                    loop(middle) = loop(outside) by middleCarries;
+                    middle = outside by Plane.IsLoop.injective_before_finish;
+                    Plane.Point.first(t) ≤ Plane.Point.first(middle) by substituting (middle = outside);
+                    Plane.Point.first(middle) = Plane.Point.first(t) by Real.LessOrEqual.antisymmetric;
+                    middle = t by Plane.unitSegment_equal_of_first_coordinate;
+                    loop(t) = z by substituting (middle = t);
+                    z = loop(t);
+                    z ∈ Set.singleton(Plane.Point, loop(t));
+                    done
+                  }
+              }
+            }
+        }
+      };
+
+  s ∈ Plane.segment(s, t) by Plane.left_in_segment;
+  t ∈ Plane.segment(s, t) by Plane.right_in_segment;
+  s ∈ Plane.segment(Plane.origin, s) by Plane.right_in_segment;
+  t ∈ Plane.segment(t, Plane.Point.make(1, 0)) by Plane.left_in_segment;
+  loop(s) ∈ Plane.imageSet(loop, Plane.segment(s, t)) by { witness s with done };
+  loop(t) ∈ Plane.imageSet(loop, Plane.segment(s, t)) by { witness t with done };
+  loop(s) ∈ Plane.imageSet(loop, Plane.segment(Plane.origin, s)) by { witness s with done };
+  loop(t) ∈ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))) by { witness t with done };
+  Set.singleton(Plane.Point, loop(s)) ∪ Set.singleton(Plane.Point, loop(t))
+      ⊆ Plane.imageSet(loop, Plane.segment(s, t))
+            ∩ (Plane.imageSet(loop, Plane.segment(Plane.origin, s))
+                   ∪ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))))
+      by (z : Plane.Point)
+         (onEnds : z ∈ Set.singleton(Plane.Point, loop(s)) ∪ Set.singleton(Plane.Point, loop(t))) ↦ {
+        done by cases {
+          case z ∈ Set.singleton(Plane.Point, loop(s)) as atStart: {
+              z = loop(s);
+              z ∈ Plane.imageSet(loop, Plane.segment(s, t)) by substituting (z = loop(s));
+              z ∈ Plane.imageSet(loop, Plane.segment(Plane.origin, s)) by substituting (z = loop(s));
+              z ∈ Plane.imageSet(loop, Plane.segment(Plane.origin, s))
+                  ∪ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0)));
+              done
+            }
+          case z ∈ Set.singleton(Plane.Point, loop(t)) as atEnd: {
+              z = loop(t);
+              z ∈ Plane.imageSet(loop, Plane.segment(s, t)) by substituting (z = loop(t));
+              z ∈ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0))) by substituting (z = loop(t));
+              z ∈ Plane.imageSet(loop, Plane.segment(Plane.origin, s))
+                  ∪ Plane.imageSet(loop, Plane.segment(t, Plane.Point.make(1, 0)));
+              done
+            }
+        }
+      };
+  done by Set.equal_of_same_members
+}
