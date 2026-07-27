@@ -1,0 +1,84 @@
+-- Prototype: can a bundled metric space carry the topology generically,
+-- with the bundle recovered from a `Set(carrier)` argument?
+module Test.metric
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Real.interface
+import Real.order
+import Real.absolute_value
+import Plane.vector
+import Plane.point
+import Plane.norm
+import Plane.topology
+import Plane.separation
+
+definition IsMetric (carrier : Type(0)) (distance : carrier → carrier → ℝ) : Proposition :=
+  (∀ (x : carrier). distance(x, x) = 0)
+    ∧ (∀ (x : carrier). ∀ (y : carrier). distance(x, y) = distance(y, x))
+
+inductive MetricSpace : Type(1) where
+  | MetricSpace.make
+      : (carrier : Type(0))
+        → (distance : carrier → carrier → ℝ)
+        → IsMetric(carrier, distance)
+        → MetricSpace
+
+definition MetricSpace.carrier : MetricSpace → Type(0)
+  | MetricSpace.make(carrier, distance, isMetric) => carrier
+
+definition MetricSpace.distance {m : MetricSpace}
+        : MetricSpace.carrier(m) → MetricSpace.carrier(m) → ℝ :=
+  let ⟨carrier, distance, isMetric⟩ := m in
+    distance
+
+-- The question: does `{m}` resolve from a `Set(MetricSpace.carrier(m))`?
+definition MetricSpace.OpenIn {m : MetricSpace}
+        (subset region : Set(MetricSpace.carrier(m))) : Proposition :=
+  ∀ (x : MetricSpace.carrier(m)). x ∈ subset →
+    ∃ (radius : ℝ). 0 < radius ∧
+      ∀ (y : MetricSpace.carrier(m)). y ∈ region →
+        MetricSpace.distance(x, y) < radius → y ∈ subset
+
+-- Two instances on different carriers.
+definition Real.gap (x y : ℝ) : ℝ := abs(x - y)
+
+theorem Real.is_metric : IsMetric(ℝ, Real.gap) := {
+  ∀ (x : ℝ). Real.gap(x, x) = 0
+      by { take x : ℝ;
+           Real.gap(x, x)
+              = abs(x - x)
+              = abs((0 : ℝ))
+              = 0 by Real.absolute_value_zero;
+           done };
+  ∀ (x : ℝ). ∀ (y : ℝ). Real.gap(x, y) = Real.gap(y, x)
+      by { take x : ℝ; take y : ℝ; Real.gap(x, y) = abs(x - y); Real.gap(y, x) = abs(y - x); done by Real.absolute_value_subtract_swap };
+  done
+}
+
+definition Real.metricSpace : MetricSpace :=
+  MetricSpace.make(ℝ, Real.gap, Real.is_metric)
+
+-- instance Real.metricSpace   (carrier is ℝ — see below)
+
+theorem Plane.is_metric : IsMetric(Plane.Point, Plane.distance) := {
+  ∀ (x : Plane.Point). Plane.distance(x, x) = 0
+      by { take x : Plane.Point; done by Plane.distance_self };
+  ∀ (x : Plane.Point). ∀ (y : Plane.Point). Plane.distance(x, y) = Plane.distance(y, x)
+      by { take x : Plane.Point; take y : Plane.Point; done by Plane.distance_symmetric };
+  done
+}
+
+definition Plane.metricSpace : MetricSpace :=
+  MetricSpace.make(Plane.Point, Plane.distance, Plane.is_metric)
+
+instance Plane.metricSpace
+
+-- THE TEST: `{m}` recovered from a bare `Set(ℝ)` / `Set(Plane.Point)`.
+definition Test.unitInterval : Set(ℝ) :=
+  (t : ℝ) ↦ 0 ≤ t ∧ t ≤ 1
+
+definition Test.openInPlane (subset region : Set(Plane.Point)) : Proposition :=
+  MetricSpace.OpenIn(subset, region)
