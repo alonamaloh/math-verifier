@@ -14,7 +14,12 @@ import Real.order
 import Real.order_field
 import Real.absolute_value
 import Real.absolute_value_order
+import Natural.basics
+import Natural.order
+import Natural.eventually
+import Real.convergence
 import Metric.space
+import Metric.sequence
 
 definition Real.distance (x y : ℝ) : ℝ := abs(x - y)
 
@@ -69,3 +74,47 @@ instance Real.metricSpace
 theorem Real.metric_distance (x y : ℝ)
         : MetricSpace.distance(x, y) = abs(x - y) :=
   reflexivity(ℝ, abs(x - y))
+
+-- ----------------------------------------------------------------------
+-- Convergence on the line, read either way. `Real.SequenceConverges`
+-- measures the gap as `|s(k) - limit|` and the metric one as
+-- `distance(limit, s(k))`; the two are the same number, and these carry
+-- a fact from one spelling to the other.
+
+theorem Real.metric_SequenceConverges (s : ℕ → ℝ) (limit : ℝ)
+        (converges : Real.SequenceConverges(s, limit))
+        : MetricSpace.SequenceConverges(s, limit) := {
+  take tolerance : ℝ;
+  suppose tolerance > 0;
+  choose threshold such that
+      ∀ (k : ℕ). threshold ≤ k → abs(s(k) - limit) < tolerance
+      as closeBeyond from converges;
+  witness threshold with
+      (k : ℕ) (beyond : threshold ≤ k) ↦ {
+        abs(s(k) - limit) < tolerance by closeBeyond;
+        MetricSpace.distance(limit, s(k))
+           = abs(limit - s(k))
+           = abs(s(k) - limit) by Real.absolute_value_subtract_swap
+           < tolerance;
+        done
+      }
+}
+
+theorem Real.SequenceConverges.of_metric (s : ℕ → ℝ) (limit : ℝ)
+        (converges : MetricSpace.SequenceConverges(s, limit))
+        : Real.SequenceConverges(s, limit) := {
+  take tolerance : ℝ;
+  suppose tolerance > 0;
+  choose threshold such that
+      ∀ (k : ℕ). threshold ≤ k → MetricSpace.distance(limit, s(k)) < tolerance
+      as closeBeyond from converges;
+  witness threshold with
+      (k : ℕ) (beyond : threshold ≤ k) ↦ {
+        MetricSpace.distance(limit, s(k)) < tolerance by closeBeyond;
+        abs(s(k) - limit)
+           = abs(limit - s(k)) by Real.absolute_value_subtract_swap
+           = MetricSpace.distance(limit, s(k))
+           < tolerance;
+        done
+      }
+}

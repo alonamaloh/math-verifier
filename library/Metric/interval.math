@@ -1,0 +1,89 @@
+-- Metric/interval.math
+--
+-- The unit interval as a subset of ℝ, with the two properties every
+-- parametrised curve needs of its domain: it is compact and it is
+-- connected. This is the domain a mathematician gives a curve, and with
+-- the topology developed over a metric space it is available directly —
+-- no plane point has to stand in for a parameter.
+
+module Metric.interval
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Set.algebra
+import Natural.basics
+import Natural.order
+import Natural.eventually
+import Natural.subsequence
+import Real.interface
+import Real.order
+import Real.order_field
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.convergence
+import Real.cluster
+import Metric.space
+import Metric.topology
+import Metric.sequence
+import Metric.compactness
+import Metric.real
+
+definition Real.unitInterval : Set(ℝ) :=
+  (t : ℝ) ↦ t ≥ 0 ∧ t ≤ 1
+
+theorem Real.zero_in_unitInterval : (0 : ℝ) ∈ Real.unitInterval := {
+  (0 : ℝ) ≥ 0;
+  (0 : ℝ) ≤ 1;
+  done
+}
+
+theorem Real.one_in_unitInterval : (1 : ℝ) ∈ Real.unitInterval := {
+  (1 : ℝ) ≥ 0;
+  (1 : ℝ) ≤ 1;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- Compactness. A sequence in the interval is bounded by 1, so
+-- Bolzano--Weierstrass thins it; the limit is caught between the same
+-- two bounds because every term is.
+
+theorem Real.unitInterval_IsCompact
+        : MetricSpace.IsCompact(Real.unitInterval) := {
+  take s : ℕ → ℝ;
+  suppose ∀ (k : ℕ). s(k) ∈ Real.unitInterval as inside;
+  ∀ (k : ℕ). s(k) ≥ 0 by { take k : ℕ; s(k) ∈ Real.unitInterval by inside; done }
+      as atLeastZero;
+  ∀ (k : ℕ). s(k) ≤ 1 by { take k : ℕ; s(k) ∈ Real.unitInterval by inside; done }
+      as atMostOne;
+  Real.SequenceIsBounded(s)
+      by { witness (1 : ℝ) with
+             (k : ℕ) ↦ {
+               s(k) ≥ 0 by atLeastZero;
+               abs(s(k)) = s(k) by Real.absolute_value_when_nonneg
+                  ≤ 1 by atMostOne;
+               done
+             } };
+  choose index : ℕ → ℕ, limit : ℝ such that
+      Real.SubsequenceConverges(s, index, limit)
+      from Real.bolzano_weierstrass;
+  Natural.IsStrictlyIncreasing(index)
+      by Real.SubsequenceConverges.increasing;
+  Real.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
+      by Real.SubsequenceConverges.converges;
+
+  limit ≥ 0
+      by Real.SequenceConverges.ge_of_eventually_ge(
+          N := 0, tailAbove := (k : ℕ) (beyond : 0 ≤ k) ↦ atLeastZero(index(k)));
+  limit ≤ 1
+      by Real.SequenceConverges.le_of_eventually_le(
+          N := 0, tailBelow := (k : ℕ) (beyond : 0 ≤ k) ↦ atMostOne(index(k)));
+  limit ∈ Real.unitInterval;
+
+  MetricSpace.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
+      by Real.metric_SequenceConverges;
+  MetricSpace.SubsequenceConverges(s, index, limit);
+  witness index with { witness limit }
+}

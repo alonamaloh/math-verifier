@@ -1,6 +1,51 @@
 # Metric spaces, and topology developed once
 
-**Status: proposed 2026-07-27. Not started.**
+**Status: steps 1–3 DONE 2026-07-27. Step 4 not started.**
+
+| Step | State |
+| --- | --- |
+| 0. `instance` accepts the bundle | **done** — `carrierProjectionField` reads the carrier off the constructor's telescope instead of a four-name table (8a898f6a). Regression test: `library/Test/bundle_carrier_registration_test.math`. |
+| 1. `Metric/` : bundle, `IsMetric`, instances | **done** — `Metric/space.math`; instances `Real.metricSpace` (`Metric/real.math`) and `Plane.metricSpace` (`Plane/metric.math`). |
+| 2. Topology ported generically | **done** — `Metric/{topology,continuity,sequence,compactness,homeomorphism,connected}.math`. |
+| 3. `Plane.*` as thin aliases | **done** — `Plane/{topology,sequence,compact,compactness,homeomorphism,connected,extremum}.math` keep every name; the tree is green throughout. |
+| 4. Parametrisation domains → ℝ | **not started** — see "Where step 4 stands" below. |
+
+What the port actually removed: `Plane/topology.math` 830 → 260 lines,
+`Plane/connected.math` 853 → 486, `Plane/compactness.math` 425 → 130,
+`Plane/homeomorphism.math` 239 → 84, and the second continuity family
+(`Plane.RealContinuousAt`/`RealContinuousOn`) collapsed onto the generic
+one with ℝ as the target space.
+
+Two statements changed shape on the way, both for the better:
+
+- Uniqueness of limits was proved coordinatewise in the plane; over a
+  metric space it is the triangle inequality plus separation.
+- `IsCompact.bounded` now takes the centre it measures from as an
+  argument. A metric space has no distinguished point (and the empty
+  space has none at all), so this is not a generic theorem without one;
+  the plane supplies the origin at the call site.
+
+## Where step 4 stands
+
+Prerequisites, in order:
+
+1. `Real.unitInterval : Set(ℝ)` — **done**, with
+   `Real.unitInterval_IsCompact` (`Metric/interval.math`).
+2. `MetricSpace.IsConnected(Real.unitInterval)` — **not done**. Two
+   routes. The honest one is the supremum argument written directly on
+   ℝ: it is `Plane.IsConvex.connected`'s argument with the walk replaced
+   by `a + t·(b - a)` and `parameterGap` by `r / (1 + |b - a|)`, so
+   noticeably shorter than the ~240 plane-specific lines it comes from,
+   but still a real proof. The cheap one is to push
+   `Plane.unitSegment_IsConnected` forward along `Plane.Point.first`,
+   which is continuous on the segment and has the interval as its image
+   — three lines, but it makes the interval's connectedness depend on
+   the plane, which is exactly the dependency this plan exists to cut.
+   Prefer the direct proof.
+3. Then the migration proper: `Plane.IsArc` / `Plane.arc` /
+   `Plane.IsLoop` / `Plane.IsJordanCurve` take `γ : ℝ → Plane.Point` on
+   `Real.unitInterval`, and `Plane/{curve,subarc,concatenate,twoarcs}`
+   follow. That is where the deletions the plan promises actually land.
 
 ## The problem
 
@@ -82,7 +127,7 @@ continuity families collapse to one: `ContinuousOn(γ, Real.unitInterval)`
 for `γ : ℝ → Plane.Point` is the same definition as the `Plane → Plane`
 case, with two instances instead of one.
 
-## Prototype findings (2026-07-27)
+## Prototype findings (2026-07-27), and how they resolved
 
 Verified against the real kernel, not assumed:
 
@@ -90,19 +135,44 @@ Verified against the real kernel, not assumed:
   distance projections, and `MetricSpace.OpenIn` over
   `Set(MetricSpace.carrier(m))` all typecheck, using the `Ring` projection
   idiom (`let ⟨…⟩ := m in …`).
-- **`instance` registration does not yet accept the bundle.** Both
-  `instance Real.metricSpace` and `instance Plane.metricSpace` fail with
+- **`instance` registration did not accept the bundle.** Both
+  `instance Real.metricSpace` and `instance Plane.metricSpace` failed with
   *"could not determine the carrier of its bundle type 'MetricSpace'"* —
-  so it is not carrier-specific. Registration reads the carrier via
-  `carrierProjectionField` in `src/elaborator/statements.cpp` (~line 205);
-  that helper returns nothing for this bundle although the shape matches
-  `Ring`'s. **This is the one blocking unknown, and it is narrow.** Settle
-  it before committing to the plan.
+  the blocking unknown, and it was narrow. `carrierProjectionField`
+  matched a hard-coded list of four projector names
+  (`Ring`/`CommutativeRing`/`Field`/`VectorSpace`) and four constructor
+  names, so no fifth bundle could ever register. **Fixed** by reading the
+  rule off the constructor's own telescope: the carrier is the first
+  argument whose declared type is a sort (which is what lets
+  `VectorSpace(f)`'s leading field parameter be skipped without
+  special-casing it), and failing that the first argument that is itself a
+  bundle with a carrier projection (how `CommutativeRing` and `Field`
+  reach the `Ring` one layer down).
 - **No competing metric.** `Plane.supBall` is defined and never used, and
   no topology is built on `supDistance` — it appears only as a
   real-valued function (the square-boundary level set, some estimates). So
   one canonical instance per carrier is enough, and canonical inference is
   not at risk.
+
+## Friction met during the port
+
+- **A `choose` reports the generic spelling, not the stated one.** With
+  `Plane.IsCompact` an alias, `choose index, limit such that limit ∈ region
+  ∧ Plane.SubsequenceConverges(s, index, limit) from compact;` introduces
+  the hypothesis with `MetricSpace.SubsequenceConverges` in it, so a later
+  argument-free `by Plane.SubsequenceConverges.increasing` no longer
+  matches — the two are definitionally equal but citation matching is
+  syntactic. The fix at each site is one bare restatement in the alias's
+  spelling, which the prover closes by defeq. Three sites needed it. The
+  natural behaviour would be for `choose … such that <prop>` to introduce
+  **the proposition the author wrote** (the kernel checks it either way),
+  which is what `docs/style.md` says the form is for.
+- **`choose x such that … from <lemma>` cannot always read the witness
+  type** when the carrier is `MetricSpace.carrier(m)`; it asks for the
+  annotation `choose x : MetricSpace.carrier(m) such that …`. Two sites.
+- **`let` in a proof block requires its type**: `let far := Natural.maximum(a, b);`
+  is a parse error, `let far : ℕ := …` is fine. Inferring it from the
+  right-hand side would remove a piece of pure bureaucracy.
 
 ## Staged migration (keeps the tree green throughout)
 
