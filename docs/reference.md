@@ -191,9 +191,14 @@ suffices Q by reduction;
 Introduce:
 
 ```math
+witness value
 witness value with proof
 witness first with witness second with proof
 ```
+
+`with proof` is optional: `witness value` leaves the remaining obligation
+to the auto-prover, which is what `witness value with done` said at more
+length.
 
 Eliminate:
 

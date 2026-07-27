@@ -2183,16 +2183,14 @@ Equality chain steps still take their arguments, and that is not a gap:
 there the arguments choose WHICH occurrence to rewrite, which the step's
 endpoints alone do not determine.
 
-**OPEN — the docs promise `take a;` but the parser demands `take a : T`.**
-`docs/style.md` writes the ∀-introduction as `by { take a; take b; suppose
-P(a) as ha; … }`, but a bare `take` is a parse error:
+**OPEN — `docs/style.md` writes `take a;` but a bare `take` is a parse
+error.** The guide's ∀-introduction example reads `by { take a; take b;
+suppose P(a) as ha; … }`, and that does not parse:
 
 ```
 expected ':' after take name (take n : T; or take n as <pat> : T;)
 ```
 
-The goal is a `∀ (m : ℕ). …` at that point, so its binder type is right
-there to be read off. Either infer it (better — the annotation restates
-what the goal already says, which is the same objection that makes the
-restated-type lambda worse than `take`), or fix the guide. Until then the
-idiomatic form carries one redundant ascription per binder.
+The parser is the one to keep — an annotated `take m : ℕ;` says what the
+binder is at the point the reader meets it, which is worth the word. Fix
+the GUIDE's example to carry its types.

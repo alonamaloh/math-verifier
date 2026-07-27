@@ -5230,13 +5230,23 @@ private:
     SurfaceExpressionPointer parseWitnessExpression() {
         Token witnessToken = consumeAny();  // 'witness'
         auto witnessExpression = parseRelational();
-        expect(TokenKind::KeywordWith,
-               "after witness expression");
-        // The proof position accepts a bare ≥2-step relation chain (the
-        // keyword-free calc), like `:=` and arm bodies — chain-only, since
-        // a trailing `by`/`as` after a `with` proof belongs to the
-        // enclosing statement.
-        auto witnessProof = parseBodyExpressionOrStatement();
+        SurfaceExpressionPointer witnessProof;
+        if (peek().kind == TokenKind::KeywordWith) {
+            consumeAny();  // 'with'
+            // The proof position accepts a bare ≥2-step relation chain (the
+            // keyword-free calc), like `:=` and arm bodies — chain-only,
+            // since a trailing `by`/`as` after a `with` proof belongs to the
+            // enclosing statement.
+            witnessProof = parseBodyExpressionOrStatement();
+        } else {
+            // `witness v` — the remaining obligation is whatever the goal
+            // says about `v`, so there is nothing for the author to name.
+            // `witness v with done` said the same thing and read as a
+            // sentence that trails off; this is the same term.
+            witnessProof = makeSurfaceStructuredClaim(
+                nullptr, "", nullptr, /*byCases=*/false, {},
+                witnessToken.line, witnessToken.column);
+        }
         std::vector<SurfaceExpressionPointer> components;
         components.push_back(std::move(witnessExpression));
         components.push_back(std::move(witnessProof));

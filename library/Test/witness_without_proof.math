@@ -1,0 +1,33 @@
+-- `witness v` with no `with` clause: the remaining obligation is whatever
+-- the goal says about `v`, so there is nothing for the author to name.
+--
+-- `witness v with done` said exactly this, and read as a sentence that
+-- trails off ("witness source with … done"). The two elaborate to the same
+-- term; this file pins both spellings so they cannot drift.
+module Test.witness_without_proof
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.order
+
+theorem Test.witness_without_proof (P : ℕ → Proposition) (holds : P(3))
+        : ∃ (n : ℕ). P(n) :=
+  witness 3
+
+theorem Test.witness_with_done_still_parses (P : ℕ → Proposition) (holds : P(3))
+        : ∃ (n : ℕ). P(n) :=
+  witness 3 with done
+
+-- Nested: the inner obligation is discharged the same way, and the outer
+-- one still takes a `with` because its proof is the inner witness.
+theorem Test.witness_nested (P : ℕ → ℕ → Proposition) (holds : P(1, 2))
+        : ∃ (a : ℕ). ∃ (b : ℕ). P(a, b) :=
+  witness 1 with witness 2
+
+-- A `with` clause that is a real proof is untouched by the optionality.
+theorem Test.witness_with_a_real_proof (P : ℕ → Proposition)
+        (everywhere : ∀ (n : ℕ). P(n))
+        : ∃ (n : ℕ). P(n) :=
+  witness 7 with everywhere(7)
