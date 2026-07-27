@@ -29,25 +29,29 @@ import Real.absolute_value
 import Real.absolute_value_order
 import Real.minimum
 import Real.supremum
+import Metric.space
+import Metric.topology
+import Metric.continuity
+import Metric.sequence
+import Metric.compactness
+import Metric.connected
 import Plane.segment
 import Plane.vector
 import Plane.point
 import Plane.norm
+import Plane.metric
 import Plane.topology
 import Plane.sequence
 import Plane.compact
 import Plane.compactness
 
 -- ----------------------------------------------------------------------
--- Connectedness.
+-- Connectedness. Everything down to the convexity section is the generic
+-- metric-space notion of `Metric/connected.math`, named at the plane;
+-- convexity is where the plane's own geometry enters.
 
 definition Plane.IsConnected (region : Set(Plane.Point)) : Proposition :=
-  ∀ (piece : Set(Plane.Point)).
-    piece ⊆ region →
-    Plane.OpenIn(piece, region) →
-    Plane.OpenIn(region ∖ piece, region) →
-    Set.IsNonempty(Plane.Point, piece) →
-    piece = region
+  MetricSpace.IsConnected(region)
 
 -- A nonempty open-and-closed piece is everything. This is the definition
 -- read back through `ClosedIn`, which is how a topology argument states
@@ -60,7 +64,7 @@ theorem Plane.IsConnected.clopen_is_everything
         (closed : Plane.ClosedIn(piece, region))
         (nonempty : Set.IsNonempty(Plane.Point, piece))
         : piece = region :=
-  connected(piece, inside, open, closed, nonempty)
+  done by MetricSpace.IsConnected.clopen_is_everything
 
 -- ----------------------------------------------------------------------
 -- Preimages.
@@ -74,63 +78,19 @@ theorem Plane.IsConnected.clopen_is_everything
 definition Plane.preimageIn
         (f : Plane.Point → Plane.Point) (target carrier : Set(Plane.Point))
         : Set(Plane.Point) :=
-  (x : Plane.Point) ↦ x ∈ carrier ∧ f(x) ∈ target
+  MetricSpace.preimageIn(f, target, carrier)
 
 theorem Plane.OpenIn.preimage
         (f : Plane.Point → Plane.Point) (carrier target : Set(Plane.Point))
         (continuous : Plane.ContinuousOn(f, carrier))
         (targetOpen : Plane.OpenIn(target, Plane.imageSet(f, carrier)))
-        : Plane.OpenIn(Plane.preimageIn(f, target, carrier), carrier) := {
-  take x : Plane.Point;
-  suppose x ∈ Plane.preimageIn(f, target, carrier) as inPreimage;
-  x ∈ carrier as inCarrier;
-  f(x) ∈ target as valueInTarget;
-  choose radius such that
-      0 < radius ∧
-      ∀ (w : Plane.Point). w ∈ Plane.imageSet(f, carrier) →
-        Plane.distance(f(x), w) < radius → w ∈ target
-      from targetOpen(f(x), valueInTarget);
-  0 < radius as radiusPositive;
-  ∀ (w : Plane.Point). w ∈ Plane.imageSet(f, carrier) →
-      Plane.distance(f(x), w) < radius → w ∈ target
-      as nearbyValuesHit;
-  choose nearness such that
-      0 < nearness ∧
-      ∀ (y : Plane.Point). y ∈ carrier →
-        Plane.distance(x, y) < nearness →
-          Plane.distance(f(x), f(y)) < radius
-      from continuous(x, inCarrier, radius, radiusPositive);
-  0 < nearness;
-  ∀ (y : Plane.Point). y ∈ carrier →
-      Plane.distance(x, y) < nearness →
-        Plane.distance(f(x), f(y)) < radius
-      as nearbyPointsMoveLittle;
-  witness nearness with {
-    0 < nearness;
-    ∀ (y : Plane.Point). y ∈ carrier →
-        Plane.distance(x, y) < nearness →
-          y ∈ Plane.preimageIn(f, target, carrier)
-        by (y : Plane.Point) (inCarrierY : y ∈ carrier)
-           (near : Plane.distance(x, y) < nearness) ↦ {
-          Plane.distance(f(x), f(y)) < radius
-              by nearbyPointsMoveLittle;
-          f(y) ∈ Plane.imageSet(f, carrier) by { witness y };
-          f(y) ∈ target by nearbyValuesHit;
-          y ∈ Plane.preimageIn(f, target, carrier);
-          done
-        };
-    done
-  }
-}
+        : Plane.OpenIn(Plane.preimageIn(f, target, carrier), carrier) :=
+  done by MetricSpace.OpenIn.preimage
 
 theorem Plane.preimageIn_subset
         (f : Plane.Point → Plane.Point) (target carrier : Set(Plane.Point))
-        : Plane.preimageIn(f, target, carrier) ⊆ carrier := {
-  take x : Plane.Point;
-  suppose x ∈ Plane.preimageIn(f, target, carrier) as inPreimage;
-  x ∈ carrier;
-  done
-}
+        : Plane.preimageIn(f, target, carrier) ⊆ carrier :=
+  done by MetricSpace.preimageIn_subset
 
 -- The complement of a preimage is the preimage of the complement — the
 -- bookkeeping that turns "clopen in the image" into "clopen in the
@@ -139,37 +99,8 @@ theorem Plane.preimageIn_complement
         (f : Plane.Point → Plane.Point) (carrier target : Set(Plane.Point))
         : carrier ∖ Plane.preimageIn(f, target, carrier)
               = Plane.preimageIn(
-                    f, Plane.imageSet(f, carrier) ∖ target, carrier) := {
-  carrier ∖ Plane.preimageIn(f, target, carrier)
-      ⊆ Plane.preimageIn(f, Plane.imageSet(f, carrier) ∖ target, carrier)
-      by (x : Plane.Point)
-         (outside : x ∈ carrier ∖ Plane.preimageIn(f, target, carrier)) ↦ {
-        x ∈ carrier;
-        ¬(x ∈ Plane.preimageIn(f, target, carrier));
-        f(x) ∈ Plane.imageSet(f, carrier) by { witness x };
-        suppose f(x) ∈ target for contradiction {
-          x ∈ Plane.preimageIn(f, target, carrier);
-          done
-        };
-        f(x) ∈ Plane.imageSet(f, carrier) ∖ target;
-        done
-      };
-  Plane.preimageIn(f, Plane.imageSet(f, carrier) ∖ target, carrier)
-      ⊆ carrier ∖ Plane.preimageIn(f, target, carrier)
-      by (x : Plane.Point)
-         (inside : x ∈ Plane.preimageIn(
-              f, Plane.imageSet(f, carrier) ∖ target, carrier)) ↦ {
-        x ∈ carrier;
-        f(x) ∈ Plane.imageSet(f, carrier) ∖ target;
-        ¬(f(x) ∈ target);
-        suppose x ∈ Plane.preimageIn(f, target, carrier) for contradiction {
-          f(x) ∈ target;
-          done
-        };
-        done
-      };
-  done by Set.equal_of_same_members
-}
+                    f, Plane.imageSet(f, carrier) ∖ target, carrier) :=
+  done by MetricSpace.preimageIn_complement
 
 -- ----------------------------------------------------------------------
 -- The continuous image of a connected set is connected.
@@ -183,57 +114,8 @@ theorem Plane.IsConnected.image
         (f : Plane.Point → Plane.Point) (carrier : Set(Plane.Point))
         (connected : Plane.IsConnected(carrier))
         (continuous : Plane.ContinuousOn(f, carrier))
-        : Plane.IsConnected(Plane.imageSet(f, carrier)) := {
-  take piece : Set(Plane.Point);
-  suppose piece ⊆ Plane.imageSet(f, carrier) as pieceInImage;
-  suppose Plane.OpenIn(piece, Plane.imageSet(f, carrier)) as pieceOpen;
-  suppose Plane.OpenIn(
-      Plane.imageSet(f, carrier) ∖ piece, Plane.imageSet(f, carrier))
-      as restOpen;
-  suppose Set.IsNonempty(Plane.Point, piece) as pieceNonempty;
-
-  Plane.preimageIn(f, piece, carrier) ⊆ carrier
-      by Plane.preimageIn_subset;
-  Plane.OpenIn(Plane.preimageIn(f, piece, carrier), carrier)
-      by Plane.OpenIn.preimage;
-  carrier ∖ Plane.preimageIn(f, piece, carrier)
-      = Plane.preimageIn(f, Plane.imageSet(f, carrier) ∖ piece, carrier)
-      by Plane.preimageIn_complement;
-  Plane.OpenIn(
-      Plane.preimageIn(f, Plane.imageSet(f, carrier) ∖ piece, carrier),
-      carrier)
-      by Plane.OpenIn.preimage;
-  Plane.OpenIn(carrier ∖ Plane.preimageIn(f, piece, carrier), carrier);
-
-  -- The piece has a point, and that point is a value.
-  choose value such that value ∈ piece from pieceNonempty;
-  value ∈ Plane.imageSet(f, carrier) by pieceInImage;
-  choose source such that source ∈ carrier ∧ f(source) = value
-      from { value ∈ Plane.imageSet(f, carrier) };
-  source ∈ carrier;
-  f(source) = value;
-  f(source) ∈ piece;
-  source ∈ Plane.preimageIn(f, piece, carrier);
-  Set.IsNonempty(Plane.Point, Plane.preimageIn(f, piece, carrier))
-      by { witness source };
-
-  Set.IsNonempty(Plane.Point, Plane.preimageIn(f, piece, carrier));
-  Plane.preimageIn(f, piece, carrier) = carrier by connected;
-
-  -- Pushing that forward: every value is the value at a point of the
-  -- pullback, hence lands in the piece.
-  Plane.imageSet(f, carrier) ⊆ piece
-      by (y : Plane.Point) (inImage : y ∈ Plane.imageSet(f, carrier)) ↦ {
-        choose x such that x ∈ carrier ∧ f(x) = y from inImage;
-        x ∈ carrier;
-        f(x) = y;
-        carrier = Plane.preimageIn(f, piece, carrier);
-        x ∈ Plane.preimageIn(f, piece, carrier);
-        f(x) ∈ piece;
-        done
-      };
-  done by Set.equal_of_same_members
-}
+        : Plane.IsConnected(Plane.imageSet(f, carrier)) :=
+  done by MetricSpace.IsConnected.image
 
 -- ----------------------------------------------------------------------
 -- Restriction.
@@ -246,65 +128,16 @@ theorem Plane.OpenIn.restrict
         (piece carrier smaller : Set(Plane.Point))
         (openInCarrier : Plane.OpenIn(piece, carrier))
         (inside : smaller ⊆ carrier)
-        : Plane.OpenIn(piece ∩ smaller, smaller) := {
-  take x : Plane.Point;
-  suppose x ∈ piece ∩ smaller as inBoth;
-  x ∈ piece;
-  choose radius such that
-      0 < radius ∧
-      ∀ (y : Plane.Point). y ∈ carrier →
-        Plane.distance(x, y) < radius → y ∈ piece
-      from openInCarrier(x, { x ∈ piece });
-  0 < radius;
-  ∀ (y : Plane.Point). y ∈ carrier →
-      Plane.distance(x, y) < radius → y ∈ piece as nearbyInPiece;
-  witness radius with {
-    0 < radius;
-    ∀ (y : Plane.Point). y ∈ smaller →
-        Plane.distance(x, y) < radius → y ∈ piece ∩ smaller
-        by (y : Plane.Point) (inSmaller : y ∈ smaller)
-           (near : Plane.distance(x, y) < radius) ↦ {
-          y ∈ carrier by inside;
-          y ∈ piece by nearbyInPiece;
-          done        };
-    done
-  }
-}
+        : Plane.OpenIn(piece ∩ smaller, smaller) :=
+  done by MetricSpace.OpenIn.restrict
 
 -- Cutting a piece out of a subset is the same as cutting the ambient
 -- complement down to it. The bookkeeping the union argument runs on.
 theorem Plane.difference_intersection
         (larger smaller piece : Set(Plane.Point))
         (inside : smaller ⊆ larger)
-        : smaller ∖ (piece ∩ smaller) = (larger ∖ piece) ∩ smaller := {
-  smaller ∖ (piece ∩ smaller) ⊆ (larger ∖ piece) ∩ smaller
-      by (x : Plane.Point)
-         (outside : x ∈ smaller ∖ (piece ∩ smaller)) ↦ {
-        x ∈ smaller;
-        ¬(x ∈ piece ∩ smaller);
-        x ∈ larger by inside;
-        ¬(x ∈ piece)
-            by (inPiece : x ∈ piece) ↦ {
-              x ∈ piece ∩ smaller;
-              done
-            };
-        x ∈ larger ∖ piece;
-        done      };
-  (larger ∖ piece) ∩ smaller ⊆ smaller ∖ (piece ∩ smaller)
-      by (x : Plane.Point)
-         (inCut : x ∈ (larger ∖ piece) ∩ smaller) ↦ {
-        x ∈ larger ∖ piece;
-        x ∈ smaller;
-        ¬(x ∈ piece);
-        ¬(x ∈ piece ∩ smaller)
-            by (inBoth : x ∈ piece ∩ smaller) ↦ {
-              x ∈ piece;
-              done
-            };
-        done
-      };
-  done by Set.equal_of_same_members
-}
+        : smaller ∖ (piece ∩ smaller) = (larger ∖ piece) ∩ smaller :=
+  done by MetricSpace.difference_intersection
 
 -- ----------------------------------------------------------------------
 -- A connected piece swallows a whole connected set it meets.
@@ -320,21 +153,8 @@ theorem Plane.IsConnected.swallows
         (pieceOpen : Plane.OpenIn(piece, whole))
         (restOpen : Plane.OpenIn(whole ∖ piece, whole))
         (meets : Set.IsNonempty(Plane.Point, piece ∩ part))
-        : part ⊆ piece := {
-  Plane.OpenIn(piece ∩ part, part) by Plane.OpenIn.restrict(carrier := whole);
-  part ∖ (piece ∩ part) = (whole ∖ piece) ∩ part
-      by Plane.difference_intersection;
-  Plane.OpenIn((whole ∖ piece) ∩ part, part)
-      by Plane.OpenIn.restrict(carrier := whole);
-  Plane.OpenIn(part ∖ (piece ∩ part), part);
-  piece ∩ part ⊆ part by Set.intersection_subset_right;
-  piece ∩ part = part by partConnected;
-  part = piece ∩ part;
-  take x : Plane.Point;
-  suppose x ∈ part;
-  x ∈ piece ∩ part;
-  done
-}
+        : part ⊆ piece :=
+  done by MetricSpace.IsConnected.swallows
 
 -- ----------------------------------------------------------------------
 -- Two connected sets that share a point make a connected union.
@@ -349,55 +169,8 @@ theorem Plane.IsConnected.union
         (rightConnected : Plane.IsConnected(right))
         (shared : Plane.Point)
         (sharedInLeft : shared ∈ left) (sharedInRight : shared ∈ right)
-        : Plane.IsConnected(left ∪ right) := {
-  take piece : Set(Plane.Point);
-  suppose piece ⊆ left ∪ right as pieceInside;
-  suppose Plane.OpenIn(piece, left ∪ right) as pieceOpen;
-  suppose Plane.OpenIn((left ∪ right) ∖ piece, left ∪ right) as restOpen;
-  suppose Set.IsNonempty(Plane.Point, piece) as pieceNonempty;
-  left ⊆ left ∪ right by Set.subset_union_left;
-  right ⊆ left ∪ right by Set.subset_union_right;
-
-  -- Whichever side the piece meets, the shared point ends up inside it.
-  choose start such that start ∈ piece from pieceNonempty;
-  start ∈ left ∪ right by pieceInside;
-  shared ∈ piece by cases {
-    case start ∈ left as startInLeft: {
-        Set.IsNonempty(Plane.Point, piece ∩ left)
-            by { witness start };
-        left ⊆ piece
-            by Plane.IsConnected.swallows(whole := left ∪ right)
-            as leftSwallowed;
-        done by leftSwallowed
-      }
-    case start ∈ right as startInRight: {
-        Set.IsNonempty(Plane.Point, piece ∩ right)
-            by { witness start };
-        right ⊆ piece
-            by Plane.IsConnected.swallows(whole := left ∪ right)
-            as rightSwallowed;
-        done by rightSwallowed
-      }
-  };
-
-  -- With the shared point inside, both sides are swallowed.
-  Set.IsNonempty(Plane.Point, piece ∩ left)
-      by { witness shared };
-  Set.IsNonempty(Plane.Point, piece ∩ right)
-      by { witness shared };
-  left ⊆ piece
-      by Plane.IsConnected.swallows(whole := left ∪ right) as leftInPiece;
-  right ⊆ piece
-      by Plane.IsConnected.swallows(whole := left ∪ right) as rightInPiece;
-  left ∪ right ⊆ piece
-      by (x : Plane.Point) (inUnion : x ∈ left ∪ right) ↦ {
-        done by cases {
-          case x ∈ left as inLeft: leftInPiece(x, inLeft)
-          case x ∈ right as inRight: rightInPiece(x, inRight)
-        }
-      };
-  done by Set.equal_of_same_members
-}
+        : Plane.IsConnected(left ∪ right) :=
+  done by MetricSpace.IsConnected.union
 
 -- ----------------------------------------------------------------------
 -- Convex sets are connected.
@@ -677,52 +450,8 @@ theorem Plane.IsConnected.lands_in_side
         (apart : ∀ (x : Plane.Point). x ∈ left → ¬(x ∈ right))
         (covered : part ⊆ left ∪ right)
         (meetsLeft : Set.IsNonempty(Plane.Point, left ∩ part))
-        : part ⊆ left := {
-  part ⊆ Set.universe(Plane.Point) by Set.subset_universe;
-  Plane.OpenIn(left ∩ part, part)
-      by Plane.OpenIn.restrict(carrier := Set.universe(Plane.Point));
-  Plane.OpenIn(right ∩ part, part)
-      by Plane.OpenIn.restrict(carrier := Set.universe(Plane.Point));
-
-  -- What the left side leaves of `part` is exactly what the right side
-  -- catches, so the leftover is relatively open too.
-  part ∖ (left ∩ part) ⊆ right ∩ part
-      by (x : Plane.Point) (missedLeft : x ∈ part ∖ (left ∩ part)) ↦ {
-        x ∈ part;
-        ¬(x ∈ left ∩ part);
-        ¬(x ∈ left)
-            by (xInLeft : x ∈ left) ↦ {
-              x ∈ left ∩ part;
-              done
-            };
-        x ∈ left ∪ right by covered;
-        x ∈ left ∨ x ∈ right;
-        x ∈ right;
-        done      };
-  right ∩ part ⊆ part ∖ (left ∩ part)
-      by (x : Plane.Point) (inRightPart : x ∈ right ∩ part) ↦ {
-        x ∈ right;
-        x ∈ part;
-        ¬(x ∈ left ∩ part)
-            by (inLeftPart : x ∈ left ∩ part) ↦ {
-              x ∈ left;
-              ¬(x ∈ right) by apart;
-              done
-            };
-        done
-      };
-  part ∖ (left ∩ part) = right ∩ part
-      by Set.equal_of_same_members as leftoverIsRight;
-  Plane.OpenIn(part ∖ (left ∩ part), part) by substituting leftoverIsRight;
-
-  left ∩ part ⊆ part by Set.intersection_subset_right;
-  left ∩ part = part by partConnected;
-  part = left ∩ part;
-  take x : Plane.Point;
-  suppose x ∈ part;
-  x ∈ left ∩ part;
-  done
-}
+        : part ⊆ left :=
+  done by MetricSpace.IsConnected.lands_in_side
 
 -- The same fact stated as the alternative it is usually quoted as. The
 -- side a nonempty connected set meets is decided by any one of its
@@ -734,39 +463,8 @@ theorem Plane.IsConnected.lands_in_one_side
         (apart : ∀ (x : Plane.Point). x ∈ left → ¬(x ∈ right))
         (covered : part ⊆ left ∪ right)
         (nonempty : Set.IsNonempty(Plane.Point, part))
-        : part ⊆ left ∨ part ⊆ right := {
-  choose start such that start ∈ part from nonempty;
-  start ∈ left ∪ right by covered;
-  done by cases {
-    case start ∈ left as startInLeft: {
-        Set.IsNonempty(Plane.Point, left ∩ part)
-            by { witness start };
-        part ⊆ left
-            by Plane.IsConnected.lands_in_side(right := right);
-        done
-      }
-    case start ∈ right as startInRight: {
-        ∀ (x : Plane.Point). x ∈ right → ¬(x ∈ left)
-            by (x : Plane.Point) (xInRight : x ∈ right)
-               (xInLeft : x ∈ left) ↦ {
-              ¬(x ∈ right) by apart;
-              done
-            };
-        part ⊆ right ∪ left
-            by (x : Plane.Point) (xInPart : x ∈ part) ↦ {
-              x ∈ left ∪ right by covered;
-              x ∈ left ∨ x ∈ right;
-              x ∈ right ∨ x ∈ left by Or.swap;
-              done
-            };
-        Set.IsNonempty(Plane.Point, right ∩ part)
-            by { witness start };
-        part ⊆ right
-            by Plane.IsConnected.lands_in_side(right := left);
-        done
-      }
-  }
-}
+        : part ⊆ left ∨ part ⊆ right :=
+  done by MetricSpace.IsConnected.lands_in_one_side
 
 -- ----------------------------------------------------------------------
 -- Adjoining limit points keeps a set connected.
@@ -784,70 +482,5 @@ theorem Plane.IsConnected.adjoin_limits
         (coreConnected : Plane.IsConnected(core))
         (coreInside : core ⊆ wide)
         (wideInClosure : wide ⊆ Plane.ClosureIn(core, wide))
-        : Plane.IsConnected(wide) := {
-  take piece : Set(Plane.Point);
-  suppose piece ⊆ wide as pieceInside;
-  suppose Plane.OpenIn(piece, wide) as pieceOpen;
-  suppose Plane.OpenIn(wide ∖ piece, wide) as restOpen;
-  suppose Set.IsNonempty(Plane.Point, piece) as pieceNonempty;
-
-  -- The piece reaches the core, so it holds all of it.
-  choose start such that start ∈ piece from pieceNonempty;
-  start ∈ wide by pieceInside;
-  choose radius such that
-      0 < radius ∧
-        ∀ (y : Plane.Point). y ∈ wide →
-          Plane.distance(start, y) < radius → y ∈ piece
-      from pieceOpen;
-  0 < radius;
-  ∀ (y : Plane.Point). y ∈ wide →
-      Plane.distance(start, y) < radius → y ∈ piece as nearbyInPiece;
-  start ∈ Plane.ClosureIn(core, wide) by wideInClosure;
-  ∀ (scale : ℝ). 0 < scale →
-      ∃ (y : Plane.Point). y ∈ core ∧ Plane.distance(start, y) < scale
-      as coreIsNear;
-  choose near such that
-      near ∈ core ∧ Plane.distance(start, near) < radius
-      from coreIsNear;
-  near ∈ core;
-  Plane.distance(start, near) < radius;
-  near ∈ wide by coreInside;
-  near ∈ piece by nearbyInPiece;
-  Set.IsNonempty(Plane.Point, piece ∩ core)
-      by { witness near };
-  core ⊆ piece by Plane.IsConnected.swallows as coreInPiece;
-
-  -- And nothing of the wider set is left outside it.
-  wide ⊆ piece
-      by (x : Plane.Point) (xInWide : x ∈ wide) ↦ {
-        suppose ¬(x ∈ piece) as xOutside for contradiction {
-          x ∈ wide ∖ piece;
-          choose reach such that
-              0 < reach ∧
-                ∀ (y : Plane.Point). y ∈ wide →
-                  Plane.distance(x, y) < reach → y ∈ wide ∖ piece
-              from restOpen(x, { x ∈ wide ∖ piece });
-          0 < reach;
-          ∀ (y : Plane.Point). y ∈ wide →
-              Plane.distance(x, y) < reach → y ∈ wide ∖ piece
-              as nearbyOutside;
-          x ∈ Plane.ClosureIn(core, wide) by wideInClosure;
-          ∀ (scale : ℝ). 0 < scale →
-              ∃ (y : Plane.Point). y ∈ core ∧ Plane.distance(x, y) < scale
-              as coreIsNearX;
-          choose witnessPoint such that
-              witnessPoint ∈ core ∧ Plane.distance(x, witnessPoint) < reach
-              from coreIsNearX;
-          witnessPoint ∈ core;
-          Plane.distance(x, witnessPoint) < reach;
-          witnessPoint ∈ wide by coreInside;
-          witnessPoint ∈ wide ∖ piece
-              by nearbyOutside;
-          ¬(witnessPoint ∈ piece);
-          witnessPoint ∈ piece by coreInPiece;
-          done
-        };
-        done
-      };
-  done by Set.equal_of_same_members
-}
+        : Plane.IsConnected(wide) :=
+  done by MetricSpace.IsConnected.adjoin_limits
