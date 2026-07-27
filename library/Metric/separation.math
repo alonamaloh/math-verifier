@@ -1,0 +1,338 @@
+-- Metric/separation.math
+--
+-- Disjoint compact sets are a positive distance apart, and the sequence
+-- machinery that gets there: two sequences that close on each other share
+-- a limit, and in compact sets a single thinning reaches it along both.
+--
+-- The proof is the one a mathematician writes: if no gap worked, there
+-- would be pairs of points, one from each set, closer than every
+-- 1/(1+n); thinning twice makes both sequences converge; the limits are
+-- then at distance zero, hence equal, hence a point in both sets.
+--
+-- Two applications of countable choice, in sequence rather than over
+-- pairs: the first picks the point of `A`, the second — knowing that
+-- point — picks its partner in `B`. That avoids needing a product type
+-- and reads the way the argument is spoken.
+
+module Metric.separation
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Set.algebra
+import Natural.basics
+import Natural.order
+import Natural.maximum
+import Natural.subsequence
+import Real.interface
+import Real.order
+import Real.order_field
+import Real.division
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.convergence
+import Real.harmonic_series
+import Real.archimedean
+import Metric.space
+import Metric.topology
+import Metric.continuity
+import Metric.sequence
+import Metric.compactness
+
+-- Moving the far endpoint moves the distance by no more than the move.
+-- This is what makes `distance(centre, ·)` continuous — hence its level
+-- sets closed.
+theorem MetricSpace.distance_shift_bound (m : MetricSpace)
+        (centre x y : MetricSpace.carrier(m))
+        : abs(MetricSpace.distance(centre, y) - MetricSpace.distance(centre, x))
+              ≤ MetricSpace.distance(x, y) := {
+  MetricSpace.distance(centre, y)
+      ≤ MetricSpace.distance(centre, x) + MetricSpace.distance(x, y)
+      by MetricSpace.distance_triangle;
+  MetricSpace.distance(centre, y) - MetricSpace.distance(centre, x)
+      ≤ MetricSpace.distance(x, y) by ordered_field;
+  MetricSpace.distance(centre, x)
+      ≤ MetricSpace.distance(centre, y) + MetricSpace.distance(y, x)
+      by MetricSpace.distance_triangle;
+  MetricSpace.distance(y, x) = MetricSpace.distance(x, y)
+      by MetricSpace.distance_symmetric;
+  MetricSpace.distance(centre, x)
+      ≤ MetricSpace.distance(centre, y) + MetricSpace.distance(x, y);
+  -MetricSpace.distance(x, y)
+      ≤ MetricSpace.distance(centre, y) - MetricSpace.distance(centre, x)
+      by ordered_field;
+  done by Real.absolute_value_LessOrEqual_of_bounds
+}
+
+-- ----------------------------------------------------------------------
+-- Two sequences that close on each other have the same limit.
+--
+-- Stated on a common thinning, because that is how it arrives: two
+-- sequences built in step, thinned together until both converge. The
+-- three-term triangle inequality does the work, with a quarter of the
+-- tolerance for each end and a quarter for the gap between them.
+
+theorem MetricSpace.equal_limits_of_closing (m : MetricSpace)
+        (u v : ℕ → MetricSpace.carrier(m)) (index : ℕ → ℕ)
+        (limitU limitV : MetricSpace.carrier(m))
+        (increasing : Natural.IsStrictlyIncreasing(index))
+        (toU : MetricSpace.SequenceConverges((k : ℕ) ↦ u(index(k)), limitU))
+        (toV : MetricSpace.SequenceConverges((k : ℕ) ↦ v(index(k)), limitV))
+        (closing : ∀ (n : ℕ).
+            MetricSpace.distance(u(n), v(n)) < Real.harmonic_term(n))
+        : limitU = limitV := {
+  ∀ (tolerance : ℝ). tolerance > 0 →
+      MetricSpace.distance(limitU, limitV) < tolerance
+      by (tolerance : ℝ) (tolerancePositive : tolerance > 0) ↦ {
+        (4 : ℝ) ≠ 0;
+        tolerance / 4 > 0 by Real.divide_positive;
+        choose thresholdU such that
+            ∀ (k : ℕ). thresholdU ≤ k →
+                MetricSpace.distance(limitU, u(index(k))) < tolerance / 4
+            as closeU from toU(tolerance / 4, { tolerance / 4 > 0 });
+        choose thresholdV such that
+            ∀ (k : ℕ). thresholdV ≤ k →
+                MetricSpace.distance(limitV, v(index(k))) < tolerance / 4
+            as closeV from toV(tolerance / 4, { tolerance / 4 > 0 });
+        choose scale such that Real.harmonic_term(scale) < tolerance / 4
+            from Real.exists_harmonic_term_below(
+                tolerance / 4, { tolerance / 4 > 0 });
+        let far : ℕ :=
+            Natural.maximum(Natural.maximum(thresholdU, thresholdV), scale);
+        Natural.maximum(thresholdU, thresholdV) ≤ far;
+        thresholdU ≤ Natural.maximum(thresholdU, thresholdV);
+        thresholdV ≤ Natural.maximum(thresholdU, thresholdV);
+        thresholdU ≤ far;
+        thresholdV ≤ far;
+        scale ≤ far;
+        let deep : ℕ := index(far);
+        MetricSpace.distance(limitU, u(deep)) < tolerance / 4 by closeU;
+        MetricSpace.distance(limitV, v(deep)) < tolerance / 4 by closeV;
+        MetricSpace.distance(u(deep), v(deep)) < Real.harmonic_term(deep)
+            by closing;
+        far ≤ deep by Natural.IsStrictlyIncreasing.LessOrEqual;
+        scale ≤ deep;
+        Real.harmonic_term(deep) ≤ Real.harmonic_term(scale)
+            by Real.harmonic_term_antitone;
+        MetricSpace.distance(u(deep), v(deep)) < tolerance / 4;
+        MetricSpace.distance(limitV, v(deep))
+            = MetricSpace.distance(v(deep), limitV)
+            by MetricSpace.distance_symmetric;
+        tolerance / 4 + tolerance / 4 + tolerance / 4
+            < tolerance / 4 + tolerance / 4 + tolerance / 4 + tolerance / 4
+            by ordered_field;
+        tolerance / 4 + tolerance / 4 + tolerance / 4 + tolerance / 4
+            = tolerance by Real.divide_four_quarters;
+        MetricSpace.distance(u(deep), limitV)
+            ≤ MetricSpace.distance(u(deep), v(deep))
+                  + MetricSpace.distance(v(deep), limitV)
+            by MetricSpace.distance_triangle;
+        MetricSpace.distance(limitU, limitV)
+           ≤ MetricSpace.distance(limitU, u(deep))
+                 + MetricSpace.distance(u(deep), limitV)
+                 by MetricSpace.distance_triangle
+           ≤ MetricSpace.distance(limitU, u(deep))
+                 + (MetricSpace.distance(u(deep), v(deep))
+                        + MetricSpace.distance(v(deep), limitV))
+           = MetricSpace.distance(limitU, u(deep))
+                 + MetricSpace.distance(u(deep), v(deep))
+                 + MetricSpace.distance(v(deep), limitV) by ring
+           < tolerance / 4 + tolerance / 4 + tolerance / 4
+           < tolerance;
+        done
+      }
+      as arbitrarilyClose;
+  MetricSpace.distance(limitU, limitV) ≥ 0 by MetricSpace.distance_nonneg;
+  abs(MetricSpace.distance(limitU, limitV))
+      = MetricSpace.distance(limitU, limitV)
+      by Real.absolute_value_when_nonneg;
+  ∀ (tolerance : ℝ). tolerance > 0 →
+      abs(MetricSpace.distance(limitU, limitV)) < tolerance
+      by (tolerance : ℝ) (tolerancePositive : tolerance > 0) ↦ {
+        MetricSpace.distance(limitU, limitV) < tolerance by arbitrarilyClose;
+        done
+      };
+  MetricSpace.distance(limitU, limitV) = 0
+      by Real.eq_of_absolute_value_less_than_all_positive_real;
+  done by MetricSpace.equal_of_distance_zero
+}
+
+-- Two sequences in compact sets that close on each other share a limit,
+-- and one thinning reaches it along both. Thin the first sequence, thin
+-- the partner along that, and compose the two index maps: the composite
+-- is increasing, so it thins the already-convergent first sequence too,
+-- and both limits are then the limit of the same closing pairs.
+--
+-- Every proof that pushes a negation through "for every scale there is a
+-- pair" arrives here, so this is where the double thinning lives.
+theorem MetricSpace.closing_pairs_share_a_limit (m : MetricSpace)
+        (regionA regionB : Set(MetricSpace.carrier(m)))
+        (compactA : MetricSpace.IsCompact(regionA))
+        (compactB : MetricSpace.IsCompact(regionB))
+        (u v : ℕ → MetricSpace.carrier(m))
+        (insideA : ∀ (n : ℕ). u(n) ∈ regionA)
+        (insideB : ∀ (n : ℕ). v(n) ∈ regionB)
+        (closing : ∀ (n : ℕ).
+            MetricSpace.distance(u(n), v(n)) < Real.harmonic_term(n))
+        : ∃ (index : ℕ → ℕ). ∃ (limit : MetricSpace.carrier(m)).
+            (limit ∈ regionA ∧ limit ∈ regionB)
+            ∧ (MetricSpace.SequenceConverges((k : ℕ) ↦ u(index(k)), limit)
+                   ∧ MetricSpace.SequenceConverges((k : ℕ) ↦ v(index(k)), limit)) := {
+  choose firstIndex : ℕ → ℕ, limitU : MetricSpace.carrier(m) such that
+      limitU ∈ regionA ∧ MetricSpace.SubsequenceConverges(u, firstIndex, limitU)
+      from compactA;
+  Natural.IsStrictlyIncreasing(firstIndex)
+      by MetricSpace.SubsequenceConverges.increasing;
+  limitU ∈ regionA;
+  MetricSpace.SequenceConverges((k : ℕ) ↦ u(firstIndex(k)), limitU)
+      by MetricSpace.SubsequenceConverges.converges;
+
+  choose secondIndex : ℕ → ℕ, limitV : MetricSpace.carrier(m) such that
+      limitV ∈ regionB
+      ∧ MetricSpace.SubsequenceConverges(
+            (k : ℕ) ↦ v(firstIndex(k)), secondIndex, limitV)
+      from compactB;
+  Natural.IsStrictlyIncreasing(secondIndex)
+      by MetricSpace.SubsequenceConverges.increasing;
+  limitV ∈ regionB;
+  MetricSpace.SequenceConverges(
+      (k : ℕ) ↦ v(firstIndex(secondIndex(k))), limitV);
+  MetricSpace.SequenceConverges((k : ℕ) ↦ u(firstIndex(secondIndex(k))), limitU)
+      by MetricSpace.SequenceConverges.subsequence(
+          s := (k : ℕ) ↦ u(firstIndex(k)));
+
+  Natural.IsStrictlyIncreasing((k : ℕ) ↦ firstIndex(secondIndex(k)))
+      by Natural.IsStrictlyIncreasing.compose;
+  limitU = limitV
+      by MetricSpace.equal_limits_of_closing(
+          index := (k : ℕ) ↦ firstIndex(secondIndex(k)))
+      as limitsAgree;
+  limitU ∈ regionB by substituting limitsAgree;
+  MetricSpace.SequenceConverges((k : ℕ) ↦ v(firstIndex(secondIndex(k))), limitU)
+      by substituting limitsAgree;
+  let composed : ℕ → ℕ := (k : ℕ) ↦ firstIndex(secondIndex(k));
+  done by { witness composed with { witness limitU } }
+}
+
+-- ----------------------------------------------------------------------
+-- The separation lemma.
+
+-- "No gap works, so every scale is beaten by some pair." One sentence in
+-- a textbook; the block below is what pushing the negation through the
+-- quantifiers costs, and it is quarantined here so the theorem that uses
+-- it can just say the sentence.
+theorem MetricSpace.close_pair_at_every_scale (m : MetricSpace)
+        (regionA regionB : Set(MetricSpace.carrier(m)))
+        (noGap : ¬(∃ (gap : ℝ). gap > 0 ∧
+            ∀ (a : MetricSpace.carrier(m)). a ∈ regionA →
+              ∀ (b : MetricSpace.carrier(m)). b ∈ regionB →
+                gap ≤ MetricSpace.distance(a, b)))
+        (n : ℕ)
+        : ∃ (a : MetricSpace.carrier(m)). a ∈ regionA ∧
+            ∃ (b : MetricSpace.carrier(m)). b ∈ regionB
+                ∧ MetricSpace.distance(a, b) < Real.harmonic_term(n) := {
+  Real.harmonic_term(n) > 0 by Real.divide_positive;
+  suppose ¬(∃ (a : MetricSpace.carrier(m)). a ∈ regionA ∧
+      ∃ (b : MetricSpace.carrier(m)). b ∈ regionB
+          ∧ MetricSpace.distance(a, b) < Real.harmonic_term(n))
+      as noClosePair for contradiction {
+    ∀ (a : MetricSpace.carrier(m)). a ∈ regionA →
+      ∀ (b : MetricSpace.carrier(m)). b ∈ regionB →
+        Real.harmonic_term(n) ≤ MetricSpace.distance(a, b)
+        by (a : MetricSpace.carrier(m)) (inA : a ∈ regionA)
+           (b : MetricSpace.carrier(m)) (inB : b ∈ regionB) ↦ {
+          suppose ¬(Real.harmonic_term(n) ≤ MetricSpace.distance(a, b))
+              as close for contradiction {
+            MetricSpace.distance(a, b) < Real.harmonic_term(n)
+                by Real.LessThan_of_not_LessOrEqual;
+            ∃ (b : MetricSpace.carrier(m)). b ∈ regionB
+                ∧ MetricSpace.distance(a, b) < Real.harmonic_term(n)
+                by { witness b };
+            ∃ (a : MetricSpace.carrier(m)). a ∈ regionA ∧
+                ∃ (b : MetricSpace.carrier(m)). b ∈ regionB
+                    ∧ MetricSpace.distance(a, b) < Real.harmonic_term(n)
+                by { witness a };
+            done
+          };
+          done
+        };
+    ∃ (gap : ℝ). gap > 0 ∧
+        ∀ (a : MetricSpace.carrier(m)). a ∈ regionA →
+          ∀ (b : MetricSpace.carrier(m)). b ∈ regionB →
+            gap ≤ MetricSpace.distance(a, b)
+        by { witness Real.harmonic_term(n) };
+    done
+  };
+  done
+}
+
+theorem MetricSpace.compact_separation (m : MetricSpace)
+        (regionA regionB : Set(MetricSpace.carrier(m)))
+        (compactA : MetricSpace.IsCompact(regionA))
+        (compactB : MetricSpace.IsCompact(regionB))
+        (disjoint : ∀ (x : MetricSpace.carrier(m)). x ∈ regionA → ¬(x ∈ regionB))
+        : ∃ (gap : ℝ). gap > 0 ∧
+            ∀ (a : MetricSpace.carrier(m)). a ∈ regionA →
+              ∀ (b : MetricSpace.carrier(m)). b ∈ regionB →
+                gap ≤ MetricSpace.distance(a, b) := {
+  suppose ¬(∃ (gap : ℝ). gap > 0 ∧
+      ∀ (a : MetricSpace.carrier(m)). a ∈ regionA →
+        ∀ (b : MetricSpace.carrier(m)). b ∈ regionB →
+          gap ≤ MetricSpace.distance(a, b)) as noGap for contradiction {
+
+    -- No gap works, so every scale is beaten by some pair.
+    ∀ (n : ℕ). ∃ (a : MetricSpace.carrier(m)). a ∈ regionA ∧
+        ∃ (b : MetricSpace.carrier(m)). b ∈ regionB
+            ∧ MetricSpace.distance(a, b) < Real.harmonic_term(n)
+        by (n : ℕ) ↦
+             MetricSpace.close_pair_at_every_scale(m, regionA, regionB, noGap, n)
+        as closePairs;
+
+    -- First choice: the point of `A`.
+    choose a such that
+        ∀ (n : ℕ). a(n) ∈ regionA ∧
+            ∃ (b : MetricSpace.carrier(m)). b ∈ regionB
+                ∧ MetricSpace.distance(a(n), b) < Real.harmonic_term(n)
+        as chosenA
+        from Logic.countable_choice(
+            MetricSpace.carrier(m),
+            (n : ℕ) (x : MetricSpace.carrier(m)) ↦ x ∈ regionA ∧
+                ∃ (b : MetricSpace.carrier(m)). b ∈ regionB
+                    ∧ MetricSpace.distance(x, b) < Real.harmonic_term(n),
+            closePairs);
+    ∀ (k : ℕ). a(k) ∈ regionA by { take k : ℕ; done by chosenA };
+
+    -- Second choice: its partner in `B`.
+    ∀ (n : ℕ). ∃ (y : MetricSpace.carrier(m)). y ∈ regionB
+        ∧ MetricSpace.distance(a(n), y) < Real.harmonic_term(n)
+        by { take n : ℕ; done by chosenA }
+        as partners;
+    choose b such that
+        ∀ (n : ℕ). b(n) ∈ regionB
+            ∧ MetricSpace.distance(a(n), b(n)) < Real.harmonic_term(n)
+        as chosenB
+        from Logic.countable_choice(
+            MetricSpace.carrier(m),
+            (n : ℕ) (y : MetricSpace.carrier(m)) ↦ y ∈ regionB
+                ∧ MetricSpace.distance(a(n), y) < Real.harmonic_term(n),
+            partners);
+    ∀ (k : ℕ). b(k) ∈ regionB by { take k : ℕ; done by chosenB };
+
+    -- The pairs close on each other, so they share a limit — which is
+    -- then a point of both regions, and they were disjoint.
+    ∀ (n : ℕ). MetricSpace.distance(a(n), b(n)) < Real.harmonic_term(n)
+        by { take n : ℕ; done by chosenB };
+    choose index : ℕ → ℕ, limit : MetricSpace.carrier(m) such that
+        (limit ∈ regionA ∧ limit ∈ regionB)
+        ∧ (MetricSpace.SequenceConverges((k : ℕ) ↦ a(index(k)), limit)
+               ∧ MetricSpace.SequenceConverges((k : ℕ) ↦ b(index(k)), limit))
+        from MetricSpace.closing_pairs_share_a_limit;
+    limit ∈ regionA;
+    limit ∈ regionB;
+    ¬(limit ∈ regionB) by disjoint;
+    done
+  };
+  done
+}

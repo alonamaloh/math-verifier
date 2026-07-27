@@ -37,6 +37,8 @@ import Real.archimedean
 import Metric.space
 import Metric.real
 import Metric.continuity
+import Metric.separation
+import Metric.uniform
 import Plane.vector
 import Plane.point
 import Plane.norm
@@ -371,205 +373,17 @@ theorem Plane.attains_minimum (f : Plane.Point → ℝ)
 -- Uniform continuity.
 --
 -- The nearness that continuity supplies depends on the point. On a
--- compact set it need not: one nearness serves everywhere.
---
--- The proof is the third instance of the same shape. If no nearness
--- worked, then at every scale some pair of points would be within
--- `1/(1+n)` and yet have values `tolerance` apart — two choices, in
--- sequence, for the two points. Thinning twice makes both converge, and
--- to the SAME limit, since they were built to close on each other. But
--- continuity at that limit puts both values within `tolerance/2` of the
--- value there, hence within `tolerance` of each other.
+-- compact set it need not: one nearness serves everywhere. Both the
+-- notion and the theorem are the generic metric ones, read here with ℝ
+-- as the target space.
 
 definition Plane.UniformlyContinuousOn
         (f : Plane.Point → ℝ) (carrier : Set(Plane.Point)) : Proposition :=
-  ∀ (tolerance : ℝ). 0 < tolerance →
-    ∃ (nearness : ℝ). 0 < nearness ∧
-      ∀ (x : Plane.Point). x ∈ carrier →
-        ∀ (y : Plane.Point). y ∈ carrier →
-          Plane.distance(x, y) < nearness → abs(f(x) - f(y)) < tolerance
-
--- "No nearness works, so at every scale some pair is close with values
--- that are not." Same quarantine as the two above.
-theorem Plane.bad_pair_at_every_scale (f : Plane.Point → ℝ)
-        (region : Set(Plane.Point)) (tolerance : ℝ)
-        (noNearness : ¬(∃ (nearness : ℝ). 0 < nearness ∧
-            ∀ (x : Plane.Point). x ∈ region →
-              ∀ (y : Plane.Point). y ∈ region →
-                Plane.distance(x, y) < nearness
-                  → abs(f(x) - f(y)) < tolerance))
-        (n : ℕ)
-        : ∃ (p : Plane.Point). p ∈ region ∧
-            ∃ (q : Plane.Point). q ∈ region
-                ∧ (Plane.distance(p, q) < Real.harmonic_term(n)
-                       ∧ ¬(abs(f(p) - f(q)) < tolerance)) := {
-  Real.harmonic_term(n) > 0 by Real.divide_positive;
-  suppose ¬(∃ (p : Plane.Point). p ∈ region ∧
-      ∃ (q : Plane.Point). q ∈ region
-          ∧ (Plane.distance(p, q) < Real.harmonic_term(n)
-                 ∧ ¬(abs(f(p) - f(q)) < tolerance)))
-      as noBadPair for contradiction {
-    ∀ (x : Plane.Point). x ∈ region →
-      ∀ (y : Plane.Point). y ∈ region →
-        Plane.distance(x, y) < Real.harmonic_term(n)
-          → abs(f(x) - f(y)) < tolerance
-        by (x : Plane.Point) (inX : x ∈ region)
-           (y : Plane.Point) (inY : y ∈ region)
-           (near : Plane.distance(x, y) < Real.harmonic_term(n)) ↦ {
-          suppose ¬(abs(f(x) - f(y)) < tolerance)
-              as valuesApart for contradiction {
-            ∃ (q : Plane.Point). q ∈ region
-                ∧ (Plane.distance(x, q) < Real.harmonic_term(n)
-                       ∧ ¬(abs(f(x) - f(q)) < tolerance))
-                by { witness y };
-            ∃ (p : Plane.Point). p ∈ region ∧
-                ∃ (q : Plane.Point). q ∈ region
-                    ∧ (Plane.distance(p, q) < Real.harmonic_term(n)
-                           ∧ ¬(abs(f(p) - f(q)) < tolerance))
-                by { witness x };
-            done
-          };
-          done
-        };
-    ∃ (nearness : ℝ). 0 < nearness ∧
-        ∀ (x : Plane.Point). x ∈ region →
-          ∀ (y : Plane.Point). y ∈ region →
-            Plane.distance(x, y) < nearness
-              → abs(f(x) - f(y)) < tolerance
-        by { witness Real.harmonic_term(n) };
-    done
-  };
-  done
-}
+  MetricSpace.UniformlyContinuousOn(f, carrier)
 
 theorem Plane.uniformly_continuous_on_compact
         (f : Plane.Point → ℝ) (region : Set(Plane.Point))
         (compact : Plane.IsCompact(region))
         (continuous : Plane.RealContinuousOn(f, region))
-        : Plane.UniformlyContinuousOn(f, region) := {
-  take tolerance : ℝ;
-  suppose 0 < tolerance as tolerancePositive;
-  suppose ¬(∃ (nearness : ℝ). 0 < nearness ∧
-      ∀ (x : Plane.Point). x ∈ region →
-        ∀ (y : Plane.Point). y ∈ region →
-          Plane.distance(x, y) < nearness → abs(f(x) - f(y)) < tolerance)
-      as noNearness for contradiction {
-
-    -- At every scale, a pair that is close but whose values are not.
-    ∀ (n : ℕ). ∃ (p : Plane.Point). p ∈ region ∧
-        ∃ (q : Plane.Point). q ∈ region
-            ∧ (Plane.distance(p, q) < Real.harmonic_term(n)
-                   ∧ ¬(abs(f(p) - f(q)) < tolerance))
-        by (n : ℕ) ↦ Plane.bad_pair_at_every_scale(
-             f, region, tolerance, noNearness, n)
-        as badPairs;
-
-    choose p such that
-        ∀ (n : ℕ). p(n) ∈ region ∧
-            ∃ (q : Plane.Point). q ∈ region
-                ∧ (Plane.distance(p(n), q) < Real.harmonic_term(n)
-                       ∧ ¬(abs(f(p(n)) - f(q)) < tolerance))
-        as chosenP
-        from Logic.countable_choice(
-            Plane.Point,
-            (n : ℕ) (x : Plane.Point) ↦ x ∈ region ∧
-                ∃ (q : Plane.Point). q ∈ region
-                    ∧ (Plane.distance(x, q) < Real.harmonic_term(n)
-                           ∧ ¬(abs(f(x) - f(q)) < tolerance)),
-            badPairs);
-    ∀ (m : ℕ). p(m) ∈ region
-        by { take m : ℕ; done by chosenP };
-    ∀ (n : ℕ). ∃ (z : Plane.Point). z ∈ region
-        ∧ (Plane.distance(p(n), z) < Real.harmonic_term(n)
-               ∧ ¬(abs(f(p(n)) - f(z)) < tolerance))
-        by { take n : ℕ; done by chosenP }
-        as partners;
-    choose q such that
-        ∀ (n : ℕ). q(n) ∈ region
-            ∧ (Plane.distance(p(n), q(n)) < Real.harmonic_term(n)
-                   ∧ ¬(abs(f(p(n)) - f(q(n))) < tolerance))
-        as chosenQ
-        from Logic.countable_choice(
-            Plane.Point,
-            (n : ℕ) (z : Plane.Point) ↦ z ∈ region
-                ∧ (Plane.distance(p(n), z) < Real.harmonic_term(n)
-                       ∧ ¬(abs(f(p(n)) - f(z)) < tolerance)),
-            partners);
-    ∀ (m : ℕ). q(m) ∈ region
-        by { take m : ℕ; done by chosenQ };
-
-    -- The pairs close on each other, so one thinning carries both to the
-    -- same limit.
-    ∀ (n : ℕ). Plane.distance(p(n), q(n)) < Real.harmonic_term(n)
-        by {
-          take n : ℕ;
-          q(n) ∈ region
-              ∧ (Plane.distance(p(n), q(n)) < Real.harmonic_term(n) ∧ ¬(abs(f(p(n)) - f(q(n))) < tolerance))
-              by chosenQ;
-          done
-        };
-    choose index : ℕ → ℕ, limit : Plane.Point such that
-        (limit ∈ region ∧ limit ∈ region)
-        ∧ (Plane.SequenceConverges((k : ℕ) ↦ p(index(k)), limit)
-               ∧ Plane.SequenceConverges((k : ℕ) ↦ q(index(k)), limit))
-        from Plane.closing_pairs_share_a_limit;
-    limit ∈ region;
-    Plane.SequenceConverges((k : ℕ) ↦ p(index(k)), limit) as toLimitP;
-    Plane.SequenceConverges((k : ℕ) ↦ q(index(k)), limit) as toLimitQ;
-
-    -- Continuity at the common limit puts both values within half the
-    -- tolerance of the value there — so within the tolerance of each
-    -- other, which the pairs were built to contradict.
-    (2 : ℝ) ≠ 0;
-    0 < tolerance / 2 by Real.divide_positive;
-    choose nearness such that
-        0 < nearness ∧
-        ∀ (y : Plane.Point). y ∈ region →
-          Plane.distance(limit, y) < nearness
-            → abs(f(limit) - f(y)) < tolerance / 2
-        from continuous;
-    0 < nearness as nearnessPositive;
-    ∀ (y : Plane.Point). y ∈ region →
-        Plane.distance(limit, y) < nearness
-          → abs(f(limit) - f(y)) < tolerance / 2
-        as valuesClose;
-    choose thresholdP such that
-        ∀ (k : ℕ). thresholdP ≤ k →
-            Plane.distance(limit, p(index(k))) < nearness
-        as nearP from toLimitP(nearness, nearnessPositive);
-    choose thresholdQ such that
-        ∀ (k : ℕ). thresholdQ ≤ k →
-            Plane.distance(limit, q(index(k))) < nearness
-        as nearQ from toLimitQ(nearness, nearnessPositive);
-    let far : ℕ := Natural.maximum(thresholdP, thresholdQ);
-    thresholdP ≤ far;
-    thresholdQ ≤ far;
-    let deep : ℕ := index(far);
-    Plane.distance(limit, p(deep)) < nearness by nearP;
-    Plane.distance(limit, q(deep)) < nearness by nearQ;
-    abs(f(limit) - f(p(deep))) < tolerance / 2 by valuesClose;
-    abs(f(limit) - f(q(deep))) < tolerance / 2 by valuesClose;
-    abs(f(q(deep)) - f(limit)) = abs(f(limit) - f(q(deep)))
-        by Real.absolute_value_subtract_swap;
-    f(p(deep)) - f(q(deep))
-        = (f(p(deep)) - f(limit)) + (f(limit) - f(q(deep)))
-        by ring as splitAtLimit;
-    abs(f(p(deep)) - f(limit)) = abs(f(limit) - f(p(deep)))
-        by Real.absolute_value_subtract_swap;
-    tolerance / 2 + tolerance / 2 = tolerance by Real.divide_two_doubled;
-    abs(f(p(deep)) - f(q(deep)))
-       = abs((f(p(deep)) - f(limit)) + (f(limit) - f(q(deep))))
-             by splitAtLimit
-       ≤ abs(f(p(deep)) - f(limit)) + abs(f(limit) - f(q(deep)))
-             by Real.triangle_inequality
-       < tolerance / 2 + tolerance / 2 by ordered_field
-       = tolerance;
-    q(deep) ∈ region
-        ∧ (Plane.distance(p(deep), q(deep)) < Real.harmonic_term(deep)
-               ∧ ¬(abs(f(p(deep)) - f(q(deep))) < tolerance))
-        by chosenQ;
-    ¬(abs(f(p(deep)) - f(q(deep))) < tolerance);
-    done
-  };
-  done
-}
+        : Plane.UniformlyContinuousOn(f, region) :=
+  done by MetricSpace.uniformly_continuous_on_compact

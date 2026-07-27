@@ -1,17 +1,11 @@
 -- Plane/separation.math
 --
--- Disjoint compact sets are a positive distance apart.
+-- Disjoint compact sets in the plane are a positive distance apart.
 --
--- This is the blueprint's `lem:compact-separation`, and the last thing
--- Layer 2 owes it. The proof is the one a mathematician writes: if no gap
--- worked, there would be pairs of points, one from each set, closer than
--- every 1/(1+n); thinning twice makes both sequences converge; the limits
--- are then at distance zero, hence equal, hence a point in both sets.
---
--- Two applications of countable choice, in sequence rather than over
--- pairs: the first picks the point of `A`, the second — knowing that
--- point — picks its partner in `B`. That avoids needing a product type
--- and reads the way the argument is spoken.
+-- This is the blueprint's `lem:compact-separation`. Nothing about it is
+-- about the plane — the argument is the closing-pairs one over any metric
+-- space — so it lives in `Metric/separation.math` and the names here are
+-- how the Jordan–Schönflies development speaks it.
 
 module Plane.separation
 
@@ -34,11 +28,16 @@ import Real.absolute_value_order
 import Real.convergence
 import Real.harmonic_series
 import Real.archimedean
+import Metric.space
+import Metric.sequence
+import Metric.compactness
+import Metric.separation
 import Plane.vector
 import Plane.point
 import Plane.bilinear
 import Plane.direction
 import Plane.norm
+import Plane.metric
 import Plane.sequence
 import Plane.compact
 import Plane.compactness
@@ -48,31 +47,8 @@ import Plane.compactness
 -- `distance(centre, ·)` continuous — hence its level sets closed.
 theorem Plane.distance_shift_bound (centre x y : Plane.Point)
         : abs(Plane.distance(centre, y) - Plane.distance(centre, x))
-              ≤ Plane.distance(x, y) := {
-  Plane.distance(centre, y)
-      ≤ Plane.distance(centre, x) + Plane.distance(x, y)
-      by Plane.distance_triangle;
-  Plane.distance(centre, y) - Plane.distance(centre, x)
-      ≤ Plane.distance(x, y) by ordered_field;
-  Plane.distance(centre, x)
-      ≤ Plane.distance(centre, y) + Plane.distance(y, x)
-      by Plane.distance_triangle;
-  Plane.distance(y, x) = Plane.distance(x, y) by Plane.distance_symmetric;
-  Plane.distance(centre, x)
-      ≤ Plane.distance(centre, y) + Plane.distance(x, y);
-  -Plane.distance(x, y)
-      ≤ Plane.distance(centre, y) - Plane.distance(centre, x)
-      by ordered_field;
-  done by Real.absolute_value_LessOrEqual_of_bounds
-}
-
--- ----------------------------------------------------------------------
--- Two sequences that close on each other have the same limit.
---
--- Stated on a common thinning, because that is how it arrives: two
--- sequences built in step, thinned together until both converge. The
--- three-term triangle inequality does the work, with a quarter of the
--- tolerance for each end and a quarter for the gap between them.
+              ≤ Plane.distance(x, y) :=
+  done by MetricSpace.distance_shift_bound
 
 theorem Plane.equal_limits_of_closing
         (u v : ℕ → Plane.Point) (index : ℕ → ℕ)
@@ -82,91 +58,9 @@ theorem Plane.equal_limits_of_closing
         (toV : Plane.SequenceConverges((k : ℕ) ↦ v(index(k)), limitV))
         (closing : ∀ (n : ℕ).
             Plane.distance(u(n), v(n)) < Real.harmonic_term(n))
-        : limitU = limitV := {
-  ∀ (tolerance : ℝ). 0 < tolerance →
-      Plane.distance(limitU, limitV) < tolerance
-      by (tolerance : ℝ) (tolerancePositive : 0 < tolerance) ↦ {
-        (4 : ℝ) ≠ 0;
-        0 < tolerance / 4 by Real.divide_positive;
-        choose thresholdU such that
-            ∀ (k : ℕ). thresholdU ≤ k →
-                Plane.distance(limitU, u(index(k))) < tolerance / 4
-            as closeU from toU(tolerance / 4, { 0 < tolerance / 4 });
-        choose thresholdV such that
-            ∀ (k : ℕ). thresholdV ≤ k →
-                Plane.distance(limitV, v(index(k))) < tolerance / 4
-            as closeV from toV(tolerance / 4, { 0 < tolerance / 4 });
-        choose scale such that Real.harmonic_term(scale) < tolerance / 4
-            from Real.exists_harmonic_term_below(
-                tolerance / 4, { 0 < tolerance / 4 });
-        let far : ℕ :=
-            Natural.maximum(Natural.maximum(thresholdU, thresholdV), scale);
-        Natural.maximum(thresholdU, thresholdV) ≤ far;
-        thresholdU ≤ Natural.maximum(thresholdU, thresholdV);
-        thresholdV ≤ Natural.maximum(thresholdU, thresholdV);
-        thresholdU ≤ far;
-        thresholdV ≤ far;
-        scale ≤ far;
-        let deep : ℕ := index(far);
-        Plane.distance(limitU, u(deep)) < tolerance / 4
-            by closeU;
-        Plane.distance(limitV, v(deep)) < tolerance / 4
-            by closeV;
-        Plane.distance(u(deep), v(deep)) < Real.harmonic_term(deep)
-            by closing;
-        far ≤ deep by Natural.IsStrictlyIncreasing.LessOrEqual;
-        scale ≤ deep;
-        Real.harmonic_term(deep) ≤ Real.harmonic_term(scale)
-            by Real.harmonic_term_antitone;
-        Plane.distance(u(deep), v(deep)) < tolerance / 4;
-        Plane.distance(limitV, v(deep)) = Plane.distance(v(deep), limitV)
-            by Plane.distance_symmetric;
-        tolerance / 4 + tolerance / 4 + tolerance / 4
-            < tolerance / 4 + tolerance / 4 + tolerance / 4 + tolerance / 4
-            by ordered_field;
-        tolerance / 4 + tolerance / 4 + tolerance / 4 + tolerance / 4
-            = tolerance by Real.divide_four_quarters;
-        Plane.distance(u(deep), limitV)
-            ≤ Plane.distance(u(deep), v(deep))
-                  + Plane.distance(v(deep), limitV)
-            by Plane.distance_triangle;
-        Plane.distance(limitU, limitV)
-           ≤ Plane.distance(limitU, u(deep)) + Plane.distance(u(deep), limitV)
-                 by Plane.distance_triangle
-           ≤ Plane.distance(limitU, u(deep))
-                 + (Plane.distance(u(deep), v(deep))
-                        + Plane.distance(v(deep), limitV))
-           = Plane.distance(limitU, u(deep))
-                 + Plane.distance(u(deep), v(deep))
-                 + Plane.distance(v(deep), limitV) by ring
-           < tolerance / 4 + tolerance / 4 + tolerance / 4
-           < tolerance;
-        done
-      }
-      as arbitrarilyClose;
-  0 ≤ Plane.distance(limitU, limitV) by Plane.distance_nonneg;
-  abs(Plane.distance(limitU, limitV)) = Plane.distance(limitU, limitV)
-      by Real.absolute_value_when_nonneg;
-  ∀ (tolerance : ℝ). 0 < tolerance →
-      abs(Plane.distance(limitU, limitV)) < tolerance
-      by (tolerance : ℝ) (tolerancePositive : 0 < tolerance) ↦ {
-        Plane.distance(limitU, limitV) < tolerance
-            by arbitrarilyClose;
-        done
-      };
-  Plane.distance(limitU, limitV) = 0
-      by Real.eq_of_absolute_value_less_than_all_positive_real;
-  done by Plane.equal_of_distance_zero
-}
+        : limitU = limitV :=
+  done by MetricSpace.equal_limits_of_closing
 
--- Two sequences in compact sets that close on each other share a limit,
--- and one thinning reaches it along both. Thin the first sequence, thin
--- the partner along that, and compose the two index maps: the composite
--- is increasing, so it thins the already-convergent first sequence too,
--- and both limits are then the limit of the same closing pairs.
---
--- Every proof that pushes a negation through "for every scale there is a
--- pair" arrives here, so this is where the double thinning lives.
 theorem Plane.closing_pairs_share_a_limit
         (regionA regionB : Set(Plane.Point))
         (compactA : Plane.IsCompact(regionA))
@@ -179,52 +73,9 @@ theorem Plane.closing_pairs_share_a_limit
         : ∃ (index : ℕ → ℕ). ∃ (limit : Plane.Point).
             (limit ∈ regionA ∧ limit ∈ regionB)
             ∧ (Plane.SequenceConverges((k : ℕ) ↦ u(index(k)), limit)
-                   ∧ Plane.SequenceConverges((k : ℕ) ↦ v(index(k)), limit)) := {
-  choose firstIndex : ℕ → ℕ, limitU : Plane.Point such that
-      limitU ∈ regionA ∧ Plane.SubsequenceConverges(u, firstIndex, limitU)
-      from compactA;
-  Plane.SubsequenceConverges(u, firstIndex, limitU);
-  Natural.IsStrictlyIncreasing(firstIndex)
-      by Plane.SubsequenceConverges.increasing;
-  limitU ∈ regionA;
-  Plane.SequenceConverges((k : ℕ) ↦ u(firstIndex(k)), limitU)
-      by Plane.SubsequenceConverges.converges;
+                   ∧ Plane.SequenceConverges((k : ℕ) ↦ v(index(k)), limit)) :=
+  done by MetricSpace.closing_pairs_share_a_limit
 
-  choose secondIndex : ℕ → ℕ, limitV : Plane.Point such that
-      limitV ∈ regionB
-      ∧ Plane.SubsequenceConverges(
-            (k : ℕ) ↦ v(firstIndex(k)), secondIndex, limitV)
-      from compactB;
-  Plane.SubsequenceConverges((k : ℕ) ↦ v(firstIndex(k)), secondIndex, limitV);
-  Natural.IsStrictlyIncreasing(secondIndex)
-      by Plane.SubsequenceConverges.increasing;
-  limitV ∈ regionB;
-  Plane.SequenceConverges(
-      (k : ℕ) ↦ v(firstIndex(secondIndex(k))), limitV);
-  Plane.SequenceConverges((k : ℕ) ↦ u(firstIndex(secondIndex(k))), limitU)
-      by Plane.SequenceConverges.subsequence(
-          s := (k : ℕ) ↦ u(firstIndex(k)));
-
-  Natural.IsStrictlyIncreasing((k : ℕ) ↦ firstIndex(secondIndex(k)))
-      by Natural.IsStrictlyIncreasing.compose;
-  limitU = limitV
-      by Plane.equal_limits_of_closing(
-          index := (k : ℕ) ↦ firstIndex(secondIndex(k)))
-      as limitsAgree;
-  limitU ∈ regionB by substituting limitsAgree;
-  Plane.SequenceConverges((k : ℕ) ↦ v(firstIndex(secondIndex(k))), limitU)
-      by substituting limitsAgree;
-  let composed : ℕ → ℕ := (k : ℕ) ↦ firstIndex(secondIndex(k));
-  done by { witness composed with { witness limitU } }
-}
-
--- ----------------------------------------------------------------------
--- The separation lemma.
-
--- "No gap works, so every scale is beaten by some pair." One sentence in
--- a textbook; the block below is what pushing the negation through the
--- quantifiers costs, and it is quarantined here so the theorem that uses
--- it can just say the sentence.
 theorem Plane.close_pair_at_every_scale
         (regionA regionB : Set(Plane.Point))
         (noGap : ¬(∃ (gap : ℝ). 0 < gap ∧
@@ -234,42 +85,8 @@ theorem Plane.close_pair_at_every_scale
         (n : ℕ)
         : ∃ (a : Plane.Point). a ∈ regionA ∧
             ∃ (b : Plane.Point). b ∈ regionB
-                ∧ Plane.distance(a, b) < Real.harmonic_term(n) := {
-  Real.harmonic_term(n) > 0 by Real.divide_positive;
-  suppose ¬(∃ (a : Plane.Point). a ∈ regionA ∧
-      ∃ (b : Plane.Point). b ∈ regionB
-          ∧ Plane.distance(a, b) < Real.harmonic_term(n))
-      as noClosePair for contradiction {
-    ∀ (a : Plane.Point). a ∈ regionA →
-      ∀ (b : Plane.Point). b ∈ regionB →
-        Real.harmonic_term(n) ≤ Plane.distance(a, b)
-        by (a : Plane.Point) (inA : a ∈ regionA)
-           (b : Plane.Point) (inB : b ∈ regionB) ↦ {
-          suppose ¬(Real.harmonic_term(n) ≤ Plane.distance(a, b))
-              as close for contradiction {
-            Plane.distance(a, b) < Real.harmonic_term(n)
-                by Real.LessThan_of_not_LessOrEqual;
-            ∃ (b : Plane.Point). b ∈ regionB
-                ∧ Plane.distance(a, b) < Real.harmonic_term(n)
-                by { witness b };
-            ∃ (a : Plane.Point). a ∈ regionA ∧
-                ∃ (b : Plane.Point). b ∈ regionB
-                    ∧ Plane.distance(a, b) < Real.harmonic_term(n)
-                by { witness a };
-            done
-          };
-          done
-        };
-    ∃ (gap : ℝ). 0 < gap ∧
-        ∀ (a : Plane.Point). a ∈ regionA →
-          ∀ (b : Plane.Point). b ∈ regionB →
-            gap ≤ Plane.distance(a, b)
-        by { witness Real.harmonic_term(n) };
-    done
-  };
-  done
-}
-
+                ∧ Plane.distance(a, b) < Real.harmonic_term(n) :=
+  done by MetricSpace.close_pair_at_every_scale
 
 theorem Plane.compact_separation (regionA regionB : Set(Plane.Point))
         (compactA : Plane.IsCompact(regionA))
@@ -278,63 +95,5 @@ theorem Plane.compact_separation (regionA regionB : Set(Plane.Point))
         : ∃ (gap : ℝ). 0 < gap ∧
             ∀ (a : Plane.Point). a ∈ regionA →
               ∀ (b : Plane.Point). b ∈ regionB →
-                gap ≤ Plane.distance(a, b) := {
-  suppose ¬(∃ (gap : ℝ). 0 < gap ∧
-      ∀ (a : Plane.Point). a ∈ regionA →
-        ∀ (b : Plane.Point). b ∈ regionB →
-          gap ≤ Plane.distance(a, b)) as noGap for contradiction {
-
-    -- No gap works, so every scale is beaten by some pair.
-    ∀ (n : ℕ). ∃ (a : Plane.Point). a ∈ regionA ∧
-        ∃ (b : Plane.Point). b ∈ regionB
-            ∧ Plane.distance(a, b) < Real.harmonic_term(n)
-        by (n : ℕ) ↦
-             Plane.close_pair_at_every_scale(regionA, regionB, noGap, n)
-        as closePairs;
-
-    -- First choice: the point of `A`.
-    choose a such that
-        ∀ (n : ℕ). a(n) ∈ regionA ∧
-            ∃ (b : Plane.Point). b ∈ regionB
-                ∧ Plane.distance(a(n), b) < Real.harmonic_term(n)
-        as chosenA
-        from Logic.countable_choice(
-            Plane.Point,
-            (n : ℕ) (x : Plane.Point) ↦ x ∈ regionA ∧
-                ∃ (b : Plane.Point). b ∈ regionB
-                    ∧ Plane.distance(x, b) < Real.harmonic_term(n),
-            closePairs);
-    ∀ (m : ℕ). a(m) ∈ regionA by { take m : ℕ; done by chosenA };
-
-    -- Second choice: its partner in `B`.
-    ∀ (n : ℕ). ∃ (y : Plane.Point). y ∈ regionB
-        ∧ Plane.distance(a(n), y) < Real.harmonic_term(n)
-        by { take n : ℕ; done by chosenA }
-        as partners;
-    choose b such that
-        ∀ (n : ℕ). b(n) ∈ regionB
-            ∧ Plane.distance(a(n), b(n)) < Real.harmonic_term(n)
-        as chosenB
-        from Logic.countable_choice(
-            Plane.Point,
-            (n : ℕ) (y : Plane.Point) ↦ y ∈ regionB
-                ∧ Plane.distance(a(n), y) < Real.harmonic_term(n),
-            partners);
-    ∀ (m : ℕ). b(m) ∈ regionB by { take m : ℕ; done by chosenB };
-
-    -- The pairs close on each other, so they share a limit — which is
-    -- then a point of both regions, and they were disjoint.
-    ∀ (n : ℕ). Plane.distance(a(n), b(n)) < Real.harmonic_term(n)
-        by { take n : ℕ; done by chosenB };
-    choose index : ℕ → ℕ, limit : Plane.Point such that
-        (limit ∈ regionA ∧ limit ∈ regionB)
-        ∧ (Plane.SequenceConverges((k : ℕ) ↦ a(index(k)), limit)
-               ∧ Plane.SequenceConverges((k : ℕ) ↦ b(index(k)), limit))
-        from Plane.closing_pairs_share_a_limit;
-    limit ∈ regionA;
-    limit ∈ regionB;
-    ¬(limit ∈ regionB) by disjoint;
-    done
-  };
-  done
-}
+                gap ≤ Plane.distance(a, b) :=
+  done by MetricSpace.compact_separation
