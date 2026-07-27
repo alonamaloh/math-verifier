@@ -3,8 +3,15 @@
 -- Relative topology of the plane. Layer 1 of the Jordan–Schönflies
 -- foundation.
 --
--- Everything here is stated RELATIVE to a carrier set from the start,
--- and the absolute notions are the `carrier = universe` case. That is a
+-- Every notion here is the generic metric-space one from `Metric/`, read
+-- at `Plane.Point` through the instance in `Plane/metric.math`. The names
+-- are kept because the Jordan–Schönflies development speaks them; the
+-- mathematics lives in `Metric/topology.math` and
+-- `Metric/continuity.math`, where it is written once and also serves the
+-- real line.
+--
+-- Everything is stated RELATIVE to a carrier set from the start, and the
+-- absolute notions are the `carrier = universe` case. That is a
 -- deliberate choice, settled in PLAN_JORDAN_SCHOENFLIES.md: connectedness
 -- gets applied to arcs and curves as subspaces, and the model-curve
 -- parametrization needs compact→Hausdorff on a subspace, so retrofitting
@@ -25,216 +32,81 @@ import Set.basics
 import Set.algebra
 import Real.interface
 import Real.minimum
+import Metric.space
+import Metric.topology
+import Metric.continuity
 import Plane.vector
 import Plane.point
 import Plane.norm
 import Plane.segment
+import Plane.metric
 
 -- ----------------------------------------------------------------------
 -- Open sets, relative to a carrier.
 
 definition Plane.OpenIn (subset carrier : Set(Plane.Point)) : Proposition :=
-  ∀ (x : Plane.Point). x ∈ subset →
-    ∃ (radius : ℝ). 0 < radius ∧
-      ∀ (y : Plane.Point). y ∈ carrier →
-        Plane.distance(x, y) < radius → y ∈ subset
+  MetricSpace.OpenIn(subset, carrier)
 
 definition Plane.IsOpen (subset : Set(Plane.Point)) : Proposition :=
-  Plane.OpenIn(subset, Set.universe(Plane.Point))
+  MetricSpace.IsOpen(subset)
 
 definition Plane.ClosedIn (subset carrier : Set(Plane.Point)) : Proposition :=
-  Plane.OpenIn(Set.difference(carrier, subset), carrier)
+  MetricSpace.ClosedIn(subset, carrier)
 
 -- ----------------------------------------------------------------------
--- The lattice laws. Each is the ε-ball argument a textbook gives.
+-- The lattice laws.
 
 theorem Plane.OpenIn.universe (carrier : Set(Plane.Point))
-        : Plane.OpenIn(Set.universe(Plane.Point), carrier) := {
-  take x : Plane.Point;
-  suppose x ∈ Set.universe(Plane.Point);
-  witness (1 : ℝ) with {
-    (0 : ℝ) < 1;
-    ∀ (y : Plane.Point). y ∈ carrier →
-        Plane.distance(x, y) < 1 → y ∈ Set.universe(Plane.Point)
-        by (y : Plane.Point) (yInCarrier : y ∈ carrier)
-           (yClose : Plane.distance(x, y) < 1) ↦
-             Set.member_universe(y);
-    done
-  }
-}
+        : Plane.OpenIn(Set.universe(Plane.Point), carrier) :=
+  done by MetricSpace.OpenIn.universe
 
 theorem Plane.OpenIn.empty (carrier : Set(Plane.Point))
-        : Plane.OpenIn(Set.empty(Plane.Point), carrier) := {
-  take x : Plane.Point;
-  suppose x ∈ Set.empty(Plane.Point) as inEmpty;
-  False by Set.not_member_empty;
-  done
-}
+        : Plane.OpenIn(Set.empty(Plane.Point), carrier) :=
+  done by MetricSpace.OpenIn.empty
 
--- A finite intersection of relatively open sets is relatively open: take
--- the smaller of the two radii.
 theorem Plane.OpenIn.intersection
         (left right carrier : Set(Plane.Point))
         (leftOpen : Plane.OpenIn(left, carrier))
         (rightOpen : Plane.OpenIn(right, carrier))
-        : Plane.OpenIn(left ∩ right, carrier) := {
-  take x : Plane.Point;
-  suppose x ∈ left ∩ right as inBoth;
-  x ∈ left by Set.intersection_member_left;
-  x ∈ right by Set.intersection_member_right;
-  choose leftRadius such that
-      0 < leftRadius ∧
-        ∀ (y : Plane.Point). y ∈ carrier →
-          Plane.distance(x, y) < leftRadius → y ∈ left
-      from leftOpen;
-  choose rightRadius such that
-      0 < rightRadius ∧
-        ∀ (y : Plane.Point). y ∈ carrier →
-          Plane.distance(x, y) < rightRadius → y ∈ right
-      from rightOpen;
-  0 < leftRadius;
-  0 < rightRadius;
-  ∀ (y : Plane.Point). y ∈ carrier →
-      Plane.distance(x, y) < leftRadius → y ∈ left as leftBall;
-  ∀ (y : Plane.Point). y ∈ carrier →
-      Plane.distance(x, y) < rightRadius → y ∈ right as rightBall;
-  witness min(leftRadius, rightRadius) with {
-    0 < min(leftRadius, rightRadius);
-    ∀ (y : Plane.Point). y ∈ carrier →
-        Plane.distance(x, y) < min(leftRadius, rightRadius) → y ∈ left ∩ right
-        by (y : Plane.Point) (yInCarrier : y ∈ carrier)
-           (yClose : Plane.distance(x, y) < min(leftRadius, rightRadius)) ↦ {
-             Plane.distance(x, y)
-                < min(leftRadius, rightRadius)
-                ≤ leftRadius;
-             Plane.distance(x, y)
-                < min(leftRadius, rightRadius)
-                ≤ rightRadius;
-             y ∈ left by leftBall;
-             y ∈ right by rightBall;
-             done by Set.member_intersection
-           };
-    done
-  }
-}
+        : Plane.OpenIn(left ∩ right, carrier) :=
+  done by MetricSpace.OpenIn.intersection
 
--- A union of two relatively open sets is relatively open: whichever side
--- the point came from supplies the radius.
 theorem Plane.OpenIn.union
         (left right carrier : Set(Plane.Point))
         (leftOpen : Plane.OpenIn(left, carrier))
         (rightOpen : Plane.OpenIn(right, carrier))
-        : Plane.OpenIn(left ∪ right, carrier) := {
-  take x : Plane.Point;
-  suppose x ∈ left ∪ right as inEither;
-  done by cases {
-    case x ∈ left: {
-        choose radius such that
-            0 < radius ∧
-              ∀ (y : Plane.Point). y ∈ carrier →
-                Plane.distance(x, y) < radius → y ∈ left
-            from leftOpen;
-        0 < radius;
-        ∀ (y : Plane.Point). y ∈ carrier →
-            Plane.distance(x, y) < radius → y ∈ left as leftBall;
-        witness radius with {
-          0 < radius;
-          ∀ (y : Plane.Point). y ∈ carrier →
-              Plane.distance(x, y) < radius → y ∈ left ∪ right
-              by (y : Plane.Point) (yInCarrier : y ∈ carrier)
-                 (yClose : Plane.distance(x, y) < radius) ↦ {
-                   y ∈ left by leftBall;
-                   done by Set.subset_union_left
-                 };
-          done
-        }
-      }
-    case x ∈ right: {
-        choose radius such that
-            0 < radius ∧
-              ∀ (y : Plane.Point). y ∈ carrier →
-                Plane.distance(x, y) < radius → y ∈ right
-            from rightOpen;
-        0 < radius;
-        ∀ (y : Plane.Point). y ∈ carrier →
-            Plane.distance(x, y) < radius → y ∈ right as rightBall;
-        witness radius with {
-          0 < radius;
-          ∀ (y : Plane.Point). y ∈ carrier →
-              Plane.distance(x, y) < radius → y ∈ left ∪ right
-              by (y : Plane.Point) (yInCarrier : y ∈ carrier)
-                 (yClose : Plane.distance(x, y) < radius) ↦ {
-                   y ∈ right by rightBall;
-                   done by Set.subset_union_right
-                 };
-          done
-        }
-      }
-  }
-}
+        : Plane.OpenIn(left ∪ right, carrier) :=
+  done by MetricSpace.OpenIn.union
 
 -- ----------------------------------------------------------------------
 -- Balls are open, which is what makes the definition worth having.
 
 theorem Plane.Ball_IsOpen (center : Plane.Point) (radius : ℝ)
-        : Plane.IsOpen(Plane.Ball(center, radius)) := {
-  take x : Plane.Point;
-  suppose x ∈ Plane.Ball(center, radius) as xInside;
-  Plane.distance(center, x) < radius;
-  0 < radius - Plane.distance(center, x);
-  witness radius - Plane.distance(center, x) with {
-    0 < radius - Plane.distance(center, x);
-    ∀ (y : Plane.Point). y ∈ Set.universe(Plane.Point) →
-        Plane.distance(x, y) < radius - Plane.distance(center, x) →
-          y ∈ Plane.Ball(center, radius)
-        by (y : Plane.Point) (yAnywhere : y ∈ Set.universe(Plane.Point))
-           (yClose : Plane.distance(x, y) < radius - Plane.distance(center, x)) ↦ {
-             Plane.distance(center, y)
-                ≤ Plane.distance(center, x) + Plane.distance(x, y)
-                      by Plane.distance_triangle
-                < Plane.distance(center, x)
-                      + (radius - Plane.distance(center, x))
-                = radius;
-             done
-           };
-    done
-  }
-}
+        : Plane.IsOpen(Plane.Ball(center, radius)) :=
+  done by MetricSpace.Ball_IsOpen
 
 -- ----------------------------------------------------------------------
 -- The textbook characterization: relatively open means "cut out of the
--- carrier by an open set". The ε-ball form above is what the proofs
--- manipulate; this is what a reader expects to see.
+-- carrier by an open set".
 
--- Witness for the forward direction: the union of every ball the ε-ball
--- condition supplies. A comprehension, so no indexed unions are needed.
--- The conjunction is kept flat so that a proof builds it leg by leg.
 definition Plane.BallWitness
         (subset carrier : Set(Plane.Point))
         (x : Plane.Point) (radius : ℝ) (y : Plane.Point) : Proposition :=
-  x ∈ subset
-  ∧ 0 < radius
-  ∧ (∀ (z : Plane.Point). z ∈ carrier →
-        Plane.distance(x, z) < radius → z ∈ subset)
-  ∧ Plane.distance(x, y) < radius
+  MetricSpace.BallWitness(subset, carrier, x, radius, y)
 
--- The four legs, as citations. `BallWitness` is a definition, so a proof
--- that reaches into a folded witness pays a δ-unfolding at every
--- projection; these pay it once each, and the use sites then say which
--- leg they are using.
 theorem Plane.BallWitness.centre_inside
         (subset carrier : Set(Plane.Point))
         (x : Plane.Point) (radius : ℝ) (y : Plane.Point)
         (holds : Plane.BallWitness(subset, carrier, x, radius, y))
         : x ∈ subset :=
-  unfold Plane.BallWitness in { x ∈ subset; done }
+  done by MetricSpace.BallWitness.centre_inside
 
 theorem Plane.BallWitness.radius_positive
         (subset carrier : Set(Plane.Point))
         (x : Plane.Point) (radius : ℝ) (y : Plane.Point)
         (holds : Plane.BallWitness(subset, carrier, x, radius, y))
         : 0 < radius :=
-  unfold Plane.BallWitness in { 0 < radius; done }
+  done by MetricSpace.BallWitness.radius_positive
 
 theorem Plane.BallWitness.ball_inside
         (subset carrier : Set(Plane.Point))
@@ -242,469 +114,133 @@ theorem Plane.BallWitness.ball_inside
         (holds : Plane.BallWitness(subset, carrier, x, radius, y))
         : ∀ (z : Plane.Point). z ∈ carrier →
               Plane.distance(x, z) < radius → z ∈ subset :=
-  unfold Plane.BallWitness in {
-    ∀ (z : Plane.Point). z ∈ carrier →
-        Plane.distance(x, z) < radius → z ∈ subset;
-    done
-  }
+  done by MetricSpace.BallWitness.ball_inside
 
 theorem Plane.BallWitness.reaches
         (subset carrier : Set(Plane.Point))
         (x : Plane.Point) (radius : ℝ) (y : Plane.Point)
         (holds : Plane.BallWitness(subset, carrier, x, radius, y))
         : Plane.distance(x, y) < radius :=
-  unfold Plane.BallWitness in { Plane.distance(x, y) < radius; done }
+  done by MetricSpace.BallWitness.reaches
 
 definition Plane.openHull (subset carrier : Set(Plane.Point))
         : Set(Plane.Point) :=
-  (y : Plane.Point) ↦
-    ∃ (x : Plane.Point). ∃ (radius : ℝ).
-      Plane.BallWitness(subset, carrier, x, radius, y)
+  MetricSpace.openHull(subset, carrier)
 
 theorem Plane.openHull_IsOpen (subset carrier : Set(Plane.Point))
-        : Plane.IsOpen(Plane.openHull(subset, carrier)) := {
-  take y : Plane.Point;
-  suppose y ∈ Plane.openHull(subset, carrier) as inHull;
-  choose x, radius such that
-      Plane.BallWitness(subset, carrier, x, radius, y) from inHull;
-  x ∈ subset by Plane.BallWitness.centre_inside;
-  0 < radius by Plane.BallWitness.radius_positive;
-  ∀ (z : Plane.Point). z ∈ carrier →
-      Plane.distance(x, z) < radius → z ∈ subset
-      by Plane.BallWitness.ball_inside;
-  Plane.distance(x, y) < radius by Plane.BallWitness.reaches;
-  0 < radius - Plane.distance(x, y);
-  witness radius - Plane.distance(x, y) with {
-    0 < radius - Plane.distance(x, y);
-    ∀ (w : Plane.Point). w ∈ Set.universe(Plane.Point) →
-        Plane.distance(y, w) < radius - Plane.distance(x, y) →
-          w ∈ Plane.openHull(subset, carrier)
-        by (w : Plane.Point) (wAnywhere : w ∈ Set.universe(Plane.Point))
-           (wNear : Plane.distance(y, w) < radius - Plane.distance(x, y)) ↦ {
-             Plane.distance(x, w)
-                ≤ Plane.distance(x, y) + Plane.distance(y, w)
-                      by Plane.distance_triangle
-                < Plane.distance(x, y) + (radius - Plane.distance(x, y))
-                = radius;
-             Plane.BallWitness(subset, carrier, x, radius, w) as witnessHolds;
-             witness x with witness radius with witnessHolds
-           };
-    done
-  }
-}
+        : Plane.IsOpen(Plane.openHull(subset, carrier)) :=
+  done by MetricSpace.openHull_IsOpen
 
--- Forward: a relatively open subset is cut out by its own open hull.
 theorem Plane.subset_openHull_intersection (subset carrier : Set(Plane.Point))
         (subsetInCarrier : subset ⊆ carrier)
         (openInCarrier : Plane.OpenIn(subset, carrier))
-        : subset ⊆ Plane.openHull(subset, carrier) ∩ carrier := {
-  take y : Plane.Point;
-  suppose y ∈ subset;
-  y ∈ carrier by subsetInCarrier;
-  choose radius such that
-      0 < radius ∧
-        ∀ (z : Plane.Point). z ∈ carrier →
-          Plane.distance(y, z) < radius → z ∈ subset
-      from openInCarrier;
-  0 < radius;
-  ∀ (z : Plane.Point). z ∈ carrier →
-      Plane.distance(y, z) < radius → z ∈ subset;
-  Plane.distance(y, y)
-     = 0 by Plane.distance_self
-     < radius;
-  Plane.BallWitness(subset, carrier, y, radius, y) as witnessHolds;
-  y ∈ Plane.openHull(subset, carrier)
-      by { witness y with witness radius with witnessHolds };
-  done by Set.member_intersection
-}
+        : subset ⊆ Plane.openHull(subset, carrier) ∩ carrier :=
+  done by MetricSpace.subset_openHull_intersection
 
--- Backward: whatever the hull cuts out of the carrier was already in the
--- subset — that is precisely what each ball property says.
 theorem Plane.openHull_intersection_subset (subset carrier : Set(Plane.Point))
-        : Plane.openHull(subset, carrier) ∩ carrier ⊆ subset := {
-  take y : Plane.Point;
-  suppose y ∈ Plane.openHull(subset, carrier) ∩ carrier as inBoth;
-  y ∈ Plane.openHull(subset, carrier)
-      by Set.intersection_member_left as inHull;
-  y ∈ carrier by Set.intersection_member_right;
-  choose x, radius such that
-      Plane.BallWitness(subset, carrier, x, radius, y) from inHull;
-  ∀ (z : Plane.Point). z ∈ carrier →
-      Plane.distance(x, z) < radius → z ∈ subset
-      by Plane.BallWitness.ball_inside as ballProperty;
-  Plane.distance(x, y) < radius by Plane.BallWitness.reaches;
-  done by ballProperty
-}
+        : Plane.openHull(subset, carrier) ∩ carrier ⊆ subset :=
+  done by MetricSpace.openHull_intersection_subset
 
 theorem Plane.OpenIn_cut_by_open (subset carrier : Set(Plane.Point))
         (subsetInCarrier : subset ⊆ carrier)
         (openInCarrier : Plane.OpenIn(subset, carrier))
-        : subset = Plane.openHull(subset, carrier) ∩ carrier := {
-  subset ⊆ Plane.openHull(subset, carrier) ∩ carrier
-      by Plane.subset_openHull_intersection;
-  Plane.openHull(subset, carrier) ∩ carrier ⊆ subset
-      by Plane.openHull_intersection_subset;
-  done by Set.equal_of_same_members
-}
+        : subset = Plane.openHull(subset, carrier) ∩ carrier :=
+  done by MetricSpace.OpenIn_cut_by_open
 
--- The converse, and the direction consumers use to BUILD relatively open
--- sets: anything cut out of the carrier by an open set is open in it.
 theorem Plane.OpenIn_of_cut (subset carrier ambient : Set(Plane.Point))
         (ambientOpen : Plane.IsOpen(ambient))
         (cut : subset = ambient ∩ carrier)
-        : Plane.OpenIn(subset, carrier) := {
-  take x : Plane.Point;
-  suppose x ∈ subset as xInSubset;
-  x ∈ ambient ∩ carrier by substituting cut;
-  x ∈ ambient by Set.intersection_member_left;
-  choose radius such that
-      0 < radius ∧
-        ∀ (y : Plane.Point). y ∈ Set.universe(Plane.Point) →
-          Plane.distance(x, y) < radius → y ∈ ambient
-      from ambientOpen;
-  0 < radius;
-  ∀ (y : Plane.Point). y ∈ Set.universe(Plane.Point) →
-      Plane.distance(x, y) < radius → y ∈ ambient as ambientBall;
-  witness radius with {
-    0 < radius;
-    ∀ (y : Plane.Point). y ∈ carrier →
-        Plane.distance(x, y) < radius → y ∈ subset
-        by (y : Plane.Point) (yInCarrier : y ∈ carrier)
-           (yClose : Plane.distance(x, y) < radius) ↦ {
-             y ∈ Set.universe(Plane.Point) by Set.member_universe;
-             y ∈ ambient by ambientBall;
-             y ∈ ambient ∩ carrier by Set.member_intersection;
-             done by substituting cut
-           };
-    done
-  }
-}
+        : Plane.OpenIn(subset, carrier) :=
+  done by MetricSpace.OpenIn_of_cut
 
 -- ----------------------------------------------------------------------
 -- Interior, closure, boundary — all relative to the carrier.
---
--- The interior collects the points that have a ball to themselves; the
--- closure collects the points of the carrier that every ball reaches; the
--- boundary is what the closure has and the interior does not.
 
 definition Plane.InteriorIn (subset carrier : Set(Plane.Point))
         : Set(Plane.Point) :=
-  (x : Plane.Point) ↦ x ∈ subset ∧
-    ∃ (radius : ℝ). 0 < radius ∧
-      ∀ (y : Plane.Point). y ∈ carrier →
-        Plane.distance(x, y) < radius → y ∈ subset
+  MetricSpace.InteriorIn(subset, carrier)
 
 definition Plane.ClosureIn (subset carrier : Set(Plane.Point))
         : Set(Plane.Point) :=
-  (x : Plane.Point) ↦ x ∈ carrier ∧
-    ∀ (radius : ℝ). 0 < radius →
-      ∃ (y : Plane.Point). y ∈ subset ∧ Plane.distance(x, y) < radius
+  MetricSpace.ClosureIn(subset, carrier)
 
 definition Plane.BoundaryIn (subset carrier : Set(Plane.Point))
         : Set(Plane.Point) :=
-  Plane.ClosureIn(subset, carrier) ∖ Plane.InteriorIn(subset, carrier)
-
--- ----------------------------------------------------------------------
--- Interior.
+  MetricSpace.BoundaryIn(subset, carrier)
 
 theorem Plane.InteriorIn_subset (subset carrier : Set(Plane.Point))
-        : Plane.InteriorIn(subset, carrier) ⊆ subset := {
-  take x : Plane.Point;
-  suppose x ∈ Plane.InteriorIn(subset, carrier) as inInterior;
-  x ∈ subset;
-  done
-}
+        : Plane.InteriorIn(subset, carrier) ⊆ subset :=
+  done by MetricSpace.InteriorIn_subset
 
--- The interior is relatively open: shrink the radius by the distance
--- already travelled, exactly as for a ball.
 theorem Plane.InteriorIn_OpenIn (subset carrier : Set(Plane.Point))
-        : Plane.OpenIn(Plane.InteriorIn(subset, carrier), carrier) := {
-  take x : Plane.Point;
-  suppose x ∈ Plane.InteriorIn(subset, carrier) as inInterior;
-  x ∈ subset;
-  ∃ (radius : ℝ). 0 < radius ∧
-      ∀ (y : Plane.Point). y ∈ carrier →
-        Plane.distance(x, y) < radius → y ∈ subset as hasBall;
-  choose radius such that 0 < radius ∧
-      ∀ (y : Plane.Point). y ∈ carrier →
-        Plane.distance(x, y) < radius → y ∈ subset
-      from hasBall;
-  0 < radius;
-  ∀ (y : Plane.Point). y ∈ carrier →
-      Plane.distance(x, y) < radius → y ∈ subset as ballProperty;
-  witness radius with {
-    0 < radius;
-    ∀ (y : Plane.Point). y ∈ carrier →
-        Plane.distance(x, y) < radius →
-          y ∈ Plane.InteriorIn(subset, carrier)
-        by (y : Plane.Point) (yInCarrier : y ∈ carrier)
-           (yClose : Plane.distance(x, y) < radius) ↦ {
-             y ∈ subset by ballProperty;
-             0 < radius - Plane.distance(x, y);
-             ∃ (smaller : ℝ). 0 < smaller ∧
-                 ∀ (z : Plane.Point). z ∈ carrier →
-                   Plane.distance(y, z) < smaller → z ∈ subset
-                 by { witness radius - Plane.distance(x, y) with {
-                        0 < radius - Plane.distance(x, y);
-                        ∀ (z : Plane.Point). z ∈ carrier →
-                            Plane.distance(y, z) < radius - Plane.distance(x, y)
-                              → z ∈ subset
-                            by (z : Plane.Point) (zInCarrier : z ∈ carrier)
-                               (zClose : Plane.distance(y, z)
-                                   < radius - Plane.distance(x, y)) ↦ {
-                                 Plane.distance(x, z)
-                                    ≤ Plane.distance(x, y) + Plane.distance(y, z)
-                                          by Plane.distance_triangle
-                                    < Plane.distance(x, y)
-                                          + (radius - Plane.distance(x, y))
-                                    = radius;
-                                 done by ballProperty
-                               };
-                        done
-                      } };
-             done
-           };
-    done
-  }
-}
+        : Plane.OpenIn(Plane.InteriorIn(subset, carrier), carrier) :=
+  done by MetricSpace.InteriorIn_OpenIn
 
--- A relatively open subset is its own interior.
 theorem Plane.subset_InteriorIn_of_OpenIn (subset carrier : Set(Plane.Point))
         (openInCarrier : Plane.OpenIn(subset, carrier))
-        : subset ⊆ Plane.InteriorIn(subset, carrier) := {
-  take x : Plane.Point;
-  suppose x ∈ subset as xInSubset;
-  ∃ (radius : ℝ). 0 < radius ∧
-      ∀ (y : Plane.Point). y ∈ carrier →
-        Plane.distance(x, y) < radius → y ∈ subset
-      by openInCarrier;
-  done
-}
-
--- ----------------------------------------------------------------------
--- Closure.
+        : subset ⊆ Plane.InteriorIn(subset, carrier) :=
+  done by MetricSpace.subset_InteriorIn_of_OpenIn
 
 theorem Plane.ClosureIn_subset_carrier (subset carrier : Set(Plane.Point))
-        : Plane.ClosureIn(subset, carrier) ⊆ carrier := {
-  take x : Plane.Point;
-  suppose x ∈ Plane.ClosureIn(subset, carrier) as inClosure;
-  x ∈ carrier;
-  done
-}
+        : Plane.ClosureIn(subset, carrier) ⊆ carrier :=
+  done by MetricSpace.ClosureIn_subset_carrier
 
--- A subset of the carrier lies in its own closure: the point itself is
--- the witness at every radius, since it is at distance zero from itself.
 theorem Plane.subset_ClosureIn (subset carrier : Set(Plane.Point))
         (subsetInCarrier : subset ⊆ carrier)
-        : subset ⊆ Plane.ClosureIn(subset, carrier) := {
-  take x : Plane.Point;
-  suppose x ∈ subset as xInSubset;
-  x ∈ carrier by subsetInCarrier;
-  ∀ (radius : ℝ). 0 < radius →
-      ∃ (y : Plane.Point). y ∈ subset ∧ Plane.distance(x, y) < radius
-      by (radius : ℝ) (radiusPositive : 0 < radius) ↦ {
-        Plane.distance(x, x)
-           = 0 by Plane.distance_self
-           < radius;
-        witness x with {
-          x ∈ subset;
-          Plane.distance(x, x) < radius;
-          done
-        }
-      };
-  done
-}
-
--- ----------------------------------------------------------------------
--- Boundary.
+        : subset ⊆ Plane.ClosureIn(subset, carrier) :=
+  done by MetricSpace.subset_ClosureIn
 
 theorem Plane.BoundaryIn_subset_ClosureIn (subset carrier : Set(Plane.Point))
         : Plane.BoundaryIn(subset, carrier)
-              ⊆ Plane.ClosureIn(subset, carrier) := {
-  take x : Plane.Point;
-  suppose x ∈ Plane.BoundaryIn(subset, carrier) as onBoundary;
-  x ∈ Plane.ClosureIn(subset, carrier);
-  done
-}
+              ⊆ Plane.ClosureIn(subset, carrier) :=
+  done by MetricSpace.BoundaryIn_subset_ClosureIn
 
--- For a relatively open subset the boundary is what the closure adds:
--- `∂U = closure(U) ∖ U`, because such a `U` is already its own interior.
 theorem Plane.BoundaryIn_of_OpenIn (subset carrier : Set(Plane.Point))
         (openInCarrier : Plane.OpenIn(subset, carrier))
         (x : Plane.Point)
         (onBoundary : x ∈ Plane.BoundaryIn(subset, carrier))
-        : x ∈ Plane.ClosureIn(subset, carrier) ∖ subset := {
-  x ∈ Plane.ClosureIn(subset, carrier);
-  ¬(x ∈ Plane.InteriorIn(subset, carrier));
-  ¬(x ∈ subset)
-      by (xInSubset : x ∈ subset) ↦ {
-        x ∈ Plane.InteriorIn(subset, carrier)
-            by Plane.subset_InteriorIn_of_OpenIn;
-        done
-      };
-  done
-}
+        : x ∈ Plane.ClosureIn(subset, carrier) ∖ subset :=
+  done by MetricSpace.BoundaryIn_of_OpenIn
 
 -- ----------------------------------------------------------------------
 -- Continuity, relative to a carrier.
---
--- A map is continuous on a carrier when the usual ε-δ condition holds
--- with both quantifiers restricted to it. Nothing is asked of the map
--- off the carrier.
 
 definition Plane.ContinuousAt
         (f : Plane.Point → Plane.Point) (carrier : Set(Plane.Point))
         (x : Plane.Point) : Proposition :=
-  ∀ (tolerance : ℝ). 0 < tolerance →
-    ∃ (nearness : ℝ). 0 < nearness ∧
-      ∀ (y : Plane.Point). y ∈ carrier →
-        Plane.distance(x, y) < nearness →
-          Plane.distance(f(x), f(y)) < tolerance
+  MetricSpace.ContinuousAt(f, carrier, x)
 
 definition Plane.ContinuousOn
         (f : Plane.Point → Plane.Point) (carrier : Set(Plane.Point))
         : Proposition :=
-  ∀ (x : Plane.Point). x ∈ carrier → Plane.ContinuousAt(f, carrier, x)
+  MetricSpace.ContinuousOn(f, carrier)
 
--- Continuity only sees the values on the carrier, so a map that agrees
--- with a continuous one there is continuous there. This is what lets a
--- glued map be pasted: on each piece it agrees with that piece's map.
 theorem Plane.ContinuousOn.of_agreeing
         (f g : Plane.Point → Plane.Point) (carrier : Set(Plane.Point))
         (agree : ∀ (x : Plane.Point). x ∈ carrier → f(x) = g(x))
         (gContinuous : Plane.ContinuousOn(g, carrier))
-        : Plane.ContinuousOn(f, carrier) := {
-  take x : Plane.Point;
-  suppose x ∈ carrier as xInCarrier;
-  take tolerance : ℝ;
-  suppose 0 < tolerance as tolerancePositive;
-  choose nearness such that
-      0 < nearness ∧
-        ∀ (y : Plane.Point). y ∈ carrier →
-          Plane.distance(x, y) < nearness →
-            Plane.distance(g(x), g(y)) < tolerance
-      from gContinuous;
-  0 < nearness;
-  ∀ (y : Plane.Point). y ∈ carrier →
-      Plane.distance(x, y) < nearness →
-        Plane.distance(g(x), g(y)) < tolerance as valuesClose;
-  f(x) = g(x) by agree as valueAtCentre;
-  witness nearness with {
-    0 < nearness;
-    ∀ (y : Plane.Point). y ∈ carrier →
-        Plane.distance(x, y) < nearness →
-          Plane.distance(f(x), f(y)) < tolerance
-        by (y : Plane.Point) (yInCarrier : y ∈ carrier)
-           (near : Plane.distance(x, y) < nearness) ↦ {
-          f(y) = g(y) by agree as valueAtPoint;
-          Plane.distance(g(x), g(y)) < tolerance by valuesClose;
-          Plane.distance(f(x), f(y))
-             = Plane.distance(g(x), f(y)) by substituting valueAtCentre
-             = Plane.distance(g(x), g(y)) by substituting valueAtPoint
-             < tolerance;
-          done
-        };
-    done
-  }
-}
+        : Plane.ContinuousOn(f, carrier) :=
+  done by MetricSpace.ContinuousOn.of_agreeing
 
--- Continuity composes. The outer map's tolerance chooses the nearness the
--- inner map must meet, and the inner map's nearness answers for the
--- composite — provided the inner map lands where the outer one is
--- continuous.
 theorem Plane.ContinuousOn.compose
         (inner outer : Plane.Point → Plane.Point)
         (carrier target : Set(Plane.Point))
         (innerContinuous : Plane.ContinuousOn(inner, carrier))
         (lands : ∀ (x : Plane.Point). x ∈ carrier → inner(x) ∈ target)
         (outerContinuous : Plane.ContinuousOn(outer, target))
-        : Plane.ContinuousOn((x : Plane.Point) ↦ outer(inner(x)), carrier) := {
-  take x : Plane.Point;
-  suppose x ∈ carrier as xInCarrier;
-  take tolerance : ℝ;
-  suppose 0 < tolerance as tolerancePositive;
-  inner(x) ∈ target by lands;
-  choose middle such that
-      0 < middle ∧
-        ∀ (y : Plane.Point). y ∈ target →
-          Plane.distance(inner(x), y) < middle →
-            Plane.distance(outer(inner(x)), outer(y)) < tolerance
-      from outerContinuous;
-  0 < middle;
-  ∀ (y : Plane.Point). y ∈ target →
-      Plane.distance(inner(x), y) < middle →
-        Plane.distance(outer(inner(x)), outer(y)) < tolerance
-      as outerAnswers;
-  choose nearness such that
-      0 < nearness ∧
-        ∀ (y : Plane.Point). y ∈ carrier →
-          Plane.distance(x, y) < nearness →
-            Plane.distance(inner(x), inner(y)) < middle
-      from innerContinuous;
-  0 < nearness;
-  ∀ (y : Plane.Point). y ∈ carrier →
-      Plane.distance(x, y) < nearness →
-        Plane.distance(inner(x), inner(y)) < middle
-      as innerAnswers;
-  witness nearness with {
-    0 < nearness;
-    ∀ (y : Plane.Point). y ∈ carrier →
-        Plane.distance(x, y) < nearness →
-          Plane.distance(outer(inner(x)), outer(inner(y))) < tolerance
-        by (y : Plane.Point) (yInCarrier : y ∈ carrier)
-           (near : Plane.distance(x, y) < nearness) ↦ {
-          Plane.distance(inner(x), inner(y)) < middle by innerAnswers;
-          inner(y) ∈ target by lands;
-          done by outerAnswers
-        };
-    done
-  }
-}
+        : Plane.ContinuousOn((x : Plane.Point) ↦ outer(inner(x)), carrier) :=
+  done by MetricSpace.ContinuousOn.compose
 
--- Restricting the carrier only weakens the condition.
 theorem Plane.ContinuousOn.restrict
         (f : Plane.Point → Plane.Point)
         (smaller larger : Set(Plane.Point))
         (smallerInLarger : smaller ⊆ larger)
         (continuousOnLarger : Plane.ContinuousOn(f, larger))
-        : Plane.ContinuousOn(f, smaller) := {
-  take x : Plane.Point;
-  suppose x ∈ smaller as xInSmaller;
-  x ∈ larger by smallerInLarger;
-  take tolerance : ℝ;
-  suppose 0 < tolerance as tolerancePositive;
-  choose nearness such that 0 < nearness ∧
-      ∀ (y : Plane.Point). y ∈ larger →
-        Plane.distance(x, y) < nearness →
-          Plane.distance(f(x), f(y)) < tolerance
-      from continuousOnLarger;
-  0 < nearness;
-  ∀ (y : Plane.Point). y ∈ larger →
-      Plane.distance(x, y) < nearness →
-        Plane.distance(f(x), f(y)) < tolerance as largerBall;
-  witness nearness with {
-    0 < nearness;
-    ∀ (y : Plane.Point). y ∈ smaller →
-        Plane.distance(x, y) < nearness →
-          Plane.distance(f(x), f(y)) < tolerance
-        by (y : Plane.Point) (yInSmaller : y ∈ smaller)
-           (yClose : Plane.distance(x, y) < nearness) ↦ {
-             y ∈ larger by smallerInLarger;
-             done by largerBall
-           };
-    done
-  }
-}
+        : Plane.ContinuousOn(f, smaller) :=
+  done by MetricSpace.ContinuousOn.restrict
 
 -- ----------------------------------------------------------------------
 -- The pasting lemma.
---
--- Each piece supplies a radius at every point of the union, by one of two
--- routes. If the point is IN the piece, continuity on that piece supplies
--- it. If the point is NOT in the piece, the piece being closed in the
--- union supplies a radius within which no point of the union is in the
--- piece at all, so the requirement is vacuous. Both routes give the same
--- statement, which is what lets the main proof avoid a four-way split.
 
 theorem Plane.pasteRadius
         (f : Plane.Point → Plane.Point)
@@ -717,61 +253,8 @@ theorem Plane.pasteRadius
             ∀ (y : Plane.Point). y ∈ union → y ∈ piece →
               Plane.distance(x, y) < nearness →
                 Plane.distance(f(x), f(y)) < tolerance :=
-  done by cases {
-    case x ∈ piece: {
-        choose nearness such that 0 < nearness ∧
-            ∀ (y : Plane.Point). y ∈ piece →
-              Plane.distance(x, y) < nearness →
-                Plane.distance(f(x), f(y)) < tolerance
-            from pieceContinuous;
-        0 < nearness;
-        ∀ (y : Plane.Point). y ∈ piece →
-            Plane.distance(x, y) < nearness →
-              Plane.distance(f(x), f(y)) < tolerance as pieceBall;
-        witness nearness with {
-          0 < nearness;
-          ∀ (y : Plane.Point). y ∈ union → y ∈ piece →
-              Plane.distance(x, y) < nearness →
-                Plane.distance(f(x), f(y)) < tolerance
-              by (y : Plane.Point) (yInUnion : y ∈ union)
-                 (yInPiece : y ∈ piece)
-                 (yClose : Plane.distance(x, y) < nearness) ↦
-                   pieceBall(y, yInPiece, yClose);
-          done
-        }
-      }
-    otherwise as xOutsidePiece: {
-        x ∈ union ∖ piece;
-        choose nearness such that 0 < nearness ∧
-            ∀ (y : Plane.Point). y ∈ union →
-              Plane.distance(x, y) < nearness →
-                y ∈ union ∖ piece
-            from pieceClosed;
-        0 < nearness;
-        ∀ (y : Plane.Point). y ∈ union →
-            Plane.distance(x, y) < nearness →
-              y ∈ union ∖ piece as avoidsPiece;
-        witness nearness with {
-          0 < nearness;
-          ∀ (y : Plane.Point). y ∈ union → y ∈ piece →
-              Plane.distance(x, y) < nearness →
-                Plane.distance(f(x), f(y)) < tolerance
-              by (y : Plane.Point) (yInUnion : y ∈ union)
-                 (yInPiece : y ∈ piece)
-                 (yClose : Plane.distance(x, y) < nearness) ↦ {
-                   y ∈ union ∖ piece by avoidsPiece;
-                   ¬(y ∈ piece);
-                   False;
-                   done
-                 };
-          done
-        }
-      }
-  }
+  done by MetricSpace.pasteRadius
 
--- A map continuous on each of two relatively closed pieces is continuous
--- on their union. This is what glues the interior and exterior extensions
--- of the main theorem along the curve they share.
 theorem Plane.ContinuousOn.paste
         (f : Plane.Point → Plane.Point)
         (first second : Set(Plane.Point))
@@ -779,52 +262,5 @@ theorem Plane.ContinuousOn.paste
         (secondClosed : Plane.ClosedIn(second, first ∪ second))
         (firstContinuous : Plane.ContinuousOn(f, first))
         (secondContinuous : Plane.ContinuousOn(f, second))
-        : Plane.ContinuousOn(f, first ∪ second) := {
-  take x : Plane.Point;
-  suppose x ∈ first ∪ second as xInUnion;
-  take tolerance : ℝ;
-  suppose 0 < tolerance as tolerancePositive;
-  choose firstNearness such that 0 < firstNearness ∧
-      ∀ (y : Plane.Point). y ∈ first ∪ second → y ∈ first →
-        Plane.distance(x, y) < firstNearness →
-          Plane.distance(f(x), f(y)) < tolerance
-      from Plane.pasteRadius(piece := first);
-  choose secondNearness such that 0 < secondNearness ∧
-      ∀ (y : Plane.Point). y ∈ first ∪ second → y ∈ second →
-        Plane.distance(x, y) < secondNearness →
-          Plane.distance(f(x), f(y)) < tolerance
-      from Plane.pasteRadius(piece := second);
-  0 < firstNearness;
-  0 < secondNearness;
-  ∀ (y : Plane.Point). y ∈ first ∪ second → y ∈ first →
-      Plane.distance(x, y) < firstNearness →
-        Plane.distance(f(x), f(y)) < tolerance as firstBall;
-  ∀ (y : Plane.Point). y ∈ first ∪ second → y ∈ second →
-      Plane.distance(x, y) < secondNearness →
-        Plane.distance(f(x), f(y)) < tolerance as secondBall;
-  witness min(firstNearness, secondNearness) with {
-    0 < min(firstNearness, secondNearness);
-    ∀ (y : Plane.Point). y ∈ first ∪ second →
-        Plane.distance(x, y) < min(firstNearness, secondNearness) →
-          Plane.distance(f(x), f(y)) < tolerance
-        by (y : Plane.Point) (yInUnion : y ∈ first ∪ second)
-           (yClose : Plane.distance(x, y)
-               < min(firstNearness, secondNearness)) ↦ {
-             Plane.distance(x, y)
-                < min(firstNearness, secondNearness)
-                ≤ firstNearness;
-             Plane.distance(x, y)
-                < min(firstNearness, secondNearness)
-                ≤ secondNearness;
-             done by cases {
-               case y ∈ first as yInFirst:
-                   firstBall(y, yInUnion, yInFirst,
-                       { Plane.distance(x, y) < firstNearness })
-               case y ∈ second as yInSecond:
-                   secondBall(y, yInUnion, yInSecond,
-                       { Plane.distance(x, y) < secondNearness })
-             }
-           };
-    done
-  }
-}
+        : Plane.ContinuousOn(f, first ∪ second) :=
+  done by MetricSpace.ContinuousOn.paste
