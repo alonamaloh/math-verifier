@@ -385,10 +385,18 @@ two points meet exactly in those points; open subarcs form a basis.
 
 **Size:** 4–7k lines.
 
-### Two arcs between two points — state as of 2026-07-27
+### Two arcs between two points — **DONE 2026-07-27**
 
-The remaining Layer 4 item, being built in `Plane/twoarcs.math`. Two points
-cut a Jordan curve into two arcs meeting exactly in those two points.
+`Plane.IsJordanCurve.two_arcs` (`Plane/twoarcs.math`, 838 lines): two
+distinct points of a Jordan curve cut it into two arcs between them, which
+cover the curve and meet in exactly those two points. Layer 4 is closed
+apart from the loop→circle bridge, which needs a traversal of the circle by
+an interval and waits on the trigonometry-free construction.
+
+Landed on the way: `Plane.imageSet_union`, `Set.union_commutative`,
+`Set.intersection_commutative`, and `Plane.IsArcBetween` (a piece with two
+named endpoints), stated RIGHT-NESTED so `IsArc` is a direct leg — see the
+measurement note at the definition.
 
 The whole argument runs on the loop's PARAMETERS: pull the two points back
 to parameters `s` and `t` short of the finish, with `s` first; the two arcs

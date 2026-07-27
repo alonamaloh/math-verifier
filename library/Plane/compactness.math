@@ -336,6 +336,51 @@ definition Plane.imageSet
         : Set(Plane.Point) :=
   (y : Plane.Point) ↦ ∃ (x : Plane.Point). x ∈ region ∧ f(x) = y
 
+-- Taking images commutes with union: a point of the image of a union came
+-- from one side or the other.
+theorem Plane.imageSet_union (f : Plane.Point → Plane.Point)
+        (left right : Set(Plane.Point))
+        : Plane.imageSet(f, left ∪ right)
+              = Plane.imageSet(f, left) ∪ Plane.imageSet(f, right) := {
+  Plane.imageSet(f, left ∪ right) ⊆ Plane.imageSet(f, left) ∪ Plane.imageSet(f, right)
+      by (y : Plane.Point) (onImage : y ∈ Plane.imageSet(f, left ∪ right)) ↦ {
+        choose source such that source ∈ left ∪ right ∧ f(source) = y;
+        source ∈ left ∪ right;
+        f(source) = y;
+        done by cases {
+          case source ∈ left as fromLeft: {
+              y ∈ Plane.imageSet(f, left) by { witness source };
+              done
+            }
+          case source ∈ right as fromRight: {
+              y ∈ Plane.imageSet(f, right) by { witness source };
+              done
+            }
+        }
+      };
+  Plane.imageSet(f, left) ∪ Plane.imageSet(f, right) ⊆ Plane.imageSet(f, left ∪ right)
+      by (y : Plane.Point)
+         (onEither : y ∈ Plane.imageSet(f, left) ∪ Plane.imageSet(f, right)) ↦ {
+        done by cases {
+          case y ∈ Plane.imageSet(f, left) as onLeft: {
+              choose source such that source ∈ left ∧ f(source) = y from onLeft;
+              source ∈ left;
+              f(source) = y;
+              source ∈ left ∪ right;
+              done by { witness source }
+            }
+          case y ∈ Plane.imageSet(f, right) as onRight: {
+              choose source such that source ∈ right ∧ f(source) = y from onRight;
+              source ∈ right;
+              f(source) = y;
+              source ∈ left ∪ right;
+              done by { witness source }
+            }
+        }
+      };
+  done by Set.equal_of_same_members
+}
+
 -- The continuous image of a compact set is compact. A sequence in the
 -- image has preimages — countable choice again — which compactness thins
 -- to a convergent one; continuity carries that convergence forward.

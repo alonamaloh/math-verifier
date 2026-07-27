@@ -2194,3 +2194,18 @@ expected ':' after take name (take n : T; or take n as <pat> : T;)
 The parser is the one to keep — an annotated `take m : ℕ;` says what the
 binder is at the point the reader meets it, which is worth the word. Fix
 the GUIDE's example to carry its types.
+
+**CONFIRMED IN USE — the nested-leg projection gap has a measurable cost,
+not just a syntactic one.** `Plane.IsArcBetween` was first stated as
+`(IsArc(f) ∧ arc(f) = piece) ∧ (arcStart = p ∧ arcFinish = q)`. Projecting
+`IsArc(f)` out of a `choose`n fact of that shape — a leg OF A LEG — is one
+level too deep for the bridge, so the auto-prover silently rebuilt `IsArc`
+from continuity and injectivity instead: three sites at 68k, 74k and 93k
+kernel steps. Citing the conjunction by name (`by backFacts`) did not help;
+the projection is what is missing, not the reference.
+
+Re-bracketing to the right (`IsArc(f) ∧ (arc(f) = piece ∧ (… ∧ …))`) made
+all three free and the file warning-clean. So the workaround is real but it
+constrains how a bundled proposition may be written, which is exactly the
+kind of "equal spellings treated differently" this project tries to remove.
+Worth fixing at the source: let the projection descend more than one level.
