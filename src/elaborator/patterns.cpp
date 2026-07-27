@@ -174,6 +174,93 @@ void Elaborator::elaboratePatternMatchDefinition(
                 + "' must have at least one argument");
         }
 
+        // Implicit pre-colon binders are not written at a call site, so
+        // the comparison below runs over the explicit ones only.
+        std::vector<std::string> explicitOuterBinderNames;
+        for (const auto& binder : declaration.arguments) {
+            if (binder.isImplicit) continue;
+            for (const auto& name : binder.names) {
+                explicitOuterBinderNames.push_back(name);
+            }
+        }
+
+        // The pre-colon binders are bound OUTSIDE the recursor, so the
+        // recursive occurrence in a case body is the recursor's own
+        // recursive result — it does not re-apply them. A recursive call
+        // that passes something ELSE for one of them therefore has that
+        // argument silently ignored, and the definition means something
+        // other than what is written. Reject it: an accumulator that the
+        // recursion moves belongs in the RETURN type, where it is a real
+        // argument.
+        // Deliberately conservative: it walks the shapes a case body is
+        // actually written in and fires only on a definite mismatch, so a
+        // variant it does not descend into costs a missed report, never a
+        // false one.
+        std::function<void(const SurfaceExpressionPointer&)> checkSelfCalls =
+            [&](const SurfaceExpressionPointer& expression) {
+                if (!expression) return;
+                if (auto* binary = std::get_if<SurfaceBinaryOperation>(
+                        &expression->node)) {
+                    checkSelfCalls(binary->left);
+                    checkSelfCalls(binary->right);
+                    return;
+                }
+                if (auto* unary = std::get_if<SurfaceUnaryOperation>(
+                        &expression->node)) {
+                    checkSelfCalls(unary->operand);
+                    return;
+                }
+                if (auto* lambda =
+                        std::get_if<SurfaceLambda>(&expression->node)) {
+                    checkSelfCalls(lambda->body);
+                    return;
+                }
+                if (auto* ascription =
+                        std::get_if<SurfaceAscription>(&expression->node)) {
+                    checkSelfCalls(ascription->expression);
+                    return;
+                }
+                if (auto* application =
+                        std::get_if<SurfaceApplication>(&expression->node)) {
+                    for (const auto& argument : application->arguments) {
+                        checkSelfCalls(argument.value);
+                    }
+                    auto* head = std::get_if<SurfaceIdentifier>(
+                        &application->function->node);
+                    if (head && head->qualifiedName == declaration.name) {
+                        size_t checked = std::min(
+                            explicitOuterBinderNames.size(),
+                            application->arguments.size());
+                        for (size_t index = 0; index < checked; ++index) {
+                            auto* passed = std::get_if<SurfaceIdentifier>(
+                                &application->arguments[index].value->node);
+                            if (passed
+                                && passed->qualifiedName
+                                       == explicitOuterBinderNames[index]) {
+                                continue;
+                            }
+                            throw ElaborateError(
+                                "pattern-match definition '"
+                                + declaration.name
+                                + "': the recursive call passes a different"
+                                  " value for the parameter '"
+                                + explicitOuterBinderNames[index]
+                                + "', which is bound outside the recursion"
+                                  " and so is IGNORED there — the definition"
+                                  " would not mean what it says. Move the"
+                                  " varying argument into the return type"
+                                  " (`: List(A) → (P → R)`, recursing on the"
+                                  " list and taking the moving parameter"
+                                  " after), or pass '"
+                                + explicitOuterBinderNames[index] + "' unchanged");
+                        }
+                    }
+                }
+            };
+        for (const auto& patternCase : declaration.cases) {
+            checkSelfCalls(patternCase.body);
+        }
+
         // Elaborate the kernel types for each function argument, and
         // the kernel return type. We need these for both type signature
         // and motive construction. The starting stack is the outer

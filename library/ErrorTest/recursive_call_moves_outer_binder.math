@@ -1,0 +1,28 @@
+-- A pattern-match definition whose recursive call passes a DIFFERENT value
+-- for a pre-colon binder.
+--
+-- Those binders are bound outside the recursor, so the recursive occurrence
+-- does not re-apply them: the argument written here is silently discarded
+-- and the definition means something other than what it says. Measured
+-- before the guard existed: `Test.varying(a, [b])` reduced to
+-- `segment(a, b) ∪ {a}` — the ORIGINAL start — while the text says `{b}`.
+-- Nothing warned, and every theorem proved about it would have been true of
+-- a function nobody wrote.
+--
+-- Passing the binder unchanged is fine and stays legal (`List.product` does
+-- it); an accumulator the recursion MOVES belongs in the return type.
+module ErrorTest.recursive_call_moves_outer_binder
+
+import Logic.basics
+import Equality.basics
+import Set.basics
+import Set.algebra
+import Lists.list
+import Plane.point
+import Plane.segment
+
+definition ErrorTest.varying (start : Plane.Point)
+        : List(Plane.Point) → Set(Plane.Point)
+  | List.empty => Set.singleton(Plane.Point, start)
+  | List.prepend(next, rest) =>
+      Plane.segment(start, next) ∪ ErrorTest.varying(next, rest)

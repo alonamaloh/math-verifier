@@ -694,3 +694,64 @@ it) but do not interchange in a chain step whose justification matches
 on structure: swapping the base of `((2 : ℝ) * (2 : ℝ)) ^ m` for
 `(2 * 2 : ℝ) ^ m` in `Real.means_inequality_double` breaks step 12.
 Worth knowing before any bulk re-spelling of ascriptions.
+
+---
+
+## Q: a pattern-match recursion silently discarded an argument (FIXED 2026-07-26)
+
+Found building Layer 4's polygonal arcs, and worth knowing because the
+failure mode was **not** an error.
+
+```math
+definition Test.varying (start : Plane.Point)
+        : List(Plane.Point) → Set(Plane.Point)
+  | List.empty               => Set.singleton(Plane.Point, start)
+  | List.prepend(next, rest) =>
+      Plane.segment(start, next) ∪ Test.varying(next, rest)
+```
+
+This elaborated without complaint. Its base equation reduced. But the step
+equation as written did not, and the reason turned out to be that the
+recursive call's `next` was **silently replaced by the enclosing `start`**:
+
+| claim about `varying(a, [b])` | before the fix |
+|---|---|
+| `= segment(a,b) ∪ {b}` — what the text says | rejected |
+| `= segment(a,b) ∪ {a}` — what it computed | accepted |
+
+The pre-colon binders are bound OUTSIDE the recursor, so the recursive
+occurrence is the recursor's own recursive result and never re-applies
+them. `internal.hpp` documented this ("No `(arguments)` allowed before the
+colon"), but nothing enforced it, and `List.product` shows why a blanket
+ban would be wrong: pre-colon binders are fine when the recursive call
+passes them **unchanged**.
+
+Worst-case shape for a system whose premise is that proofs read like
+mathematics: the text says one thing, the kernel checks another, and every
+theorem proved about it is true — of a function nobody wrote.
+
+**Fixed** by rejecting a recursive call that passes a different value for
+an explicit pre-colon binder, naming the binder and pointing at the shape
+that works. The comparison skips implicit binders, which are not written at
+call sites (`List.product {A}` was the first false positive). Locked by
+`ErrorTest/recursive_call_moves_outer_binder`.
+
+**The shape that works**: thread the moving parameter through the RETURN
+type, where it is a real argument.
+
+```math
+definition Plane.chainFunction
+        : List(Plane.Point) → (Plane.Point → Set(Plane.Point))
+  | List.empty               => (start : Plane.Point) ↦ Set.singleton(Plane.Point, start)
+  | List.prepend(next, rest) =>
+      (start : Plane.Point) ↦ Plane.segment(start, next) ∪ Plane.chainFunction(rest)(next)
+```
+
+A proof by induction over such a definition must then **generalise the
+moving parameter** — `∀ start. …` in the motive — since an induction that
+fixes it gets a hypothesis about the wrong walk.
+
+**Still open**: nested constructor patterns (`| prepend(a, prepend(b, r))`)
+elaborate but their equations do not reduce either. Not investigated, since
+the return-type shape removed the need; if someone wants two-element
+lookahead, start there.
