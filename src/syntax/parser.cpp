@@ -381,7 +381,8 @@ SurfaceExpressionPointer substituteSurfaceName(
             : substituteSurfaceName(eventuallyScope->body,
                                      targetName, replacement);
         return makeSurfaceEventuallyScope(
-            eventuallyScope->binderName, std::move(newBody), line, column);
+            eventuallyScope->binderName, std::move(newBody), line, column,
+            eventuallyScope->filterPredicate);
     }
     if (auto* structured =
             std::get_if<SurfaceStructuredClaim>(&node.node)) {
@@ -3718,25 +3719,38 @@ private:
                 std::move(binderName), std::move(body),
                 head.line, head.column);
         }
-        // Prose spelling of the same scope:
-        // `for sufficiently large m: <body>`.
+        // Prose spelling of the scope, BINDER FIRST so the bound name sits
+        // where a reader looks for it and the phrase reads as English:
+        //     for m sufficiently large: <body>
+        //     for y sufficiently near x: <body>
+        // The phrase selects the filter; its parameters (the point, for
+        // `near`) are read off the GOAL by the elaborator, so nothing here
+        // has to know a filter's arity.
         if (current.kind == TokenKind::Identifier
             && current.lexeme == "for"
             && peekAt(1).kind == TokenKind::Identifier
-            && peekAt(1).lexeme == "sufficiently"
             && peekAt(2).kind == TokenKind::Identifier
-            && peekAt(2).lexeme == "large"
+            && peekAt(2).lexeme == "sufficiently"
             && peekAt(3).kind == TokenKind::Identifier
-            && peekAt(4).kind == TokenKind::Colon) {
-            Token head = consumeAny();  // 'for'
-            consumeAny();               // 'sufficiently'
-            consumeAny();               // 'large'
-            std::string binderName = consumeAny().lexeme;
-            consumeAny();               // ':'
-            SurfaceExpressionPointer body = parseExpression();
-            return makeSurfaceEventuallyScope(
-                std::move(binderName), std::move(body),
-                head.line, head.column);
+            && (peekAt(3).lexeme == "large" || peekAt(3).lexeme == "near")) {
+            bool isNear = peekAt(3).lexeme == "near";
+            // `large` is followed by `:`; `near` by its point then `:`.
+            bool shaped = isNear
+                ? peekAt(5).kind == TokenKind::Colon
+                : peekAt(4).kind == TokenKind::Colon;
+            if (shaped) {
+                Token head = consumeAny();  // 'for'
+                std::string binderName = consumeAny().lexeme;
+                consumeAny();               // 'sufficiently'
+                consumeAny();               // 'large' | 'near'
+                if (isNear) consumeAny();   // the point — the goal supplies it
+                consumeAny();               // ':'
+                SurfaceExpressionPointer body = parseExpression();
+                return makeSurfaceEventuallyScope(
+                    std::move(binderName), std::move(body),
+                    head.line, head.column,
+                    isNear ? "MetricSpace.Near" : "Natural.Eventually");
+            }
         }
         if (current.kind == TokenKind::Identifier
             && current.lexeme == "eventually"

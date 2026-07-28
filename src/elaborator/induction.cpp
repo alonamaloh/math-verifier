@@ -163,10 +163,46 @@ ExpressionPointer Elaborator::elaborateEventuallyScope(
         ExpressionPointer goalOpened = peelRootBetaRedexes(
             openOverLocalBinders(expectedType, localBinders, N));
         auto* goalApp = std::get_if<Application>(&goalOpened->node);
+        // The filter's LEADING ARGUMENTS — `Near`'s space and point — sit
+        // between the head and the predicate. Collect them so every lemma
+        // call below can thread them through verbatim; `Eventually` simply
+        // has none. This is what keeps the elaborator filter-agnostic.
+        std::vector<ExpressionPointer> filterArguments;
+        {
+            // In the CLOSED representation, to match both the in-scope
+            // hypothesis types (which arrive bound-and-lifted) and the
+            // predicates handed to the lemma citations. Comparing against
+            // the opened goal silently matches nothing.
+            ExpressionPointer cursor = closeOverLocalBinders(
+                goalOpened, localBinders, N);
+            std::vector<ExpressionPointer> reversed;
+            while (auto* app = std::get_if<Application>(&cursor->node)) {
+                reversed.push_back(app->argument);
+                cursor = app->function;
+            }
+            auto* head = std::get_if<Constant>(&cursor->node);
+            if (head && head->name == scope.filterPredicate
+                && !reversed.empty()) {
+                // Outermost-first, dropping the predicate (the last one).
+                for (size_t i = reversed.size(); i-- > 1;) {
+                    filterArguments.push_back(reversed[i]);
+                }
+            }
+        }
         auto* goalHead = goalApp
             ? std::get_if<Constant>(&goalApp->function->node) : nullptr;
         ExpressionPointer goalPredicateOpened;
-        if (goalHead && goalHead->name == "Natural.Eventually") {
+        bool headIsFilter = false;
+        {
+            ExpressionPointer cursor = goalOpened;
+            while (auto* app = std::get_if<Application>(&cursor->node)) {
+                cursor = app->function;
+            }
+            auto* head = std::get_if<Constant>(&cursor->node);
+            headIsFilter = head && head->name == scope.filterPredicate;
+        }
+        (void)goalHead;
+        if (headIsFilter) {
             goalPredicateOpened = goalApp->argument;
         } else {
             // Upstream machinery (a quotient-cases motive, a suffices
@@ -202,12 +238,33 @@ ExpressionPointer Elaborator::elaborateEventuallyScope(
             // (`(λN. eventually …)(w)` from choose) peels first.
             typeInScope = peelRootBetaRedexes(typeInScope);
             auto* app = std::get_if<Application>(&typeInScope->node);
-            auto* head = app
-                ? std::get_if<Constant>(&app->function->node) : nullptr;
-            if (head && head->name == "Natural.Eventually") {
-                factPredicates.push_back(app->argument);
-                factProofs.push_back(makeBoundVariable(N - 1 - b));
-                continue;
+            {
+                // Same filter, and at the SAME leading arguments: a `Near`
+                // fact about a different point says nothing here.
+                ExpressionPointer cursor = typeInScope;
+                std::vector<ExpressionPointer> reversed;
+                while (auto* walk = std::get_if<Application>(&cursor->node)) {
+                    reversed.push_back(walk->argument);
+                    cursor = walk->function;
+                }
+                auto* head = std::get_if<Constant>(&cursor->node);
+                if (head && head->name == scope.filterPredicate
+                    && reversed.size() == filterArguments.size() + 1) {
+                    bool sameArguments = true;
+                    for (size_t i = 0; i < filterArguments.size(); ++i) {
+                        if (!structurallyEqual(
+                                reversed[reversed.size() - 1 - i],
+                                filterArguments[i])) {
+                            sameArguments = false;
+                            break;
+                        }
+                    }
+                    if (sameArguments) {
+                        factPredicates.push_back(app->argument);
+                        factProofs.push_back(makeBoundVariable(N - 1 - b));
+                        continue;
+                    }
+                }
             }
             ExpressionPointer folded =
                 recognizeUnfoldedEventually(typeInScope);
@@ -217,7 +274,33 @@ ExpressionPointer Elaborator::elaborateEventuallyScope(
             }
         }
 
+        // The binder's domain is the filter predicate's own domain — ℕ for
+        // `Eventually`, the carrier for `Near` — so nothing here names a
+        // concrete type either.
         ExpressionPointer naturalType = makeConstant("Natural", {});
+        try {
+            Context domainContext =
+                buildContextFromLocalBinders(localBinders);
+            ExpressionPointer predicateType = inferType(
+                environment_, domainContext, goalPredicateOpened);
+            if (auto* predicatePi =
+                    std::get_if<Pi>(&weakHeadNormalForm(
+                        environment_, predicateType)->node)) {
+                naturalType = closeOverLocalBinders(
+                    predicatePi->domain, localBinders, N);
+            }
+        } catch (...) {
+            // Leave the ℕ default; a mis-typed goal reports below.
+        }
+        // `<filter>.<lemma>` applied to the filter's leading arguments.
+        auto citeFilterLemma = [&](const char* suffix) {
+            ExpressionPointer cited = makeConstant(
+                scope.filterPredicate + "." + suffix, {});
+            for (const auto& argument : filterArguments) {
+                cited = makeApplication(std::move(cited), argument);
+            }
+            return cited;
+        };
         if (factPredicates.empty()) {
             // No eventual hypotheses: the body proves Q(m) outright and
             // `Eventually.of_always` supplies threshold 0.
@@ -232,7 +315,7 @@ ExpressionPointer Elaborator::elaborateEventuallyScope(
                 scope.binderName, naturalType, bodyKernel);
             return makeApplication(
                 makeApplication(
-                    makeConstant("Natural.Eventually.of_always", {}),
+                    citeFilterLemma("of_always"),
                     goalPredicate),
                 std::move(alwaysLambda));
         }
@@ -248,7 +331,7 @@ ExpressionPointer Elaborator::elaborateEventuallyScope(
                 makeApplication(
                     makeApplication(
                         makeApplication(
-                            makeConstant("Natural.Eventually.and", {}),
+                            citeFilterLemma("and"),
                             combinedPredicate),
                         factPredicates[i]),
                     combinedProof),
@@ -289,7 +372,7 @@ ExpressionPointer Elaborator::elaborateEventuallyScope(
             makeApplication(
                 makeApplication(
                     makeApplication(
-                        makeConstant("Natural.Eventually.monotone", {}),
+                        citeFilterLemma("monotone"),
                         combinedPredicate),
                     goalPredicate),
                 combinedProof),

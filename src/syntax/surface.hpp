@@ -610,6 +610,13 @@ struct SurfaceByStrongInduction {
 struct SurfaceEventuallyScope {
     std::string binderName;
     SurfaceExpressionPointer body;
+    // The FILTER this scope proves a goal of — `Natural.Eventually`,
+    // `MetricSpace.Near`, … The elaborator is filter-agnostic: it reads
+    // the filter's leading arguments (the point, for `Near`) off the goal
+    // and cites `<filter>.of_always` / `.and` / `.monotone` by name, so a
+    // new filter is a phrase here plus those three lemmas, and no
+    // elaborator change at all.
+    std::string filterPredicate;
 };
 
 // `choose <name> such that <predicate>;` — Exists-elimination via
@@ -1127,9 +1134,11 @@ inline SurfaceExpressionPointer makeSurfaceByStrongInduction(
 inline SurfaceExpressionPointer makeSurfaceEventuallyScope(
     std::string binderName,
     SurfaceExpressionPointer body,
-    int line, int column) {
+    int line, int column,
+    std::string filterPredicate = "Natural.Eventually") {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
-        SurfaceEventuallyScope{std::move(binderName), std::move(body)},
+        SurfaceEventuallyScope{std::move(binderName), std::move(body),
+                                std::move(filterPredicate)},
         line, column});
 }
 

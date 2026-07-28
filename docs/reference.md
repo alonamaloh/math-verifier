@@ -224,8 +224,23 @@ combines their thresholds, and hands the body each fact at the bound index:
 
 ```math
 eventually (m): { … }                 -- goal position
-for sufficiently large m: { … }       -- the same thing, in prose
+for m sufficiently large: { … }       -- the same thing, in prose
 ```
+
+The prose form is **binder first**, so the bound name sits where a reader
+looks for it, and it generalises to other filters by swapping the phrase:
+
+```math
+for y sufficiently near x: { … }      -- proves `MetricSpace.Near(x, Q)`
+```
+
+`near` is the **spatial** filter (`Metric/near.math`): "throughout some ball
+around x", with the minimum of two radii where `large` takes the maximum of two
+thresholds. The scope is one construct — it collects every in-scope fact for
+the *same* filter *at the same point*, folds them, and hands the body each at
+the bound variable. The elaborator names no filter: it reads the filter's
+leading arguments off the goal and cites `<filter>.of_always` / `.and` /
+`.monotone`, so a new filter is a phrase plus those three lemmas.
 
 Inside the body, each `eventually (k). Q(k)` in scope is available as `Q(m)`,
 and the threshold — the `Natural.maximum` of all of them — never appears. With

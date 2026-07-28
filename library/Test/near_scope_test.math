@@ -1,0 +1,58 @@
+-- `for y sufficiently near x: { … }` — the filter scope, read at the
+-- SPATIAL filter. Same construct as `for m sufficiently large: { … }`,
+-- same elaborator path: the scope collects every in-scope fact for the
+-- SAME filter at the SAME point, combines them (`Near.and`, which takes
+-- the minimum of the radii), and hands the body each one at the bound
+-- point. No radius, and no minimum, appears on the page.
+--
+-- The elaborator names no filter: it reads the filter's leading arguments
+-- (here the space and the point) off the GOAL and cites
+-- `<filter>.of_always` / `.and` / `.monotone`. Registering a new filter is
+-- a phrase in the parser plus those three lemmas.
+
+module Test.near_scope_test
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Set.algebra
+import Real.interface
+import Real.order
+import Real.order_field
+import Real.minimum
+import Metric.space
+import Metric.topology
+import Metric.continuity
+import Metric.near
+
+-- The exact analogue of Test.eventually_scope: two near-facts combine.
+theorem Test.near_scope {m : MetricSpace} (x : m) (P Q : m → Proposition)
+        (nearP : MetricSpace.Near(x, P))
+        (nearQ : MetricSpace.Near(x, Q))
+        : MetricSpace.Near(x, (y : m) ↦ P(y) ∧ Q(y)) :=
+  for y sufficiently near x: {
+    P(y);
+    Q(y);
+    done
+  }
+
+-- With no near-hypotheses in scope: plain introduction at any radius.
+theorem Test.near_scope_always {m : MetricSpace} (x : m) (P : m → Proposition)
+        (always : ∀ (z : m). P(z))
+        : MetricSpace.Near(x, P) :=
+  for y sufficiently near x: {
+    done by always
+  }
+
+-- Derivation in the body, mixing the two facts.
+theorem Test.near_scope_derives {m : MetricSpace} (x : m) (P Q R : m → Proposition)
+        (nearP : MetricSpace.Near(x, P))
+        (nearQ : MetricSpace.Near(x, Q))
+        (combine : ∀ (z : m). P(z) → Q(z) → R(z))
+        : MetricSpace.Near(x, R) :=
+  for y sufficiently near x: {
+    P(y);
+    Q(y);
+    done by combine
+  }
