@@ -37,6 +37,7 @@ import Real.minimum
 import Metric.space
 import Metric.continuity
 import Metric.real
+import Metric.near
 
 -- ----------------------------------------------------------------------
 -- f is continuous at x: for every positive tolerance ε there is a positive
@@ -103,6 +104,25 @@ theorem Real.ContinuousAt.tolerance (f : ℝ → ℝ) (x : ℝ)
 }
 
 -- ----------------------------------------------------------------------
+-- Continuity through the SPATIAL FILTER. `Real.distance(x, y)` is
+-- `abs(y - x)`, so `MetricSpace.Near(x, P)` on the line is exactly
+-- "P(y) for all y within some δ of x" — the ε-δ inner statement with its
+-- δ, and the δ-juggling, inside the filter. Proofs below state their
+-- tolerances and let `for y sufficiently near x: { … }` take the minimum.
+
+theorem Real.ContinuousAt.of_near (f : ℝ → ℝ) (x : ℝ)
+        (nearby : ∀ (ε : ℝ). ε > 0 →
+            MetricSpace.Near(x, (y : ℝ) ↦ abs(f(y) - f(x)) < ε))
+        : Real.ContinuousAt(f, x) :=
+  unfold MetricSpace.Near in { done by Real.ContinuousAt.of_epsilon_delta }
+
+theorem Real.ContinuousAt.near (f : ℝ → ℝ) (x : ℝ)
+        (continuous : Real.ContinuousAt(f, x))
+        (ε : ℝ) (εPositive : ε > 0)
+        : MetricSpace.Near(x, (y : ℝ) ↦ abs(f(y) - f(x)) < ε) :=
+  unfold MetricSpace.Near in { done by Real.ContinuousAt.tolerance }
+
+-- ----------------------------------------------------------------------
 -- Constant functions are continuous: any δ works (ε itself is at hand),
 -- since the image never moves at all.
 theorem Real.ContinuousAt.constant (c x : ℝ)
@@ -144,46 +164,26 @@ theorem Real.ContinuousAt.add (f g : ℝ → ℝ) (x : ℝ)
         (fContinuous : Real.ContinuousAt(f, x))
         (gContinuous : Real.ContinuousAt(g, x))
         : Real.ContinuousAt((y : ℝ) ↦ f(y) + g(y), x) := {
-  suffices ∀ (ε : ℝ). ε > 0 → ∃ (δ : ℝ). δ > 0 ∧
-      ∀ (y : ℝ). abs(y - x) < δ → abs((f(y) + g(y)) - (f(x) + g(x))) < ε
-      by Real.ContinuousAt.of_epsilon_delta;
-  take ε : ℝ;
-  suppose ε > 0 as εPositive;
-  {
-    ε / 2 > 0;
-    choose fδ such that fδ > 0
-            ∧ ∀ (y : ℝ). abs(y - x) < fδ → abs(f(y) - f(x)) < ε / 2
-        from Real.ContinuousAt.tolerance;
-    ∀ (y : ℝ). abs(y - x) < fδ
-            → abs(f(y) - f(x)) < ε / 2 as fClose;
-    choose gδ such that gδ > 0
-            ∧ ∀ (y : ℝ). abs(y - x) < gδ → abs(g(y) - g(x)) < ε / 2
-        from Real.ContinuousAt.tolerance;
-    ∀ (y : ℝ). abs(y - x) < gδ
-            → abs(g(y) - g(x)) < ε / 2 as gClose;
-    witness min(fδ, gδ) with {
-      ∀ (y : ℝ). abs(y - x) < min(fδ, gδ)
-              → abs((f(y) + g(y)) - (f(x) + g(x))) < ε
-          by (y : ℝ)
-             (yClose : abs(y - x) < min(fδ, gδ)) ↦ {
-               min(fδ, gδ) ≤ fδ;
-               min(fδ, gδ) ≤ gδ;
-               abs(y - x) < min(fδ, gδ) ≤ fδ as yCloseF;
-               abs(y - x) < min(fδ, gδ) ≤ gδ as yCloseG;
-               abs(f(y) - f(x)) < ε / 2 by fClose(y, yCloseF);
-               abs(g(y) - g(x)) < ε / 2 by gClose(y, yCloseG);
-               abs((f(y) + g(y)) - (f(x) + g(x)))
-                  = abs((f(y) - f(x)) + (g(y) - g(x)))
-                        by substituting
-                            (ring : (f(y) + g(y)) - (f(x) + g(x))
-                                = (f(y) - f(x)) + (g(y) - g(x)))
-                  ≤ abs(f(y) - f(x)) + abs(g(y) - g(x))
-                  < ε / 2 + ε / 2
-                  = ε
-          };
-      done
-    }
-  }
+  ∀ (ε : ℝ). ε > 0 →
+      MetricSpace.Near(x, (y : ℝ) ↦ abs((f(y) + g(y)) - (f(x) + g(x))) < ε)
+      by { take ε : ℝ;
+           suppose ε > 0;
+           ε / 2 > 0;
+           MetricSpace.Near(x, (y : ℝ) ↦ abs(f(y) - f(x)) < ε / 2)
+               by Real.ContinuousAt.near;
+           MetricSpace.Near(x, (y : ℝ) ↦ abs(g(y) - g(x)) < ε / 2)
+               by Real.ContinuousAt.near;
+           for y sufficiently near x: {
+             abs((f(y) + g(y)) - (f(x) + g(x)))
+                = abs((f(y) - f(x)) + (g(y) - g(x)))
+                      by substituting
+                          (ring : (f(y) + g(y)) - (f(x) + g(x))
+                              = (f(y) - f(x)) + (g(y) - g(x)))
+                ≤ abs(f(y) - f(x)) + abs(g(y) - g(x))
+                < ε / 2 + ε / 2
+                = ε
+           } };
+  done by Real.ContinuousAt.of_near
 }
 
 -- Negation preserves continuity: |−f(y) − (−f(x))| = |f(y) − f(x)|,

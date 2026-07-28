@@ -31,7 +31,11 @@ import Metric.topology
 import Metric.continuity
 
 -- P holds throughout some ball around x.
-definition MetricSpace.Near {m : MetricSpace} (x : m)
+-- OPAQUE: consumers use the four lemmas below, never the ∃-body. That is
+-- also what keeps the `for y sufficiently near x: { … }` scope working —
+-- a transparent definition gets δ-reduced away by ∀-peeling before the
+-- scope can recognise its own goal.
+opaque definition MetricSpace.Near {m : MetricSpace} (x : m)
         (P : m → Proposition) : Proposition :=
   ∃ (radius : ℝ). radius > 0 ∧
     ∀ (y : m). MetricSpace.distance(x, y) < radius → P(y)
@@ -39,7 +43,8 @@ definition MetricSpace.Near {m : MetricSpace} (x : m)
 -- A property that always holds, holds near x (any radius will do).
 theorem MetricSpace.Near.of_always {m : MetricSpace} (x : m)
         (P : m → Proposition) (always : ∀ (y : m). P(y))
-        : MetricSpace.Near(x, P) := {
+        : MetricSpace.Near(x, P) :=
+  unfold MetricSpace.Near in {
   (1 : ℝ) > 0;
   ∀ (y : m). MetricSpace.distance(x, y) < 1 → P(y)
       by { take y : m;
@@ -55,7 +60,8 @@ theorem MetricSpace.Near.and {m : MetricSpace} (x : m)
         (P Q : m → Proposition)
         (nearP : MetricSpace.Near(x, P))
         (nearQ : MetricSpace.Near(x, Q))
-        : MetricSpace.Near(x, (y : m) ↦ P(y) ∧ Q(y)) := {
+        : MetricSpace.Near(x, (y : m) ↦ P(y) ∧ Q(y)) :=
+  unfold MetricSpace.Near in {
   choose radiusP such that
       radiusP > 0 ∧ ∀ (y : m). MetricSpace.distance(x, y) < radiusP → P(y)
       from nearP;
@@ -84,7 +90,8 @@ theorem MetricSpace.Near.monotone {m : MetricSpace} (x : m)
         (P Q : m → Proposition)
         (nearP : MetricSpace.Near(x, P))
         (pointwise : ∀ (y : m). P(y) → Q(y))
-        : MetricSpace.Near(x, Q) := {
+        : MetricSpace.Near(x, Q) :=
+  unfold MetricSpace.Near in {
   choose radius such that
       radius > 0 ∧ ∀ (y : m). MetricSpace.distance(x, y) < radius → P(y)
       from nearP;
@@ -102,7 +109,8 @@ theorem MetricSpace.Near.monotone {m : MetricSpace} (x : m)
 -- ball because `distance(x, x) = 0`.
 theorem MetricSpace.Near.at_centre {m : MetricSpace} (x : m)
         (P : m → Proposition) (nearP : MetricSpace.Near(x, P))
-        : P(x) := {
+        : P(x) :=
+  unfold MetricSpace.Near in {
   choose radius such that
       radius > 0 ∧ ∀ (y : m). MetricSpace.distance(x, y) < radius → P(y)
       from nearP;
@@ -116,7 +124,8 @@ theorem MetricSpace.Near.at_centre {m : MetricSpace} (x : m)
 
 theorem MetricSpace.Near.holds_somewhere {m : MetricSpace} (x : m)
         (P : m → Proposition) (nearP : MetricSpace.Near(x, P))
-        : ∃ (y : m). P(y) := {
+        : ∃ (y : m). P(y) :=
+  unfold MetricSpace.Near in {
   P(x) by MetricSpace.Near.at_centre;
   witness x
 }
@@ -126,7 +135,7 @@ theorem MetricSpace.Near.holds_somewhere {m : MetricSpace} (x : m)
 theorem MetricSpace.Near.not_false_nearby {m : MetricSpace} (x : m)
         (nearFalse : MetricSpace.Near(x, (y : m) ↦ False))
         : False :=
-  done by MetricSpace.Near.at_centre
+  unfold MetricSpace.Near in { done by MetricSpace.Near.at_centre }
 
 -- ----------------------------------------------------------------------
 -- Continuity, read through the filter. This is the point of the notion:
@@ -139,7 +148,8 @@ theorem MetricSpace.ContinuousAt.of_near {source target : MetricSpace}
         (nearby : ∀ (tolerance : ℝ). tolerance > 0 →
             MetricSpace.Near(x,
                 (y : source) ↦ MetricSpace.distance(f(x), f(y)) < tolerance))
-        : MetricSpace.ContinuousAt(f, Set.universe(source), x) := {
+        : MetricSpace.ContinuousAt(f, Set.universe(source), x) :=
+  unfold MetricSpace.Near in {
   take tolerance : ℝ;
   suppose tolerance > 0;
   MetricSpace.Near(x,
@@ -164,7 +174,8 @@ theorem MetricSpace.ContinuousAt.near {source target : MetricSpace}
         (continuous : MetricSpace.ContinuousAt(f, Set.universe(source), x))
         (tolerance : ℝ) (tolerancePositive : tolerance > 0)
         : MetricSpace.Near(x,
-              (y : source) ↦ MetricSpace.distance(f(x), f(y)) < tolerance) := {
+              (y : source) ↦ MetricSpace.distance(f(x), f(y)) < tolerance) :=
+  unfold MetricSpace.Near in {
   choose radius such that radius > 0 ∧
       ∀ (y : source). y ∈ Set.universe(source) →
         MetricSpace.distance(x, y) < radius →
