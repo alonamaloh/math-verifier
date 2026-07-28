@@ -214,31 +214,16 @@ theorem Real.ContinuousAt.composition (f g : ℝ → ℝ) (x : ℝ)
         (gContinuous : Real.ContinuousAt(g, x))
         (fContinuous : Real.ContinuousAt(f, g(x)))
         : Real.ContinuousAt((y : ℝ) ↦ f(g(y)), x) := {
-  suffices ∀ (ε : ℝ). ε > 0 →
-      ∃ (δ : ℝ). δ > 0 ∧ ∀ (y : ℝ). abs(y - x) < δ → abs(f(g(y)) - f(g(x))) < ε
-      by Real.ContinuousAt.of_epsilon_delta;
-  take ε : ℝ;
-  suppose ε > 0 as εPositive;
-  {
-    choose fδ such that fδ > 0
-            ∧ ∀ (z : ℝ). abs(z - g(x)) < fδ → abs(f(z) - f(g(x))) < ε
-        from Real.ContinuousAt.tolerance;
-    fδ > 0;
-    ∀ (z : ℝ). abs(z - g(x)) < fδ
-            → abs(f(z) - f(g(x))) < ε as fClose;
-    choose gδ such that gδ > 0
-            ∧ ∀ (y : ℝ). abs(y - x) < gδ → abs(g(y) - g(x)) < fδ
-        from Real.ContinuousAt.tolerance;
-    ∀ (y : ℝ). abs(y - x) < gδ
-            → abs(g(y) - g(x)) < fδ as gClose;
-    witness gδ with {
-      ∀ (y : ℝ). abs(y - x) < gδ
-              → abs(f(g(y)) - f(g(x))) < ε
-          by (y : ℝ) (yClose : abs(y - x) < gδ) ↦
-            fClose(g(y), gClose(y, yClose));
-      done
-    }
-  }
+  ∀ (ε : ℝ). ε > 0 →
+      MetricSpace.Near(x, (y : ℝ) ↦ abs(f(g(y)) - f(g(x))) < ε)
+      by { take ε : ℝ;
+           suppose ε > 0;
+           -- f's neighbourhood sits at g(x), not at x; the pushforward
+           -- along g is what carries it back.
+           MetricSpace.Near(g(x), (z : ℝ) ↦ abs(f(z) - f(g(x))) < ε)
+               by Real.ContinuousAt.near;
+           done by MetricSpace.Near.under };
+  done by Real.ContinuousAt.of_near
 }
 
 -- Differences: f − g = f + (−g), and subtraction on Real is

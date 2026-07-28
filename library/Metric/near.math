@@ -190,3 +190,35 @@ theorem MetricSpace.ContinuousAt.near {source target : MetricSpace}
            done };
   witness radius
 }
+
+-- ----------------------------------------------------------------------
+-- Pushforward: the filter transported along a continuous map. This is the
+-- `Near` analogue of `Eventually.shift`, and it is what a COMPOSITION
+-- needs — there the two hypotheses sit at different centres (`f` near
+-- `g(x)`, `g` near `x`), which the scope, folding facts at one centre,
+-- cannot combine on its own.
+theorem MetricSpace.Near.under {source target : MetricSpace}
+        (g : source → target) (x : source)
+        (gContinuous : MetricSpace.ContinuousAt(g, Set.universe(source), x))
+        (P : target → Proposition)
+        (nearP : MetricSpace.Near(g(x), P))
+        : MetricSpace.Near(x, (y : source) ↦ P(g(y))) :=
+  unfold MetricSpace.Near in {
+    choose radius such that radius > 0 ∧
+        ∀ (z : target). MetricSpace.distance(g(x), z) < radius → P(z)
+        from nearP;
+    radius > 0;
+    choose nearness such that nearness > 0 ∧
+        ∀ (y : source). y ∈ Set.universe(source) →
+          MetricSpace.distance(x, y) < nearness →
+            MetricSpace.distance(g(x), g(y)) < radius
+        from gContinuous;
+    nearness > 0;
+    ∀ (y : source). MetricSpace.distance(x, y) < nearness → P(g(y))
+        by { take y : source;
+             suppose MetricSpace.distance(x, y) < nearness;
+             y ∈ Set.universe(source);
+             MetricSpace.distance(g(x), g(y)) < radius;
+             done };
+    witness nearness
+  }
