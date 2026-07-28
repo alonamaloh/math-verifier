@@ -18,8 +18,13 @@ import Natural.basics
 import Natural.order
 import Natural.eventually
 import Real.convergence
+import Real.continuity
+import Set.basics
+import Set.algebra
 import Metric.space
 import Metric.sequence
+import Metric.topology
+import Metric.continuity
 
 definition Real.distance (x y : ℝ) : ℝ := abs(x - y)
 
@@ -117,4 +122,98 @@ theorem Real.SequenceConverges.of_metric (s : ℕ → ℝ) (limit : ℝ)
            < tolerance;
         done
       }
+}
+
+-- ----------------------------------------------------------------------
+-- Continuity on the line, read either way. `Real.ContinuousAt` is the
+-- unrestricted ε-δ statement — no carrier — so its metric reading is the
+-- generic notion taken over the whole line. As with the distance itself
+-- the two say the same thing about the same numbers; only the order of
+-- the subtraction differs.
+
+theorem Real.metric_ContinuousAt (f : ℝ → ℝ) (x : ℝ)
+        (continuous : Real.ContinuousAt(f, x))
+        : MetricSpace.ContinuousAt(f, Set.universe(ℝ), x) := {
+  take tolerance : ℝ;
+  suppose tolerance > 0;
+  choose nearness such that
+      nearness > 0 ∧ ∀ (y : ℝ). abs(y - x) < nearness → abs(f(y) - f(x)) < tolerance
+      as closeNearby from continuous;
+  nearness > 0;
+  ∀ (y : ℝ). y ∈ Set.universe(ℝ) → MetricSpace.distance(x, y) < nearness
+        → MetricSpace.distance(f(x), f(y)) < tolerance
+      by { take y : ℝ;
+           suppose y ∈ Set.universe(ℝ);
+           suppose MetricSpace.distance(x, y) < nearness;
+           abs(y - x)
+              = abs(x - y)
+              = MetricSpace.distance(x, y)
+              < nearness;
+           abs(f(y) - f(x)) < tolerance by closeNearby;
+           MetricSpace.distance(f(x), f(y))
+              = abs(f(x) - f(y))
+              = abs(f(y) - f(x))
+              < tolerance;
+           done };
+  witness nearness
+}
+
+theorem Real.ContinuousAt.of_metric (f : ℝ → ℝ) (x : ℝ)
+        (continuous : MetricSpace.ContinuousAt(f, Set.universe(ℝ), x))
+        : Real.ContinuousAt(f, x) := {
+  take tolerance : ℝ;
+  suppose tolerance > 0;
+  choose nearness such that
+      nearness > 0 ∧ ∀ (y : ℝ). y ∈ Set.universe(ℝ) →
+        MetricSpace.distance(x, y) < nearness →
+          MetricSpace.distance(f(x), f(y)) < tolerance
+      as closeNearby from continuous;
+  nearness > 0;
+  ∀ (y : ℝ). abs(y - x) < nearness → abs(f(y) - f(x)) < tolerance
+      by { take y : ℝ;
+           suppose abs(y - x) < nearness;
+           y ∈ Set.universe(ℝ);
+           MetricSpace.distance(x, y)
+              = abs(x - y)
+              = abs(y - x)
+              < nearness;
+           MetricSpace.distance(f(x), f(y)) < tolerance by closeNearby;
+           abs(f(y) - f(x))
+              = abs(f(x) - f(y))
+              = MetricSpace.distance(f(x), f(y))
+              < tolerance;
+           done };
+  witness nearness
+}
+
+-- Continuity at every point of a region — the ambient, carrier-free
+-- notion the analysis layer states its hypotheses in — is the generic
+-- notion relative to that region. Only the points of the region are left
+-- to test, so the same nearness serves.
+theorem Real.metric_ContinuousOn (f : ℝ → ℝ) (region : Set(ℝ))
+        (continuous : ∀ (x : ℝ). x ∈ region → Real.ContinuousAt(f, x))
+        : MetricSpace.ContinuousOn(f, region) := {
+  take x : ℝ;
+  suppose x ∈ region;
+  Real.ContinuousAt(f, x);
+  MetricSpace.ContinuousAt(f, Set.universe(ℝ), x) by Real.metric_ContinuousAt;
+  region ⊆ Set.universe(ℝ) by Set.subset_universe;
+  done by MetricSpace.ContinuousAt.restrict
+}
+
+-- The analysis layer states continuity on an interval by its endpoints
+-- (`Real.ContinuousOn(f, a, b)`), not by a set. Any region inside those
+-- endpoints therefore carries the generic notion — this is the form
+-- `Real/intermediate_value.math` and `Real/derivative.math` can be read
+-- through without restating their hypotheses.
+theorem Real.metric_ContinuousOn_interval
+        (f : ℝ → ℝ) (a b : ℝ) (region : Set(ℝ))
+        (inside : ∀ (x : ℝ). x ∈ region → a ≤ x ∧ x ≤ b)
+        (continuous : Real.ContinuousOn(f, a, b))
+        : MetricSpace.ContinuousOn(f, region) := {
+  ∀ (x : ℝ). x ∈ region → Real.ContinuousAt(f, x)
+      by { take x : ℝ;
+           suppose x ∈ region;
+           done by continuous };
+  done by Real.metric_ContinuousOn
 }

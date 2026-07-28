@@ -137,6 +137,34 @@ theorem MetricSpace.ContinuousOn.compose (source middle target : MetricSpace)
   }
 }
 
+-- Restricting the carrier only weakens the condition — pointwise. The
+-- same nearness serves, because there are fewer points left to test.
+theorem MetricSpace.ContinuousAt.restrict (source target : MetricSpace)
+        (f : MetricSpace.carrier(source) → MetricSpace.carrier(target))
+        (smaller larger : Set(MetricSpace.carrier(source)))
+        (smallerInLarger : smaller ⊆ larger)
+        (x : MetricSpace.carrier(source))
+        (continuousAtInLarger : MetricSpace.ContinuousAt(f, larger, x))
+        : MetricSpace.ContinuousAt(f, smaller, x) := {
+  take tolerance : ℝ;
+  suppose tolerance > 0;
+  choose nearness such that nearness > 0 ∧
+      ∀ (y : MetricSpace.carrier(source)). y ∈ larger →
+        MetricSpace.distance(x, y) < nearness →
+          MetricSpace.distance(f(x), f(y)) < tolerance
+      as largerBall from continuousAtInLarger;
+  nearness > 0;
+  ∀ (y : MetricSpace.carrier(source)). y ∈ smaller →
+      MetricSpace.distance(x, y) < nearness →
+        MetricSpace.distance(f(x), f(y)) < tolerance
+      by { take y : MetricSpace.carrier(source);
+           suppose y ∈ smaller;
+           suppose MetricSpace.distance(x, y) < nearness;
+           y ∈ larger by smallerInLarger;
+           done by largerBall };
+  witness nearness
+}
+
 -- Restricting the carrier only weakens the condition.
 theorem MetricSpace.ContinuousOn.restrict (source target : MetricSpace)
         (f : MetricSpace.carrier(source) → MetricSpace.carrier(target))
