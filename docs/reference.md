@@ -261,15 +261,33 @@ for m sufficiently large: {
 The prose spelling is **scope-only**; a statement (a hypothesis, a theorem's
 conclusion) uses the `eventually (m). …` binder.
 
-The scope hands the body its facts *at the bound index and nowhere else*. Four
-lemmas cover what it cannot (`Natural/eventually.math`):
+The body follows the same rule as a `:=` or `↦` body: braces hold several
+statements, and a single statement — typically a relation chain — stands on
+its own.
+
+```math
+for m sufficiently large:
+  abs(t(m) - limit)
+     = abs(s(m) - limit)   by pointwiseEqual(m)
+     < ε
+```
+
+The scope matches the goal's **spelling**, not its normal form (reducing it
+would unfold the filter itself past recognition). So a goal that *is* the
+filter behind a wrapper — `x ∈ Real.eventual_lower_bounds(s)` — needs one
+`change eventually (m). …` line to say so.
+
+The scope hands the body its facts *at the bound index and nowhere else*.
+These lemmas cover what it cannot (`Natural/eventually.math`):
 
 | | |
 |---|---|
 | `Natural.Eventually.of_always` | a fact that always holds, holds eventually |
 | `Natural.Eventually.monotone` | weaken an eventual fact pointwise |
 | `Natural.Eventually.shift` | translation: `P` eventually gives `P(offset + ·)` eventually — for a proof needing a fact at a *shifted* index |
+| `Natural.Eventually.beyond` | `threshold ≤ m` is itself eventual — put "past this index" into the filter instead of taking a maximum by hand |
 | `Natural.Eventually.holds_somewhere` | properness: what holds eventually holds somewhere |
+| `Natural.Eventually.constant` | a fact not depending on the index, holding eventually, holds — how a scope whose conclusion is a plain fact ends |
 | `Natural.Eventually.not_eventually_false` | hence a tail cannot be false throughout — how a limit argument by contradiction ends |
 
 ## Conjunctions and disjunctions

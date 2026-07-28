@@ -30,7 +30,13 @@ than paying for it once.
 - The bundle `MetricSpace`, `IsMetric`, `MetricSpace.carrier`,
   `MetricSpace.distance` — [space.math](space.math)
 - `MetricSpace.OpenIn`, `IsOpen`, `Ball`, `Closure` — [topology.math](topology.math)
-- `MetricSpace.ContinuousAt`, `ContinuousOn` — [continuity.math](continuity.math)
+- `MetricSpace.ContinuousAt`, `ContinuousOn` — [continuity.math](continuity.math).
+  `MetricSpace.ContinuousAt.near` and `MetricSpace.ContinuousAt.of_near`
+  cross to the filter for continuity on the whole space;
+  `MetricSpace.ContinuousAt.near_on` and
+  `MetricSpace.ContinuousAt.of_near_on` do it relative to a carrier (the two
+  spellings differ only in the order of the membership and the ball
+  antecedent)
 - `MetricSpace.Near` — [near.math](near.math), the spatial twin of
   `Natural.Eventually`: "P holds throughout some ball around x". Same four
   moves, with the **minimum** of two radii where sequences take the maximum

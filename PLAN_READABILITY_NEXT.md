@@ -329,11 +329,39 @@ Allow `for (m : ℝ) sufficiently large.` where ℕ and ℝ both want
 Real/derivative.math        min: 45 → 0   (done)
 Real/continuity.math        min: 20 → 0   (done)
 Real/limits.math            Natural.maximum: 25 → 0   (done, 3ac96946)
-Metric/topology.math        min:  6       (generic layer; not converted)
-Metric/continuity.math      min:  6       (generic layer; not converted)
-Metric/separation.math      Natural.maximum:  5
-Metric/uniform.math         Natural.maximum:  2
+Metric/topology.math        min:  6 → 0   (done, a12283a6)
+Metric/separation.math      Natural.maximum: 5 → 0   (done, 6ab5c54f)
+Metric/uniform.math         Natural.maximum: 2 → 0   (done)
+Metric/continuity.math      min:  6 → 0   (done)
+Real/order.math             Natural.maximum: 3 → 0   (done)
+Real/supremum.math          Natural.maximum: 2 → 0   (done)
+Plane/sequence.math         Natural.maximum: 1 → 0   (done)
+Plane/extremum.math         Natural.maximum: 1 → 0   (done)
+ComplexNumber/limits.math   Natural.maximum: 2 → 0   (done)
+ComplexNumber/{completeness,exponential}.math            → 0   (done)
+Real/{convergence,multiplication,order_multiplication}   → 0   (done)
+Real/{basics,cauchy_complete}.math                       → 0   (done)
 ```
+
+**THE SWEEP IS FINISHED.** What `Natural.maximum` remains in the analysis
+layer is the **two-index Cauchy** shape (`∃N. ∀ m n ≥ N. …` in
+`Real/{addition,multiplication,reciprocal}.math`) — not this filter — plus
+`Real.cauchy_sign_eventually`, whose `max` is a witness the conclusion
+existentially quantifies AND a point the proof reads the sign at. That last
+one is the missing `for m past N:` intro form (finding 3 below), not a site
+the scope can close. `Real/uncountable.math`'s `max(m, n)` is a monotonicity
+argument, and the surviving `min`s in `Metric/interval.math` /
+`Plane/connected.math` choose a *step size* used in the conclusion — both are
+mathematics, not bookkeeping.
+
+**Six definitions stopped spelling the filter by hand** and now take it:
+`ComplexNumber.SequenceConverges`, `Rational.sequence.cauchy_is_naturally_-`
+`bounded`, `CauchyEquivalent` (the relation ℝ itself is a quotient by),
+`Real.eventual_lower_bounds`, and the two
+`Real.multiply_*_respects_at_rep_*_inner` conclusions. Respelling
+`CauchyEquivalent` broke **nothing**; respelling
+`cauchy_is_naturally_bounded` broke **three** consumers — see the citation
+finding below.
 
 **ITEM 3 IS DONE for the analysis layer.** The three files the item measured
 carry **zero** `min` and **zero** `Natural.maximum` between them, and neither
@@ -361,13 +389,49 @@ more. What landed, and what it cost:
   `Near.within` (the ball is itself a neighbourhood, so a bound on
   `distance(x, y)` joins the same filter as everything else).
 
-Residual friction, worth fixing but not blocking: the scope hands its facts to
-the body spelled as `MetricSpace.Ball`, so a step that *scales* one needs the
-arithmetic form restated (two lines in `ContinuousAt.multiply`).
-
 Note the last two: the newly written generic files brought **new** max
 bookkeeping. This is not a legacy problem being cleaned up, it is an ongoing
 tax on new work.
+
+### What the rest of the sweep turned up
+
+Each conversion has wanted one more primitive than the design predicted, and
+that held to the end: `Near.under`, `Near.within`, `Eventually.beyond`,
+`Eventually.constant`, then
+`Real.eventually_above_cast_of_LessOrEqual` (mirror of the `…_below_…`
+bridge) and `MetricSpace.ContinuousAt.near_on` / `.of_near_on` (the
+carrier-relative crossing, without which the pasting lemma cannot be written
+through the filter). The first four are filter laws; the last three are
+**boundary lemmas** — a notion restated in the filter's vocabulary. Expect
+one of those per notion the filter meets, not per proof.
+
+Three findings, all fixed at the source rather than worked around:
+
+1. **A citation does not see through the definition.** `Natural.Eventually`
+   is a transparent `definition`, but the citation matcher is structural, so
+   `by <lemma>` will **not** discharge a goal spelled `∃N. ∀m ≥ N. P(m)`
+   from a lemma concluding `Eventually(P)`. The scope has
+   `recognizeUnfoldedEventually` for exactly this; citation matching has no
+   counterpart. That is why respelling one lemma's conclusion broke three
+   consumers. **The general fix is to fold in the matcher**; it is the same
+   gap as (2), one layer up.
+2. **The scope matches the goal's spelling, not its normal form** — it must,
+   since WHNF would unfold the filter past recognition. So a goal that *is*
+   the filter behind a wrapper (`x ∈ Real.eventual_lower_bounds(s)`) needs
+   one `change eventually (m). …` line. Cheap, but worth a recogniser that
+   δ-reduces the wrapper *without* touching the filter head.
+3. **The scope body was an expression position; it should have been a
+   statement position** (fixed). `for m sufficiently large: <chain>` parsed
+   the body with `parseExpression`, which stops at the first relation — the
+   chain's remaining steps re-parented onto the enclosing statement and the
+   scope was elaborated with no expected type, reporting `needs an expected
+   type from context` while pointing at a goal that *was* an `eventually`.
+   Both spellings now use `parseBodyExpressionOrStatement`, the D2 entry
+   `:=` and `↦` bodies use.
+
+The earlier residual friction — facts handed to the body spelled as
+`MetricSpace.Ball` — was an unreduced β-redex in `hypothesisType` and is
+fixed (`6b20e8c7`).
 
 ### Retire `eventually`?
 
@@ -397,15 +461,11 @@ parallel code path.
 
 ### Two prerequisites, both cheap
 
-- **Document the scope form.** `eventually (m): { … }` and its prose spelling
-  `for sufficiently large m: { … }` are implemented, tested
-  (`library/Test/eventually_test.math`), and appear **nowhere in `docs/`**:
-  `grep -rn "sufficiently large\|eventually (" docs/` returns nothing.
-  `docs/reference.md` documents `take`, `witness`, `choose`, and the bounded
-  range check but not this. Two library files use it. C4 of
-  `PLAN_LANGUAGE_IMPROVEMENT.md` already requires docs in the same commit as
-  the construct; this one slipped. **Still outstanding** — and now it also
-  owes the three new `Natural.Eventually` lemmas below.
+- ~~**Document the scope form.**~~ **DONE.** `docs/reference.md`'s
+  "Eventually" section covers both spellings, the `near` filter, the
+  statement-vs-scope split, the body forms (braces vs a single chain), the
+  goal-spelling caveat, and the full lemma table including `beyond` and
+  `constant`.
 - ~~**Rewrite `Real/limits.math` with it.**~~ **DONE (`3ac96946`).** Findings
   below; they are the reason this was the first move.
 

@@ -117,6 +117,7 @@ recursion, or [number-theory.md](number-theory.md) for division, gcd, and primes
 `Integer` uses `Natural.distance` for absolute value; `Rational` relies on
 multiplicative cancellation; `Set` uses `Natural.compare_strict` and
 quotient/remainder uniqueness for finite bijections. Analysis over `Real` and
-`ComplexNumber` repeatedly uses `Natural.maximum`, `Natural.Eventually`,
+`ComplexNumber` runs on `Natural.Eventually` — `Natural.maximum` is what the
+filter takes internally, so limit arguments no longer name it — and on
 comparison, powers, factorials, and binomial coefficients. Algebra and modular
 arithmetic use division, gcd, primes, and totients.

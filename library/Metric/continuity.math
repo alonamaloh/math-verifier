@@ -17,7 +17,6 @@ import Equality.basics
 import Set.basics
 import Set.algebra
 import Real.interface
-import Real.minimum
 import Metric.space
 import Metric.topology
 import Metric.near
@@ -202,139 +201,6 @@ theorem MetricSpace.ContinuousOn.restrict (source target : MetricSpace)
 }
 
 -- ----------------------------------------------------------------------
--- The pasting lemma.
---
--- Each piece supplies a radius at every point of the union, by one of two
--- routes. If the point is IN the piece, continuity on that piece supplies
--- it. If the point is NOT in the piece, the piece being closed in the
--- union supplies a radius within which no point of the union is in the
--- piece at all, so the requirement is vacuous. Both routes give the same
--- statement, which is what lets the main proof avoid a four-way split.
-
-theorem MetricSpace.pasteRadius (source target : MetricSpace)
-        (f : source → target)
-        (piece union : Set(source))
-        (pieceClosed : MetricSpace.ClosedIn(piece, union))
-        (pieceContinuous : MetricSpace.ContinuousOn(f, piece))
-        (x : source) (xInUnion : x ∈ union)
-        (tolerance : ℝ) (tolerancePositive : tolerance > 0)
-        : ∃ (nearness : ℝ). nearness > 0 ∧
-            ∀ (y : source). y ∈ union → y ∈ piece →
-              distance(x, y) < nearness →
-                distance(f(x), f(y)) < tolerance :=
-  done by cases {
-    case x ∈ piece: {
-        choose nearness such that nearness > 0 ∧
-            ∀ (y : source). y ∈ piece →
-              distance(x, y) < nearness →
-                distance(f(x), f(y)) < tolerance
-            from pieceContinuous;
-        nearness > 0;
-        ∀ (y : source). y ∈ piece →
-            distance(x, y) < nearness →
-              distance(f(x), f(y)) < tolerance as pieceBall;
-        witness nearness with {
-          nearness > 0;
-          ∀ (y : source). y ∈ union → y ∈ piece →
-              distance(x, y) < nearness →
-                distance(f(x), f(y)) < tolerance
-              by (y : source) (yInUnion : y ∈ union)
-                 (yInPiece : y ∈ piece)
-                 (yClose : distance(x, y) < nearness) ↦
-                   pieceBall(y, yInPiece, yClose);
-          done
-        }
-      }
-    otherwise as xOutsidePiece: {
-        x ∈ union ∖ piece;
-        choose nearness such that nearness > 0 ∧
-            ∀ (y : source). y ∈ union →
-              distance(x, y) < nearness →
-                y ∈ union ∖ piece
-            from pieceClosed;
-        nearness > 0;
-        ∀ (y : source). y ∈ union →
-            distance(x, y) < nearness →
-              y ∈ union ∖ piece as avoidsPiece;
-        witness nearness with {
-          nearness > 0;
-          ∀ (y : source). y ∈ union → y ∈ piece →
-              distance(x, y) < nearness →
-                distance(f(x), f(y)) < tolerance
-              by (y : source) (yInUnion : y ∈ union)
-                 (yInPiece : y ∈ piece)
-                 (yClose : distance(x, y) < nearness) ↦ {
-                   y ∈ union ∖ piece by avoidsPiece;
-                   ¬(y ∈ piece);
-                   False;
-                   done
-                 };
-          done
-        }
-      }
-  }
-
--- A map continuous on each of two relatively closed pieces is continuous
--- on their union. This is what glues the interior and exterior extensions
--- of the main theorem along the curve they share.
-theorem MetricSpace.ContinuousOn.paste (source target : MetricSpace)
-        (f : source → target)
-        (first second : Set(source))
-        (firstClosed : MetricSpace.ClosedIn(first, first ∪ second))
-        (secondClosed : MetricSpace.ClosedIn(second, first ∪ second))
-        (firstContinuous : MetricSpace.ContinuousOn(f, first))
-        (secondContinuous : MetricSpace.ContinuousOn(f, second))
-        : MetricSpace.ContinuousOn(f, first ∪ second) := {
-  take x : source;
-  suppose x ∈ first ∪ second as xInUnion;
-  take tolerance : ℝ;
-  suppose tolerance > 0 as tolerancePositive;
-  choose firstNearness such that firstNearness > 0 ∧
-      ∀ (y : source). y ∈ first ∪ second → y ∈ first →
-        distance(x, y) < firstNearness →
-          distance(f(x), f(y)) < tolerance
-      from MetricSpace.pasteRadius(piece := first);
-  choose secondNearness such that secondNearness > 0 ∧
-      ∀ (y : source). y ∈ first ∪ second → y ∈ second →
-        distance(x, y) < secondNearness →
-          distance(f(x), f(y)) < tolerance
-      from MetricSpace.pasteRadius(piece := second);
-  firstNearness > 0;
-  secondNearness > 0;
-  ∀ (y : source). y ∈ first ∪ second → y ∈ first →
-      distance(x, y) < firstNearness →
-        distance(f(x), f(y)) < tolerance as firstBall;
-  ∀ (y : source). y ∈ first ∪ second → y ∈ second →
-      distance(x, y) < secondNearness →
-        distance(f(x), f(y)) < tolerance as secondBall;
-  witness min(firstNearness, secondNearness) with {
-    min(firstNearness, secondNearness) > 0;
-    ∀ (y : source). y ∈ first ∪ second →
-        distance(x, y) < min(firstNearness, secondNearness) →
-          distance(f(x), f(y)) < tolerance
-        by (y : source) (yInUnion : y ∈ first ∪ second)
-           (yClose : distance(x, y)
-               < min(firstNearness, secondNearness)) ↦ {
-             distance(x, y)
-                < min(firstNearness, secondNearness)
-                ≤ firstNearness;
-             distance(x, y)
-                < min(firstNearness, secondNearness)
-                ≤ secondNearness;
-             done by cases {
-               case y ∈ first as yInFirst:
-                   firstBall(y, yInUnion, yInFirst,
-                       { distance(x, y) < firstNearness })
-               case y ∈ second as yInSecond:
-                   secondBall(y, yInUnion, yInSecond,
-                       { distance(x, y) < secondNearness })
-             }
-           };
-    done
-  }
-}
-
--- ----------------------------------------------------------------------
 -- ----------------------------------------------------------------------
 -- Continuity, read through the filter. This is the point of the notion:
 -- "f is continuous at x" is "for every tolerance, f(y) is within it for y
@@ -389,6 +255,63 @@ theorem MetricSpace.ContinuousAt.near {source target : MetricSpace}
   witness radius
 }
 
+-- The same crossing for continuity RELATIVE TO A CARRIER: the filter's
+-- predicate carries the membership antecedent, so the two spellings
+-- differ only in the order of the two antecedents — exactly as for
+-- `OpenIn.near`. What they buy is that combining two continuity facts at
+-- one point becomes `Near.and`, one radius taken by the filter, instead
+-- of a minimum carried by hand.
+
+theorem MetricSpace.ContinuousAt.near_on {source target : MetricSpace}
+        (f : source → target) (carrier : Set(source)) (x : source)
+        (continuous : MetricSpace.ContinuousAt(f, carrier, x))
+        (tolerance : ℝ) (tolerancePositive : tolerance > 0)
+        : MetricSpace.Near(x,
+              (y : source) ↦ y ∈ carrier →
+                  distance(f(x), f(y)) < tolerance) :=
+  unfold MetricSpace.Near in {
+  choose radius such that radius > 0 ∧
+      ∀ (y : source). y ∈ carrier →
+        distance(x, y) < radius →
+          distance(f(x), f(y)) < tolerance
+      from continuous;
+  radius > 0;
+  ∀ (y : source). distance(x, y) < radius →
+      (y ∈ carrier → distance(f(x), f(y)) < tolerance)
+      by { take y : source;
+           suppose distance(x, y) < radius;
+           suppose y ∈ carrier;
+           done };
+  witness radius
+}
+
+theorem MetricSpace.ContinuousAt.of_near_on {source target : MetricSpace}
+        (f : source → target) (carrier : Set(source)) (x : source)
+        (nearby : ∀ (tolerance : ℝ). tolerance > 0 →
+            MetricSpace.Near(x,
+                (y : source) ↦ y ∈ carrier →
+                    distance(f(x), f(y)) < tolerance))
+        : MetricSpace.ContinuousAt(f, carrier, x) :=
+  unfold MetricSpace.Near in {
+  take tolerance : ℝ;
+  suppose tolerance > 0;
+  MetricSpace.Near(x,
+      (y : source) ↦ y ∈ carrier → distance(f(x), f(y)) < tolerance)
+      by nearby;
+  choose radius such that radius > 0 ∧
+      ∀ (y : source). distance(x, y) < radius →
+        (y ∈ carrier → distance(f(x), f(y)) < tolerance);
+  radius > 0;
+  ∀ (y : source). y ∈ carrier →
+      distance(x, y) < radius →
+        distance(f(x), f(y)) < tolerance
+      by { take y : source;
+           suppose y ∈ carrier;
+           suppose distance(x, y) < radius;
+           done };
+  witness radius
+}
+
 -- ----------------------------------------------------------------------
 -- Pushforward: the filter transported along a continuous map. This is the
 -- `Near` analogue of `Eventually.shift`, and it is what a COMPOSITION
@@ -420,4 +343,90 @@ theorem MetricSpace.Near.under {source target : MetricSpace}
              done };
     witness nearness
   }
+
+-- ----------------------------------------------------------------------
+-- The pasting lemma, through the filter.
+--
+-- Each piece supplies, near every point of the union, the bound for the
+-- points of the union that lie in that piece — by one of two routes. If
+-- the point is IN the piece, continuity on that piece supplies it. If the
+-- point is NOT in the piece, the piece being closed in the union supplies
+-- a ball within which no point of the union is in the piece at all, so
+-- the requirement is vacuous. Both routes give the same near-fact, which
+-- is what lets the main proof avoid a four-way split.
+
+theorem MetricSpace.pasteRadius (source target : MetricSpace)
+        (f : source → target)
+        (piece union : Set(source))
+        (pieceClosed : MetricSpace.ClosedIn(piece, union))
+        (pieceContinuous : MetricSpace.ContinuousOn(f, piece))
+        (x : source) (xInUnion : x ∈ union)
+        (tolerance : ℝ) (tolerancePositive : tolerance > 0)
+        : MetricSpace.Near(x,
+              (y : source) ↦ y ∈ union → y ∈ piece →
+                  distance(f(x), f(y)) < tolerance) :=
+  done by cases {
+    case x ∈ piece: {
+        MetricSpace.ContinuousAt(f, piece, x) by pieceContinuous;
+        MetricSpace.Near(x,
+            (y : source) ↦ y ∈ piece →
+                distance(f(x), f(y)) < tolerance)
+            by MetricSpace.ContinuousAt.near_on;
+        for y sufficiently near x: {
+          suppose y ∈ union;
+          suppose y ∈ piece;
+          done
+        }
+      }
+    otherwise as xOutsidePiece: {
+        x ∈ union ∖ piece;
+        MetricSpace.Near(x,
+            (y : source) ↦ y ∈ union → y ∈ union ∖ piece)
+            by MetricSpace.OpenIn.near(subset := union ∖ piece);
+        for y sufficiently near x: {
+          suppose y ∈ union;
+          suppose y ∈ piece;
+          y ∈ union ∖ piece;
+          ¬(y ∈ piece);
+          False;
+          done
+        }
+      }
+  }
+
+-- A map continuous on each of two relatively closed pieces is continuous
+-- on their union. This is what glues the interior and exterior extensions
+-- of the main theorem along the curve they share.
+theorem MetricSpace.ContinuousOn.paste (source target : MetricSpace)
+        (f : source → target)
+        (first second : Set(source))
+        (firstClosed : MetricSpace.ClosedIn(first, first ∪ second))
+        (secondClosed : MetricSpace.ClosedIn(second, first ∪ second))
+        (firstContinuous : MetricSpace.ContinuousOn(f, first))
+        (secondContinuous : MetricSpace.ContinuousOn(f, second))
+        : MetricSpace.ContinuousOn(f, first ∪ second) := {
+  take x : source;
+  suppose x ∈ first ∪ second as xInUnion;
+  ∀ (tolerance : ℝ). tolerance > 0 →
+      MetricSpace.Near(x, (y : source) ↦ y ∈ first ∪ second →
+          distance(f(x), f(y)) < tolerance)
+      by { take tolerance : ℝ;
+           suppose tolerance > 0;
+           MetricSpace.Near(x,
+               (y : source) ↦ y ∈ first ∪ second → y ∈ first →
+                   distance(f(x), f(y)) < tolerance)
+               by MetricSpace.pasteRadius(piece := first);
+           MetricSpace.Near(x,
+               (y : source) ↦ y ∈ first ∪ second → y ∈ second →
+                   distance(f(x), f(y)) < tolerance)
+               by MetricSpace.pasteRadius(piece := second);
+           for y sufficiently near x: {
+             suppose y ∈ first ∪ second;
+             done by cases {
+               case y ∈ first: done
+               case y ∈ second: done
+             }
+           } };
+  done by MetricSpace.ContinuousAt.of_near_on
+}
 

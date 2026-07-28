@@ -368,7 +368,16 @@ CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
 # 2026-07-20: 397 → 397. rank_three_representative_truants manifest-added at
 # ZERO counted leaks; all eight representatives have exact truants and both
 # rank-two parent branches now have complete rank-three truant classifications.
-CLEAN_LEAK_BUDGET ?= 397
+# 2026-07-28: 397 → 399. TWO new `unfold MetricSpace.Near` boundary markers in
+# Metric/continuity.math: `ContinuousAt.near_on` / `.of_near_on`, the
+# carrier-relative crossing between the ε-δ spelling and the filter. Exactly
+# the same intended-boundary class as the `.near` / `.of_near` pair already
+# counted there (3 markers) — `Near` is opaque, so the lemmas that cross to it
+# are the only place it may be unfolded. What they bought: the pasting lemma
+# now goes through the filter, `MetricSpace.pasteRadius` states a `Near`,
+# `Plane.pasteRadius` is deleted, and Metric/continuity.math loses its
+# `min`, its `Real.minimum` import, and ~45 lines.
+CLEAN_LEAK_BUDGET ?= 399
 # Second, independent axis: user-written `⟨…⟩` over a logical connective
 # (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the
 # elaborator under MATH_CHECK_ANON_TUPLES (see `clean-anon-ratchet`). Held at the
