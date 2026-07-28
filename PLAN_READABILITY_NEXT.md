@@ -391,17 +391,45 @@ alias in `Plane/extremum.math`.
 a `Real.ContinuousAt` that is about to be redefined, and `Real/derivative.math`
 — the largest single beneficiary of item 3 — converts twice.
 
-### DONE, but by bridging, not redefining (`7aa45c4a`)
+### DONE by bridging (`7aa45c4a`) — redefinition needs a re-layering first
 
-**The redefinition this item proposed is not available.** `Real/interface.math`
-re-exports `Real.ContinuousAt` under `export definitions` — **with its body**,
-closure-validated against the Real public vocabulary — and
-`Metric/space.math` imports `Real.interface`. So a `Real.ContinuousAt` whose
-body mentions `MetricSpace.ContinuousAt` is an import cycle, and the only way
-out is dropping it from the export list, which takes the ε-δ body away from
-exactly the consumers that eliminate it. The `Plane.RealContinuousAt`
-precedent does not transfer: `Plane/` sits *above* the metric layer, `Real/`
-sits below it.
+**Why the redefinition is not available *as the tree is laid out today*.**
+`Metric/space.math` imports `Real.interface`, and `Real/interface.math` — the
+seal (`interface module Real.interface implemented by Real.cauchy`) — imports
+the entire Real subtree, topology included: `Real.intermediate_value` (61),
+`Real.square_root` (70), `Real.continuity` (71), `Real.derivative` (72).
+`Real/cauchy.math`, the construction the seal is implemented by, imports the
+same four at its lines 43–46. So every `Metric.*` module sits above *all* of
+`Real/`, and `Real/continuity.math` importing `Metric.continuity` is a cycle.
+
+**But nothing requires that, and the fix is small in principle.** What pins
+the topology below the seal is a single chain — `√` is part of the public
+view (`constant Real.square_root` in the interface), `√` is constructed from
+the intermediate value theorem, and IVT needs continuity. It is a real
+mathematical dependency, but it is a dependency of *constructing √*, not of
+anything the metric layer needs. Measured:
+
+```sh
+grep -rho "square_root" library/Metric/*.math | wc -l      # → 0
+```
+
+Every consumer of `Real.square_root` — `Plane/norm.math`, `ComplexNumber/*`,
+`GaussianInteger/fermat_two_squares.math`,
+`IntegerMod/square_root_of_minus_one.math` — is **above** the metric layer.
+So the chain `square_root → intermediate_value → continuity → derivative` can
+be lifted out of the seal and placed above `Metric/`, after which
+`Real.ContinuousAt` can be *defined* as
+`MetricSpace.ContinuousAt(f, Set.universe(ℝ), x)` and this item's original
+"Do" goes through as written.
+
+That re-layering is its own step, not a side effect of a bridge: it drops four
+imports from `Real/cauchy.math` and from `Real/interface.math`, removes
+`Real.ContinuousAt` / `ContinuousOn` / `HasDerivativeAt` from
+`export definitions` and the `constant Real.square_root` declaration from the
+public view, and updates whatever reached those through
+`import Real.interface` alone (`library/Test/real_interface_consumer.math`
+tests exactly that exposure). It touches the sealed-structure mechanism of
+`PLAN_LANGUAGE_IMPROVEMENT.md` D3/D3a, so it wants its own pass.
 
 What landed instead is the bridge, following the
 `Real.metric_SequenceConverges` / `Real.SequenceConverges.of_metric` pair that
@@ -431,6 +459,7 @@ Three things worth carrying forward:
   change**, which is the upside of bridging: item 3 can now register `Near`
   against a `Real.ContinuousAt` that is *not* about to be redefined, so the
   "converts twice" risk this item was sequenced to avoid is gone either way.
+  If the re-layering above is taken first, they convert once, properly.
 
 ---
 
