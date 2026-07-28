@@ -228,12 +228,11 @@ Prove one with the **scope** form, which takes every in-scope eventual fact,
 combines their thresholds, and hands the body each fact at the bound index:
 
 ```math
-eventually (m): { … }                 -- goal position
-for m sufficiently large: { … }       -- the same thing, in prose
+for m sufficiently large: { … }
 ```
 
-The prose form is **binder first**, so the bound name sits where a reader
-looks for it, and it generalises to other filters by swapping the phrase:
+It is **binder first**, so the bound name sits where a reader looks for it, and
+it generalises to other filters by swapping the phrase:
 
 ```math
 for y sufficiently near x: { … }      -- proves `MetricSpace.Near(x, Q)`
@@ -263,8 +262,9 @@ for m sufficiently large: {
 }
 ```
 
-The prose spelling is **scope-only**; a statement (a hypothesis, a theorem's
-conclusion) uses the `eventually (m). …` binder.
+The two forms divide cleanly: `for m sufficiently large:` proves, and the
+`eventually (m). …` binder states — a hypothesis, a theorem's conclusion, a
+fact asserted mid-proof.
 
 The body follows the same rule as a `:=` or `↦` body: braces hold several
 statements, and a single statement — typically a relation chain — stands on

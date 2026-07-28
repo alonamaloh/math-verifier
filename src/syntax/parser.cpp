@@ -3695,45 +3695,22 @@ private:
             && peekAt(5).kind == TokenKind::KeywordFrom) {
             return parseFoldBinder();
         }
-        // The `eventually` binder form (A6): `eventually (m). P(m)` —
-        // sugar for `Natural.Eventually((m : Natural) ↦ P(m))`, the
-        // "holds from some index on" quantifier of limit arguments.
-        // `eventually` stays an ordinary identifier everywhere else;
-        // the form is claimed by the `(name).` lookahead shape only.
-        // Goal-position scope (A6 rule ii): `eventually (m): <body>` —
-        // proves a `Natural.Eventually(Q)` goal with every in-scope
-        // eventual hypothesis usable at `m`; thresholds stay invisible.
-        if (current.kind == TokenKind::Identifier
-            && current.lexeme == "eventually"
-            && peekAt(1).kind == TokenKind::LeftParen
-            && peekAt(2).kind == TokenKind::Identifier
-            && peekAt(3).kind == TokenKind::RightParen
-            && peekAt(4).kind == TokenKind::Colon) {
-            Token head = consumeAny();  // 'eventually'
-            consumeAny();               // '('
-            std::string binderName = consumeAny().lexeme;
-            consumeAny();               // ')'
-            consumeAny();               // ':'
-            // D2 body: a bare relation chain is the natural spelling here
-            // (the scope's body is an argument, and the argument is
-            // usually a calculation), and the plain expression parser
-            // cannot represent one — it would stop after the first
-            // relation and the chain's remaining steps would re-parent
-            // onto the ENCLOSING statement, leaving the scope with no
-            // expected type.
-            SurfaceExpressionPointer body =
-                parseBodyExpressionOrStatement();
-            return makeSurfaceEventuallyScope(
-                std::move(binderName), std::move(body),
-                head.line, head.column);
-        }
-        // Prose spelling of the scope, BINDER FIRST so the bound name sits
-        // where a reader looks for it and the phrase reads as English:
+        // The scope form, BINDER FIRST so the bound name sits where a
+        // reader looks for it and the phrase reads as English:
         //     for m sufficiently large: <body>
         //     for y sufficiently near x: <body>
         // The phrase selects the filter; its parameters (the point, for
         // `near`) are read off the GOAL by the elaborator, so nothing here
-        // has to know a filter's arity.
+        // has to know a filter's arity. The statement binder
+        // `eventually (m). P(m)` below is the other half of the pair: one
+        // way to say it, one way to prove it.
+        //
+        // The body is parsed with `parseBodyExpressionOrStatement` (the D2
+        // entry `:=` and `↦` bodies use), not `parseExpression`: a bare
+        // relation chain is the natural spelling here, and the expression
+        // parser cannot represent one — it stops after the first relation
+        // and the chain's remaining steps re-parent onto the ENCLOSING
+        // statement, leaving the scope with no expected type.
         if (current.kind == TokenKind::Identifier
             && current.lexeme == "for"
             && peekAt(1).kind == TokenKind::Identifier
