@@ -18,7 +18,6 @@ import Natural.basics
 import Natural.peano
 import Natural.arithmetic
 import Natural.order
-import Natural.maximum
 import Natural.eventually
 import Rational.basics
 import Rational.addition
@@ -236,25 +235,15 @@ theorem Real.eq_of_sub_eq_zero
 -- ----------------------------------------------------------------------
 -- Limit uniqueness: if `s` converges to both L1 and L2, then L1 = L2.
 --
--- Standard ε–N argument: for arbitrary positive Rational ε, split
--- in half to get halvedε = halve(ε); pick N1 (from s ↦ L1 at
--- halvedε) and N2 (s ↦ L2 at halvedε); take m = max(N1, N2);
--- then by triangle inequality,
+-- Standard ε–N argument: at a positive ε, both tails hold at ε/2, and
+-- where they hold together the triangle inequality gives
 --   |L1 - L2| = |(L1 - s(m)) + (s(m) - L2)|
 --             ≤ |L1 - s(m)| + |s(m) - L2|
---             < halvedε + halvedε
+--             < ε/2 + ε/2
 --             = ε.
--- Since this holds for every positive Rational ε, eq_of_absolute_value_-
--- less_than_all_positive gives L1 - L2 = Real.zero; eq_of_sub_eq_zero
--- finishes.
---
--- The whole argument lives at the Real level: pick N1, N2 from the
--- two convergence proofs at ε/2, take m = max(N1, N2), then by
--- triangle inequality at Real level
---   |L1 - L2| ≤ |L1 - s(m)| + |s(m) - L2| < ε/2 + ε/2 = ε.
--- Since this holds for every positive Rational ε, by
--- eq_of_absolute_value_less_than_all_positive applied to (L1 - L2)
--- we get L1 - L2 = 0, and eq_of_sub_eq_zero finishes.
+-- The bound does not mention the index, so properness hands it back.
+-- Holding for every positive ε, eq_of_absolute_value_less_than_all_-
+-- positive gives L1 - L2 = Real.zero; eq_of_sub_eq_zero finishes.
 
 theorem Real.SequenceConverges.unique
         (s : ℕ → ℝ)
@@ -262,30 +251,30 @@ theorem Real.SequenceConverges.unique
         (convergesToL1 : Real.SequenceConverges(s, L1))
         (convergesToL2 : Real.SequenceConverges(s, L2))
         : L1 = L2 := {
-  -- For every ε > 0, the triangle inequality on (L1 - s(m)) + (s(m) - L2)
-  -- and the two ε/2 bounds give |L1 - L2| < ε.
   ∀ (ε : ℝ). ε > 0 → abs(L1 - L2) < ε
     by {
       take ε : ℝ;
-      take εPositive : ε > 0;
+      suppose ε > 0;
       (2 : ℝ) > 0;
-      ε / 2 > 0 as halfPositive;
-      choose N1 as boundFromL1 from convergesToL1(ε / 2, halfPositive);
-      choose N2 as boundFromL2 from convergesToL2(ε / 2, halfPositive);
-      let m : ℕ := Natural.maximum(N1, N2);
-      N1 ≤ m;
-      N2 ≤ m;
-      -- Pointwise bounds at m. The L1 side has |s - L| swapped to
-      -- |L - s| so triangle's two summands share orientation.
-      abs(L1 - s(m))
-              = abs(s(m) - L1)
-              < ε / 2        by boundFromL1;
-      abs(s(m) - L2) < ε / 2 by boundFromL2(m, (N2 ≤ m));
-      abs(L1 - L2)
-         = abs((L1 - s(m)) + (s(m) - L2))            by (ring : (L1 - s(m)) + (s(m) - L2) = L1 - L2)
-         ≤ abs(L1 - s(m)) + abs(s(m) - L2)
-         < ε / 2 + ε / 2
-         = ε
+      ε / 2 > 0;
+      eventually (m). abs(s(m) - L1) < ε / 2 by convergesToL1;
+      eventually (m). abs(s(m) - L2) < ε / 2 by convergesToL2;
+      eventually (m). abs(L1 - L2) < ε
+          by for m sufficiently large: {
+               -- The L1 side has |s - L| swapped to |L - s| so triangle's
+               -- two summands share orientation.
+               abs(L1 - s(m))
+                       = abs(s(m) - L1)
+                       < ε / 2;
+               abs(L1 - L2)
+                  = abs((L1 - s(m)) + (s(m) - L2))
+                        by (ring : (L1 - s(m)) + (s(m) - L2) = L1 - L2)
+                  ≤ abs(L1 - s(m)) + abs(s(m) - L2)
+                  < ε / 2 + ε / 2
+                  = ε;
+               done
+             };
+      done by Natural.Eventually.constant
     };
   L1 - L2 = Real.zero;
   done

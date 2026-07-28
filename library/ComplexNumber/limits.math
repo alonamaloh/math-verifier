@@ -20,7 +20,7 @@ import axioms
 import Equality.basics
 import Natural.basics
 import Natural.order
-import Natural.maximum
+import Natural.eventually
 import Integer.basics
 import Integer.embedding
 import Rational.basics
@@ -77,19 +77,17 @@ theorem ComplexNumber.SequenceConverges.realPart
               (n : ℕ) ↦ ComplexNumber.realPart(s(n)),
               ComplexNumber.realPart(limit)) :=
   (ε : ℝ) (εPositive : ε > 0) ↦ {
-    choose threshold as close from converges(ε, εPositive);
-    witness threshold with
-        (m : ℕ) (aboveThreshold : threshold ≤ m) ↦ {
-          ComplexNumber.realPart(s(m) - limit)
-              = ComplexNumber.realPart(s(m)) - ComplexNumber.realPart(limit) as differencePart;
-          abs(ComplexNumber.realPart(s(m)) - ComplexNumber.realPart(limit))
-             = abs(ComplexNumber.realPart(s(m) - limit))
-                   by differencePart
-             ≤ abs(s(m) - limit)
-                   by ComplexNumber.realPart_bound
-             < ε
-                   by close(m, aboveThreshold)
-        }
+    eventually (m). abs(s(m) - limit) < ε by converges;
+    for m sufficiently large: {
+      ComplexNumber.realPart(s(m) - limit)
+          = ComplexNumber.realPart(s(m)) - ComplexNumber.realPart(limit) as differencePart;
+      abs(ComplexNumber.realPart(s(m)) - ComplexNumber.realPart(limit))
+         = abs(ComplexNumber.realPart(s(m) - limit))
+               by differencePart
+         ≤ abs(s(m) - limit)
+               by ComplexNumber.realPart_bound
+         < ε
+    }
   }
 
 theorem ComplexNumber.SequenceConverges.imaginaryPart
@@ -99,19 +97,17 @@ theorem ComplexNumber.SequenceConverges.imaginaryPart
               (n : ℕ) ↦ ComplexNumber.imaginaryPart(s(n)),
               ComplexNumber.imaginaryPart(limit)) :=
   (ε : ℝ) (εPositive : ε > 0) ↦ {
-    choose threshold as close from converges(ε, εPositive);
-    witness threshold with
-        (m : ℕ) (aboveThreshold : threshold ≤ m) ↦ {
-          ComplexNumber.imaginaryPart(s(m) - limit)
-              = ComplexNumber.imaginaryPart(s(m)) - ComplexNumber.imaginaryPart(limit) as differencePart;
-          abs(ComplexNumber.imaginaryPart(s(m)) - ComplexNumber.imaginaryPart(limit))
-             = abs(ComplexNumber.imaginaryPart(s(m) - limit))
-                   by differencePart
-             ≤ abs(s(m) - limit)
-                   by ComplexNumber.imaginaryPart_bound
-             < ε
-                   by close(m, aboveThreshold)
-        }
+    eventually (m). abs(s(m) - limit) < ε by converges;
+    for m sufficiently large: {
+      ComplexNumber.imaginaryPart(s(m) - limit)
+          = ComplexNumber.imaginaryPart(s(m)) - ComplexNumber.imaginaryPart(limit) as differencePart;
+      abs(ComplexNumber.imaginaryPart(s(m)) - ComplexNumber.imaginaryPart(limit))
+         = abs(ComplexNumber.imaginaryPart(s(m) - limit))
+               by differencePart
+         ≤ abs(s(m) - limit)
+               by ComplexNumber.imaginaryPart_bound
+         < ε
+    }
   }
 
 -- ----------------------------------------------------------------------
@@ -132,40 +128,32 @@ theorem ComplexNumber.SequenceConverges.of_coordinates
   (ε : ℝ) (εPositive : ε > 0) ↦ {
     (2 : ℝ) > 0;
     (2 : ℝ) ≠ 0;
-    ε / 2 > 0 as halfPositive;
-    choose realThreshold as realClose
-        from realConverges(ε / 2, halfPositive);
-    choose imaginaryThreshold as imaginaryClose
-        from imaginaryConverges(ε / 2, halfPositive);
-    witness Natural.maximum(realThreshold, imaginaryThreshold) with
-        (m : ℕ)
-        (aboveMaximum : Natural.maximum(realThreshold, imaginaryThreshold) ≤ m) ↦ {
-          realThreshold ≤ m by Natural.le_through_max_left as realAbove;
-          imaginaryThreshold ≤ m by Natural.le_through_max_right as imaginaryAbove;
-          abs(ComplexNumber.realPart(s(m)) - ComplexNumber.realPart(limit))
-                < ε / 2
-              by realClose(m, realAbove);
-          abs(ComplexNumber.imaginaryPart(s(m)) - ComplexNumber.imaginaryPart(limit))
-                < ε / 2
-              by imaginaryClose(m, imaginaryAbove);
-          ComplexNumber.realPart(s(m) - limit)
-              = ComplexNumber.realPart(s(m)) - ComplexNumber.realPart(limit) as realDifference;
-          ComplexNumber.imaginaryPart(s(m) - limit)
-              = ComplexNumber.imaginaryPart(s(m)) - ComplexNumber.imaginaryPart(limit) as imaginaryDifference;
-          abs(s(m) - limit)
-             ≤ abs(ComplexNumber.realPart(s(m) - limit))
-               + abs(ComplexNumber.imaginaryPart(s(m) - limit))
-                   by ComplexNumber.modulus_coordinate_bound
-             = abs(ComplexNumber.realPart(s(m)) - ComplexNumber.realPart(limit))
-               + abs(ComplexNumber.imaginaryPart(s(m) - limit))
-                   by realDifference
-             = abs(ComplexNumber.realPart(s(m)) - ComplexNumber.realPart(limit))
-               + abs(ComplexNumber.imaginaryPart(s(m)) - ComplexNumber.imaginaryPart(limit))
-                   by imaginaryDifference
-             < ε / 2 + ε / 2
-                   by Real.LessThan.add_strict_strict
-             = ε
-        }
+    ε / 2 > 0;
+    eventually (m).
+        abs(ComplexNumber.realPart(s(m)) - ComplexNumber.realPart(limit)) < ε / 2
+        by realConverges;
+    eventually (m).
+        abs(ComplexNumber.imaginaryPart(s(m)) - ComplexNumber.imaginaryPart(limit)) < ε / 2
+        by imaginaryConverges;
+    for m sufficiently large: {
+      ComplexNumber.realPart(s(m) - limit)
+          = ComplexNumber.realPart(s(m)) - ComplexNumber.realPart(limit) as realDifference;
+      ComplexNumber.imaginaryPart(s(m) - limit)
+          = ComplexNumber.imaginaryPart(s(m)) - ComplexNumber.imaginaryPart(limit) as imaginaryDifference;
+      abs(s(m) - limit)
+         ≤ abs(ComplexNumber.realPart(s(m) - limit))
+           + abs(ComplexNumber.imaginaryPart(s(m) - limit))
+               by ComplexNumber.modulus_coordinate_bound
+         = abs(ComplexNumber.realPart(s(m)) - ComplexNumber.realPart(limit))
+           + abs(ComplexNumber.imaginaryPart(s(m) - limit))
+               by realDifference
+         = abs(ComplexNumber.realPart(s(m)) - ComplexNumber.realPart(limit))
+           + abs(ComplexNumber.imaginaryPart(s(m)) - ComplexNumber.imaginaryPart(limit))
+               by imaginaryDifference
+         < ε / 2 + ε / 2
+               by Real.LessThan.add_strict_strict
+         = ε
+    }
   }
 
 -- ----------------------------------------------------------------------
@@ -176,12 +164,11 @@ theorem ComplexNumber.SequenceConverges.of_pointwise
         (sConverges : ComplexNumber.SequenceConverges(s, limit))
         : ComplexNumber.SequenceConverges(t, limit) :=
   (ε : ℝ) (εPositive : ε > 0) ↦ {
-    choose threshold as close from sConverges(ε, εPositive);
-    witness threshold with
-        (m : ℕ) (aboveThreshold : threshold ≤ m) ↦
-          abs(t(m) - limit)
-             = abs(s(m) - limit)    by pointwiseEqual(m)
-             < ε              by close
+    eventually (m). abs(s(m) - limit) < ε by sConverges;
+    for m sufficiently large:
+      abs(t(m) - limit)
+         = abs(s(m) - limit)    by pointwiseEqual(m)
+         < ε
   }
 
 -- ----------------------------------------------------------------------
@@ -195,32 +182,22 @@ theorem ComplexNumber.SequenceConverges.add
   (ε : ℝ) (εPositive : ε > 0) ↦ {
     (2 : ℝ) > 0;
     (2 : ℝ) ≠ 0;
-    ε / 2 > 0 as halfPositive;
-    choose sThreshold as sClose
-        from sConverges(ε / 2, halfPositive);
-    choose tThreshold as tClose
-        from tConverges(ε / 2, halfPositive);
-    witness Natural.maximum(sThreshold, tThreshold) with
-        (m : ℕ)
-        (aboveMaximum : Natural.maximum(sThreshold, tThreshold) ≤ m) ↦ {
-          sThreshold ≤ m by Natural.le_through_max_left as sAbove;
-          tThreshold ≤ m by Natural.le_through_max_right as tAbove;
-          abs(s(m) - sLimit) < ε / 2
-              by sClose(m, sAbove);
-          abs(t(m) - tLimit) < ε / 2
-              by tClose(m, tAbove);
-          abs((s(m) + t(m)) - (sLimit + tLimit))
-             = abs((s(m) - sLimit) + (t(m) - tLimit))
-                   by substituting
-                       (ring : (s(m) + t(m)) - (sLimit + tLimit)
-                           = (s(m) - sLimit) + (t(m) - tLimit))
-             ≤ abs(s(m) - sLimit)
-               + abs(t(m) - tLimit)
-                   by ComplexNumber.modulus_triangle
-             < ε / 2 + ε / 2
-                   by Real.LessThan.add_strict_strict
-             = ε
-        }
+    ε / 2 > 0;
+    eventually (m). abs(s(m) - sLimit) < ε / 2 by sConverges;
+    eventually (m). abs(t(m) - tLimit) < ε / 2 by tConverges;
+    for m sufficiently large: {
+      abs((s(m) + t(m)) - (sLimit + tLimit))
+         = abs((s(m) - sLimit) + (t(m) - tLimit))
+               by substituting
+                   (ring : (s(m) + t(m)) - (sLimit + tLimit)
+                       = (s(m) - sLimit) + (t(m) - tLimit))
+         ≤ abs(s(m) - sLimit)
+           + abs(t(m) - tLimit)
+               by ComplexNumber.modulus_triangle
+         < ε / 2 + ε / 2
+               by Real.LessThan.add_strict_strict
+         = ε
+    }
   }
 
 -- ----------------------------------------------------------------------

@@ -3714,7 +3714,15 @@ private:
             std::string binderName = consumeAny().lexeme;
             consumeAny();               // ')'
             consumeAny();               // ':'
-            SurfaceExpressionPointer body = parseExpression();
+            // D2 body: a bare relation chain is the natural spelling here
+            // (the scope's body is an argument, and the argument is
+            // usually a calculation), and the plain expression parser
+            // cannot represent one — it would stop after the first
+            // relation and the chain's remaining steps would re-parent
+            // onto the ENCLOSING statement, leaving the scope with no
+            // expected type.
+            SurfaceExpressionPointer body =
+                parseBodyExpressionOrStatement();
             return makeSurfaceEventuallyScope(
                 std::move(binderName), std::move(body),
                 head.line, head.column);
@@ -3745,7 +3753,8 @@ private:
                 consumeAny();               // 'large' | 'near'
                 if (isNear) consumeAny();   // the point — the goal supplies it
                 consumeAny();               // ':'
-                SurfaceExpressionPointer body = parseExpression();
+                SurfaceExpressionPointer body =
+                    parseBodyExpressionOrStatement();
                 return makeSurfaceEventuallyScope(
                     std::move(binderName), std::move(body),
                     head.line, head.column,

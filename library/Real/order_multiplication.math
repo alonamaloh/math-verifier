@@ -20,7 +20,7 @@ import Equality.basics
 import Natural.basics
 import Natural.arithmetic
 import Natural.order
-import Natural.maximum
+import Natural.eventually
 import Integer.basics
 import Integer.addition
 import Integer.embedding
@@ -80,64 +80,49 @@ theorem Real.IsNonneg.multiply_at_make
       ((ε : ℚ)
       (εPositive : Rational.zero < ε) ↦ {
         -- Bound both sequences by one naturally-embedded rational B.
-        choose KS, NS such that
-            ∀ (m : ℕ). NS ≤ m → abs(s(m)) ≤ ((KS + 1) : ℚ)
+        choose KS such that eventually (m). abs(s(m)) ≤ ((KS + 1) : ℚ)
             from Rational.sequence.cauchy_is_naturally_bounded;
-        choose KT, NT such that
-            ∀ (m : ℕ). NT ≤ m → abs(t(m)) ≤ ((KT + 1) : ℚ)
+        choose KT such that eventually (m). abs(t(m)) ≤ ((KT + 1) : ℚ)
             from Rational.sequence.cauchy_is_naturally_bounded;
         let K : ℕ := KS + KT + 1;
         Rational.IsNonneg(((KT + 1) : ℚ));
         Rational.IsNonneg(((KS + 1) : ℚ));
-        -- Choose δ with (K + 1 : ℚ)·δ ≤ ε/2, and tail indices where both
-        -- sequences are above -δ.
+        -- Choose δ with (K + 1 : ℚ)·δ ≤ ε/2; both sequences are eventually
+        -- above -δ, and eventually inside the bound.
         Rational.zero < Rational.halve(ε);
         choose δ such that Rational.zero < δ
             ∧ ((K + 1) : ℚ) * δ ≤ Rational.halve(ε)
             from Rational.divide_by_succ_positive;
-        choose N1 as sLow from sNonneg(δ, (Rational.zero < δ));
-        choose N2 as tLow from tNonneg(δ, (Rational.zero < δ));
-        witness Natural.maximum(Natural.maximum(N1, N2),
-                    Natural.maximum(NS, NT)) with
-            (m : ℕ)
-            (aboveAll : Natural.maximum(Natural.maximum(N1, N2),
-                            Natural.maximum(NS, NT)) ≤ m) ↦ {
-              -- Unpack the four tail conditions at m.
-              Natural.maximum(N1, N2) ≤ m;
-              Natural.maximum(NS, NT) ≤ m;
-              N1 ≤ m as aboveN1;
-              N2 ≤ m as aboveN2;
-              NS ≤ m;
-              NT ≤ m;
-              -δ < s(m) by sLow(m, aboveN1);
-              -δ < t(m) by tLow(m, aboveN2);
-              Rational.zero ≤ ((KT + 1) : ℚ);
-              Rational.zero ≤ ((KS + 1) : ℚ);
-              abs(s(m))
-                 ≤ ((KS + 1) : ℚ)
-                 = ((KS + 1) : ℚ) + Rational.zero
-                 ≤ ((KS + 1) : ℚ)
-                       + ((KT + 1) : ℚ)
-                 = ((K + 1) : ℚ);
-              abs(t(m))
-                 ≤ ((KT + 1) : ℚ)
-                 = ((KT + 1) : ℚ) + Rational.zero
-                 ≤ ((KT + 1) : ℚ)
-                       + ((KS + 1) : ℚ)
-                 = ((KS + 1) : ℚ)
-                       + ((KT + 1) : ℚ)
-                 = ((K + 1) : ℚ);
-              -- The pointwise product bound, then the ε-budget.
-              -(((K + 1) : ℚ) * δ) ≤ s(m) * t(m)
-                  by Rational.product_lower_bound_of_lower_bounds;
-              ((K + 1) : ℚ) * δ
-                 ≤ Rational.halve(ε)
-                 < ε;
-              -ε < -(((K + 1) : ℚ) * δ);
-              -ε
-                 < -(((K + 1) : ℚ) * δ)
-                 ≤ s(m) * t(m)
-            }
+        eventually (m). -δ < s(m) by sNonneg;
+        eventually (m). -δ < t(m) by tNonneg;
+        for m sufficiently large: {
+          Rational.zero ≤ ((KT + 1) : ℚ);
+          Rational.zero ≤ ((KS + 1) : ℚ);
+          abs(s(m))
+             ≤ ((KS + 1) : ℚ)
+             = ((KS + 1) : ℚ) + Rational.zero
+             ≤ ((KS + 1) : ℚ)
+                   + ((KT + 1) : ℚ)
+             = ((K + 1) : ℚ);
+          abs(t(m))
+             ≤ ((KT + 1) : ℚ)
+             = ((KT + 1) : ℚ) + Rational.zero
+             ≤ ((KT + 1) : ℚ)
+                   + ((KS + 1) : ℚ)
+             = ((KS + 1) : ℚ)
+                   + ((KT + 1) : ℚ)
+             = ((K + 1) : ℚ);
+          -- The pointwise product bound, then the ε-budget.
+          -(((K + 1) : ℚ) * δ) ≤ s(m) * t(m)
+              by Rational.product_lower_bound_of_lower_bounds;
+          ((K + 1) : ℚ) * δ
+             ≤ Rational.halve(ε)
+             < ε;
+          -ε < -(((K + 1) : ℚ) * δ);
+          -ε
+             < -(((K + 1) : ℚ) * δ)
+             ≤ s(m) * t(m)
+        }
       })
 }
 

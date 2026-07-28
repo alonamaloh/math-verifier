@@ -148,14 +148,12 @@ theorem Rational.sequence.product_is_cauchy
   (ε : ℚ)
            (εPositive : Rational.zero < ε) ↦ {
     -- Step 1: bound |s| eventually by (succ K_s : R) starting from N_s_bound.
-    ∃ (K : ℕ). ∃ (N : ℕ).
-            ∀ (m : ℕ). N ≤ m → abs(s(m)) ≤ ((K + 1) : ℚ)
+    ∃ (K : ℕ). eventually (m). abs(s(m)) ≤ ((K + 1) : ℚ)
         by Rational.sequence.cauchy_is_naturally_bounded;
     choose K_s, N_s_bound such that
             ∀ (m : ℕ). N_s_bound ≤ m → abs(s(m)) ≤ ((K_s + 1) : ℚ);
     -- Step 2: similar for t.
-    ∃ (K : ℕ). ∃ (N : ℕ).
-            ∀ (m : ℕ). N ≤ m → abs(t(m)) ≤ ((K + 1) : ℚ)
+    ∃ (K : ℕ). eventually (m). abs(t(m)) ≤ ((K + 1) : ℚ)
         by Rational.sequence.cauchy_is_naturally_bounded;
     choose K_t, N_t_bound such that
             ∀ (m : ℕ). N_t_bound ≤ m → abs(t(m)) ≤ ((K_t + 1) : ℚ);
@@ -268,30 +266,20 @@ theorem Real.multiply_after_first_respects_at_rep_inner
                              CauchyRationalSequence.make(s_y, sCauchy_y),
                              CauchyRationalSequence.make(s_yPrime, sCauchy_yPrime)))
         (ε : ℚ) (εPositive : Rational.zero < ε)
-        : ∃ (N : ℕ).
-            ∀ (m : ℕ). N ≤ m →
-              abs(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
-                < ε := {
-    ∃ (K : ℕ). ∃ (N : ℕ).
-            ∀ (m : ℕ). N ≤ m → abs(s_x(m)) ≤ ((K + 1) : ℚ)
+        : eventually (m). abs(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m)) < ε := {
+    ∃ (K : ℕ). eventually (m). abs(s_x(m)) ≤ ((K + 1) : ℚ)
         by Rational.sequence.cauchy_is_naturally_bounded;
-    choose K, N_x_bound such that
-            ∀ (m : ℕ). N_x_bound ≤ m → abs(s_x(m)) ≤ ((K + 1) : ℚ);
+    choose K such that eventually (m). abs(s_x(m)) ≤ ((K + 1) : ℚ);
     Rational.zero < Rational.halve(ε);
     choose δ such that
             Rational.zero < δ ∧ ((K + 1) : ℚ) * δ ≤ Rational.halve(ε)
         from Rational.divide_by_succ_positive;
-    choose N_y as yEquivAt from refinedYEquiv(δ, (Rational.zero < δ));
-    witness max(N_x_bound, N_y) with
-        (m : ℕ) (m_ge_max : max(N_x_bound, N_y) ≤ m) ↦ {
-          N_x_bound ≤ m;
-          N_y ≤ m as mGeNy;
-          abs(s_x(m)) ≤ ((K + 1) : ℚ);
-          abs(s_y(m) - s_yPrime(m)) < δ by yEquivAt(m, mGeNy);
-          abs(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m)) < ε
-              by Real.multiply_respect_bound_chain;
-          done
-        }
+    eventually (m). abs(s_y(m) - s_yPrime(m)) < δ by refinedYEquiv;
+    for m sufficiently large: {
+      abs(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m)) < ε
+          by Real.multiply_respect_bound_chain;
+      done
+    }
 }
 
 -- Respect of multiplication in the second argument: rep_x fixed, y
@@ -307,7 +295,7 @@ theorem Real.multiply_respects_second
       let ⟨s_yPrime, sCauchy_yPrime⟩ := rep_yPrime;
       (ε : ℚ)
                (εPositive : Rational.zero < ε) ↦ {
-        change ∃ (N : ℕ). ∀ (m : ℕ). N ≤ m →
+        change eventually (m).
                  abs(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m)) < ε;
         done
       }
@@ -326,24 +314,15 @@ theorem Real.multiply_respects_at_rep_y_inner
                              CauchyRationalSequence.make(s_x, sCauchy_x),
                              CauchyRationalSequence.make(s_xPrime, sCauchy_xPrime)))
         (ε : ℚ) (εPositive : Rational.zero < ε)
-        : ∃ (N : ℕ).
-            ∀ (m : ℕ). N ≤ m →
-              abs(s_x(m) * s_y(m) - s_xPrime(m) * s_y(m))
-                < ε :=
+        : eventually (m). abs(s_x(m) * s_y(m) - s_xPrime(m) * s_y(m)) < ε :=
   -- Reduce to multiply_after_first_respects_at_rep_inner with s_y as
   -- the "fixed" sequence (bounded) and x varying.
   {
-    ∃ (N : ℕ).
-            ∀ (m : ℕ). N ≤ m →
-              abs(s_y(m) * s_x(m) - s_y(m) * s_xPrime(m)) < ε
-        as boundedYExists;
-    choose N as boundedY from boundedYExists;
-    witness N with
-        (m : ℕ) (N_leq_m : N ≤ m) ↦
-          abs(s_x(m) * s_y(m) - s_xPrime(m) * s_y(m))
-             = abs(s_y(m) * s_x(m) - s_y(m) * s_xPrime(m))
-             < ε
-                  by boundedY(m, N_leq_m)
+    eventually (m). abs(s_y(m) * s_x(m) - s_y(m) * s_xPrime(m)) < ε;
+    for m sufficiently large:
+      abs(s_x(m) * s_y(m) - s_xPrime(m) * s_y(m))
+         = abs(s_y(m) * s_x(m) - s_y(m) * s_xPrime(m))
+         < ε
   }
 
 -- Respect of multiplication in the first argument: symmetric to
@@ -358,7 +337,7 @@ theorem Real.multiply_respects_first
       let ⟨s_y, sCauchy_y⟩ := rep_y;
       (ε : ℚ)
                (εPositive : Rational.zero < ε) ↦ {
-        change ∃ (N : ℕ). ∀ (m : ℕ). N ≤ m →
+        change eventually (m).
                  abs(s_x(m) * s_y(m) - s_xPrime(m) * s_y(m)) < ε;
         done by Real.multiply_respects_at_rep_y_inner
       }

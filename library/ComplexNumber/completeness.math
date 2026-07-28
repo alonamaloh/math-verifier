@@ -18,7 +18,7 @@ import axioms
 import Equality.basics
 import Natural.basics
 import Natural.order
-import Natural.maximum
+import Natural.eventually
 import Integer.basics
 import Integer.embedding
 import Rational.basics
@@ -67,9 +67,7 @@ import ComplexNumber.modulus_bounds
 definition ComplexNumber.SequenceConverges
         (s : ℕ → ℂ) (limit : ℂ) : Proposition :=
   ∀ (ε : ℝ). ε > 0 →
-    ∃ (N : ℕ).
-      ∀ (m : ℕ). N ≤ m →
-        ComplexNumber.modulus(s(m) - limit) < ε
+    eventually (m). ComplexNumber.modulus(s(m) - limit) < ε
 
 definition ComplexNumber.SequenceConvergent
         (s : ℕ → ℂ) : Proposition :=
@@ -149,70 +147,61 @@ theorem ComplexNumber.cauchy_sequence_converges
   -- The candidate limit reassembles the coordinate limits.
   witness ComplexNumber.ofCoordinates(realLimit, imaginaryLimit) with
       (ε : ℝ) (εPositive : ε > 0) ↦ {
-        ε / 2 > 0 as halfPositive;
-        choose realThreshold as realClose
-            from realConverges(ε / 2, halfPositive);
-        choose imaginaryThreshold as imaginaryClose
-            from imaginaryConverges(ε / 2, halfPositive);
-        witness Natural.maximum(realThreshold, imaginaryThreshold) with
-            (m : ℕ)
-            (aboveMaximum : Natural.maximum(realThreshold, imaginaryThreshold) ≤ m) ↦ {
-              realThreshold ≤ m by Natural.le_through_max_left as realAbove;
-              imaginaryThreshold ≤ m by Natural.le_through_max_right as imaginaryAbove;
-              abs(ComplexNumber.realPart(s(m)) - realLimit)
-                    < ε / 2
-                  by realClose(m, realAbove);
-              abs(ComplexNumber.imaginaryPart(s(m)) - imaginaryLimit)
-                    < ε / 2
-                  by imaginaryClose(m, imaginaryAbove);
-              -- The coordinates of the difference s(m) − limit.
-              ComplexNumber.realPart(
-                    s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
-                  = ComplexNumber.realPart(s(m))
-                    - ComplexNumber.realPart(
-                          ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
-                  as realDifference;
-              ComplexNumber.imaginaryPart(
-                    s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
-                  = ComplexNumber.imaginaryPart(s(m))
-                    - ComplexNumber.imaginaryPart(
-                          ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
-                  as imaginaryDifference;
-              ComplexNumber.realPart(
-                    ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
-                  = realLimit as realOfLimit;
-              ComplexNumber.imaginaryPart(
-                    ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
-                  = imaginaryLimit as imaginaryOfLimit;
-              -- Squeeze the modulus through the coordinate sum.
-              ComplexNumber.modulus(
-                       s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
-                 ≤ abs(ComplexNumber.realPart(
-                           s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit)))
-                       + abs(ComplexNumber.imaginaryPart(
-                                 s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit)))
-                       by ComplexNumber.modulus_coordinate_bound
-                 = abs(ComplexNumber.realPart(s(m))
-                           - ComplexNumber.realPart(
-                                 ComplexNumber.ofCoordinates(realLimit, imaginaryLimit)))
-                       + abs(ComplexNumber.imaginaryPart(
-                                 s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit)))
-                       by realDifference
-                 = abs(ComplexNumber.realPart(s(m)) - realLimit)
-                       + abs(ComplexNumber.imaginaryPart(
-                                 s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit)))
-                       by realOfLimit
-                 = abs(ComplexNumber.realPart(s(m)) - realLimit)
-                       + abs(ComplexNumber.imaginaryPart(s(m))
-                                 - ComplexNumber.imaginaryPart(
-                                       ComplexNumber.ofCoordinates(realLimit, imaginaryLimit)))
-                       by imaginaryDifference
-                 = abs(ComplexNumber.realPart(s(m)) - realLimit)
-                       + abs(ComplexNumber.imaginaryPart(s(m)) - imaginaryLimit)
-                       by imaginaryOfLimit
-                 < ε / 2 + ε / 2
-                       by Real.LessThan.add_strict_strict
-                 = ε
-            }
+        ε / 2 > 0;
+        eventually (m). abs(ComplexNumber.realPart(s(m)) - realLimit) < ε / 2
+            by realConverges;
+        eventually (m). abs(ComplexNumber.imaginaryPart(s(m)) - imaginaryLimit)
+                          < ε / 2
+            by imaginaryConverges;
+        for m sufficiently large: {
+          -- The coordinates of the difference s(m) − limit.
+          ComplexNumber.realPart(
+                s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
+              = ComplexNumber.realPart(s(m))
+                - ComplexNumber.realPart(
+                      ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
+              as realDifference;
+          ComplexNumber.imaginaryPart(
+                s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
+              = ComplexNumber.imaginaryPart(s(m))
+                - ComplexNumber.imaginaryPart(
+                      ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
+              as imaginaryDifference;
+          ComplexNumber.realPart(
+                ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
+              = realLimit as realOfLimit;
+          ComplexNumber.imaginaryPart(
+                ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
+              = imaginaryLimit as imaginaryOfLimit;
+          -- Squeeze the modulus through the coordinate sum.
+          ComplexNumber.modulus(
+                   s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
+             ≤ abs(ComplexNumber.realPart(
+                       s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit)))
+                   + abs(ComplexNumber.imaginaryPart(
+                             s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit)))
+                   by ComplexNumber.modulus_coordinate_bound
+             = abs(ComplexNumber.realPart(s(m))
+                       - ComplexNumber.realPart(
+                             ComplexNumber.ofCoordinates(realLimit, imaginaryLimit)))
+                   + abs(ComplexNumber.imaginaryPart(
+                             s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit)))
+                   by realDifference
+             = abs(ComplexNumber.realPart(s(m)) - realLimit)
+                   + abs(ComplexNumber.imaginaryPart(
+                             s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit)))
+                   by realOfLimit
+             = abs(ComplexNumber.realPart(s(m)) - realLimit)
+                   + abs(ComplexNumber.imaginaryPart(s(m))
+                             - ComplexNumber.imaginaryPart(
+                                   ComplexNumber.ofCoordinates(realLimit, imaginaryLimit)))
+                   by imaginaryDifference
+             = abs(ComplexNumber.realPart(s(m)) - realLimit)
+                   + abs(ComplexNumber.imaginaryPart(s(m)) - imaginaryLimit)
+                   by imaginaryOfLimit
+             < ε / 2 + ε / 2
+                   by Real.LessThan.add_strict_strict
+             = ε
+        }
       }
 }
