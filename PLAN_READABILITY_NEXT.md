@@ -151,6 +151,56 @@ Three things for whoever does 1b/1c:
   costed separately** — it is proof-carrying (`i < n` discharged from context),
   which neither of the above is.
 
+### 1b — mechanism DONE (`407587ea`, `ea529776`, `63eba046`); the sweep is NOT mechanical
+
+`coercion (NaturalsBelow, Natural) := NaturalsBelow.value` is registered and
+works: `s(i)`, `i = v`, `i + 0`, `i < n`, `i + j`, and a calc endpoint absorbed
+into an ℕ carrier. Three elaborator changes were needed —
+
+- a coercion function may now carry **leading implicit** parameters (every
+  subtype projection has this shape; the registry checked the first Pi domain
+  and so could express none of them). The kernel has no implicits, so the
+  application solves them from the source type — which must be **closed** over
+  the local binders first, or you get "unbound internal variable";
+- a **homogeneous unregistered operand pair** (`i + j`) now coerces both sides
+  to the nearest type carrying the operator. It runs **after** the
+  expected-type fallback, deliberately: first, it made `1 / k!` at an ambient
+  ℝ dispatch as *integer* division;
+- calc endpoints thread their type through, for a chain that changes carrier.
+
+**But the sweep is a per-site judgment call, unlike 1a — do not batch it.**
+`Set/finite.math` deliberately gives `NaturalsBelow` *its own* relational
+vocabulary (`NaturalsBelow.LessThan` / `LessOrEqual`, registered on `<` / `≤`).
+So deleting `.value` between two indices does not delete a projection, it
+**changes which proposition is stated**:
+
+```math
+-- ℕ-order on the values; `Natural.lt_or_gt_of_ne` cites it
+NaturalsBelow.value(a) < NaturalsBelow.value(b) ∨ NaturalsBelow.value(b) < NaturalsBelow.value(a)
+-- the INDEX order — one δ-step away, and the citation no longer matches
+a < b ∨ b < a
+```
+
+Worse for equality: `a ≠ b` at `NaturalsBelow` is not `value(a) ≠ value(b)` —
+they are bridged by `equal_of_value` plus proof irrelevance, not by δ. A blind
+sweep of `Permutation.sign_swap` turned its opening `value(a) ≠ value(b)` into
+a restatement of its own hypothesis and broke the proof.
+
+**The rule the sweep must follow:** delete `.value` only where the context
+*forces* a ℕ — an argument to an ℕ-function, mixed arithmetic, a comparison
+against a bound like `i < n`. Leave it wherever both sides are indices, where
+the index-level spelling is the better one anyway and citations are resolved
+against it. That is judgment per site, not `replace_all`.
+
+Measured shape of the work: **662** sites are a bare identifier
+(`NaturalsBelow.value(i)`, 15 distinct spellings), **407** are compound
+(`NaturalsBelow.value(sel(i))`, 108 distinct spellings), over 21 files. The
+bare-identifier ones are where the index-vs-value hazard concentrates, so
+"bare = easy" is exactly backwards.
+
+`Set/finite_sum.math` is swept as the worked example (37 sites, all genuinely
+ℕ-forced).
+
 ---
 
 ## 2. `VectorSpace.linearCombination` should be indexed by a list
