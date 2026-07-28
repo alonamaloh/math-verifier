@@ -100,6 +100,11 @@ write in a textbook, with the kernel doing the typechecking. Optimize for
   layering/machinery-quarantine patterns (boundary lemmas,
   pattern-match at constructor representatives, auxiliary-definition
   red flags).
+- **sufficiently-large.md** — "for all sufficiently large `m`" and "for all
+  `y` sufficiently near `x`": stating an eventually-fact, the scope that
+  folds several of them, `beyond`/`constant`/`shift`/`under`, and the two
+  spelling traps. Written for a mathematician, so it is also the file to
+  hand a newcomer.
 - **relation-chains.md** — the bare relation-chain form with mixed
   `=`/`≤`/`<`/`≥`/`>`, chains over preorders (`∣`/`⊆`), by-less `=` steps
   via the full prover, `let` abbreviations, `<chain> as NAME`,

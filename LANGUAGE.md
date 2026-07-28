@@ -18,6 +18,9 @@ For a mathematical library area, begin with its brief README:
 Focused advanced notes live in `docs/conventions/`:
 
 - [`relation-chains.md`](docs/conventions/relation-chains.md)
+- [`sufficiently-large.md`](docs/conventions/sufficiently-large.md) — "for all
+  sufficiently large m" and "for all y sufficiently near x", written for a
+  mathematician rather than an implementer
 - [`algebra-tactics.md`](docs/conventions/algebra-tactics.md)
 - [`quotients.md`](docs/conventions/quotients.md)
 - [`structures-and-inference.md`](docs/conventions/structures-and-inference.md)

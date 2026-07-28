@@ -212,6 +212,11 @@ name whose premises are available in context.
 
 ## Eventually — "from some index on"
 
+*(This is the catalogue entry.
+[`conventions/sufficiently-large.md`](conventions/sufficiently-large.md) is the
+same material written for a mathematician, with worked proofs — read that one
+first if you are new to the construct.)*
+
 `Natural.Eventually(P)` is `∃ N. ∀ m ≥ N. P(m)`, the quantifier every limit
 argument runs on. State it with a binder:
 
