@@ -2552,6 +2552,13 @@ ExpressionPointer Elaborator::elaborateBlockTail(
             // the claim fallback masks the direct reading's real error
             // behind "anonymous tuple needs an expected type".
             || std::holds_alternative<SurfaceAnonymousTuple>(
+                   blockTail.expression->node)
+            // `eventually (m): { … }` / `for sufficiently large m: { … }`
+            // is likewise a proof construct. Without this, a failing scope
+            // BODY is reported as "`eventually (m): …` needs an expected
+            // type from context" — pointing at the goal, which is fine,
+            // instead of at the claim inside the scope that did not close.
+            || std::holds_alternative<SurfaceEventuallyScope>(
                    blockTail.expression->node);
         try {
             ExpressionPointer direct = elaborateExpression(

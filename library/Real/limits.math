@@ -15,7 +15,6 @@ import Logic.quotient
 import Equality.basics
 import Natural.basics
 import Natural.order
-import Natural.maximum
 import Natural.eventually
 import Rational.basics
 import Rational.addition
@@ -56,13 +55,13 @@ theorem Real.constant_sequence_converges (c : ℝ)
         : Real.SequenceConverges((n : ℕ) ↦ c, c) :=
   (ε : ℝ)
   (εPositive : ε > 0) ↦
-    witness 0 with
-        (m : ℕ) (_ : 0 ≤ m) ↦
-          abs(c - c)
-             = abs((0 : ℝ))
-                   by substituting (ring : c - c = 0)
-             = 0
-             < ε
+    for sufficiently large m: {
+      abs(c - c)
+         = abs((0 : ℝ))
+               by substituting (ring : c - c = 0)
+         = 0
+         < ε
+    }
 
 -- ----------------------------------------------------------------------
 -- The Archimedean core: 1/(n+1) → 0. This is the one place ℝ's Archimedean
@@ -78,40 +77,32 @@ theorem Real.reciprocal_successor_converges_zero
   (εPositive : ε > Rational.zero) ↦ {
     Rational.zero ≤ (1 : ℚ);
     Rational.IsNonneg((1 : ℚ));
-    choose N such that
-        ∀ (m : ℕ). N ≤ m
-          → (1 : ℚ) * Rational.reciprocal_function((1 + m : ℚ)) < ε
-        as tailBelow
-        from Rational.scaled_reciprocal_eventually_below;
-    witness N with
-        (m : ℕ) (aboveThreshold : N ≤ m) ↦ {
-          (1 + m : ℚ) > Rational.zero;
-          (1 + m : ℚ) ≠ Rational.zero;
-          (1 + m : ℝ) > 0;
-          (1 + m : ℝ) ≠ 0;
-          (((1 : ℚ)
-                 * Rational.reciprocal_function((1 + m : ℚ))) : ℝ)
-             = ((1 : ℚ) : ℝ)
-               * ((Rational.reciprocal_function((1 + m : ℚ))) : ℝ)
-             = ((1 : ℚ) : ℝ) * (1 / (1 + m : ℝ))
-             = 1 / (1 + m : ℝ);
-          (1 : ℚ)
-                      * Rational.reciprocal_function((1 + m : ℚ))
-                  < ε
-              by tailBelow;
-          (((1 : ℚ) * Rational.reciprocal_function((1 + m : ℚ))) : ℝ) < (ε : ℝ);
-          1 / (1 + m : ℝ) < (ε : ℝ);
-          (1 : ℝ) > 0;
-          1 / (1 + m : ℝ) > 0;
-          1 / (1 + m : ℝ) ≥ 0;
-          Real.IsNonneg(1 / (1 + m : ℝ));
-          abs(1 / (1 + m : ℝ) - Real.zero)
-             = abs(1 / (1 + m : ℝ))
-                   by (1 / (1 + m : ℝ) - Real.zero
-                       = 1 / (1 + m : ℝ))
-             = 1 / (1 + m : ℝ)
-             < (ε : ℝ)
-        }
+    eventually (m). (1 : ℚ) * Rational.reciprocal_function((1 + m : ℚ)) < ε
+        by Rational.scaled_reciprocal_eventually_below;
+    for sufficiently large m: {
+      (1 + m : ℚ) > Rational.zero;
+      (1 + m : ℚ) ≠ Rational.zero;
+      (1 + m : ℝ) > 0;
+      (1 + m : ℝ) ≠ 0;
+      (((1 : ℚ)
+             * Rational.reciprocal_function((1 + m : ℚ))) : ℝ)
+         = ((1 : ℚ) : ℝ)
+           * ((Rational.reciprocal_function((1 + m : ℚ))) : ℝ)
+         = ((1 : ℚ) : ℝ) * (1 / (1 + m : ℝ))
+         = 1 / (1 + m : ℝ);
+      (((1 : ℚ) * Rational.reciprocal_function((1 + m : ℚ))) : ℝ) < (ε : ℝ);
+      1 / (1 + m : ℝ) < (ε : ℝ);
+      (1 : ℝ) > 0;
+      1 / (1 + m : ℝ) > 0;
+      1 / (1 + m : ℝ) ≥ 0;
+      Real.IsNonneg(1 / (1 + m : ℝ));
+      abs(1 / (1 + m : ℝ) - Real.zero)
+         = abs(1 / (1 + m : ℝ))
+               by (1 / (1 + m : ℝ) - Real.zero
+                   = 1 / (1 + m : ℝ))
+         = 1 / (1 + m : ℝ)
+         < (ε : ℝ)
+    }
   })
 
 -- ----------------------------------------------------------------------
@@ -123,27 +114,19 @@ theorem Real.SequenceConverges.add (s t : ℕ → ℝ)
         : Real.SequenceConverges((n : ℕ) ↦ s(n) + t(n), sLimit + tLimit) :=
   (ε : ℝ)
   (εPositive : ε > 0) ↦ {
-    ε / 2 > 0 as halfPositive;
-    choose sThreshold as sClose
-        from sConverges(ε / 2, halfPositive);
-    choose tThreshold as tClose
-        from tConverges(ε / 2, halfPositive);
-    witness Natural.maximum(sThreshold, tThreshold) with
-        (m : ℕ)
-        (aboveMaximum : Natural.maximum(sThreshold, tThreshold) ≤ m) ↦ {
-          sThreshold ≤ m as sAbove;
-          tThreshold ≤ m as tAbove;
-          abs(s(m) - sLimit) < ε / 2 by sClose(m, sAbove);
-          abs(t(m) - tLimit) < ε / 2 by tClose(m, tAbove);
-          abs((s(m) + t(m)) - (sLimit + tLimit))
-             = abs((s(m) - sLimit) + (t(m) - tLimit))
-                   by substituting
-                       (ring : (s(m) + t(m)) - (sLimit + tLimit)
-                           = (s(m) - sLimit) + (t(m) - tLimit))
-             ≤ abs(s(m) - sLimit) + abs(t(m) - tLimit)
-             < ε / 2 + ε / 2
-             = ε
-        }
+    ε / 2 > 0;
+    eventually (m). abs(s(m) - sLimit) < ε / 2 by sConverges;
+    eventually (m). abs(t(m) - tLimit) < ε / 2 by tConverges;
+    for sufficiently large m: {
+      abs((s(m) + t(m)) - (sLimit + tLimit))
+         = abs((s(m) - sLimit) + (t(m) - tLimit))
+               by substituting
+                   (ring : (s(m) + t(m)) - (sLimit + tLimit)
+                       = (s(m) - sLimit) + (t(m) - tLimit))
+         ≤ abs(s(m) - sLimit) + abs(t(m) - tLimit)
+         < ε / 2 + ε / 2
+         = ε
+    }
   }
 
 -- Negating a sequence negates its limit.
@@ -152,15 +135,15 @@ theorem Real.SequenceConverges.negate (s : ℕ → ℝ) (sLimit : ℝ)
         : Real.SequenceConverges((n : ℕ) ↦ -s(n), -sLimit) :=
   (ε : ℝ)
   (εPositive : ε > 0) ↦ {
-    choose threshold from sConverges(ε, εPositive);
-    witness threshold with
-        (m : ℕ) (aboveThreshold : threshold ≤ m) ↦
-          abs(-s(m) - -sLimit)
-             = abs(-(s(m) - sLimit))
-                   by substituting
-                       (ring : -s(m) - -sLimit = -(s(m) - sLimit))
-             = abs(s(m) - sLimit)
-             < ε
+    eventually (m). abs(s(m) - sLimit) < ε by sConverges;
+    for sufficiently large m: {
+      abs(-s(m) - -sLimit)
+         = abs(-(s(m) - sLimit))
+               by substituting
+                   (ring : -s(m) - -sLimit = -(s(m) - sLimit))
+         = abs(s(m) - sLimit)
+         < ε
+    }
   }
 
 -- ----------------------------------------------------------------------
@@ -171,14 +154,10 @@ theorem Real.SequenceConverges.shift_one (s : ℕ → ℝ) (limit : ℝ)
         : Real.SequenceConverges((n : ℕ) ↦ s(1 + n), limit) :=
   (ε : ℝ)
   (εPositive : ε > 0) ↦ {
-    choose threshold from sConverges(ε, εPositive);
-    witness threshold with
-        (m : ℕ) (aboveThreshold : threshold ≤ m) ↦ {
-          threshold
-             ≤ m
-             ≤ 1 + m;
-          abs(s(1 + m) - limit) < ε
-        }
+    eventually (m). abs(s(m) - limit) < ε by sConverges;
+    eventually (m). abs(s(1 + m) - limit) < ε
+        by Natural.Eventually.shift(P := (m : ℕ) ↦ abs(s(m) - limit) < ε, offset := 1);
+    done
   }
 
 -- ----------------------------------------------------------------------
@@ -191,12 +170,12 @@ theorem Real.SequenceConverges.of_pointwise (s t : ℕ → ℝ)
         : Real.SequenceConverges(t, limit) :=
   (ε : ℝ)
   (εPositive : ε > 0) ↦ {
-    choose threshold from sConverges(ε, εPositive);
-    witness threshold with
-        (m : ℕ) (aboveThreshold : threshold ≤ m) ↦
-          abs(t(m) - limit)
-             = abs(s(m) - limit)    by pointwiseEqual(m)
-             < ε
+    eventually (m). abs(s(m) - limit) < ε by sConverges;
+    for sufficiently large m: {
+      abs(t(m) - limit)
+         = abs(s(m) - limit)    by pointwiseEqual(m)
+         < ε
+    }
   }
 
 -- The squeeze at zero: a sequence dominated in absolute value by one
@@ -207,19 +186,18 @@ theorem Real.SequenceConverges.squeeze_zero (v u : ℕ → ℝ)
         : Real.SequenceConverges(v, 0) :=
   (ε : ℝ)
   (εPositive : ε > 0) ↦ {
-    choose threshold from uVanishes(ε, εPositive);
-    witness threshold with
-        (m : ℕ) (aboveThreshold : threshold ≤ m) ↦ {
-          u(m) ≤ abs(u(m));
-          abs(v(m) - 0)
-             = abs(v(m))
-                   by substituting (ring : v(m) - 0 = v(m))
-             ≤ u(m)
-             ≤ abs(u(m))
-             = abs(u(m) - 0)
-                   by substituting (ring : u(m) - 0 = u(m))
-             < ε
-        }
+    eventually (m). abs(u(m) - 0) < ε by uVanishes;
+    for sufficiently large m: {
+      u(m) ≤ abs(u(m));
+      abs(v(m) - 0)
+         = abs(v(m))
+               by substituting (ring : v(m) - 0 = v(m))
+         ≤ u(m)
+         ≤ abs(u(m))
+         = abs(u(m) - 0)
+               by substituting (ring : u(m) - 0 = u(m))
+         < ε
+    }
   }
 
 -- ----------------------------------------------------------------------
@@ -242,7 +220,7 @@ theorem Real.SequenceConverges.multiply (s t : ℕ → ℝ)
     let tBound : ℝ := 1 + abs(tLimit);
     abs(sLimit) ≥ 0;
     abs(tLimit) ≥ 0;
-    (0 : ℝ) < 1 as onePositive;
+    (0 : ℝ) < 1;
     (0 : ℝ) ≤ 1;
     (0 : ℝ)
        < 1
@@ -259,58 +237,48 @@ theorem Real.SequenceConverges.multiply (s t : ℕ → ℝ)
        ≤ 1 + abs(tLimit);
     -- Each piece gets a quarter of ε, divided by the opposite roof.
     ε / 4 > 0;
-    (ε / 4) / sBound > 0 as tTolerancePositive;
-    (ε / 4) / tBound > 0 as sTolerancePositive;
+    (ε / 4) / sBound > 0;
+    (ε / 4) / tBound > 0;
     -- Tails: s within one unit of its limit (to roof |s(m)|), and each
     -- sequence within its tolerance.
-    choose unitThreshold as sUnitClose from sConverges((1 : ℝ), onePositive);
-    choose tThreshold as tClose from tConverges((ε / 4) / sBound, tTolerancePositive);
-    choose sThreshold as sClose from sConverges((ε / 4) / tBound, sTolerancePositive);
-    witness Natural.maximum(unitThreshold, Natural.maximum(tThreshold, sThreshold)) with
-        (m : ℕ)
-        (aboveAll : Natural.maximum(unitThreshold,
-                        Natural.maximum(tThreshold, sThreshold)) ≤ m) ↦ {
-          unitThreshold ≤ m;
-          Natural.maximum(tThreshold, sThreshold) ≤ m;
-          tThreshold ≤ m;
-          sThreshold ≤ m;
-          abs(s(m)) ≥ 0;
-          abs(t(m) - tLimit) ≥ 0;
-          abs(s(m) - sLimit) ≥ 0;
-          -- |s(m)| ≤ sBound, since s is within one unit of its limit.
-          abs(s(m) - sLimit) < 1 by sUnitClose(m, (unitThreshold ≤ m));
-          abs(s(m) - sLimit) ≤ 1;
-          abs(s(m))
-             = abs((s(m) - sLimit) + sLimit)
-                   by substituting (ring : s(m) = (s(m) - sLimit) + sLimit)
-             ≤ abs(s(m) - sLimit) + abs(sLimit)   by Real.triangle_inequality
-             ≤ 1 + abs(sLimit);
-          -- Each tolerance is realised at m, then weakened to ≤.
-          abs(t(m) - tLimit) < (ε / 4) / sBound by tClose(m, (tThreshold ≤ m));
-          abs(t(m) - tLimit) ≤ (ε / 4) / sBound;
-          abs(s(m) - sLimit) < (ε / 4) / tBound by sClose(m, (sThreshold ≤ m));
-          abs(s(m) - sLimit) ≤ (ε / 4) / tBound;
-          -- Each piece collapses to a quarter of ε.
-          abs(s(m) * (t(m) - tLimit))
-             = abs(s(m)) * abs(t(m) - tLimit)
-             ≤ sBound * ((ε / 4) / sBound)
-             = ε / 4;
-          abs(tLimit * (s(m) - sLimit))
-             = abs(tLimit) * abs(s(m) - sLimit)
-             ≤ tBound * ((ε / 4) / tBound)
-             = ε / 4;
-          -- Assemble: split, triangle, two quarters, half < whole.
-          abs(s(m) * t(m) - sLimit * tLimit)
-             = abs(s(m) * (t(m) - tLimit) + tLimit * (s(m) - sLimit))
-                   by substituting
-                       (ring : s(m) * t(m) - sLimit * tLimit
-                           = s(m) * (t(m) - tLimit) + tLimit * (s(m) - sLimit))
-             ≤ abs(s(m) * (t(m) - tLimit)) + abs(tLimit * (s(m) - sLimit))
-             ≤ ε / 4 + abs(tLimit * (s(m) - sLimit))
-             ≤ ε / 4 + ε / 4
-             = ε / 2   by field
-             < ε
-        }
+    eventually (m). abs(s(m) - sLimit) < 1 by sConverges;
+    eventually (m). abs(t(m) - tLimit) < (ε / 4) / sBound by tConverges;
+    eventually (m). abs(s(m) - sLimit) < (ε / 4) / tBound by sConverges;
+    for sufficiently large m: {
+      abs(s(m)) ≥ 0;
+      abs(t(m) - tLimit) ≥ 0;
+      abs(s(m) - sLimit) ≥ 0;
+      -- |s(m)| ≤ sBound, since s is within one unit of its limit.
+      abs(s(m) - sLimit) ≤ 1;
+      abs(s(m))
+         = abs((s(m) - sLimit) + sLimit)
+               by substituting (ring : s(m) = (s(m) - sLimit) + sLimit)
+         ≤ abs(s(m) - sLimit) + abs(sLimit)   by Real.triangle_inequality
+         ≤ 1 + abs(sLimit);
+      -- Each tolerance is realised at m, then weakened to ≤.
+      abs(t(m) - tLimit) ≤ (ε / 4) / sBound;
+      abs(s(m) - sLimit) ≤ (ε / 4) / tBound;
+      -- Each piece collapses to a quarter of ε.
+      abs(s(m) * (t(m) - tLimit))
+         = abs(s(m)) * abs(t(m) - tLimit)
+         ≤ sBound * ((ε / 4) / sBound)
+         = ε / 4;
+      abs(tLimit * (s(m) - sLimit))
+         = abs(tLimit) * abs(s(m) - sLimit)
+         ≤ tBound * ((ε / 4) / tBound)
+         = ε / 4;
+      -- Assemble: split, triangle, two quarters, half < whole.
+      abs(s(m) * t(m) - sLimit * tLimit)
+         = abs(s(m) * (t(m) - tLimit) + tLimit * (s(m) - sLimit))
+               by substituting
+                   (ring : s(m) * t(m) - sLimit * tLimit
+                       = s(m) * (t(m) - tLimit) + tLimit * (s(m) - sLimit))
+         ≤ abs(s(m) * (t(m) - tLimit)) + abs(tLimit * (s(m) - sLimit))
+         ≤ ε / 4 + abs(tLimit * (s(m) - sLimit))
+         ≤ ε / 4 + ε / 4
+         = ε / 2   by field
+         < ε
+    }
   }
 
 -- ----------------------------------------------------------------------
@@ -411,24 +379,29 @@ theorem Real.monotone_bounded_converges (s : ℕ → ℝ)
             done
         };
         choose N such that limit - ε < s(N);
-        witness N with
-            (m : ℕ) (aboveThreshold : N ≤ m) ↦ {
-              -- limit − ε < s(N) ≤ s(m) ≤ limit < limit + ε.
-              limit - ε
-                 < s(N)
-                 ≤ s(m);
-              s(m) ∈ Real.sequence_range(s)
-                  by witness m with reflexivity(ℝ, s(m));
-              s(m) ≤ limit;
-              s(m) - limit
-                 ≤ limit - limit
-                 = 0
-                 < ε;
-              -ε
-                 = (limit - ε) - limit
-                 < s(m) - limit;
-              done by Real.absolute_value_LessThan_of_bounds
-            }
+        -- Monotonicity carries that one term along the whole tail.
+        eventually (m). limit - ε < s(m)
+            by witness N with
+                (m : ℕ) (aboveThreshold : N ≤ m) ↦ {
+                  limit - ε
+                     < s(N)
+                     ≤ s(m);
+                  done
+                };
+        for sufficiently large m: {
+          -- limit − ε < s(m) ≤ limit < limit + ε.
+          s(m) ∈ Real.sequence_range(s)
+              by witness m with reflexivity(ℝ, s(m));
+          s(m) ≤ limit;
+          s(m) - limit
+             ≤ limit - limit
+             = 0
+             < ε;
+          -ε
+             = (limit - ε) - limit
+             < s(m) - limit;
+          done by Real.absolute_value_LessThan_of_bounds
+        }
       }
 }
 
@@ -442,12 +415,12 @@ theorem Real.SequenceConverges.pointwise
         : Real.SequenceConverges(s, limit) :=
   (ε : ℝ)
   (εPositive : ε > 0) ↦ {
-    choose N from primeConverges(ε, εPositive);
-    witness N with
-        (m : ℕ) (aboveThreshold : N ≤ m) ↦
-          abs(s(m) - limit)
-             = abs(sequencePrime(m) - limit)   by substituting pointwiseEqual(m)
-             < ε
+    eventually (m). abs(sequencePrime(m) - limit) < ε by primeConverges;
+    for sufficiently large m: {
+      abs(s(m) - limit)
+         = abs(sequencePrime(m) - limit)   by substituting pointwiseEqual(m)
+         < ε
+    }
   }
 
 -- ----------------------------------------------------------------------
@@ -475,29 +448,28 @@ theorem Real.SequenceConverges.le_of_eventually_le
        < limit - bound;
     let ε : ℝ := (limit - bound) / 2;
     (2 : ℝ) > 0;
-    (limit - bound) / 2 > 0 as εPositive;
+    (limit - bound) / 2 > 0;
     ε < limit - bound by Real.divide_two_less_than_self;
-    choose M as tailClose from converges(ε, εPositive);
-    N ≤ Natural.maximum(N, M);
-    M ≤ Natural.maximum(N, M);
-    s(Natural.maximum(N, M)) ≤ bound;
-    abs(s(Natural.maximum(N, M)) - limit) < ε
-        by tailClose(Natural.maximum(N, M), (M ≤ Natural.maximum(N, M)));
-    -ε < s(Natural.maximum(N, M)) - limit
-        by Real.absolute_value_LessThan_bounds;
-    limit - ε
-       = -ε + limit
-       < (s(Natural.maximum(N, M)) - limit) + limit
-       = s(Natural.maximum(N, M));
-    bound + ε
-       < bound + (limit - bound)
-       = limit;
-    bound
-       = (bound + ε) - ε
-       < limit - ε
-       < s(Natural.maximum(N, M));
-    bound < bound by Real.LessThan.transitive_right;
-    done
+    eventually (m). s(m) ≤ bound by witness N with tailBelow;
+    eventually (m). abs(s(m) - limit) < ε by converges;
+    eventually (m). False
+        by for sufficiently large m: {
+             -ε < s(m) - limit by Real.absolute_value_LessThan_bounds;
+             limit - ε
+                = -ε + limit
+                < (s(m) - limit) + limit
+                = s(m);
+             bound + ε
+                < bound + (limit - bound)
+                = limit;
+             bound
+                = (bound + ε) - ε
+                < limit - ε
+                < s(m);
+             bound < bound by Real.LessThan.transitive_right;
+             done
+           };
+    done by Natural.Eventually.not_eventually_false
   };
   done by Real.LessOrEqual_of_not_LessThan
 }
@@ -514,26 +486,25 @@ theorem Real.SequenceConverges.ge_of_eventually_ge
        < bound - limit;
     let ε : ℝ := (bound - limit) / 2;
     (2 : ℝ) > 0;
-    (bound - limit) / 2 > 0 as εPositive;
+    (bound - limit) / 2 > 0;
     ε < bound - limit by Real.divide_two_less_than_self;
-    choose M as tailClose from converges(ε, εPositive);
-    N ≤ Natural.maximum(N, M);
-    M ≤ Natural.maximum(N, M);
-    bound ≤ s(Natural.maximum(N, M));
-    abs(s(Natural.maximum(N, M)) - limit) < ε
-        by tailClose(Natural.maximum(N, M), (M ≤ Natural.maximum(N, M)));
-    s(Natural.maximum(N, M)) - limit < ε
-        by Real.absolute_value_LessThan_bounds;
-    s(Natural.maximum(N, M))
-       = (s(Natural.maximum(N, M)) - limit) + limit
-       < ε + limit
-       = limit + ε;
-    s(Natural.maximum(N, M))
-       < limit + ε
-       < limit + (bound - limit)
-       = bound;
-    bound < bound by Real.LessThan.transitive_left;
-    done
+    eventually (m). bound ≤ s(m) by witness N with tailAbove;
+    eventually (m). abs(s(m) - limit) < ε by converges;
+    eventually (m). False
+        by for sufficiently large m: {
+             s(m) - limit < ε by Real.absolute_value_LessThan_bounds;
+             s(m)
+                = (s(m) - limit) + limit
+                < ε + limit
+                = limit + ε;
+             s(m)
+                < limit + ε
+                < limit + (bound - limit)
+                = bound;
+             bound < bound by Real.LessThan.transitive_left;
+             done
+           };
+    done by Natural.Eventually.not_eventually_false
   };
   done by Real.LessOrEqual_of_not_LessThan
 }

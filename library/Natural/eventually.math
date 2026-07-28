@@ -61,6 +61,46 @@ theorem Natural.Eventually.monotone
         pointwise(m, P(m))
 }
 
+-- The filter is proper: what holds eventually holds somewhere. This is
+-- the elimination form a contradiction argument needs — derive
+-- `eventually (m). False` from the facts in play, and there is no index
+-- left for it to hold at.
+theorem Natural.Eventually.holds_somewhere
+        (P : ℕ → Proposition) (eventualP : Natural.Eventually(P))
+        : ∃ (m : ℕ). P(m) := {
+  choose N such that ∀ (m : ℕ). N ≤ m → P(m) from eventualP;
+  N ≤ N;
+  witness N with done
+}
+
+-- Hence a tail cannot be false throughout. This is the form a limit
+-- argument by contradiction ends on: combine the facts in the scope
+-- until the body closes `False`, and there is no index left to hold it.
+theorem Natural.Eventually.not_eventually_false
+        (eventualFalse : Natural.Eventually((m : ℕ) ↦ False))
+        : False := {
+  choose someIndex such that False from Natural.Eventually.holds_somewhere;
+  done
+}
+
+-- Translation invariance: shifting the index by a fixed offset keeps an
+-- eventual fact eventual. The scope form hands every eventual fact to the
+-- body AT the bound index, so a proof that needs one at a shifted index
+-- (the tail of a sequence) reaches for this first.
+theorem Natural.Eventually.shift
+        (P : ℕ → Proposition) (offset : ℕ)
+        (eventualP : Natural.Eventually(P))
+        : Natural.Eventually((m : ℕ) ↦ P(offset + m)) := {
+  choose N such that ∀ (m : ℕ). N ≤ m → P(m) from eventualP;
+  witness N with
+      (m : ℕ) (mPastThreshold : N ≤ m) ↦ {
+        N ≤ m
+          ≤ offset + m;
+        P(offset + m);
+        done
+      }
+}
+
 -- A tail of an eventual fact: it still holds past any LATER threshold.
 theorem Natural.Eventually.past
         (P : ℕ → Proposition) (threshold : ℕ)

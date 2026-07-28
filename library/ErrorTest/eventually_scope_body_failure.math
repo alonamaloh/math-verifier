@@ -1,0 +1,32 @@
+-- A failing `for sufficiently large m: { … }` body must report the CLAIM
+-- that did not close. The scope is a proof construct, so `elaborateBlockTail`
+-- must rethrow its direct-reading error rather than fall through to the
+-- stated-proposition reading, which elaborates the tail with no expected
+-- type and reports the misleading "needs an expected type from context".
+-- The goal here arrives δ-reduced (through `Real.SequenceConverges`), which
+-- is what sent the old code down the fallback path.
+module ErrorTest.eventually_scope_body_failure
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.maximum
+import Natural.eventually
+import Real.basics
+import Real.order
+import Real.absolute_value
+import Real.division
+import Real.convergence
+
+theorem ErrorTest.scope_body_fails (s : ℕ → ℝ) (limit : ℝ)
+        (sConverges : Real.SequenceConverges(s, limit))
+        : Real.SequenceConverges(s, limit) := {
+  take ε : ℝ;
+  suppose ε > 0 as εPositive;
+  eventually (m). abs(s(m) - limit) < ε by sConverges;
+  for sufficiently large m: {
+    abs(s(m) - limit) < ε / 2
+  }
+}
