@@ -250,7 +250,7 @@ no eventual hypotheses in scope, the body just proves `Q(m)` outright.
 ε / 2 > 0;
 eventually (m). abs(s(m) - sLimit) < ε / 2 by sConverges;
 eventually (m). abs(t(m) - tLimit) < ε / 2 by tConverges;
-for sufficiently large m: {
+for m sufficiently large: {
   abs((s(m) + t(m)) - (sLimit + tLimit))
      ≤ abs(s(m) - sLimit) + abs(t(m) - tLimit)
      < ε / 2 + ε / 2
