@@ -365,7 +365,9 @@ ExpressionPointer Elaborator::resolveOverloadedCall(
             if (!signatureAcceptsArgumentTypes(signature,
                                                   argumentTypeNames)
                 && !signatureAcceptsArgumentTypesDefeq(
-                       signature, argumentTypesClosed)) {
+                       signature, argumentTypesClosed)
+                && !signatureAcceptsArgumentTypesViaInstance(
+                       signature, argumentTypeNames)) {
                 continue;
             }
             matches.push_back(candidateName);
@@ -600,6 +602,43 @@ bool Elaborator::signatureAcceptsArgumentTypes(
             cursor = pi->codomain;
         }
         return true;
+    }
+
+bool Elaborator::signatureAcceptsArgumentTypesViaInstance(
+        ExpressionPointer signature,
+        const std::vector<std::string>& argumentTypeNames) {
+        bool usedInstance = false;
+        ExpressionPointer cursor = signature;
+        for (const auto& expectedName : argumentTypeNames) {
+            cursor = weakHeadNormalForm(environment_, cursor);
+            auto* pi = std::get_if<Pi>(&cursor->node);
+            if (!pi) return false;
+            std::string actualName = headConstantName(pi->domain);
+            if (actualName != expectedName) {
+                // `<Struct>.carrier(<opened implicit>)` against a concrete
+                // carrier: accept when that carrier has a canonical bundle.
+                const std::string suffix = ".carrier";
+                if (actualName.size() <= suffix.size()
+                    || actualName.compare(actualName.size() - suffix.size(),
+                                           suffix.size(), suffix) != 0) {
+                    return false;
+                }
+                std::string structureName =
+                    actualName.substr(0, actualName.size() - suffix.size());
+                if (environment_.canonicalBundleRegistry.find(
+                        std::make_tuple(structureName, expectedName))
+                    == environment_.canonicalBundleRegistry.end()) {
+                    return false;
+                }
+                usedInstance = true;
+            }
+            cursor = pi->codomain;
+        }
+        // Only a match when the instance route was actually needed; a
+        // signature that already matches head-for-head is the other
+        // acceptor's business, and reporting it here too would make every
+        // such candidate look like two.
+        return usedInstance;
     }
 
 bool Elaborator::signatureAcceptsArgumentTypesDefeq(

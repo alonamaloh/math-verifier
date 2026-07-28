@@ -157,6 +157,27 @@ It fires in binder annotations, both sides of an arrow, `∀`/`∃` binders,
 fire where the term is already a type, nor where the expected argument is not a
 `Type` — so `MetricSpace.carrier(source)` written out is left alone.
 
+### `overload` resolves through instances
+
+`overload short := Qualified.name` gives a qualified function a bare
+mathematical spelling — `abs`, `min`, `max`, `exp`, `conj`, `distance`.
+Dispatch is on the argument types' heads, and it **runs instance inference**:
+a parameter declared at a bundle carrier (`MetricSpace.carrier(m)`, with `m`
+implicit) accepts any concrete carrier that has a canonical `instance`. So
+
+```math
+overload distance := MetricSpace.distance
+```
+
+serves `distance(x, y)` at an abstract `m`, at ℝ, and at the plane alike.
+
+**One registration per bundle — do not add the concrete carriers beside it.**
+For unrelated heads (`abs` over ℝ, ℚ, ℤ, ℂ) several registrations are right.
+For a bundle they are not: dispatch offers the δ-reduced candidates of the
+argument type, and `MetricSpace.carrier(Real.metricSpace)` reduces to `Real`,
+so a bundle registration and a `Real` registration both match at every
+abstract site and the name becomes ambiguous.
+
 ## Operator overloading
 
 `operator (sym) on (T1, T2) := F;` registers `sym` to dispatch on

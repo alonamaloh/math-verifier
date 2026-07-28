@@ -6115,6 +6115,19 @@ private:
     // result of `z * w`) — the same match a direct application makes. Only
     // consulted when the name-based check fails, so it can only widen
     // acceptance, never change an existing resolution.
+    // A parameter declared at a BUNDLE CARRIER (`MetricSpace.carrier(m)`
+    // with `m` an opened implicit) accepts any concrete carrier that has a
+    // canonical instance: `distance(x, y)` at ℝ resolves through
+    // `Real.metricSpace`, exactly as an implicit `{m : MetricSpace}` does
+    // everywhere else. Without this the overload sees head
+    // `MetricSpace.carrier` against head `Real` and declines — and
+    // registering the concrete carriers separately is not a fix, because
+    // `MetricSpace.carrier(Real.metricSpace)` δ-reduces to `Real` and the
+    // two registrations then both match every abstract site.
+    bool signatureAcceptsArgumentTypesViaInstance(
+        ExpressionPointer signature,
+        const std::vector<std::string>& argumentTypeNames);
+
     bool signatureAcceptsArgumentTypesDefeq(
         ExpressionPointer signature,
         const std::vector<ExpressionPointer>& argumentTypesClosed);
