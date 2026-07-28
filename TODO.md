@@ -96,20 +96,34 @@ field-of-fractions quotient.
   `Natural.add_one` automatic in argument position would cover this and
   the family of cases around it.
 
-- **`Natural.binomial_pascal` still re-decides its own conditional.**
-  It opens `if 1 + k = 0 then …` on a natural that is visibly a
-  successor, which is precisely what `docs/style.md` says not to do —
-  reason through the characterizing equations over
-  `Logic.if_positive` / `Logic.if_negative` instead. The
-  straightforward rewrite fails because `Natural.binomial` NESTS two
-  conditionals (`n = 0`, then `k = 0`), so the goal is not a bare
-  `if … = b` and one `if_negative` citation does not reach it; it
-  wants either both conditions discharged in sequence or a
-  characterizing equation for the nested form. The sibling
-  `binomial_zero_succ` already reads correctly
-  (`done by Logic.if_negative`), and the same shape in
-  `Real.augmentedScaledRow_{zero,one_plus}` is now clean, so this is
-  the last one.
+- **`Natural.binomial_pascal` still re-decides its own conditional, and
+  a citation cannot currently replace the split.** It opens
+  `if 1 + k = 0 then …` on a natural that is visibly a successor, which
+  is what `docs/style.md` says not to do — reason through the
+  characterizing equations over `Logic.if_positive` /
+  `Logic.if_negative` instead.
+
+  Four rewrites were tried and all fail the same way. The goal reaches
+  the citation matcher as `binomial(1 + n, 1 + k) = …`, with
+  `binomial`'s head NOT reduced, so it never has the
+  `Decidable_recursor …  = b` shape `if_negative` concludes with;
+  `unfold Natural.binomial` does not help, because `unfold` grants
+  transparency and the matcher still does not reduce. What the
+  proof-level `if` is really doing is forcing the OUTER guard — which
+  is the structural recursion on the first argument, not a classical
+  `if` — to ι-reduce in each branch, exposing the inner classical one.
+
+  So this is a matcher limitation, not a spelling choice: the fix is
+  reduction during citation matching (the same gap as the
+  `partialSum_split` index item above), or a
+  `binomial_pascal`-shaped characterizing equation generated with the
+  definition. `binomial_zero_succ` reads correctly
+  (`done by Logic.if_negative`) only because its first argument is the
+  literal `0`, so nothing needs to reduce.
+
+  The unrelated instances of this shape in
+  `Real.augmentedScaledRow_{zero,one_plus}` ARE fixed — there the
+  conditional is the definition's own head, so the citation lands.
 
 - **`by_induction … using` (prime_divisor v3 style) needs the
   return-type ascription stripped.** Its last 2 lines remain CIC
