@@ -1,0 +1,61 @@
+-- An INDEX IS ITS VALUE where a ℕ is wanted. `NaturalsBelow(n)` is a
+-- subtype of ℕ, and `NaturalsBelow.value` is registered as the coercion
+-- out of it, so index-heavy proofs write `i` and not
+-- `NaturalsBelow.value(i)`.
+--
+-- What made this expressible: a coercion function may now carry LEADING
+-- IMPLICIT parameters. `NaturalsBelow.value {n : ℕ} (element :
+-- NaturalsBelow(n))` has one, and the kernel has no implicits, so the
+-- application solves `n` from the source type.
+
+module Test.subtype_value_coercion_test
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.arithmetic
+import Set.basics
+import Set.finite
+
+-- Function-argument position.
+theorem Test.value_as_argument (n : ℕ) (s : ℕ → ℕ) (i : NaturalsBelow(n))
+        : s(i) = s(NaturalsBelow.value(i)) :=
+  reflexivity(ℕ, s(NaturalsBelow.value(i)))
+
+-- Equality, index against ℕ.
+theorem Test.value_in_equality (n : ℕ) (i : NaturalsBelow(n))
+        : NaturalsBelow.value(i) = i :=
+  reflexivity(ℕ, NaturalsBelow.value(i))
+
+-- Operator with a ℕ on the other side.
+theorem Test.value_mixed_operator (n : ℕ) (i : NaturalsBelow(n))
+        : i + 0 = NaturalsBelow.value(i) :=
+  ring
+
+-- Order against the bound, which `below` supplies for free.
+theorem Test.value_order_against_bound (n : ℕ) (i : NaturalsBelow(n))
+        : i < n :=
+  done by NaturalsBelow.below
+
+-- BOTH operands indices: the homogeneous pair coerces to the nearest type
+-- carrying the operator, which is ℕ and not Integer or Real.
+theorem Test.value_two_indices (n : ℕ) (i j : NaturalsBelow(n))
+        : i + j = NaturalsBelow.value(j) + NaturalsBelow.value(i) :=
+  ring
+
+-- A calc chain whose carrier is ℕ absorbing an index endpoint.
+theorem Test.value_calc_endpoint (n : ℕ) (i : NaturalsBelow(n))
+        : i + 0 ≤ n := {
+  i + 0
+     = NaturalsBelow.value(i)
+     < n;
+  done
+}
+
+-- The ordering guard — that the expected type still beats proximity, so
+-- `1 / k!` at an ambient ℝ is REAL and not the nearest type carrying `/` —
+-- lives in Test/factorial_notation, which already has the import set that
+-- exercise needs.
