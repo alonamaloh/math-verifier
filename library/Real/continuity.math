@@ -1,8 +1,10 @@
 -- Real/continuity.math
 --
 -- ε–δ continuity of functions on the reals, in the familiar form: ε and δ
--- are real numbers. (Real division, Real.minimum and the Real ε/2 split
--- carry the tolerance arithmetic that the rational version used to.)
+-- are real numbers. No proof here names a δ: continuity is stated through
+-- the spatial filter (`Metric/near.math`) and the algebra of continuous
+-- functions is proved inside `for y sufficiently near x: { … }`, which
+-- intersects the neighbourhoods the hypotheses supply.
 --
 -- This file: the definition, continuity on a closed interval, and the
 -- algebra of continuous functions (constants, identity, negation; sums,
@@ -33,7 +35,6 @@ import Real.reciprocal
 import Real.field
 import Real.order_field
 import Real.division
-import Real.minimum
 import Metric.space
 import Metric.continuity
 import Metric.real
@@ -158,8 +159,9 @@ theorem Real.ContinuousAt.identity (x : ℝ)
   }
 }
 
--- Sums of continuous functions are continuous: the usual ε/2 argument,
--- with δ = min(δf, δg) so both summands' bounds apply at once.
+-- Sums of continuous functions are continuous: the usual ε/2 argument.
+-- Each summand is within ε/2 near x, and the filter intersects the two
+-- neighbourhoods — no δ is named.
 theorem Real.ContinuousAt.add (f g : ℝ → ℝ) (x : ℝ)
         (fContinuous : Real.ContinuousAt(f, x))
         (gContinuous : Real.ContinuousAt(g, x))
@@ -191,26 +193,19 @@ theorem Real.ContinuousAt.add (f g : ℝ → ℝ) (x : ℝ)
 theorem Real.ContinuousAt.negate (f : ℝ → ℝ) (x : ℝ)
         (fContinuous : Real.ContinuousAt(f, x))
         : Real.ContinuousAt((y : ℝ) ↦ -f(y), x) := {
-  suffices ∀ (ε : ℝ). ε > 0 →
-      ∃ (δ : ℝ). δ > 0 ∧ ∀ (y : ℝ). abs(y - x) < δ → abs(-f(y) - -f(x)) < ε
-      by Real.ContinuousAt.of_epsilon_delta;
-  take ε : ℝ;
-  suppose ε > 0 as εPositive;
-  {
-    choose δ such that δ > 0
-            ∧ ∀ (y : ℝ). abs(y - x) < δ → abs(f(y) - f(x)) < ε
-        from Real.ContinuousAt.tolerance;
-    witness δ with {
-      ∀ (y : ℝ). abs(y - x) < δ → abs(-f(y) - -f(x)) < ε
-          by (y : ℝ) (yClose : abs(y - x) < δ) ↦
-            abs(-f(y) - -f(x))
-               = abs(-(f(y) - f(x)))
-                     by substituting (ring : -f(y) - -f(x) = -(f(y) - f(x)))
-               = abs(f(y) - f(x))
-               < ε;
-      done
-    }
-  }
+  ∀ (ε : ℝ). ε > 0 → MetricSpace.Near(x, (y : ℝ) ↦ abs(-f(y) - -f(x)) < ε)
+      by { take ε : ℝ;
+           suppose ε > 0;
+           MetricSpace.Near(x, (y : ℝ) ↦ abs(f(y) - f(x)) < ε)
+               by Real.ContinuousAt.near;
+           for y sufficiently near x: {
+             abs(-f(y) - -f(x))
+                = abs(-(f(y) - f(x)))
+                      by substituting (ring : -f(y) - -f(x) = -(f(y) - f(x)))
+                = abs(f(y) - f(x))
+                < ε
+           } };
+  done by Real.ContinuousAt.of_near
 }
 
 -- Composition: g's δ for the tolerance f demands at g(x). No minimum
@@ -266,92 +261,63 @@ theorem Real.ContinuousAt.multiply (f g : ℝ → ℝ) (x : ℝ)
         (fContinuous : Real.ContinuousAt(f, x))
         (gContinuous : Real.ContinuousAt(g, x))
         : Real.ContinuousAt((y : ℝ) ↦ f(y) * g(y), x) := {
-  suffices ∀ (ε : ℝ). ε > 0 →
-      ∃ (δ : ℝ). δ > 0 ∧ ∀ (y : ℝ). abs(y - x) < δ → abs(f(y) * g(y) - f(x) * g(x)) < ε
-      by Real.ContinuousAt.of_epsilon_delta;
-  take ε : ℝ;
-  suppose ε > 0 as εPositive;
-  {
-    let fRoof : ℝ := abs(f(x)) + 1;
-    let gRoof : ℝ := abs(g(x)) + 1;
-    -- The roofs bound their factors.
-    abs(g(x)) ≤ abs(g(x)) + 1;
-    -- Each factor's tolerance: ε/2, scaled down by the opposite roof.
-    let gTolerance : ℝ := ε / 2 / fRoof;
-    let fTolerance : ℝ := ε / 2 / gRoof;
-    gTolerance > 0;
-    fTolerance > 0;
-    -- The three δs: stay within 1 of f(x), and within each scaled
-    -- tolerance for the matching factor.
-    (1 : ℝ) > 0;
-    choose nearδ such that nearδ > 0
-            ∧ ∀ (y : ℝ). abs(y - x) < nearδ → abs(f(y) - f(x)) < 1
-        from Real.ContinuousAt.tolerance;
-    ∀ (y : ℝ). abs(y - x) < nearδ
-            → abs(f(y) - f(x)) < 1 as fNear;
-    choose gδ such that gδ > 0
-            ∧ ∀ (y : ℝ). abs(y - x) < gδ → abs(g(y) - g(x)) < gTolerance
-        from Real.ContinuousAt.tolerance;
-    ∀ (y : ℝ). abs(y - x) < gδ
-            → abs(g(y) - g(x)) < gTolerance as gClose;
-    choose fδ such that fδ > 0
-            ∧ ∀ (y : ℝ). abs(y - x) < fδ → abs(f(y) - f(x)) < fTolerance
-        from Real.ContinuousAt.tolerance;
-    ∀ (y : ℝ). abs(y - x) < fδ
-            → abs(f(y) - f(x)) < fTolerance as fClose;
-    witness min(nearδ, min(gδ, fδ)) with {
-      ∀ (y : ℝ). abs(y - x) < min(nearδ, min(gδ, fδ))
-              → abs(f(y) * g(y) - f(x) * g(x)) < ε
-          by (y : ℝ)
-             (yClose : abs(y - x) < min(nearδ, min(gδ, fδ))) ↦ {
-           -- The single δ serves all three continuity facts.
-           min(nearδ, min(gδ, fδ)) ≤ nearδ;
-           min(nearδ, min(gδ, fδ)) ≤ min(gδ, fδ);
-           min(gδ, fδ) ≤ gδ;
-           min(gδ, fδ) ≤ fδ;
-           min(nearδ, min(gδ, fδ)) ≤ gδ;
-           min(nearδ, min(gδ, fδ)) ≤ fδ;
-           abs(y - x) < min(nearδ, min(gδ, fδ)) ≤ nearδ as yNear;
-           abs(y - x) < min(nearδ, min(gδ, fδ)) ≤ gδ as yCloseG;
-           abs(y - x) < min(nearδ, min(gδ, fδ)) ≤ fδ as yCloseF;
-           -- |f(y)| sits under its roof.
-           abs(f(y) - f(x)) < 1 by fNear(y, yNear);
-           abs(f(y))
-              = abs(f(x) + (f(y) - f(x)))            by (f(y) = f(x) + (f(y) - f(x)))
-              ≤ abs(f(x)) + abs(f(y) - f(x))
-              ≤ abs(f(x)) + 1;
-           -- The two error terms, each strictly below its tolerance.
-           abs(g(y) - g(x)) < gTolerance by gClose(y, yCloseG);
-           abs(f(y) - f(x)) < fTolerance by fClose(y, yCloseF);
-           abs(f(y)) * abs(g(y) - g(x))
-              ≤ fRoof * abs(g(y) - g(x))
-              = abs(g(y) - g(x)) * fRoof
-              < gTolerance * fRoof
-              = fRoof * gTolerance;
-           abs(g(x)) * abs(f(y) - f(x))
-              ≤ gRoof * abs(f(y) - f(x))
-              = abs(f(y) - f(x)) * gRoof
-              < fTolerance * gRoof
-              = gRoof * fTolerance;
-           -- Each roof times its scaled tolerance is exactly ε/2.
-           fRoof * gTolerance = ε / 2 as fRoofCollapse;
-           gRoof * fTolerance = ε / 2 as gRoofCollapse;
-           -- Assemble.
-           abs(f(y) * g(y) - f(x) * g(x))
-              = abs(f(y) * (g(y) - g(x)) + g(x) * (f(y) - f(x)))
-                    by (f(y) * g(y) - f(x) * g(x)
-                        = f(y) * (g(y) - g(x)) + g(x) * (f(y) - f(x)))
-              ≤ abs(f(y) * (g(y) - g(x))) + abs(g(x) * (f(y) - f(x)))
-              = abs(f(y)) * abs(g(y) - g(x)) + abs(g(x) * (f(y) - f(x)))
-              = abs(f(y)) * abs(g(y) - g(x)) + abs(g(x)) * abs(f(y) - f(x))
-              < fRoof * gTolerance + gRoof * fTolerance
-              = ε / 2 + gRoof * fTolerance
-                    by fRoofCollapse
-              = ε / 2 + ε / 2
-                    by gRoofCollapse
-              = ε
-          };
-      done
-    }
-  }
+  ∀ (ε : ℝ). ε > 0 →
+      MetricSpace.Near(x, (y : ℝ) ↦ abs(f(y) * g(y) - f(x) * g(x)) < ε)
+      by { take ε : ℝ;
+           suppose ε > 0;
+           -- A positive roof over each factor, one unit above its value.
+           let fRoof : ℝ := abs(f(x)) + 1;
+           let gRoof : ℝ := abs(g(x)) + 1;
+           abs(g(x)) ≤ abs(g(x)) + 1;
+           -- Each factor's tolerance: ε/2, scaled down by the opposite roof.
+           let gTolerance : ℝ := ε / 2 / fRoof;
+           let fTolerance : ℝ := ε / 2 / gRoof;
+           gTolerance > 0;
+           fTolerance > 0;
+           (1 : ℝ) > 0;
+           -- Three tolerances, three near-facts; the filter takes the
+           -- minimum of the three radii, and none of them is named.
+           MetricSpace.Near(x, (y : ℝ) ↦ abs(f(y) - f(x)) < 1)
+               by Real.ContinuousAt.near;
+           MetricSpace.Near(x, (y : ℝ) ↦ abs(g(y) - g(x)) < gTolerance)
+               by Real.ContinuousAt.near;
+           MetricSpace.Near(x, (y : ℝ) ↦ abs(f(y) - f(x)) < fTolerance)
+               by Real.ContinuousAt.near;
+           for y sufficiently near x: {
+             -- |f(y)| sits under its roof.
+             abs(f(y))
+                = abs(f(x) + (f(y) - f(x)))   by (f(y) = f(x) + (f(y) - f(x)))
+                ≤ abs(f(x)) + abs(f(y) - f(x))
+                ≤ abs(f(x)) + 1;
+             -- Each error term, strictly below its tolerance. (The filter
+             -- hands these over spelled as balls; the arithmetic form is
+             -- what the scaling steps below match against.)
+             abs(g(y) - g(x)) < gTolerance;
+             abs(f(y) - f(x)) < fTolerance;
+             abs(f(y)) * abs(g(y) - g(x))
+                ≤ fRoof * abs(g(y) - g(x))
+                = abs(g(y) - g(x)) * fRoof
+                < gTolerance * fRoof
+                = fRoof * gTolerance;
+             abs(g(x)) * abs(f(y) - f(x))
+                ≤ gRoof * abs(f(y) - f(x))
+                = abs(f(y) - f(x)) * gRoof
+                < fTolerance * gRoof
+                = gRoof * fTolerance;
+             -- Each roof times its scaled tolerance is exactly ε/2.
+             fRoof * gTolerance = ε / 2 as fRoofCollapse;
+             gRoof * fTolerance = ε / 2 as gRoofCollapse;
+             abs(f(y) * g(y) - f(x) * g(x))
+                = abs(f(y) * (g(y) - g(x)) + g(x) * (f(y) - f(x)))
+                      by (f(y) * g(y) - f(x) * g(x)
+                          = f(y) * (g(y) - g(x)) + g(x) * (f(y) - f(x)))
+                ≤ abs(f(y) * (g(y) - g(x))) + abs(g(x) * (f(y) - f(x)))
+                = abs(f(y)) * abs(g(y) - g(x)) + abs(g(x) * (f(y) - f(x)))
+                = abs(f(y)) * abs(g(y) - g(x)) + abs(g(x)) * abs(f(y) - f(x))
+                < fRoof * gTolerance + gRoof * fTolerance
+                = ε / 2 + gRoof * fTolerance   by fRoofCollapse
+                = ε / 2 + ε / 2                by gRoofCollapse
+                = ε
+           } };
+  done by Real.ContinuousAt.of_near
 }
