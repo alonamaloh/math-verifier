@@ -266,13 +266,15 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
                 // now (`ι(a) ⊕ ι(b)`) so every downstream consumer sees one
                 // canonical form. A no-op on a coerced leaf (`ι(q)`).
                 leftKernel = applyCoercionChain(
-                    std::move(leftKernel), combined->coerceLeft);
+                    std::move(leftKernel), combined->coerceLeft,
+                    leftTypeClosed);
                 if (!combined->coerceLeft.empty()) {
                     leftKernel =
                         castPushToLeaves(leftKernel, localBinders).term;
                 }
                 rightKernel = applyCoercionChain(
-                    std::move(rightKernel), combined->coerceRight);
+                    std::move(rightKernel), combined->coerceRight,
+                    rightTypeClosed);
                 if (!combined->coerceRight.empty()) {
                     rightKernel =
                         castPushToLeaves(rightKernel, localBinders).term;
@@ -438,13 +440,16 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
                     if (atJoin.empty()) continue;
 
                     leftKernel = applyCoercionChain(
-                        std::move(leftKernel), combined->coerceLeft);
+                        std::move(leftKernel), combined->coerceLeft,
+                        leftTypeClosed);
                     if (!combined->coerceLeft.empty()) {
                         leftKernel =
                             castPushToLeaves(leftKernel, localBinders).term;
                     }
                     rightKernel = applyCoercionChain(
-                        std::move(rightKernel), combined->coerceRight);
+                        std::move(rightKernel), combined->coerceRight,
+                        closeOverLocalBinders(rightTypeRaw, localBinders,
+                                               localBinders.size()));
                     if (!combined->coerceRight.empty()) {
                         rightKernel =
                             castPushToLeaves(rightKernel, localBinders).term;
@@ -507,13 +512,15 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
                 auto rightChain = chainTo(rightTypeName);
                 if (!registeredAtExpected.empty() && leftChain && rightChain) {
                     leftKernel = applyCoercionChain(
-                        std::move(leftKernel), *leftChain);
+                        std::move(leftKernel), *leftChain, leftTypeClosed);
                     if (!leftChain->empty()) {
                         leftKernel =
                             castPushToLeaves(leftKernel, localBinders).term;
                     }
                     rightKernel = applyCoercionChain(
-                        std::move(rightKernel), *rightChain);
+                        std::move(rightKernel), *rightChain,
+                        closeOverLocalBinders(rightTypeRaw, localBinders,
+                                               localBinders.size()));
                     if (!rightChain->empty()) {
                         rightKernel =
                             castPushToLeaves(rightKernel, localBinders).term;

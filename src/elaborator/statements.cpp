@@ -590,6 +590,18 @@ void Elaborator::elaborateCoercionDeclaration(
         ExpressionPointer functionType = declarationType(*functionDecl);
         ExpressionPointer cursor = weakHeadNormalForm(
             environment_, functionType);
+        // Skip leading IMPLICIT parameters: `NaturalsBelow.value {n : ℕ}
+        // (element : NaturalsBelow(n))` coerces `NaturalsBelow → Natural`,
+        // but its first Pi domain is `n`'s type, not the source type. The
+        // implicits are supplied at application time by
+        // inferLeadingImplicitsFromSourceType.
+        int leadingImplicits =
+            environment_.implicitArgumentCount(declaration.functionName);
+        for (int skipped = 0; skipped < leadingImplicits; ++skipped) {
+            auto* implicitPi = std::get_if<Pi>(&cursor->node);
+            if (!implicitPi) break;
+            cursor = weakHeadNormalForm(environment_, implicitPi->codomain);
+        }
         auto* domainPi = std::get_if<Pi>(&cursor->node);
         if (!domainPi) {
             throwElaborate(
@@ -687,11 +699,80 @@ void Elaborator::elaborateCoercionDeclaration(
         }
     }
 
+bool Elaborator::inferLeadingImplicitsFromSourceType(
+        const std::string& functionName,
+        ExpressionPointer sourceTypeOpened,
+        std::vector<ExpressionPointer>& implicitsOut) {
+        implicitsOut.clear();
+        int leadingImplicits =
+            environment_.implicitArgumentCount(functionName);
+        if (leadingImplicits == 0) return true;
+        if (!sourceTypeOpened) return false;
+        const Declaration* decl = environment_.lookup(functionName);
+        if (!decl) return false;
+        ExpressionPointer cursor =
+            weakHeadNormalForm(environment_, declarationType(*decl));
+        for (int skipped = 0; skipped < leadingImplicits; ++skipped) {
+            auto* implicitPi = std::get_if<Pi>(&cursor->node);
+            if (!implicitPi) return false;
+            cursor = weakHeadNormalForm(environment_, implicitPi->codomain);
+        }
+        auto* explicitPi = std::get_if<Pi>(&cursor->node);
+        if (!explicitPi) return false;
+        // Collect both argument lists, outermost-first.
+        auto arguments = [](ExpressionPointer type) {
+            std::vector<ExpressionPointer> reversed;
+            ExpressionPointer walk = type;
+            while (auto* app = std::get_if<Application>(&walk->node)) {
+                reversed.push_back(app->argument);
+                walk = app->function;
+            }
+            std::reverse(reversed.begin(), reversed.end());
+            return reversed;
+        };
+        std::vector<ExpressionPointer> declared = arguments(explicitPi->domain);
+        std::vector<ExpressionPointer> actual = arguments(sourceTypeOpened);
+        if (declared.size() != actual.size()) return false;
+        implicitsOut.assign(leadingImplicits, nullptr);
+        for (size_t position = 0; position < declared.size(); ++position) {
+            auto* bound =
+                std::get_if<BoundVariable>(&declared[position]->node);
+            if (!bound) continue;
+            // Inside the explicit parameter's domain the implicits sit at
+            // de Bruijn `leadingImplicits - 1 - j` for implicit j.
+            int index = leadingImplicits - 1 - bound->deBruijnIndex;
+            if (index < 0 || index >= leadingImplicits) continue;
+            implicitsOut[static_cast<size_t>(index)] = actual[position];
+        }
+        for (const auto& solved : implicitsOut) {
+            if (!solved) return false;
+        }
+        return true;
+    }
+
 ExpressionPointer Elaborator::applyCoercionChain(
-        ExpressionPointer expr, const std::vector<std::string>& chain) {
+        ExpressionPointer expr, const std::vector<std::string>& chain,
+        ExpressionPointer sourceTypeOpened) {
+        bool first = true;
         for (const auto& functionName : chain) {
-            expr = makeApplication(makeConstant(functionName),
-                                    std::move(expr));
+            std::vector<ExpressionPointer> implicits;
+            // Only the FIRST edge can solve implicits: after it the term's
+            // type has changed and we no longer have it here. Every
+            // registered target so far is implicit-free, so this is the
+            // whole of the need; a later edge that wants implicits leaves
+            // the term un-coerced rather than mis-applied.
+            if (!inferLeadingImplicitsFromSourceType(
+                    functionName, first ? sourceTypeOpened : nullptr,
+                    implicits)) {
+                return expr;
+            }
+            ExpressionPointer applied = makeConstant(functionName);
+            for (auto& implicitArgument : implicits) {
+                applied = makeApplication(std::move(applied),
+                                           std::move(implicitArgument));
+            }
+            expr = makeApplication(std::move(applied), std::move(expr));
+            first = false;
         }
         return expr;
     }

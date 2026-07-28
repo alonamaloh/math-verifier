@@ -825,8 +825,28 @@ private:
     // Wrap `expr` in the coercion-function `chain` (outermost last), e.g.
     // `[to_integer, to_rational]` builds `to_rational(to_integer(expr))`.
     // A empty chain returns `expr` unchanged.
+    // `sourceTypeOpened`, when supplied, is `expr`'s type in the opened
+    // local context. It is needed only when a chain function carries
+    // LEADING IMPLICIT parameters — `NaturalsBelow.value {n} (element :
+    // NaturalsBelow(n))` — because the kernel has no implicits, so the
+    // application must supply `n` itself. It is read off the source type
+    // positionally (see inferLeadingImplicitsFromSourceType). Chains whose
+    // functions are implicit-free ignore it entirely.
     ExpressionPointer applyCoercionChain(
-        ExpressionPointer expr, const std::vector<std::string>& chain);
+        ExpressionPointer expr, const std::vector<std::string>& chain,
+        ExpressionPointer sourceTypeOpened = nullptr);
+
+    // Solve a coercion function's leading implicit arguments by matching
+    // its first EXPLICIT parameter's declared type against the actual
+    // source type, positionally: where the declared type's i-th argument
+    // is exactly one of the implicit binders, that implicit is the actual
+    // type's i-th argument. Returns false when the shapes don't line up,
+    // which leaves the caller with the un-coerced term rather than a
+    // wrong one.
+    bool inferLeadingImplicitsFromSourceType(
+        const std::string& functionName,
+        ExpressionPointer sourceTypeOpened,
+        std::vector<ExpressionPointer>& implicitsOut);
 
     // PLAN_CALC_WIDENING §B/§D — the relation-proof companion of
     // `applyCoercionChain`: lift `proof : lhs R rhs` up the coercion

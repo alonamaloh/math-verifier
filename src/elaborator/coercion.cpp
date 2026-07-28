@@ -52,8 +52,16 @@ ExpressionPointer Elaborator::coerceToExpectedTypeViaRegistry(
                     auto entry = environment_.coercionRegistry.find(
                         std::make_tuple(termHead, expectedHead));
                     if (entry != environment_.coercionRegistry.end()) {
+                        // `term` is CLOSED over the local binders, so the
+                        // implicits solved from its type must be too —
+                        // otherwise they carry free variables of the opened
+                        // context and the kernel reports an unbound
+                        // internal variable.
                         return applyCoercionChain(
-                            std::move(term), entry->second);
+                            std::move(term), entry->second,
+                            closeOverLocalBinders(
+                                termTypeOpened, localBinders,
+                                localBinders.size()));
                     }
                 }
             }

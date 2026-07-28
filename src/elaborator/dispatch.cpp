@@ -1979,15 +1979,19 @@ ExpressionPointer Elaborator::elaborateExpression(
                     bool reconciled = false;
                     auto applyCombined =
                         [&](CombineResult combined) {
+                            // Pass each side's (closed) type: a coercion
+                            // function with leading implicits — the subtype
+                            // projections — solves them from it.
                             leftKernel = applyCoercionChain(
-                                std::move(leftKernel), combined.coerceLeft);
+                                std::move(leftKernel), combined.coerceLeft,
+                                leftType);
                             if (!combined.coerceLeft.empty()) {
                                 leftKernel = castPushToLeaves(
                                     leftKernel, localBinders).term;
                             }
                             rightKernel = applyCoercionChain(
                                 std::move(rightKernel),
-                                combined.coerceRight);
+                                combined.coerceRight, rightType);
                             if (!combined.coerceRight.empty()) {
                                 rightKernel = castPushToLeaves(
                                     rightKernel, localBinders).term;
