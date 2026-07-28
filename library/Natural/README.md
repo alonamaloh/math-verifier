@@ -56,7 +56,9 @@ recursion, or [number-theory.md](number-theory.md) for division, gcd, and primes
   what the scope cannot reach: `Natural.Eventually.shift` for a fact needed at a
   *shifted* index, and `Natural.Eventually.holds_somewhere` /
   `Natural.Eventually.not_eventually_false` — properness, which is how a limit
-  argument by contradiction ends.
+  argument by contradiction ends — and `Natural.Eventually.beyond`, which
+  puts "past a given index" into the filter so a proof combining a
+  threshold with a specific natural takes no maximum by hand.
 
 ## Main theorems
 

@@ -13,7 +13,6 @@ import Equality.basics
 import Set.basics
 import Natural.basics
 import Natural.order
-import Natural.maximum
 import Natural.eventually
 import Natural.subsequence
 import Real.interface
@@ -54,30 +53,25 @@ theorem MetricSpace.SequenceConverges.unique (m : MetricSpace)
     distance(limit, other) ≥ 0 by MetricSpace.distance_nonneg;
     distance(limit, other) > 0;
     distance(limit, other) / 2 > 0;
-    choose limitThreshold such that
-        ∀ (k : ℕ). limitThreshold ≤ k →
-          distance(limit, s(k)) < distance(limit, other) / 2
-        as nearLimit from toLimit;
-    choose otherThreshold such that
-        ∀ (k : ℕ). otherThreshold ≤ k →
-          distance(other, s(k)) < distance(limit, other) / 2
-        as nearOther from toOther;
-    let far : ℕ := Natural.maximum(limitThreshold, otherThreshold);
-    limitThreshold ≤ far;
-    otherThreshold ≤ far;
-    distance(limit, s(far)) < distance(limit, other) / 2
-        by nearLimit;
-    distance(other, s(far)) < distance(limit, other) / 2
-        by nearOther;
-    distance(s(far), other) = distance(other, s(far))
-        by MetricSpace.distance_symmetric;
-    distance(limit, other)
-       ≤ distance(limit, s(far)) + distance(s(far), other)
-             by MetricSpace.distance_triangle
-       = distance(limit, s(far)) + distance(other, s(far))
-       < distance(limit, other) / 2 + distance(limit, other) / 2
-       = distance(limit, other);
-    done
+    eventually (k). distance(limit, s(k)) < distance(limit, other) / 2
+        by toLimit;
+    eventually (k). distance(other, s(k)) < distance(limit, other) / 2
+        by toOther;
+    -- Both tails hold at once past some index, and there the triangle
+    -- inequality makes the gap smaller than itself.
+    eventually (k). False
+        by for k sufficiently large: {
+             distance(s(k), other) = distance(other, s(k))
+                 by MetricSpace.distance_symmetric;
+             distance(limit, other)
+                ≤ distance(limit, s(k)) + distance(s(k), other)
+                      by MetricSpace.distance_triangle
+                = distance(limit, s(k)) + distance(other, s(k))
+                < distance(limit, other) / 2 + distance(limit, other) / 2
+                = distance(limit, other);
+             done
+           };
+    done by Natural.Eventually.not_eventually_false
   };
   done by MetricSpace.equal_of_distance_zero
 }

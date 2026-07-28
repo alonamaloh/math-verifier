@@ -26,7 +26,6 @@ import Set.basics
 import Set.algebra
 import Natural.basics
 import Natural.order
-import Natural.maximum
 import Natural.subsequence
 import Real.interface
 import Real.order
@@ -239,37 +238,38 @@ theorem MetricSpace.IsCompact.bounded (m : MetricSpace)
     MetricSpace.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
         by MetricSpace.SubsequenceConverges.converges as converges;
     (1 : ℝ) > 0;
-    choose threshold such that
-        ∀ (k : ℕ). threshold ≤ k →
-            distance(limit, s(index(k))) < 1
-        as closeBeyond from converges;
+    eventually (k). distance(limit, s(index(k))) < 1 by converges;
     -- One index past both the convergence threshold and any natural
-    -- exceeding `distance(centre, limit) + 1` is a contradiction.
+    -- exceeding `distance(centre, limit) + 1` is a contradiction. Being
+    -- past that natural is itself eventual, so the filter combines the
+    -- two and no maximum is taken.
     choose escape such that
         distance(centre, limit) + 1 < (1 + escape : ℝ)
         from Real.exists_natural_above;
-    let far : ℕ := Natural.maximum(threshold, escape);
-    threshold ≤ far;
-    escape ≤ far;
-    distance(limit, s(index(far))) < 1 by closeBeyond;
-    s(index(far)) ∈ region ∧ (1 + index(far) : ℝ)
-        < distance(centre, s(index(far))) by escapesAt;
-    (1 + index(far) : ℝ) < distance(centre, s(index(far)));
-    far ≤ index(far) by Natural.IsStrictlyIncreasing.LessOrEqual;
-    escape ≤ index(far);
-    (1 + escape : ℝ) ≤ (1 + index(far) : ℝ);
-    distance(centre, s(index(far)))
-        ≤ distance(centre, limit)
-              + distance(limit, s(index(far)))
-        by MetricSpace.distance_triangle;
-    distance(centre, limit) + 1
-       < (1 + escape : ℝ)
-       ≤ (1 + index(far) : ℝ)
-       < distance(centre, s(index(far)))
-       ≤ distance(centre, limit)
-             + distance(limit, s(index(far)))
-       < distance(centre, limit) + 1;
-    done
+    eventually (k). escape ≤ k by Natural.Eventually.beyond;
+    eventually (k). False
+        by for k sufficiently large: {
+             s(index(k)) ∈ region ∧ (1 + index(k) : ℝ)
+                 < distance(centre, s(index(k))) by escapesAt;
+             (1 + index(k) : ℝ) < distance(centre, s(index(k)));
+             escape
+                ≤ k
+                ≤ index(k) by Natural.IsStrictlyIncreasing.LessOrEqual;
+             (1 + escape : ℝ) ≤ (1 + index(k) : ℝ);
+             distance(centre, s(index(k)))
+                 ≤ distance(centre, limit)
+                       + distance(limit, s(index(k)))
+                 by MetricSpace.distance_triangle;
+             distance(centre, limit) + 1
+                < (1 + escape : ℝ)
+                ≤ (1 + index(k) : ℝ)
+                < distance(centre, s(index(k)))
+                ≤ distance(centre, limit)
+                      + distance(limit, s(index(k)))
+                < distance(centre, limit) + 1;
+             done
+           };
+    done by Natural.Eventually.not_eventually_false
   };
   done
 }
