@@ -477,6 +477,13 @@ ExpressionPointer Elaborator::elaborateOrderedField(
     if (!expectedType) {
         throwElaborate("`ordered_field` needs an order goal from context");
     }
+    // ζ-unfold let-binders in the goal, as `ring` does: a let-bound
+    // abbreviation (`let bound := 1 + abs(limit)`) is otherwise an opaque
+    // ATOM in the linear model, so `abs(limit) ≤ bound` looks like an
+    // unrelated pair of atoms and is declined as "not a linear consequence"
+    // — when it is one the moment the binding is seen. The unfolded type is
+    // ζ-equal to the original, so the proof still discharges the goal.
+    expectedType = zetaUnfoldLetBinders(expectedType, localBinders);
     size_t binderCount = localBinders.size();
     ExpressionPointer goalOpened =
         openOverLocalBinders(expectedType, localBinders, binderCount);
@@ -643,8 +650,14 @@ ExpressionPointer Elaborator::elaborateOrderedField(
         rows.push_back(std::move(row));
     };
     for (const ContextFact& fact : collectLocalBinderFacts(localBinders)) {
-        ExpressionPointer factType =
-            openOverLocalBinders(fact.type, localBinders, binderCount);
+        // ζ-unfolded on the SAME terms as the goal above. Unfolding one
+        // side only desynchronises them: a let-bound local standing for a
+        // `≠ 0` side condition becomes its proof term in the goal while
+        // the hypotheses still name the binder, and `a / c` then splits
+        // into two unrelated atoms of the linear model.
+        ExpressionPointer factType = openOverLocalBinders(
+            zetaUnfoldLetBinders(fact.type, localBinders),
+            localBinders, binderCount);
         // Opened only once the fact is known to become a row. Proof terms
         // are large, and most facts in scope are not order relations at
         // this carrier — opening every one of them was most of what the

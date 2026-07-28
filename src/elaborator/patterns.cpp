@@ -2288,7 +2288,8 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                                        recursiveCallScrutineeIndex,
                                        implicitOuterBinderCount),
                 node.line, node.column,
-                eventuallyScope->filterPredicate);
+                eventuallyScope->filterPredicate,
+                eventuallyScope->phrase);
         }
         if (auto* inductionUsing =
                 std::get_if<SurfaceByInductionUsing>(&node.node)) {

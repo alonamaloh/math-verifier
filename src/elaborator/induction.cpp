@@ -147,22 +147,61 @@ ExpressionPointer Elaborator::elaborateEventuallyScope(
         ExpressionPointer expectedType,
         int line, int column) {
         Frame frame(*this,
-            "eventually (" + scope.binderName + "): at line "
-            + std::to_string(line));
+            scope.phrase + ": at line " + std::to_string(line));
         int N = static_cast<int>(localBinders.size());
         if (!expectedType) {
             throwElaborate(
-                "`eventually (" + scope.binderName + "): …` needs an "
-                "expected type from context — the goal must be an "
-                "`eventually (m). …` proposition");
+                "`" + scope.phrase + ": …` needs an expected type from "
+                "context — the goal must be a `" + scope.filterPredicate
+                + "` proposition");
         }
-        // The goal must be `Natural.Eventually(Q)` — matched on the
-        // STATED spelling (WHNF would δ-unfold the transparent
-        // definition past recognition; the binder sugar always
-        // produces the literal head).
+        // Read the filter's predicate off the goal. Three spellings reach
+        // here and all three must work:
+        //   * the literal head `<filter>(a₁…aₖ, Q)`, which the binder
+        //     sugar produces;
+        //   * the δ-REDUCED `∃N. ∀m ≥ N. …`, which upstream machinery (a
+        //     quotient-cases motive, a `suffices` ascription) hands over;
+        //   * the filter behind a WRAPPER — `x ∈ Real.eventual_lower_-`
+        //     `bounds(s)` is the filter by definition, and a proof should
+        //     not have to say so with a `change` line.
+        // The wrapper case is why WHNF is a fallback rather than the first
+        // move: it reduces a transparent filter past its own head, and the
+        // recogniser is what folds that back. An opaque filter (`Near`)
+        // stops WHNF at its head by construction.
         ExpressionPointer goalOpened = peelRootBetaRedexes(
             openOverLocalBinders(expectedType, localBinders, N));
-        auto* goalApp = std::get_if<Application>(&goalOpened->node);
+        ExpressionPointer goalPredicateOpened;
+        auto readPredicate =
+            [&](const ExpressionPointer& goal) -> ExpressionPointer {
+                ExpressionPointer cursor = goal;
+                while (auto* app = std::get_if<Application>(&cursor->node)) {
+                    cursor = app->function;
+                }
+                if (auto* head = std::get_if<Constant>(&cursor->node);
+                    head && head->name == scope.filterPredicate) {
+                    if (auto* app =
+                            std::get_if<Application>(&goal->node)) {
+                        return app->argument;
+                    }
+                }
+                return recognizeUnfoldedEventually(goal);
+            };
+        goalPredicateOpened = readPredicate(goalOpened);
+        if (!goalPredicateOpened) {
+            ExpressionPointer reduced = peelRootBetaRedexes(
+                weakHeadNormalForm(environment_, goalOpened));
+            if (ExpressionPointer viaReduction = readPredicate(reduced)) {
+                goalOpened = reduced;
+                goalPredicateOpened = viaReduction;
+            }
+        }
+        if (!goalPredicateOpened) {
+            throwElaborate(
+                "`" + scope.phrase + ": …` proves a `"
+                + scope.filterPredicate + "` goal, but the expected type "
+                  "here is neither that nor anything that reduces to it: "
+                + prettyPrintInLocalScope(expectedType, localBinders));
+        }
         // The filter's LEADING ARGUMENTS — `Near`'s space and point — sit
         // between the head and the predicate. Collect them so every lemma
         // call below can thread them through verbatim; `Eventually` simply
@@ -188,36 +227,6 @@ ExpressionPointer Elaborator::elaborateEventuallyScope(
                     filterArguments.push_back(reversed[i]);
                 }
             }
-        }
-        auto* goalHead = goalApp
-            ? std::get_if<Constant>(&goalApp->function->node) : nullptr;
-        ExpressionPointer goalPredicateOpened;
-        bool headIsFilter = false;
-        {
-            ExpressionPointer cursor = goalOpened;
-            while (auto* app = std::get_if<Application>(&cursor->node)) {
-                cursor = app->function;
-            }
-            auto* head = std::get_if<Constant>(&cursor->node);
-            headIsFilter = head && head->name == scope.filterPredicate;
-        }
-        (void)goalHead;
-        if (headIsFilter) {
-            goalPredicateOpened = goalApp->argument;
-        } else {
-            // Upstream machinery (a quotient-cases motive, a suffices
-            // ascription) may hand the scope the goal δ-REDUCED; fold
-            // the raw ∃N.∀m≥N shape back to its predicate.
-            goalPredicateOpened = recognizeUnfoldedEventually(goalOpened);
-        }
-        if (!goalPredicateOpened) {
-            throwElaborate(
-                "`eventually (" + scope.binderName + "): …` proves an "
-                "`eventually (m). …` goal, but the expected type here "
-                "is spelled differently: "
-                + prettyPrintInLocalScope(expectedType, localBinders)
-                + "\n  state the goal with the `eventually (m). …` "
-                  "binder (or as `Natural.Eventually(…)`)");
         }
         ExpressionPointer goalPredicate = closeOverLocalBinders(
             goalPredicateOpened, localBinders, N);

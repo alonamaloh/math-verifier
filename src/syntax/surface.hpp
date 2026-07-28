@@ -617,6 +617,9 @@ struct SurfaceEventuallyScope {
     // new filter is a phrase here plus those three lemmas, and no
     // elaborator change at all.
     std::string filterPredicate;
+    // The phrase as written (`for m sufficiently large`), so a diagnostic
+    // quotes the reader's own words rather than a canonical spelling.
+    std::string phrase;
 };
 
 // `choose <name> such that <predicate>;` — Exists-elimination via
@@ -1135,10 +1138,15 @@ inline SurfaceExpressionPointer makeSurfaceEventuallyScope(
     std::string binderName,
     SurfaceExpressionPointer body,
     int line, int column,
-    std::string filterPredicate = "Natural.Eventually") {
+    std::string filterPredicate = "Natural.Eventually",
+    std::string phrase = {}) {
+    if (phrase.empty()) {
+        phrase = "for " + binderName + " sufficiently large";
+    }
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceEventuallyScope{std::move(binderName), std::move(body),
-                                std::move(filterPredicate)},
+                                std::move(filterPredicate),
+                                std::move(phrase)},
         line, column});
 }
 

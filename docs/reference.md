@@ -277,10 +277,12 @@ for m sufficiently large:
      < ε
 ```
 
-The scope matches the goal's **spelling**, not its normal form (reducing it
-would unfold the filter itself past recognition). So a goal that *is* the
-filter behind a wrapper — `x ∈ Real.eventual_lower_bounds(s)` — needs one
-`change eventually (m). …` line to say so.
+The scope takes the goal in any of three spellings: the filter's own head, the
+δ-reduced `∃N. ∀m ≥ N. …`, or the filter behind a wrapper
+(`x ∈ Real.eventual_lower_bounds(s)`). It tries the written form first and
+reduces only if that fails, because reducing a *transparent* filter unfolds it
+past its own head — `recognizeUnfoldedEventually` is what folds that back, and
+an opaque filter (`Near`) stops the reduction at its head by construction.
 
 The scope hands the body its facts *at the bound index and nowhere else*.
 These lemmas cover what it cannot (`Natural/eventually.math`):

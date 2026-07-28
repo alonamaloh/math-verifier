@@ -217,20 +217,14 @@ sit at *different* centres, as in a composition.
 | a near-fact needed at f(y) | `MetricSpace.Near.under` |
 | what holds near x, at x | `MetricSpace.Near.at_centre` |
 
-## Two things that will look wrong
+## One thing that will look wrong
 
-**"The goal is spelled differently."** The block recognises what it is being
-asked to prove by how that is *written*, not by what it unfolds to. If your
-statement is an eventually-fact only after unfolding a definition — typically
-a membership like `x ∈ Real.eventual_lower_bounds(s)` — write out what it is
-and carry on:
+A result whose conclusion is `eventually (m). …` will not discharge a statement
+you wrote out longhand as `∃ N. ∀ m ≥ N. …`, even though those are the same
+proposition — citing it will report that the lemma does not prove the goal.
+Write the statement with the `eventually` binder and it matches. That is a
+known rough edge, not something you are doing wrong.
 
-```math
-change eventually (m). s(N) - q ≤ s(m);
-```
-
-**A lemma about eventually-facts won't apply.** For the same reason, a result
-whose conclusion is `eventually (m). …` will not discharge a statement you
-wrote out longhand as `∃ N. ∀ m ≥ N. …`, even though those are the same
-proposition. Write the statement with the `eventually` binder and it matches.
-Both of these are known rough edges, not something you are doing wrong.
+(The block itself has no such restriction: it proves your statement whenever
+that statement *is* the filter, however it is written — spelled out longhand,
+or wrapped in a definition, as `x ∈ Real.eventual_lower_bounds(s)` is.)

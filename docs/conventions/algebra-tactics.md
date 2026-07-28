@@ -37,14 +37,20 @@ real limitation:
   relation step or stated proposition, no `by field` needed. Write the hint only
   when the bare step genuinely fails (pinned by
   `Test/field_battery_test.math`).
-- **`let`-bound values are transparent to `ring`/`field` (and the sign
-  battery); still atoms to `linear_combination`.** `ring` and `field`
+- **`let`-bound values are transparent to `ring`/`field`/`ordered_field`
+  (and the sign battery); still atoms to `linear_combination`.** These
   ζ-unfold local `let`s in the goal (and `field` reads its nonzero
   hypotheses at the same let-free spelling), so
   `mean * mean - x*y = halfDiff * halfDiff by field` with
   `let mean := (x+y)/2` closes as written; so do bare sign/positivity
   stated facts over a `let` (`let tolerance := ε / 2 / fRoof;
-  tolerance > 0;` — pinned by `Test/zeta_let_test.math`). The one
+  tolerance > 0;` — pinned by `Test/zeta_let_test.math`), and so does
+  a bound stated against an abbreviation (`let roof := 1 + abs(x);`
+  then `abs(x) ≤ roof by ordered_field` — pinned by
+  `Test/ordered_field_test.math`). `ordered_field` unfolds its
+  HYPOTHESES on the same terms as its goal; unfolding one side alone
+  desynchronises them, and a let-bound `≠ 0` side condition then splits
+  `a / c` into two unrelated atoms of the linear model. The one
   remaining blind spot is `linear_combination`: its cited hypothesis
   equations feed the coefficient bookkeeping at their stated
   spellings, so keep explicit forms on those identities. See

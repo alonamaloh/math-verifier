@@ -382,7 +382,7 @@ SurfaceExpressionPointer substituteSurfaceName(
                                      targetName, replacement);
         return makeSurfaceEventuallyScope(
             eventuallyScope->binderName, std::move(newBody), line, column,
-            eventuallyScope->filterPredicate);
+            eventuallyScope->filterPredicate, eventuallyScope->phrase);
     }
     if (auto* structured =
             std::get_if<SurfaceStructuredClaim>(&node.node)) {
@@ -3727,15 +3727,20 @@ private:
                 Token head = consumeAny();  // 'for'
                 std::string binderName = consumeAny().lexeme;
                 consumeAny();               // 'sufficiently'
-                consumeAny();               // 'large' | 'near'
-                if (isNear) consumeAny();   // the point — the goal supplies it
+                std::string kind = consumeAny().lexeme;  // 'large' | 'near'
+                std::string phrase =
+                    "for " + binderName + " sufficiently " + kind;
+                // The point — the goal supplies it, so nothing but the
+                // diagnostic phrase keeps it.
+                if (isNear) phrase += " " + consumeAny().lexeme;
                 consumeAny();               // ':'
                 SurfaceExpressionPointer body =
                     parseBodyExpressionOrStatement();
                 return makeSurfaceEventuallyScope(
                     std::move(binderName), std::move(body),
                     head.line, head.column,
-                    isNear ? "MetricSpace.Near" : "Natural.Eventually");
+                    isNear ? "MetricSpace.Near" : "Natural.Eventually",
+                    std::move(phrase));
             }
         }
         if (current.kind == TokenKind::Identifier

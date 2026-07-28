@@ -415,11 +415,15 @@ Three findings, all fixed at the source rather than worked around:
    counterpart. That is why respelling one lemma's conclusion broke three
    consumers. **The general fix is to fold in the matcher**; it is the same
    gap as (2), one layer up.
-2. **The scope matches the goal's spelling, not its normal form** — it must,
-   since WHNF would unfold the filter past recognition. So a goal that *is*
-   the filter behind a wrapper (`x ∈ Real.eventual_lower_bounds(s)`) needs
-   one `change eventually (m). …` line. Cheap, but worth a recogniser that
-   δ-reduces the wrapper *without* touching the filter head.
+2. ~~**The scope matches the goal's spelling, not its normal form.**~~
+   **FIXED.** The worry was that WHNF unfolds a transparent filter past its
+   own head — true, but `recognizeUnfoldedEventually` already folds that
+   shape back, and an *opaque* filter (`Near`) stops WHNF at its head by
+   construction. So WHNF is safe as a **fallback**: try the written form,
+   reduce only if that fails. A goal that *is* the filter behind a wrapper
+   (`x ∈ Real.eventual_lower_bounds(s)`) now needs no `change` line, and
+   `Real.cauchy_tail_gives_lower_bound` lost the one it had. Pinned by
+   `Test.eventually_scope_through_wrapper`.
 3. **The scope body was an expression position; it should have been a
    statement position** (fixed). `for m sufficiently large: <chain>` parsed
    the body with `parseExpression`, which stops at the first relation — the
