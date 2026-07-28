@@ -532,6 +532,55 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
                 }
             }
         }
+        // Homogeneous unregistered pair: BOTH operands have the same head,
+        // nothing is registered for it, but it coerces to a type that DOES
+        // have the operator — `i + j` for two `NaturalsBelow` indices. The
+        // mismatched-head join above cannot fire (the heads agree) and the
+        // expected-type fallback ABOVE needs an ambient type a bare
+        // statement does not supply. Runs last, deliberately: the expected
+        // type is stronger evidence of intent than proximity, and putting
+        // this first turned `1 / k!` into INTEGER division. Pick the NEAREST such target: the
+        // registry is transitively closed, so `NaturalsBelow` reaches
+        // Natural, Integer, Rational and Real alike, and only the shortest
+        // chain is the intended one.
+        if (targetFunction.empty() && operandTypeName == rightTypeName
+            && !operandTypeName.empty()) {
+            const std::vector<std::string>* bestChain = nullptr;
+            std::string bestTarget;
+            for (const auto& [key, chain] : environment_.coercionRegistry) {
+                const auto& [from, to] = key;
+                if (from != operandTypeName) continue;
+                if (environment_.lookupOperator(operatorSymbol, to, to)
+                        .empty()) {
+                    continue;
+                }
+                if (!bestChain || chain.size() < bestChain->size()) {
+                    bestChain = &chain;
+                    bestTarget = to;
+                }
+            }
+            if (bestChain) {
+                leftKernel = applyCoercionChain(
+                    std::move(leftKernel), *bestChain, leftTypeClosed);
+                leftKernel = castPushToLeaves(leftKernel, localBinders).term;
+                rightKernel = applyCoercionChain(
+                    std::move(rightKernel), *bestChain,
+                    closeOverLocalBinders(rightTypeRaw, localBinders,
+                                           localBinders.size()));
+                rightKernel =
+                    castPushToLeaves(rightKernel, localBinders).term;
+                targetFunction = environment_.lookupOperator(
+                    operatorSymbol, bestTarget, bestTarget);
+                operandTypeName = bestTarget;
+                rightTypeName = bestTarget;
+                leftTypeClosed = inferTypeInLocalContext(
+                    localBinders, leftKernel);
+                leftTypeClosed = closeOverLocalBinders(
+                    leftTypeClosed, localBinders, localBinders.size());
+                leftTypeRaw = leftTypeClosed;
+                rightTypeRaw = leftTypeClosed;
+            }
+        }
         // Half-match fallback: one operand's ANNOTATED type is a REDUCT of
         // the registered carrier — a `let d : ℤ` scalar against the
         // `(•) on (CommutativeRing.carrier, RingVector)` registration. The
