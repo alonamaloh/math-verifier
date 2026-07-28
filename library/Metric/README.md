@@ -31,6 +31,11 @@ than paying for it once.
   `MetricSpace.distance` — [space.math](space.math)
 - `MetricSpace.OpenIn`, `IsOpen`, `Ball`, `Closure` — [topology.math](topology.math)
 - `MetricSpace.ContinuousAt`, `ContinuousOn` — [continuity.math](continuity.math)
+- `MetricSpace.Near` — [near.math](near.math), the spatial twin of
+  `Natural.Eventually`: "P holds throughout some ball around x". Same four
+  moves, with the **minimum** of two radii where sequences take the maximum
+  of two thresholds. **Unpunctured**, so it is proper with no
+  non-isolated-point side condition (`Near.at_centre`)
 - `MetricSpace.SequenceConverges`, `IsBounded`, `SubsequenceConverges` —
   [sequence.math](sequence.math)
 - `MetricSpace.IsCompact`, `imageSet` — [compactness.math](compactness.math)
