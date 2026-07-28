@@ -21,7 +21,7 @@ import Set.basics
 import Set.algebra
 import Natural.basics
 import Natural.order
-import Natural.maximum
+import Natural.eventually
 import Natural.subsequence
 import Real.interface
 import Real.order
@@ -191,43 +191,41 @@ theorem MetricSpace.uniformly_continuous_on_compact (source target : MetricSpace
           distance(limit, y) < nearness
             → distance(f(limit), f(y)) < tolerance / 2
         from continuous;
-    nearness > 0 as nearnessPositive;
+    nearness > 0;
     ∀ (y : source). y ∈ region →
         distance(limit, y) < nearness
           → distance(f(limit), f(y)) < tolerance / 2
         as valuesClose;
-    choose thresholdP such that
-        ∀ (k : ℕ). thresholdP ≤ k →
-            distance(limit, p(index(k))) < nearness
-        as nearP from toLimitP(nearness, nearnessPositive);
-    choose thresholdQ such that
-        ∀ (k : ℕ). thresholdQ ≤ k →
-            distance(limit, q(index(k))) < nearness
-        as nearQ from toLimitQ(nearness, nearnessPositive);
-    let far : ℕ := Natural.maximum(thresholdP, thresholdQ);
-    thresholdP ≤ far;
-    thresholdQ ≤ far;
-    let deep : ℕ := index(far);
-    distance(limit, p(deep)) < nearness by nearP;
-    distance(limit, q(deep)) < nearness by nearQ;
-    distance(f(limit), f(p(deep))) < tolerance / 2 by valuesClose;
-    distance(f(limit), f(q(deep))) < tolerance / 2 by valuesClose;
-    distance(f(p(deep)), f(limit))
-        = distance(f(limit), f(p(deep)))
-        by MetricSpace.distance_symmetric;
-    tolerance / 2 + tolerance / 2 = tolerance by Real.divide_two_doubled;
-    distance(f(p(deep)), f(q(deep)))
-       ≤ distance(f(p(deep)), f(limit))
-             + distance(f(limit), f(q(deep)))
-             by MetricSpace.distance_triangle
-       < tolerance / 2 + tolerance / 2 by ordered_field
-       = tolerance;
-    q(deep) ∈ region
-        ∧ (distance(p(deep), q(deep)) < Real.harmonic_term(deep)
-               ∧ ¬(distance(f(p(deep)), f(q(deep))) < tolerance))
-        by chosenQ;
-    ¬(distance(f(p(deep)), f(q(deep))) < tolerance);
-    done
+    eventually (k). distance(limit, p(index(k))) < nearness by toLimitP;
+    eventually (k). distance(limit, q(index(k))) < nearness by toLimitQ;
+    eventually (k). False
+        by for k sufficiently large: {
+             let deep : ℕ := index(k);
+             -- Restated at `deep`: the facts arrive about `index(k)`, and
+             -- the `let` is opaque to the match.
+             distance(limit, p(deep)) < nearness;
+             distance(limit, q(deep)) < nearness;
+             distance(f(limit), f(p(deep))) < tolerance / 2 by valuesClose;
+             distance(f(limit), f(q(deep))) < tolerance / 2 by valuesClose;
+             distance(f(p(deep)), f(limit))
+                 = distance(f(limit), f(p(deep)))
+                 by MetricSpace.distance_symmetric;
+             tolerance / 2 + tolerance / 2 = tolerance
+                 by Real.divide_two_doubled;
+             distance(f(p(deep)), f(q(deep)))
+                ≤ distance(f(p(deep)), f(limit))
+                      + distance(f(limit), f(q(deep)))
+                      by MetricSpace.distance_triangle
+                < tolerance / 2 + tolerance / 2 by ordered_field
+                = tolerance;
+             q(deep) ∈ region
+                 ∧ (distance(p(deep), q(deep)) < Real.harmonic_term(deep)
+                        ∧ ¬(distance(f(p(deep)), f(q(deep))) < tolerance))
+                 by chosenQ;
+             ¬(distance(f(p(deep)), f(q(deep))) < tolerance);
+             done
+           };
+    done by Natural.Eventually.not_eventually_false
   };
   done
 }

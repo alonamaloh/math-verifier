@@ -24,6 +24,7 @@ import Set.basics
 import Set.algebra
 import Natural.basics
 import Natural.order
+import Natural.eventually
 import Natural.subsequence
 import Real.interface
 import Real.order
@@ -111,23 +112,16 @@ theorem Plane.RealContinuousAt.along_sequence
       ∀ (y : Plane.Point). y ∈ carrier →
         Plane.distance(x, y) < nearness → abs(f(y) - f(x)) < tolerance
       from continuous;
-  0 < nearness as nearnessPositive;
+  nearness > 0;
   ∀ (y : Plane.Point). y ∈ carrier →
       Plane.distance(x, y) < nearness → abs(f(y) - f(x)) < tolerance
       as valuesClose;
-  choose threshold such that
-      ∀ (m : ℕ). threshold ≤ m → Plane.distance(x, s(m)) < nearness
-      as closeBeyond from converges;
-  witness threshold with
-      (m : ℕ) (beyond : threshold ≤ m) ↦ {
-        Plane.distance(x, s(m)) < nearness by closeBeyond;
-        s(m) ∈ carrier by inside;
-        abs(f(x) - f(s(m))) < tolerance by valuesClose;
-        abs(f(s(m)) - f(x))
-           = abs(f(x) - f(s(m))) by Real.absolute_value_subtract_swap
-           < tolerance;
-        done
-      }
+  eventually (m). Plane.distance(x, s(m)) < nearness by converges;
+  for m sufficiently large: {
+    s(m) ∈ carrier by inside;
+    abs(f(s(m)) - f(x)) < tolerance by valuesClose;
+    done
+  }
 }
 
 -- ----------------------------------------------------------------------
@@ -210,31 +204,33 @@ theorem Plane.image_bounded_above (f : Plane.Point → ℝ)
             inside := (k : ℕ) ↦ inside(index(k)))
         as valuesConverge;
     (0 : ℝ) < 1;
-    choose threshold such that
-        ∀ (k : ℕ). threshold ≤ k → abs(f(s(index(k))) - f(limit)) < 1
-        as closeBeyond from valuesConverge;
     choose escape such that f(limit) + 1 < (1 + escape : ℝ)
         from Real.exists_natural_above;
-    let far : ℕ := Natural.maximum(threshold, escape);
-    threshold ≤ far;
-    escape ≤ far;
-    abs(f(s(index(far))) - f(limit)) < 1
-        by closeBeyond;
-    f(s(index(far))) - f(limit) ≤ abs(f(s(index(far))) - f(limit))
-        by Real.LessOrEqual_absolute_value;
-    s(index(far)) ∈ region ∧ (1 + index(far) : ℝ) < f(s(index(far)))
-        by escapesAt;
-    (1 + index(far) : ℝ) < f(s(index(far)));
-    far ≤ index(far) by Natural.IsStrictlyIncreasing.LessOrEqual;
-    escape ≤ index(far);
-    (1 + escape : ℝ) ≤ (1 + index(far) : ℝ);
-    f(limit) + 1
-       < (1 + escape : ℝ)
-       ≤ (1 + index(far) : ℝ)
-       < f(s(index(far)))
-       ≤ f(limit) + abs(f(s(index(far))) - f(limit))
-       < f(limit) + 1;
-    done
+    -- Two tails: the values close to f(limit), and the index past
+    -- `escape`. Where they meet, the escaping term is both above and
+    -- below f(limit) + 1.
+    eventually (k). abs(f(s(index(k))) - f(limit)) < 1 by valuesConverge;
+    eventually (k). escape ≤ k by Natural.Eventually.beyond;
+    eventually (k). False
+        by for k sufficiently large: {
+             f(s(index(k))) - f(limit) ≤ abs(f(s(index(k))) - f(limit))
+                 by Real.LessOrEqual_absolute_value;
+             s(index(k)) ∈ region ∧ (1 + index(k) : ℝ) < f(s(index(k)))
+                 by escapesAt;
+             (1 + index(k) : ℝ) < f(s(index(k)));
+             escape
+                ≤ k
+                ≤ index(k) by Natural.IsStrictlyIncreasing.LessOrEqual;
+             (1 + escape : ℝ) ≤ (1 + index(k) : ℝ);
+             f(limit) + 1
+                < (1 + escape : ℝ)
+                ≤ (1 + index(k) : ℝ)
+                < f(s(index(k)))
+                ≤ f(limit) + abs(f(s(index(k))) - f(limit))
+                < f(limit) + 1;
+             done
+           };
+    done by Natural.Eventually.not_eventually_false
   };
   done
 }
