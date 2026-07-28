@@ -14,7 +14,7 @@ import Natural.basics
 import Natural.peano
 import Natural.arithmetic
 import Natural.order
-import Natural.maximum
+import Natural.eventually
 import Rational.basics
 import Rational.addition
 import Rational.multiplication
@@ -46,14 +46,11 @@ definition CauchyRationalSequence.sequenceFunction
 operator (()) on (CauchyRationalSequence) := CauchyRationalSequence.sequenceFunction
 
 -- Two Cauchy sequences are equivalent when their pointwise difference
--- converges to zero: for every positive ε there exists N such that
--- beyond N, |s(m) - t(m)| < ε.
+-- converges to zero: for every positive ε, eventually |s(m) - t(m)| < ε.
 definition CauchyEquivalent
         (a b : CauchyRationalSequence) : Proposition :=
   ∀ (ε : ℚ). Rational.zero < ε →
-    ∃ (N : ℕ).
-      ∀ (m : ℕ). N ≤ m →
-        abs(a(m) - b(m)) < ε
+    eventually (m). abs(a(m) - b(m)) < ε
 
 -- The Real numbers: equivalence classes of Cauchy rational sequences.
 definition Real : Type(0) :=
@@ -77,11 +74,10 @@ theorem CauchyEquivalent.reflexive
   let ⟨s, _⟩ := a;
   (ε : ℚ)
            (εPositive : Rational.zero < ε) ↦
-    witness zero with
-        (m : ℕ) (_ : zero ≤ m) ↦
-          abs(s(m) - s(m))
-             = Rational.zero
-             < ε
+    for m sufficiently large:
+      abs(s(m) - s(m))
+         = Rational.zero
+         < ε
 }
 
 -- CauchyEquivalent is symmetric. Use the abstract `(...)` application
@@ -93,13 +89,11 @@ theorem CauchyEquivalent.symmetric
         : CauchyEquivalent(b, a) :=
   (ε : ℚ)
            (εPositive : Rational.zero < ε) ↦ {
-    choose N as aEquivb_at_N from aEquivb(ε, εPositive);
-    witness N with
-        (m : ℕ) (N_leq_m : N ≤ m) ↦
-          abs(b(m) - a(m))
-             = abs(a(m) - b(m))
-             < ε
-                 by aEquivb_at_N(m, N_leq_m)
+    eventually (m). abs(a(m) - b(m)) < ε by aEquivb;
+    for m sufficiently large:
+      abs(b(m) - a(m))
+         = abs(a(m) - b(m))
+         < ε
   }
 
 -- Algebra helper: (a - b) + (b - c) = a - c.
@@ -115,29 +109,16 @@ theorem CauchyEquivalent.transitive
         : CauchyEquivalent(a, c) :=
   (ε : ℚ)
            (εPositive : Rational.zero < ε) ↦ {
-    choose N_ab as abBound
-        from aEquivb(Rational.halve(ε),
-                     Rational.halve_positive(ε, εPositive));
-    choose N_bc as bcBound
-        from bEquivc(Rational.halve(ε),
-                     Rational.halve_positive(ε, εPositive));
-    witness Natural.maximum(N_ab, N_bc) with
-        (m : ℕ)
-                 (m_ge_max : Natural.maximum(N_ab, N_bc) ≤ m) ↦ {
-          let sa : ℚ := a(m);
-          let sb : ℚ := b(m);
-          let sc : ℚ := c(m);
-          N_ab ≤ m as mGeNab;
-          N_bc ≤ m as mGeNbc;
-          abs(sa - sb) < Rational.halve(ε) by abBound(m, mGeNab);
-          abs(sb - sc) < Rational.halve(ε) by bcBound(m, mGeNbc);
-          -- |a-c| = |(a-b)+(b-c)| ≤ |a-b|+|b-c| < ε/2 + ε/2 = ε.
-          abs(sa - sc)
-             = abs((sa - sb) + (sb - sc))
-             ≤ abs(sa - sb) + abs(sb - sc)
-             < Rational.halve(ε) + Rational.halve(ε)
-             = ε
-        }
+    Rational.zero < Rational.halve(ε);
+    eventually (m). abs(a(m) - b(m)) < Rational.halve(ε) by aEquivb;
+    eventually (m). abs(b(m) - c(m)) < Rational.halve(ε) by bEquivc;
+    for m sufficiently large:
+      -- |a-c| = |(a-b)+(b-c)| ≤ |a-b|+|b-c| < ε/2 + ε/2 = ε.
+      abs(a(m) - c(m))
+         = abs((a(m) - b(m)) + (b(m) - c(m)))
+         ≤ abs(a(m) - b(m)) + abs(b(m) - c(m))
+         < Rational.halve(ε) + Rational.halve(ε)
+         = ε
   }
 
 -- The Cauchy equivalence bundled as an `IsEquivalenceRelation`,

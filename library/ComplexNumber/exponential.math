@@ -19,7 +19,7 @@ import Natural.basics
 import Natural.peano
 import Natural.order
 import Natural.add_order
-import Natural.maximum
+import Natural.eventually
 import Natural.compare
 import Natural.subtraction
 import Natural.factorial
@@ -483,46 +483,35 @@ theorem ComplexNumber.SequenceConverges.unique
       by (ε : ℝ) (εPositive : ε > 0) ↦ {
            (2 : ℝ) > 0;
            (2 : ℝ) ≠ 0;
-           ε / 2 > 0 as halfPositive;
-           choose threshold1 as close1 from converges1(ε / 2, halfPositive);
-           choose threshold2 as close2 from converges2(ε / 2, halfPositive);
-           threshold1 ≤ Natural.maximum(threshold1, threshold2);
-           threshold2 ≤ Natural.maximum(threshold1, threshold2);
-           ComplexNumber.modulus(
-                     s(Natural.maximum(threshold1, threshold2)) - limit1)
-                 < ε / 2
-               by close1;
-           ComplexNumber.modulus(
-                     s(Natural.maximum(threshold1, threshold2)) - limit2)
-                 < ε / 2
-               by close2;
-           limit1 - limit2
-                 = (limit1 - s(Natural.maximum(threshold1, threshold2)))
-                   + (s(Natural.maximum(threshold1, threshold2)) - limit2)
-               by ring as differenceSplits;
-           ComplexNumber.modulus(
-                     limit1 - s(Natural.maximum(threshold1, threshold2)))
-                 = ComplexNumber.modulus(
-                       s(Natural.maximum(threshold1, threshold2)) - limit1)
-               by ComplexNumber.modulus_subtract_swap as swapFirst;
-           ComplexNumber.modulus(limit1 - limit2)
-              = ComplexNumber.modulus(
-                    (limit1 - s(Natural.maximum(threshold1, threshold2)))
-                    + (s(Natural.maximum(threshold1, threshold2)) - limit2))
-                    by differenceSplits
-              ≤ ComplexNumber.modulus(
-                    limit1 - s(Natural.maximum(threshold1, threshold2)))
-                + ComplexNumber.modulus(
-                      s(Natural.maximum(threshold1, threshold2)) - limit2)
-                    by ComplexNumber.modulus_triangle
-              = ComplexNumber.modulus(
-                    s(Natural.maximum(threshold1, threshold2)) - limit1)
-                + ComplexNumber.modulus(
-                      s(Natural.maximum(threshold1, threshold2)) - limit2)
-                    by swapFirst
-              < ε / 2 + ε / 2
-                    by Real.LessThan.add_strict_strict
-              = ε
+           ε / 2 > 0;
+           eventually (m). ComplexNumber.modulus(s(m) - limit1) < ε / 2
+               by converges1;
+           eventually (m). ComplexNumber.modulus(s(m) - limit2) < ε / 2
+               by converges2;
+           eventually (m). ComplexNumber.modulus(limit1 - limit2) < ε
+               by for m sufficiently large: {
+                    limit1 - limit2
+                          = (limit1 - s(m)) + (s(m) - limit2)
+                        by ring as differenceSplits;
+                    ComplexNumber.modulus(limit1 - s(m))
+                          = ComplexNumber.modulus(s(m) - limit1)
+                        by ComplexNumber.modulus_subtract_swap as swapFirst;
+                    ComplexNumber.modulus(limit1 - limit2)
+                       = ComplexNumber.modulus(
+                             (limit1 - s(m)) + (s(m) - limit2))
+                             by differenceSplits
+                       ≤ ComplexNumber.modulus(limit1 - s(m))
+                         + ComplexNumber.modulus(s(m) - limit2)
+                             by ComplexNumber.modulus_triangle
+                       = ComplexNumber.modulus(s(m) - limit1)
+                         + ComplexNumber.modulus(s(m) - limit2)
+                             by swapFirst
+                       < ε / 2 + ε / 2
+                             by Real.LessThan.add_strict_strict
+                       = ε;
+                    done
+                  };
+           done by Natural.Eventually.constant
          };
   limit1 - limit2
         = RingModulo.zero(Real.polynomial_commutative_ring,

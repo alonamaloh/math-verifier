@@ -18,7 +18,7 @@ import Logic.quotient
 import Equality.basics
 import Natural.basics
 import Natural.order
-import Natural.maximum
+import Natural.eventually
 import Natural.compare
 import Set.basics
 import Real.sequence
@@ -50,7 +50,7 @@ definition Real.SequenceIsCauchy (s : ℕ → ℝ) : Proposition :=
 -- The eventual lower bounds of a sequence: the reals that some tail
 -- of the sequence stays at or above.
 definition Real.eventual_lower_bounds (s : ℕ → ℝ) : Set(ℝ) :=
-  (t : ℝ) ↦ ∃ (N : ℕ). ∀ (m : ℕ). N ≤ m → t ≤ s(m)
+  (t : ℝ) ↦ eventually (m). t ≤ s(m)
 
 -- ----------------------------------------------------------------------
 -- A Cauchy tail at tolerance q pins the eventual lower bounds around
@@ -61,19 +61,21 @@ theorem Real.cauchy_tail_gives_lower_bound
         (s : ℕ → ℝ) (N : ℕ) (q : ℝ)
         (tailClose : ∀ (m n : ℕ). N ≤ m → N ≤ n
                      → abs(s(m) - s(n)) < q)
-        : (s(N) - q) ∈ Real.eventual_lower_bounds(s) :=
-  witness N with
-      (m : ℕ) (mInTail : N ≤ m) ↦ {
-        abs(s(m) - s(N)) < q
-            by tailClose(m, N, mInTail, (N ≤ N));
-        -q < s(m) - s(N)
-            by Real.absolute_value_LessThan_bounds;
-        s(N) - q
-                    = -q + s(N)
-                    < (s(m) - s(N)) + s(N)       by Real.add_preserves_LessThan
-                    = s(m);
-        done
-      }
+        : (s(N) - q) ∈ Real.eventual_lower_bounds(s) := {
+  change eventually (m). s(N) - q ≤ s(m);
+  N ≤ N;
+  eventually (m). N ≤ m by Natural.Eventually.beyond;
+  for m sufficiently large: {
+    abs(s(m) - s(N)) < q by tailClose;
+    -q < s(m) - s(N)
+        by Real.absolute_value_LessThan_bounds;
+    s(N) - q
+                = -q + s(N)
+                < (s(m) - s(N)) + s(N)       by Real.add_preserves_LessThan
+                = s(m);
+    done
+  }
+}
 
 theorem Real.cauchy_tail_gives_upper_bound
         (s : ℕ → ℝ) (N : ℕ) (q : ℝ)
@@ -82,26 +84,23 @@ theorem Real.cauchy_tail_gives_upper_bound
         : Real.IsUpperBound(Real.eventual_lower_bounds(s),
                             s(N) + q) :=
   (t : ℝ) (tEventual : t ∈ Real.eventual_lower_bounds(s)) ↦ {
-    choose tailStart such that ∀ (m : ℕ). tailStart ≤ m → t ≤ s(m)
-        from tEventual;
     -- Probe past both tails at once.
-    tailStart ≤ Natural.maximum(tailStart, N);
-    N ≤ Natural.maximum(tailStart, N);
-    t ≤ s(Natural.maximum(tailStart, N)) as tBelowTerm;
-    abs(s(Natural.maximum(tailStart, N)) - s(N)) < q
-        by tailClose(Natural.maximum(tailStart, N), N,
-                     (N ≤ Natural.maximum(tailStart, N)), (N ≤ N));
-    s(Natural.maximum(tailStart, N)) - s(N) < q
-        by Real.absolute_value_LessThan_bounds;
-    s(Natural.maximum(tailStart, N))
-                = (s(Natural.maximum(tailStart, N)) - s(N)) + s(N)
+    N ≤ N;
+    eventually (m). t ≤ s(m) by tEventual;
+    eventually (m). N ≤ m by Natural.Eventually.beyond;
+    eventually (m). t ≤ s(N) + q
+        by for m sufficiently large: {
+             abs(s(m) - s(N)) < q by tailClose;
+             s(m) - s(N) < q
+                 by Real.absolute_value_LessThan_bounds;
+             t
+                ≤ s(m)
+                = (s(m) - s(N)) + s(N)
                 < q + s(N)        by Real.add_preserves_LessThan
-                = s(N) + q
-        as termBelow;
-    t
-       ≤ s(Natural.maximum(tailStart, N))    by tBelowTerm
-       < s(N) + q                   by termBelow;
-    done
+                = s(N) + q;
+             done
+           };
+    done by Natural.Eventually.constant
   }
 
 -- ----------------------------------------------------------------------
