@@ -391,6 +391,47 @@ alias in `Plane/extremum.math`.
 a `Real.ContinuousAt` that is about to be redefined, and `Real/derivative.math`
 — the largest single beneficiary of item 3 — converts twice.
 
+### DONE, but by bridging, not redefining (`7aa45c4a`)
+
+**The redefinition this item proposed is not available.** `Real/interface.math`
+re-exports `Real.ContinuousAt` under `export definitions` — **with its body**,
+closure-validated against the Real public vocabulary — and
+`Metric/space.math` imports `Real.interface`. So a `Real.ContinuousAt` whose
+body mentions `MetricSpace.ContinuousAt` is an import cycle, and the only way
+out is dropping it from the export list, which takes the ε-δ body away from
+exactly the consumers that eliminate it. The `Plane.RealContinuousAt`
+precedent does not transfer: `Plane/` sits *above* the metric layer, `Real/`
+sits below it.
+
+What landed instead is the bridge, following the
+`Real.metric_SequenceConverges` / `Real.SequenceConverges.of_metric` pair that
+was already in `Metric/real.math`:
+
+```
+Real.metric_ContinuousAt            Real → metric, at Set.universe
+Real.ContinuousAt.of_metric         metric → Real
+Real.metric_ContinuousOn            pointwise on a region
+Real.metric_ContinuousOn_interval   from the (a, b) endpoint form
+MetricSpace.ContinuousAt.restrict   (gap: the ContinuousOn version existed)
+```
+
+Three things worth carrying forward:
+
+- **The duplication is now connected, not removed.** The ε-δ text still exists
+  twice. That was the stated defect ("no bridge lemma in either direction") and
+  it is fixed, but anyone expecting a line-count win should not.
+- **`Real.ContinuousOn` is not the metric `ContinuousOn`.** `Real.ContinuousOn(f, a, b)`
+  is *ambient* continuity at each point of [a, b]; `MetricSpace.ContinuousOn(f, S)`
+  restricts both quantifiers to `S`. The first is strictly stronger — a function
+  can be continuous relative to [a, b] and discontinuous at `a` ambiently. So
+  that bridge is one-directional **by mathematics**, and this item's parenthetical
+  "(or interval)" hid a real distinction. Any future attempt to unify the two
+  notions changes what `intermediate_value` and `derivative` assume.
+- **`Real/derivative.math` and `Real/intermediate_value.math` did not need to
+  change**, which is the upside of bridging: item 3 can now register `Near`
+  against a `Real.ContinuousAt` that is *not* about to be redefined, so the
+  "converts twice" risk this item was sequenced to avoid is gone either way.
+
 ---
 
 ## 5. Bounded quantifiers in statements
