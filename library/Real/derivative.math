@@ -228,9 +228,13 @@ theorem Real.HasDerivativeAt.scale (c : ℝ) (f : ℝ → ℝ) (x L : ℝ)
 -- slope roof is the rational density bound on L, cast to Real.
 theorem Real.HasDerivativeAt.continuous (f : ℝ → ℝ) (x L : ℝ)
         (fDerivative : Real.HasDerivativeAt(f, x, L))
-        : Real.ContinuousAt(f, x) :=
-  (ε : ℝ)
-  (εPositive : ε > 0) ↦ {
+        : Real.ContinuousAt(f, x) := {
+  suffices ∀ (ε : ℝ). ε > 0 →
+      ∃ (δ : ℝ). δ > 0 ∧ ∀ (y : ℝ). abs(y - x) < δ → abs(f(y) - f(x)) < ε
+      by Real.ContinuousAt.of_epsilon_delta;
+  take ε : ℝ;
+  suppose ε > 0 as εPositive;
+  {
     choose slopeRoof from Real.exists_positive_rational_roof(L);
     abs(L) ≤ (slopeRoof : ℝ);
     choose nearδ from fDerivative((1 : ℝ), Real.zero_less_one);
@@ -281,6 +285,7 @@ theorem Real.HasDerivativeAt.continuous (f : ℝ → ℝ) (x L : ℝ)
               = ε
          }⟩
   }
+}
 
 -- The product rule. The error of f·g against slope f′g(x) + f(x)g′
 -- splits into three pieces:
@@ -294,7 +299,7 @@ theorem Real.HasDerivativeAt.multiply (f g : ℝ → ℝ) (x fSlope gSlope : ℝ
               (y : ℝ) ↦ f(y) * g(y), x, fSlope * g(x) + f(x) * gSlope) :=
   (ε : ℝ)
   (εPositive : ε > 0) ↦ {
-    Real.ContinuousAt(g, x) by Real.HasDerivativeAt.continuous as gContinuous;
+    Real.ContinuousAt(g, x) by Real.HasDerivativeAt.continuous;
     -- Real roofs over the three bystander factors, each with headroom.
     let gHeadroom : ℝ := abs(g(x)) + 1;
     let fRoof : ℝ := abs(f(x)) + 1;
@@ -306,7 +311,7 @@ theorem Real.HasDerivativeAt.multiply (f g : ℝ → ℝ) (x fSlope gSlope : ℝ
     -- The three scaled tolerances, all positive.
     ε / 2 / gHeadroom > 0 as fTolerancePositive;
     ε / 2 / 2 / fRoof > 0 as gTolerancePositive;
-    ε / 2 / 2 / slopeRoof > 0 as differenceTolerancePositive;
+    ε / 2 / 2 / slopeRoof > 0;
     -- The four δs.
     choose fδ from fDerivative(ε / 2 / gHeadroom, fTolerancePositive);
     ∀ (y : ℝ). abs(y - x) < fδ
@@ -314,10 +319,15 @@ theorem Real.HasDerivativeAt.multiply (f g : ℝ → ℝ) (x fSlope gSlope : ℝ
     choose gδ from gDerivative(ε / 2 / 2 / fRoof, gTolerancePositive);
     ∀ (y : ℝ). abs(y - x) < gδ
             → abs(g(y) - g(x) - gSlope * (y - x)) ≤ ε / 2 / 2 / fRoof * abs(y - x) as gClose;
-    choose nearδ from gContinuous((1 : ℝ), Real.zero_less_one);
+    (1 : ℝ) > 0;
+    choose nearδ such that nearδ > 0
+            ∧ ∀ (y : ℝ). abs(y - x) < nearδ → abs(g(y) - g(x)) < 1
+        from Real.ContinuousAt.tolerance;
     ∀ (y : ℝ). abs(y - x) < nearδ → abs(g(y) - g(x)) < 1 as gNearClose;
-    choose differenceδ
-        from gContinuous(ε / 2 / 2 / slopeRoof, differenceTolerancePositive);
+    choose differenceδ such that differenceδ > 0
+            ∧ ∀ (y : ℝ). abs(y - x) < differenceδ
+              → abs(g(y) - g(x)) < ε / 2 / 2 / slopeRoof
+        from Real.ContinuousAt.tolerance;
     ∀ (y : ℝ). abs(y - x) < differenceδ
             → abs(g(y) - g(x)) < ε / 2 / 2 / slopeRoof as gDifferenceClose;
     min(fδ, gδ) > 0 by Real.minimum_positive;

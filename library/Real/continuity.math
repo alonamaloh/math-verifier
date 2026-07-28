@@ -15,6 +15,7 @@ import Logic.exists
 import Logic.quotient
 import Equality.basics
 import Set.basics
+import Set.algebra
 import Real.basics
 import Real.addition
 import Real.negation
@@ -33,15 +34,20 @@ import Real.field
 import Real.order_field
 import Real.division
 import Real.minimum
+import Metric.space
+import Metric.continuity
+import Metric.real
 
 -- ----------------------------------------------------------------------
 -- f is continuous at x: for every positive tolerance ε there is a positive
 -- δ such that f moves points δ-close to x to points ε-close to f(x).
+--
+-- Not a second notion: this IS the generic metric-space continuity of
+-- `Metric/continuity.math`, read on the line, where the distance is
+-- `abs` of the difference. There is no carrier to restrict to, so the
+-- carrier is the whole line.
 definition Real.ContinuousAt (f : ℝ → ℝ) (x : ℝ) : Proposition :=
-  ∀ (ε : ℝ). ε > 0 →
-    ∃ (δ : ℝ).
-      δ > 0 ∧ ∀ (y : ℝ). abs(y - x) < δ →
-            abs(f(y) - f(x)) < ε
+  MetricSpace.ContinuousAt(f, Set.universe(ℝ), x)
 
 -- f is continuous on the closed interval [a, b]: continuous at every
 -- point of the interval.
@@ -50,13 +56,83 @@ definition Real.ContinuousOn
   ∀ (x : ℝ). a ≤ x → x ≤ b → Real.ContinuousAt(f, x)
 
 -- ----------------------------------------------------------------------
+-- The ε–δ characterisation — the boundary between the generic notion and
+-- the arithmetic a real-analysis text writes. On the line the distance IS
+-- `abs` of the difference and the carrier imposes nothing, so the two
+-- statements say the same thing; only the order of the subtraction and
+-- the vacuous membership stand between them. Every proof below states ε
+-- and δ and crosses here once; nothing on the line speaks `distance`.
+
+theorem Real.ContinuousAt.of_epsilon_delta {f : ℝ → ℝ} {x : ℝ}
+        (nearby : ∀ (ε : ℝ). ε > 0 →
+            ∃ (δ : ℝ). δ > 0 ∧ ∀ (y : ℝ). abs(y - x) < δ → abs(f(y) - f(x)) < ε)
+        : Real.ContinuousAt(f, x) := {
+  take tolerance : ℝ;
+  suppose tolerance > 0;
+  choose nearness such that
+      nearness > 0
+        ∧ ∀ (y : ℝ). abs(y - x) < nearness → abs(f(y) - f(x)) < tolerance
+      as closeNearby from nearby;
+  nearness > 0;
+  ∀ (y : ℝ). y ∈ Set.universe(ℝ) → MetricSpace.distance(x, y) < nearness
+        → MetricSpace.distance(f(x), f(y)) < tolerance
+      by { take y : ℝ;
+           suppose y ∈ Set.universe(ℝ);
+           suppose MetricSpace.distance(x, y) < nearness;
+           abs(y - x)
+              = abs(x - y)
+              = MetricSpace.distance(x, y)
+              < nearness;
+           abs(f(y) - f(x)) < tolerance by closeNearby;
+           MetricSpace.distance(f(x), f(y))
+              = abs(f(x) - f(y))
+              = abs(f(y) - f(x))
+              < tolerance;
+           done };
+  witness nearness
+}
+
+-- The elimination side takes the tolerance directly, so a proof that
+-- needs a δ writes `choose δ such that … from Real.ContinuousAt.tolerance`
+-- and both premises — the continuity and `ε > 0` — come from context.
+theorem Real.ContinuousAt.tolerance (f : ℝ → ℝ) (x : ℝ)
+        (continuous : Real.ContinuousAt(f, x))
+        (ε : ℝ) (εPositive : ε > 0)
+        : ∃ (δ : ℝ). δ > 0 ∧ ∀ (y : ℝ). abs(y - x) < δ → abs(f(y) - f(x)) < ε := {
+  choose nearness such that
+      nearness > 0 ∧ ∀ (y : ℝ). y ∈ Set.universe(ℝ) →
+        MetricSpace.distance(x, y) < nearness →
+          MetricSpace.distance(f(x), f(y)) < ε
+      as closeNearby from continuous;
+  nearness > 0;
+  ∀ (y : ℝ). abs(y - x) < nearness → abs(f(y) - f(x)) < ε
+      by { take y : ℝ;
+           suppose abs(y - x) < nearness;
+           y ∈ Set.universe(ℝ);
+           MetricSpace.distance(x, y)
+              = abs(x - y)
+              = abs(y - x)
+              < nearness;
+           MetricSpace.distance(f(x), f(y)) < ε by closeNearby;
+           abs(f(y) - f(x))
+              = abs(f(x) - f(y))
+              = MetricSpace.distance(f(x), f(y))
+              < ε;
+           done };
+  witness nearness
+}
+
+-- ----------------------------------------------------------------------
 -- Constant functions are continuous: any δ works (ε itself is at hand),
 -- since the image never moves at all.
 theorem Real.ContinuousAt.constant (c x : ℝ)
-        : Real.ContinuousAt((y : ℝ) ↦ c, x) :=
-  (ε : ℝ)
-  (εPositive : ε > 0) ↦
-    witness ε with {
+        : Real.ContinuousAt((y : ℝ) ↦ c, x) := {
+  suffices ∀ (ε : ℝ). ε > 0 →
+      ∃ (δ : ℝ). δ > 0 ∧ ∀ (y : ℝ). abs(y - x) < δ → abs(c - c) < ε
+      by Real.ContinuousAt.of_epsilon_delta;
+  take ε : ℝ;
+  suppose ε > 0 as εPositive;
+  witness ε with {
       ∀ (y : ℝ). abs(y - x) < ε → abs(c - c) < ε
           by (y : ℝ) (_ : abs(y - x) < ε) ↦
             abs(c - c)
@@ -65,35 +141,44 @@ theorem Real.ContinuousAt.constant (c x : ℝ)
                < ε;
       done
     }
+}
 
 -- The identity is continuous: δ = ε verbatim.
 theorem Real.ContinuousAt.identity (x : ℝ)
-        : Real.ContinuousAt((y : ℝ) ↦ y, x) :=
-  (ε : ℝ)
-  (εPositive : ε > 0) ↦
-    witness ε with {
-      ∀ (y : ℝ). abs(y - x) < ε → abs(y - x) < ε
-          by (y : ℝ) (yClose : abs(y - x) < ε) ↦ yClose;
-      done
-    }
+        : Real.ContinuousAt((y : ℝ) ↦ y, x) := {
+  suffices ∀ (ε : ℝ). ε > 0 →
+      ∃ (δ : ℝ). δ > 0 ∧ ∀ (y : ℝ). abs(y - x) < δ → abs(y - x) < ε
+      by Real.ContinuousAt.of_epsilon_delta;
+  take ε : ℝ;
+  suppose ε > 0 as εPositive;
+  witness ε with {
+    ∀ (y : ℝ). abs(y - x) < ε → abs(y - x) < ε
+        by (y : ℝ) (yClose : abs(y - x) < ε) ↦ yClose;
+    done
+  }
+}
 
 -- Sums of continuous functions are continuous: the usual ε/2 argument,
 -- with δ = min(δf, δg) so both summands' bounds apply at once.
 theorem Real.ContinuousAt.add (f g : ℝ → ℝ) (x : ℝ)
         (fContinuous : Real.ContinuousAt(f, x))
         (gContinuous : Real.ContinuousAt(g, x))
-        : Real.ContinuousAt((y : ℝ) ↦ f(y) + g(y), x) :=
-  (ε : ℝ)
-  (εPositive : ε > 0) ↦ {
-    ε / 2 > 0 as halfPositive;
+        : Real.ContinuousAt((y : ℝ) ↦ f(y) + g(y), x) := {
+  suffices ∀ (ε : ℝ). ε > 0 → ∃ (δ : ℝ). δ > 0 ∧
+      ∀ (y : ℝ). abs(y - x) < δ → abs((f(y) + g(y)) - (f(x) + g(x))) < ε
+      by Real.ContinuousAt.of_epsilon_delta;
+  take ε : ℝ;
+  suppose ε > 0 as εPositive;
+  {
+    ε / 2 > 0;
     choose fδ such that fδ > 0
             ∧ ∀ (y : ℝ). abs(y - x) < fδ → abs(f(y) - f(x)) < ε / 2
-        from fContinuous(ε / 2, halfPositive);
+        from Real.ContinuousAt.tolerance;
     ∀ (y : ℝ). abs(y - x) < fδ
             → abs(f(y) - f(x)) < ε / 2 as fClose;
     choose gδ such that gδ > 0
             ∧ ∀ (y : ℝ). abs(y - x) < gδ → abs(g(y) - g(x)) < ε / 2
-        from gContinuous(ε / 2, halfPositive);
+        from Real.ContinuousAt.tolerance;
     ∀ (y : ℝ). abs(y - x) < gδ
             → abs(g(y) - g(x)) < ε / 2 as gClose;
     witness min(fδ, gδ) with {
@@ -119,17 +204,22 @@ theorem Real.ContinuousAt.add (f g : ℝ → ℝ) (x : ℝ)
       done
     }
   }
+}
 
 -- Negation preserves continuity: |−f(y) − (−f(x))| = |f(y) − f(x)|,
 -- so f's own δ serves unchanged.
 theorem Real.ContinuousAt.negate (f : ℝ → ℝ) (x : ℝ)
         (fContinuous : Real.ContinuousAt(f, x))
-        : Real.ContinuousAt((y : ℝ) ↦ -f(y), x) :=
-  (ε : ℝ)
-  (εPositive : ε > 0) ↦ {
+        : Real.ContinuousAt((y : ℝ) ↦ -f(y), x) := {
+  suffices ∀ (ε : ℝ). ε > 0 →
+      ∃ (δ : ℝ). δ > 0 ∧ ∀ (y : ℝ). abs(y - x) < δ → abs(-f(y) - -f(x)) < ε
+      by Real.ContinuousAt.of_epsilon_delta;
+  take ε : ℝ;
+  suppose ε > 0 as εPositive;
+  {
     choose δ such that δ > 0
             ∧ ∀ (y : ℝ). abs(y - x) < δ → abs(f(y) - f(x)) < ε
-        from fContinuous(ε, εPositive);
+        from Real.ContinuousAt.tolerance;
     witness δ with {
       ∀ (y : ℝ). abs(y - x) < δ → abs(-f(y) - -f(x)) < ε
           by (y : ℝ) (yClose : abs(y - x) < δ) ↦
@@ -141,24 +231,29 @@ theorem Real.ContinuousAt.negate (f : ℝ → ℝ) (x : ℝ)
       done
     }
   }
+}
 
 -- Composition: g's δ for the tolerance f demands at g(x). No minimum
 -- needed — the tolerances chain instead of combining.
 theorem Real.ContinuousAt.composition (f g : ℝ → ℝ) (x : ℝ)
         (gContinuous : Real.ContinuousAt(g, x))
         (fContinuous : Real.ContinuousAt(f, g(x)))
-        : Real.ContinuousAt((y : ℝ) ↦ f(g(y)), x) :=
-  (ε : ℝ)
-  (εPositive : ε > 0) ↦ {
+        : Real.ContinuousAt((y : ℝ) ↦ f(g(y)), x) := {
+  suffices ∀ (ε : ℝ). ε > 0 →
+      ∃ (δ : ℝ). δ > 0 ∧ ∀ (y : ℝ). abs(y - x) < δ → abs(f(g(y)) - f(g(x))) < ε
+      by Real.ContinuousAt.of_epsilon_delta;
+  take ε : ℝ;
+  suppose ε > 0 as εPositive;
+  {
     choose fδ such that fδ > 0
             ∧ ∀ (z : ℝ). abs(z - g(x)) < fδ → abs(f(z) - f(g(x))) < ε
-        from fContinuous(ε, εPositive);
-    fδ > 0 as fδPositive;
+        from Real.ContinuousAt.tolerance;
+    fδ > 0;
     ∀ (z : ℝ). abs(z - g(x)) < fδ
             → abs(f(z) - f(g(x))) < ε as fClose;
     choose gδ such that gδ > 0
             ∧ ∀ (y : ℝ). abs(y - x) < gδ → abs(g(y) - g(x)) < fδ
-        from gContinuous(fδ, fδPositive);
+        from Real.ContinuousAt.tolerance;
     ∀ (y : ℝ). abs(y - x) < gδ
             → abs(g(y) - g(x)) < fδ as gClose;
     witness gδ with {
@@ -169,6 +264,7 @@ theorem Real.ContinuousAt.composition (f g : ℝ → ℝ) (x : ℝ)
       done
     }
   }
+}
 
 -- Differences: f − g = f + (−g), and subtraction on Real is
 -- definitionally addition of the negation.
@@ -189,9 +285,13 @@ theorem Real.ContinuousAt.subtract (f g : ℝ → ℝ) (x : ℝ)
 theorem Real.ContinuousAt.multiply (f g : ℝ → ℝ) (x : ℝ)
         (fContinuous : Real.ContinuousAt(f, x))
         (gContinuous : Real.ContinuousAt(g, x))
-        : Real.ContinuousAt((y : ℝ) ↦ f(y) * g(y), x) :=
-  (ε : ℝ)
-  (εPositive : ε > 0) ↦ {
+        : Real.ContinuousAt((y : ℝ) ↦ f(y) * g(y), x) := {
+  suffices ∀ (ε : ℝ). ε > 0 →
+      ∃ (δ : ℝ). δ > 0 ∧ ∀ (y : ℝ). abs(y - x) < δ → abs(f(y) * g(y) - f(x) * g(x)) < ε
+      by Real.ContinuousAt.of_epsilon_delta;
+  take ε : ℝ;
+  suppose ε > 0 as εPositive;
+  {
     let fRoof : ℝ := abs(f(x)) + 1;
     let gRoof : ℝ := abs(g(x)) + 1;
     -- The roofs bound their factors.
@@ -199,23 +299,24 @@ theorem Real.ContinuousAt.multiply (f g : ℝ → ℝ) (x : ℝ)
     -- Each factor's tolerance: ε/2, scaled down by the opposite roof.
     let gTolerance : ℝ := ε / 2 / fRoof;
     let fTolerance : ℝ := ε / 2 / gRoof;
-    gTolerance > 0 as gTolerancePositive;
-    fTolerance > 0 as fTolerancePositive;
+    gTolerance > 0;
+    fTolerance > 0;
     -- The three δs: stay within 1 of f(x), and within each scaled
     -- tolerance for the matching factor.
+    (1 : ℝ) > 0;
     choose nearδ such that nearδ > 0
             ∧ ∀ (y : ℝ). abs(y - x) < nearδ → abs(f(y) - f(x)) < 1
-        from fContinuous((1 : ℝ), Real.zero_less_one);
+        from Real.ContinuousAt.tolerance;
     ∀ (y : ℝ). abs(y - x) < nearδ
             → abs(f(y) - f(x)) < 1 as fNear;
     choose gδ such that gδ > 0
             ∧ ∀ (y : ℝ). abs(y - x) < gδ → abs(g(y) - g(x)) < gTolerance
-        from gContinuous(gTolerance, gTolerancePositive);
+        from Real.ContinuousAt.tolerance;
     ∀ (y : ℝ). abs(y - x) < gδ
             → abs(g(y) - g(x)) < gTolerance as gClose;
     choose fδ such that fδ > 0
             ∧ ∀ (y : ℝ). abs(y - x) < fδ → abs(f(y) - f(x)) < fTolerance
-        from fContinuous(fTolerance, fTolerancePositive);
+        from Real.ContinuousAt.tolerance;
     ∀ (y : ℝ). abs(y - x) < fδ
             → abs(f(y) - f(x)) < fTolerance as fClose;
     witness min(nearδ, min(gδ, fδ)) with {
@@ -273,3 +374,4 @@ theorem Real.ContinuousAt.multiply (f g : ℝ → ℝ) (x : ℝ)
       done
     }
   }
+}
