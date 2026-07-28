@@ -24,7 +24,6 @@ import Set.basics
 import Set.algebra
 import Natural.basics
 import Natural.order
-import Natural.maximum
 import Natural.subsequence
 import Real.interface
 import Real.order
@@ -88,32 +87,28 @@ theorem MetricSpace.equal_limits_of_closing (m : MetricSpace)
       by (tolerance : ℝ) (tolerancePositive : tolerance > 0) ↦ {
         (4 : ℝ) ≠ 0;
         tolerance / 4 > 0 by Real.divide_positive;
-        choose thresholdU such that
-            ∀ (k : ℕ). thresholdU ≤ k →
-                distance(limitU, u(index(k))) < tolerance / 4
-            as closeU from toU(tolerance / 4, { tolerance / 4 > 0 });
-        choose thresholdV such that
-            ∀ (k : ℕ). thresholdV ≤ k →
-                distance(limitV, v(index(k))) < tolerance / 4
-            as closeV from toV(tolerance / 4, { tolerance / 4 > 0 });
         choose scale such that Real.harmonic_term(scale) < tolerance / 4
             from Real.exists_harmonic_term_below(
                 tolerance / 4, { tolerance / 4 > 0 });
-        let far : ℕ :=
-            Natural.maximum(Natural.maximum(thresholdU, thresholdV), scale);
-        Natural.maximum(thresholdU, thresholdV) ≤ far;
-        thresholdU ≤ Natural.maximum(thresholdU, thresholdV);
-        thresholdV ≤ Natural.maximum(thresholdU, thresholdV);
-        thresholdU ≤ far;
-        thresholdV ≤ far;
-        scale ≤ far;
-        let deep : ℕ := index(far);
-        distance(limitU, u(deep)) < tolerance / 4 by closeU;
-        distance(limitV, v(deep)) < tolerance / 4 by closeV;
+        -- Three tails: u close to its limit, v close to its limit, and the
+        -- index past `scale`. The filter takes the maximum of all three.
+        eventually (k). distance(limitU, u(index(k))) < tolerance / 4
+            by toU;
+        eventually (k). distance(limitV, v(index(k))) < tolerance / 4
+            by toV;
+        eventually (k). scale ≤ k by Natural.Eventually.beyond;
+        eventually (k). distance(limitU, limitV) < tolerance
+            by for k sufficiently large: {
+        let deep : ℕ := index(k);
+        -- The filter hands these over as balls at `index(k)`; the chain
+        -- below matches the arithmetic form at `deep`.
+        distance(limitU, u(deep)) < tolerance / 4;
+        distance(limitV, v(deep)) < tolerance / 4;
         distance(u(deep), v(deep)) < Real.harmonic_term(deep)
             by closing;
-        far ≤ deep by Natural.IsStrictlyIncreasing.LessOrEqual;
-        scale ≤ deep;
+        scale
+           ≤ k
+           ≤ deep by Natural.IsStrictlyIncreasing.LessOrEqual;
         Real.harmonic_term(deep) ≤ Real.harmonic_term(scale)
             by Real.harmonic_term_antitone;
         distance(u(deep), v(deep)) < tolerance / 4;
@@ -141,6 +136,11 @@ theorem MetricSpace.equal_limits_of_closing (m : MetricSpace)
                  + distance(v(deep), limitV) by ring
            < tolerance / 4 + tolerance / 4 + tolerance / 4
            < tolerance;
+        done
+              } as closeSomewhere;
+        choose someIndex such that distance(limitU, limitV) < tolerance
+            from Natural.Eventually.holds_somewhere(
+                eventualP := closeSomewhere);
         done
       }
       as arbitrarilyClose;
