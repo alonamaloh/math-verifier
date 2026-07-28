@@ -38,7 +38,7 @@ import Metric.continuity
 opaque definition MetricSpace.Near {m : MetricSpace} (x : m)
         (P : m → Proposition) : Proposition :=
   ∃ (radius : ℝ). radius > 0 ∧
-    ∀ (y : m). MetricSpace.distance(x, y) < radius → P(y)
+    ∀ (y : m). distance(x, y) < radius → P(y)
 
 -- A property that always holds, holds near x (any radius will do).
 theorem MetricSpace.Near.of_always {m : MetricSpace} (x : m)
@@ -46,9 +46,9 @@ theorem MetricSpace.Near.of_always {m : MetricSpace} (x : m)
         : MetricSpace.Near(x, P) :=
   unfold MetricSpace.Near in {
   (1 : ℝ) > 0;
-  ∀ (y : m). MetricSpace.distance(x, y) < 1 → P(y)
+  ∀ (y : m). distance(x, y) < 1 → P(y)
       by { take y : m;
-           suppose MetricSpace.distance(x, y) < 1;
+           suppose distance(x, y) < 1;
            done by always };
   witness (1 : ℝ)
 }
@@ -63,22 +63,22 @@ theorem MetricSpace.Near.and {m : MetricSpace} (x : m)
         : MetricSpace.Near(x, (y : m) ↦ P(y) ∧ Q(y)) :=
   unfold MetricSpace.Near in {
   choose radiusP such that
-      radiusP > 0 ∧ ∀ (y : m). MetricSpace.distance(x, y) < radiusP → P(y)
+      radiusP > 0 ∧ ∀ (y : m). distance(x, y) < radiusP → P(y)
       from nearP;
   choose radiusQ such that
-      radiusQ > 0 ∧ ∀ (y : m). MetricSpace.distance(x, y) < radiusQ → Q(y)
+      radiusQ > 0 ∧ ∀ (y : m). distance(x, y) < radiusQ → Q(y)
       from nearQ;
   radiusP > 0;
   radiusQ > 0;
   min(radiusP, radiusQ) > 0 by Real.minimum_positive;
-  ∀ (y : m). MetricSpace.distance(x, y) < min(radiusP, radiusQ)
+  ∀ (y : m). distance(x, y) < min(radiusP, radiusQ)
         → P(y) ∧ Q(y)
       by { take y : m;
-           suppose MetricSpace.distance(x, y) < min(radiusP, radiusQ);
+           suppose distance(x, y) < min(radiusP, radiusQ);
            min(radiusP, radiusQ) ≤ radiusP;
            min(radiusP, radiusQ) ≤ radiusQ;
-           MetricSpace.distance(x, y) < min(radiusP, radiusQ) ≤ radiusP;
-           MetricSpace.distance(x, y) < min(radiusP, radiusQ) ≤ radiusQ;
+           distance(x, y) < min(radiusP, radiusQ) ≤ radiusP;
+           distance(x, y) < min(radiusP, radiusQ) ≤ radiusQ;
            P(y);
            Q(y);
            done };
@@ -93,12 +93,12 @@ theorem MetricSpace.Near.monotone {m : MetricSpace} (x : m)
         : MetricSpace.Near(x, Q) :=
   unfold MetricSpace.Near in {
   choose radius such that
-      radius > 0 ∧ ∀ (y : m). MetricSpace.distance(x, y) < radius → P(y)
+      radius > 0 ∧ ∀ (y : m). distance(x, y) < radius → P(y)
       from nearP;
   radius > 0;
-  ∀ (y : m). MetricSpace.distance(x, y) < radius → Q(y)
+  ∀ (y : m). distance(x, y) < radius → Q(y)
       by { take y : m;
-           suppose MetricSpace.distance(x, y) < radius;
+           suppose distance(x, y) < radius;
            P(y);
            done by pointwise };
   witness radius
@@ -112,11 +112,11 @@ theorem MetricSpace.Near.at_centre {m : MetricSpace} (x : m)
         : P(x) :=
   unfold MetricSpace.Near in {
   choose radius such that
-      radius > 0 ∧ ∀ (y : m). MetricSpace.distance(x, y) < radius → P(y)
+      radius > 0 ∧ ∀ (y : m). distance(x, y) < radius → P(y)
       from nearP;
   radius > 0;
-  MetricSpace.distance(x, x) = 0 by MetricSpace.distance_self;
-  MetricSpace.distance(x, x)
+  distance(x, x) = 0 by MetricSpace.distance_self;
+  distance(x, x)
      = 0
      < radius;
   done
@@ -147,24 +147,24 @@ theorem MetricSpace.ContinuousAt.of_near {source target : MetricSpace}
         (f : source → target) (x : source)
         (nearby : ∀ (tolerance : ℝ). tolerance > 0 →
             MetricSpace.Near(x,
-                (y : source) ↦ MetricSpace.distance(f(x), f(y)) < tolerance))
+                (y : source) ↦ distance(f(x), f(y)) < tolerance))
         : MetricSpace.ContinuousAt(f, Set.universe(source), x) :=
   unfold MetricSpace.Near in {
   take tolerance : ℝ;
   suppose tolerance > 0;
   MetricSpace.Near(x,
-      (y : source) ↦ MetricSpace.distance(f(x), f(y)) < tolerance)
+      (y : source) ↦ distance(f(x), f(y)) < tolerance)
       by nearby;
   choose radius such that radius > 0 ∧
-      ∀ (y : source). MetricSpace.distance(x, y) < radius →
-        MetricSpace.distance(f(x), f(y)) < tolerance;
+      ∀ (y : source). distance(x, y) < radius →
+        distance(f(x), f(y)) < tolerance;
   radius > 0;
   ∀ (y : source). y ∈ Set.universe(source) →
-      MetricSpace.distance(x, y) < radius →
-        MetricSpace.distance(f(x), f(y)) < tolerance
+      distance(x, y) < radius →
+        distance(f(x), f(y)) < tolerance
       by { take y : source;
            suppose y ∈ Set.universe(source);
-           suppose MetricSpace.distance(x, y) < radius;
+           suppose distance(x, y) < radius;
            done };
   witness radius
 }
@@ -174,18 +174,18 @@ theorem MetricSpace.ContinuousAt.near {source target : MetricSpace}
         (continuous : MetricSpace.ContinuousAt(f, Set.universe(source), x))
         (tolerance : ℝ) (tolerancePositive : tolerance > 0)
         : MetricSpace.Near(x,
-              (y : source) ↦ MetricSpace.distance(f(x), f(y)) < tolerance) :=
+              (y : source) ↦ distance(f(x), f(y)) < tolerance) :=
   unfold MetricSpace.Near in {
   choose radius such that radius > 0 ∧
       ∀ (y : source). y ∈ Set.universe(source) →
-        MetricSpace.distance(x, y) < radius →
-          MetricSpace.distance(f(x), f(y)) < tolerance
+        distance(x, y) < radius →
+          distance(f(x), f(y)) < tolerance
       from continuous;
   radius > 0;
-  ∀ (y : source). MetricSpace.distance(x, y) < radius →
-      MetricSpace.distance(f(x), f(y)) < tolerance
+  ∀ (y : source). distance(x, y) < radius →
+      distance(f(x), f(y)) < tolerance
       by { take y : source;
-           suppose MetricSpace.distance(x, y) < radius;
+           suppose distance(x, y) < radius;
            y ∈ Set.universe(source);
            done };
   witness radius
@@ -205,20 +205,20 @@ theorem MetricSpace.Near.under {source target : MetricSpace}
         : MetricSpace.Near(x, (y : source) ↦ P(g(y))) :=
   unfold MetricSpace.Near in {
     choose radius such that radius > 0 ∧
-        ∀ (z : target). MetricSpace.distance(g(x), z) < radius → P(z)
+        ∀ (z : target). distance(g(x), z) < radius → P(z)
         from nearP;
     radius > 0;
     choose nearness such that nearness > 0 ∧
         ∀ (y : source). y ∈ Set.universe(source) →
-          MetricSpace.distance(x, y) < nearness →
-            MetricSpace.distance(g(x), g(y)) < radius
+          distance(x, y) < nearness →
+            distance(g(x), g(y)) < radius
         from gContinuous;
     nearness > 0;
-    ∀ (y : source). MetricSpace.distance(x, y) < nearness → P(g(y))
+    ∀ (y : source). distance(x, y) < nearness → P(g(y))
         by { take y : source;
-             suppose MetricSpace.distance(x, y) < nearness;
+             suppose distance(x, y) < nearness;
              y ∈ Set.universe(source);
-             MetricSpace.distance(g(x), g(y)) < radius;
+             distance(g(x), g(y)) < radius;
              done };
     witness nearness
   }
@@ -229,12 +229,12 @@ theorem MetricSpace.Near.under {source target : MetricSpace}
 theorem MetricSpace.Near.within {m : MetricSpace} (x : m) (radius : ℝ)
         (radiusPositive : radius > 0)
         : MetricSpace.Near(x,
-              (y : m) ↦ MetricSpace.distance(x, y) < radius) :=
+              (y : m) ↦ distance(x, y) < radius) :=
   unfold MetricSpace.Near in {
-    ∀ (y : m). MetricSpace.distance(x, y) < radius
-        → MetricSpace.distance(x, y) < radius
+    ∀ (y : m). distance(x, y) < radius
+        → distance(x, y) < radius
         by { take y : m;
-             suppose MetricSpace.distance(x, y) < radius;
+             suppose distance(x, y) < radius;
              done };
     witness radius
   }

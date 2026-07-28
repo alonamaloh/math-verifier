@@ -54,6 +54,20 @@ definition MetricSpace.distance {m : MetricSpace}
   let ⟨carrier, distance, isMetric⟩ := m in
     distance
 
+-- `distance(x, y)` at any metric space. The qualifier carries no
+-- information at a use site — the space is implicit and recovered from the
+-- points — so the short name is what proofs read.
+--
+-- Registered for the BUNDLE only, deliberately. Adding
+-- `overload distance := Real.distance` alongside it makes the name
+-- ambiguous rather than more useful: overload dispatch offers the
+-- δ-reduced candidates of the argument type, and
+-- `MetricSpace.carrier(Real.metricSpace)` reduces to `Real`, so both
+-- registrations match and every abstract site breaks. Where the carrier is
+-- concrete (`Metric/interval.math`, `Plane/subarc.math`) the qualified
+-- name stays.
+overload distance := MetricSpace.distance
+
 definition MetricSpace.is_metric (m : MetricSpace)
         : IsMetric(m, MetricSpace.distance) :=
   let ⟨carrier, distance, isMetric⟩ := m in
@@ -64,14 +78,14 @@ definition MetricSpace.is_metric (m : MetricSpace)
 -- consumer walks the hierarchy by hand.
 
 theorem MetricSpace.distance_self (m : MetricSpace) (x : m)
-        : MetricSpace.distance(x, x) = 0 := {
+        : distance(x, x) = 0 := {
   IsMetric(m, MetricSpace.distance);
   done
 }
 
 theorem MetricSpace.equal_of_distance_zero (m : MetricSpace)
         (x y : m)
-        (apart : MetricSpace.distance(x, y) = 0)
+        (apart : distance(x, y) = 0)
         : x = y := {
   IsMetric(m, MetricSpace.distance);
   done
@@ -79,15 +93,15 @@ theorem MetricSpace.equal_of_distance_zero (m : MetricSpace)
 
 theorem MetricSpace.distance_symmetric (m : MetricSpace)
         (x y : m)
-        : MetricSpace.distance(x, y) = MetricSpace.distance(y, x) := {
+        : distance(x, y) = distance(y, x) := {
   IsMetric(m, MetricSpace.distance);
   done
 }
 
 theorem MetricSpace.distance_triangle (m : MetricSpace)
         (x y z : m)
-        : MetricSpace.distance(x, z)
-              ≤ MetricSpace.distance(x, y) + MetricSpace.distance(y, z) := {
+        : distance(x, z)
+              ≤ distance(x, y) + distance(y, z) := {
   IsMetric(m, MetricSpace.distance);
   done
 }
@@ -96,12 +110,12 @@ theorem MetricSpace.distance_triangle (m : MetricSpace)
 -- y says twice the distance is at least zero.
 theorem MetricSpace.distance_nonneg (m : MetricSpace)
         (x y : m)
-        : MetricSpace.distance(x, y) ≥ 0 := {
+        : distance(x, y) ≥ 0 := {
   (0 : ℝ)
-     = MetricSpace.distance(x, x) by MetricSpace.distance_self
-     ≤ MetricSpace.distance(x, y) + MetricSpace.distance(y, x)
+     = distance(x, x) by MetricSpace.distance_self
+     ≤ distance(x, y) + distance(y, x)
            by MetricSpace.distance_triangle
-     = MetricSpace.distance(x, y) + MetricSpace.distance(x, y)
+     = distance(x, y) + distance(x, y)
            by substituting MetricSpace.distance_symmetric(m, y, x);
   done by ordered_field
 }
@@ -113,17 +127,17 @@ theorem MetricSpace.distance_nonneg (m : MetricSpace)
 definition MetricSpace.Ball {m : MetricSpace}
         (center : m) (radius : ℝ)
         : Set(m) :=
-  (x : m) ↦ MetricSpace.distance(center, x) < radius
+  (x : m) ↦ distance(center, x) < radius
 
 theorem MetricSpace.member_Ball (m : MetricSpace)
         (center x : m) (radius : ℝ)
         (inside : x ∈ MetricSpace.Ball(center, radius))
-        : MetricSpace.distance(center, x) < radius :=
+        : distance(center, x) < radius :=
   inside
 
 theorem MetricSpace.Ball_of_distance (m : MetricSpace)
         (center x : m) (radius : ℝ)
-        (near : MetricSpace.distance(center, x) < radius)
+        (near : distance(center, x) < radius)
         : x ∈ MetricSpace.Ball(center, radius) :=
   near
 
@@ -131,7 +145,7 @@ theorem MetricSpace.center_Ball (m : MetricSpace)
         (center : m) (radius : ℝ)
         (radiusPositive : radius > 0)
         : center ∈ MetricSpace.Ball(center, radius) := {
-  MetricSpace.distance(center, center)
+  distance(center, center)
      = 0 by MetricSpace.distance_self
      < radius;
   done
