@@ -75,21 +75,21 @@ theorem NaturalsBelow.below_unshifts (m n value : ℕ)
 definition NaturalsBelow.sum_into (m n : ℕ)
         : DisjointUnion(NaturalsBelow(m), NaturalsBelow(n)) → NaturalsBelow(m + n)
   | Sum.left(element) =>
-      NaturalsBelow.make(NaturalsBelow.value(element), NaturalsBelow.below_extends)
+      NaturalsBelow.make(element, NaturalsBelow.below_extends)
   | Sum.right(element) =>
-      NaturalsBelow.make(m + NaturalsBelow.value(element), NaturalsBelow.below_shifts)
+      NaturalsBelow.make(m + element, NaturalsBelow.below_shifts)
 
 -- The inverse: compare the value against m. Below m → the left block,
 -- keeping the value. At least m → the right block, value shifted down by m.
 definition NaturalsBelow.sum_out_of (m n : ℕ)
         : NaturalsBelow(m + n) → DisjointUnion(NaturalsBelow(m), NaturalsBelow(n)) :=
   (element : NaturalsBelow(m + n)) ↦
-    if NaturalsBelow.value(element) < m then {
-        NaturalsBelow.value(element) < m as valueBelow;
-        Sum.left(NaturalsBelow.make(NaturalsBelow.value(element), valueBelow))
+    if element < m then {
+        element < m as valueBelow;
+        Sum.left(NaturalsBelow.make(element, valueBelow))
     } else {
-        m ≤ NaturalsBelow.value(element) by Natural.less_or_equal_of_not_less_than;
-        Sum.right(NaturalsBelow.make(NaturalsBelow.value(element) ∸ m,
+        m ≤ element by Natural.less_or_equal_of_not_less_than;
+        Sum.right(NaturalsBelow.make(element ∸ m,
             NaturalsBelow.below_unshifts))
     }
 
@@ -98,24 +98,24 @@ definition NaturalsBelow.sum_out_of (m n : ℕ)
 -- (Proof-level `if` refines the classical decision so `sum_out_of` ι-reduces;
 -- the make's proof field is irrelevant, so the two sides agree definitionally.)
 theorem NaturalsBelow.sum_out_of_below (m n : ℕ)
-        (element : NaturalsBelow(m + n)) (valueBelow : NaturalsBelow.value(element) < m)
+        (element : NaturalsBelow(m + n)) (valueBelow : element < m)
         : NaturalsBelow.sum_out_of(m, n, element)
-          = Sum.left(NaturalsBelow.make(NaturalsBelow.value(element), valueBelow)) :=
-  if NaturalsBelow.value(element) < m
+          = Sum.left(NaturalsBelow.make(element, valueBelow)) :=
+  if element < m
   then { done }
   else {
-      ¬(NaturalsBelow.value(element) < m);
+      ¬(element < m);
       done
     }
 
 theorem NaturalsBelow.sum_out_of_at_least (m n : ℕ)
-        (element : NaturalsBelow(m + n)) (notBelow : ¬(NaturalsBelow.value(element) < m))
-        (shiftedBelow : (NaturalsBelow.value(element) ∸ m) < n)
+        (element : NaturalsBelow(m + n)) (notBelow : ¬(element < m))
+        (shiftedBelow : (element ∸ m) < n)
         : NaturalsBelow.sum_out_of(m, n, element)
-          = Sum.right(NaturalsBelow.make(NaturalsBelow.value(element) ∸ m, shiftedBelow)) :=
-  if NaturalsBelow.value(element) < m
+          = Sum.right(NaturalsBelow.make(element ∸ m, shiftedBelow)) :=
+  if element < m
   then {
-      NaturalsBelow.value(element) < m;
+      element < m;
       done
     }
   else { done }
@@ -132,31 +132,31 @@ theorem NaturalsBelow.sum_round_trip_left (m n : ℕ)
     case Sum.left(element): {
         -- The placed value is below m, so out_of returns it to the left; the
         -- values agree, so ⟨value, _⟩ is element.
-        NaturalsBelow.value(element) < m as placedBelow;
+        element < m as placedBelow;
         NaturalsBelow.sum_out_of(m, n, NaturalsBelow.sum_into(m, n, Sum.left(element)))
-           = Sum.left(NaturalsBelow.make(NaturalsBelow.value(element), placedBelow))
+           = Sum.left(NaturalsBelow.make(element, placedBelow))
                  by NaturalsBelow.sum_out_of_below
            = Sum.left(element)   by NaturalsBelow.equal_of_value
       }
     case Sum.right(element): {
         -- The shifted value m + value is at least m, so out_of drops it back
         -- down by m to value again.
-        ¬(m + NaturalsBelow.value(element) < m) by {
-            suppose m + NaturalsBelow.value(element) < m for contradiction {
-                m + NaturalsBelow.value(element)
+        ¬(m + element < m) by {
+            suppose m + element < m for contradiction {
+                m + element
                           < m
-                          ≤ m + NaturalsBelow.value(element);
+                          ≤ m + element;
                 done
             }
         };
-        ((m + NaturalsBelow.value(element)) ∸ m) < n by {
-            (m + NaturalsBelow.value(element)) ∸ m
-                = NaturalsBelow.value(element)
+        ((m + element) ∸ m) < n by {
+            (m + element) ∸ m
+                = element
                 < n
         } as shiftBound;
-        ((m + NaturalsBelow.value(element)) ∸ m) = NaturalsBelow.value(element);
+        ((m + element) ∸ m) = element;
         NaturalsBelow.sum_out_of(m, n, NaturalsBelow.sum_into(m, n, Sum.right(element)))
-           = Sum.right(NaturalsBelow.make((m + NaturalsBelow.value(element)) ∸ m, shiftBound))
+           = Sum.right(NaturalsBelow.make((m + element) ∸ m, shiftBound))
                  by NaturalsBelow.sum_out_of_at_least
            = Sum.right(element)   by NaturalsBelow.equal_of_value
       }
@@ -168,26 +168,26 @@ theorem NaturalsBelow.sum_round_trip_right (m n : ℕ)
         (element : NaturalsBelow(m + n))
         : NaturalsBelow.sum_into(m, n, NaturalsBelow.sum_out_of(m, n, element)) = element :=
   done by cases {
-    case NaturalsBelow.value(element) < m as valueBelow: {
+    case element < m as valueBelow: {
         NaturalsBelow.sum_out_of(m, n, element)
-            = Sum.left(NaturalsBelow.make(NaturalsBelow.value(element), valueBelow))
+            = Sum.left(NaturalsBelow.make(element, valueBelow))
             by NaturalsBelow.sum_out_of_below;
         NaturalsBelow.sum_into(m, n, NaturalsBelow.sum_out_of(m, n, element))
            = NaturalsBelow.sum_into(m, n,
-                 Sum.left(NaturalsBelow.make(NaturalsBelow.value(element), valueBelow)))
+                 Sum.left(NaturalsBelow.make(element, valueBelow)))
            = element   by NaturalsBelow.equal_of_value
       }
     otherwise as notBelow: {
-        m ≤ NaturalsBelow.value(element) by Natural.less_or_equal_of_not_less_than;
-        (NaturalsBelow.value(element) ∸ m) < n
+        m ≤ element by Natural.less_or_equal_of_not_less_than;
+        (element ∸ m) < n
             by NaturalsBelow.below_unshifts as shiftBound;
-        m + (NaturalsBelow.value(element) ∸ m) = NaturalsBelow.value(element);
+        m + (element ∸ m) = element;
         NaturalsBelow.sum_out_of(m, n, element)
-            = Sum.right(NaturalsBelow.make(NaturalsBelow.value(element) ∸ m, shiftBound))
+            = Sum.right(NaturalsBelow.make(element ∸ m, shiftBound))
             by NaturalsBelow.sum_out_of_at_least;
         NaturalsBelow.sum_into(m, n, NaturalsBelow.sum_out_of(m, n, element))
            = NaturalsBelow.sum_into(m, n,
-                 Sum.right(NaturalsBelow.make(NaturalsBelow.value(element) ∸ m, shiftBound)))
+                 Sum.right(NaturalsBelow.make(element ∸ m, shiftBound)))
            = element   by NaturalsBelow.equal_of_value
       }
   }

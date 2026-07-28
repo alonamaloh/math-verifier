@@ -66,7 +66,8 @@ ExpressionPointer Elaborator::elaborateCalc(
                         leadingTypeClosed, firstRightTypeClosed)) {
                     if (!combined->coerceLeft.empty()) {
                         previousKernel = applyCoercionChain(
-                            std::move(previousKernel), combined->coerceLeft);
+                            std::move(previousKernel), combined->coerceLeft,
+                            leadingTypeClosed);
                         previousKernel = castPushToLeaves(
                             previousKernel, localBinders).term;
                         carrierTypeOpen = inferTypeInLocalContext(
@@ -240,7 +241,18 @@ ExpressionPointer Elaborator::elaborateCalc(
                     localBinders);
             }
             for (auto& endpoint : endpointKernels) {
-                endpoint = applyCoercionChain(endpoint, chain);
+                // Each endpoint carries its own type; a chain function with
+                // leading implicits solves them from it.
+                ExpressionPointer endpointTypeClosed;
+                try {
+                    endpointTypeClosed = closeOverLocalBinders(
+                        inferTypeInLocalContext(localBinders, endpoint),
+                        localBinders, localBinders.size());
+                } catch (...) {
+                    endpointTypeClosed = nullptr;
+                }
+                endpoint = applyCoercionChain(endpoint, chain,
+                                               endpointTypeClosed);
             }
             previousKernel = endpointKernels.back();
             carrierType = newCarrierClosed;
@@ -329,7 +341,8 @@ ExpressionPointer Elaborator::elaborateCalc(
                             nextTypeClosed, carrierType)) {
                         if (!combined->coerceLeft.empty()) {
                             nextKernel = applyCoercionChain(
-                                std::move(nextKernel), combined->coerceLeft);
+                                std::move(nextKernel), combined->coerceLeft,
+                                nextTypeClosed);
                             nextKernel = castPushToLeaves(
                                 nextKernel, localBinders).term;
                         }
