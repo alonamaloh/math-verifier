@@ -56,8 +56,9 @@ import Real.convergence
 import Real.supremum
 import Real.limits
 import Real.continuity
+import Metric.space
+import Metric.near
 import Real.division
-import Real.minimum
 
 -- ----------------------------------------------------------------------
 -- f has derivative L at x.
@@ -70,6 +71,24 @@ definition Real.HasDerivativeAt (f : ℝ → ℝ) (x L : ℝ) : Proposition :=
 
 -- ----------------------------------------------------------------------
 -- Constants have derivative zero: the approximation error vanishes.
+-- The derivative condition through the SPATIAL FILTER: for every ε, the
+-- linear approximation is within ε·|y − x| for y near x. Every proof below
+-- states its tolerances and lets `for y sufficiently near x: { … }`
+-- intersect the neighbourhoods, so no δ is named.
+
+theorem Real.HasDerivativeAt.of_near (f : ℝ → ℝ) (x L : ℝ)
+        (nearby : ∀ (ε : ℝ). ε > 0 → MetricSpace.Near(x,
+            (y : ℝ) ↦ abs(f(y) - f(x) - L * (y - x)) ≤ ε * abs(y - x)))
+        : Real.HasDerivativeAt(f, x, L) :=
+  unfold MetricSpace.Near in { done }
+
+theorem Real.HasDerivativeAt.near (f : ℝ → ℝ) (x L : ℝ)
+        (derivative : Real.HasDerivativeAt(f, x, L))
+        (ε : ℝ) (εPositive : ε > 0)
+        : MetricSpace.Near(x,
+              (y : ℝ) ↦ abs(f(y) - f(x) - L * (y - x)) ≤ ε * abs(y - x)) :=
+  unfold MetricSpace.Near in { done by derivative }
+
 theorem Real.HasDerivativeAt.constant (c x : ℝ)
         : Real.HasDerivativeAt((y : ℝ) ↦ c, x, (0 : ℝ)) :=
   (ε : ℝ)
@@ -108,71 +127,66 @@ theorem Real.HasDerivativeAt.add (f g : ℝ → ℝ) (x fSlope gSlope : ℝ)
         (fDerivative : Real.HasDerivativeAt(f, x, fSlope))
         (gDerivative : Real.HasDerivativeAt(g, x, gSlope))
         : Real.HasDerivativeAt(
-              (y : ℝ) ↦ f(y) + g(y), x, fSlope + gSlope) :=
-  (ε : ℝ)
-  (εPositive : ε > 0) ↦ {
-    ε / 2 > 0 as halfPositive;
-    choose fδ from fDerivative(ε / 2, halfPositive);
-    ∀ (y : ℝ). abs(y - x) < fδ
-            → abs(f(y) - f(x) - fSlope * (y - x)) ≤ ε / 2 * abs(y - x) as fClose;
-    choose gδ from gDerivative(ε / 2, halfPositive);
-    ∀ (y : ℝ). abs(y - x) < gδ
-            → abs(g(y) - g(x) - gSlope * (y - x)) ≤ ε / 2 * abs(y - x) as gClose;
-    min(fδ, gδ) > 0 by Real.minimum_positive as minimumPositive;
-    witness min(fδ, gδ) with
-        ⟨minimumPositive,
-         (y : ℝ)
-         (yClose : abs(y - x) < min(fδ, gδ)) ↦ {
-           min(fδ, gδ) ≤ fδ by Real.minimum_LessOrEqual_left;
-           min(fδ, gδ) ≤ gδ by Real.minimum_LessOrEqual_right;
-           abs(y - x) < min(fδ, gδ) ≤ fδ as yCloseF;
-           abs(y - x) < min(fδ, gδ) ≤ gδ as yCloseG;
-           abs(f(y) - f(x) - fSlope * (y - x)) ≤ ε / 2 * abs(y - x)
-               by fClose(y, yCloseF);
-           abs(g(y) - g(x) - gSlope * (y - x)) ≤ ε / 2 * abs(y - x)
-               by gClose(y, yCloseG);
-           abs(f(y) + g(y) - (f(x) + g(x)) - (fSlope + gSlope) * (y - x))
-              = abs((f(y) - f(x) - fSlope * (y - x))
-                    + (g(y) - g(x) - gSlope * (y - x)))
-                    by (f(y) + g(y) - (f(x) + g(x)) - (fSlope + gSlope) * (y - x)
-                        = (f(y) - f(x) - fSlope * (y - x))
-                          + (g(y) - g(x) - gSlope * (y - x)))
-              ≤ abs(f(y) - f(x) - fSlope * (y - x))
-                + abs(g(y) - g(x) - gSlope * (y - x))
-                    by Real.triangle_inequality
-              ≤ ε / 2 * abs(y - x)
-                + abs(g(y) - g(x) - gSlope * (y - x))
-              ≤ ε / 2 * abs(y - x) + ε / 2 * abs(y - x)
-                    by Real.add_preserves_LessOrEqual_left
-              = (ε / 2 + ε / 2) * abs(y - x)
-              = ε * abs(y - x)
-                    by Real.divide_two_doubled
-         }⟩
-  }
+              (y : ℝ) ↦ f(y) + g(y), x, fSlope + gSlope) := {
+  ∀ (ε : ℝ). ε > 0 → MetricSpace.Near(x, (y : ℝ) ↦
+      abs(f(y) + g(y) - (f(x) + g(x)) - (fSlope + gSlope) * (y - x))
+        ≤ ε * abs(y - x))
+      by { take ε : ℝ;
+           suppose ε > 0;
+           ε / 2 > 0;
+           MetricSpace.Near(x, (y : ℝ) ↦
+               abs(f(y) - f(x) - fSlope * (y - x)) ≤ ε / 2 * abs(y - x))
+               by Real.HasDerivativeAt.near;
+           MetricSpace.Near(x, (y : ℝ) ↦
+               abs(g(y) - g(x) - gSlope * (y - x)) ≤ ε / 2 * abs(y - x))
+               by Real.HasDerivativeAt.near;
+           for y sufficiently near x: {
+             abs(f(y) - f(x) - fSlope * (y - x)) ≤ ε / 2 * abs(y - x);
+             abs(g(y) - g(x) - gSlope * (y - x)) ≤ ε / 2 * abs(y - x);
+             abs(f(y) + g(y) - (f(x) + g(x)) - (fSlope + gSlope) * (y - x))
+                = abs((f(y) - f(x) - fSlope * (y - x))
+                      + (g(y) - g(x) - gSlope * (y - x)))
+                      by (f(y) + g(y) - (f(x) + g(x)) - (fSlope + gSlope) * (y - x)
+                          = (f(y) - f(x) - fSlope * (y - x))
+                            + (g(y) - g(x) - gSlope * (y - x)))
+                ≤ abs(f(y) - f(x) - fSlope * (y - x))
+                  + abs(g(y) - g(x) - gSlope * (y - x))
+                      by Real.triangle_inequality
+                ≤ ε / 2 * abs(y - x)
+                  + abs(g(y) - g(x) - gSlope * (y - x))
+                ≤ ε / 2 * abs(y - x) + ε / 2 * abs(y - x)
+                      by Real.add_preserves_LessOrEqual_left
+                = (ε / 2 + ε / 2) * abs(y - x)
+                = ε * abs(y - x)
+                      by Real.divide_two_doubled
+           } };
+  done by Real.HasDerivativeAt.of_near
+}
 
 -- Negation flips the derivative: the approximation error is the same
 -- up to sign, and |·| forgets the sign.
 theorem Real.HasDerivativeAt.negate (f : ℝ → ℝ) (x L : ℝ)
         (fDerivative : Real.HasDerivativeAt(f, x, L))
-        : Real.HasDerivativeAt((y : ℝ) ↦ -f(y), x, -L) :=
-  (ε : ℝ)
-  (εPositive : ε > 0) ↦ {
-    choose δ from fDerivative(ε, εPositive);
-    δ > 0 as δPositive;
-    ∀ (y : ℝ). abs(y - x) < δ
-            → abs(f(y) - f(x) - L * (y - x)) ≤ ε * abs(y - x);
-    witness δ with
-        ⟨δPositive,
-         (y : ℝ) (yClose : abs(y - x) < δ) ↦ {
-           abs(f(y) - f(x) - L * (y - x)) ≤ ε * abs(y - x) as fBound;
-           abs(-f(y) - -f(x) - -L * (y - x))
-              = abs(-(f(y) - f(x) - L * (y - x)))
-                    by (-f(y) - -f(x) - -L * (y - x) = -(f(y) - f(x) - L * (y - x)))
-              = abs(f(y) - f(x) - L * (y - x))
-              ≤ ε * abs(y - x)
-                    by fBound
-         }⟩
-  }
+        : Real.HasDerivativeAt((y : ℝ) ↦ -f(y), x, -L) := {
+  ∀ (ε : ℝ). ε > 0 → MetricSpace.Near(x, (y : ℝ) ↦
+      abs(-f(y) - -f(x) - -L * (y - x)) ≤ ε * abs(y - x))
+      by { take ε : ℝ;
+           suppose ε > 0;
+           MetricSpace.Near(x, (y : ℝ) ↦
+               abs(f(y) - f(x) - L * (y - x)) ≤ ε * abs(y - x))
+               by Real.HasDerivativeAt.near;
+           for y sufficiently near x: {
+             abs(f(y) - f(x) - L * (y - x)) ≤ ε * abs(y - x) as fBound;
+             abs(-f(y) - -f(x) - -L * (y - x))
+                = abs(-(f(y) - f(x) - L * (y - x)))
+                      by (-f(y) - -f(x) - -L * (y - x)
+                          = -(f(y) - f(x) - L * (y - x)))
+                = abs(f(y) - f(x) - L * (y - x))
+                ≤ ε * abs(y - x)
+                      by fBound
+           } };
+  done by Real.HasDerivativeAt.of_near
+}
 
 -- Differences: f − g = f + (−g), and subtraction on Real is
 -- definitionally addition of the negation.
@@ -229,62 +243,47 @@ theorem Real.HasDerivativeAt.scale (c : ℝ) (f : ℝ → ℝ) (x L : ℝ)
 theorem Real.HasDerivativeAt.continuous (f : ℝ → ℝ) (x L : ℝ)
         (fDerivative : Real.HasDerivativeAt(f, x, L))
         : Real.ContinuousAt(f, x) := {
-  suffices ∀ (ε : ℝ). ε > 0 →
-      ∃ (δ : ℝ). δ > 0 ∧ ∀ (y : ℝ). abs(y - x) < δ → abs(f(y) - f(x)) < ε
-      by Real.ContinuousAt.of_epsilon_delta;
-  take ε : ℝ;
-  suppose ε > 0 as εPositive;
-  {
-    choose slopeRoof from Real.exists_positive_rational_roof(L);
-    abs(L) ≤ (slopeRoof : ℝ);
-    choose nearδ from fDerivative((1 : ℝ), Real.zero_less_one);
-    ∀ (y : ℝ). abs(y - x) < nearδ
-            → abs(f(y) - f(x) - L * (y - x)) ≤ 1 * abs(y - x);
-    min(nearδ, ε / (1 + (slopeRoof : ℝ))) > 0
-        by Real.minimum_positive as minimumPositive;
-    witness min(nearδ, ε / (1 + (slopeRoof : ℝ)))
-        with
-        ⟨minimumPositive,
-         (y : ℝ)
-         (yClose : abs(y - x)
-                   < min(nearδ, ε / (1 + (slopeRoof : ℝ)))) ↦ {
-           min(nearδ, ε / (1 + (slopeRoof : ℝ))) ≤ nearδ
-               by Real.minimum_LessOrEqual_left;
-           min(nearδ, ε / (1 + (slopeRoof : ℝ)))
-                   ≤ ε / (1 + (slopeRoof : ℝ))
-               by Real.minimum_LessOrEqual_right;
-           abs(y - x)
-              < min(nearδ, ε / (1 + (slopeRoof : ℝ)))
-              ≤ nearδ;
-           abs(y - x)
-              < min(nearδ, ε / (1 + (slopeRoof : ℝ)))
-              ≤ ε / (1 + (slopeRoof : ℝ));
-           abs(f(y) - f(x) - L * (y - x)) ≤ 1 * abs(y - x);
+  ∀ (ε : ℝ). ε > 0 → MetricSpace.Near(x, (y : ℝ) ↦ abs(f(y) - f(x)) < ε)
+      by { take ε : ℝ;
+           suppose ε > 0;
+           choose slopeRoof from Real.exists_positive_rational_roof(L);
            abs(L) ≤ (slopeRoof : ℝ);
-           abs(L) * abs(y - x) ≤ (slopeRoof : ℝ) * abs(y - x)
-               by Real.LessOrEqual.multiply_by_nonneg_right;
+           (1 : ℝ) > 0;
+           ε / (1 + (slopeRoof : ℝ)) > 0;
            (1 + (slopeRoof : ℝ)) * (ε / (1 + (slopeRoof : ℝ))) = ε;
-           abs(f(y) - f(x))
-              = abs((f(y) - f(x) - L * (y - x)) + L * (y - x))
-                    by ((f(y) - f(x) - L * (y - x)) + L * (y - x) = f(y) - f(x))
-              ≤ abs(f(y) - f(x) - L * (y - x)) + abs(L * (y - x))
-                    by Real.triangle_inequality
-              = abs(f(y) - f(x) - L * (y - x)) + abs(L) * abs(y - x)
-                    by Real.absolute_value_multiplicative
-              ≤ 1 * abs(y - x) + abs(L) * abs(y - x)
-                    by Real.add_preserves_LessOrEqual
-              ≤ 1 * abs(y - x) + (slopeRoof : ℝ) * abs(y - x)
-                    by Real.add_preserves_LessOrEqual_left
-              = (1 + (slopeRoof : ℝ)) * abs(y - x)
-              = abs(y - x) * (1 + (slopeRoof : ℝ))
-              < (ε / (1 + (slopeRoof : ℝ)))
-                * (1 + (slopeRoof : ℝ))
-                    by Real.LessThan.multiply_by_positive_right
-              = (1 + (slopeRoof : ℝ))
-                * (ε / (1 + (slopeRoof : ℝ)))
-              = ε
-         }⟩
-  }
+           -- Two neighbourhoods: where the linear approximation is good,
+           -- and where y is close enough for the roofed slope to be small.
+           MetricSpace.Near(x, (y : ℝ) ↦
+               abs(f(y) - f(x) - L * (y - x)) ≤ 1 * abs(y - x))
+               by Real.HasDerivativeAt.near;
+           MetricSpace.Near(x, (y : ℝ) ↦
+               abs(y - x) < ε / (1 + (slopeRoof : ℝ)))
+               by MetricSpace.Near.within;
+           for y sufficiently near x: {
+             abs(f(y) - f(x) - L * (y - x)) ≤ 1 * abs(y - x);
+             abs(y - x) < ε / (1 + (slopeRoof : ℝ));
+             abs(L) * abs(y - x) ≤ (slopeRoof : ℝ) * abs(y - x)
+                 by Real.LessOrEqual.multiply_by_nonneg_right;
+             abs(f(y) - f(x))
+                = abs((f(y) - f(x) - L * (y - x)) + L * (y - x))
+                      by ((f(y) - f(x) - L * (y - x)) + L * (y - x)
+                          = f(y) - f(x))
+                ≤ abs(f(y) - f(x) - L * (y - x)) + abs(L * (y - x))
+                      by Real.triangle_inequality
+                = abs(f(y) - f(x) - L * (y - x)) + abs(L) * abs(y - x)
+                      by Real.absolute_value_multiplicative
+                ≤ 1 * abs(y - x) + abs(L) * abs(y - x)
+                      by Real.add_preserves_LessOrEqual
+                ≤ 1 * abs(y - x) + (slopeRoof : ℝ) * abs(y - x)
+                      by Real.add_preserves_LessOrEqual_left
+                = (1 + (slopeRoof : ℝ)) * abs(y - x)
+                = abs(y - x) * (1 + (slopeRoof : ℝ))
+                < (ε / (1 + (slopeRoof : ℝ))) * (1 + (slopeRoof : ℝ))
+                      by Real.LessThan.multiply_by_positive_right
+                = (1 + (slopeRoof : ℝ)) * (ε / (1 + (slopeRoof : ℝ)))
+                = ε
+           } };
+  done by Real.ContinuousAt.of_near
 }
 
 -- The product rule. The error of f·g against slope f′g(x) + f(x)g′
@@ -296,277 +295,126 @@ theorem Real.HasDerivativeAt.multiply (f g : ℝ → ℝ) (x fSlope gSlope : ℝ
         (fDerivative : Real.HasDerivativeAt(f, x, fSlope))
         (gDerivative : Real.HasDerivativeAt(g, x, gSlope))
         : Real.HasDerivativeAt(
-              (y : ℝ) ↦ f(y) * g(y), x, fSlope * g(x) + f(x) * gSlope) :=
-  (ε : ℝ)
-  (εPositive : ε > 0) ↦ {
-    Real.ContinuousAt(g, x) by Real.HasDerivativeAt.continuous;
-    -- Real roofs over the three bystander factors, each with headroom.
-    let gHeadroom : ℝ := abs(g(x)) + 1;
-    let fRoof : ℝ := abs(f(x)) + 1;
-    let slopeRoof : ℝ := abs(fSlope) + 1;
-    abs(f(x))
-       ≤ abs(f(x)) + 1            by Real.less_or_equal_add_of_nonneg;
-    abs(fSlope)
-       ≤ abs(fSlope) + 1          by Real.less_or_equal_add_of_nonneg;
-    -- The three scaled tolerances, all positive.
-    ε / 2 / gHeadroom > 0 as fTolerancePositive;
-    ε / 2 / 2 / fRoof > 0 as gTolerancePositive;
-    ε / 2 / 2 / slopeRoof > 0;
-    -- The four δs.
-    choose fδ from fDerivative(ε / 2 / gHeadroom, fTolerancePositive);
-    ∀ (y : ℝ). abs(y - x) < fδ
-            → abs(f(y) - f(x) - fSlope * (y - x)) ≤ ε / 2 / gHeadroom * abs(y - x) as fClose;
-    choose gδ from gDerivative(ε / 2 / 2 / fRoof, gTolerancePositive);
-    ∀ (y : ℝ). abs(y - x) < gδ
-            → abs(g(y) - g(x) - gSlope * (y - x)) ≤ ε / 2 / 2 / fRoof * abs(y - x) as gClose;
-    (1 : ℝ) > 0;
-    choose nearδ such that nearδ > 0
-            ∧ ∀ (y : ℝ). abs(y - x) < nearδ → abs(g(y) - g(x)) < 1
-        from Real.ContinuousAt.tolerance;
-    ∀ (y : ℝ). abs(y - x) < nearδ → abs(g(y) - g(x)) < 1 as gNearClose;
-    choose differenceδ such that differenceδ > 0
-            ∧ ∀ (y : ℝ). abs(y - x) < differenceδ
-              → abs(g(y) - g(x)) < ε / 2 / 2 / slopeRoof
-        from Real.ContinuousAt.tolerance;
-    ∀ (y : ℝ). abs(y - x) < differenceδ
-            → abs(g(y) - g(x)) < ε / 2 / 2 / slopeRoof as gDifferenceClose;
-    min(fδ, gδ) > 0 by Real.minimum_positive;
-    min(nearδ, differenceδ) > 0 by Real.minimum_positive;
-    min(min(fδ, gδ), min(nearδ, differenceδ)) > 0
-        by Real.minimum_positive as minimumPositive;
-    witness min(min(fδ, gδ), min(nearδ, differenceδ)) with
-        ⟨minimumPositive,
-         (y : ℝ)
-         (yClose : abs(y - x)
-                   < min(min(fδ, gδ), min(nearδ, differenceδ))) ↦ {
-           -- The single δ serves all four closeness facts.
-           min(min(fδ, gδ), min(nearδ, differenceδ))
-                   ≤ min(fδ, gδ)
-               by Real.minimum_LessOrEqual_left;
-           min(min(fδ, gδ), min(nearδ, differenceδ))
-                   ≤ min(nearδ, differenceδ)
-               by Real.minimum_LessOrEqual_right;
-           min(fδ, gδ) ≤ fδ by Real.minimum_LessOrEqual_left;
-           min(fδ, gδ) ≤ gδ by Real.minimum_LessOrEqual_right;
-           min(nearδ, differenceδ) ≤ nearδ
-               by Real.minimum_LessOrEqual_left;
-           min(nearδ, differenceδ) ≤ differenceδ
-               by Real.minimum_LessOrEqual_right;
-           min(min(fδ, gδ), min(nearδ, differenceδ)) ≤ fδ
-               by Real.LessOrEqual.transitive;
-           min(min(fδ, gδ), min(nearδ, differenceδ)) ≤ gδ
-               by Real.LessOrEqual.transitive;
-           min(min(fδ, gδ), min(nearδ, differenceδ)) ≤ nearδ
-               by Real.LessOrEqual.transitive;
-           min(min(fδ, gδ), min(nearδ, differenceδ)) ≤ differenceδ
-               by Real.LessOrEqual.transitive;
-           abs(y - x)
-              < min(min(fδ, gδ), min(nearδ, differenceδ))
-              ≤ fδ
-              as yCloseF;
-           abs(y - x)
-              < min(min(fδ, gδ), min(nearδ, differenceδ))
-              ≤ gδ
-              as yCloseG;
-           abs(y - x)
-              < min(min(fδ, gδ), min(nearδ, differenceδ))
-              ≤ nearδ
-              as yCloseNear;
-           abs(y - x)
-              < min(min(fδ, gδ), min(nearδ, differenceδ))
-              ≤ differenceδ
-              as yCloseDifference;
-           -- |g(y)| sits under its headroom roof.
-           abs(g(y) - g(x)) < 1 by gNearClose(y, yCloseNear);
-           abs(g(y) - g(x)) ≤ 1 by Real.LessThan.weaken;
-           abs(g(y))
-              = abs(g(x) + (g(y) - g(x)))            by (g(x) + (g(y) - g(x)) = g(y))
-              ≤ abs(g(x)) + abs(g(y) - g(x))         by Real.triangle_inequality
-              ≤ abs(g(x)) + 1                        by Real.add_preserves_LessOrEqual_left;
-           -- The three error bounds delivered by the δs.
-           abs(f(y) - f(x) - fSlope * (y - x)) ≤ ε / 2 / gHeadroom * abs(y - x)
-               by fClose(y, yCloseF);
-           abs(g(y) - g(x) - gSlope * (y - x)) ≤ ε / 2 / 2 / fRoof * abs(y - x)
-               by gClose(y, yCloseG);
-           abs(g(y) - g(x)) < ε / 2 / 2 / slopeRoof
-               by gDifferenceClose(y, yCloseDifference);
-           abs(g(y) - g(x)) ≤ ε / 2 / 2 / slopeRoof by Real.LessThan.weaken;
-           -- The three tolerance collapses.
-           gHeadroom * (ε / 2 / gHeadroom) = ε / 2 as collapseFirst;
-           fRoof * (ε / 2 / 2 / fRoof) = ε / 2 / 2
-               by Real.divide_cancel as collapseSecond;
-           slopeRoof * (ε / 2 / 2 / slopeRoof) = ε / 2 / 2 as collapseThird;
-           -- First piece: (f-error)·g(y) ≤ (ε/2)·|y − x|.
-           abs((f(y) - f(x) - fSlope * (y - x)) * g(y))
-              = abs(f(y) - f(x) - fSlope * (y - x)) * abs(g(y))
-              ≤ (ε / 2 / gHeadroom * abs(y - x)) * gHeadroom
-                    by Real.LessOrEqual.multiply_monotone_nonneg
-              = (gHeadroom * (ε / 2 / gHeadroom)) * abs(y - x)
-              = ε / 2 * abs(y - x)
-                    by collapseFirst;
-           -- Second piece: f(x)·(g-error) ≤ (ε/4)·|y − x|.
-           abs(f(x) * (g(y) - g(x) - gSlope * (y - x)))
-              = abs(f(x)) * abs(g(y) - g(x) - gSlope * (y - x))
-              ≤ fRoof * (ε / 2 / 2 / fRoof * abs(y - x))
-                    by Real.LessOrEqual.multiply_monotone_nonneg
-              = (fRoof * (ε / 2 / 2 / fRoof)) * abs(y - x)
-              = ε / 2 / 2 * abs(y - x)
-                    by collapseSecond;
-           -- Third piece: f′·(y − x)·(g(y) − g(x)) ≤ (ε/4)·|y − x|.
-           abs(y - x) * abs(g(y) - g(x))
-                   ≤ abs(y - x) * (ε / 2 / 2 / slopeRoof)
-               by Real.LessOrEqual.multiply_monotone_nonneg;
-           abs(fSlope * ((y - x) * (g(y) - g(x))))
-              = abs(fSlope) * abs((y - x) * (g(y) - g(x)))
-              = abs(fSlope) * (abs(y - x) * abs(g(y) - g(x)))
-                    by Real.absolute_value_multiplicative
-              ≤ slopeRoof * (abs(y - x) * (ε / 2 / 2 / slopeRoof))
-                    by Real.LessOrEqual.multiply_monotone_nonneg
-              = (slopeRoof * (ε / 2 / 2 / slopeRoof)) * abs(y - x)
-              = ε / 2 / 2 * abs(y - x)
-                    by collapseThird;
-           -- Assemble: triangle inequality twice, then ε/2 + ε/4 + ε/4.
-           abs(f(x) * (g(y) - g(x) - gSlope * (y - x))
-                       + fSlope * ((y - x) * (g(y) - g(x))))
-                   ≤ abs(f(x) * (g(y) - g(x) - gSlope * (y - x)))
-                     + abs(fSlope * ((y - x) * (g(y) - g(x))))
-               by Real.triangle_inequality;
-           abs(f(x) * (g(y) - g(x) - gSlope * (y - x)))
-                + abs(fSlope * ((y - x) * (g(y) - g(x))))
-              ≤ ε / 2 / 2 * abs(y - x)
-                + abs(fSlope * ((y - x) * (g(y) - g(x))))
-                    by Real.add_preserves_LessOrEqual
-              ≤ ε / 2 / 2 * abs(y - x) + ε / 2 / 2 * abs(y - x)
-                    by Real.add_preserves_LessOrEqual_left;
-           abs(f(y) * g(y) - f(x) * g(x)
-                    - (fSlope * g(x) + f(x) * gSlope) * (y - x))
-              = abs((f(y) - f(x) - fSlope * (y - x)) * g(y)
-                    + (f(x) * (g(y) - g(x) - gSlope * (y - x))
-                       + fSlope * ((y - x) * (g(y) - g(x)))))
-                    by ((f(y) - f(x) - fSlope * (y - x)) * g(y)
-                        + (f(x) * (g(y) - g(x) - gSlope * (y - x))
-                           + fSlope * ((y - x) * (g(y) - g(x))))
-                        = f(y) * g(y) - f(x) * g(x)
-                          - (fSlope * g(x) + f(x) * gSlope) * (y - x))
-              ≤ abs((f(y) - f(x) - fSlope * (y - x)) * g(y))
-                + abs(f(x) * (g(y) - g(x) - gSlope * (y - x))
-                      + fSlope * ((y - x) * (g(y) - g(x))))
-                    by Real.triangle_inequality
-              ≤ ε / 2 * abs(y - x)
-                + abs(f(x) * (g(y) - g(x) - gSlope * (y - x))
-                      + fSlope * ((y - x) * (g(y) - g(x))))
-                    by Real.add_preserves_LessOrEqual
-              ≤ ε / 2 * abs(y - x)
-                + (abs(f(x) * (g(y) - g(x) - gSlope * (y - x)))
-                   + abs(fSlope * ((y - x) * (g(y) - g(x)))))
-                    by Real.add_preserves_LessOrEqual_left
-              ≤ ε / 2 * abs(y - x)
-                + (ε / 2 / 2 * abs(y - x) + ε / 2 / 2 * abs(y - x))
-                    by Real.add_preserves_LessOrEqual_left
-              = (ε / 2 + (ε / 2 / 2 + ε / 2 / 2)) * abs(y - x)
-              = (ε / 2 + ε / 2) * abs(y - x)
-                    by substituting Real.divide_two_doubled(ε / 2)
-              = ε * abs(y - x)
-                    by substituting Real.divide_two_doubled(ε)
-         }⟩
-  }
-
--- The derivative is unique: two slopes that both approximate f at x to
--- within every ε·|y − x| are equal. Probe both approximations at x + d
--- for a small positive d, cancel d, and squeeze.
-theorem Real.HasDerivativeAt.unique (f : ℝ → ℝ) (x L1 L2 : ℝ)
-        (firstDerivative : Real.HasDerivativeAt(f, x, L1))
-        (secondDerivative : Real.HasDerivativeAt(f, x, L2))
-        : L1 = L2 := {
-  ∀ (ε : ℝ). ε > 0 → abs(L1 - L2) < ε
-      by {
-        take ε : ℝ;
-        take εPositive : ε > 0;
-        ε / 2 / 2 > 0 as quarterPositive;
-        choose δ1 from firstDerivative(ε / 2 / 2, quarterPositive);
-        ∀ (y : ℝ). abs(y - x) < δ1
-                → abs(f(y) - f(x) - L1 * (y - x)) ≤ ε / 2 / 2 * abs(y - x) as firstClose;
-        choose δ2 from secondDerivative(ε / 2 / 2, quarterPositive);
-        ∀ (y : ℝ). abs(y - x) < δ2
-                → abs(f(y) - f(x) - L2 * (y - x)) ≤ ε / 2 / 2 * abs(y - x) as secondClose;
-        min(δ1, δ2) > 0 by Real.minimum_positive;
-        -- Probing at any point x + d strictly inside the shared δ bounds
-        -- the slope gap by ε/2.
-        ∀ (d : ℝ). d > 0 → d < min(δ1, δ2)
-                      → abs(L1 - L2) ≤ ε / 2
-            by {
-              take d : ℝ;
-              take dPositive : d > 0;
-              take dSmall : d < min(δ1, δ2);
-              Real.IsNonneg(d);
-              abs(x + d - x)
-                 = abs(d)   by (x + d - x = d)
-                 = d
-                 as distanceEquation;
-              min(δ1, δ2) ≤ δ1 by Real.minimum_LessOrEqual_left;
-              min(δ1, δ2) ≤ δ2 by Real.minimum_LessOrEqual_right;
-              abs(x + d - x)
-                 = d
-                 < min(δ1, δ2)    by dSmall
-                 ≤ δ1
-                 as probeClose1;
-              abs(x + d - x)
-                 = d
-                 < min(δ1, δ2)    by dSmall
-                 ≤ δ2
-                 as probeClose2;
-              abs(f(x + d) - f(x) - L1 * (x + d - x))
-                      ≤ ε / 2 / 2 * abs(x + d - x)
-                  by firstClose(x + d, probeClose1);
-              abs(f(x + d) - f(x) - L2 * (x + d - x))
-                      ≤ ε / 2 / 2 * abs(x + d - x)
-                  by secondClose(x + d, probeClose2);
-              abs(L1 - L2) * d
-                 = abs(L1 - L2) * abs(x + d - x)
-                       by distanceEquation
-                 = abs((L1 - L2) * (x + d - x))
-                 = abs((f(x + d) - f(x) - L2 * (x + d - x))
-                       - (f(x + d) - f(x) - L1 * (x + d - x)))
-                       by ((L1 - L2) * (x + d - x)
-                           = (f(x + d) - f(x) - L2 * (x + d - x))
-                             - (f(x + d) - f(x) - L1 * (x + d - x)))
-                 ≤ abs(f(x + d) - f(x) - L2 * (x + d - x))
-                   + abs(-(f(x + d) - f(x) - L1 * (x + d - x)))
-                       by Real.triangle_inequality
-                 = abs(f(x + d) - f(x) - L2 * (x + d - x))
-                   + abs(f(x + d) - f(x) - L1 * (x + d - x))
-                       by Real.absolute_value_negate
-                 ≤ ε / 2 / 2 * abs(x + d - x)
-                   + abs(f(x + d) - f(x) - L1 * (x + d - x))
-                       by Real.add_preserves_LessOrEqual
-                 ≤ ε / 2 / 2 * abs(x + d - x)
-                   + ε / 2 / 2 * abs(x + d - x)
-                       by Real.add_preserves_LessOrEqual_left
-                 = (ε / 2 / 2 + ε / 2 / 2) * abs(x + d - x)
-                 = ε / 2 * abs(x + d - x)
-                       by substituting Real.divide_two_doubled(ε / 2)
-                 = ε / 2 * d
-                       by distanceEquation
-                 as productBound;
-              d * abs(L1 - L2)
-                 = abs(L1 - L2) * d
-                 ≤ ε / 2 * d         by productBound
-                 = d * (ε / 2);
-              done by Real.LessOrEqual.multiply_cancel_left_positive
-            } as probe;
-        -- Instantiate the probe at half the shared δ and squeeze.
-        min(δ1, δ2) / 2 > 0
-            by Real.divide_positive as probeValuePositive;
-        min(δ1, δ2) / 2 < min(δ1, δ2)
-            by Real.divide_two_less_than_self as probeValueSmall;
-        abs(L1 - L2) ≤ ε / 2
-            by probe(min(δ1, δ2) / 2, probeValuePositive, probeValueSmall) as slopeBound;
-        ε / 2 < ε by Real.divide_two_less_than_self as εHalfBelow;
-        abs(L1 - L2)
-           ≤ ε / 2   by slopeBound
-           < ε       by εHalfBelow
-      };
-  L1 - L2 = 0
-      by Real.eq_of_absolute_value_less_than_all_positive_real as differenceIsZero;
-  Real.eq_of_sub_eq_zero(L1, L2, differenceIsZero)
+              (y : ℝ) ↦ f(y) * g(y), x, fSlope * g(x) + f(x) * gSlope) := {
+  ∀ (ε : ℝ). ε > 0 → MetricSpace.Near(x, (y : ℝ) ↦
+      abs(f(y) * g(y) - f(x) * g(x)
+          - (fSlope * g(x) + f(x) * gSlope) * (y - x)) ≤ ε * abs(y - x))
+      by { take ε : ℝ;
+           suppose ε > 0;
+           Real.ContinuousAt(g, x) by Real.HasDerivativeAt.continuous;
+           -- Real roofs over the three bystander factors, each with headroom.
+           let gHeadroom : ℝ := abs(g(x)) + 1;
+           let fRoof : ℝ := abs(f(x)) + 1;
+           let slopeRoof : ℝ := abs(fSlope) + 1;
+           abs(f(x))
+              ≤ abs(f(x)) + 1       by Real.less_or_equal_add_of_nonneg;
+           abs(fSlope)
+              ≤ abs(fSlope) + 1     by Real.less_or_equal_add_of_nonneg;
+           -- The three scaled tolerances, all positive.
+           ε / 2 / gHeadroom > 0;
+           ε / 2 / 2 / fRoof > 0;
+           ε / 2 / 2 / slopeRoof > 0;
+           (1 : ℝ) > 0;
+           -- FOUR neighbourhoods, and not one δ named: the filter takes
+           -- the minimum of all four radii.
+           MetricSpace.Near(x, (y : ℝ) ↦
+               abs(f(y) - f(x) - fSlope * (y - x))
+                 ≤ ε / 2 / gHeadroom * abs(y - x))
+               by Real.HasDerivativeAt.near;
+           MetricSpace.Near(x, (y : ℝ) ↦
+               abs(g(y) - g(x) - gSlope * (y - x))
+                 ≤ ε / 2 / 2 / fRoof * abs(y - x))
+               by Real.HasDerivativeAt.near;
+           MetricSpace.Near(x, (y : ℝ) ↦ abs(g(y) - g(x)) < 1)
+               by Real.ContinuousAt.near;
+           MetricSpace.Near(x, (y : ℝ) ↦
+               abs(g(y) - g(x)) < ε / 2 / 2 / slopeRoof)
+               by Real.ContinuousAt.near;
+           for y sufficiently near x: {
+             -- |g(y)| sits under its headroom roof.
+             abs(g(y) - g(x)) ≤ 1 by Real.LessThan.weaken;
+             abs(g(y))
+                = abs(g(x) + (g(y) - g(x)))            by (g(x) + (g(y) - g(x)) = g(y))
+                ≤ abs(g(x)) + abs(g(y) - g(x))         by Real.triangle_inequality
+                ≤ abs(g(x)) + 1                        by Real.add_preserves_LessOrEqual_left;
+             -- The three error bounds delivered by the δs.
+             abs(g(y) - g(x)) ≤ ε / 2 / 2 / slopeRoof by Real.LessThan.weaken;
+             -- The three tolerance collapses.
+             gHeadroom * (ε / 2 / gHeadroom) = ε / 2 as collapseFirst;
+             fRoof * (ε / 2 / 2 / fRoof) = ε / 2 / 2
+                 by Real.divide_cancel as collapseSecond;
+             slopeRoof * (ε / 2 / 2 / slopeRoof) = ε / 2 / 2 as collapseThird;
+             -- First piece: (f-error)·g(y) ≤ (ε/2)·|y − x|.
+             abs((f(y) - f(x) - fSlope * (y - x)) * g(y))
+                = abs(f(y) - f(x) - fSlope * (y - x)) * abs(g(y))
+                ≤ (ε / 2 / gHeadroom * abs(y - x)) * gHeadroom
+                      by Real.LessOrEqual.multiply_monotone_nonneg
+                = (gHeadroom * (ε / 2 / gHeadroom)) * abs(y - x)
+                = ε / 2 * abs(y - x)
+                      by collapseFirst;
+             -- Second piece: f(x)·(g-error) ≤ (ε/4)·|y − x|.
+             abs(f(x) * (g(y) - g(x) - gSlope * (y - x)))
+                = abs(f(x)) * abs(g(y) - g(x) - gSlope * (y - x))
+                ≤ fRoof * (ε / 2 / 2 / fRoof * abs(y - x))
+                      by Real.LessOrEqual.multiply_monotone_nonneg
+                = (fRoof * (ε / 2 / 2 / fRoof)) * abs(y - x)
+                = ε / 2 / 2 * abs(y - x)
+                      by collapseSecond;
+             -- Third piece: f′·(y − x)·(g(y) − g(x)) ≤ (ε/4)·|y − x|.
+             abs(y - x) * abs(g(y) - g(x))
+                     ≤ abs(y - x) * (ε / 2 / 2 / slopeRoof)
+                 by Real.LessOrEqual.multiply_monotone_nonneg;
+             abs(fSlope * ((y - x) * (g(y) - g(x))))
+                = abs(fSlope) * abs((y - x) * (g(y) - g(x)))
+                = abs(fSlope) * (abs(y - x) * abs(g(y) - g(x)))
+                      by Real.absolute_value_multiplicative
+                ≤ slopeRoof * (abs(y - x) * (ε / 2 / 2 / slopeRoof))
+                      by Real.LessOrEqual.multiply_monotone_nonneg
+                = (slopeRoof * (ε / 2 / 2 / slopeRoof)) * abs(y - x)
+                = ε / 2 / 2 * abs(y - x)
+                      by collapseThird;
+             -- Assemble: triangle inequality twice, then ε/2 + ε/4 + ε/4.
+             abs(f(x) * (g(y) - g(x) - gSlope * (y - x))
+                         + fSlope * ((y - x) * (g(y) - g(x))))
+                     ≤ abs(f(x) * (g(y) - g(x) - gSlope * (y - x)))
+                       + abs(fSlope * ((y - x) * (g(y) - g(x))))
+                 by Real.triangle_inequality;
+             abs(f(x) * (g(y) - g(x) - gSlope * (y - x)))
+                  + abs(fSlope * ((y - x) * (g(y) - g(x))))
+                ≤ ε / 2 / 2 * abs(y - x)
+                  + abs(fSlope * ((y - x) * (g(y) - g(x))))
+                      by Real.add_preserves_LessOrEqual
+                ≤ ε / 2 / 2 * abs(y - x) + ε / 2 / 2 * abs(y - x)
+                      by Real.add_preserves_LessOrEqual_left;
+             abs(f(y) * g(y) - f(x) * g(x)
+                      - (fSlope * g(x) + f(x) * gSlope) * (y - x))
+                = abs((f(y) - f(x) - fSlope * (y - x)) * g(y)
+                      + (f(x) * (g(y) - g(x) - gSlope * (y - x))
+                         + fSlope * ((y - x) * (g(y) - g(x)))))
+                      by ((f(y) - f(x) - fSlope * (y - x)) * g(y)
+                          + (f(x) * (g(y) - g(x) - gSlope * (y - x))
+                             + fSlope * ((y - x) * (g(y) - g(x))))
+                          = f(y) * g(y) - f(x) * g(x)
+                            - (fSlope * g(x) + f(x) * gSlope) * (y - x))
+                ≤ abs((f(y) - f(x) - fSlope * (y - x)) * g(y))
+                  + abs(f(x) * (g(y) - g(x) - gSlope * (y - x))
+                        + fSlope * ((y - x) * (g(y) - g(x))))
+                      by Real.triangle_inequality
+                ≤ ε / 2 * abs(y - x)
+                  + abs(f(x) * (g(y) - g(x) - gSlope * (y - x))
+                        + fSlope * ((y - x) * (g(y) - g(x))))
+                      by Real.add_preserves_LessOrEqual
+                ≤ ε / 2 * abs(y - x)
+                  + (abs(f(x) * (g(y) - g(x) - gSlope * (y - x)))
+                     + abs(fSlope * ((y - x) * (g(y) - g(x)))))
+                      by Real.add_preserves_LessOrEqual_left
+                ≤ ε / 2 * abs(y - x)
+                  + (ε / 2 / 2 * abs(y - x) + ε / 2 / 2 * abs(y - x))
+                      by Real.add_preserves_LessOrEqual_left
+                = (ε / 2 + (ε / 2 / 2 + ε / 2 / 2)) * abs(y - x)
+                = (ε / 2 + ε / 2) * abs(y - x)
+                      by substituting Real.divide_two_doubled(ε / 2)
+                = ε * abs(y - x)
+           } };
+  done by Real.HasDerivativeAt.of_near
 }
