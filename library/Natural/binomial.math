@@ -53,15 +53,18 @@ theorem Natural.binomial_zero_succ (k : ℕ)
   done by Logic.if_negative
 }
 
--- Pascal's rule: C(n+1, k+1) = C(n, k) + C(n, k+1). The `k+1 = 0` test fails,
--- so the coefficient is the else branch, with monus(k+1, 1) = k.
+-- Pascal's rule: C(n+1, k+1) = C(n, k) + C(n, k+1). Off the k = 0 edge the
+-- coefficient is the sum of the two above it, and the column shifts by one.
 theorem Natural.binomial_pascal (n k : ℕ)
         : Natural.binomial(1 + n, 1 + k)
           = Natural.binomial(n, k) + Natural.binomial(n, 1 + k) :=
-  unfold Natural.add, ℕ in
-  if 1 + k = 0
-  then { 1 + k ≠ 0; done }
-  else {
+  unfold Natural.add, ℕ in {
+    1 + k ≠ 0;
+    ((if 1 + k = 0
+      then 1
+      else Natural.binomial(n, (1 + k) ∸ 1) + Natural.binomial(n, 1 + k)) : ℕ)
+       = Natural.binomial(n, (1 + k) ∸ 1) + Natural.binomial(n, 1 + k)
+       by Logic.if_negative;
     (1 + k) ∸ 1 = k;
     done
   }

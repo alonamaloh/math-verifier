@@ -96,34 +96,42 @@ field-of-fractions quotient.
   `Natural.add_one` automatic in argument position would cover this and
   the family of cases around it.
 
-- **`Natural.binomial_pascal` still re-decides its own conditional, and
-  a citation cannot currently replace the split.** It opens
-  `if 1 + k = 0 then …` on a natural that is visibly a successor, which
-  is what `docs/style.md` says not to do — reason through the
-  characterizing equations over `Logic.if_positive` /
-  `Logic.if_negative` instead.
+- **A citation cannot reduce the goal's head to find its own conclusion
+  shape.** `Natural.binomial_pascal` no longer re-decides its
+  conditional, but it still has to WRITE the conditional out —
+  `((if 1 + k = 0 then 1 else …) : ℕ) = … by Logic.if_negative` — before
+  the citation can land. `done by Logic.if_negative` on the bare goal
+  fails: the goal reaches the hole solver as
+  `binomial(1 + n, 1 + k) = …` and never acquires the
+  `Decidable_recursor … = b` shape the lemma concludes with, so the
+  holes go unassigned. `unfold Natural.binomial` does not help — it
+  grants transparency, and the solver still does not reduce.
 
-  Four rewrites were tried and all fail the same way. The goal reaches
-  the citation matcher as `binomial(1 + n, 1 + k) = …`, with
-  `binomial`'s head NOT reduced, so it never has the
-  `Decidable_recursor …  = b` shape `if_negative` concludes with;
-  `unfold Natural.binomial` does not help, because `unfold` grants
-  transparency and the matcher still does not reduce. What the
-  proof-level `if` is really doing is forcing the OUTER guard — which
-  is the structural recursion on the first argument, not a classical
-  `if` — to ι-reduce in each branch, exposing the inner classical one.
+  Established while fixing it: the reduced form IS definitionally equal
+  to the goal (a `note goal :` at the conditional passes), and the
+  outer guard — the structural recursion on the first argument — has
+  already bound the predecessor, so the reduct mentions `n`, not
+  `(1 + n) ∸ 1`. Once the head is visible the matcher pins every hole,
+  so the matcher is fine; only the reduction is missing.
 
-  So this is a matcher limitation, not a spelling choice: the fix is
-  reduction during citation matching (the same gap as the
-  `partialSum_split` index item above), or a
-  `binomial_pascal`-shaped characterizing equation generated with the
-  definition. `binomial_zero_succ` reads correctly
-  (`done by Logic.if_negative`) only because its first argument is the
-  literal `0`, so nothing needs to reduce.
+  `citeWithInferredArguments` → Step 2 in `inference.cpp` already has
+  four fallback rungs, including an equality-ENDPOINT WHNF retry
+  (`reduceEqualityEndpoints`) that is exactly the right shape. It does
+  not fire here, and a probe says why: with the first argument the
+  LITERAL `0`, `Natural.binomial(0, 1 + k) = 0` closes on a bare
+  `done by Logic.if_negative` — the reduction runs and the citation
+  lands. With the first argument `1 + n` it does not. So WHNF cannot
+  take `1 + n` to the successor the recursion scrutinises, even with
+  `Natural.add` and `ℕ` unfolded; `Natural.Raw.add` does recurse on its
+  first argument, so what is stuck is peeling the numeral literal `1`
+  to `successor(zero)`.
 
-  The unrelated instances of this shape in
-  `Real.augmentedScaledRow_{zero,one_plus}` ARE fixed — there the
-  conditional is the definition's own head, so the citation lands.
+  That makes this the `one_plus_vs_plus_one_asymmetry` /
+  `numeral_zero_one_normalization` story rather than a matcher bug, and
+  it is the same root as the `partialSum_split` index item above. Fixing
+  literal peeling in WHNF would let the existing endpoint retry close
+  both, and would let `binomial_pascal` read
+  `done by Logic.if_negative` with no conditional written out at all.
 
 - **`by_induction … using` (prime_divisor v3 style) needs the
   return-type ascription stripped.** Its last 2 lines remain CIC
