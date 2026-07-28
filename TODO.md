@@ -81,6 +81,21 @@ field-of-fractions quotient.
 
 ## Elaborator quirks (small open issues)
 
+- **`Natural.binomial_pascal` still re-decides its own conditional.**
+  It opens `if 1 + k = 0 then …` on a natural that is visibly a
+  successor, which is precisely what `docs/style.md` says not to do —
+  reason through the characterizing equations over
+  `Logic.if_positive` / `Logic.if_negative` instead. The
+  straightforward rewrite fails because `Natural.binomial` NESTS two
+  conditionals (`n = 0`, then `k = 0`), so the goal is not a bare
+  `if … = b` and one `if_negative` citation does not reach it; it
+  wants either both conditions discharged in sequence or a
+  characterizing equation for the nested form. The sibling
+  `binomial_zero_succ` already reads correctly
+  (`done by Logic.if_negative`), and the same shape in
+  `Real.augmentedScaledRow_{zero,one_plus}` is now clean, so this is
+  the last one.
+
 - **`by_induction … using` (prime_divisor v3 style) needs the
   return-type ascription stripped.** Its last 2 lines remain CIC
   plumbing in an otherwise textbook proof. Until that's fixed, new
