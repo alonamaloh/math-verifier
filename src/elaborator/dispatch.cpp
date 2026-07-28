@@ -1445,6 +1445,10 @@ ExpressionPointer Elaborator::elaborateExpression(
                     argumentTerm = coerceToExpectedTypeViaRegistry(
                         localBinders, argumentTerm,
                         argumentExpectedType);
+                    // A bundle value where a TYPE is wanted means its
+                    // carrier: `Set(source)` for `source : MetricSpace`.
+                    argumentTerm = coerceBundleValueToCarrier(
+                        argumentTerm, localBinders, argumentExpectedType);
                     checkRedundantCongruenceOfWrapper(
                         argument, localBinders, argumentExpectedType,
                         "function-call argument");

@@ -1,0 +1,82 @@
+-- A BUNDLE VALUE used where a TYPE is expected means its carrier:
+-- with `space : MetricSpace`, `(x : space)` is
+-- `(x : MetricSpace.carrier(space))`. A mathematician writes "let X, Y be
+-- metric spaces, f : X → Y, A ⊆ X"; this is what lets the library write
+-- that too.
+--
+-- A bundle is recognised the same way `instance` recognises one — by a
+-- `<Structure>.carrier` projection being in scope — so no name table is
+-- involved and every bundle of that shape qualifies. The guard is that
+-- the term's type must not already be a Sort, and (in argument position)
+-- that a Sort is what's expected.
+
+module Test.bundle_carrier_coercion_test
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Set.algebra
+import Real.interface
+import Real.order
+import Metric.space
+import Metric.topology
+import Metric.continuity
+import Metric.compactness
+
+-- Declaration binder position.
+theorem Test.carrier_declaration_binder (space : MetricSpace) (x : space)
+        : x = x :=
+  reflexivity(MetricSpace.carrier(space), x)
+
+-- Pi domain and codomain, anonymous (`source → target`).
+theorem Test.carrier_arrow (source target : MetricSpace)
+        (f : source → target) (x : source)
+        : f(x) = f(x) :=
+  reflexivity(MetricSpace.carrier(target), f(x))
+
+-- Argument position, gated on a Sort being expected (`Set(source)`).
+theorem Test.carrier_type_argument (source : MetricSpace)
+        (region : Set(source))
+        : region = region :=
+  reflexivity(Set(MetricSpace.carrier(source)), region)
+
+-- Named Pi binder in a statement, and the `take` that introduces it
+-- (which desugars to a lambda, so this pins the lambda path too).
+theorem Test.carrier_forall_and_take (space : MetricSpace)
+        (region : Set(space))
+        : ∀ (x : space). x ∈ region → x ∈ region := {
+  take x : space;
+  suppose x ∈ region;
+  done
+}
+
+-- Nested: a function into a Set over the bundle.
+theorem Test.carrier_nested (source target : MetricSpace)
+        (pick : source → Set(target)) (x : source)
+        : pick(x) = pick(x) :=
+  reflexivity(Set(MetricSpace.carrier(target)), pick(x))
+
+-- THE TARGET SHAPE, checked against the real theorem: the elaborated
+-- statement is the same one `MetricSpace.IsCompact.image` proves, so the
+-- bare citation closes it.
+theorem Test.carrier_image_reads_as_mathematics
+        (source target : MetricSpace)
+        (f : source → target)
+        (region : Set(source))
+        (compact : MetricSpace.IsCompact(region))
+        (continuous : MetricSpace.ContinuousOn(f, region))
+        : MetricSpace.IsCompact(MetricSpace.imageSet(f, region)) :=
+  done by MetricSpace.IsCompact.image
+
+-- GUARD: a genuine type is untouched — ℝ is not a bundle value, and a
+-- bundle-typed value in a NON-type argument position is left alone
+-- (`MetricSpace.carrier(space)` must not become
+-- `MetricSpace.carrier(MetricSpace.carrier(space))`).
+theorem Test.carrier_guard_ordinary_types (f : ℝ → ℝ) (x : ℝ)
+        (space : MetricSpace) (y : MetricSpace.carrier(space))
+        : f(x) = f(x) ∧ y = y := {
+  f(x) = f(x);
+  y = y;
+  done
+}

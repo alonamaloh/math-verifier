@@ -3369,30 +3369,76 @@ ExpressionPointer Elaborator::elaborateNumericLiteral(
         return makeNaturalLiteral(NaturalValue(numeric.digits));
     }
 
+ExpressionPointer Elaborator::coerceBundleValueToCarrier(
+        ExpressionPointer term,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType) {
+        if (!term) return term;
+        if (expectedType) {
+            // Argument position: fire only where a TYPE is what's wanted.
+            ExpressionPointer expectedHead;
+            try {
+                expectedHead =
+                    weakHeadNormalForm(environment_, expectedType);
+            } catch (...) {
+                return term;
+            }
+            if (!std::get_if<Sort>(&expectedHead->node)) return term;
+        }
+        int binderCount = static_cast<int>(localBinders.size());
+        Context context = buildContextFromLocalBinders(localBinders);
+        ExpressionPointer opened =
+            openOverLocalBinders(term, localBinders, binderCount);
+        ExpressionPointer termType;
+        try {
+            termType = inferType(environment_, context, opened);
+        } catch (...) {
+            // Not typeable here — leave it alone and let the ordinary
+            // path report whatever is actually wrong.
+            return term;
+        }
+        if (!termType) return term;
+        // Already a type (`ℝ`, `Set(ℝ)`, a proposition)? Nothing to do.
+        ExpressionPointer termTypeHead;
+        try {
+            termTypeHead = weakHeadNormalForm(environment_, termType);
+        } catch (...) {
+            return term;
+        }
+        if (std::get_if<Sort>(&termTypeHead->node)) return term;
+        std::string structureName = headConstantName(termType);
+        if (structureName == "<unknown>") return term;
+        std::string projectionName = structureName + ".carrier";
+        if (environment_.lookup(projectionName) == nullptr) return term;
+        return makeApplication(makeConstant(projectionName),
+                               std::move(term));
+    }
+
 ExpressionPointer Elaborator::elaboratePiType(
         const SurfacePiType& piType,
         const std::vector<LocalBinder>& localBinders) {
         if (piType.binder.names.empty()) {
             // Anonymous: T → U.
-            ExpressionPointer domain =
-                elaborateExpression(*piType.binder.type, localBinders);
+            ExpressionPointer domain = coerceBundleValueToCarrier(
+                elaborateExpression(*piType.binder.type, localBinders),
+                localBinders);
             std::vector<LocalBinder> extended = localBinders;
             extended.push_back({"_", domain});
-            ExpressionPointer codomain =
-                elaborateExpression(*piType.codomain, extended);
+            ExpressionPointer codomain = coerceBundleValueToCarrier(
+                elaborateExpression(*piType.codomain, extended), extended);
             return makePi("_", std::move(domain), std::move(codomain));
         }
         // Multi-name binder: (x y z : T) → U becomes a chain of Pis.
         std::vector<LocalBinder> extended = localBinders;
         std::vector<ExpressionPointer> domainsPerName;
         for (const auto& name : piType.binder.names) {
-            ExpressionPointer domainHere =
-                elaborateExpression(*piType.binder.type, extended);
+            ExpressionPointer domainHere = coerceBundleValueToCarrier(
+                elaborateExpression(*piType.binder.type, extended), extended);
             domainsPerName.push_back(domainHere);
             extended.push_back({name, domainHere});
         }
-        ExpressionPointer codomain =
-            elaborateExpression(*piType.codomain, extended);
+        ExpressionPointer codomain = coerceBundleValueToCarrier(
+            elaborateExpression(*piType.codomain, extended), extended);
         ExpressionPointer result = codomain;
         for (int i = static_cast<int>(piType.binder.names.size()) - 1;
              i >= 0; --i) {
@@ -3444,8 +3490,9 @@ ExpressionPointer Elaborator::elaborateLambda(
             const auto& name = lambda.binder.names[k];
             ExpressionPointer domainHere;
             if (lambda.binder.type) {
-                domainHere =
-                    elaborateExpression(*lambda.binder.type, extended);
+                domainHere = coerceBundleValueToCarrier(
+                    elaborateExpression(*lambda.binder.type, extended),
+                    extended);
             } else {
                 // Untyped binder: read the domain from the expected
                 // Pi. The kernel term is already in the right scope

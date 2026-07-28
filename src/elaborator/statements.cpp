@@ -2232,13 +2232,17 @@ void Elaborator::elaborateDefinition(const SurfaceDefinitionDeclaration& origDec
             try {
                 for (const auto& binder : declaration.arguments) {
                     ExpressionPointer argumentType =
-                        elaborateExpression(*binder.type, localBinders);
+                        coerceBundleValueToCarrier(
+                            elaborateExpression(*binder.type, localBinders),
+                            localBinders);
                     for (const auto& name : binder.names) {
                         argumentBinders.push_back({name, argumentType});
                         localBinders.push_back({name, argumentType});
                         if (&name != &binder.names.back()) {
-                            argumentType = elaborateExpression(
-                                *binder.type, localBinders);
+                            argumentType = coerceBundleValueToCarrier(
+                                elaborateExpression(
+                                    *binder.type, localBinders),
+                                localBinders);
                         }
                     }
                 }
@@ -2345,14 +2349,16 @@ void Elaborator::elaborateTheoremStatementOnly(
         // on the stack, or it reaches the driver bare and prints at 1:1.
         try {
             for (const auto& binder : declaration.arguments) {
-                ExpressionPointer argumentType =
-                    elaborateExpression(*binder.type, localBinders);
+                ExpressionPointer argumentType = coerceBundleValueToCarrier(
+                    elaborateExpression(*binder.type, localBinders),
+                    localBinders);
                 for (const auto& name : binder.names) {
                     argumentBinders.push_back({name, argumentType});
                     localBinders.push_back({name, argumentType});
                     if (&name != &binder.names.back()) {
-                        argumentType = elaborateExpression(*binder.type,
-                                                            localBinders);
+                        argumentType = coerceBundleValueToCarrier(
+                            elaborateExpression(*binder.type, localBinders),
+                            localBinders);
                     }
                 }
             }

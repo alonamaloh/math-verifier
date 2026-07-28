@@ -6040,6 +6040,28 @@ private:
     ExpressionPointer carrierProjectionField(ExpressionPointer type,
                                              int depth = 0);
 
+    // A BUNDLE VALUE used where a TYPE is expected means its carrier:
+    // with `source target : MetricSpace`, `(f : source → target)` is
+    // `(f : MetricSpace.carrier(source) → MetricSpace.carrier(target))`
+    // and `Set(source)` is `Set(MetricSpace.carrier(source))`. Returns the
+    // projection-wrapped term, or `term` unchanged when it does not apply.
+    //
+    // A bundle is recognised exactly as `instance` recognises one — by a
+    // `<Structure>.carrier` projection being in scope — so every bundle of
+    // that shape gets this and no name table is involved. The guard that
+    // makes it safe is that the term's type must NOT already be a Sort:
+    // a genuine type (`ℝ`, `Set(ℝ)`, a proposition) is left alone, and so
+    // is any value whose type has no `.carrier`.
+    // `expectedType`, when supplied, must WHNF to a Sort for the coercion
+    // to fire — the argument-position gate. Without it, `source` inside
+    // `MetricSpace.carrier(source)` (expected type `MetricSpace`, not a
+    // Sort) would itself be wrapped. At a Pi domain or a declaration
+    // binder's type, pass nullptr: the position already demands a type.
+    ExpressionPointer coerceBundleValueToCarrier(
+        ExpressionPointer term,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType = nullptr);
+
     // Walk `signature`'s Pi chain; check that the first N domains have
     // the head-name listed in `argumentTypeNames`. Requires the chain
     // to have AT LEAST N Pis — partial application of an overloaded
