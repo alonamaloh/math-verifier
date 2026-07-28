@@ -19,7 +19,6 @@ import Natural.peano
 import Natural.arithmetic
 import Natural.order
 import Natural.eventually
-import Natural.maximum
 import Rational.basics
 import Rational.addition
 import Rational.multiplication
@@ -61,9 +60,8 @@ definition CauchyRationalSequence.IsEventuallyNonneg
 -- Respect: if a ~ b, then IsEventuallyNonneg(a) ↔ IsEventuallyNonneg(b).
 
 -- Forward direction. Given IsEventuallyNonneg(a) and a ~ b: at ε for b,
--- pick N_a with -(ε/2) < a(m) and N_eq with |a(m) - b(m)| < ε/2;
--- at m ≥ max(N_a, N_eq) the second gives -(ε/2) < b(m) - a(m).
--- Adding: -ε = -(ε/2) + -(ε/2) < a(m) + (b(m) - a(m)) = b(m).
+-- both -(ε/2) < a(m) and |a(m) - b(m)| < ε/2 hold eventually, and where
+-- they hold together, -ε = -(ε/2) + -(ε/2) < a(m) + (b(m) - a(m)) = b(m).
 theorem CauchyRationalSequence.IsEventuallyNonneg.respect_forward
         (a b : CauchyRationalSequence)
         (aEquivB : CauchyEquivalent(a, b))
@@ -72,34 +70,22 @@ theorem CauchyRationalSequence.IsEventuallyNonneg.respect_forward
         : CauchyRationalSequence.IsEventuallyNonneg(b) :=
   (ε : ℚ)
            (εPositive : Rational.zero < ε) ↦ {
-    Rational.zero < Rational.halve(ε) as halvedPositive;
-    choose N_a from aEventuallyNonneg(Rational.halve(ε), halvedPositive);
-    choose N_eq as eqBound from aEquivB(Rational.halve(ε), halvedPositive);
-    witness Natural.maximum(N_a, N_eq) with
-        (m : ℕ)
-                 (mGeMax : Natural.maximum(N_a, N_eq) ≤ m) ↦ {
-          N_a ≤ m;
-          N_eq ≤ m;
-          -Rational.halve(ε) < a(m);
-          abs(a(m) - b(m)) < Rational.halve(ε) by eqBound;
-          -- |b(m) - a(m)| < ε/2  (swap inside the abs).
-          abs(b(m) - a(m)) = abs(a(m) - b(m)) < Rational.halve(ε);
-          -- Extract the lower bound: -(ε/2) < b(m) - a(m)
-          -- (lower half of the |·| bounds on the swapped abs).
-          -Rational.halve(ε) < b(m) - a(m)
-              by Rational.absolute_value_LessThan_bounds;
-          -- Chain the two ε/2 bounds end-to-end:
-          --   -ε = -halve(ε) + -halve(ε)
-          --      < a(m) + -halve(ε)                    (aBoundAtM)
-          --      < a(m) + (b(m) - a(m))                (swappedδ)
-          --      = b(m).
-          -ε
-             = -(Rational.halve(ε) + Rational.halve(ε))
-             = -Rational.halve(ε) + -Rational.halve(ε)
-             < a(m) + -Rational.halve(ε)
-             < a(m) + (b(m) - a(m))
-             = b(m)
-        }
+    Rational.zero < Rational.halve(ε);
+    eventually (m). -Rational.halve(ε) < a(m);
+    eventually (m). abs(a(m) - b(m)) < Rational.halve(ε);
+    for m sufficiently large: {
+      -- |b(m) - a(m)| < ε/2 (swap inside the abs); its lower half is
+      -- the bound the chain needs.
+      abs(b(m) - a(m)) = abs(a(m) - b(m)) < Rational.halve(ε);
+      -Rational.halve(ε) < b(m) - a(m)
+          by Rational.absolute_value_LessThan_bounds;
+      -ε
+         = -(Rational.halve(ε) + Rational.halve(ε))
+         = -Rational.halve(ε) + -Rational.halve(ε)
+         < a(m) + -Rational.halve(ε)
+         < a(m) + (b(m) - a(m))
+         = b(m)
+    }
   }
 
 -- Backward direction: use forward with a, b swapped, using
@@ -189,8 +175,8 @@ automatic theorem Real.LessOrEqual.reflexive (x : ℝ) : x ≤ x :=
 -- Real.IsNonneg.add and Real.LessOrEqual.transitive.
 
 -- Sequence-level: sum of two IsEventuallyNonneg sequences is
--- IsEventuallyNonneg. ε/2 split, max of N's, then -ε = -(ε/2) + -(ε/2)
--- < s(m) + t(m).
+-- IsEventuallyNonneg. ε/2 split, then -ε = -(ε/2) + -(ε/2) < s(m) + t(m)
+-- wherever both bounds hold.
 theorem Rational.sequence.IsEventuallyNonneg.add
         (s t : Rational.sequence.Sequence)
         (sNonneg : Rational.sequence.IsEventuallyNonneg(s))
@@ -200,29 +186,15 @@ theorem Rational.sequence.IsEventuallyNonneg.add
   (ε : ℚ)
            (εPositive : Rational.zero < ε) ↦ {
     Rational.zero < Rational.halve(ε);
-    eventually (m). -Rational.halve(ε) < s(m) as sBounded;
-    choose N_s such that ∀ (m : ℕ). N_s ≤ m → -Rational.halve(ε) < s(m)
-        from sBounded;
-    eventually (m). -Rational.halve(ε) < t(m) as tBounded;
-    choose N_t such that ∀ (m : ℕ). N_t ≤ m → -Rational.halve(ε) < t(m)
-        from tBounded;
-    witness Natural.maximum(N_s, N_t) with
-        (m : ℕ)
-                 (mGeMax : Natural.maximum(N_s, N_t) ≤ m) ↦ {
-          N_s ≤ m;
-          N_t ≤ m;
-          -Rational.halve(ε) < s(m);
-          -Rational.halve(ε) < t(m);
-          -- Chain the two ε/2 bounds end-to-end:
-          --   -ε = -halve(ε) + -halve(ε)
-          --      < s(m) + -halve(ε)    (sAt, added on the right)
-          --      < s(m) + t(m)         (tAt, added on the left).
-          -ε
-             = -(Rational.halve(ε) + Rational.halve(ε))
-             = -Rational.halve(ε) + -Rational.halve(ε)
-             < s(m) + -Rational.halve(ε)
-             < s(m) + t(m)
-        }
+    eventually (m). -Rational.halve(ε) < s(m);
+    eventually (m). -Rational.halve(ε) < t(m);
+    for m sufficiently large: {
+      -ε
+         = -(Rational.halve(ε) + Rational.halve(ε))
+         = -Rational.halve(ε) + -Rational.halve(ε)
+         < s(m) + -Rational.halve(ε)
+         < s(m) + t(m)
+    }
   }
 
 -- Real.IsNonneg.add at the rep level.
@@ -276,10 +248,9 @@ theorem Real.LessOrEqual.transitive
 -- Antisymmetry of Real.IsNonneg: x ≥ 0 and -x ≥ 0 implies x = 0.
 
 -- Sequence-level: if both s and its negation are eventually nonneg,
--- then s is equivalent to the constant-zero sequence. At ε > 0, take
--- the max of the two N witnesses; past it, -ε < s(m) (nonneg of s)
--- and -ε < -s(m) (nonneg of -s), so s(m) < ε. Combine into |s(m)| < ε
--- via absolute_value_LessThan_of_bounds, then |s(m) - 0| = |s(m)| < ε.
+-- then s is equivalent to the constant-zero sequence. At ε > 0, both
+-- -ε < s(m) (nonneg of s) and -ε < -s(m) (nonneg of -s) hold eventually,
+-- so s(m) < ε too; that is |s(m)| < ε, and |s(m) - 0| = |s(m)|.
 theorem Rational.sequence.equivalent_zero_of_IsEventuallyNonneg_both
         (s : Rational.sequence.Sequence)
         (sNonneg : Rational.sequence.IsEventuallyNonneg(s))
@@ -287,35 +258,22 @@ theorem Rational.sequence.equivalent_zero_of_IsEventuallyNonneg_both
             : Rational.sequence.IsEventuallyNonneg(
                   (n : ℕ) ↦ -s(n)))
         : ∀ (ε : ℚ). Rational.zero < ε →
-            ∃ (N : ℕ).
-              ∀ (m : ℕ). N ≤ m →
-                abs(s(m) - Rational.zero) < ε :=
+            eventually (m). abs(s(m) - Rational.zero) < ε :=
   (ε : ℚ)
            (εPositive : Rational.zero < ε) ↦ {
-    choose N_s from sNonneg(ε, εPositive);
-    choose N_negS as negSLowerBound from negSNonneg(ε, εPositive);
-    witness Natural.maximum(N_s, N_negS) with
-        (m : ℕ)
-                 (mGeMax : Natural.maximum(N_s, N_negS) ≤ m) ↦ {
-          -- Lower bound on s(m): -ε < s(m), from sNonneg.
-          N_s ≤ m;
-          N_negS ≤ m as mGeNnegS;
-          -ε < s(m);
-          -- Lower bound on -s(m): -ε < -s(m), from negSNonneg. Negating
-          -- both sides flips the inequality: s(m) < ε.
-          -ε < -s(m) by negSLowerBound(m, mGeNnegS);
-          s(m)
-             = -(-s(m))
-             < -(-ε)
-             = ε;
-          -- Combine: |s(m)| < ε.
-          abs(s(m)) < ε;
-          -- Final step: |s(m) - 0| = |s(m)| < ε. s(m) - 0 = s(m) by
-          -- add_zero applied to (s(m) + -0) (definition of subtract).
-          abs(s(m) - Rational.zero)
-             = abs(s(m))   by { s(m) - Rational.zero = s(m) }
-             < ε
-        }
+    eventually (m). -ε < s(m);
+    eventually (m). -ε < -s(m) by negSNonneg;
+    for m sufficiently large: {
+      -- Negating both sides of -ε < -s(m) flips it.
+      s(m)
+         = -(-s(m))
+         < -(-ε)
+         = ε;
+      abs(s(m)) < ε;
+      abs(s(m) - Rational.zero)
+         = abs(s(m))   by { s(m) - Rational.zero = s(m) }
+         < ε
+    }
   }
 
 -- Rep-level: a Cauchy sequence whose IsEventuallyNonneg holds on both

@@ -760,22 +760,10 @@ theorem Real.bisection_width_invariant
 -- to it after extracting the pointwise bound from `bisectionLeft`'s
 -- below-witness or `bisectionRight`'s upper-bound invariant.
 --
--- Proof at make (B = mk(make(b, _))): the goal reduces (via Real.add /
--- Real.negate / Real.IsNonneg Quotient.lift β-reductions plus
--- pattern-match ι on add/negate of make) to
---   Rational.sequence.IsEventuallyNonneg(λj. b(j) - s(j)).
--- At positive ε:
---   · Pick N_s from sIsCauchy at halve(ε): |s(m) - s(N_s)| < halve(ε)
---     for m ≥ N_s.
---   · Apply pointwiseLeq(N_s) at halve(ε). At constant-(s(N_s)) Real,
---     the diff sequence is (λj. b(j) - s(N_s)); pick N_b such that
---     b(j) - s(N_s) > -halve(ε) for j ≥ N_b.
---   · For j ≥ max(N_s, N_b): from |s(j) - s(N_s)| < halve(ε) extract
---     `s(N_s) - s(j) > -halve(ε)` (upper bound + LessThan.negate).
---     Sum with `b(j) - s(N_s) > -halve(ε)`:
---       (b(j) - s(N_s)) + (s(N_s) - s(j)) > -ε
---     LHS reduces (by Rational.add_subtract_cancel_left applied
---     symmetrically) to b(j) - s(j). Done.
+-- Proof at make (B = mk(make(b, _))): anchor the Cauchy modulus at
+-- some N, read the pointwise bound at that anchor, and chain the two
+-- ε/2 bounds inside one eventually scope — the exact mirror of
+-- `LessOrEqual_of_pointwise_lower` below, thresholds never on the page.
 theorem Real.LessOrEqual_of_pointwise_at_make
         (s : ℕ → ℚ)
         (sIsCauchy : Rational.sequence.IsCauchy(s))
@@ -786,47 +774,34 @@ theorem Real.LessOrEqual_of_pointwise_at_make
                 (s(n) : ℝ)
                   ≤ Real.from_cauchy_sequence(b, bIsCauchy))
         : Real.from_cauchy_sequence(s, sIsCauchy)
-            ≤ Real.from_cauchy_sequence(b, bIsCauchy) :=
-  unfold Real.IsNonneg in
-  ((ε : ℚ)
-           (εPositive : (0 : ℚ) < ε) ↦ {
-    (0 : ℚ) < Rational.halve(ε) as halvedPositive;
-    choose N_s as sCauchyAt
-        from sIsCauchy(Rational.halve(ε), halvedPositive);
-    choose N_b as bMinusSAt
-        from pointwiseLeq(N_s)(Rational.halve(ε), halvedPositive);
-    witness Natural.maximum(N_s, N_b) with
-        (m : ℕ)
-                 (mGeMax : Natural.maximum(N_s, N_b) ≤ m) ↦ {
-          N_s ≤ m as m_geq_N_s;
-          N_b ≤ m as m_geq_N_b;
-          -- |s(m) - s(N_s)| < halve(ε)
-          abs(s(m) - s(N_s)) < Rational.halve(ε)
-            by sCauchyAt(m, m_geq_N_s, N_s, N_s ≤ N_s);
-          s(m) - s(N_s) < Rational.halve(ε)
-            by Rational.absolute_value_LessThan_bounds;
-          -- Flip: -halve(ε) < s(N_s) - s(m). LessThan.negate gives
-          -- -halve(ε) < -(s(m) - s(N_s)) = s(N_s) - s(m).
-          -Rational.halve(ε)
-                  < -(s(m) - s(N_s))
-                  = s(N_s) - s(m);
-          -- bMinusSAt at m: -halve(ε) < b(m) - s(N_s)
-          -Rational.halve(ε) < b(m) - s(N_s)
-            by bMinusSAt(m, m_geq_N_b);
-          -- Chain the two ε/2 bounds end-to-end and simplify:
-          --   -ε = -halve(ε) + -halve(ε)
-          --      < (b(m) - s(N_s)) + -halve(ε)            (bBound)
-          --      ≤ (b(m) - s(N_s)) + (s(N_s) - s(m))      (sFlippedBound, weakened)
-          --      = b(m) - s(m).
-          -Rational.halve(ε) ≤ s(N_s) - s(m);
-          -ε
-             = -(Rational.halve(ε) + Rational.halve(ε))
-             = -Rational.halve(ε) + -Rational.halve(ε)
-             < (b(m) - s(N_s)) + -Rational.halve(ε)
-             ≤ (b(m) - s(N_s)) + (s(N_s) - s(m))
-             = b(m) - s(m)
-        }
-  })
+            ≤ Real.from_cauchy_sequence(b, bIsCauchy) := {
+  suffices ∀ (ε : ℚ). ε > 0 → eventually (m). -ε < b(m) - s(m)
+      by definition of Real.LessOrEqual, Real.IsNonneg;
+  take ε : ℚ;
+  suppose ε > 0 as εPositive;
+  Rational.halve(ε) > 0;
+
+  choose N such that eventually (m). abs(s(m) - s(N)) < Rational.halve(ε)
+      from Rational.sequence.IsCauchy.eventually_near_anchor;
+  eventually (m). -Rational.halve(ε) < b(m) - s(N)
+      by Real.eventually_above_cast_of_LessOrEqual;
+
+  eventually (m): {
+    s(m) - s(N) < Rational.halve(ε)
+        by Rational.absolute_value_LessThan_bounds;
+    -Rational.halve(ε)
+            ≤ -(s(m) - s(N))
+            = s(N) - s(m);
+    -ε
+       = -(Rational.halve(ε) + Rational.halve(ε))
+             by substituting Rational.halve_doubled
+       = -Rational.halve(ε) + -Rational.halve(ε)
+       < (b(m) - s(N)) + -Rational.halve(ε)
+       ≤ (b(m) - s(N)) + (s(N) - s(m))
+       = b(m) - s(m);
+    done
+  }
+}
 
 -- Lift to arbitrary Real B via Quotient.induct: case on B = mk(b_rep),
 -- Take a representative B = [(b, bIsCauchy)]; the at-make form proves it.
@@ -875,6 +850,8 @@ theorem Real.LessOrEqual_of_pointwise_lower
     -Rational.halve(ε) < s(m) - s(N)
         by Rational.absolute_value_LessThan_bounds;
     -ε
+       = -(Rational.halve(ε) + Rational.halve(ε))
+             by substituting Rational.halve_doubled
        = -Rational.halve(ε) + -Rational.halve(ε)
        < (s(m) - s(N)) + -Rational.halve(ε)
        ≤ (s(m) - s(N)) + (s(N) - b(m))
@@ -1479,10 +1456,9 @@ definition Real.bisectionLimit
 -- IsEventuallyNonneg(λn. bisectionLeft(n) - yseq(n)) form via the
 -- standard Quotient.lift β chain. Pick K with width(K) < ε/2
 -- (modulus); the pointwise upper bound y ≤ bisectionRight(K) gives
--- bisectionRight(K) - yseq(j) > -ε/2 for j ≥ M; combine with
+-- bisectionRight(K) - yseq(j) > -ε/2 eventually; combine with
 -- bisectionLeft(j) ≥ bisectionLeft(K) = bisectionRight(K) - width(K)
 -- > bisectionRight(K) - ε/2 to get bisectionLeft(j) - yseq(j) > -ε.
--- At-rep form: pattern-match y_rep to expose (yseq, yIsCauchy).
 theorem Real.bisectionLimit_is_upper_bound_at_rep
         (subset : Set(ℝ)) (initial : Real.BisectionInterval)
         (initialLeftLeqRight
@@ -1501,53 +1477,50 @@ theorem Real.bisectionLimit_is_upper_bound_at_rep
   unfold Real.IsNonneg in
   ((ε : ℚ)
            (εPositive : (0 : ℚ) < ε) ↦ {
-    (0 : ℚ) < Rational.halve(ε) as halvedPositive;
+    (0 : ℚ) < Rational.halve(ε);
     choose K such that Real.bisectionWidth(initial, K) < Rational.halve(ε)
         from Real.exists_bisectionWidth_below;
     Real.IsUpperBound(
               subset, (Real.bisectionRight(subset, initial, K) : ℝ));
     Real.from_cauchy_sequence(yseq, yIsCauchy)
-            ≤ (Real.bisectionRight(subset, initial, K) : ℝ) as yLeqRightK;
-    choose M as pointwiseAt
-        from yLeqRightK(Rational.halve(ε), halvedPositive);
-    witness Natural.maximum(K, M) with
-        (j : ℕ)
-                 (jGeMax : Natural.maximum(K, M) ≤ j) ↦ {
-          K ≤ j;
-          M ≤ j as j_geq_M;
-          Real.bisectionLeft(subset, initial, K)
-                  ≤ Real.bisectionLeft(subset, initial, j);
-          -Rational.halve(ε) < -Real.bisectionWidth(initial, K);
-          -Rational.halve(ε)
-                  < Real.bisectionRight(subset, initial, K) - yseq(j)
-            by pointwiseAt(j, j_geq_M);
-          -- Algebraic bridge: (right(K) - yseq(j)) + -width(K)
-          --                    = bisectionLeft(K) - yseq(j),
-          -- using width(K) = right(K) - left(K) (the width invariant).
-          -- Anonymous: the calc below finds it by type-match.
-          (Real.bisectionRight(subset, initial, K) - yseq(j))
-               + -Real.bisectionWidth(initial, K)
-             = (Real.bisectionRight(subset, initial, K)
-                - Real.bisectionWidth(initial, K))
-               - yseq(j)
-             = (Real.bisectionRight(subset, initial, K)
-                - (Real.bisectionRight(subset, initial, K)
-                   - Real.bisectionLeft(subset, initial, K)))
-               - yseq(j)
-             = Real.bisectionLeft(subset, initial, K) - yseq(j);
-          -- Chain the two ε/2 bounds end-to-end, bridge by widthBridge,
-          -- then weaken K → j on the left endpoint.
-          -Rational.halve(ε) ≤ -Real.bisectionWidth(initial, K);
-          -ε
-             = -(Rational.halve(ε) + Rational.halve(ε))
-             = -Rational.halve(ε) + -Rational.halve(ε)
-             < (Real.bisectionRight(subset, initial, K) - yseq(j))
-                 + -Rational.halve(ε)
-             ≤ (Real.bisectionRight(subset, initial, K) - yseq(j))
-                 + -Real.bisectionWidth(initial, K)
-             = Real.bisectionLeft(subset, initial, K) - yseq(j)
-             ≤ Real.bisectionLeft(subset, initial, j) - yseq(j)
-        }
+            ≤ (Real.bisectionRight(subset, initial, K) : ℝ);
+    eventually (j). -Rational.halve(ε)
+                      < Real.bisectionRight(subset, initial, K) - yseq(j)
+        by Real.eventually_below_cast_of_LessOrEqual;
+    eventually (j). K ≤ j by Natural.Eventually.beyond;
+
+    eventually (j): {
+      Real.bisectionLeft(subset, initial, K)
+              ≤ Real.bisectionLeft(subset, initial, j);
+      -Rational.halve(ε) < -Real.bisectionWidth(initial, K);
+      -- Algebraic bridge: (right(K) - yseq(j)) + -width(K)
+      --                    = bisectionLeft(K) - yseq(j),
+      -- using width(K) = right(K) - left(K) (the width invariant).
+      (Real.bisectionRight(subset, initial, K) - yseq(j))
+           + -Real.bisectionWidth(initial, K)
+         = (Real.bisectionRight(subset, initial, K)
+            - Real.bisectionWidth(initial, K))
+           - yseq(j)
+         = (Real.bisectionRight(subset, initial, K)
+            - (Real.bisectionRight(subset, initial, K)
+               - Real.bisectionLeft(subset, initial, K)))
+           - yseq(j)
+         = Real.bisectionLeft(subset, initial, K) - yseq(j);
+      -- Chain the two ε/2 bounds end-to-end, bridge by the width
+      -- identity, then weaken K → j on the left endpoint.
+      -Rational.halve(ε) ≤ -Real.bisectionWidth(initial, K);
+      -ε
+         = -(Rational.halve(ε) + Rational.halve(ε))
+               by substituting Rational.halve_doubled
+         = -Rational.halve(ε) + -Rational.halve(ε)
+         < (Real.bisectionRight(subset, initial, K) - yseq(j))
+             + -Rational.halve(ε)
+         ≤ (Real.bisectionRight(subset, initial, K) - yseq(j))
+             + -Real.bisectionWidth(initial, K)
+         = Real.bisectionLeft(subset, initial, K) - yseq(j)
+         ≤ Real.bisectionLeft(subset, initial, j) - yseq(j);
+      done
+    }
   })
 }
 
