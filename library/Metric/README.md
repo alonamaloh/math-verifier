@@ -35,7 +35,7 @@ than paying for it once.
   `Natural.Eventually`: "P holds throughout some ball around x". Same four
   moves, with the **minimum** of two radii where sequences take the maximum
   of two thresholds. **Unpunctured**, so it is proper with no
-  non-isolated-point side condition (`Near.at_centre`)
+  non-isolated-point side condition (`MetricSpace.Near.at_centre`)
 - `MetricSpace.SequenceConverges`, `IsBounded`, `SubsequenceConverges` —
   [sequence.math](sequence.math)
 - `MetricSpace.IsCompact`, `imageSet` — [compactness.math](compactness.math)
