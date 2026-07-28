@@ -326,14 +326,44 @@ Allow `for (m : ℝ) sufficiently large.` where ℕ and ℝ both want
 ### Current cost of not having it
 
 ```
-Real/derivative.math        min: 45
-Real/continuity.math        min: 20
-Metric/topology.math        min:  6
-Metric/continuity.math      min:  6
+Real/derivative.math        min: 45 → 0   (done)
+Real/continuity.math        min: 20 → 0   (done)
 Real/limits.math            Natural.maximum: 25 → 0   (done, 3ac96946)
+Metric/topology.math        min:  6       (generic layer; not converted)
+Metric/continuity.math      min:  6       (generic layer; not converted)
 Metric/separation.math      Natural.maximum:  5
 Metric/uniform.math         Natural.maximum:  2
 ```
+
+**ITEM 3 IS DONE for the analysis layer.** The three files the item measured
+carry **zero** `min` and **zero** `Natural.maximum` between them, and neither
+`Real/continuity.math` nor `Real/derivative.math` imports `Real.minimum` any
+more. What landed, and what it cost:
+
+- **One scope, two filters.** `elaborateEventuallyScope`'s five hardcoded
+  strings became one — the filter's name, carried on the surface node —
+  because **the goal supplies the parameters**: a filter goal is
+  `F(a₁…aₖ, P)`, its leading arguments are what the lemma citations thread
+  through, and the binder's domain is `P`'s own domain. Registering a filter
+  is a phrase plus `of_always` / `and` / `monotone`; no elaborator change.
+- **Prose is binder-first** (`for m sufficiently large:`,
+  `for y sufficiently near x:`), as this item asked.
+- **`MetricSpace.Near` is unpunctured** — proper with no non-isolated-point
+  side condition, which is what every ε-δ contradiction closes on. And the
+  punctured/unpunctured choice was **not** irreversible: with a registry they
+  are two phrases, not a fork.
+- **`Near` must be opaque.** A transparent filter gets δ-reduced away by
+  ∀-peeling before the scope can recognise its own goal, and the workaround
+  (`change`, restating the predicate) costs more than the `min` it removes.
+- **Two lemmas the conversion demanded that the design did not predict:**
+  `Near.under` (pushforward along a continuous map — `composition`'s two
+  hypotheses sit at *different centres*, which one scope cannot fold) and
+  `Near.within` (the ball is itself a neighbourhood, so a bound on
+  `distance(x, y)` joins the same filter as everything else).
+
+Residual friction, worth fixing but not blocking: the scope hands its facts to
+the body spelled as `MetricSpace.Ball`, so a step that *scales* one needs the
+arithmetic form restated (two lines in `ContinuousAt.multiply`).
 
 Note the last two: the newly written generic files brought **new** max
 bookkeeping. This is not a legacy problem being cleaned up, it is an ongoing
