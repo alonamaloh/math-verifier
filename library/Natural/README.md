@@ -50,7 +50,13 @@ recursion, or [number-theory.md](number-theory.md) for division, gcd, and primes
   [power.math](power.math), [factorial.math](factorial.math), and
   [binomial.math](binomial.math).
 - **Eventually** — `Natural.Eventually` in [eventually.math](eventually.math),
-  the threshold-based predicate behind `eventually (n). P(n)`.
+  the threshold-based predicate behind `eventually (n). P(n)` and the
+  `for sufficiently large n: { … }` scope. Beyond `of_always`, `and` and
+  `monotone` (which the scope cites to fold thresholds), the file carries
+  what the scope cannot reach: `Natural.Eventually.shift` for a fact needed at a
+  *shifted* index, and `Natural.Eventually.holds_somewhere` /
+  `Natural.Eventually.not_eventually_false` — properness, which is how a limit
+  argument by contradiction ends.
 
 ## Main theorems
 

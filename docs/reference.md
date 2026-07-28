@@ -210,6 +210,53 @@ choose x, y such that R(x, y) from source;
 The source may be a hypothesis, an applied term, or an argument-free theorem
 name whose premises are available in context.
 
+## Eventually — "from some index on"
+
+`Natural.Eventually(P)` is `∃ N. ∀ m ≥ N. P(m)`, the quantifier every limit
+argument runs on. State it with a binder:
+
+```math
+eventually (m). abs(s(m) - limit) < ε
+```
+
+Prove one with the **scope** form, which takes every in-scope eventual fact,
+combines their thresholds, and hands the body each fact at the bound index:
+
+```math
+eventually (m): { … }                 -- goal position
+for sufficiently large m: { … }       -- the same thing, in prose
+```
+
+Inside the body, each `eventually (k). Q(k)` in scope is available as `Q(m)`,
+and the threshold — the `Natural.maximum` of all of them — never appears. With
+no eventual hypotheses in scope, the body just proves `Q(m)` outright.
+
+```math
+ε / 2 > 0;
+eventually (m). abs(s(m) - sLimit) < ε / 2 by sConverges;
+eventually (m). abs(t(m) - tLimit) < ε / 2 by tConverges;
+for sufficiently large m: {
+  abs((s(m) + t(m)) - (sLimit + tLimit))
+     ≤ abs(s(m) - sLimit) + abs(t(m) - tLimit)
+     < ε / 2 + ε / 2
+     = ε
+}
+```
+
+The prose spelling is **scope-only**; a statement (a hypothesis, a theorem's
+conclusion) uses the `eventually (m). …` binder.
+
+The scope hands the body its facts *at the bound index and nowhere else*. Four
+lemmas cover what it cannot (`Natural/eventually.math`):
+
+| | |
+|---|---|
+| `Natural.Eventually.of_always` | a fact that always holds, holds eventually |
+| `Natural.Eventually.monotone` | weaken an eventual fact pointwise |
+| `Natural.Eventually.shift` | translation: `P` eventually gives `P(offset + ·)` eventually — for a proof needing a fact at a *shifted* index |
+| `Natural.Eventually.holds_somewhere` | properness: what holds eventually holds somewhere |
+| `Natural.Eventually.not_eventually_false` | hence a tail cannot be false throughout — how a limit argument by contradiction ends |
+
 ## Conjunctions and disjunctions
 
 To build a conjunction, establish its components and close:

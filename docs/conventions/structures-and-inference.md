@@ -110,6 +110,53 @@ What instance resolution will NOT touch (by design):
   instance inference is for hand-cited structure lemmas they can't
   discharge (cancellation, inverse-uniqueness, …).
 
+## Coercions
+
+`coercion (Source, Target) := F;` registers `F` as the canonical way to read a
+`Source` where a `Target` is wanted. The registry is transitively closed at
+registration (so `ℕ ↪ ℤ ↪ ℚ ↪ ℝ` gives every hop as one lookup) and rejects
+diamonds. `F` may carry **leading implicit** parameters — which every subtype
+projection does — and they are solved from the source type at each use:
+
+```math
+coercion (NaturalsBelow, Natural) := NaturalsBelow.value
+```
+
+With that registered, an index reads as its value wherever a `ℕ` is what the
+context wants: `s(i)`, `i + 1`, `i < n`, a calc endpoint at an `ℕ` carrier, and
+`i + j` for two indices (both sides coerce to the nearest type carrying the
+operator). **An ambient expected type still wins over proximity** — `1 / k!` in
+an `ℝ`-typed position is real division, not division at whatever nearest type
+happens to have `/`.
+
+**Do not read a coercion as licence to delete every projection.** Where the
+subtype has its *own* vocabulary — `NaturalsBelow` registers `<` and `≤` as
+`NaturalsBelow.LessThan` / `LessOrEqual` — dropping `.value` between two
+elements changes *which proposition is stated*: `a < b` is the index order,
+one δ-step from `value(a) < value(b)`, and a citation resolved against one does
+not match the other. Drop the projection where the context forces the base
+type; keep it where both sides are elements.
+
+### A bundle value used where a type is expected means its carrier
+
+With `source target : MetricSpace`, write the mathematics:
+
+```math
+theorem MetricSpace.IsCompact.image (source target : MetricSpace)
+        (f : source → target)
+        (region : Set(source))
+        …
+```
+
+`source` in a type position elaborates to `MetricSpace.carrier(source)`. A
+bundle is recognised the same way `instance` recognises one — by a
+`<Structure>.carrier` projection being in scope — so this is not a name table:
+`Ring`, `Field`, `VectorSpace` and any future bundle qualify on the same terms.
+It fires in binder annotations, both sides of an arrow, `∀`/`∃` binders,
+`take x : space;`, and arguments whose parameter is a `Type`. It does **not**
+fire where the term is already a type, nor where the expected argument is not a
+`Type` — so `MetricSpace.carrier(source)` written out is left alone.
+
 ## Operator overloading
 
 `operator (sym) on (T1, T2) := F;` registers `sym` to dispatch on

@@ -61,17 +61,17 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
 - `Plane.Component`, `Plane.IsRegion` — [component.math](component.math)
 - `Plane.PolygonalReach`, `Plane.reachableFrom` —
   [polygonal.math](polygonal.math)
-- `Plane.origin`, `Plane.unitSegment`, `Plane.squareBoundary`,
-  `Plane.circle` — [model.math](model.math)
+- `Plane.origin`, `Plane.squareBoundary`, `Plane.circle` —
+  [model.math](model.math)
 - `Plane.InjectiveOn`, `Plane.HasContinuousInverseOn`,
   `Plane.IsHomeomorphismOn` — [homeomorphism.math](homeomorphism.math)
 - `Plane.IsArc`, `Plane.arc`, `Plane.arcStart`, `Plane.arcFinish`,
   `Plane.IsLoop`, `Plane.IsJordanCurve`, `Plane.IsJordanParametrisation` —
   [curve.math](curve.math)
-- `Plane.walkOnto`, `Plane.subarc`, `Plane.openUnitSegment`,
-  `Plane.openArc` — [subarc.math](subarc.math)
-- `Plane.retime`, `Plane.lowerHalf`, `Plane.upperHalf`,
-  `Plane.concatenate` — [concatenate.math](concatenate.math)
+- `Plane.subarc`, `Real.openUnitInterval`, `Plane.openArc` —
+  [subarc.math](subarc.math)
+- `Plane.lowerHalf`, `Plane.upperHalf`, `Plane.concatenate` —
+  [concatenate.math](concatenate.math)
 
 ## Main theorems
 
@@ -163,13 +163,14 @@ those three obligations and concluding the fourth, so taking the criterion
 as the definition spares each of them a reductio — and the blueprint's own
 "Recognizing a component" is then `Plane.Component.recognize`, two lines.
 
-## Arcs and curves are parametrised by plane sets
+## Arcs and curves are parametrised by the real unit interval
 
-An arc is a continuous injective map on `Plane.unitSegment`; a Jordan curve
+An arc is a continuous injective map on `Real.unitInterval`; a Jordan curve
 is a **set** carried onto by a **loop** on the same interval — continuous,
 returning to its start, injective until it does — which is the blueprint's
-definition. **Both model domains are subsets of the plane, not of ℝ.** That is what
-lets everything above apply unchanged: a
+definition. The parameter domain is a subset of **ℝ**, and the topology it
+carries is the generic one of `Metric/`, so everything above applies
+unchanged: a
 parametrisation is an ordinary `Plane.Point → Plane.Point` map, its
 continuity is `ContinuousOn`, its image is `imageSet`, its compactness is
 `IsCompact`. Parametrising by `[0,1] ⊆ ℝ` would need a second relative
@@ -189,10 +190,11 @@ Two consequences worth knowing before extending this area:
   its image) is proved. **Not built**: the bridge from a loop to such a
   parametrisation, which needs `∂Q`'s decomposition into four sides plus
   the radial projection (`x ↦ x/‖x‖`, `x ↦ x/‖x‖∞`).
-- The parameter of a point of the unit segment is its **first coordinate**
-  (`Plane.unitSegment_at_first_coordinate`). The model interval runs along
-  the axis for exactly this reason: a reparametrisation reads its parameter
-  off the point, with no inverse to construct.
+- A curve's parameter **is** a real number: the domain is
+  `Real.unitInterval`, so a reparametrisation composes on ℝ with nothing to
+  extract and no inverse to construct. (Before the interval migration the
+  domain was a segment *in the plane* and the parameter had to be read off
+  a point as its first coordinate; that bridging vocabulary is gone.)
 
 The inverse of a homeomorphism is never named:
 `Plane.HasContinuousInverseOn(f, carrier)` says points whose images are

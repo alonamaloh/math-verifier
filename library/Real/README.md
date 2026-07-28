@@ -18,7 +18,12 @@ construction internals.
   `Real.IsSupremum`
 - Functions: `Real.square_root`, `Real.exponential`, and `Real.e`
 - Calculus: `Real.ContinuousAt`, `Real.ContinuousOn`, and
-  `Real.HasDerivativeAt`
+  `Real.HasDerivativeAt`. `Real.ContinuousAt` **is** the metric-space
+  notion over the whole line, not a second definition; cross between it
+  and the ε–δ arithmetic with `Real.ContinuousAt.of_epsilon_delta`
+  (intro) and `Real.ContinuousAt.tolerance` (elim, at a given ε), so a
+  proof on the line never spells `distance`. See
+  [../Metric/README.md](../Metric/README.md)
 
 ## Main theorems
 

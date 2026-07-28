@@ -80,6 +80,19 @@ laws:
 - **`FiniteField/`** — F_{p^k} = F_p[x]/(f) for irreducible f.
 - **`PAdic/`** — the p-adic numbers with their absolute value.
 
+## Analysis and geometry
+
+- **`Metric/`** (start with [`Metric/README.md`](../library/Metric/README.md))
+  — metric spaces as a **bundle**, and the relative topology developed once
+  over an abstract one: open/closed, closure, compactness (sequential),
+  connectedness, continuity, uniform continuity, homeomorphism. Read at ℝ and
+  at the plane through `instance`. `Real.ContinuousAt` **is** the notion here,
+  over the whole line — not a second definition.
+- **`Plane/`** (start with [`Plane/README.md`](../library/Plane/README.md))
+  — the Euclidean plane as a metric space, with curves parametrised by
+  `Real.unitInterval`: arcs, loops, Jordan curves, polygonal reachability,
+  components, and the model curves (circle, square boundary).
+
 ## Other
 
 - **`Set/`** — the finite-cardinality / counting layer: `Equinumerous`,
