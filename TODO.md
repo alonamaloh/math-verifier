@@ -81,6 +81,21 @@ field-of-fractions quotient.
 
 ## Elaborator quirks (small open issues)
 
+- **A `partialSum`/`partialProduct` split costs a line of index
+  commutation.** `Real.partialSum_split` is stated at `k + n`, so a goal
+  about `partialSum(row, 1 + m)` cannot cite it until the index is
+  rewritten to `m + 1`, and the citation matcher will not commute a `+`
+  inside a ℕ argument. Both chains in
+  `Real.means_inequality_predecessor` therefore carry a bare
+  `= Real.partialSum(augmentedRow, m + 1)` step whose entire content is
+  that indices commute. **This is a prover limitation, not mathematical
+  content** — no mathematician writes that line, and it should not be
+  read as house style. Fix is either AC-normalisation of ℕ index
+  arithmetic during citation matching, or the `1 + n` / `n + 1` story in
+  general (see the `one_plus_vs_plus_one_asymmetry` note): making
+  `Natural.add_one` automatic in argument position would cover this and
+  the family of cases around it.
+
 - **`Natural.binomial_pascal` still re-decides its own conditional.**
   It opens `if 1 + k = 0 then …` on a natural that is visibly a
   successor, which is precisely what `docs/style.md` says not to do —
