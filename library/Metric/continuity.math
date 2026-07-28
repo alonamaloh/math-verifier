@@ -20,6 +20,7 @@ import Real.interface
 import Real.minimum
 import Metric.space
 import Metric.topology
+import Metric.near
 
 definition MetricSpace.ContinuousAt {source target : MetricSpace}
         (f : source → target)
@@ -332,3 +333,91 @@ theorem MetricSpace.ContinuousOn.paste (source target : MetricSpace)
     done
   }
 }
+
+-- ----------------------------------------------------------------------
+-- ----------------------------------------------------------------------
+-- Continuity, read through the filter. This is the point of the notion:
+-- "f is continuous at x" is "for every tolerance, f(y) is within it for y
+-- near x" — the ε-δ statement with the δ, and its bookkeeping, inside
+-- `Near`.
+
+theorem MetricSpace.ContinuousAt.of_near {source target : MetricSpace}
+        (f : source → target) (x : source)
+        (nearby : ∀ (tolerance : ℝ). tolerance > 0 →
+            MetricSpace.Near(x,
+                (y : source) ↦ distance(f(x), f(y)) < tolerance))
+        : MetricSpace.ContinuousAt(f, Set.universe(source), x) :=
+  unfold MetricSpace.Near in {
+  take tolerance : ℝ;
+  suppose tolerance > 0;
+  MetricSpace.Near(x,
+      (y : source) ↦ distance(f(x), f(y)) < tolerance)
+      by nearby;
+  choose radius such that radius > 0 ∧
+      ∀ (y : source). distance(x, y) < radius →
+        distance(f(x), f(y)) < tolerance;
+  radius > 0;
+  ∀ (y : source). y ∈ Set.universe(source) →
+      distance(x, y) < radius →
+        distance(f(x), f(y)) < tolerance
+      by { take y : source;
+           suppose y ∈ Set.universe(source);
+           suppose distance(x, y) < radius;
+           done };
+  witness radius
+}
+
+theorem MetricSpace.ContinuousAt.near {source target : MetricSpace}
+        (f : source → target) (x : source)
+        (continuous : MetricSpace.ContinuousAt(f, Set.universe(source), x))
+        (tolerance : ℝ) (tolerancePositive : tolerance > 0)
+        : MetricSpace.Near(x,
+              (y : source) ↦ distance(f(x), f(y)) < tolerance) :=
+  unfold MetricSpace.Near in {
+  choose radius such that radius > 0 ∧
+      ∀ (y : source). y ∈ Set.universe(source) →
+        distance(x, y) < radius →
+          distance(f(x), f(y)) < tolerance
+      from continuous;
+  radius > 0;
+  ∀ (y : source). distance(x, y) < radius →
+      distance(f(x), f(y)) < tolerance
+      by { take y : source;
+           suppose distance(x, y) < radius;
+           y ∈ Set.universe(source);
+           done };
+  witness radius
+}
+
+-- ----------------------------------------------------------------------
+-- Pushforward: the filter transported along a continuous map. This is the
+-- `Near` analogue of `Eventually.shift`, and it is what a COMPOSITION
+-- needs — there the two hypotheses sit at different centres (`f` near
+-- `g(x)`, `g` near `x`), which the scope, folding facts at one centre,
+-- cannot combine on its own.
+theorem MetricSpace.Near.under {source target : MetricSpace}
+        (g : source → target) (x : source)
+        (gContinuous : MetricSpace.ContinuousAt(g, Set.universe(source), x))
+        (P : target → Proposition)
+        (nearP : MetricSpace.Near(g(x), P))
+        : MetricSpace.Near(x, (y : source) ↦ P(g(y))) :=
+  unfold MetricSpace.Near in {
+    choose radius such that radius > 0 ∧
+        ∀ (z : target). distance(g(x), z) < radius → P(z)
+        from nearP;
+    radius > 0;
+    choose nearness such that nearness > 0 ∧
+        ∀ (y : source). y ∈ Set.universe(source) →
+          distance(x, y) < nearness →
+            distance(g(x), g(y)) < radius
+        from gContinuous;
+    nearness > 0;
+    ∀ (y : source). distance(x, y) < nearness → P(g(y))
+        by { take y : source;
+             suppose distance(x, y) < nearness;
+             y ∈ Set.universe(source);
+             distance(g(x), g(y)) < radius;
+             done };
+    witness nearness
+  }
+

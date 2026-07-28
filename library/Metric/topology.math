@@ -24,8 +24,8 @@ import Equality.basics
 import Set.basics
 import Set.algebra
 import Real.interface
-import Real.minimum
 import Metric.space
+import Metric.near
 
 -- ----------------------------------------------------------------------
 -- Open sets, relative to a carrier.
@@ -47,6 +47,52 @@ definition MetricSpace.ClosedIn {m : MetricSpace}
 
 -- ----------------------------------------------------------------------
 -- The lattice laws. Each is the ε-ball argument a textbook gives.
+
+-- `OpenIn` through the SPATIAL FILTER: a set is relatively open when, at
+-- each of its points, belonging to it holds NEAR that point (for the
+-- points of the carrier). The two spellings differ only in the order of
+-- the two antecedents, so these cross between them; what they buy is that
+-- combining two open sets becomes `Near.and` — one radius, taken by the
+-- filter — instead of a minimum carried by hand.
+
+theorem MetricSpace.OpenIn.near {m : MetricSpace}
+        (subset carrier : Set(m))
+        (isOpen : MetricSpace.OpenIn(subset, carrier))
+        (x : m) (inSubset : x ∈ subset)
+        : MetricSpace.Near(x, (y : m) ↦ y ∈ carrier → y ∈ subset) :=
+  unfold MetricSpace.Near in {
+    choose radius such that radius > 0 ∧
+        ∀ (y : m). y ∈ carrier → distance(x, y) < radius → y ∈ subset
+        from isOpen;
+    radius > 0;
+    ∀ (y : m). distance(x, y) < radius → (y ∈ carrier → y ∈ subset)
+        by { take y : m;
+             suppose distance(x, y) < radius;
+             suppose y ∈ carrier;
+             done };
+    witness radius
+  }
+
+theorem MetricSpace.OpenIn.of_near {m : MetricSpace}
+        (subset carrier : Set(m))
+        (nearby : ∀ (x : m). x ∈ subset →
+            MetricSpace.Near(x, (y : m) ↦ y ∈ carrier → y ∈ subset))
+        : MetricSpace.OpenIn(subset, carrier) := {
+  take x : m;
+  suppose x ∈ subset;
+  MetricSpace.Near(x, (y : m) ↦ y ∈ carrier → y ∈ subset) by nearby;
+  unfold MetricSpace.Near in {
+    choose radius such that radius > 0 ∧
+        ∀ (y : m). distance(x, y) < radius → (y ∈ carrier → y ∈ subset);
+    radius > 0;
+    ∀ (y : m). y ∈ carrier → distance(x, y) < radius → y ∈ subset
+        by { take y : m;
+             suppose y ∈ carrier;
+             suppose distance(x, y) < radius;
+             done };
+    witness radius
+  }
+}
 
 theorem MetricSpace.OpenIn.universe (m : MetricSpace)
         (carrier : Set(m))
@@ -73,51 +119,30 @@ theorem MetricSpace.OpenIn.empty (m : MetricSpace)
   done
 }
 
--- A finite intersection of relatively open sets is relatively open: take
--- the smaller of the two radii.
+-- A finite intersection of relatively open sets is relatively open. The
+-- filter takes the smaller of the two radii; no radius is named here.
 theorem MetricSpace.OpenIn.intersection (m : MetricSpace)
         (left right carrier : Set(m))
         (leftOpen : MetricSpace.OpenIn(left, carrier))
         (rightOpen : MetricSpace.OpenIn(right, carrier))
         : MetricSpace.OpenIn(left ∩ right, carrier) := {
-  take x : m;
-  suppose x ∈ left ∩ right as inBoth;
-  x ∈ left;
-  x ∈ right;
-  choose leftRadius such that
-      leftRadius > 0 ∧
-        ∀ (y : m). y ∈ carrier →
-          distance(x, y) < leftRadius → y ∈ left
-      from leftOpen;
-  choose rightRadius such that
-      rightRadius > 0 ∧
-        ∀ (y : m). y ∈ carrier →
-          distance(x, y) < rightRadius → y ∈ right
-      from rightOpen;
-  leftRadius > 0;
-  rightRadius > 0;
-  ∀ (y : m). y ∈ carrier →
-      distance(x, y) < leftRadius → y ∈ left as leftBall;
-  ∀ (y : m). y ∈ carrier →
-      distance(x, y) < rightRadius → y ∈ right as rightBall;
-  witness min(leftRadius, rightRadius) with {
-    min(leftRadius, rightRadius) > 0;
-    ∀ (y : m). y ∈ carrier →
-        distance(x, y) < min(leftRadius, rightRadius) → y ∈ left ∩ right
-        by (y : m) (yInCarrier : y ∈ carrier)
-           (yClose : distance(x, y) < min(leftRadius, rightRadius)) ↦ {
-             distance(x, y)
-                < min(leftRadius, rightRadius)
-                ≤ leftRadius;
-             distance(x, y)
-                < min(leftRadius, rightRadius)
-                ≤ rightRadius;
-             y ∈ left by leftBall;
-             y ∈ right by rightBall;
+  ∀ (x : m). x ∈ left ∩ right →
+      MetricSpace.Near(x, (y : m) ↦ y ∈ carrier → y ∈ left ∩ right)
+      by { take x : m;
+           suppose x ∈ left ∩ right;
+           x ∈ left;
+           x ∈ right;
+           MetricSpace.Near(x, (y : m) ↦ y ∈ carrier → y ∈ left)
+               by MetricSpace.OpenIn.near;
+           MetricSpace.Near(x, (y : m) ↦ y ∈ carrier → y ∈ right)
+               by MetricSpace.OpenIn.near;
+           for y sufficiently near x: {
+             suppose y ∈ carrier;
+             y ∈ left;
+             y ∈ right;
              done
-           };
-    done
-  }
+           } };
+  done by MetricSpace.OpenIn.of_near
 }
 
 -- A union of two relatively open sets is relatively open: whichever side
