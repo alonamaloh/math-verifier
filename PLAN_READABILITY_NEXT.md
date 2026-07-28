@@ -391,7 +391,45 @@ alias in `Plane/extremum.math`.
 a `Real.ContinuousAt` that is about to be redefined, and `Real/derivative.math`
 — the largest single beneficiary of item 3 — converts twice.
 
-### DONE by bridging (`7aa45c4a`) — redefinition needs a re-layering first
+### DONE — re-layered, then redefined (`ae7f0a23`, `fa5ba885`)
+
+`Real.ContinuousAt` **is** the generic notion now, as this item asked:
+
+```math
+definition Real.ContinuousAt (f : ℝ → ℝ) (x : ℝ) : Proposition :=
+  MetricSpace.ContinuousAt(f, Set.universe(ℝ), x)
+```
+
+The re-layering that unblocked it cost **two import lines**. The four
+bridge lemmas of `7aa45c4a` are retired;
+`MetricSpace.ContinuousAt.restrict` stays (a real gap in that API).
+
+Three things worth keeping:
+
+- **The seal was the whole obstacle, and it was cheap to move.** Lifting
+  `square_root → intermediate_value → continuity → derivative` out of
+  `Real/cauchy.math` and `Real/interface.math` broke exactly two files
+  (`Real/arithmetic_geometric_mean.math`, `ComplexNumber/modulus.math`,
+  both reaching `Real.square_root` through the interface) plus the test
+  that asserted continuity survives the seal. Continuity is topology; it
+  was never part of the number system's interface.
+- **The two spellings are not defeq, and no re-layering fixes that.**
+  `distance(x, y)` is `abs(x - y)` where analysis writes `abs(y - x)`, and
+  the universe carrier leaves a vacuous `y ∈ universe` premise that no
+  reduction removes. So the boundary is a characterising pair
+  (`conventions/opaque.md`) — but it is drawn **once**, and
+  `derivative.math` / `intermediate_value.math` mention `distance`
+  **zero** times.
+- **The elimination form is what made it cheap.**
+  `Real.ContinuousAt.tolerance` takes ε directly, so callers write
+  `choose δ such that … from Real.ContinuousAt.tolerance` with both
+  premises discharged from context. That replaced direct positional calls
+  (`from fContinuous(ε / 2, halfPositive)`), so the nine converted call
+  sites got *shorter*. A characterisation that takes the whole `∀ε.∃δ.…`
+  instead would have forced a restatement at every use — worth remembering
+  when item 3 designs `Near`'s registry lemmas.
+
+### Superseded: the first attempt bridged instead (`7aa45c4a`)
 
 **Why the redefinition is not available *as the tree is laid out today*.**
 `Metric/space.math` imports `Real.interface`, and `Real/interface.math` — the
