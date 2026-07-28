@@ -206,7 +206,7 @@ theorem Real.telescoping_partialSum
 -- Splitting a partial sum at a cut: the part below n, plus the block
 -- of k terms shifted past n.
 theorem Real.partialSum_split (s : ℕ → ℝ) (n k : ℕ)
-        : Real.partialSum(s, k + n)
+        : Real.partialSum(s, n + k)
           = Real.partialSum(s, n)
             + Real.partialSum((j : ℕ) ↦ s(n + j), k) :=
   Algebra.indexedAggregate_split(associativity := Real.add_associative,
@@ -257,13 +257,13 @@ theorem Real.partialSum_monotone_of_nonneg (s : ℕ → ℝ)
         (termsNonneg : ∀ (j : ℕ). Real.zero ≤ s(j))
         (N m : ℕ) (NLeqM : N ≤ m)
         : Real.partialSum(s, N) ≤ Real.partialSum(s, m) := {
-  choose k such that m = k + N from Natural.le_to_add;
+  choose k such that m = N + k from Natural.subtraction_witness;
   ∀ (j : ℕ). Real.zero ≤ s(N + j) by (j : ℕ) ↦ termsNonneg(N + j);
   Real.zero ≤ Real.partialSum((j : ℕ) ↦ s(N + j), k);
   Real.partialSum(s, N)
      = Real.partialSum(s, N) + Real.zero
      ≤ Real.partialSum(s, N) + Real.partialSum((j : ℕ) ↦ s(N + j), k)
-     = Real.partialSum(s, k + N)
+     = Real.partialSum(s, N + k)
      = Real.partialSum(s, m)
 }
 
@@ -432,20 +432,20 @@ theorem Real.abs_partialSum_le (s : ℕ → ℝ) (n : ℕ)
   }
 
 -- A window of a sum is bounded by the same window of the absolute
--- series: |B(w+m) − B(m)| ≤ Babs(w+m) − Babs(m).
+-- series: |B(m+w) − B(m)| ≤ Babs(m+w) − Babs(m).
 theorem Real.partialSum_window_bound (b : ℕ → ℝ) (m w : ℕ)
-        : abs(Real.partialSum(b, w + m) - Real.partialSum(b, m))
-          ≤ Real.partialSum((k : ℕ) ↦ abs(b(k)), w + m)
+        : abs(Real.partialSum(b, m + w) - Real.partialSum(b, m))
+          ≤ Real.partialSum((k : ℕ) ↦ abs(b(k)), m + w)
             - Real.partialSum((k : ℕ) ↦ abs(b(k)), m) := {
-  Real.partialSum(b, w + m)
+  Real.partialSum(b, m + w)
         = Real.partialSum(b, m)
           + Real.partialSum((j : ℕ) ↦ b(m + j), w)
       by Real.partialSum_split;
-  Real.partialSum((k : ℕ) ↦ abs(b(k)), w + m)
+  Real.partialSum((k : ℕ) ↦ abs(b(k)), m + w)
         = Real.partialSum((k : ℕ) ↦ abs(b(k)), m)
           + Real.partialSum((j : ℕ) ↦ abs(b(m + j)), w)
       by Real.partialSum_split;
-  abs(Real.partialSum(b, w + m) - Real.partialSum(b, m))
+  abs(Real.partialSum(b, m + w) - Real.partialSum(b, m))
      = abs((Real.partialSum(b, m)
                 + Real.partialSum((j : ℕ) ↦ b(m + j), w))
            - Real.partialSum(b, m))
@@ -460,6 +460,6 @@ theorem Real.partialSum_window_bound (b : ℕ → ℝ) (m w : ℕ)
      = (Real.partialSum((k : ℕ) ↦ abs(b(k)), m)
             + Real.partialSum((j : ℕ) ↦ abs(b(m + j)), w))
        - Real.partialSum((k : ℕ) ↦ abs(b(k)), m)
-     = Real.partialSum((k : ℕ) ↦ abs(b(k)), w + m)
+     = Real.partialSum((k : ℕ) ↦ abs(b(k)), m + w)
        - Real.partialSum((k : ℕ) ↦ abs(b(k)), m)
 }

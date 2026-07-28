@@ -5698,11 +5698,18 @@ int verifyWithCache(const std::string& sourcePath,
                     << "interface\n";
                 return 1;
             }
+            // Prefer the interface cache, like every other dependency read
+            // (see the resolvedDependencyCachePaths loop). This runs in
+            // stage 1, whose `make` prerequisites are the imports'
+            // INTERFACES; an import's full `.mathv` may exist from an
+            // earlier build and still carry a superseded statement, and
+            // re-exporting that would hand consumers a stale theorem.
             CacheContents exportedCache;
             try {
-                std::string exportedPath = exportedInfo->second.first;
+                std::string exportedPath =
+                    exportedInfo->second.first + ".iface";
                 if (!std::filesystem::exists(exportedPath)) {
-                    exportedPath += ".iface";
+                    exportedPath = exportedInfo->second.first;
                 }
                 exportedCache = readCacheFile(
                     exportedPath, /*skipDefinitionBodies=*/true);
@@ -5857,9 +5864,10 @@ int verifyWithCache(const std::string& sourcePath,
                 if (droppedInfo == moduleToDepInfo.end()) continue;
                 CacheContents droppedCache;
                 try {
-                    std::string droppedPath = droppedInfo->second.first;
+                    std::string droppedPath =
+                        droppedInfo->second.first + ".iface";
                     if (!std::filesystem::exists(droppedPath)) {
-                        droppedPath += ".iface";
+                        droppedPath = droppedInfo->second.first;
                     }
                     droppedCache = readCacheFile(
                         droppedPath, /*skipDefinitionBodies=*/true);

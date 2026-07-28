@@ -81,57 +81,51 @@ field-of-fractions quotient.
 
 ## Elaborator quirks (small open issues)
 
-- **A `partialSum`/`partialProduct` split costs a line of index
-  commutation.** `Real.partialSum_split` is stated at `k + n`, so a goal
-  about `partialSum(row, 1 + m)` cannot cite it until the index is
-  rewritten to `m + 1`, and the citation matcher will not commute a `+`
-  inside a ℕ argument. Both chains in
-  `Real.means_inequality_predecessor` therefore carry a bare
-  `= Real.partialSum(augmentedRow, m + 1)` step whose entire content is
-  that indices commute. **This is a prover limitation, not mathematical
-  content** — no mathematician writes that line, and it should not be
-  read as house style. Fix is either AC-normalisation of ℕ index
-  arithmetic during citation matching, or the `1 + n` / `n + 1` story in
-  general (see the `one_plus_vs_plus_one_asymmetry` note): making
-  `Natural.add_one` automatic in argument position would cover this and
-  the family of cases around it.
+- **CLOSED — there was never a numeral-peeling gap in WHNF.** Both items
+  that used to sit here (the `partialSum_split` index commutation and
+  `binomial_pascal`'s written-out `if`) blamed `weakHeadNormalForm` for
+  failing to peel the literal `1` in `1 + n` to `successor(zero)`. It
+  does peel it. Instrumenting the equality-ENDPOINT retry
+  (`reduceEqualityEndpoints`, `inference.cpp`) shows
+  `Natural.binomial(1 + n, 1 + k)` reducing all the way to
+  `Decidable_recursor (1 + k = 0) … `, and the hole solver then pinning
+  every one of `Logic.if_negative`'s value arguments. The kernel's
+  literal↔constructor bridge (`naturalLiteralConstructorView` plus the
+  ι-reduction literal-target case) has covered this since
+  PLAN_FAST_NUMERALS §B.
 
-- **A citation cannot reduce the goal's head to find its own conclusion
-  shape.** `Natural.binomial_pascal` no longer re-decides its
-  conditional, but it still has to WRITE the conditional out —
-  `((if 1 + k = 0 then 1 else …) : ℕ) = … by Logic.if_negative` — before
-  the citation can land. `done by Logic.if_negative` on the bare goal
-  fails: the goal reaches the hole solver as
-  `binomial(1 + n, 1 + k) = …` and never acquires the
-  `Decidable_recursor … = b` shape the lemma concludes with, so the
-  holes go unassigned. `unfold Natural.binomial` does not help — it
-  grants transparency, and the solver still does not reduce.
+  What actually stopped each one:
 
-  Established while fixing it: the reduced form IS definitionally equal
-  to the goal (a `note goal :` at the conditional passes), and the
-  outer guard — the structural recursion on the first argument — has
-  already bound the predecessor, so the reduct mentions `n`, not
-  `(1 + n) ∸ 1`. Once the head is visible the matcher pins every hole,
-  so the matcher is fine; only the reduction is missing.
+  - **`binomial_pascal`.** Two separate things, neither a reduction bug.
+    (a) The peel needs `Natural.add` and `ℕ` TRANSPARENT — they are
+    sealed, so without the `unfold` line WHNF correctly stops at the
+    stuck `Natural.add(1, n)` recursor target. (b) With them unfolded
+    the citation instantiates, but its conclusion lands at
+    `binomial(n, (1 + k) ∸ 1) + …` while the goal says
+    `binomial(n, k) + …`, and `Natural.monus` is opaque by design, so
+    the two are NOT definitionally equal. `done by Logic.if_negative`
+    on the bare goal is therefore impossible in principle, not missing
+    a reduction: the column shift is content, and it has to be applied
+    as a rewrite. The proof now says exactly that as a two-step chain
+    (`… by Logic.if_negative`, then `= binomial(n, k) + …`) with no
+    conditional written anywhere.
 
-  `citeWithInferredArguments` → Step 2 in `inference.cpp` already has
-  four fallback rungs, including an equality-ENDPOINT WHNF retry
-  (`reduceEqualityEndpoints`) that is exactly the right shape. It does
-  not fire here, and a probe says why: with the first argument the
-  LITERAL `0`, `Natural.binomial(0, 1 + k) = 0` closes on a bare
-  `done by Logic.if_negative` — the reduction runs and the citation
-  lands. With the first argument `1 + n` it does not. So WHNF cannot
-  take `1 + n` to the successor the recursion scrutinises, even with
-  `Natural.add` and `ℕ` unfolded; `Natural.Raw.add` does recurse on its
-  first argument, so what is stuck is peeling the numeral literal `1`
-  to `successor(zero)`.
+  - **`partialSum_split`.** `1 + m` and `m + 1` are not definitionally
+    equal for a variable `m` — `add` recurses on its first argument, so
+    `m + 1` is stuck — and no amount of WHNF can bridge them. The
+    `k + n` index order was an artifact of inducting on `k`, not the
+    mathematics: the natural statement is "the first `n` terms, then
+    the next `k`", i.e. `n + k`. `Algebra.indexedAggregate_split` and
+    the three carrier-level splits are now stated that way and every
+    call site spells the cut first, which deleted the commutation lines
+    in `Real.means_inequality_predecessor`,
+    `Algebra.indexedAggregate_shift`, `Real.cauchy_complete`,
+    `Real.exponential`, `ComplexNumber.exponential` and
+    `Real.partialSum_monotone`.
 
-  That makes this the `one_plus_vs_plus_one_asymmetry` /
-  `numeral_zero_one_normalization` story rather than a matcher bug, and
-  it is the same root as the `partialSum_split` index item above. Fixing
-  literal peeling in WHNF would let the existing endpoint retry close
-  both, and would let `binomial_pascal` read
-  `done by Logic.if_negative` with no conditional written out at all.
+  The general `1 + n` vs `n + 1` friction (see the
+  `one_plus_vs_plus_one_asymmetry` note) is untouched and still real —
+  it just was not what these two sites were hitting.
 
 - **`by_induction … using` (prime_divisor v3 style) needs the
   return-type ascription stripped.** Its last 2 lines remain CIC
