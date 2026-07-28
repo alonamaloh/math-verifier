@@ -354,9 +354,36 @@ ExpressionPointer Elaborator::elaborateEventuallyScope(
         // combined hypothesis (whose ∧-legs the prover decomposes).
         std::vector<LocalBinder> stepBinders = localBinders;
         stepBinders.push_back({scope.binderName, naturalType});
-        ExpressionPointer hypothesisType = makeApplication(
-            liftBoundVariables(combinedPredicate, 1, 0),
-            makeBoundVariable(0));
+        // BETA-REDUCE what the body sees. The combined predicate itself
+        // must stay unreduced — `<filter>.and`'s conclusion is spelled
+        // `λm. P(m) ∧ Q(m)` and the fold typechecks structurally against
+        // it — but the HYPOTHESIS handed to the body is a separate term,
+        // and left as the redex `(λy. …)(m)` every use of it has to
+        // restate the fact in reduced form before a chain step will match.
+        // Peel the root, then each conjunct, so the body sees the facts as
+        // written.
+        ExpressionPointer hypothesisType = peelRootBetaRedexes(
+            makeApplication(liftBoundVariables(combinedPredicate, 1, 0),
+                             makeBoundVariable(0)));
+        {
+            std::function<ExpressionPointer(ExpressionPointer)> reduceLegs =
+                [&](ExpressionPointer term) -> ExpressionPointer {
+                    term = peelRootBetaRedexes(term);
+                    auto* outer = std::get_if<Application>(&term->node);
+                    if (!outer) return term;
+                    auto* inner =
+                        std::get_if<Application>(&outer->function->node);
+                    if (!inner) return term;
+                    auto* head =
+                        std::get_if<Constant>(&inner->function->node);
+                    if (!head || head->name != "And") return term;
+                    return makeApplication(
+                        makeApplication(inner->function,
+                                         reduceLegs(inner->argument)),
+                        reduceLegs(outer->argument));
+                };
+            hypothesisType = reduceLegs(hypothesisType);
+        }
         std::string hypothesisName = "_eventually_hyp_"
             + std::to_string(line) + "_" + std::to_string(column);
         stepBinders.push_back({hypothesisName, hypothesisType});

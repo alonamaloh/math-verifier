@@ -58,7 +58,9 @@ recursion, or [number-theory.md](number-theory.md) for division, gcd, and primes
   `Natural.Eventually.not_eventually_false` — properness, which is how a limit
   argument by contradiction ends — and `Natural.Eventually.beyond`, which
   puts "past a given index" into the filter so a proof combining a
-  threshold with a specific natural takes no maximum by hand.
+  threshold with a specific natural takes no maximum by hand, and
+  `Natural.Eventually.constant`, which closes a scope whose conclusion
+  does not depend on the index.
 
 ## Main theorems
 
