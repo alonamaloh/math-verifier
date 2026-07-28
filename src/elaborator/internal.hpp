@@ -6057,6 +6057,22 @@ private:
     // `MetricSpace.carrier(source)` (expected type `MetricSpace`, not a
     // Sort) would itself be wrapped. At a Pi domain or a declaration
     // binder's type, pass nullptr: the position already demands a type.
+    // Is the `index`-th leading Pi domain of `signature` literally a Sort
+    // (so that parameter takes a TYPE)? Used to decide whether a bundle
+    // value in that position should become its carrier.
+    bool domainAtIsSort(ExpressionPointer signature, size_t index) {
+        ExpressionPointer cursor = signature;
+        for (size_t step = 0; step <= index; ++step) {
+            auto* pi = std::get_if<Pi>(&cursor->node);
+            if (!pi) return false;
+            if (step == index) {
+                return std::get_if<Sort>(&pi->domain->node) != nullptr;
+            }
+            cursor = pi->codomain;
+        }
+        return false;
+    }
+
     ExpressionPointer coerceBundleValueToCarrier(
         ExpressionPointer term,
         const std::vector<LocalBinder>& localBinders,

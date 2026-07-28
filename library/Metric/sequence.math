@@ -23,20 +23,20 @@ import Real.convergence
 import Metric.space
 
 definition MetricSpace.SequenceConverges {m : MetricSpace}
-        (s : ℕ → MetricSpace.carrier(m)) (limit : MetricSpace.carrier(m))
+        (s : ℕ → m) (limit : m)
         : Proposition :=
   ∀ (tolerance : ℝ). tolerance > 0 →
     eventually (k). MetricSpace.distance(limit, s(k)) < tolerance
 
 definition MetricSpace.IsBounded {m : MetricSpace}
-        (region : Set(MetricSpace.carrier(m))) : Proposition :=
-  ∃ (center : MetricSpace.carrier(m)). ∃ (bound : ℝ).
-    ∀ (x : MetricSpace.carrier(m)). x ∈ region →
+        (region : Set(m)) : Proposition :=
+  ∃ (center : m). ∃ (bound : ℝ).
+    ∀ (x : m). x ∈ region →
       MetricSpace.distance(center, x) ≤ bound
 
 definition MetricSpace.SequenceIsBounded {m : MetricSpace}
-        (s : ℕ → MetricSpace.carrier(m)) : Proposition :=
-  ∃ (centre : MetricSpace.carrier(m)). ∃ (bound : ℝ).
+        (s : ℕ → m) : Proposition :=
+  ∃ (centre : m). ∃ (bound : ℝ).
     ∀ (k : ℕ). MetricSpace.distance(centre, s(k)) ≤ bound
 
 -- ----------------------------------------------------------------------
@@ -45,7 +45,7 @@ definition MetricSpace.SequenceIsBounded {m : MetricSpace}
 -- place among the axioms.
 
 theorem MetricSpace.SequenceConverges.unique (m : MetricSpace)
-        (s : ℕ → MetricSpace.carrier(m)) (limit other : MetricSpace.carrier(m))
+        (s : ℕ → m) (limit other : m)
         (toLimit : MetricSpace.SequenceConverges(s, limit))
         (toOther : MetricSpace.SequenceConverges(s, other))
         : limit = other := {
@@ -86,15 +86,15 @@ theorem MetricSpace.SequenceConverges.unique (m : MetricSpace)
 -- Thinning, as a named relation.
 
 definition MetricSpace.SubsequenceConverges {m : MetricSpace}
-        (s : ℕ → MetricSpace.carrier(m)) (index : ℕ → ℕ)
-        (limit : MetricSpace.carrier(m))
+        (s : ℕ → m) (index : ℕ → ℕ)
+        (limit : m)
         : Proposition :=
   Natural.IsStrictlyIncreasing(index)
   ∧ MetricSpace.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
 
 theorem MetricSpace.SubsequenceConverges.increasing (m : MetricSpace)
-        (s : ℕ → MetricSpace.carrier(m)) (index : ℕ → ℕ)
-        (limit : MetricSpace.carrier(m))
+        (s : ℕ → m) (index : ℕ → ℕ)
+        (limit : m)
         (thins : MetricSpace.SubsequenceConverges(s, index, limit))
         : Natural.IsStrictlyIncreasing(index) :=
   unfold MetricSpace.SubsequenceConverges in {
@@ -103,8 +103,8 @@ theorem MetricSpace.SubsequenceConverges.increasing (m : MetricSpace)
   }
 
 theorem MetricSpace.SubsequenceConverges.converges (m : MetricSpace)
-        (s : ℕ → MetricSpace.carrier(m)) (index : ℕ → ℕ)
-        (limit : MetricSpace.carrier(m))
+        (s : ℕ → m) (index : ℕ → ℕ)
+        (limit : m)
         (thins : MetricSpace.SubsequenceConverges(s, index, limit))
         : MetricSpace.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) :=
   unfold MetricSpace.SubsequenceConverges in {
@@ -115,7 +115,7 @@ theorem MetricSpace.SubsequenceConverges.converges (m : MetricSpace)
 -- Thinning preserves a limit: an index map never falls behind its own
 -- index, so the subsequence reaches every threshold the sequence does.
 theorem MetricSpace.SequenceConverges.subsequence (m : MetricSpace)
-        (s : ℕ → MetricSpace.carrier(m)) (limit : MetricSpace.carrier(m))
+        (s : ℕ → m) (limit : m)
         (index : ℕ → ℕ)
         (converges : MetricSpace.SequenceConverges(s, limit))
         (increasing : Natural.IsStrictlyIncreasing(index))

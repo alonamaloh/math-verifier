@@ -48,26 +48,26 @@ import Metric.compactness
 -- Injectivity and homeomorphism, both relative to a carrier.
 
 definition MetricSpace.InjectiveOn {source target : MetricSpace}
-        (f : MetricSpace.carrier(source) → MetricSpace.carrier(target))
-        (carrier : Set(MetricSpace.carrier(source)))
+        (f : source → target)
+        (carrier : Set(source))
         : Proposition :=
-  ∀ (x : MetricSpace.carrier(source)). x ∈ carrier →
-    ∀ (y : MetricSpace.carrier(source)). y ∈ carrier → f(x) = f(y) → x = y
+  ∀ (x : source). x ∈ carrier →
+    ∀ (y : source). y ∈ carrier → f(x) = f(y) → x = y
 
 definition MetricSpace.HasContinuousInverseOn {source target : MetricSpace}
-        (f : MetricSpace.carrier(source) → MetricSpace.carrier(target))
-        (carrier : Set(MetricSpace.carrier(source)))
+        (f : source → target)
+        (carrier : Set(source))
         : Proposition :=
-  ∀ (x : MetricSpace.carrier(source)). x ∈ carrier →
+  ∀ (x : source). x ∈ carrier →
     ∀ (tolerance : ℝ). tolerance > 0 →
       ∃ (nearness : ℝ). nearness > 0 ∧
-        ∀ (y : MetricSpace.carrier(source)). y ∈ carrier →
+        ∀ (y : source). y ∈ carrier →
           MetricSpace.distance(f(x), f(y)) < nearness →
             MetricSpace.distance(x, y) < tolerance
 
 definition MetricSpace.IsHomeomorphismOn {source target : MetricSpace}
-        (f : MetricSpace.carrier(source) → MetricSpace.carrier(target))
-        (carrier : Set(MetricSpace.carrier(source)))
+        (f : source → target)
+        (carrier : Set(source))
         : Proposition :=
   MetricSpace.ContinuousOn(f, carrier) ∧ MetricSpace.InjectiveOn(f, carrier)
     ∧ MetricSpace.HasContinuousInverseOn(f, carrier)
@@ -79,31 +79,31 @@ definition MetricSpace.IsHomeomorphismOn {source target : MetricSpace}
 
 theorem MetricSpace.far_point_with_close_image_at_every_scale
         (source target : MetricSpace)
-        (f : MetricSpace.carrier(source) → MetricSpace.carrier(target))
-        (carrier : Set(MetricSpace.carrier(source)))
-        (x : MetricSpace.carrier(source)) (tolerance : ℝ)
+        (f : source → target)
+        (carrier : Set(source))
+        (x : source) (tolerance : ℝ)
         (noNearness : ¬(∃ (nearness : ℝ). nearness > 0 ∧
-            ∀ (y : MetricSpace.carrier(source)). y ∈ carrier →
+            ∀ (y : source). y ∈ carrier →
               MetricSpace.distance(f(x), f(y)) < nearness →
                 MetricSpace.distance(x, y) < tolerance))
         (n : ℕ)
-        : ∃ (y : MetricSpace.carrier(source)). y ∈ carrier
+        : ∃ (y : source). y ∈ carrier
             ∧ (MetricSpace.distance(f(x), f(y)) < Real.harmonic_term(n)
                    ∧ ¬(MetricSpace.distance(x, y) < tolerance)) := {
   Real.harmonic_term(n) > 0 by Real.divide_positive;
-  suppose ¬(∃ (y : MetricSpace.carrier(source)). y ∈ carrier
+  suppose ¬(∃ (y : source). y ∈ carrier
       ∧ (MetricSpace.distance(f(x), f(y)) < Real.harmonic_term(n)
              ∧ ¬(MetricSpace.distance(x, y) < tolerance)))
       as noFarPoint for contradiction {
-    ∀ (y : MetricSpace.carrier(source)). y ∈ carrier →
+    ∀ (y : source). y ∈ carrier →
         MetricSpace.distance(f(x), f(y)) < Real.harmonic_term(n) →
           MetricSpace.distance(x, y) < tolerance
-        by (y : MetricSpace.carrier(source)) (inCarrier : y ∈ carrier)
+        by (y : source) (inCarrier : y ∈ carrier)
            (imageClose : MetricSpace.distance(f(x), f(y))
                              < Real.harmonic_term(n)) ↦ {
           suppose ¬(MetricSpace.distance(x, y) < tolerance)
               as pointFar for contradiction {
-            ∃ (z : MetricSpace.carrier(source)). z ∈ carrier
+            ∃ (z : source). z ∈ carrier
                 ∧ (MetricSpace.distance(f(x), f(z)) < Real.harmonic_term(n)
                        ∧ ¬(MetricSpace.distance(x, z) < tolerance))
                 by { witness y };
@@ -112,7 +112,7 @@ theorem MetricSpace.far_point_with_close_image_at_every_scale
           done
         };
     ∃ (nearness : ℝ). nearness > 0 ∧
-        ∀ (y : MetricSpace.carrier(source)). y ∈ carrier →
+        ∀ (y : source). y ∈ carrier →
           MetricSpace.distance(f(x), f(y)) < nearness →
             MetricSpace.distance(x, y) < tolerance
         by { witness Real.harmonic_term(n) };
@@ -125,24 +125,24 @@ theorem MetricSpace.far_point_with_close_image_at_every_scale
 -- The inverse of a continuous injection on a compactum is continuous.
 
 theorem MetricSpace.inverse_continuous_on_compact (source target : MetricSpace)
-        (f : MetricSpace.carrier(source) → MetricSpace.carrier(target))
-        (carrier : Set(MetricSpace.carrier(source)))
+        (f : source → target)
+        (carrier : Set(source))
         (compact : MetricSpace.IsCompact(carrier))
         (continuous : MetricSpace.ContinuousOn(f, carrier))
         (injective : MetricSpace.InjectiveOn(f, carrier))
         : MetricSpace.HasContinuousInverseOn(f, carrier) := {
-  take x : MetricSpace.carrier(source);
+  take x : source;
   suppose x ∈ carrier as xInCarrier;
   take tolerance : ℝ;
   suppose tolerance > 0 as tolerancePositive;
   suppose ¬(∃ (nearness : ℝ). nearness > 0 ∧
-      ∀ (y : MetricSpace.carrier(source)). y ∈ carrier →
+      ∀ (y : source). y ∈ carrier →
         MetricSpace.distance(f(x), f(y)) < nearness →
           MetricSpace.distance(x, y) < tolerance)
       as noNearness for contradiction {
 
     -- The bad points, one per scale.
-    ∀ (n : ℕ). ∃ (y : MetricSpace.carrier(source)). y ∈ carrier
+    ∀ (n : ℕ). ∃ (y : source). y ∈ carrier
         ∧ (MetricSpace.distance(f(x), f(y)) < Real.harmonic_term(n)
                ∧ ¬(MetricSpace.distance(x, y) < tolerance))
         by (n : ℕ) ↦ MetricSpace.far_point_with_close_image_at_every_scale(
@@ -154,8 +154,8 @@ theorem MetricSpace.inverse_continuous_on_compact (source target : MetricSpace)
                  ∧ ¬(MetricSpace.distance(x, s(n)) < tolerance))
         as chosen
         from Logic.countable_choice(
-            MetricSpace.carrier(source),
-            (n : ℕ) (y : MetricSpace.carrier(source)) ↦ y ∈ carrier
+            source,
+            (n : ℕ) (y : source) ↦ y ∈ carrier
                 ∧ (MetricSpace.distance(f(x), f(y)) < Real.harmonic_term(n)
                        ∧ ¬(MetricSpace.distance(x, y) < tolerance)),
             badPoints);
@@ -164,7 +164,7 @@ theorem MetricSpace.inverse_continuous_on_compact (source target : MetricSpace)
         as inside;
 
     -- Thin them to a convergent sequence.
-    choose index : ℕ → ℕ, limit : MetricSpace.carrier(source) such that
+    choose index : ℕ → ℕ, limit : source such that
         limit ∈ carrier ∧ MetricSpace.SubsequenceConverges(s, index, limit)
         from compact;
     Natural.IsStrictlyIncreasing(index);
@@ -231,8 +231,8 @@ theorem MetricSpace.inverse_continuous_on_compact (source target : MetricSpace)
 
 theorem MetricSpace.IsHomeomorphismOn.of_continuous_injective_on_compact
         (source target : MetricSpace)
-        (f : MetricSpace.carrier(source) → MetricSpace.carrier(target))
-        (carrier : Set(MetricSpace.carrier(source)))
+        (f : source → target)
+        (carrier : Set(source))
         (compact : MetricSpace.IsCompact(carrier))
         (continuous : MetricSpace.ContinuousOn(f, carrier))
         (injective : MetricSpace.InjectiveOn(f, carrier))

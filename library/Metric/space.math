@@ -47,15 +47,15 @@ definition MetricSpace.carrier : MetricSpace → Type(0)
 -- The distance takes its space implicitly, recovered from the type of
 -- either point, so it reads as an operation on points rather than on a
 -- space. Written with a destructuring `let ⟨…⟩ := m in …` because the
--- return type mentions `MetricSpace.carrier(m)` (the dependent motive a
+-- return type mentions the carrier of `m` (the dependent motive a
 -- pattern-match definition cannot yet build).
 definition MetricSpace.distance {m : MetricSpace}
-        : MetricSpace.carrier(m) → MetricSpace.carrier(m) → ℝ :=
+        : m → m → ℝ :=
   let ⟨carrier, distance, isMetric⟩ := m in
     distance
 
 definition MetricSpace.is_metric (m : MetricSpace)
-        : IsMetric(MetricSpace.carrier(m), MetricSpace.distance) :=
+        : IsMetric(m, MetricSpace.distance) :=
   let ⟨carrier, distance, isMetric⟩ := m in
     isMetric
 
@@ -63,39 +63,39 @@ definition MetricSpace.is_metric (m : MetricSpace)
 -- The axioms, flattened out of the bundled conjunction once so that no
 -- consumer walks the hierarchy by hand.
 
-theorem MetricSpace.distance_self (m : MetricSpace) (x : MetricSpace.carrier(m))
+theorem MetricSpace.distance_self (m : MetricSpace) (x : m)
         : MetricSpace.distance(x, x) = 0 := {
-  IsMetric(MetricSpace.carrier(m), MetricSpace.distance);
+  IsMetric(m, MetricSpace.distance);
   done
 }
 
 theorem MetricSpace.equal_of_distance_zero (m : MetricSpace)
-        (x y : MetricSpace.carrier(m))
+        (x y : m)
         (apart : MetricSpace.distance(x, y) = 0)
         : x = y := {
-  IsMetric(MetricSpace.carrier(m), MetricSpace.distance);
+  IsMetric(m, MetricSpace.distance);
   done
 }
 
 theorem MetricSpace.distance_symmetric (m : MetricSpace)
-        (x y : MetricSpace.carrier(m))
+        (x y : m)
         : MetricSpace.distance(x, y) = MetricSpace.distance(y, x) := {
-  IsMetric(MetricSpace.carrier(m), MetricSpace.distance);
+  IsMetric(m, MetricSpace.distance);
   done
 }
 
 theorem MetricSpace.distance_triangle (m : MetricSpace)
-        (x y z : MetricSpace.carrier(m))
+        (x y z : m)
         : MetricSpace.distance(x, z)
               ≤ MetricSpace.distance(x, y) + MetricSpace.distance(y, z) := {
-  IsMetric(MetricSpace.carrier(m), MetricSpace.distance);
+  IsMetric(m, MetricSpace.distance);
   done
 }
 
 -- Distances are nonnegative: the triangle inequality from x to x through
 -- y says twice the distance is at least zero.
 theorem MetricSpace.distance_nonneg (m : MetricSpace)
-        (x y : MetricSpace.carrier(m))
+        (x y : m)
         : MetricSpace.distance(x, y) ≥ 0 := {
   (0 : ℝ)
      = MetricSpace.distance(x, x) by MetricSpace.distance_self
@@ -111,24 +111,24 @@ theorem MetricSpace.distance_nonneg (m : MetricSpace)
 -- and the one place the topology needs a set builder.
 
 definition MetricSpace.Ball {m : MetricSpace}
-        (center : MetricSpace.carrier(m)) (radius : ℝ)
-        : Set(MetricSpace.carrier(m)) :=
-  (x : MetricSpace.carrier(m)) ↦ MetricSpace.distance(center, x) < radius
+        (center : m) (radius : ℝ)
+        : Set(m) :=
+  (x : m) ↦ MetricSpace.distance(center, x) < radius
 
 theorem MetricSpace.member_Ball (m : MetricSpace)
-        (center x : MetricSpace.carrier(m)) (radius : ℝ)
+        (center x : m) (radius : ℝ)
         (inside : x ∈ MetricSpace.Ball(center, radius))
         : MetricSpace.distance(center, x) < radius :=
   inside
 
 theorem MetricSpace.Ball_of_distance (m : MetricSpace)
-        (center x : MetricSpace.carrier(m)) (radius : ℝ)
+        (center x : m) (radius : ℝ)
         (near : MetricSpace.distance(center, x) < radius)
         : x ∈ MetricSpace.Ball(center, radius) :=
   near
 
 theorem MetricSpace.center_Ball (m : MetricSpace)
-        (center : MetricSpace.carrier(m)) (radius : ℝ)
+        (center : m) (radius : ℝ)
         (radiusPositive : radius > 0)
         : center ∈ MetricSpace.Ball(center, radius) := {
   MetricSpace.distance(center, center)

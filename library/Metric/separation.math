@@ -45,7 +45,7 @@ import Metric.compactness
 -- This is what makes `distance(centre, ·)` continuous — hence its level
 -- sets closed.
 theorem MetricSpace.distance_shift_bound (m : MetricSpace)
-        (centre x y : MetricSpace.carrier(m))
+        (centre x y : m)
         : abs(MetricSpace.distance(centre, y) - MetricSpace.distance(centre, x))
               ≤ MetricSpace.distance(x, y) := {
   MetricSpace.distance(centre, y)
@@ -75,8 +75,8 @@ theorem MetricSpace.distance_shift_bound (m : MetricSpace)
 -- tolerance for each end and a quarter for the gap between them.
 
 theorem MetricSpace.equal_limits_of_closing (m : MetricSpace)
-        (u v : ℕ → MetricSpace.carrier(m)) (index : ℕ → ℕ)
-        (limitU limitV : MetricSpace.carrier(m))
+        (u v : ℕ → m) (index : ℕ → ℕ)
+        (limitU limitV : m)
         (increasing : Natural.IsStrictlyIncreasing(index))
         (toU : MetricSpace.SequenceConverges((k : ℕ) ↦ u(index(k)), limitU))
         (toV : MetricSpace.SequenceConverges((k : ℕ) ↦ v(index(k)), limitV))
@@ -168,19 +168,19 @@ theorem MetricSpace.equal_limits_of_closing (m : MetricSpace)
 -- Every proof that pushes a negation through "for every scale there is a
 -- pair" arrives here, so this is where the double thinning lives.
 theorem MetricSpace.closing_pairs_share_a_limit (m : MetricSpace)
-        (regionA regionB : Set(MetricSpace.carrier(m)))
+        (regionA regionB : Set(m))
         (compactA : MetricSpace.IsCompact(regionA))
         (compactB : MetricSpace.IsCompact(regionB))
-        (u v : ℕ → MetricSpace.carrier(m))
+        (u v : ℕ → m)
         (insideA : ∀ (n : ℕ). u(n) ∈ regionA)
         (insideB : ∀ (n : ℕ). v(n) ∈ regionB)
         (closing : ∀ (n : ℕ).
             MetricSpace.distance(u(n), v(n)) < Real.harmonic_term(n))
-        : ∃ (index : ℕ → ℕ). ∃ (limit : MetricSpace.carrier(m)).
+        : ∃ (index : ℕ → ℕ). ∃ (limit : m).
             (limit ∈ regionA ∧ limit ∈ regionB)
             ∧ (MetricSpace.SequenceConverges((k : ℕ) ↦ u(index(k)), limit)
                    ∧ MetricSpace.SequenceConverges((k : ℕ) ↦ v(index(k)), limit)) := {
-  choose firstIndex : ℕ → ℕ, limitU : MetricSpace.carrier(m) such that
+  choose firstIndex : ℕ → ℕ, limitU : m such that
       limitU ∈ regionA ∧ MetricSpace.SubsequenceConverges(u, firstIndex, limitU)
       from compactA;
   Natural.IsStrictlyIncreasing(firstIndex)
@@ -189,7 +189,7 @@ theorem MetricSpace.closing_pairs_share_a_limit (m : MetricSpace)
   MetricSpace.SequenceConverges((k : ℕ) ↦ u(firstIndex(k)), limitU)
       by MetricSpace.SubsequenceConverges.converges;
 
-  choose secondIndex : ℕ → ℕ, limitV : MetricSpace.carrier(m) such that
+  choose secondIndex : ℕ → ℕ, limitV : m such that
       limitV ∈ regionB
       ∧ MetricSpace.SubsequenceConverges(
             (k : ℕ) ↦ v(firstIndex(k)), secondIndex, limitV)
@@ -224,34 +224,34 @@ theorem MetricSpace.closing_pairs_share_a_limit (m : MetricSpace)
 -- quantifiers costs, and it is quarantined here so the theorem that uses
 -- it can just say the sentence.
 theorem MetricSpace.close_pair_at_every_scale (m : MetricSpace)
-        (regionA regionB : Set(MetricSpace.carrier(m)))
+        (regionA regionB : Set(m))
         (noGap : ¬(∃ (gap : ℝ). gap > 0 ∧
-            ∀ (a : MetricSpace.carrier(m)). a ∈ regionA →
-              ∀ (b : MetricSpace.carrier(m)). b ∈ regionB →
+            ∀ (a : m). a ∈ regionA →
+              ∀ (b : m). b ∈ regionB →
                 gap ≤ MetricSpace.distance(a, b)))
         (n : ℕ)
-        : ∃ (a : MetricSpace.carrier(m)). a ∈ regionA ∧
-            ∃ (b : MetricSpace.carrier(m)). b ∈ regionB
+        : ∃ (a : m). a ∈ regionA ∧
+            ∃ (b : m). b ∈ regionB
                 ∧ MetricSpace.distance(a, b) < Real.harmonic_term(n) := {
   Real.harmonic_term(n) > 0 by Real.divide_positive;
-  suppose ¬(∃ (a : MetricSpace.carrier(m)). a ∈ regionA ∧
-      ∃ (b : MetricSpace.carrier(m)). b ∈ regionB
+  suppose ¬(∃ (a : m). a ∈ regionA ∧
+      ∃ (b : m). b ∈ regionB
           ∧ MetricSpace.distance(a, b) < Real.harmonic_term(n))
       as noClosePair for contradiction {
-    ∀ (a : MetricSpace.carrier(m)). a ∈ regionA →
-      ∀ (b : MetricSpace.carrier(m)). b ∈ regionB →
+    ∀ (a : m). a ∈ regionA →
+      ∀ (b : m). b ∈ regionB →
         Real.harmonic_term(n) ≤ MetricSpace.distance(a, b)
-        by (a : MetricSpace.carrier(m)) (inA : a ∈ regionA)
-           (b : MetricSpace.carrier(m)) (inB : b ∈ regionB) ↦ {
+        by (a : m) (inA : a ∈ regionA)
+           (b : m) (inB : b ∈ regionB) ↦ {
           suppose ¬(Real.harmonic_term(n) ≤ MetricSpace.distance(a, b))
               as close for contradiction {
             MetricSpace.distance(a, b) < Real.harmonic_term(n)
                 by Real.LessThan_of_not_LessOrEqual;
-            ∃ (b : MetricSpace.carrier(m)). b ∈ regionB
+            ∃ (b : m). b ∈ regionB
                 ∧ MetricSpace.distance(a, b) < Real.harmonic_term(n)
                 by { witness b };
-            ∃ (a : MetricSpace.carrier(m)). a ∈ regionA ∧
-                ∃ (b : MetricSpace.carrier(m)). b ∈ regionB
+            ∃ (a : m). a ∈ regionA ∧
+                ∃ (b : m). b ∈ regionB
                     ∧ MetricSpace.distance(a, b) < Real.harmonic_term(n)
                 by { witness a };
             done
@@ -259,8 +259,8 @@ theorem MetricSpace.close_pair_at_every_scale (m : MetricSpace)
           done
         };
     ∃ (gap : ℝ). gap > 0 ∧
-        ∀ (a : MetricSpace.carrier(m)). a ∈ regionA →
-          ∀ (b : MetricSpace.carrier(m)). b ∈ regionB →
+        ∀ (a : m). a ∈ regionA →
+          ∀ (b : m). b ∈ regionB →
             gap ≤ MetricSpace.distance(a, b)
         by { witness Real.harmonic_term(n) };
     done
@@ -269,22 +269,22 @@ theorem MetricSpace.close_pair_at_every_scale (m : MetricSpace)
 }
 
 theorem MetricSpace.compact_separation (m : MetricSpace)
-        (regionA regionB : Set(MetricSpace.carrier(m)))
+        (regionA regionB : Set(m))
         (compactA : MetricSpace.IsCompact(regionA))
         (compactB : MetricSpace.IsCompact(regionB))
-        (disjoint : ∀ (x : MetricSpace.carrier(m)). x ∈ regionA → ¬(x ∈ regionB))
+        (disjoint : ∀ (x : m). x ∈ regionA → ¬(x ∈ regionB))
         : ∃ (gap : ℝ). gap > 0 ∧
-            ∀ (a : MetricSpace.carrier(m)). a ∈ regionA →
-              ∀ (b : MetricSpace.carrier(m)). b ∈ regionB →
+            ∀ (a : m). a ∈ regionA →
+              ∀ (b : m). b ∈ regionB →
                 gap ≤ MetricSpace.distance(a, b) := {
   suppose ¬(∃ (gap : ℝ). gap > 0 ∧
-      ∀ (a : MetricSpace.carrier(m)). a ∈ regionA →
-        ∀ (b : MetricSpace.carrier(m)). b ∈ regionB →
+      ∀ (a : m). a ∈ regionA →
+        ∀ (b : m). b ∈ regionB →
           gap ≤ MetricSpace.distance(a, b)) as noGap for contradiction {
 
     -- No gap works, so every scale is beaten by some pair.
-    ∀ (n : ℕ). ∃ (a : MetricSpace.carrier(m)). a ∈ regionA ∧
-        ∃ (b : MetricSpace.carrier(m)). b ∈ regionB
+    ∀ (n : ℕ). ∃ (a : m). a ∈ regionA ∧
+        ∃ (b : m). b ∈ regionB
             ∧ MetricSpace.distance(a, b) < Real.harmonic_term(n)
         by (n : ℕ) ↦
              MetricSpace.close_pair_at_every_scale(m, regionA, regionB, noGap, n)
@@ -293,19 +293,19 @@ theorem MetricSpace.compact_separation (m : MetricSpace)
     -- First choice: the point of `A`.
     choose a such that
         ∀ (n : ℕ). a(n) ∈ regionA ∧
-            ∃ (b : MetricSpace.carrier(m)). b ∈ regionB
+            ∃ (b : m). b ∈ regionB
                 ∧ MetricSpace.distance(a(n), b) < Real.harmonic_term(n)
         as chosenA
         from Logic.countable_choice(
-            MetricSpace.carrier(m),
-            (n : ℕ) (x : MetricSpace.carrier(m)) ↦ x ∈ regionA ∧
-                ∃ (b : MetricSpace.carrier(m)). b ∈ regionB
+            m,
+            (n : ℕ) (x : m) ↦ x ∈ regionA ∧
+                ∃ (b : m). b ∈ regionB
                     ∧ MetricSpace.distance(x, b) < Real.harmonic_term(n),
             closePairs);
     ∀ (k : ℕ). a(k) ∈ regionA by { take k : ℕ; done by chosenA };
 
     -- Second choice: its partner in `B`.
-    ∀ (n : ℕ). ∃ (y : MetricSpace.carrier(m)). y ∈ regionB
+    ∀ (n : ℕ). ∃ (y : m). y ∈ regionB
         ∧ MetricSpace.distance(a(n), y) < Real.harmonic_term(n)
         by { take n : ℕ; done by chosenA }
         as partners;
@@ -314,8 +314,8 @@ theorem MetricSpace.compact_separation (m : MetricSpace)
             ∧ MetricSpace.distance(a(n), b(n)) < Real.harmonic_term(n)
         as chosenB
         from Logic.countable_choice(
-            MetricSpace.carrier(m),
-            (n : ℕ) (y : MetricSpace.carrier(m)) ↦ y ∈ regionB
+            m,
+            (n : ℕ) (y : m) ↦ y ∈ regionB
                 ∧ MetricSpace.distance(a(n), y) < Real.harmonic_term(n),
             partners);
     ∀ (k : ℕ). b(k) ∈ regionB by { take k : ℕ; done by chosenB };
@@ -324,7 +324,7 @@ theorem MetricSpace.compact_separation (m : MetricSpace)
     -- then a point of both regions, and they were disjoint.
     ∀ (n : ℕ). MetricSpace.distance(a(n), b(n)) < Real.harmonic_term(n)
         by { take n : ℕ; done by chosenB };
-    choose index : ℕ → ℕ, limit : MetricSpace.carrier(m) such that
+    choose index : ℕ → ℕ, limit : m such that
         (limit ∈ regionA ∧ limit ∈ regionB)
         ∧ (MetricSpace.SequenceConverges((k : ℕ) ↦ a(index(k)), limit)
                ∧ MetricSpace.SequenceConverges((k : ℕ) ↦ b(index(k)), limit))

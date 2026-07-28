@@ -43,15 +43,15 @@ import Metric.sequence
 -- Compactness.
 
 definition MetricSpace.IsCompact {m : MetricSpace}
-        (region : Set(MetricSpace.carrier(m))) : Proposition :=
-  ∀ (s : ℕ → MetricSpace.carrier(m)). (∀ (k : ℕ). s(k) ∈ region) →
-    ∃ (index : ℕ → ℕ). ∃ (limit : MetricSpace.carrier(m)).
+        (region : Set(m)) : Proposition :=
+  ∀ (s : ℕ → m). (∀ (k : ℕ). s(k) ∈ region) →
+    ∃ (index : ℕ → ℕ). ∃ (limit : m).
       limit ∈ region ∧ MetricSpace.SubsequenceConverges(s, index, limit)
 
 -- The closure of a set, taken in the whole space.
 definition MetricSpace.Closure {m : MetricSpace}
-        (region : Set(MetricSpace.carrier(m))) : Set(MetricSpace.carrier(m)) :=
-  MetricSpace.ClosureIn(region, Set.universe(MetricSpace.carrier(m)))
+        (region : Set(m)) : Set(m) :=
+  MetricSpace.ClosureIn(region, Set.universe(m))
 
 -- ----------------------------------------------------------------------
 -- Closure and limits. The two directions are asymmetric: a limit of
@@ -59,14 +59,14 @@ definition MetricSpace.Closure {m : MetricSpace}
 -- the sequence from a point of the closure is a choice.
 
 theorem MetricSpace.limit_in_Closure (m : MetricSpace)
-        (region : Set(MetricSpace.carrier(m)))
-        (s : ℕ → MetricSpace.carrier(m)) (inside : ∀ (k : ℕ). s(k) ∈ region)
-        (limit : MetricSpace.carrier(m))
+        (region : Set(m))
+        (s : ℕ → m) (inside : ∀ (k : ℕ). s(k) ∈ region)
+        (limit : m)
         (converges : MetricSpace.SequenceConverges(s, limit))
         : limit ∈ MetricSpace.Closure(region) := {
-  limit ∈ Set.universe(MetricSpace.carrier(m));
+  limit ∈ Set.universe(m);
   ∀ (radius : ℝ). radius > 0 →
-      ∃ (y : MetricSpace.carrier(m)). y ∈ region ∧
+      ∃ (y : m). y ∈ region ∧
         MetricSpace.distance(limit, y) < radius
       by (radius : ℝ) (radiusPositive : radius > 0) ↦ {
         choose threshold such that
@@ -84,15 +84,15 @@ theorem MetricSpace.limit_in_Closure (m : MetricSpace)
 -- each `n` the closure offers a point within `1/(1+n)`; countable choice
 -- turns that family of nonempty options into one sequence.
 theorem MetricSpace.sequence_to_Closure_point (m : MetricSpace)
-        (region : Set(MetricSpace.carrier(m)))
-        (x : MetricSpace.carrier(m)) (inClosure : x ∈ MetricSpace.Closure(region))
-        : ∃ (s : ℕ → MetricSpace.carrier(m)).
+        (region : Set(m))
+        (x : m) (inClosure : x ∈ MetricSpace.Closure(region))
+        : ∃ (s : ℕ → m).
             (∀ (k : ℕ). s(k) ∈ region) ∧ MetricSpace.SequenceConverges(s, x) := {
   ∀ (radius : ℝ). radius > 0 →
-      ∃ (y : MetricSpace.carrier(m)). y ∈ region ∧
+      ∃ (y : m). y ∈ region ∧
         MetricSpace.distance(x, y) < radius
       as meetsEveryBall;
-  ∀ (n : ℕ). ∃ (y : MetricSpace.carrier(m)).
+  ∀ (n : ℕ). ∃ (y : m).
       y ∈ region ∧ MetricSpace.distance(x, y) < Real.harmonic_term(n)
       by {
         take n : ℕ;
@@ -100,11 +100,11 @@ theorem MetricSpace.sequence_to_Closure_point (m : MetricSpace)
         done by meetsEveryBall
       }
       as closeAtEveryScale;
-  ∃ (chosen : ℕ → MetricSpace.carrier(m)). ∀ (n : ℕ).
+  ∃ (chosen : ℕ → m). ∀ (n : ℕ).
       chosen(n) ∈ region ∧ MetricSpace.distance(x, chosen(n)) < Real.harmonic_term(n)
       by Logic.countable_choice(
-          MetricSpace.carrier(m),
-          (n : ℕ) (y : MetricSpace.carrier(m)) ↦
+          m,
+          (n : ℕ) (y : m) ↦
               y ∈ region ∧ MetricSpace.distance(x, y) < Real.harmonic_term(n),
           closeAtEveryScale)
       as choiceMade;
@@ -138,17 +138,17 @@ theorem MetricSpace.sequence_to_Closure_point (m : MetricSpace)
 -- sequential form, which is what the consumers actually use.
 
 theorem MetricSpace.IsCompact.Closure_subset (m : MetricSpace)
-        (region : Set(MetricSpace.carrier(m)))
+        (region : Set(m))
         (compact : MetricSpace.IsCompact(region))
         : MetricSpace.Closure(region) ⊆ region := {
-  take x : MetricSpace.carrier(m);
+  take x : m;
   suppose x ∈ MetricSpace.Closure(region) as inClosure;
-  choose s : ℕ → MetricSpace.carrier(m) such that
+  choose s : ℕ → m such that
       (∀ (k : ℕ). s(k) ∈ region) ∧ MetricSpace.SequenceConverges(s, x)
       from MetricSpace.sequence_to_Closure_point;
   ∀ (k : ℕ). s(k) ∈ region;
   MetricSpace.SequenceConverges(s, x);
-  choose index : ℕ → ℕ, limit : MetricSpace.carrier(m) such that
+  choose index : ℕ → ℕ, limit : m such that
       limit ∈ region ∧ MetricSpace.SubsequenceConverges(s, index, limit)
       from compact;
   Natural.IsStrictlyIncreasing(index)
@@ -178,23 +178,23 @@ theorem MetricSpace.IsCompact.Closure_subset (m : MetricSpace)
 -- The block is what pushing the negation through the quantifiers costs;
 -- quarantined here so the theorem below can just say the sentence.
 theorem MetricSpace.point_past_every_scale (m : MetricSpace)
-        (region : Set(MetricSpace.carrier(m)))
-        (centre : MetricSpace.carrier(m))
+        (region : Set(m))
+        (centre : m)
         (unbounded : ¬MetricSpace.IsBounded(region))
         (n : ℕ)
-        : ∃ (x : MetricSpace.carrier(m)).
+        : ∃ (x : m).
             x ∈ region ∧ (1 + n : ℝ) < MetricSpace.distance(centre, x) := {
-  suppose ¬(∃ (x : MetricSpace.carrier(m)).
+  suppose ¬(∃ (x : m).
       x ∈ region ∧ (1 + n : ℝ) < MetricSpace.distance(centre, x))
       as noneBeyond for contradiction {
-    ∀ (x : MetricSpace.carrier(m)). x ∈ region →
+    ∀ (x : m). x ∈ region →
         MetricSpace.distance(centre, x) ≤ (1 + n : ℝ)
-        by (x : MetricSpace.carrier(m)) (inRegion : x ∈ region) ↦ {
+        by (x : m) (inRegion : x ∈ region) ↦ {
           suppose ¬(MetricSpace.distance(centre, x) ≤ (1 + n : ℝ))
               as far for contradiction {
             (1 + n : ℝ) < MetricSpace.distance(centre, x)
                 by Real.LessThan_of_not_LessOrEqual;
-            ∃ (x : MetricSpace.carrier(m)). x ∈ region
+            ∃ (x : m). x ∈ region
                 ∧ (1 + n : ℝ) < MetricSpace.distance(centre, x)
                 by { witness x };
             done
@@ -209,13 +209,13 @@ theorem MetricSpace.point_past_every_scale (m : MetricSpace)
 }
 
 theorem MetricSpace.IsCompact.bounded (m : MetricSpace)
-        (region : Set(MetricSpace.carrier(m)))
-        (centre : MetricSpace.carrier(m))
+        (region : Set(m))
+        (centre : m)
         (compact : MetricSpace.IsCompact(region))
         : MetricSpace.IsBounded(region) := {
   suppose ¬MetricSpace.IsBounded(region) as unbounded for contradiction {
     -- Past every natural, some point of the region.
-    ∀ (n : ℕ). ∃ (x : MetricSpace.carrier(m)).
+    ∀ (n : ℕ). ∃ (x : m).
         x ∈ region ∧ (1 + n : ℝ) < MetricSpace.distance(centre, x)
         by (n : ℕ) ↦
              MetricSpace.point_past_every_scale(m, region, centre, unbounded, n)
@@ -225,13 +225,13 @@ theorem MetricSpace.IsCompact.bounded (m : MetricSpace)
             ∧ (1 + n : ℝ) < MetricSpace.distance(centre, s(n))
         as escapesAt
         from Logic.countable_choice(
-            MetricSpace.carrier(m),
-            (n : ℕ) (x : MetricSpace.carrier(m)) ↦
+            m,
+            (n : ℕ) (x : m) ↦
                 x ∈ region ∧ (1 + n : ℝ) < MetricSpace.distance(centre, x),
             escapes);
     ∀ (k : ℕ). s(k) ∈ region
         by { take k : ℕ; done by escapesAt };
-    choose index : ℕ → ℕ, limit : MetricSpace.carrier(m) such that
+    choose index : ℕ → ℕ, limit : m such that
         limit ∈ region ∧ MetricSpace.SubsequenceConverges(s, index, limit)
         from compact;
     Natural.IsStrictlyIncreasing(index)
@@ -280,11 +280,11 @@ theorem MetricSpace.IsCompact.bounded (m : MetricSpace)
 -- Continuity is sequential: a sequence in the carrier converging to a
 -- point of it has its values converging to the value there.
 theorem MetricSpace.ContinuousAt.along_sequence (source target : MetricSpace)
-        (f : MetricSpace.carrier(source) → MetricSpace.carrier(target))
-        (carrier : Set(MetricSpace.carrier(source)))
-        (x : MetricSpace.carrier(source))
+        (f : source → target)
+        (carrier : Set(source))
+        (x : source)
         (continuous : MetricSpace.ContinuousAt(f, carrier, x))
-        (s : ℕ → MetricSpace.carrier(source))
+        (s : ℕ → source)
         (inside : ∀ (k : ℕ). s(k) ∈ carrier)
         (converges : MetricSpace.SequenceConverges(s, x))
         : MetricSpace.SequenceConverges((k : ℕ) ↦ f(s(k)), f(x)) := {
@@ -292,12 +292,12 @@ theorem MetricSpace.ContinuousAt.along_sequence (source target : MetricSpace)
   suppose tolerance > 0;
   choose nearness such that
       nearness > 0 ∧
-      ∀ (y : MetricSpace.carrier(source)). y ∈ carrier →
+      ∀ (y : source). y ∈ carrier →
         MetricSpace.distance(x, y) < nearness →
           MetricSpace.distance(f(x), f(y)) < tolerance
       from continuous;
   nearness > 0;
-  ∀ (y : MetricSpace.carrier(source)). y ∈ carrier →
+  ∀ (y : source). y ∈ carrier →
       MetricSpace.distance(x, y) < nearness →
         MetricSpace.distance(f(x), f(y)) < tolerance
       as imagesClose;
@@ -313,22 +313,22 @@ theorem MetricSpace.ContinuousAt.along_sequence (source target : MetricSpace)
 }
 
 definition MetricSpace.imageSet {source target : MetricSpace}
-        (f : MetricSpace.carrier(source) → MetricSpace.carrier(target))
-        (region : Set(MetricSpace.carrier(source)))
-        : Set(MetricSpace.carrier(target)) :=
-  (y : MetricSpace.carrier(target)) ↦
-    ∃ (x : MetricSpace.carrier(source)). x ∈ region ∧ f(x) = y
+        (f : source → target)
+        (region : Set(source))
+        : Set(target) :=
+  (y : target) ↦
+    ∃ (x : source). x ∈ region ∧ f(x) = y
 
 -- Taking images commutes with union: a point of the image of a union came
 -- from one side or the other.
 theorem MetricSpace.imageSet_union (source target : MetricSpace)
-        (f : MetricSpace.carrier(source) → MetricSpace.carrier(target))
-        (left right : Set(MetricSpace.carrier(source)))
+        (f : source → target)
+        (left right : Set(source))
         : MetricSpace.imageSet(f, left ∪ right)
               = MetricSpace.imageSet(f, left) ∪ MetricSpace.imageSet(f, right) := {
   MetricSpace.imageSet(f, left ∪ right)
       ⊆ MetricSpace.imageSet(f, left) ∪ MetricSpace.imageSet(f, right)
-      by (y : MetricSpace.carrier(target))
+      by (y : target)
          (onImage : y ∈ MetricSpace.imageSet(f, left ∪ right)) ↦ {
         choose source such that source ∈ left ∪ right ∧ f(source) = y;
         source ∈ left ∪ right;
@@ -346,7 +346,7 @@ theorem MetricSpace.imageSet_union (source target : MetricSpace)
       };
   MetricSpace.imageSet(f, left) ∪ MetricSpace.imageSet(f, right)
       ⊆ MetricSpace.imageSet(f, left ∪ right)
-      by (y : MetricSpace.carrier(target))
+      by (y : target)
          (onEither : y ∈ MetricSpace.imageSet(f, left)
              ∪ MetricSpace.imageSet(f, right)) ↦ {
         done by cases {
@@ -373,26 +373,26 @@ theorem MetricSpace.imageSet_union (source target : MetricSpace)
 -- image has preimages — countable choice again — which compactness thins
 -- to a convergent one; continuity carries that convergence forward.
 theorem MetricSpace.IsCompact.image (source target : MetricSpace)
-        (f : MetricSpace.carrier(source) → MetricSpace.carrier(target))
-        (region : Set(MetricSpace.carrier(source)))
+        (f : source → target)
+        (region : Set(source))
         (compact : MetricSpace.IsCompact(region))
         (continuous : MetricSpace.ContinuousOn(f, region))
         : MetricSpace.IsCompact(MetricSpace.imageSet(f, region)) := {
-  take t : ℕ → MetricSpace.carrier(target);
+  take t : ℕ → target;
   suppose ∀ (k : ℕ). t(k) ∈ MetricSpace.imageSet(f, region) as inImage;
-  ∀ (n : ℕ). ∃ (x : MetricSpace.carrier(source)). x ∈ region ∧ f(x) = t(n)
+  ∀ (n : ℕ). ∃ (x : source). x ∈ region ∧ f(x) = t(n)
       by (n : ℕ) ↦ inImage(n)
       as preimages;
   choose s such that ∀ (n : ℕ). s(n) ∈ region ∧ f(s(n)) = t(n)
       as chosen
       from Logic.countable_choice(
-          MetricSpace.carrier(source),
-          (n : ℕ) (x : MetricSpace.carrier(source)) ↦ x ∈ region ∧ f(x) = t(n),
+          source,
+          (n : ℕ) (x : source) ↦ x ∈ region ∧ f(x) = t(n),
           preimages);
   ∀ (k : ℕ). s(k) ∈ region
       by { take k : ℕ; done by chosen }
       as inside;
-  choose index : ℕ → ℕ, limit : MetricSpace.carrier(source) such that
+  choose index : ℕ → ℕ, limit : source such that
       limit ∈ region ∧ MetricSpace.SubsequenceConverges(s, index, limit)
       from compact;
   Natural.IsStrictlyIncreasing(index)

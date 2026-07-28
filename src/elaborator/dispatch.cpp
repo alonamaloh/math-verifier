@@ -1246,14 +1246,29 @@ ExpressionPointer Elaborator::elaborateExpression(
                     // harmless. Such arguments are re-elaborated below with the
                     // expected type the function's signature supplies.
                     std::vector<ExpressionPointer> valueArguments;
+                    size_t probeIndex = 0;
                     for (const auto& argumentSurface :
                          positionalArguments) {
                         try {
-                            valueArguments.push_back(elaborateExpression(
-                                *argumentSurface, localBinders));
+                            ExpressionPointer probe = elaborateExpression(
+                                *argumentSurface, localBinders);
+                            // A Sort-domain parameter takes a TYPE, so a
+                            // bundle there means its carrier — and the
+                            // level must be read off the CARRIER, not the
+                            // bundle. `∃ (x : m). …` desugars to
+                            // `Exists(m, …)` and its level is inferred
+                            // HERE, before the argument coercion below.
+                            if (domainAtIsSort(
+                                    declarationType(*environmentDeclaration),
+                                    probeIndex)) {
+                                probe = coerceBundleValueToCarrier(
+                                    probe, localBinders);
+                            }
+                            valueArguments.push_back(std::move(probe));
                         } catch (const ElaborateError&) {
                             valueArguments.push_back(nullptr);
                         }
+                        ++probeIndex;
                     }
                     std::vector<LevelPointer> inferredUniverseArguments =
                         inferUniverseArguments(*environmentDeclaration,
