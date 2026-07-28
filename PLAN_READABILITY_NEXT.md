@@ -105,6 +105,52 @@ rather than a name table — that is the piece a general carrier coercion needs.
 order of magnitude with no proof text hand-rewritten beyond deleting
 projections; `MetricSpace.IsCompact.image` reads as above.
 
+### 1a DONE — structure-as-its-carrier (`5255fe09`, `514028e4`)
+
+`MetricSpace.carrier` across `library/`: **506 → 0** (the 8 that remain are
+inside `Test/bundle_carrier_coercion_test`, where writing the projection
+explicitly is the point). `MetricSpace.IsCompact.image` reads as the target
+above, verbatim, and no proof text was rewritten — only projections deleted.
+
+A bundle is recognised exactly as `instance` recognises one (`8a898f6a`) — by
+a `<Structure>.carrier` projection being in scope — so there is no name table
+and `Ring` / `Field` / `VectorSpace` / any future bundle qualify on the same
+terms. Two guards: the term's type must not already be a Sort (genuine types
+untouched), and in argument position the *expected* type must be a Sort
+(without which `source` inside `MetricSpace.carrier(source)` would itself be
+wrapped).
+
+**Measured effect: horizontal, not vertical.** `Metric/` is 3,670 lines before
+and after. Nothing got shorter by a line; every signature got shorter by a
+*concept*. Judge the change on the diff, not on a line count:
+
+```math
+-- before
+(f : MetricSpace.carrier(source) → MetricSpace.carrier(target))
+(region : Set(MetricSpace.carrier(source)))
+-- after
+(f : source → target)
+(region : Set(source))
+```
+
+Three things for whoever does 1b/1c:
+
+- **Wire every binder path, and check `make tests`, not just a verify.** The
+  two-stage build has two of them — `elaborateDefinition` and
+  `elaborateTheoremStatementOnly` (stage 1, `MATH_STATEMENTS_ONLY=1`). Wiring
+  only the first left stage 1 building a Pi over a non-Sort domain, which
+  surfaces as `internal: expected a Sort when computing universe level` at
+  1:1. A direct `kernel verify` passes; only the interface stage fails.
+- **Universe-polymorphic heads infer their level before argument coercion
+  runs.** `∃ (x : m). …` desugars to `Exists(m, …)`; the level comes from the
+  arguments, so the bundle has to be unwrapped at the *probe* stage
+  (`domainAtIsSort` gates it) or the call fails with "could not infer 1
+  universe level of 'Exists'". Any `.value`/`.make` coercion in 1b/1c will hit
+  the same thing.
+- **`.make` (ℕ → `NaturalsBelow(n)`) is a different mechanism and should be
+  costed separately** — it is proof-carrying (`i < n` discharged from context),
+  which neither of the above is.
+
 ---
 
 ## 2. `VectorSpace.linearCombination` should be indexed by a list
