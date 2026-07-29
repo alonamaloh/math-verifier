@@ -140,6 +140,43 @@ theorem Graph.Joins.incident_target (graph : Graph(V, E, ends)) (edge : E) (u v 
   done by Graph.Joins.incident_source
 }
 
+-- An edge has no ends beyond the two: a vertex incident to it is one of
+-- them. This is what stops a walk from leaving an edge anywhere else.
+theorem Graph.Incident.is_end (graph : Graph(V, E, ends)) (edge : E) (u v vertex : V)
+        (joins : Graph.Joins(graph, edge, u, v))
+        (incident : Graph.Incident(graph, edge, vertex))
+        : vertex = u ∨ vertex = v := {
+  choose farEnd such that Graph.Joins(graph, edge, vertex, farEnd) from incident;
+  done by cases {
+    case ends(edge) = Product.make(u, v):
+        done by cases {
+          case ends(edge) = Product.make(vertex, farEnd):
+              vertex = Product.first(Product.make(vertex, farEnd))
+                     = Product.first(ends(edge))
+                     = Product.first(Product.make(u, v))
+                     = u
+          case ends(edge) = Product.make(farEnd, vertex):
+              vertex = Product.second(Product.make(farEnd, vertex))
+                     = Product.second(ends(edge))
+                     = Product.second(Product.make(u, v))
+                     = v
+        }
+    case ends(edge) = Product.make(v, u):
+        done by cases {
+          case ends(edge) = Product.make(vertex, farEnd):
+              vertex = Product.first(Product.make(vertex, farEnd))
+                     = Product.first(ends(edge))
+                     = Product.first(Product.make(v, u))
+                     = v
+          case ends(edge) = Product.make(farEnd, vertex):
+              vertex = Product.second(Product.make(farEnd, vertex))
+                     = Product.second(ends(edge))
+                     = Product.second(Product.make(v, u))
+                     = u
+        }
+  }
+}
+
 theorem Graph.Adjacent.symmetric (graph : Graph(V, E, ends)) (u v : V)
         (adjacent : Graph.Adjacent(graph, u, v))
         : Graph.Adjacent(graph, v, u) := {

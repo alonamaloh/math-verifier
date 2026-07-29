@@ -79,6 +79,123 @@ definition Graph.walkVertices (graph : Graph(V, E, ends)) (source : V) (edgeList
         : Set(V) :=
   (vertex : V) ↦ vertex = source ∨ vertex ∈ Graph.coveredVertices(graph, edgeList)
 
+theorem Graph.coveredVertices.no_edges (graph : Graph(V, E, ends)) (vertex : V)
+        : ¬(vertex ∈ Graph.coveredVertices(graph, List.empty(E))) := {
+  suppose vertex ∈ Graph.coveredVertices(graph, List.empty(E));
+  choose usedEdge such that usedEdge ∈ List.empty(E) ∧ Graph.Incident(graph, usedEdge, vertex);
+  usedEdge ∈ List.empty(E);
+  ¬(usedEdge ∈ List.empty(E)) by List.no_member_empty;
+  done
+}
+
+theorem Graph.coveredVertices.of_edge (graph : Graph(V, E, ends)) (edge : E)
+        (edgeList : List(E)) (vertex : V)
+        (isMember : edge ∈ edgeList)
+        (incident : Graph.Incident(graph, edge, vertex))
+        : vertex ∈ Graph.coveredVertices(graph, edgeList) :=
+  witness edge
+
+theorem Graph.coveredVertices.invert (graph : Graph(V, E, ends)) (edge : E)
+        (rest : List(E)) (vertex : V)
+        (covered : vertex ∈ Graph.coveredVertices(graph, List.prepend(E, edge, rest)))
+        : Graph.Incident(graph, edge, vertex)
+          ∨ vertex ∈ Graph.coveredVertices(graph, rest) := {
+  choose usedEdge such that
+      usedEdge ∈ List.prepend(E, edge, rest) ∧ Graph.Incident(graph, usedEdge, vertex);
+  usedEdge ∈ List.prepend(E, edge, rest);
+  Graph.Incident(graph, usedEdge, vertex);
+  usedEdge = edge ∨ usedEdge ∈ rest by List.member_prepend_invert;
+  done by cases {
+    case usedEdge = edge: {
+        Graph.Incident(graph, edge, vertex) by substituting (usedEdge = edge);
+        done
+      }
+    case usedEdge ∈ rest: {
+        vertex ∈ Graph.coveredVertices(graph, rest) by Graph.coveredVertices.of_edge;
+        done
+      }
+  }
+}
+
+-- A longer edge list covers everything a shorter one does.
+theorem Graph.coveredVertices.monotone (graph : Graph(V, E, ends))
+        (fewer more : List(E)) (vertex : V)
+        (inclusion : ∀ (edge : E). edge ∈ fewer → edge ∈ more)
+        (covered : vertex ∈ Graph.coveredVertices(graph, fewer))
+        : vertex ∈ Graph.coveredVertices(graph, more) := {
+  choose usedEdge such that usedEdge ∈ fewer ∧ Graph.Incident(graph, usedEdge, vertex);
+  usedEdge ∈ fewer;
+  Graph.Incident(graph, usedEdge, vertex);
+  usedEdge ∈ more by inclusion;
+  done by Graph.coveredVertices.of_edge
+}
+
+-- The two ways to move the visited set across a first step: a vertex the
+-- walk visits is its source or is visited by what remains, and everything
+-- the remainder visits the whole walk visits too.
+theorem Graph.walkVertices.after_step (graph : Graph(V, E, ends))
+        (source waypoint vertex : V) (edge : E) (rest : List(E))
+        (joins : Graph.Joins(graph, edge, source, waypoint))
+        (visited : vertex ∈ Graph.walkVertices(graph, source, List.prepend(E, edge, rest)))
+        : vertex = source ∨ vertex ∈ Graph.walkVertices(graph, waypoint, rest) :=
+  done by cases {
+    case vertex = source: done
+    case vertex ∈ Graph.coveredVertices(graph, List.prepend(E, edge, rest)): {
+        Graph.Incident(graph, edge, vertex) ∨ vertex ∈ Graph.coveredVertices(graph, rest)
+            by Graph.coveredVertices.invert;
+        done by cases {
+          case Graph.Incident(graph, edge, vertex): {
+              vertex = source ∨ vertex = waypoint by Graph.Incident.is_end;
+              done by cases {
+                case vertex = source: done
+                case vertex = waypoint: {
+                    vertex ∈ Graph.walkVertices(graph, waypoint, rest);
+                    done
+                  }
+              }
+            }
+          case vertex ∈ Graph.coveredVertices(graph, rest): {
+              vertex ∈ Graph.walkVertices(graph, waypoint, rest);
+              done
+            }
+        }
+      }
+  }
+
+theorem Graph.walkVertices.before_step (graph : Graph(V, E, ends))
+        (source waypoint vertex : V) (edge : E) (rest : List(E))
+        (joins : Graph.Joins(graph, edge, source, waypoint))
+        (visited : vertex ∈ Graph.walkVertices(graph, waypoint, rest))
+        : vertex ∈ Graph.walkVertices(graph, source, List.prepend(E, edge, rest)) :=
+  done by cases {
+    case vertex = waypoint: {
+        Graph.Incident(graph, edge, waypoint) by Graph.Joins.incident_target;
+        Graph.Incident(graph, edge, vertex) by substituting (vertex = waypoint);
+        edge ∈ List.prepend(E, edge, rest) by List.member.here;
+        vertex ∈ Graph.coveredVertices(graph, List.prepend(E, edge, rest))
+            by Graph.coveredVertices.of_edge;
+        done
+      }
+    case vertex ∈ Graph.coveredVertices(graph, rest): {
+        ∀ (e : E). e ∈ rest → e ∈ List.prepend(E, edge, rest)
+            by { take e : E; suppose e ∈ rest; done by List.member.there };
+        vertex ∈ Graph.coveredVertices(graph, List.prepend(E, edge, rest))
+            by Graph.coveredVertices.monotone;
+        done
+      }
+  }
+
+theorem Graph.walkVertices.source (graph : Graph(V, E, ends)) (source : V)
+        (edgeList : List(E))
+        : source ∈ Graph.walkVertices(graph, source, edgeList) :=
+  done
+
+theorem Graph.walkVertices.of_covered (graph : Graph(V, E, ends)) (source vertex : V)
+        (edgeList : List(E))
+        (covered : vertex ∈ Graph.coveredVertices(graph, edgeList))
+        : vertex ∈ Graph.walkVertices(graph, source, edgeList) :=
+  done
+
 -- ----------------------------------------------------------------------
 -- Building walks.
 
