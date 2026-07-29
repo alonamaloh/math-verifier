@@ -256,24 +256,11 @@ theorem MetricSpace.ContinuousWithinAt.near {source target : MetricSpace}
         (tolerance : ℝ) (tolerancePositive : tolerance > 0)
         : MetricSpace.NearWithin(x, region,
               (y : source) ↦ distance(f(x), f(y)) < tolerance) := {
-  MetricSpace.Near(x,
-      (y : source) ↦ y ∈ region → distance(f(x), f(y)) < tolerance)
-      by unfold MetricSpace.Near in {
-        choose radius such that radius > 0 ∧
-            ∀ (y : source). y ∈ region →
-              distance(x, y) < radius →
-                distance(f(x), f(y)) < tolerance
-            from continuous;
-        radius > 0;
-        ∀ (y : source). distance(x, y) < radius →
-            (y ∈ region → distance(f(x), f(y)) < tolerance)
-            by { take y : source;
-                 suppose distance(x, y) < radius;
-                 suppose y ∈ region;
-                 done };
-        witness radius
-      };
-  done by MetricSpace.NearWithin.of_near
+  ∃ (nearness : ℝ). nearness > 0 ∧
+      ∀ (y : source). y ∈ region → distance(x, y) < nearness →
+        distance(f(x), f(y)) < tolerance
+      by continuous;
+  done by MetricSpace.NearWithin.of_ball
 }
 
 theorem MetricSpace.ContinuousWithinAt.of_near {source target : MetricSpace}
@@ -286,23 +273,7 @@ theorem MetricSpace.ContinuousWithinAt.of_near {source target : MetricSpace}
   suppose tolerance > 0;
   MetricSpace.NearWithin(x, region,
       (y : source) ↦ distance(f(x), f(y)) < tolerance) by nearby;
-  MetricSpace.Near(x,
-      (y : source) ↦ y ∈ region → distance(f(x), f(y)) < tolerance)
-      by MetricSpace.NearWithin.near;
-  unfold MetricSpace.Near in {
-    choose radius such that radius > 0 ∧
-        ∀ (y : source). distance(x, y) < radius →
-          (y ∈ region → distance(f(x), f(y)) < tolerance);
-    radius > 0;
-    ∀ (y : source). y ∈ region →
-        distance(x, y) < radius →
-          distance(f(x), f(y)) < tolerance
-        by { take y : source;
-             suppose y ∈ region;
-             suppose distance(x, y) < radius;
-             done };
-    witness radius
-  }
+  done by MetricSpace.NearWithin.ball
 }
 
 -- ----------------------------------------------------------------------

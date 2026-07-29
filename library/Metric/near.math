@@ -194,22 +194,6 @@ theorem MetricSpace.NearWithin.monotone {m : MetricSpace} (x : m)
     }
   }
 
--- Within a region, a point IS in the region. Trivial as a proposition,
--- and the one fact `for y sufficiently near x within region: { … }` does
--- not otherwise hand its body — state it when the argument splits on
--- where in the region `y` lies.
-theorem MetricSpace.NearWithin.in_region {m : MetricSpace} (x : m)
-        (region : Set(m))
-        : MetricSpace.NearWithin(x, region, (y : m) ↦ y ∈ region) :=
-  unfold MetricSpace.NearWithin in {
-    ∀ (y : m). distance(x, y) < 1 → (y ∈ region → y ∈ region)
-        by { take y : m;
-             suppose distance(x, y) < 1;
-             suppose y ∈ region;
-             done };
-    unfold MetricSpace.Near in { witness (1 : ℝ) }
-  }
-
 -- Crossing between the two spellings. Everything relative is stated with
 -- `NearWithin`; the ε-δ definitions unfold to the implication form, and
 -- these two are the only place that difference is visible.
@@ -225,6 +209,111 @@ theorem MetricSpace.NearWithin.of_near {m : MetricSpace} (x : m)
         (nearby : MetricSpace.Near(x, (y : m) ↦ y ∈ region → P(y)))
         : MetricSpace.NearWithin(x, region, P) :=
   unfold MetricSpace.NearWithin in { done }
+
+-- The ε-δ boundary. Every relative definition in the library is written
+-- as "some radius, within which the region's points satisfy it", and this
+-- pair is where that spelling and the filter's meet — so no other proof
+-- has to name a radius to build or to use a relative near-fact.
+
+theorem MetricSpace.NearWithin.ball {m : MetricSpace} (x : m)
+        (region : Set(m)) (P : m → Proposition)
+        (nearby : MetricSpace.NearWithin(x, region, P))
+        : ∃ (radius : ℝ). radius > 0 ∧
+            ∀ (y : m). y ∈ region → distance(x, y) < radius → P(y) := {
+  MetricSpace.Near(x, (y : m) ↦ y ∈ region → P(y))
+      by MetricSpace.NearWithin.near;
+  unfold MetricSpace.Near in {
+    choose radius such that radius > 0 ∧
+        ∀ (y : m). distance(x, y) < radius → (y ∈ region → P(y));
+    radius > 0;
+    ∀ (y : m). y ∈ region → distance(x, y) < radius → P(y)
+        by { take y : m;
+             suppose y ∈ region;
+             suppose distance(x, y) < radius;
+             done };
+    witness radius
+  }
+}
+
+theorem MetricSpace.NearWithin.of_ball {m : MetricSpace} (x : m)
+        (region : Set(m)) (P : m → Proposition)
+        (hasBall : ∃ (radius : ℝ). radius > 0 ∧
+            ∀ (y : m). y ∈ region → distance(x, y) < radius → P(y))
+        : MetricSpace.NearWithin(x, region, P) := {
+  MetricSpace.Near(x, (y : m) ↦ y ∈ region → P(y))
+      by unfold MetricSpace.Near in {
+        choose radius such that radius > 0 ∧
+            ∀ (y : m). y ∈ region → distance(x, y) < radius → P(y)
+            from hasBall;
+        radius > 0;
+        ∀ (y : m). distance(x, y) < radius → (y ∈ region → P(y))
+            by { take y : m;
+                 suppose distance(x, y) < radius;
+                 suppose y ∈ region;
+                 done };
+        witness radius
+      };
+  done by MetricSpace.NearWithin.of_near
+}
+
+-- The shrinking ball, in the filter's own words: what holds near x within
+-- the region holds near every point near x within it, because a point
+-- part-way in has the rest of the radius to itself. This is the one place
+-- that triangle inequality is written, and it is the whole reason a
+-- relative interior is relatively open.
+theorem MetricSpace.NearWithin.nearby {m : MetricSpace} (x : m)
+        (region : Set(m)) (P : m → Proposition)
+        (holds : MetricSpace.NearWithin(x, region, P))
+        : MetricSpace.NearWithin(x, region,
+              (y : m) ↦ MetricSpace.NearWithin(y, region, P)) := {
+  choose radius such that
+      radius > 0 ∧ ∀ (z : m). z ∈ region → distance(x, z) < radius → P(z)
+      from MetricSpace.NearWithin.ball;
+  radius > 0;
+  ∀ (z : m). z ∈ region → distance(x, z) < radius → P(z) as reaches;
+  ∀ (y : m). y ∈ region → distance(x, y) < radius →
+      MetricSpace.NearWithin(y, region, P)
+      by { take y : m;
+           suppose y ∈ region;
+           suppose distance(x, y) < radius;
+           radius - distance(x, y) > 0;
+           ∀ (z : m). z ∈ region →
+               distance(y, z) < radius - distance(x, y) → P(z)
+               by { take z : m;
+                    suppose z ∈ region;
+                    suppose distance(y, z) < radius - distance(x, y);
+                    distance(x, z)
+                       ≤ distance(x, y) + distance(y, z)
+                             by MetricSpace.distance_triangle
+                       < distance(x, y) + (radius - distance(x, y))
+                       = radius;
+                    done by reaches };
+           ∃ (smaller : ℝ). smaller > 0 ∧
+               ∀ (z : m). z ∈ region → distance(y, z) < smaller → P(z)
+               by { witness radius - distance(x, y) };
+           done by MetricSpace.NearWithin.of_ball };
+  ∃ (reach : ℝ). reach > 0 ∧
+      ∀ (y : m). y ∈ region → distance(x, y) < reach →
+        MetricSpace.NearWithin(y, region, P)
+      by { witness radius };
+  done by MetricSpace.NearWithin.of_ball
+}
+
+-- Within a region, a point IS in the region. Trivial as a proposition,
+-- and the one fact `for y sufficiently near x within region: { … }` does
+-- not otherwise hand its body — state it when the argument splits on
+-- where in the region `y` lies.
+theorem MetricSpace.NearWithin.in_region {m : MetricSpace} (x : m)
+        (region : Set(m))
+        : MetricSpace.NearWithin(x, region, (y : m) ↦ y ∈ region) :=
+  unfold MetricSpace.NearWithin in {
+    ∀ (y : m). distance(x, y) < 1 → (y ∈ region → y ∈ region)
+        by { take y : m;
+             suppose distance(x, y) < 1;
+             suppose y ∈ region;
+             done };
+    unfold MetricSpace.Near in { witness (1 : ℝ) }
+  }
 
 -- The relative filter is proper AT a point of the region.
 theorem MetricSpace.NearWithin.at_centre {m : MetricSpace} (x : m)
@@ -252,4 +341,27 @@ theorem MetricSpace.Near.within {m : MetricSpace} (x : m) (radius : ℝ)
              suppose distance(x, y) < radius;
              done };
     witness radius
+  }
+
+-- A point strictly inside a ball has the leftover radius to itself, so
+-- the whole ball stays in reach near it. One triangle inequality, written
+-- once: this is why a ball is open, and why the open hull of a relatively
+-- open set is.
+theorem MetricSpace.Near.inside_Ball {m : MetricSpace} (center x : m)
+        (radius : ℝ) (inside : distance(center, x) < radius)
+        : MetricSpace.Near(x,
+              (y : m) ↦ y ∈ MetricSpace.Ball(center, radius)) :=
+  unfold MetricSpace.Near in {
+    radius - distance(center, x) > 0;
+    ∀ (y : m). distance(x, y) < radius - distance(center, x)
+        → y ∈ MetricSpace.Ball(center, radius)
+        by { take y : m;
+             suppose distance(x, y) < radius - distance(center, x);
+             distance(center, y)
+                ≤ distance(center, x) + distance(x, y)
+                      by MetricSpace.distance_triangle
+                < distance(center, x) + (radius - distance(center, x))
+                = radius;
+             done };
+    witness radius - distance(center, x)
   }
