@@ -380,6 +380,12 @@ ExpressionPointer Elaborator::tryReductio(
         if (!environment_.lookup("False.eliminate_proposition")) {
             return nullptr;
         }
+        // Off-switch for measurement, mirroring MATH_BACKWARD_CHAINING.
+        static const bool reductioEnabled = [] {
+            const char* v = std::getenv("MATH_REDUCTIO");
+            return !(v && std::string(v) == "0");
+        }();
+        if (!reductioEnabled) return nullptr;
         if (inReductioAttempt_ || inSpeculativeContextScan_) return nullptr;
         // Only for a claim the AUTHOR wrote (depth 1 is the outermost
         // `autoProveClaim`). A nested call is some other strategy probing a
@@ -3589,6 +3595,26 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
             if (attempt) return attempt;
         }
 
+        // A `False` GOAL goes to the contradiction scan before anything
+        // else. Measured on the reductio in
+        // `NaturalsBelow.pigeonhole_redirect_value_at_least`: with
+        // `contradiction` at its usual place twelve tactics down, the
+        // equality battery burned 6237 µs failing before it won in 12 µs.
+        //
+        // Gated on the goal being literally `False`, which is rare — an
+        // UNCONDITIONAL hoist was measured at +75% on a clean library build
+        // (1m40 → 2m55), because the pair scan below is quadratic in the
+        // context and would then run on every claim in the library. Here it
+        // runs only where it is the likeliest winner and nothing else could
+        // do better.
+        if (auto* goalConstant = std::get_if<Constant>(&goalClosed->node);
+            goalConstant && goalConstant->name == "False") {
+            ExpressionPointer attempt = runTactic("contradiction",
+                [&] { return tryContradiction(
+                    goalClosed, localBinders, line); });
+            if (attempt) return attempt;
+        }
+
         // Experimental: a cheap, purely-syntactic congruence diff that runs
         // BEFORE the defeq-heavy equality battery. When it applies it closes
         // the goal without unfolding any definition (the battery's diff walk
@@ -3722,6 +3748,9 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
             if (attempt) return attempt;
         }
 
+        // (A `False` goal already took this at the top of the stack; this is
+        // the general case, where the goal is something else and ex falso is
+        // a last-ditch reading of the context.)
         {
             ExpressionPointer attempt = runTactic("contradiction",
                 [&] { return tryContradiction(
@@ -4065,6 +4094,9 @@ ExpressionPointer Elaborator::autoProveClaimProfiling(
         });
         runProfiled("symmetryFlip", [&] {
             return trySymmetryFlip(goalClosed, localBinders, line);
+        });
+        runProfiled("reductio", [&] {
+            return tryReductio(goalClosed, localBinders, line);
         });
 
         autoProveRows_.push_back(std::move(row));
