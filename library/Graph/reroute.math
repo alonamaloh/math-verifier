@@ -24,6 +24,7 @@ import Graph.walk
 import Graph.connected
 import Graph.deletion
 import Graph.cycle
+import Graph.vertex_deletion
 
 convention V : Type(0)
 convention E : Type(0)
@@ -114,4 +115,46 @@ theorem Graph.IsConnected.after_edge_deletion (graph : Graph(V, E, ends))
            Graph.Reaches(graph, hub, target) by Graph.IsConnected.reaches;
            done by Graph.Reaches.reroute(bigger := Graph.deleteEdge(graph, edge)) };
   done by Graph.IsConnected.from_hub(hub := hub)
+}
+
+-- The form a subdivision needs. A walk in the graph minus one vertex
+-- transfers to any graph holding the surviving edges, provided either the
+-- replaced edge's ends are still joined there, or that edge was incident
+-- to the deleted vertex — in which case the walk could not have taken it.
+theorem Graph.Reaches.across_edge_replacement (graph bigger : Graph(V, E, ends))
+        (edge : E) (u v deleted : V)
+        (endsDistinct : ¬(u = v))
+        (joins : Graph.Joins(graph, edge, u, v))
+        (otherEdgesSurvive : ∀ (candidate : E).
+            candidate ∈ Graph.edges(Graph.deleteVertex(graph, deleted))
+            → ¬(candidate = edge) → candidate ∈ Graph.edges(bigger))
+        (routed : Graph.Reaches(bigger, u, v) ∨ Graph.Incident(graph, edge, deleted))
+        (source target : V)
+        (reaches : Graph.Reaches(Graph.deleteVertex(graph, deleted), source, target))
+        : Graph.Reaches(bigger, source, target) := {
+  done by cases {
+    case Graph.Reaches(bigger, u, v): {
+        Graph.Joins(Graph.deleteVertex(graph, deleted), edge, u, v);
+        done by Graph.Reaches.reroute(graph := Graph.deleteVertex(graph, deleted))
+      }
+    case Graph.Incident(graph, edge, deleted): {
+        choose edgeList such that
+            Graph.IsWalk(Graph.deleteVertex(graph, deleted), source, edgeList, target);
+        ∀ (candidate : E). candidate ∈ edgeList → candidate ∈ Graph.edges(bigger)
+            by { take candidate : E;
+                 suppose candidate ∈ edgeList;
+                 candidate ∈ Graph.edges(Graph.deleteVertex(graph, deleted))
+                     by Graph.IsWalk.edge_is_edge;
+                 ¬Graph.Incident(graph, candidate, deleted)
+                     by Graph.deleteVertex.edge_avoids;
+                 ¬(candidate = edge)
+                     by { suppose candidate = edge;
+                          Graph.Incident(graph, candidate, deleted)
+                              by substituting (candidate = edge);
+                          done };
+                 done by otherEdgesSurvive };
+        Graph.IsWalk(bigger, source, edgeList, target) by Graph.IsWalk.transfer;
+        witness edgeList
+      }
+  }
 }

@@ -342,6 +342,34 @@ theorem Graph.IsWalk.in_supergraph (part whole : Graph(V, E, ends))
   }
 }
 
+-- A walk transfers to any graph that has the edges it takes. Weaker than
+-- an inclusion of graphs, and often all that is available: the two graphs
+-- may differ elsewhere entirely.
+theorem Graph.IsWalk.transfer (graph other : Graph(V, E, ends))
+        (source target : V) (edgeList : List(E))
+        (walk : Graph.IsWalk(graph, source, edgeList, target))
+        (edgesSurvive : ∀ (candidate : E). candidate ∈ edgeList
+            → candidate ∈ Graph.edges(other))
+        : Graph.IsWalk(other, source, edgeList, target) :=
+  by induction on walk with IH {
+    case Graph.IsWalkOver.arrived(endpoint): done by Graph.IsWalk.empty
+    case Graph.IsWalkOver.step(
+        stepSource, waypoint, stepTarget, edge, rest, isEdge, joins, restWalk): {
+        ∀ (candidate : E). candidate ∈ List.prepend(E, edge, rest)
+            → candidate ∈ Graph.edges(other) as takenEdgesSurvive;
+        ∀ (candidate : E). candidate ∈ rest → candidate ∈ Graph.edges(other)
+            by { take candidate : E;
+                 suppose candidate ∈ rest;
+                 candidate ∈ List.prepend(E, edge, rest) by List.member.there;
+                 done by takenEdgesSurvive };
+        Graph.IsWalk(other, waypoint, rest, stepTarget) by IH;
+        edge ∈ List.prepend(E, edge, rest) by List.member.here;
+        edge ∈ Graph.edges(other) by takenEdgesSurvive;
+        Graph.Joins(other, edge, stepSource, waypoint);
+        done by Graph.IsWalk.extend
+      }
+  }
+
 theorem Graph.IsWalk.target_is_visited (graph : Graph(V, E, ends)) (source target : V)
         (edgeList : List(E))
         (walk : Graph.IsWalk(graph, source, edgeList, target))
