@@ -49,7 +49,7 @@ about the subspace.)
   `Natural.Eventually`: "P holds throughout some ball around x". Same four
   moves, with the **minimum** of two radii where sequences take the maximum
   of two thresholds. **Unpunctured**, so it is proper with no
-  non-isolated-point side condition (`MetricSpace.Near.at_centre`)
+  non-isolated-point side condition (`MetricSpace.Near.at_center`)
 - `MetricSpace.NearWithin` — the relative twin, "P holds at every point of the
   region on some ball around x". A filter in its own right, so
   `for y sufficiently near x within region: { … }` proves one, folding every
