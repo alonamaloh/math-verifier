@@ -27,6 +27,7 @@ import Equality.basics
 import Set.basics
 import Lists.list
 import Lists.append
+import Lists.length
 import Graph.basics
 
 convention V : Type(0)
@@ -445,5 +446,65 @@ theorem Graph.IsWalk.empty_endpoints (graph : Graph(V, E, ends)) (source target 
         stepSource, waypoint, stepTarget, edge, rest, isEdge, joins, restWalk): {
         suppose List.prepend(E, edge, rest) = List.empty(E);
         done
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- The vertices a walk visits, in order.
+--
+-- `Graph.walkVertices` is a `Set(V)` because nothing counts the vertices
+-- a walk visits — but BUILDING a graph out of a walk needs them as a
+-- list. The recursion runs along the edge list, carrying the vertex it
+-- has reached, so the moving parameter sits in the return type.
+
+definition Graph.walkVertexListFrom (graph : Graph(V, E, ends))
+        : List(E) → V → List(V)
+  | List.empty               => (source : V) ↦ List.prepend(V, source, List.empty(V))
+  | List.prepend(edge, rest) =>
+      (source : V) ↦ List.prepend(V, source,
+          Graph.walkVertexListFrom(graph, rest, Graph.otherEnd(graph, edge, source)))
+
+-- Read in the mathematician's order: from this vertex, along these edges.
+definition Graph.walkVertexList (graph : Graph(V, E, ends)) (source : V)
+        (edgeList : List(E)) : List(V) :=
+  Graph.walkVertexListFrom(graph, edgeList, source)
+
+theorem Graph.walkVertexList.empty (graph : Graph(V, E, ends)) (source : V)
+        : Graph.walkVertexList(graph, source, List.empty(E))
+          = List.prepend(V, source, List.empty(V)) :=
+  done
+
+theorem Graph.walkVertexList.step (graph : Graph(V, E, ends)) (source : V)
+        (edge : E) (rest : List(E))
+        : Graph.walkVertexList(graph, source, List.prepend(E, edge, rest))
+          = List.prepend(V, source,
+                Graph.walkVertexList(graph, Graph.otherEnd(graph, edge, source), rest)) :=
+  done
+
+-- A walk visits one vertex more than it takes edges.
+theorem Graph.walkVertexList.length (graph : Graph(V, E, ends)) (edgeList : List(E))
+        : ∀ (source : V).
+            length(Graph.walkVertexList(graph, source, edgeList))
+            = 1 + length(edgeList) :=
+  by induction on edgeList with IH {
+    case edgeList = List.empty: {
+        take source : V;
+        length(Graph.walkVertexList(graph, source, List.empty(E)))
+           = length(List.prepend(V, source, List.empty(V)))
+           = 1 + length(List.empty(V))
+           = 1 + 0
+           = 1 + length(List.empty(E))
+      }
+    case edgeList = List.prepend(edge, rest) for some edge, rest: {
+        take source : V;
+        length(Graph.walkVertexList(graph, Graph.otherEnd(graph, edge, source), rest))
+           = 1 + length(rest) by IH;
+        length(Graph.walkVertexList(graph, source, List.prepend(E, edge, rest)))
+           = length(List.prepend(V, source,
+                 Graph.walkVertexList(graph, Graph.otherEnd(graph, edge, source), rest)))
+           = 1 + length(Graph.walkVertexList(graph,
+                     Graph.otherEnd(graph, edge, source), rest))
+           = 1 + (1 + length(rest))
+           = 1 + length(List.prepend(E, edge, rest))
       }
   }

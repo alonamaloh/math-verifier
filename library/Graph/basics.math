@@ -28,6 +28,7 @@ import Logic.exists
 import Logic.product
 import Equality.basics
 import Natural.basics
+import Natural.classical_decidable
 import Lists.list
 import Lists.length
 import Lists.distinct
@@ -86,6 +87,32 @@ theorem Graph.edge_has_ends (graph : Graph(V, E, ends)) (edge : E)
       by Product.eta;
   witness Product.first(ends(edge)) with witness Product.second(ends(edge))
 }
+
+-- The end of `edge` away from `vertex`. Takes the graph for the same
+-- reason `Graph.Joins` does — it reads only `ends`, and the graph is what
+-- fixes the ambient.
+definition Graph.otherEnd (graph : Graph(V, E, ends)) (edge : E) (vertex : V) : V :=
+  let ⟨firstEnd, secondEnd⟩ := ends(edge) in
+  if firstEnd = vertex then secondEnd else firstEnd
+
+-- At an edge's own end, `otherEnd` names the other one.
+theorem Graph.otherEnd.of_joins (graph : Graph(V, E, ends)) (edge : E) (u v : V)
+        (joins : Graph.Joins(graph, edge, u, v))
+        (distinct : ¬(u = v))
+        : Graph.otherEnd(graph, edge, u) = v :=
+  done by cases {
+    case ends(edge) = Product.make(u, v) as endsEquation: {
+        Graph.otherEnd(graph, edge, u)
+           = (if u = u then v else u : V)   by substituting endsEquation
+           = v                              by Logic.if_positive
+      }
+    case ends(edge) = Product.make(v, u) as endsEquation: {
+        ¬(v = u) by Equality.not_equal_symmetric;
+        Graph.otherEnd(graph, edge, u)
+           = (if v = u then u else v : V)   by substituting endsEquation
+           = v                              by Logic.if_negative
+      }
+  }
 
 -- An edge with two distinct ends has no third one: knowing where it
 -- starts pins where it arrives, which is what lets a walk name only the

@@ -34,6 +34,11 @@ graph although they only read `ends`.
 - `Graph.IsWalk(graph, source, edgeList, target)` in [walk.math](walk.math),
   with `Graph.walkVertices` / `Graph.coveredVertices` as the `Set(V)` of
   vertices a walk visits
+- `Graph.otherEnd(graph, edge, vertex)` — the end of an edge away from one
+  of its ends — and `Graph.walkVertexList(graph, source, edgeList)`, the
+  vertices a walk visits AS A LIST, in order. The `Set(V)` above is what
+  every argument reads; the list is what BUILDING a graph out of a walk
+  needs
 - `Graph.IsPath` in [path.math](path.math) — a walk that never departs from
   a vertex the rest of it visits
 - `Graph.Reaches` and `Graph.IsConnected` in
