@@ -645,12 +645,11 @@ reach for the math-like form instead:
     strong the auto-prover gets.
   - Transitivity / a "`x` is strictly below itself" contradiction reads as
     an inequality **`≤`-chain**, never a positional `transitive` call — and
-    it ends in `done`, not `absurd` plumbing (state `False;` first when the
-    surrounding goal isn't itself the contradiction):
+    it ends in `done`, not `absurd` plumbing. The chain's last line IS the
+    contradiction; nothing follows it:
     ```
     1 + v ≤ m by below
           ≤ v by atLeast;
-    False;
     done
     ```
   - Argument-free `by <Lemma>` works for a `≤`/`∣` chain step and any goal
@@ -772,14 +771,35 @@ judgment: which form reads as mathematics where.
   disjunction-introduction picks whichever disjunct is in context. (Same for
   proving a universal: prefer `take x; …` — introduce the variable — over a
   point-free function value; see `Natural.totality_of_less_or_equal`.)
-- **Deriving a contradiction — end in `done`.** The polished idiom is to
-  put the contradictory facts in context (a fact and its negation, a
-  ground-false equality, a chain landing on `x < x`-shaped composites)
-  and close with `done` — inside `suppose … for contradiction { … }`,
-  state `False;` first when the surrounding goal is not itself the
-  contradiction. `absurd(<proof-or-proposition>)` still exists as the
-  explicit closer, but reads as plumbing; prefer stating the false fact
-  and letting `done` refute it.
+- **Deriving a contradiction — stop at the absurd fact.** A mathematician
+  ends a reductio on the absurdity itself — "…, so `1 ≤ 0`" — and the
+  reader supplies the rest. Write that: put the contradictory fact in
+  context (a fact and its negation, a ground-false comparison, a chain
+  landing on `x < x`) and close with `done`. Nothing goes between them.
+
+  ```
+  (2 : ℕ) ≤ 1;
+  done
+  ```
+
+  Do **not** write an intervening `False;` — the auto-prover's last-resort
+  `reductio` rung asks whether the context is contradictory, so the line is
+  pure plumbing. (It also does not need the goal to be `False`, and does
+  not care where in the context the absurdity sits.) `absurd(…)` still
+  exists as an explicit closer but reads as plumbing too.
+
+  When the refutation is not obvious — or is expensive enough to trip the
+  by-less-step warning — **name it**: `done by <refutation lemma>` cites a
+  lemma that refutes what the argument just established, rather than one
+  that proves the goal.
+
+  ```
+  x < n' ≤ x;
+  done by Natural.lt_irreflexive
+  ```
+
+  Nothing forces an `unfold` here: ground comparisons like `1 + 2 ≤ 0` are
+  decided without one.
 - **Introduce a goal's `∀`/`→` binders with `take`/`suppose`, not a
   restated-type lambda.** For a goal `∀ (a b : T). P(a) → P(b) → C`, open the
   proof with `by { take a; take b; suppose P(a) as ha; suppose P(b) as hb;

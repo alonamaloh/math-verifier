@@ -1697,6 +1697,68 @@ ExpressionPointer Elaborator::recoverClaimHint(
                 return filled;
             }
         }
+        // Reductio with a named reason. `done by Natural.lt_irreflexive`
+        // after a chain has produced `x < x`: the cited lemma does not
+        // prove the GOAL, it refutes something in CONTEXT, and the goal
+        // follows because the context is absurd. Cite it at `False` and let
+        // ex falso carry the goal.
+        //
+        // This is the citation-level twin of the auto-prover's `reductio`
+        // rung, and the only way for an author to SAY why the argument
+        // ends: without it a reductio can only be closed by a bare `done`,
+        // so the reason lives nowhere and an expensive refutation cannot be
+        // signposted at all.
+        //
+        // Guarded against re-entry (the `False` citation must not ask the
+        // same question) and skipped when the goal already IS `False`, where
+        // the ordinary path applies.
+        if (!inReductioAttempt_
+            && environment_.lookup("False.eliminate_proposition")) {
+            bool goalIsFalse = false;
+            if (auto* asConstant =
+                    std::get_if<Constant>(&goalClosed->node)) {
+                goalIsFalse = asConstant->name == "False";
+            }
+            if (!goalIsFalse) {
+                inReductioAttempt_ = true;
+                struct Restore {
+                    bool& flag;
+                    ~Restore() { flag = false; }
+                } restore{inReductioAttempt_};
+                ExpressionPointer falseGoal = makeConstant("False", {});
+                ExpressionPointer contradiction = nullptr;
+                try {
+                    contradiction = elaborateExpression(
+                        byHint, localBinders, falseGoal);
+                } catch (const ElaborateError&) {
+                } catch (const TypeError&) {}
+                if (!contradiction
+                    || !bridgedResultProvesGoal(
+                           contradiction, falseGoal, localBinders)) {
+                    try {
+                        contradiction = recoverClaimHint(
+                            hintTerm, byHint, falseGoal, localBinders,
+                            line);
+                    } catch (const ElaborateError&) {
+                        contradiction = nullptr;
+                    } catch (const TypeError&) {
+                        contradiction = nullptr;
+                    }
+                }
+                if (contradiction) {
+                    ExpressionPointer wrapped = makeApplication(
+                        makeApplication(
+                            makeConstant(
+                                "False.eliminate_proposition", {}),
+                            goalClosed),
+                        contradiction);
+                    if (bridgedResultProvesGoal(
+                            wrapped, goalClosed, localBinders)) {
+                        return wrapped;
+                    }
+                }
+            }
+        }
         // Pi-typed goal (structurally, or after one WHNF step — `¬P` is
         // `P → False` behind `Not`): introduce its binders and retry the
         // citation against the inner goal (`claim (x : T) → P by Lemma`

@@ -1773,6 +1773,21 @@ private:
         ExpressionPointer disjunctClosed,
         const std::vector<LocalBinder>& localBinders);
 
+    // Reductio ad absurdum, the auto-prover's LAST resort: when nothing
+    // else closes the goal, ask whether the context is contradictory, and
+    // if `False` follows from the hypotheses, so does the goal. This is
+    // what lets an argument end on the absurd fact itself ("…, so 1 ≤ 0")
+    // instead of on a hand-written `False;` line. Unlike
+    // `tryContradiction` it does not look for a hypothesis that IS `False`
+    // — it re-runs the ordinary strategy stack on the `False` goal, where a
+    // refutation lemma stated as `(h : <absurd>) : False` is an ordinary
+    // match. Guarded by `inReductioAttempt_` so the sub-goal cannot recurse,
+    // and declined during the speculative context scan.
+    ExpressionPointer tryReductio(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line);
+
     // Disjunctive syllogism: an in-scope `A ∨ B` whose one side is the
     // goal and whose other side is refuted by an in-scope negation
     // concludes the goal by-less — the one Or-elimination performed
@@ -6747,6 +6762,11 @@ private:
     // explicit-citation convenience, and running it per candidate makes the
     // library scan exhaust the auto-prover budget on hard goals.
     bool inSpeculativeContextScan_ = false;
+    // True while the auto-prover's last-resort reductio rung is asking
+    // whether the CONTEXT is contradictory (see `tryReductio`). The `False`
+    // sub-goal it raises must not ask the same question again, or every
+    // failing claim would recurse until the budget died.
+    bool inReductioAttempt_ = false;
     // Citation universe inference. When a universe-polymorphic lemma is cited
     // bare (no `.{...}`), `elaborateIdentifier` fills its universe arguments
     // with fresh placeholder LevelParams (their names collected here) rather

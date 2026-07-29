@@ -326,29 +326,112 @@ ExpressionPointer Elaborator::tryContradiction(
                 }
             }
         }
-        // Case B: last : P. Find some other : Not(P).
-        for (int other = N - 2; other >= 0; --other) {
-            int lift = N - other;
-            ExpressionPointer otherType = weakHeadNormalForm(
-                environment_,
-                openOverLocalBinders(
-                    liftBoundVariables(
-                        localBinders[other].type, lift, 0),
-                    localBinders, N));
-            auto* pi = std::get_if<Pi>(&otherType->node);
+        // Case B: some binder is `Not(P)`; find its `P` anywhere in scope.
+        //
+        // The `P` half used to be pinned to the most recent binder, so a
+        // pair separated by any intervening fact was invisible — and a
+        // reductio whose two halves are simply not adjacent is the ordinary
+        // case, not an exotic one. Every negation-shaped binder is now
+        // matched against every other binder.
+        //
+        // Cost: the outer loop is gated on the binder's type reducing to
+        // `… → False`, which almost nothing does, so the quadratic pair
+        // scan is entered only in a context that actually carries a
+        // negation.
+        auto openedTypeAt = [&](int index) {
+            return openOverLocalBinders(
+                liftBoundVariables(
+                    localBinders[index].type, N - index, 0),
+                localBinders, N);
+        };
+        for (int negated = N - 1; negated >= 0; --negated) {
+            ExpressionPointer negatedType = weakHeadNormalForm(
+                environment_, openedTypeAt(negated));
+            auto* pi = std::get_if<Pi>(&negatedType->node);
             if (!pi) continue;
             auto* codomainConst = std::get_if<Constant>(
                 &pi->codomain->node);
             if (!codomainConst
                 || codomainConst->name != "False") continue;
-            if (!isDefinitionallyEqual(
-                    environment_, openedContext,
-                    pi->domain, lastTypeOpened)) continue;
-            return buildProofOfFalse(
-                makeBoundVariable(N - 1 - other),
-                makeBoundVariable(N - 1 - lastIdx));
+            for (int holds = N - 1; holds >= 0; --holds) {
+                if (holds == negated) continue;
+                bool matches;
+                try {
+                    matches = isDefinitionallyEqual(
+                        environment_, openedContext,
+                        openedTypeAt(holds), pi->domain);
+                } catch (const TypeError&) {
+                    matches = false;
+                }
+                if (matches) {
+                    return buildProofOfFalse(
+                        makeBoundVariable(N - 1 - negated),
+                        makeBoundVariable(N - 1 - holds));
+                }
+            }
         }
         return nullptr;
+    }
+
+ExpressionPointer Elaborator::tryReductio(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line) {
+        if (!environment_.lookup("False.eliminate_proposition")) {
+            return nullptr;
+        }
+        if (inReductioAttempt_ || inSpeculativeContextScan_) return nullptr;
+        // Only for a claim the AUTHOR wrote (depth 1 is the outermost
+        // `autoProveClaim`). A nested call is some other strategy probing a
+        // candidate, and its failures are routine — asking each one whether
+        // the whole context is contradictory buys nothing and shows up as
+        // inflated kernel-step counts on the enclosing successful step
+        // (measured: three files crossed the expensive-step warning
+        // threshold before this gate).
+        if (autoProveDepth_ != 1) return nullptr;
+        if (localBinders.empty()) return nullptr;
+        // A `False` goal is what this rung PRODUCES; asking the stack to
+        // prove `False` in order to prove `False` is the recursion the
+        // guard below already blocks, but declining here keeps the
+        // profiling honest and saves the setup.
+        if (auto* asConstant = std::get_if<Constant>(&goalClosed->node)) {
+            if (asConstant->name == "False") return nullptr;
+        }
+        // `False.eliminate_proposition` eliminates into Prop, so a goal in
+        // Type is not ours to close.
+        try {
+            if (!typeIsProposition(
+                    buildContextFromLocalBinders(localBinders),
+                    openOverLocalBinders(
+                        goalClosed, localBinders, localBinders.size()))) {
+                return nullptr;
+            }
+        } catch (const TypeError&) {
+            return nullptr;
+        }
+        ExpressionPointer contradiction = nullptr;
+        {
+            inReductioAttempt_ = true;
+            struct Restore {
+                bool& flag;
+                ~Restore() { flag = false; }
+            } restore{inReductioAttempt_};
+            try {
+                contradiction = autoProveClaim(
+                    makeConstant("False", {}), localBinders, line);
+            } catch (const ElaborateError&) {
+            } catch (const TypeError&) {
+            } catch (const AutoProverBudgetError&) {
+                // A tripped budget just means the context is not visibly
+                // contradictory; the caller's own error is the useful one.
+            }
+        }
+        if (!contradiction) return nullptr;
+        ExpressionPointer call =
+            makeConstant("False.eliminate_proposition", {});
+        call = makeApplication(call, goalClosed);
+        call = makeApplication(call, contradiction);
+        return call;
     }
 
 ExpressionPointer Elaborator::tryDisjunctiveSyllogism(
@@ -3780,6 +3863,31 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
         {
             ExpressionPointer attempt = runTactic("symmetryFlip",
                 [&] { return trySymmetryFlip(
+                    goalClosed, localBinders, line); });
+            if (attempt) return attempt;
+        }
+
+        // Reductio ad absurdum, as a mathematician ends one. Every strategy
+        // above has declined, so this claim is about to be an error — ask
+        // first whether the CONTEXT is contradictory. If `False` follows from
+        // the hypotheses, the goal does too, whatever it is.
+        //
+        // This is the step nobody writes down: "…, so 1 ≤ 0" ends the
+        // argument, and the reader supplies the rest. Without this rung the
+        // author must write the intermediate `False;` line by hand — pure
+        // plumbing, and the reason ~44 sites in the library carry one.
+        // `tryContradiction` above only spots a hypothesis that is LITERALLY
+        // `False`, or a `P`/`¬P` pair straddling the most recent binder; it
+        // has no notion of a hypothesis being refutable.
+        //
+        // Last resort, and never re-entered: the `False` sub-goal runs the
+        // ordinary strategy stack (where a refutation lemma stated as
+        // `(h : <absurd>) : False` is an ordinary library match) with this
+        // rung switched off. So the cost falls only on claims that would
+        // otherwise error, and only once.
+        {
+            ExpressionPointer attempt = runTactic("reductio",
+                [&] { return tryReductio(
                     goalClosed, localBinders, line); });
             if (attempt) return attempt;
         }

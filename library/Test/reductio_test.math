@@ -1,0 +1,74 @@
+-- Test/reductio_test.math
+--
+-- Ending an argument by reductio ad absurdum. A mathematician stops at the
+-- absurd fact — "…, so 1 ≤ 0" — and the reader supplies the rest. These
+-- pin that the auto-prover's last-resort `reductio` rung supplies it too,
+-- so no proof has to write the intermediate `False;` line by hand.
+
+module Test.reductio_test
+
+import axioms
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.add_order
+
+-- A ground absurdity among the hypotheses ends the argument, whatever the
+-- goal is.
+theorem Test.reductio_from_ground_absurdity (n : ℕ) (h : (2 : ℕ) ≤ 1)
+        : n = 1 + n := {
+  done
+}
+
+-- Nothing above zero lies at or below it (Natural.not_one_plus_le_zero),
+-- so this hypothesis is refutable rather than literally `False`.
+theorem Test.reductio_from_refutable_hypothesis (k n : ℕ) (h : 1 + k ≤ 0)
+        : n = 1 + n := {
+  done
+}
+
+-- A refutation lemma with a premise: 1 + n ≤ n is impossible.
+theorem Test.reductio_from_refutation_lemma (n m : ℕ) (h : 1 + n ≤ n)
+        : m = 1 + m := {
+  done
+}
+
+-- The contradictory pair need not straddle the most recent binder — the
+-- shape `tryContradiction` alone cannot see.
+theorem Test.reductio_from_separated_pair (P : Proposition) (n : ℕ)
+        (holds : P) (fails : ¬P) : n = 1 + n := {
+  n = n;
+  done
+}
+
+-- The goal may itself be a negation.
+theorem Test.reductio_with_negated_goal (Q : Proposition) (n : ℕ)
+        (h : (2 : ℕ) ≤ 1) : ¬Q := {
+  done
+}
+
+-- The absurdity may be derived on the spot: the last line of the argument
+-- IS the contradiction, and nothing follows it but `done`.
+theorem Test.reductio_from_derived_absurdity (a b : ℕ)
+        (ordered : a ≤ b) (reversed : 1 + b ≤ a) : (0 : ℕ) = 1 := {
+  1 + b ≤ b;
+  done
+}
+
+-- The reason may be named. The cited lemma does not prove the goal — it
+-- refutes what the chain just established — and the goal follows because
+-- the context is absurd. Worth saying when the refutation is not obvious,
+-- and it is the only way to signpost an expensive one.
+theorem Test.reductio_by_named_refutation (a n : ℕ) (h : a < a) : n = 1 + n := {
+  done by Natural.lt_irreflexive
+}
+
+-- The same, with the absurdity built by a chain first.
+theorem Test.reductio_chain_then_named_refutation (a b n : ℕ)
+        (below : a < b) (above : b ≤ a) : n = 1 + n := {
+  a < b ≤ a;
+  done by Natural.lt_irreflexive
+}
