@@ -47,6 +47,9 @@ graph although they only read `ends`.
   blueprint's convention: at least three vertices, connected, and still
   connected after any one vertex goes
 - `Graph.union` in [union.math](union.math)
+- `Graph.IsPathGraph` in [pathgraph.math](pathgraph.math) — a graph whose
+  own edge list walks from one end to the other, and whose vertices are
+  exactly what that walk visits
 
 ## Main theorems
 
@@ -69,6 +72,14 @@ graph although they only read `ends`.
   (`Graph.IsTwoConnected.edge_on_cycle`)
 - **`Graph.IsTwoConnected.union`** — two 2-connected graphs sharing two
   vertices have a 2-connected union
+- **`Graph.IsTwoConnected.ear`** — attaching a path whose two distinct ends
+  lie in a 2-connected graph keeps it 2-connected
+- `Graph.IsPath.split` — a path splits at any vertex it visits, and the
+  far half never returns to the source
+- `Graph.IsPath.reverse` — a path runs backwards over the same vertices;
+  `Graph.IsPath.extend_at_target` is what grows one at the far end
+- `Graph.IsPathGraph.reaches_an_end` — whatever vertex is deleted, every
+  remaining vertex of a path still reaches one of its two ends
 - `Graph.IsWalk.avoiding_vertex` / `.after_vertex_deletion`,
   `Graph.deleteVertex.{IsSubgraph,IsWellFormed,monotone}`, and
   `Graph.IsConnected.after_outside_deletion`

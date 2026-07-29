@@ -443,8 +443,9 @@ What remains — the assembly:
 Abstract, no geometry. Keep it that way — Layer 6 maps into it.
 
 Built so far: `Graph/{basics,walk,path,connected,deletion,cycle,
-vertex_deletion,twoconnected,union}.math`, with `library/Graph/README.md`
-as the entry point. `Lists/union.math` was added underneath it.
+vertex_deletion,twoconnected,union,reverse,pathgraph,ear}.math` (~3.4k
+lines), with `library/Graph/README.md` as the entry point.
+`Lists/union.math` was added underneath it.
 
 - **Settled: an edge is a NAME.** A graph lives over an ambient
   `(V, E, ends)` — vertex type, edge type, and `ends : E → Pair(V, V)` —
@@ -504,12 +505,28 @@ constructor.
   what the second adds), because a concatenation would list a shared
   vertex twice and make `Graph.order` wrong.
 
-**Still to build.** Degree counting and trees (`lem:three-leaf-tree` and
-the `n-1` edge count); subdivisions and ears
-(`lem:subdivision-ear-preserve`); then H5 (`lem:relative-ear`). The ear
-lemma wants a path presented AS A GRAPH and split at an internal vertex —
-`Graph.IsPath.split` is the missing piece, and the prefix half is the
-awkward one because the walk relation is built at the source end.
+- **An ear is a path presented as a graph** (`Graph.IsPathGraph`): its own
+  edge list walks from one end to the other, and its vertices are exactly
+  what that walk visits. `Graph.IsTwoConnected.ear` is
+  `lem:subdivision-ear-preserve` (b) — and the blueprint's "internal
+  vertices are new" hypothesis is NOT needed for it. What the proof turns
+  on is `Graph.IsPathGraph.reaches_an_end`: whatever vertex is deleted,
+  every remaining vertex of the path still reaches one of the two ends.
+  That in turn needed `Graph.IsPath.split` (a path splits at any vertex it
+  visits, and the far half never returns to the source) and
+  `Graph.IsPath.reverse` (a path runs backwards over the same vertices),
+  which needed `extend_at_target` — growing a path at its far end is a
+  theorem rather than a constructor, because the relation is built at the
+  source end.
+
+**Still to build.** Subdivision, `lem:subdivision-ear-preserve` (a) — the
+plan is `subdivide(graph, edge) = deleteEdge(graph, edge) ∪ P` for the
+two-edge path `P`, and the one real step is rerouting a walk that used the
+old edge through the new vertex. Degree counting and trees
+(`lem:three-leaf-tree` and the `n-1` edge count), which want a longest
+path and a degree sum. Then H5 (`lem:relative-ear`), which wants the
+components of `G` minus a subgraph's vertices, and a shortest path
+through one of them.
 
 **Definitions.** `Graph` on a finite vertex type with an edge multiset
 (parallel edges **allowed**, loops forbidden — the blueprint needs
