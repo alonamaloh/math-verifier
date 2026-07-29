@@ -1562,20 +1562,58 @@ private:
 
     // `choose <name> such that <predicate>;` — Exists-elim via scope
     // lookup. Scans local binders last-first for a hypothesis whose
-    // type WHNFs to `Exists(T, motive)`; the most-recent match wins.
+    // destructure hands the witness exactly the stated condition.
     // Desugars to a `cases ⟨<name>, _choice_pred_…⟩ => <body>` over
     // that hypothesis.
     //
-    // The user's predicate is documentation, not a search key —
-    // if the most-recent Exists doesn't match what the user intended,
-    // the body will fail to elaborate when it tries to use the
-    // destructured predicate hypothesis. Predicate-shape filtering
-    // is a planned follow-up.
+    // The stated condition is CHECKED against the source in every form
+    // (scope scan, `from <hypothesis>`, `from <statement>`, `from
+    // <lemma>`) — it is what the reader is told the witness satisfies,
+    // so it must be what the kernel binds.
     ExpressionPointer elaborateChoose(
         const SurfaceChoose& choose,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
         int line, int column);
+
+    // What a `such that <predicate>` says about the existential the
+    // `choose` destructures.
+    enum class ChooseConditionVerdict {
+        // Defeq to the whole condition the destructure binds.
+        Restated,
+        // Defeq to some — not all — of its conjuncts: an honest but
+        // partial restatement.
+        PartialConjunct,
+        // Says something else, or does not even elaborate there (a
+        // witness bound at the wrong type).
+        Mismatch,
+        // The destructure walk met a layer this check cannot read; no
+        // verdict either way.
+        Unreadable,
+    };
+
+    // The type the condition hypothesis receives when `choose`'s
+    // witness-routing tuple pattern destructures `existentialTypeOpened`
+    // (opened over `binders`) for `witnessNames`: an `And` layer spends
+    // no witness name — its left leg lands as an anonymous fact and the
+    // walk continues into the right leg — while an `Exists` layer binds
+    // one witness. `binders` grows by one entry per witness consumed, so
+    // the caller can elaborate the stated condition in the scope the
+    // body will see. Null when a layer is neither.
+    ExpressionPointer chooseConditionType(
+        ExpressionPointer existentialTypeOpened,
+        const std::vector<std::string>& witnessNames,
+        std::vector<LocalBinder>& binders);
+
+    // Check `choose … such that <predicate>` against the existential the
+    // destructure would consume (`existentialTypeClosed`, closed over
+    // `localBinders`). `report`, when non-null, receives the stated and
+    // the actual condition, ready for an error message.
+    ChooseConditionVerdict checkChooseCondition(
+        const SurfaceChoose& choose,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer existentialTypeClosed,
+        std::string* report);
 
     // `by induction on E using L with subject, ih { body }`:
     //   E    = local-variable scrutinee

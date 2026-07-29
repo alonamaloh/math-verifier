@@ -415,6 +415,131 @@ ExpressionPointer Elaborator::elaborateEventuallyScope(
             std::move(pointwiseLambda));
     }
 
+namespace {
+
+// `Exists(T, motive)` and `And(left, right)` are both a named Constant
+// applied to two arguments.
+bool matchBinaryConstant(ExpressionPointer expression, const char* name,
+                         ExpressionPointer& first,
+                         ExpressionPointer& second) {
+    auto* outer = std::get_if<Application>(&expression->node);
+    if (!outer) return false;
+    auto* inner = std::get_if<Application>(&outer->function->node);
+    if (!inner) return false;
+    auto* head = std::get_if<Constant>(&inner->function->node);
+    if (!head || head->name != name) return false;
+    first = inner->argument;
+    second = outer->argument;
+    return true;
+}
+
+void collectConjuncts(ExpressionPointer proposition,
+                      std::vector<ExpressionPointer>& conjuncts) {
+    ExpressionPointer left, right;
+    if (matchBinaryConstant(proposition, "And", left, right)) {
+        collectConjuncts(left, conjuncts);
+        collectConjuncts(right, conjuncts);
+        return;
+    }
+    conjuncts.push_back(proposition);
+}
+
+}  // namespace
+
+ExpressionPointer Elaborator::chooseConditionType(
+        ExpressionPointer existentialTypeOpened,
+        const std::vector<std::string>& witnessNames,
+        std::vector<LocalBinder>& binders) {
+    ExpressionPointer cursor = existentialTypeOpened;
+    for (size_t consumed = 0; consumed < witnessNames.size(); ) {
+        cursor = weakHeadNormalForm(environment_, cursor);
+        ExpressionPointer first, second;
+        if (matchBinaryConstant(cursor, "And", first, second)) {
+            cursor = second;
+            continue;
+        }
+        if (!matchBinaryConstant(cursor, "Exists", first, second)) {
+            return nullptr;
+        }
+        LocalBinder witness;
+        witness.name = witnessNames[consumed];
+        witness.type = closeOverLocalBinders(first, binders, binders.size());
+        binders.push_back(std::move(witness));
+        cursor = weakHeadNormalForm(environment_,
+            makeApplication(second,
+                openedLocalBinderReference(binders, binders.size() - 1)));
+        ++consumed;
+    }
+    return cursor;
+}
+
+Elaborator::ChooseConditionVerdict Elaborator::checkChooseCondition(
+        const SurfaceChoose& choose,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer existentialTypeClosed,
+        std::string* report) {
+    std::vector<std::string> witnessNames = {choose.name};
+    for (const std::string& extra : choose.additionalNames) {
+        witnessNames.push_back(extra);
+    }
+    std::vector<LocalBinder> binders = localBinders;
+    ExpressionPointer conditionOpened = chooseConditionType(
+        openOverLocalBinders(existentialTypeClosed, localBinders,
+                             localBinders.size()),
+        witnessNames, binders);
+    if (!conditionOpened) return ChooseConditionVerdict::Unreadable;
+    // The stated condition elaborates in the scope the body will see —
+    // the witnesses bound at the types this source gives them. A witness
+    // bound at the wrong type makes it fail to elaborate at all, which is
+    // itself a mismatch (and, in the scope scan, a rejected candidate).
+    ExpressionPointer statedClosed;
+    std::string elaborationFailure;
+    try {
+        statedClosed = elaborateExpression(*choose.predicate, binders);
+    } catch (const ElaborateError& error) {
+        elaborationFailure = error.what();
+    } catch (const TypeError& error) {
+        elaborationFailure = error.what();
+    }
+    ExpressionPointer conditionClosed = closeOverLocalBinders(
+        conditionOpened, binders, binders.size());
+    if (report) {
+        *report = "    you stated:  "
+            + (statedClosed
+                   ? prettyPrintInLocalScope(statedClosed, binders)
+                   : "(does not elaborate here — " + elaborationFailure + ")")
+            + "\n    it binds:    "
+            + prettyPrintInLocalScope(conditionClosed, binders);
+    }
+    if (!statedClosed) return ChooseConditionVerdict::Mismatch;
+    ExpressionPointer statedOpened = openOverLocalBinders(
+        statedClosed, binders, binders.size());
+    Context context = buildContextFromLocalBinders(binders);
+    if (isDefinitionallyEqual(environment_, context,
+                              conditionOpened, statedOpened)) {
+        return ChooseConditionVerdict::Restated;
+    }
+    std::vector<ExpressionPointer> boundConjuncts;
+    std::vector<ExpressionPointer> statedConjuncts;
+    collectConjuncts(conditionOpened, boundConjuncts);
+    collectConjuncts(statedOpened, statedConjuncts);
+    bool everyStatedConjunctIsBound = boundConjuncts.size() > 1;
+    for (const ExpressionPointer& stated : statedConjuncts) {
+        if (!everyStatedConjunctIsBound) break;
+        bool found = false;
+        for (const ExpressionPointer& bound : boundConjuncts) {
+            if (isDefinitionallyEqual(environment_, context, bound, stated)) {
+                found = true;
+                break;
+            }
+        }
+        everyStatedConjunctIsBound = found;
+    }
+    return everyStatedConjunctIsBound
+        ? ChooseConditionVerdict::PartialConjunct
+        : ChooseConditionVerdict::Mismatch;
+}
+
 ExpressionPointer Elaborator::elaborateChoose(
         const SurfaceChoose& choose,
         const std::vector<LocalBinder>& localBinders,
@@ -441,6 +566,24 @@ ExpressionPointer Elaborator::elaborateChoose(
                    " and the auto-prover finds it by type-match)\n";
         }
 
+        // A stated condition the source does not bind is a false claim
+        // about the mathematics, not a slip of prose — the reader is told
+        // the witness satisfies it.
+        auto reportConditionMismatch = [&](const std::string& report,
+                                           const std::string& advice) {
+            throwElaborate("choose " + choose.name
+                + " such that <condition>: the condition you stated is not "
+                  "the one the source binds.\n" + report
+                + (advice.empty() ? std::string() : "\n" + advice));
+        };
+        auto warnPartialCondition = [&](const std::string& report) {
+            std::cerr << "warning: " << moduleName_
+                << ":" << line << ":" << column
+                << ": `choose " << choose.name
+                << " such that ...` states only part of the condition the"
+                   " source binds\n" << report << "\n";
+        };
+
         // Decide the existential's SOURCE — what the cases below
         // destructures. Three forms:
         //   (a) `from <hypothesis>` — destructure that hypothesis directly
@@ -448,33 +591,44 @@ ExpressionPointer Elaborator::elaborateChoose(
         //   (b) `from <lemma>` — cite the lemma argument-free, shaped by
         //       `such that <prop>` into `∃ (name : _). prop`, and
         //       destructure the result;
-        //   (c) no `from` — scan scope for the most-recent Exists (the
-        //       original behaviour).
+        //   (c) no `from` — scan scope for the most-recent fact whose
+        //       destructure binds the stated condition.
         SurfaceExpressionPointer scrutinee;
         if (choose.source) {
-            // Does the source ALREADY have an existential type — a
+            // Is the source ALREADY a fact the destructure can walk — a
             // hypothesis (`aDividesB`), or any applied term (`gSurjective(z)`,
             // `List.Permutation.extract(…)`)? Then destructure it directly.
+            // `And` counts: the witness routes past a conjunction's left leg,
+            // so `fact : A ∧ ∃ (x : T). P(x)` is a source like any other.
             // Only a still-unapplied lemma (a Pi type) needs citing. Decide
             // by elaborating the source and inspecting its type, so applied
             // terms aren't mistaken for lemmas.
-            bool sourceIsExistential = false;
+            bool sourceIsFact = false;
             bool sourceIsStatement = false;
             std::exception_ptr sourceProbeError;
+            // The existential the destructure will consume, closed over
+            // the local binders — the hypothesis's type, or the addressed
+            // statement itself. Kept for the `such that` check below.
+            ExpressionPointer sourceExistentialClosed;
             try {
                 ExpressionPointer sourceTerm = elaborateExpression(
                     *choose.source, localBinders);
+                ExpressionPointer sourceTypeClosed =
+                    inferTypeInLocalContext(localBinders, sourceTerm);
                 ExpressionPointer sourceType = weakHeadNormalForm(
                     environment_, openOverLocalBinders(
-                        inferTypeInLocalContext(localBinders, sourceTerm),
-                        localBinders, N));
+                        sourceTypeClosed, localBinders, N));
                 ExpressionPointer head = sourceType;
                 while (auto* app = std::get_if<Application>(&head->node)) {
                     head = app->function;
                 }
                 if (auto* headConstant =
                         std::get_if<Constant>(&head->node)) {
-                    sourceIsExistential = headConstant->name == "Exists";
+                    sourceIsFact = headConstant->name == "Exists"
+                        || headConstant->name == "And";
+                }
+                if (sourceIsFact) {
+                    sourceExistentialClosed = sourceTypeClosed;
                 }
                 // A2 (statement-addressable facts): the source may be a
                 // PROPOSITION — `choose w from ∃ (v : T). P(v);`
@@ -482,7 +636,7 @@ ExpressionPointer Elaborator::elaborateChoose(
                 // type is then the Proposition sort; wrap it in the
                 // `given(...)` lookup so the destructure below sees the
                 // fact itself (defeq-matched, ambiguity a loud error).
-                if (!sourceIsExistential) {
+                if (!sourceIsFact) {
                     auto* sort = std::get_if<Sort>(&sourceType->node);
                     auto* level = sort
                         ? std::get_if<LevelConst>(&sort->level->node)
@@ -499,6 +653,9 @@ ExpressionPointer Elaborator::elaborateChoose(
                             std::get_if<Constant>(&statementHead->node);
                         sourceIsStatement = statementConstant
                             && statementConstant->name == "Exists";
+                        if (sourceIsStatement) {
+                            sourceExistentialClosed = sourceTerm;
+                        }
                     }
                 }
             } catch (const ElaborateError&) {
@@ -511,14 +668,28 @@ ExpressionPointer Elaborator::elaborateChoose(
             // source that failed the probe is a real error in the
             // application itself — re-raise it rather than mislabeling it
             // a malformed lemma name downstream.
-            if (!sourceIsStatement && !sourceIsExistential
+            if (!sourceIsStatement && !sourceIsFact
                 && sourceProbeError
                 && !std::get_if<SurfaceIdentifier>(&choose.source->node)) {
                 std::rethrow_exception(sourceProbeError);
             }
+            // `such that` on a fact-shaped source: the condition the proof
+            // text states must be the one the destructure binds. (A lemma
+            // source is checked by the ascription its branch builds.)
+            if (choose.predicate && sourceExistentialClosed) {
+                std::string report;
+                ChooseConditionVerdict verdict = checkChooseCondition(
+                    choose, localBinders, sourceExistentialClosed, &report);
+                if (verdict == ChooseConditionVerdict::Mismatch) {
+                    reportConditionMismatch(report, std::string());
+                }
+                if (verdict == ChooseConditionVerdict::PartialConjunct) {
+                    warnPartialCondition(report);
+                }
+            }
             if (sourceIsStatement) {
                 scrutinee = makeSurfaceGiven(choose.source, line, column);
-            } else if (sourceIsExistential) {
+            } else if (sourceIsFact) {
                 scrutinee = choose.source;
             } else if (!choose.predicate) {
                 // Lemma source, no `such that`: cite the lemma argument-free
@@ -642,26 +813,59 @@ ExpressionPointer Elaborator::elaborateChoose(
                     existential, line, column);
             }
         } else {
+            // No `from`: the STATED CONDITION is the search key. The most
+            // recent fact in scope whose destructure binds it wins, so a
+            // nearer existential about something else no longer captures
+            // the witness (and no longer binds it at a type the proof never
+            // asked for). Without a condition to search on, fall back to
+            // the most recent Exists-headed hypothesis.
             int matchedIndex = -1;
+            bool matchIsPartial = false;
+            std::string matchedReport;
+            std::string candidatesConsidered;
+            int candidatesShown = 0;
             for (int b = N - 1; b >= 0; --b) {
                 int lift = N - b;
                 ExpressionPointer binderTypeInScope =
                     liftBoundVariables(localBinders[b].type, lift, 0);
+                if (choose.predicate) {
+                    std::string report;
+                    ChooseConditionVerdict verdict = checkChooseCondition(
+                        choose, localBinders, binderTypeInScope, &report);
+                    if (verdict == ChooseConditionVerdict::Unreadable) {
+                        continue;
+                    }
+                    if (verdict == ChooseConditionVerdict::Mismatch) {
+                        if (candidatesShown < 3) {
+                            candidatesConsidered += "  considering `"
+                                + localBinders[b].name + "`:\n" + report + "\n";
+                            ++candidatesShown;
+                        }
+                        continue;
+                    }
+                    matchedIndex = b;
+                    matchIsPartial =
+                        verdict == ChooseConditionVerdict::PartialConjunct;
+                    matchedReport = report;
+                    break;
+                }
                 ExpressionPointer binderTypeOpen = openOverLocalBinders(
                     binderTypeInScope, localBinders, N);
                 ExpressionPointer whnf = weakHeadNormalForm(
                     environment_, binderTypeOpen);
-                // Exists(T, motive) is App(App(Const "Exists"), T, motive).
-                auto* outerApp = std::get_if<Application>(&whnf->node);
-                if (!outerApp) continue;
-                auto* innerApp = std::get_if<Application>(
-                    &outerApp->function->node);
-                if (!innerApp) continue;
-                auto* head = std::get_if<Constant>(
-                    &innerApp->function->node);
-                if (!head || head->name != "Exists") continue;
+                ExpressionPointer witnessType, motive;
+                if (!matchBinaryConstant(whnf, "Exists",
+                                         witnessType, motive)) {
+                    continue;
+                }
                 matchedIndex = b;
                 break;
+            }
+            if (matchedIndex == -1 && !candidatesConsidered.empty()) {
+                reportConditionMismatch(candidatesConsidered,
+                    "No fact in scope binds it. Name the source with "
+                    "`from <hypothesis-or-lemma>`, or prepend `claim ∃ …;` "
+                    "(optionally `by <lemma>`) to establish it first.");
             }
             if (matchedIndex == -1) {
                 throwElaborate(
@@ -671,6 +875,7 @@ ExpressionPointer Elaborator::elaborateChoose(
                     "prepend `claim ∃ …;` (optionally `by <lemma>`) to bring "
                     "the existential into scope first.");
             }
+            if (matchIsPartial) warnPartialCondition(matchedReport);
             scrutinee = makeSurfaceIdentifier(
                 localBinders[matchedIndex].name, {}, line, column);
         }

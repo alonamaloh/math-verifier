@@ -1,0 +1,34 @@
+-- The stated condition of a `choose` is its SEARCH KEY, not prose: the
+-- scope scan takes the most recent fact whose destructure binds exactly
+-- that condition. So a nearer existential about something else no longer
+-- captures the witness, and a condition reached through a conjunction (or
+-- through several ∃ layers at once) still has to be the one bound.
+
+module Test.choose_condition_selects_source
+
+import axioms
+import Logic.basics
+import Logic.exists
+
+-- The nearer fact is about `B`; the condition names `P`, so the scan
+-- reaches past it. Before the condition was checked, `witnessValue` came
+-- back at type `B` and the mistake surfaced only further down the proof.
+theorem Test.chooseReachesPastNearerExistential (A B : Type(0))
+        (P : A → Proposition) (Q : B → Proposition)
+        (intended : ∃ (a : A). P(a))
+        (nearer : ∃ (b : B). Q(b))
+        : ∃ (a : A). P(a) := {
+  choose witnessValue such that P(witnessValue) as holds;
+  witness witnessValue with holds
+}
+
+-- Two witness names in one step, through a conjunction: the left leg lands
+-- as an anonymous fact and the walk continues into the right leg, so the
+-- condition to state is the innermost one.
+theorem Test.chooseThroughConjunctionToNestedExistential (A : Type(0))
+        (R : A → A → Proposition)
+        (fact : True ∧ ∃ (x : A). ∃ (y : A). R(x, y))
+        : ∃ (x : A). ∃ (y : A). R(x, y) := {
+  choose first, second such that R(first, second) as related from fact;
+  witness first with witness second with related
+}
