@@ -1,13 +1,13 @@
 -- Metric/continuity.math
 --
--- Continuity between metric spaces, relative to a carrier set in the
+-- Continuity between metric spaces, relative to a region of the
 -- domain. The source and target spaces are separate bundles, so ONE
 -- definition covers every combination a curve argument needs: ℝ → ℝ,
 -- ℝ → the plane, the plane → the plane, the plane → ℝ.
 --
--- A map is continuous on a carrier when the usual ε-δ condition holds
+-- A map is continuous on a region when the usual ε-δ condition holds
 -- with both quantifiers restricted to it. Nothing is asked of the map
--- off the carrier.
+-- off the region.
 
 module Metric.continuity
 
@@ -23,51 +23,51 @@ import Metric.near
 
 definition MetricSpace.ContinuousAt {source target : MetricSpace}
         (f : source → target)
-        (carrier : Set(source))
+        (region : Set(source))
         (x : source) : Proposition :=
   ∀ (tolerance : ℝ). tolerance > 0 →
     ∃ (nearness : ℝ). nearness > 0 ∧
-      ∀ (y : source). y ∈ carrier →
+      ∀ (y : source). y ∈ region →
         distance(x, y) < nearness →
           distance(f(x), f(y)) < tolerance
 
 definition MetricSpace.ContinuousOn {source target : MetricSpace}
         (f : source → target)
-        (carrier : Set(source))
+        (region : Set(source))
         : Proposition :=
-  ∀ (x : source). x ∈ carrier →
-    MetricSpace.ContinuousAt(f, carrier, x)
+  ∀ (x : source). x ∈ region →
+    MetricSpace.ContinuousAt(f, region, x)
 
--- Continuity only sees the values on the carrier, so a map that agrees
+-- Continuity only sees the values on the region, so a map that agrees
 -- with a continuous one there is continuous there. This is what lets a
 -- glued map be pasted: on each piece it agrees with that piece's map.
 theorem MetricSpace.ContinuousOn.of_agreeing (source target : MetricSpace)
         (f g : source → target)
-        (carrier : Set(source))
-        (agree : ∀ (x : source). x ∈ carrier → f(x) = g(x))
-        (gContinuous : MetricSpace.ContinuousOn(g, carrier))
-        : MetricSpace.ContinuousOn(f, carrier) := {
+        (region : Set(source))
+        (agree : ∀ (x : source). x ∈ region → f(x) = g(x))
+        (gContinuous : MetricSpace.ContinuousOn(g, region))
+        : MetricSpace.ContinuousOn(f, region) := {
   take x : source;
-  suppose x ∈ carrier as xInCarrier;
+  suppose x ∈ region as xInRegion;
   take tolerance : ℝ;
   suppose tolerance > 0 as tolerancePositive;
   choose nearness such that
       nearness > 0 ∧
-        ∀ (y : source). y ∈ carrier →
+        ∀ (y : source). y ∈ region →
           distance(x, y) < nearness →
             distance(g(x), g(y)) < tolerance
       from gContinuous;
   nearness > 0;
-  ∀ (y : source). y ∈ carrier →
+  ∀ (y : source). y ∈ region →
       distance(x, y) < nearness →
         distance(g(x), g(y)) < tolerance as valuesClose;
   f(x) = g(x) by agree as valueAtCentre;
   witness nearness with {
     nearness > 0;
-    ∀ (y : source). y ∈ carrier →
+    ∀ (y : source). y ∈ region →
         distance(x, y) < nearness →
           distance(f(x), f(y)) < tolerance
-        by (y : source) (yInCarrier : y ∈ carrier)
+        by (y : source) (yInRegion : y ∈ region)
            (near : distance(x, y) < nearness) ↦ {
           f(y) = g(y) by agree as valueAtPoint;
           distance(g(x), g(y)) < tolerance by valuesClose;
@@ -88,56 +88,56 @@ theorem MetricSpace.ContinuousOn.of_agreeing (source target : MetricSpace)
 theorem MetricSpace.ContinuousOn.compose (source middle target : MetricSpace)
         (inner : source → middle)
         (outer : middle → target)
-        (carrier : Set(source))
-        (region : Set(middle))
-        (innerContinuous : MetricSpace.ContinuousOn(inner, carrier))
-        (lands : ∀ (x : source). x ∈ carrier → inner(x) ∈ region)
-        (outerContinuous : MetricSpace.ContinuousOn(outer, region))
+        (region : Set(source))
+        (middleRegion : Set(middle))
+        (innerContinuous : MetricSpace.ContinuousOn(inner, region))
+        (lands : ∀ (x : source). x ∈ region → inner(x) ∈ middleRegion)
+        (outerContinuous : MetricSpace.ContinuousOn(outer, middleRegion))
         : MetricSpace.ContinuousOn(
-              (x : source) ↦ outer(inner(x)), carrier) := {
+              (x : source) ↦ outer(inner(x)), region) := {
   take x : source;
-  suppose x ∈ carrier as xInCarrier;
+  suppose x ∈ region as xInRegion;
   take tolerance : ℝ;
   suppose tolerance > 0 as tolerancePositive;
-  inner(x) ∈ region by lands;
+  inner(x) ∈ middleRegion by lands;
   choose middleNearness such that
       middleNearness > 0 ∧
-        ∀ (y : middle). y ∈ region →
+        ∀ (y : middle). y ∈ middleRegion →
           distance(inner(x), y) < middleNearness →
             distance(outer(inner(x)), outer(y)) < tolerance
       from outerContinuous;
   middleNearness > 0;
-  ∀ (y : middle). y ∈ region →
+  ∀ (y : middle). y ∈ middleRegion →
       distance(inner(x), y) < middleNearness →
         distance(outer(inner(x)), outer(y)) < tolerance
       as outerAnswers;
   choose nearness such that
       nearness > 0 ∧
-        ∀ (y : source). y ∈ carrier →
+        ∀ (y : source). y ∈ region →
           distance(x, y) < nearness →
             distance(inner(x), inner(y)) < middleNearness
       from innerContinuous;
   nearness > 0;
-  ∀ (y : source). y ∈ carrier →
+  ∀ (y : source). y ∈ region →
       distance(x, y) < nearness →
         distance(inner(x), inner(y)) < middleNearness
       as innerAnswers;
   witness nearness with {
     nearness > 0;
-    ∀ (y : source). y ∈ carrier →
+    ∀ (y : source). y ∈ region →
         distance(x, y) < nearness →
           distance(outer(inner(x)), outer(inner(y))) < tolerance
-        by (y : source) (yInCarrier : y ∈ carrier)
+        by (y : source) (yInRegion : y ∈ region)
            (near : distance(x, y) < nearness) ↦ {
           distance(inner(x), inner(y)) < middleNearness by innerAnswers;
-          inner(y) ∈ region by lands;
+          inner(y) ∈ middleRegion by lands;
           done by outerAnswers
         };
     done
   }
 }
 
--- Restricting the carrier only weakens the condition — pointwise. The
+-- Restricting the region only weakens the condition — pointwise. The
 -- same nearness serves, because there are fewer points left to test.
 theorem MetricSpace.ContinuousAt.restrict (source target : MetricSpace)
         (f : source → target)
@@ -165,7 +165,7 @@ theorem MetricSpace.ContinuousAt.restrict (source target : MetricSpace)
   witness nearness
 }
 
--- Restricting the carrier only weakens the condition.
+-- Restricting the region only weakens the condition.
 theorem MetricSpace.ContinuousOn.restrict (source target : MetricSpace)
         (f : source → target)
         (smaller larger : Set(source))
@@ -255,7 +255,7 @@ theorem MetricSpace.ContinuousAt.near {source target : MetricSpace}
   witness radius
 }
 
--- The same crossing for continuity RELATIVE TO A CARRIER: the filter's
+-- The same crossing for continuity RELATIVE TO A REGION: the filter's
 -- predicate carries the membership antecedent, so the two spellings
 -- differ only in the order of the two antecedents — exactly as for
 -- `OpenIn.near`. What they buy is that combining two continuity facts at
@@ -263,50 +263,50 @@ theorem MetricSpace.ContinuousAt.near {source target : MetricSpace}
 -- of a minimum carried by hand.
 
 theorem MetricSpace.ContinuousAt.near_on {source target : MetricSpace}
-        (f : source → target) (carrier : Set(source)) (x : source)
-        (continuous : MetricSpace.ContinuousAt(f, carrier, x))
+        (f : source → target) (region : Set(source)) (x : source)
+        (continuous : MetricSpace.ContinuousAt(f, region, x))
         (tolerance : ℝ) (tolerancePositive : tolerance > 0)
         : MetricSpace.Near(x,
-              (y : source) ↦ y ∈ carrier →
+              (y : source) ↦ y ∈ region →
                   distance(f(x), f(y)) < tolerance) :=
   unfold MetricSpace.Near in {
   choose radius such that radius > 0 ∧
-      ∀ (y : source). y ∈ carrier →
+      ∀ (y : source). y ∈ region →
         distance(x, y) < radius →
           distance(f(x), f(y)) < tolerance
       from continuous;
   radius > 0;
   ∀ (y : source). distance(x, y) < radius →
-      (y ∈ carrier → distance(f(x), f(y)) < tolerance)
+      (y ∈ region → distance(f(x), f(y)) < tolerance)
       by { take y : source;
            suppose distance(x, y) < radius;
-           suppose y ∈ carrier;
+           suppose y ∈ region;
            done };
   witness radius
 }
 
 theorem MetricSpace.ContinuousAt.of_near_on {source target : MetricSpace}
-        (f : source → target) (carrier : Set(source)) (x : source)
+        (f : source → target) (region : Set(source)) (x : source)
         (nearby : ∀ (tolerance : ℝ). tolerance > 0 →
             MetricSpace.Near(x,
-                (y : source) ↦ y ∈ carrier →
+                (y : source) ↦ y ∈ region →
                     distance(f(x), f(y)) < tolerance))
-        : MetricSpace.ContinuousAt(f, carrier, x) :=
+        : MetricSpace.ContinuousAt(f, region, x) :=
   unfold MetricSpace.Near in {
   take tolerance : ℝ;
   suppose tolerance > 0;
   MetricSpace.Near(x,
-      (y : source) ↦ y ∈ carrier → distance(f(x), f(y)) < tolerance)
+      (y : source) ↦ y ∈ region → distance(f(x), f(y)) < tolerance)
       by nearby;
   choose radius such that radius > 0 ∧
       ∀ (y : source). distance(x, y) < radius →
-        (y ∈ carrier → distance(f(x), f(y)) < tolerance);
+        (y ∈ region → distance(f(x), f(y)) < tolerance);
   radius > 0;
-  ∀ (y : source). y ∈ carrier →
+  ∀ (y : source). y ∈ region →
       distance(x, y) < radius →
         distance(f(x), f(y)) < tolerance
       by { take y : source;
-           suppose y ∈ carrier;
+           suppose y ∈ region;
            suppose distance(x, y) < radius;
            done };
   witness radius

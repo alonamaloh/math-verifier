@@ -4,14 +4,14 @@
 -- image.
 --
 -- "The inverse is continuous" is stated **without naming the inverse**:
--- `MetricSpace.HasContinuousInverseOn(f, carrier)` says that points whose
+-- `MetricSpace.HasContinuousInverseOn(f, region)` says that points whose
 -- images are close are themselves close, which is what every consumer
 -- uses and what the sequence argument proves. Naming the inverse would
 -- mean choosing a preimage for every point of the image — a use of choice
 -- the statement does not need, and an extra function at every call site.
 --
 -- The proof is the textbook one. If some tolerance had no nearness, then
--- at every scale there is a point of the carrier whose image is that close
+-- at every scale there is a point of the region whose image is that close
 -- to `f(x)` and which is itself `tolerance` away from `x`. Compactness
 -- thins those points to a convergent sequence; continuity carries the
 -- images to the image of the limit, while the construction carries the
@@ -45,65 +45,65 @@ import Metric.sequence
 import Metric.compactness
 
 -- ----------------------------------------------------------------------
--- Injectivity and homeomorphism, both relative to a carrier.
+-- Injectivity and homeomorphism, both relative to a region.
 
 definition MetricSpace.InjectiveOn {source target : MetricSpace}
         (f : source → target)
-        (carrier : Set(source))
+        (region : Set(source))
         : Proposition :=
-  ∀ (x : source). x ∈ carrier →
-    ∀ (y : source). y ∈ carrier → f(x) = f(y) → x = y
+  ∀ (x : source). x ∈ region →
+    ∀ (y : source). y ∈ region → f(x) = f(y) → x = y
 
 definition MetricSpace.HasContinuousInverseOn {source target : MetricSpace}
         (f : source → target)
-        (carrier : Set(source))
+        (region : Set(source))
         : Proposition :=
-  ∀ (x : source). x ∈ carrier →
+  ∀ (x : source). x ∈ region →
     ∀ (tolerance : ℝ). tolerance > 0 →
       ∃ (nearness : ℝ). nearness > 0 ∧
-        ∀ (y : source). y ∈ carrier →
+        ∀ (y : source). y ∈ region →
           distance(f(x), f(y)) < nearness →
             distance(x, y) < tolerance
 
 definition MetricSpace.IsHomeomorphismOn {source target : MetricSpace}
         (f : source → target)
-        (carrier : Set(source))
+        (region : Set(source))
         : Proposition :=
-  MetricSpace.ContinuousOn(f, carrier) ∧ MetricSpace.InjectiveOn(f, carrier)
-    ∧ MetricSpace.HasContinuousInverseOn(f, carrier)
+  MetricSpace.ContinuousOn(f, region) ∧ MetricSpace.InjectiveOn(f, region)
+    ∧ MetricSpace.HasContinuousInverseOn(f, region)
 
 -- ----------------------------------------------------------------------
--- "No nearness works at `x`, so at every scale some point of the carrier
+-- "No nearness works at `x`, so at every scale some point of the region
 -- has an image that close and is itself far." The quantifier gymnastics,
 -- quarantined so that the theorem below reads.
 
 theorem MetricSpace.far_point_with_close_image_at_every_scale
         (source target : MetricSpace)
         (f : source → target)
-        (carrier : Set(source))
+        (region : Set(source))
         (x : source) (tolerance : ℝ)
         (noNearness : ¬(∃ (nearness : ℝ). nearness > 0 ∧
-            ∀ (y : source). y ∈ carrier →
+            ∀ (y : source). y ∈ region →
               distance(f(x), f(y)) < nearness →
                 distance(x, y) < tolerance))
         (n : ℕ)
-        : ∃ (y : source). y ∈ carrier
+        : ∃ (y : source). y ∈ region
             ∧ (distance(f(x), f(y)) < Real.harmonic_term(n)
                    ∧ ¬(distance(x, y) < tolerance)) := {
   Real.harmonic_term(n) > 0 by Real.divide_positive;
-  suppose ¬(∃ (y : source). y ∈ carrier
+  suppose ¬(∃ (y : source). y ∈ region
       ∧ (distance(f(x), f(y)) < Real.harmonic_term(n)
              ∧ ¬(distance(x, y) < tolerance)))
       as noFarPoint for contradiction {
-    ∀ (y : source). y ∈ carrier →
+    ∀ (y : source). y ∈ region →
         distance(f(x), f(y)) < Real.harmonic_term(n) →
           distance(x, y) < tolerance
-        by (y : source) (inCarrier : y ∈ carrier)
+        by (y : source) (inRegion : y ∈ region)
            (imageClose : distance(f(x), f(y))
                              < Real.harmonic_term(n)) ↦ {
           suppose ¬(distance(x, y) < tolerance)
               as pointFar for contradiction {
-            ∃ (z : source). z ∈ carrier
+            ∃ (z : source). z ∈ region
                 ∧ (distance(f(x), f(z)) < Real.harmonic_term(n)
                        ∧ ¬(distance(x, z) < tolerance))
                 by { witness y };
@@ -112,7 +112,7 @@ theorem MetricSpace.far_point_with_close_image_at_every_scale
           done
         };
     ∃ (nearness : ℝ). nearness > 0 ∧
-        ∀ (y : source). y ∈ carrier →
+        ∀ (y : source). y ∈ region →
           distance(f(x), f(y)) < nearness →
             distance(x, y) < tolerance
         by { witness Real.harmonic_term(n) };
@@ -126,56 +126,56 @@ theorem MetricSpace.far_point_with_close_image_at_every_scale
 
 theorem MetricSpace.inverse_continuous_on_compact (source target : MetricSpace)
         (f : source → target)
-        (carrier : Set(source))
-        (compact : MetricSpace.IsCompact(carrier))
-        (continuous : MetricSpace.ContinuousOn(f, carrier))
-        (injective : MetricSpace.InjectiveOn(f, carrier))
-        : MetricSpace.HasContinuousInverseOn(f, carrier) := {
+        (region : Set(source))
+        (compact : MetricSpace.IsCompact(region))
+        (continuous : MetricSpace.ContinuousOn(f, region))
+        (injective : MetricSpace.InjectiveOn(f, region))
+        : MetricSpace.HasContinuousInverseOn(f, region) := {
   take x : source;
-  suppose x ∈ carrier as xInCarrier;
+  suppose x ∈ region as xInRegion;
   take tolerance : ℝ;
   suppose tolerance > 0 as tolerancePositive;
   suppose ¬(∃ (nearness : ℝ). nearness > 0 ∧
-      ∀ (y : source). y ∈ carrier →
+      ∀ (y : source). y ∈ region →
         distance(f(x), f(y)) < nearness →
           distance(x, y) < tolerance)
       as noNearness for contradiction {
 
     -- The bad points, one per scale.
-    ∀ (n : ℕ). ∃ (y : source). y ∈ carrier
+    ∀ (n : ℕ). ∃ (y : source). y ∈ region
         ∧ (distance(f(x), f(y)) < Real.harmonic_term(n)
                ∧ ¬(distance(x, y) < tolerance))
         by (n : ℕ) ↦ MetricSpace.far_point_with_close_image_at_every_scale(
-            source, target, f, carrier, x, tolerance, noNearness, n)
+            source, target, f, region, x, tolerance, noNearness, n)
         as badPoints;
     choose s such that
-        ∀ (n : ℕ). s(n) ∈ carrier
+        ∀ (n : ℕ). s(n) ∈ region
           ∧ (distance(f(x), f(s(n))) < Real.harmonic_term(n)
                  ∧ ¬(distance(x, s(n)) < tolerance))
         as chosen
         from Logic.countable_choice(
             source,
-            (n : ℕ) (y : source) ↦ y ∈ carrier
+            (n : ℕ) (y : source) ↦ y ∈ region
                 ∧ (distance(f(x), f(y)) < Real.harmonic_term(n)
                        ∧ ¬(distance(x, y) < tolerance)),
             badPoints);
-    ∀ (k : ℕ). s(k) ∈ carrier
+    ∀ (k : ℕ). s(k) ∈ region
         by { take k : ℕ; done by chosen }
         as inside;
 
     -- Thin them to a convergent sequence.
     choose index : ℕ → ℕ, limit : source such that
-        limit ∈ carrier ∧ MetricSpace.SubsequenceConverges(s, index, limit)
+        limit ∈ region ∧ MetricSpace.SubsequenceConverges(s, index, limit)
         from compact;
     Natural.IsStrictlyIncreasing(index);
-    limit ∈ carrier as limitInCarrier;
+    limit ∈ region as limitInRegion;
     MetricSpace.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) as converges;
 
     -- The images have two limits: continuity gives one, the construction
     -- gives the other.
     MetricSpace.SequenceConverges((k : ℕ) ↦ f(s(index(k))), f(limit))
         by MetricSpace.ContinuousAt.along_sequence(
-            continuous := continuous(limit, limitInCarrier),
+            continuous := continuous(limit, limitInRegion),
             s := (k : ℕ) ↦ s(index(k)),
             inside := (k : ℕ) ↦ inside(index(k)));
     MetricSpace.SequenceConverges((k : ℕ) ↦ f(s(index(k))), f(x))
@@ -184,7 +184,7 @@ theorem MetricSpace.inverse_continuous_on_compact (source target : MetricSpace)
               from Real.exists_harmonic_term_below;
           witness step with
               (k : ℕ) (beyond : step ≤ k) ↦ {
-                s(index(k)) ∈ carrier
+                s(index(k)) ∈ region
                     ∧ (distance(f(x), f(s(index(k))))
                            < Real.harmonic_term(index(k))
                            ∧ ¬(distance(x, s(index(k))) < tolerance))
@@ -218,7 +218,7 @@ theorem MetricSpace.inverse_continuous_on_compact (source target : MetricSpace)
         by closeBeyond;
     distance(x, s(index(threshold))) < tolerance
         by substituting limitIsX;
-    s(index(threshold)) ∈ carrier
+    s(index(threshold)) ∈ region
         ∧ (distance(f(x), f(s(index(threshold))))
                < Real.harmonic_term(index(threshold))
                ∧ ¬(distance(x, s(index(threshold))) < tolerance))
@@ -232,12 +232,12 @@ theorem MetricSpace.inverse_continuous_on_compact (source target : MetricSpace)
 theorem MetricSpace.IsHomeomorphismOn.of_continuous_injective_on_compact
         (source target : MetricSpace)
         (f : source → target)
-        (carrier : Set(source))
-        (compact : MetricSpace.IsCompact(carrier))
-        (continuous : MetricSpace.ContinuousOn(f, carrier))
-        (injective : MetricSpace.InjectiveOn(f, carrier))
-        : MetricSpace.IsHomeomorphismOn(f, carrier) := {
-  MetricSpace.HasContinuousInverseOn(f, carrier)
+        (region : Set(source))
+        (compact : MetricSpace.IsCompact(region))
+        (continuous : MetricSpace.ContinuousOn(f, region))
+        (injective : MetricSpace.InjectiveOn(f, region))
+        : MetricSpace.IsHomeomorphismOn(f, region) := {
+  MetricSpace.HasContinuousInverseOn(f, region)
       by MetricSpace.inverse_continuous_on_compact;
   done
 }

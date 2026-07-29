@@ -66,54 +66,54 @@ theorem MetricSpace.IsConnected.clopen_is_everything (m : MetricSpace)
 
 definition MetricSpace.preimageIn {source target : MetricSpace}
         (f : source → target)
-        (region : Set(target))
-        (carrier : Set(source))
+        (subset : Set(target))
+        (region : Set(source))
         : Set(source) :=
-  (x : source) ↦ x ∈ carrier ∧ f(x) ∈ region
+  (x : source) ↦ x ∈ region ∧ f(x) ∈ subset
 
 theorem MetricSpace.OpenIn.preimage (source target : MetricSpace)
         (f : source → target)
-        (carrier : Set(source))
-        (region : Set(target))
-        (continuous : MetricSpace.ContinuousOn(f, carrier))
-        (targetOpen : MetricSpace.OpenIn(region, MetricSpace.imageSet(f, carrier)))
-        : MetricSpace.OpenIn(MetricSpace.preimageIn(f, region, carrier), carrier) := {
+        (region : Set(source))
+        (subset : Set(target))
+        (continuous : MetricSpace.ContinuousOn(f, region))
+        (targetOpen : MetricSpace.OpenIn(subset, MetricSpace.imageSet(f, region)))
+        : MetricSpace.OpenIn(MetricSpace.preimageIn(f, subset, region), region) := {
   take x : source;
-  suppose x ∈ MetricSpace.preimageIn(f, region, carrier) as inPreimage;
-  x ∈ carrier as inCarrier;
-  f(x) ∈ region as valueInRegion;
+  suppose x ∈ MetricSpace.preimageIn(f, subset, region) as inPreimage;
+  x ∈ region as inRegion;
+  f(x) ∈ subset as valueInSubset;
   choose radius such that
       radius > 0 ∧
-      ∀ (w : target). w ∈ MetricSpace.imageSet(f, carrier) →
-        distance(f(x), w) < radius → w ∈ region
-      from targetOpen(f(x), valueInRegion);
+      ∀ (w : target). w ∈ MetricSpace.imageSet(f, region) →
+        distance(f(x), w) < radius → w ∈ subset
+      from targetOpen(f(x), valueInSubset);
   radius > 0 as radiusPositive;
-  ∀ (w : target). w ∈ MetricSpace.imageSet(f, carrier) →
-      distance(f(x), w) < radius → w ∈ region
+  ∀ (w : target). w ∈ MetricSpace.imageSet(f, region) →
+      distance(f(x), w) < radius → w ∈ subset
       as nearbyValuesHit;
   choose nearness such that
       nearness > 0 ∧
-      ∀ (y : source). y ∈ carrier →
+      ∀ (y : source). y ∈ region →
         distance(x, y) < nearness →
           distance(f(x), f(y)) < radius
-      from continuous(x, inCarrier, radius, radiusPositive);
+      from continuous(x, inRegion, radius, radiusPositive);
   nearness > 0;
-  ∀ (y : source). y ∈ carrier →
+  ∀ (y : source). y ∈ region →
       distance(x, y) < nearness →
         distance(f(x), f(y)) < radius
       as nearbyPointsMoveLittle;
   witness nearness with {
     nearness > 0;
-    ∀ (y : source). y ∈ carrier →
+    ∀ (y : source). y ∈ region →
         distance(x, y) < nearness →
-          y ∈ MetricSpace.preimageIn(f, region, carrier)
-        by (y : source) (inCarrierY : y ∈ carrier)
+          y ∈ MetricSpace.preimageIn(f, subset, region)
+        by (y : source) (inRegionY : y ∈ region)
            (near : distance(x, y) < nearness) ↦ {
           distance(f(x), f(y)) < radius
               by nearbyPointsMoveLittle;
-          f(y) ∈ MetricSpace.imageSet(f, carrier) by { witness y };
-          f(y) ∈ region by nearbyValuesHit;
-          y ∈ MetricSpace.preimageIn(f, region, carrier);
+          f(y) ∈ MetricSpace.imageSet(f, region) by { witness y };
+          f(y) ∈ subset by nearbyValuesHit;
+          y ∈ MetricSpace.preimageIn(f, subset, region);
           done
         };
     done
@@ -122,12 +122,12 @@ theorem MetricSpace.OpenIn.preimage (source target : MetricSpace)
 
 theorem MetricSpace.preimageIn_subset (source target : MetricSpace)
         (f : source → target)
-        (region : Set(target))
-        (carrier : Set(source))
-        : MetricSpace.preimageIn(f, region, carrier) ⊆ carrier := {
+        (subset : Set(target))
+        (region : Set(source))
+        : MetricSpace.preimageIn(f, subset, region) ⊆ region := {
   take x : source;
-  suppose x ∈ MetricSpace.preimageIn(f, region, carrier) as inPreimage;
-  x ∈ carrier;
+  suppose x ∈ MetricSpace.preimageIn(f, subset, region) as inPreimage;
+  x ∈ region;
   done
 }
 
@@ -136,36 +136,36 @@ theorem MetricSpace.preimageIn_subset (source target : MetricSpace)
 -- domain".
 theorem MetricSpace.preimageIn_complement (source target : MetricSpace)
         (f : source → target)
-        (carrier : Set(source))
-        (region : Set(target))
-        : carrier ∖ MetricSpace.preimageIn(f, region, carrier)
+        (region : Set(source))
+        (subset : Set(target))
+        : region ∖ MetricSpace.preimageIn(f, subset, region)
               = MetricSpace.preimageIn(
-                    f, MetricSpace.imageSet(f, carrier) ∖ region, carrier) := {
-  carrier ∖ MetricSpace.preimageIn(f, region, carrier)
+                    f, MetricSpace.imageSet(f, region) ∖ subset, region) := {
+  region ∖ MetricSpace.preimageIn(f, subset, region)
       ⊆ MetricSpace.preimageIn(
-            f, MetricSpace.imageSet(f, carrier) ∖ region, carrier)
+            f, MetricSpace.imageSet(f, region) ∖ subset, region)
       by (x : source)
-         (outside : x ∈ carrier ∖ MetricSpace.preimageIn(f, region, carrier)) ↦ {
-        x ∈ carrier;
-        ¬(x ∈ MetricSpace.preimageIn(f, region, carrier));
-        f(x) ∈ MetricSpace.imageSet(f, carrier) by { witness x };
-        suppose f(x) ∈ region for contradiction {
-          x ∈ MetricSpace.preimageIn(f, region, carrier);
+         (outside : x ∈ region ∖ MetricSpace.preimageIn(f, subset, region)) ↦ {
+        x ∈ region;
+        ¬(x ∈ MetricSpace.preimageIn(f, subset, region));
+        f(x) ∈ MetricSpace.imageSet(f, region) by { witness x };
+        suppose f(x) ∈ subset for contradiction {
+          x ∈ MetricSpace.preimageIn(f, subset, region);
           done
         };
-        f(x) ∈ MetricSpace.imageSet(f, carrier) ∖ region;
+        f(x) ∈ MetricSpace.imageSet(f, region) ∖ subset;
         done
       };
-  MetricSpace.preimageIn(f, MetricSpace.imageSet(f, carrier) ∖ region, carrier)
-      ⊆ carrier ∖ MetricSpace.preimageIn(f, region, carrier)
+  MetricSpace.preimageIn(f, MetricSpace.imageSet(f, region) ∖ subset, region)
+      ⊆ region ∖ MetricSpace.preimageIn(f, subset, region)
       by (x : source)
          (inside : x ∈ MetricSpace.preimageIn(
-              f, MetricSpace.imageSet(f, carrier) ∖ region, carrier)) ↦ {
-        x ∈ carrier;
-        f(x) ∈ MetricSpace.imageSet(f, carrier) ∖ region;
-        ¬(f(x) ∈ region);
-        suppose x ∈ MetricSpace.preimageIn(f, region, carrier) for contradiction {
-          f(x) ∈ region;
+              f, MetricSpace.imageSet(f, region) ∖ subset, region)) ↦ {
+        x ∈ region;
+        f(x) ∈ MetricSpace.imageSet(f, region) ∖ subset;
+        ¬(f(x) ∈ subset);
+        suppose x ∈ MetricSpace.preimageIn(f, subset, region) for contradiction {
+          f(x) ∈ subset;
           done
         };
         done
@@ -183,57 +183,57 @@ theorem MetricSpace.preimageIn_complement (source target : MetricSpace)
 
 theorem MetricSpace.IsConnected.image (source target : MetricSpace)
         (f : source → target)
-        (carrier : Set(source))
-        (connected : MetricSpace.IsConnected(carrier))
-        (continuous : MetricSpace.ContinuousOn(f, carrier))
-        : MetricSpace.IsConnected(MetricSpace.imageSet(f, carrier)) := {
+        (region : Set(source))
+        (connected : MetricSpace.IsConnected(region))
+        (continuous : MetricSpace.ContinuousOn(f, region))
+        : MetricSpace.IsConnected(MetricSpace.imageSet(f, region)) := {
   take piece : Set(target);
-  suppose piece ⊆ MetricSpace.imageSet(f, carrier) as pieceInImage;
-  suppose MetricSpace.OpenIn(piece, MetricSpace.imageSet(f, carrier)) as pieceOpen;
+  suppose piece ⊆ MetricSpace.imageSet(f, region) as pieceInImage;
+  suppose MetricSpace.OpenIn(piece, MetricSpace.imageSet(f, region)) as pieceOpen;
   suppose MetricSpace.OpenIn(
-      MetricSpace.imageSet(f, carrier) ∖ piece, MetricSpace.imageSet(f, carrier))
+      MetricSpace.imageSet(f, region) ∖ piece, MetricSpace.imageSet(f, region))
       as restOpen;
   suppose Set.IsNonempty(target, piece) as pieceNonempty;
 
-  MetricSpace.preimageIn(f, piece, carrier) ⊆ carrier
+  MetricSpace.preimageIn(f, piece, region) ⊆ region
       by MetricSpace.preimageIn_subset;
-  MetricSpace.OpenIn(MetricSpace.preimageIn(f, piece, carrier), carrier)
+  MetricSpace.OpenIn(MetricSpace.preimageIn(f, piece, region), region)
       by MetricSpace.OpenIn.preimage;
-  carrier ∖ MetricSpace.preimageIn(f, piece, carrier)
+  region ∖ MetricSpace.preimageIn(f, piece, region)
       = MetricSpace.preimageIn(
-            f, MetricSpace.imageSet(f, carrier) ∖ piece, carrier)
+            f, MetricSpace.imageSet(f, region) ∖ piece, region)
       by MetricSpace.preimageIn_complement;
   MetricSpace.OpenIn(
-      MetricSpace.preimageIn(f, MetricSpace.imageSet(f, carrier) ∖ piece, carrier),
-      carrier)
+      MetricSpace.preimageIn(f, MetricSpace.imageSet(f, region) ∖ piece, region),
+      region)
       by MetricSpace.OpenIn.preimage;
-  MetricSpace.OpenIn(carrier ∖ MetricSpace.preimageIn(f, piece, carrier), carrier);
+  MetricSpace.OpenIn(region ∖ MetricSpace.preimageIn(f, piece, region), region);
 
   -- The piece has a point, and that point is a value.
   choose value such that value ∈ piece from pieceNonempty;
-  value ∈ MetricSpace.imageSet(f, carrier) by pieceInImage;
-  choose origin such that origin ∈ carrier ∧ f(origin) = value
-      from { value ∈ MetricSpace.imageSet(f, carrier) };
-  origin ∈ carrier;
+  value ∈ MetricSpace.imageSet(f, region) by pieceInImage;
+  choose origin such that origin ∈ region ∧ f(origin) = value
+      from { value ∈ MetricSpace.imageSet(f, region) };
+  origin ∈ region;
   f(origin) = value;
   f(origin) ∈ piece;
-  origin ∈ MetricSpace.preimageIn(f, piece, carrier);
+  origin ∈ MetricSpace.preimageIn(f, piece, region);
   Set.IsNonempty(
-      source, MetricSpace.preimageIn(f, piece, carrier))
+      source, MetricSpace.preimageIn(f, piece, region))
       by { witness origin };
 
-  MetricSpace.preimageIn(f, piece, carrier) = carrier by connected;
+  MetricSpace.preimageIn(f, piece, region) = region by connected;
 
   -- Pushing that forward: every value is the value at a point of the
   -- pullback, hence lands in the piece.
-  MetricSpace.imageSet(f, carrier) ⊆ piece
+  MetricSpace.imageSet(f, region) ⊆ piece
       by (y : target)
-         (inImage : y ∈ MetricSpace.imageSet(f, carrier)) ↦ {
-        choose x such that x ∈ carrier ∧ f(x) = y from inImage;
-        x ∈ carrier;
+         (inImage : y ∈ MetricSpace.imageSet(f, region)) ↦ {
+        choose x such that x ∈ region ∧ f(x) = y from inImage;
+        x ∈ region;
         f(x) = y;
-        carrier = MetricSpace.preimageIn(f, piece, carrier);
-        x ∈ MetricSpace.preimageIn(f, piece, carrier);
+        region = MetricSpace.preimageIn(f, piece, region);
+        x ∈ MetricSpace.preimageIn(f, piece, region);
         f(x) ∈ piece;
         done
       };
@@ -243,25 +243,25 @@ theorem MetricSpace.IsConnected.image (source target : MetricSpace)
 -- ----------------------------------------------------------------------
 -- Restriction.
 --
--- Relative openness survives shrinking the carrier: what is open in a set
+-- Relative openness survives shrinking the region: what is open in a set
 -- is open in any subset of it, once cut down to that subset. The radius
 -- is unchanged — only fewer points have to be checked.
 
 theorem MetricSpace.OpenIn.restrict (m : MetricSpace)
-        (piece carrier smaller : Set(m))
-        (openInCarrier : MetricSpace.OpenIn(piece, carrier))
-        (inside : smaller ⊆ carrier)
+        (piece region smaller : Set(m))
+        (openInRegion : MetricSpace.OpenIn(piece, region))
+        (inside : smaller ⊆ region)
         : MetricSpace.OpenIn(piece ∩ smaller, smaller) := {
   take x : m;
   suppose x ∈ piece ∩ smaller as inBoth;
   x ∈ piece;
   choose radius such that
       radius > 0 ∧
-      ∀ (y : m). y ∈ carrier →
+      ∀ (y : m). y ∈ region →
         distance(x, y) < radius → y ∈ piece
-      from openInCarrier(x, { x ∈ piece });
+      from openInRegion(x, { x ∈ piece });
   radius > 0;
-  ∀ (y : m). y ∈ carrier →
+  ∀ (y : m). y ∈ region →
       distance(x, y) < radius → y ∈ piece as nearbyInPiece;
   witness radius with {
     radius > 0;
@@ -269,7 +269,7 @@ theorem MetricSpace.OpenIn.restrict (m : MetricSpace)
         distance(x, y) < radius → y ∈ piece ∩ smaller
         by (y : m) (inSmaller : y ∈ smaller)
            (near : distance(x, y) < radius) ↦ {
-          y ∈ carrier by inside;
+          y ∈ region by inside;
           y ∈ piece by nearbyInPiece;
           done
         };
@@ -329,11 +329,11 @@ theorem MetricSpace.IsConnected.swallows (m : MetricSpace)
         (meets : Set.IsNonempty(m, piece ∩ part))
         : part ⊆ piece := {
   MetricSpace.OpenIn(piece ∩ part, part)
-      by MetricSpace.OpenIn.restrict(carrier := whole);
+      by MetricSpace.OpenIn.restrict(region := whole);
   part ∖ (piece ∩ part) = (whole ∖ piece) ∩ part
       by MetricSpace.difference_intersection;
   MetricSpace.OpenIn((whole ∖ piece) ∩ part, part)
-      by MetricSpace.OpenIn.restrict(carrier := whole);
+      by MetricSpace.OpenIn.restrict(region := whole);
   MetricSpace.OpenIn(part ∖ (piece ∩ part), part);
   piece ∩ part ⊆ part by Set.intersection_subset_right;
   piece ∩ part = part by partConnected;
@@ -425,9 +425,9 @@ theorem MetricSpace.IsConnected.lands_in_side (m : MetricSpace)
         : part ⊆ left := {
   part ⊆ Set.universe(m) by Set.subset_universe;
   MetricSpace.OpenIn(left ∩ part, part)
-      by MetricSpace.OpenIn.restrict(carrier := Set.universe(m));
+      by MetricSpace.OpenIn.restrict(region := Set.universe(m));
   MetricSpace.OpenIn(right ∩ part, part)
-      by MetricSpace.OpenIn.restrict(carrier := Set.universe(m));
+      by MetricSpace.OpenIn.restrict(region := Set.universe(m));
 
   -- What the left side leaves of `part` is exactly what the right side
   -- catches, so the leftover is relatively open too.

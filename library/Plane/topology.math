@@ -10,15 +10,15 @@
 -- `Metric/continuity.math`, where it is written once and also serves the
 -- real line.
 --
--- Everything is stated RELATIVE to a carrier set from the start, and the
--- absolute notions are the `carrier = universe` case. That is a
+-- Everything is stated RELATIVE to a region from the start, and the
+-- absolute notions are the `region = universe` case. That is a
 -- deliberate choice, settled in PLAN_JORDAN_SCHOENFLIES.md: connectedness
 -- gets applied to arcs and curves as subspaces, and the model-curve
 -- parametrization needs compact→Hausdorff on a subspace, so retrofitting
 -- relativisation across Layers 1–3 would cost more than paying for it
 -- once here.
 --
--- `Plane.OpenIn(subset, carrier)` does not require `subset ⊆ carrier` —
+-- `Plane.OpenIn(subset, region)` does not require `subset ⊆ region` —
 -- the ε-ball condition is meaningful without it, and demanding it would
 -- add a proof obligation at every use. Consumers that need the inclusion
 -- carry it separately.
@@ -42,40 +42,40 @@ import Plane.segment
 import Plane.metric
 
 -- ----------------------------------------------------------------------
--- Open sets, relative to a carrier.
+-- Open sets, relative to a region.
 
-definition Plane.OpenIn (subset carrier : Set(Plane.Point)) : Proposition :=
-  MetricSpace.OpenIn(subset, carrier)
+definition Plane.OpenIn (subset region : Set(Plane.Point)) : Proposition :=
+  MetricSpace.OpenIn(subset, region)
 
 definition Plane.IsOpen (subset : Set(Plane.Point)) : Proposition :=
   MetricSpace.IsOpen(subset)
 
-definition Plane.ClosedIn (subset carrier : Set(Plane.Point)) : Proposition :=
-  MetricSpace.ClosedIn(subset, carrier)
+definition Plane.ClosedIn (subset region : Set(Plane.Point)) : Proposition :=
+  MetricSpace.ClosedIn(subset, region)
 
 -- ----------------------------------------------------------------------
 -- The lattice laws.
 
-theorem Plane.OpenIn.universe (carrier : Set(Plane.Point))
-        : Plane.OpenIn(Set.universe(Plane.Point), carrier) :=
+theorem Plane.OpenIn.universe (region : Set(Plane.Point))
+        : Plane.OpenIn(Set.universe(Plane.Point), region) :=
   done by MetricSpace.OpenIn.universe
 
-theorem Plane.OpenIn.empty (carrier : Set(Plane.Point))
-        : Plane.OpenIn(Set.empty(Plane.Point), carrier) :=
+theorem Plane.OpenIn.empty (region : Set(Plane.Point))
+        : Plane.OpenIn(Set.empty(Plane.Point), region) :=
   done by MetricSpace.OpenIn.empty
 
 theorem Plane.OpenIn.intersection
-        (left right carrier : Set(Plane.Point))
-        (leftOpen : Plane.OpenIn(left, carrier))
-        (rightOpen : Plane.OpenIn(right, carrier))
-        : Plane.OpenIn(left ∩ right, carrier) :=
+        (left right region : Set(Plane.Point))
+        (leftOpen : Plane.OpenIn(left, region))
+        (rightOpen : Plane.OpenIn(right, region))
+        : Plane.OpenIn(left ∩ right, region) :=
   done by MetricSpace.OpenIn.intersection
 
 theorem Plane.OpenIn.union
-        (left right carrier : Set(Plane.Point))
-        (leftOpen : Plane.OpenIn(left, carrier))
-        (rightOpen : Plane.OpenIn(right, carrier))
-        : Plane.OpenIn(left ∪ right, carrier) :=
+        (left right region : Set(Plane.Point))
+        (leftOpen : Plane.OpenIn(left, region))
+        (rightOpen : Plane.OpenIn(right, region))
+        : Plane.OpenIn(left ∪ right, region) :=
   done by MetricSpace.OpenIn.union
 
 -- ----------------------------------------------------------------------
@@ -87,148 +87,148 @@ theorem Plane.Ball_IsOpen (center : Plane.Point) (radius : ℝ)
 
 -- ----------------------------------------------------------------------
 -- The textbook characterization: relatively open means "cut out of the
--- carrier by an open set".
+-- region by an open set".
 
 definition Plane.BallWitness
-        (subset carrier : Set(Plane.Point))
+        (subset region : Set(Plane.Point))
         (x : Plane.Point) (radius : ℝ) (y : Plane.Point) : Proposition :=
-  MetricSpace.BallWitness(subset, carrier, x, radius, y)
+  MetricSpace.BallWitness(subset, region, x, radius, y)
 
 theorem Plane.BallWitness.centre_inside
-        (subset carrier : Set(Plane.Point))
+        (subset region : Set(Plane.Point))
         (x : Plane.Point) (radius : ℝ) (y : Plane.Point)
-        (holds : Plane.BallWitness(subset, carrier, x, radius, y))
+        (holds : Plane.BallWitness(subset, region, x, radius, y))
         : x ∈ subset :=
   done by MetricSpace.BallWitness.centre_inside
 
 theorem Plane.BallWitness.radius_positive
-        (subset carrier : Set(Plane.Point))
+        (subset region : Set(Plane.Point))
         (x : Plane.Point) (radius : ℝ) (y : Plane.Point)
-        (holds : Plane.BallWitness(subset, carrier, x, radius, y))
+        (holds : Plane.BallWitness(subset, region, x, radius, y))
         : 0 < radius :=
   done by MetricSpace.BallWitness.radius_positive
 
 theorem Plane.BallWitness.ball_inside
-        (subset carrier : Set(Plane.Point))
+        (subset region : Set(Plane.Point))
         (x : Plane.Point) (radius : ℝ) (y : Plane.Point)
-        (holds : Plane.BallWitness(subset, carrier, x, radius, y))
-        : ∀ (z : Plane.Point). z ∈ carrier →
+        (holds : Plane.BallWitness(subset, region, x, radius, y))
+        : ∀ (z : Plane.Point). z ∈ region →
               Plane.distance(x, z) < radius → z ∈ subset :=
   done by MetricSpace.BallWitness.ball_inside
 
 theorem Plane.BallWitness.reaches
-        (subset carrier : Set(Plane.Point))
+        (subset region : Set(Plane.Point))
         (x : Plane.Point) (radius : ℝ) (y : Plane.Point)
-        (holds : Plane.BallWitness(subset, carrier, x, radius, y))
+        (holds : Plane.BallWitness(subset, region, x, radius, y))
         : Plane.distance(x, y) < radius :=
   done by MetricSpace.BallWitness.reaches
 
-definition Plane.openHull (subset carrier : Set(Plane.Point))
+definition Plane.openHull (subset region : Set(Plane.Point))
         : Set(Plane.Point) :=
-  MetricSpace.openHull(subset, carrier)
+  MetricSpace.openHull(subset, region)
 
-theorem Plane.openHull_IsOpen (subset carrier : Set(Plane.Point))
-        : Plane.IsOpen(Plane.openHull(subset, carrier)) :=
+theorem Plane.openHull_IsOpen (subset region : Set(Plane.Point))
+        : Plane.IsOpen(Plane.openHull(subset, region)) :=
   done by MetricSpace.openHull_IsOpen
 
-theorem Plane.subset_openHull_intersection (subset carrier : Set(Plane.Point))
-        (subsetInCarrier : subset ⊆ carrier)
-        (openInCarrier : Plane.OpenIn(subset, carrier))
-        : subset ⊆ Plane.openHull(subset, carrier) ∩ carrier :=
+theorem Plane.subset_openHull_intersection (subset region : Set(Plane.Point))
+        (subsetInRegion : subset ⊆ region)
+        (openInRegion : Plane.OpenIn(subset, region))
+        : subset ⊆ Plane.openHull(subset, region) ∩ region :=
   done by MetricSpace.subset_openHull_intersection
 
-theorem Plane.openHull_intersection_subset (subset carrier : Set(Plane.Point))
-        : Plane.openHull(subset, carrier) ∩ carrier ⊆ subset :=
+theorem Plane.openHull_intersection_subset (subset region : Set(Plane.Point))
+        : Plane.openHull(subset, region) ∩ region ⊆ subset :=
   done by MetricSpace.openHull_intersection_subset
 
-theorem Plane.OpenIn_cut_by_open (subset carrier : Set(Plane.Point))
-        (subsetInCarrier : subset ⊆ carrier)
-        (openInCarrier : Plane.OpenIn(subset, carrier))
-        : subset = Plane.openHull(subset, carrier) ∩ carrier :=
+theorem Plane.OpenIn_cut_by_open (subset region : Set(Plane.Point))
+        (subsetInRegion : subset ⊆ region)
+        (openInRegion : Plane.OpenIn(subset, region))
+        : subset = Plane.openHull(subset, region) ∩ region :=
   done by MetricSpace.OpenIn_cut_by_open
 
-theorem Plane.OpenIn_of_cut (subset carrier ambient : Set(Plane.Point))
-        (ambientOpen : Plane.IsOpen(ambient))
-        (cut : subset = ambient ∩ carrier)
-        : Plane.OpenIn(subset, carrier) :=
+theorem Plane.OpenIn_of_cut (subset region cuttingSet : Set(Plane.Point))
+        (cuttingSetOpen : Plane.IsOpen(cuttingSet))
+        (cut : subset = cuttingSet ∩ region)
+        : Plane.OpenIn(subset, region) :=
   done by MetricSpace.OpenIn_of_cut
 
 -- ----------------------------------------------------------------------
--- Interior, closure, boundary — all relative to the carrier.
+-- Interior, closure, boundary — all relative to the region.
 
-definition Plane.InteriorIn (subset carrier : Set(Plane.Point))
+definition Plane.InteriorIn (subset region : Set(Plane.Point))
         : Set(Plane.Point) :=
-  MetricSpace.InteriorIn(subset, carrier)
+  MetricSpace.InteriorIn(subset, region)
 
-definition Plane.ClosureIn (subset carrier : Set(Plane.Point))
+definition Plane.ClosureIn (subset region : Set(Plane.Point))
         : Set(Plane.Point) :=
-  MetricSpace.ClosureIn(subset, carrier)
+  MetricSpace.ClosureIn(subset, region)
 
-definition Plane.BoundaryIn (subset carrier : Set(Plane.Point))
+definition Plane.BoundaryIn (subset region : Set(Plane.Point))
         : Set(Plane.Point) :=
-  MetricSpace.BoundaryIn(subset, carrier)
+  MetricSpace.BoundaryIn(subset, region)
 
-theorem Plane.InteriorIn_subset (subset carrier : Set(Plane.Point))
-        : Plane.InteriorIn(subset, carrier) ⊆ subset :=
+theorem Plane.InteriorIn_subset (subset region : Set(Plane.Point))
+        : Plane.InteriorIn(subset, region) ⊆ subset :=
   done by MetricSpace.InteriorIn_subset
 
-theorem Plane.InteriorIn_OpenIn (subset carrier : Set(Plane.Point))
-        : Plane.OpenIn(Plane.InteriorIn(subset, carrier), carrier) :=
+theorem Plane.InteriorIn_OpenIn (subset region : Set(Plane.Point))
+        : Plane.OpenIn(Plane.InteriorIn(subset, region), region) :=
   done by MetricSpace.InteriorIn_OpenIn
 
-theorem Plane.subset_InteriorIn_of_OpenIn (subset carrier : Set(Plane.Point))
-        (openInCarrier : Plane.OpenIn(subset, carrier))
-        : subset ⊆ Plane.InteriorIn(subset, carrier) :=
+theorem Plane.subset_InteriorIn_of_OpenIn (subset region : Set(Plane.Point))
+        (openInRegion : Plane.OpenIn(subset, region))
+        : subset ⊆ Plane.InteriorIn(subset, region) :=
   done by MetricSpace.subset_InteriorIn_of_OpenIn
 
-theorem Plane.ClosureIn_subset_carrier (subset carrier : Set(Plane.Point))
-        : Plane.ClosureIn(subset, carrier) ⊆ carrier :=
-  done by MetricSpace.ClosureIn_subset_carrier
+theorem Plane.ClosureIn_subset_region (subset region : Set(Plane.Point))
+        : Plane.ClosureIn(subset, region) ⊆ region :=
+  done by MetricSpace.ClosureIn_subset_region
 
-theorem Plane.subset_ClosureIn (subset carrier : Set(Plane.Point))
-        (subsetInCarrier : subset ⊆ carrier)
-        : subset ⊆ Plane.ClosureIn(subset, carrier) :=
+theorem Plane.subset_ClosureIn (subset region : Set(Plane.Point))
+        (subsetInRegion : subset ⊆ region)
+        : subset ⊆ Plane.ClosureIn(subset, region) :=
   done by MetricSpace.subset_ClosureIn
 
-theorem Plane.BoundaryIn_subset_ClosureIn (subset carrier : Set(Plane.Point))
-        : Plane.BoundaryIn(subset, carrier)
-              ⊆ Plane.ClosureIn(subset, carrier) :=
+theorem Plane.BoundaryIn_subset_ClosureIn (subset region : Set(Plane.Point))
+        : Plane.BoundaryIn(subset, region)
+              ⊆ Plane.ClosureIn(subset, region) :=
   done by MetricSpace.BoundaryIn_subset_ClosureIn
 
-theorem Plane.BoundaryIn_of_OpenIn (subset carrier : Set(Plane.Point))
-        (openInCarrier : Plane.OpenIn(subset, carrier))
+theorem Plane.BoundaryIn_of_OpenIn (subset region : Set(Plane.Point))
+        (openInRegion : Plane.OpenIn(subset, region))
         (x : Plane.Point)
-        (onBoundary : x ∈ Plane.BoundaryIn(subset, carrier))
-        : x ∈ Plane.ClosureIn(subset, carrier) ∖ subset :=
+        (onBoundary : x ∈ Plane.BoundaryIn(subset, region))
+        : x ∈ Plane.ClosureIn(subset, region) ∖ subset :=
   done by MetricSpace.BoundaryIn_of_OpenIn
 
 -- ----------------------------------------------------------------------
--- Continuity, relative to a carrier.
+-- Continuity, relative to a region.
 
 definition Plane.ContinuousAt
-        (f : Plane.Point → Plane.Point) (carrier : Set(Plane.Point))
+        (f : Plane.Point → Plane.Point) (region : Set(Plane.Point))
         (x : Plane.Point) : Proposition :=
-  MetricSpace.ContinuousAt(f, carrier, x)
+  MetricSpace.ContinuousAt(f, region, x)
 
 definition Plane.ContinuousOn
-        (f : Plane.Point → Plane.Point) (carrier : Set(Plane.Point))
+        (f : Plane.Point → Plane.Point) (region : Set(Plane.Point))
         : Proposition :=
-  MetricSpace.ContinuousOn(f, carrier)
+  MetricSpace.ContinuousOn(f, region)
 
 theorem Plane.ContinuousOn.of_agreeing
-        (f g : Plane.Point → Plane.Point) (carrier : Set(Plane.Point))
-        (agree : ∀ (x : Plane.Point). x ∈ carrier → f(x) = g(x))
-        (gContinuous : Plane.ContinuousOn(g, carrier))
-        : Plane.ContinuousOn(f, carrier) :=
+        (f g : Plane.Point → Plane.Point) (region : Set(Plane.Point))
+        (agree : ∀ (x : Plane.Point). x ∈ region → f(x) = g(x))
+        (gContinuous : Plane.ContinuousOn(g, region))
+        : Plane.ContinuousOn(f, region) :=
   done by MetricSpace.ContinuousOn.of_agreeing
 
 theorem Plane.ContinuousOn.compose
         (inner outer : Plane.Point → Plane.Point)
-        (carrier target : Set(Plane.Point))
-        (innerContinuous : Plane.ContinuousOn(inner, carrier))
-        (lands : ∀ (x : Plane.Point). x ∈ carrier → inner(x) ∈ target)
-        (outerContinuous : Plane.ContinuousOn(outer, target))
-        : Plane.ContinuousOn((x : Plane.Point) ↦ outer(inner(x)), carrier) :=
+        (region middleRegion : Set(Plane.Point))
+        (innerContinuous : Plane.ContinuousOn(inner, region))
+        (lands : ∀ (x : Plane.Point). x ∈ region → inner(x) ∈ middleRegion)
+        (outerContinuous : Plane.ContinuousOn(outer, middleRegion))
+        : Plane.ContinuousOn((x : Plane.Point) ↦ outer(inner(x)), region) :=
   done by MetricSpace.ContinuousOn.compose
 
 theorem Plane.ContinuousOn.restrict

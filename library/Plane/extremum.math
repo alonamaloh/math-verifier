@@ -54,36 +54,36 @@ import Plane.separation
 -- target space, where the target distance IS `abs` of the difference.
 
 definition Plane.RealContinuousAt
-        (f : Plane.Point → ℝ) (carrier : Set(Plane.Point))
+        (f : Plane.Point → ℝ) (region : Set(Plane.Point))
         (x : Plane.Point) : Proposition :=
-  MetricSpace.ContinuousAt(f, carrier, x)
+  MetricSpace.ContinuousAt(f, region, x)
 
 definition Plane.RealContinuousOn
-        (f : Plane.Point → ℝ) (carrier : Set(Plane.Point)) : Proposition :=
-  MetricSpace.ContinuousOn(f, carrier)
+        (f : Plane.Point → ℝ) (region : Set(Plane.Point)) : Proposition :=
+  MetricSpace.ContinuousOn(f, region)
 
 theorem Plane.RealContinuousOn.negate
-        (f : Plane.Point → ℝ) (carrier : Set(Plane.Point))
-        (continuous : Plane.RealContinuousOn(f, carrier))
-        : Plane.RealContinuousOn((x : Plane.Point) ↦ -f(x), carrier) := {
+        (f : Plane.Point → ℝ) (region : Set(Plane.Point))
+        (continuous : Plane.RealContinuousOn(f, region))
+        : Plane.RealContinuousOn((x : Plane.Point) ↦ -f(x), region) := {
   take x : Plane.Point;
-  suppose x ∈ carrier as inCarrier;
+  suppose x ∈ region as inRegion;
   take tolerance : ℝ;
   suppose 0 < tolerance;
   choose nearness such that
       0 < nearness ∧
-      ∀ (y : Plane.Point). y ∈ carrier →
+      ∀ (y : Plane.Point). y ∈ region →
         Plane.distance(x, y) < nearness → abs(f(y) - f(x)) < tolerance
       from continuous;
   0 < nearness;
-  ∀ (y : Plane.Point). y ∈ carrier →
+  ∀ (y : Plane.Point). y ∈ region →
       Plane.distance(x, y) < nearness → abs(f(y) - f(x)) < tolerance
       as valuesClose;
   witness nearness with {
     0 < nearness;
-    ∀ (y : Plane.Point). y ∈ carrier →
+    ∀ (y : Plane.Point). y ∈ region →
         Plane.distance(x, y) < nearness → abs(-f(y) - -f(x)) < tolerance
-        by (y : Plane.Point) (inCarrierY : y ∈ carrier)
+        by (y : Plane.Point) (inRegionY : y ∈ region)
            (near : Plane.distance(x, y) < nearness) ↦ {
              abs(f(y) - f(x)) < tolerance by valuesClose;
              -f(x) - -f(y) = -(f(x) - f(y)) by ring;
@@ -97,28 +97,28 @@ theorem Plane.RealContinuousOn.negate
   }
 }
 
--- Continuity is sequential: a sequence in the carrier converging to a
+-- Continuity is sequential: a sequence in the region converging to a
 -- point of it has its values converging to the value there.
 theorem Plane.RealContinuousAt.along_sequence
-        (f : Plane.Point → ℝ) (carrier : Set(Plane.Point))
-        (x : Plane.Point) (continuous : Plane.RealContinuousAt(f, carrier, x))
-        (s : ℕ → Plane.Point) (inside : ∀ (m : ℕ). s(m) ∈ carrier)
+        (f : Plane.Point → ℝ) (region : Set(Plane.Point))
+        (x : Plane.Point) (continuous : Plane.RealContinuousAt(f, region, x))
+        (s : ℕ → Plane.Point) (inside : ∀ (m : ℕ). s(m) ∈ region)
         (converges : Plane.SequenceConverges(s, x))
         : Real.SequenceConverges((m : ℕ) ↦ f(s(m)), f(x)) := {
   take tolerance : ℝ;
   suppose tolerance > 0;
   choose nearness such that
       0 < nearness ∧
-      ∀ (y : Plane.Point). y ∈ carrier →
+      ∀ (y : Plane.Point). y ∈ region →
         Plane.distance(x, y) < nearness → abs(f(y) - f(x)) < tolerance
       from continuous;
   nearness > 0;
-  ∀ (y : Plane.Point). y ∈ carrier →
+  ∀ (y : Plane.Point). y ∈ region →
       Plane.distance(x, y) < nearness → abs(f(y) - f(x)) < tolerance
       as valuesClose;
   eventually (m). Plane.distance(x, s(m)) < nearness by converges;
   for m sufficiently large: {
-    s(m) ∈ carrier by inside;
+    s(m) ∈ region by inside;
     abs(f(s(m)) - f(x)) < tolerance by valuesClose;
     done
   }
@@ -374,8 +374,8 @@ theorem Plane.attains_minimum (f : Plane.Point → ℝ)
 -- as the target space.
 
 definition Plane.UniformlyContinuousOn
-        (f : Plane.Point → ℝ) (carrier : Set(Plane.Point)) : Proposition :=
-  MetricSpace.UniformlyContinuousOn(f, carrier)
+        (f : Plane.Point → ℝ) (region : Set(Plane.Point)) : Proposition :=
+  MetricSpace.UniformlyContinuousOn(f, region)
 
 theorem Plane.uniformly_continuous_on_compact
         (f : Plane.Point → ℝ) (region : Set(Plane.Point))
