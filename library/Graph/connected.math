@@ -1,0 +1,147 @@
+-- Graph/connected.math
+--
+-- Reachability and connectedness. Layer 5 of PLAN_JORDAN_SCHOENFLIES.md.
+--
+-- One vertex reaches another when some walk runs between them. Stated
+-- with a walk rather than a path because walks are what arguments build —
+-- they concatenate and reverse without a side condition — and a path is
+-- recovered whenever one is wanted (`Graph.Reaches.path`).
+--
+-- A connected graph is a nonempty one in which every vertex reaches every
+-- other. The emptiness clause is not bureaucracy: it is what makes the
+-- counting statements about trees true as stated.
+
+module Graph.connected
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Equality.basics
+import Set.basics
+import Lists.list
+import Lists.append
+import Graph.basics
+import Graph.walk
+import Graph.path
+
+convention V : Type(0)
+convention E : Type(0)
+convention ends : E → Pair(V, V)
+
+definition Graph.Reaches (graph : Graph(V, E, ends)) (source target : V) : Proposition :=
+  ∃ (edgeList : List(E)). Graph.IsWalk(graph, source, edgeList, target)
+
+theorem Graph.Reaches.reflexive (graph : Graph(V, E, ends)) (vertex : V)
+        : Graph.Reaches(graph, vertex, vertex) := {
+  Graph.IsWalk(graph, vertex, List.empty(E), vertex) by Graph.IsWalk.empty;
+  witness List.empty(E)
+}
+
+theorem Graph.Reaches.symmetric (graph : Graph(V, E, ends)) (source target : V)
+        (reaches : Graph.Reaches(graph, source, target))
+        : Graph.Reaches(graph, target, source) := {
+  choose edgeList : List(E) such that Graph.IsWalk(graph, source, edgeList, target)
+      from reaches;
+  choose reversed : List(E) such that Graph.IsWalk(graph, target, reversed, source)
+      from Graph.IsWalk.reverse;
+  witness reversed
+}
+
+theorem Graph.Reaches.transitive (graph : Graph(V, E, ends)) (source middle target : V)
+        (toMiddle : Graph.Reaches(graph, source, middle))
+        (fromMiddle : Graph.Reaches(graph, middle, target))
+        : Graph.Reaches(graph, source, target) := {
+  choose firstEdges : List(E) such that Graph.IsWalk(graph, source, firstEdges, middle)
+      from toMiddle;
+  choose secondEdges : List(E) such that Graph.IsWalk(graph, middle, secondEdges, target)
+      from fromMiddle;
+  Graph.IsWalk(graph, source, List.append(firstEdges, secondEdges), target)
+      by Graph.IsWalk.append;
+  witness List.append(firstEdges, secondEdges)
+}
+
+theorem Graph.Reaches.of_adjacent (graph : Graph(V, E, ends)) (source target : V)
+        (adjacent : Graph.Adjacent(graph, source, target))
+        : Graph.Reaches(graph, source, target) := {
+  choose edge : E such that
+      edge ∈ Graph.edges(graph) ∧ Graph.Joins(graph, edge, source, target)
+      from adjacent;
+  edge ∈ Graph.edges(graph);
+  Graph.Joins(graph, edge, source, target);
+  Graph.IsWalk(graph, source, List.prepend(E, edge, List.empty(E)), target)
+      by Graph.IsWalk.single;
+  witness List.prepend(E, edge, List.empty(E))
+}
+
+-- Whatever a walk reaches, a path reaches.
+theorem Graph.Reaches.path (graph : Graph(V, E, ends)) (source target : V)
+        (reaches : Graph.Reaches(graph, source, target))
+        : ∃ (pathEdges : List(E)). Graph.IsPath(graph, source, pathEdges, target) := {
+  choose edgeList : List(E) such that Graph.IsWalk(graph, source, edgeList, target)
+      from reaches;
+  choose pathEdges : List(E) such that
+      Graph.IsPath(graph, source, pathEdges, target)
+      ∧ ∀ (edge : E). edge ∈ pathEdges → edge ∈ edgeList
+      from Graph.IsWalk.contains_path;
+  Graph.IsPath(graph, source, pathEdges, target);
+  witness pathEdges
+}
+
+theorem Graph.Reaches.stays_in_graph (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph)) (source target : V)
+        (sourceIsVertex : source ∈ Graph.vertices(graph))
+        (reaches : Graph.Reaches(graph, source, target))
+        : target ∈ Graph.vertices(graph) := {
+  choose edgeList : List(E) such that Graph.IsWalk(graph, source, edgeList, target)
+      from reaches;
+  target ∈ Graph.walkVertices(graph, source, edgeList) by Graph.IsWalk.target_is_visited;
+  ∀ (vertex : V). vertex ∈ Graph.walkVertices(graph, source, edgeList)
+      → vertex ∈ Graph.vertices(graph)
+      by Graph.IsWalk.visits_vertices as walkStaysInGraph;
+  done by walkStaysInGraph
+}
+
+-- ----------------------------------------------------------------------
+-- Connectedness.
+
+definition Graph.IsConnected (graph : Graph(V, E, ends)) : Proposition :=
+  (∃ (vertex : V). vertex ∈ Graph.vertices(graph))
+  ∧ ∀ (u v : V). u ∈ Graph.vertices(graph) → v ∈ Graph.vertices(graph)
+      → Graph.Reaches(graph, u, v)
+
+theorem Graph.IsConnected.reaches (graph : Graph(V, E, ends))
+        (connected : Graph.IsConnected(graph)) (u v : V)
+        (uIsVertex : u ∈ Graph.vertices(graph))
+        (vIsVertex : v ∈ Graph.vertices(graph))
+        : Graph.Reaches(graph, u, v) := {
+  ∀ (x y : V). x ∈ Graph.vertices(graph) → y ∈ Graph.vertices(graph)
+      → Graph.Reaches(graph, x, y) as everyPair;
+  done by everyPair(u, v)
+}
+
+theorem Graph.IsConnected.has_vertex (graph : Graph(V, E, ends))
+        (connected : Graph.IsConnected(graph))
+        : ∃ (vertex : V). vertex ∈ Graph.vertices(graph) :=
+  done
+
+-- A graph is connected as soon as some one vertex reaches all the others:
+-- reachability is symmetric and transitive, so a common hub joins every
+-- pair.
+theorem Graph.IsConnected.from_hub (graph : Graph(V, E, ends)) (hub : V)
+        (hubIsVertex : hub ∈ Graph.vertices(graph))
+        (hubReaches : ∀ (vertex : V). vertex ∈ Graph.vertices(graph)
+            → Graph.Reaches(graph, hub, vertex))
+        : Graph.IsConnected(graph) := {
+  ∃ (vertex : V). vertex ∈ Graph.vertices(graph) by { witness hub };
+  ∀ (u v : V). u ∈ Graph.vertices(graph) → v ∈ Graph.vertices(graph)
+      → Graph.Reaches(graph, u, v)
+      by { take u : V;
+           take v : V;
+           suppose u ∈ Graph.vertices(graph);
+           suppose v ∈ Graph.vertices(graph);
+           Graph.Reaches(graph, hub, u) by hubReaches;
+           Graph.Reaches(graph, u, hub) by Graph.Reaches.symmetric;
+           Graph.Reaches(graph, hub, v) by hubReaches;
+           done by Graph.Reaches.transitive(middle := hub) };
+  done
+}
