@@ -254,7 +254,9 @@ theorem Graph.IsPath.split (graph : Graph(V, E, ends)) (source target : V)
         : ∃ (prefixEdges : List(E)). ∃ (suffixEdges : List(E)).
             edgeList = List.append(prefixEdges, suffixEdges)
             ∧ Graph.IsPath(graph, source, prefixEdges, vertex)
-            ∧ Graph.IsPath(graph, vertex, suffixEdges, target) :=
+            ∧ Graph.IsPath(graph, vertex, suffixEdges, target)
+            ∧ (vertex = source
+                 ∨ ¬(source ∈ Graph.walkVertices(graph, vertex, suffixEdges))) :=
   by induction on path with IH {
     case Graph.IsPathOver.arrived(endpoint): {
         done by cases {
@@ -265,7 +267,9 @@ theorem Graph.IsPath.split (graph : Graph(V, E, ends)) (source target : V)
               Graph.IsPath(graph, vertex, List.empty(E), endpoint)
                   by substituting (vertex = endpoint);
               List.empty(E) = List.append(List.empty(E), List.empty(E));
-              witness List.empty(E) with witness List.empty(E)
+              vertex = endpoint
+                  ∨ ¬(endpoint ∈ Graph.walkVertices(graph, vertex, List.empty(E)));
+              witness List.empty(E) with witness List.empty(E) with done
             }
           case vertex ∈ Graph.coveredVertices(graph, List.empty(E)): {
               ¬(vertex ∈ Graph.coveredVertices(graph, List.empty(E)))
@@ -290,6 +294,9 @@ theorem Graph.IsPath.split (graph : Graph(V, E, ends)) (source target : V)
                   by substituting (vertex = stepSource);
               List.prepend(E, edge, rest)
                  = List.append(List.empty(E), List.prepend(E, edge, rest));
+              vertex = stepSource
+                  ∨ ¬(stepSource ∈ Graph.walkVertices(graph, vertex,
+                          List.prepend(E, edge, rest)));
               witness List.empty(E) with witness List.prepend(E, edge, rest)
             }
           case vertex ∈ Graph.walkVertices(graph, waypoint, rest): {
@@ -297,6 +304,8 @@ theorem Graph.IsPath.split (graph : Graph(V, E, ends)) (source target : V)
                   rest = List.append(earlyEdges, lateEdges)
                   ∧ Graph.IsPath(graph, waypoint, earlyEdges, vertex)
                   ∧ Graph.IsPath(graph, vertex, lateEdges, stepTarget)
+                  ∧ (vertex = waypoint
+                       ∨ ¬(waypoint ∈ Graph.walkVertices(graph, vertex, lateEdges)))
                   from IH;
               rest = List.append(earlyEdges, lateEdges) as restSplits;
               Graph.IsPath(graph, waypoint, earlyEdges, vertex);
@@ -320,6 +329,29 @@ theorem Graph.IsPath.split (graph : Graph(V, E, ends)) (source target : V)
                  = List.prepend(E, edge, List.append(earlyEdges, lateEdges))
                        by substituting restSplits
                  = List.append(List.prepend(E, edge, earlyEdges), lateEdges);
+              -- The late edges are among the rest, which the step's
+              -- departure vertex already avoided.
+              ∀ (candidate : E). candidate ∈ lateEdges → candidate ∈ rest
+                  by { take candidate : E;
+                       suppose candidate ∈ lateEdges;
+                       candidate ∈ List.append(earlyEdges, lateEdges)
+                           by List.member_append_right;
+                       done by substituting restSplits };
+              ¬(stepSource ∈ Graph.walkVertices(graph, vertex, lateEdges))
+                  by { suppose stepSource ∈ Graph.walkVertices(graph, vertex, lateEdges);
+                       done by cases {
+                         case stepSource = vertex: {
+                             stepSource ∈ Graph.walkVertices(graph, waypoint, rest)
+                                 by substituting (stepSource = vertex);
+                             done
+                           }
+                         case stepSource ∈ Graph.coveredVertices(graph, lateEdges): {
+                             stepSource ∈ Graph.coveredVertices(graph, rest)
+                                 by Graph.coveredVertices.monotone;
+                             stepSource ∈ Graph.walkVertices(graph, waypoint, rest);
+                             done
+                           }
+                       } };
               witness List.prepend(E, edge, earlyEdges) with witness lateEdges
             }
         }
