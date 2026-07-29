@@ -9,10 +9,10 @@
 -- ORDER is part of the claim, which is what lets every later argument
 -- split the path without first having to sort it.
 --
--- What the ear argument asks of a path graph is always the same: from any
--- of its vertices, reach one of its two ends without passing through the
--- other. That is `reaches_far_end` and its mirror, and the mirror is why
--- `Graph.IsPath.reverse` had to be proved.
+-- What the ear argument asks of a path graph is always the same: whatever
+-- vertex is deleted, every remaining vertex still reaches one of the two
+-- ends. That is `reaches_an_end`, and the work behind it is the interior
+-- case, where the deletion cuts the path in two.
 
 module Graph.pathgraph
 
@@ -101,28 +101,9 @@ theorem Graph.IsPathGraph.reaches_far_end (pathGraph : Graph(V, E, ends))
       by Graph.IsPathGraph.path;
   vertex ∈ Graph.walkVertices(pathGraph, source, Graph.edges(pathGraph))
       by Graph.IsPathGraph.visits;
-  choose prefixEdges, suffixEdges such that
-      Graph.edges(pathGraph) = List.append(prefixEdges, suffixEdges)
-      ∧ Graph.IsPath(pathGraph, source, prefixEdges, vertex)
-      ∧ Graph.IsPath(pathGraph, vertex, suffixEdges, target)
-      ∧ (vertex = source
-           ∨ ¬(source ∈ Graph.walkVertices(pathGraph, vertex, suffixEdges)))
-      from Graph.IsPath.split;
-  Graph.IsPath(pathGraph, vertex, suffixEdges, target);
-  vertex = source ∨ ¬(source ∈ Graph.walkVertices(pathGraph, vertex, suffixEdges));
-  ¬(source ∈ Graph.walkVertices(pathGraph, vertex, suffixEdges))
-      by cases {
-        case vertex = source: done
-        case ¬(source ∈ Graph.walkVertices(pathGraph, vertex, suffixEdges)): done
-      };
-  Graph.IsWalk(pathGraph, vertex, suffixEdges, target) by Graph.IsPath.walk;
-  Graph.IsWalk(Graph.deleteVertex(pathGraph, source), vertex, suffixEdges, target)
-      by Graph.IsWalk.avoiding_vertex;
-  witness suffixEdges
+  done by Graph.IsPath.reaches_target_avoiding_source
 }
 
--- The mirror, through the reversed path: the reversal visits the same
--- vertices, so the same split argument runs from the other end.
 theorem Graph.IsPathGraph.reaches_near_end (pathGraph : Graph(V, E, ends))
         (source target : V)
         (isPathGraph : Graph.IsPathGraph(pathGraph, source, target))
@@ -132,41 +113,9 @@ theorem Graph.IsPathGraph.reaches_near_end (pathGraph : Graph(V, E, ends))
         : Graph.Reaches(Graph.deleteVertex(pathGraph, target), vertex, source) := {
   Graph.IsPath(pathGraph, source, Graph.edges(pathGraph), target)
       by Graph.IsPathGraph.path;
-  choose reversed such that
-      Graph.IsPath(pathGraph, target, reversed, source)
-      ∧ (∀ (candidate : V).
-           candidate ∈ Graph.walkVertices(pathGraph, target, reversed)
-           → candidate ∈ Graph.walkVertices(pathGraph, source, Graph.edges(pathGraph)))
-      ∧ (∀ (candidate : V).
-           candidate ∈ Graph.walkVertices(pathGraph, source, Graph.edges(pathGraph))
-           → candidate ∈ Graph.walkVertices(pathGraph, target, reversed))
-      from Graph.IsPath.reverse;
-  Graph.IsPath(pathGraph, target, reversed, source);
-  ∀ (candidate : V).
-      candidate ∈ Graph.walkVertices(pathGraph, source, Graph.edges(pathGraph))
-      → candidate ∈ Graph.walkVertices(pathGraph, target, reversed) as forwardVisits;
-  vertex ∈ Graph.walkVertices(pathGraph, target, reversed)
-      by { vertex ∈ Graph.walkVertices(pathGraph, source, Graph.edges(pathGraph))
-               by Graph.IsPathGraph.visits;
-           done by forwardVisits };
-  choose prefixEdges, suffixEdges such that
-      reversed = List.append(prefixEdges, suffixEdges)
-      ∧ Graph.IsPath(pathGraph, target, prefixEdges, vertex)
-      ∧ Graph.IsPath(pathGraph, vertex, suffixEdges, source)
-      ∧ (vertex = target
-           ∨ ¬(target ∈ Graph.walkVertices(pathGraph, vertex, suffixEdges)))
-      from Graph.IsPath.split;
-  Graph.IsPath(pathGraph, vertex, suffixEdges, source);
-  vertex = target ∨ ¬(target ∈ Graph.walkVertices(pathGraph, vertex, suffixEdges));
-  ¬(target ∈ Graph.walkVertices(pathGraph, vertex, suffixEdges))
-      by cases {
-        case vertex = target: done
-        case ¬(target ∈ Graph.walkVertices(pathGraph, vertex, suffixEdges)): done
-      };
-  Graph.IsWalk(pathGraph, vertex, suffixEdges, source) by Graph.IsPath.walk;
-  Graph.IsWalk(Graph.deleteVertex(pathGraph, target), vertex, suffixEdges, source)
-      by Graph.IsWalk.avoiding_vertex;
-  witness suffixEdges
+  vertex ∈ Graph.walkVertices(pathGraph, source, Graph.edges(pathGraph))
+      by Graph.IsPathGraph.visits;
+  done by Graph.IsPath.reaches_source_avoiding_target
 }
 
 -- ----------------------------------------------------------------------
@@ -261,4 +210,93 @@ theorem Graph.IsPathGraph.halves (pathGraph : Graph(V, E, ends)) (source target 
                }
            } };
   witness prefixEdges with witness suffixEdges
+}
+
+-- Whatever vertex is deleted, every remaining vertex of the path still
+-- reaches one of the two ends. Four situations, and the interior one is
+-- the only one with content: the deleted vertex cuts the path in two, and
+-- each remaining vertex sits on a piece that still runs to an end.
+theorem Graph.IsPathGraph.reaches_an_end (pathGraph : Graph(V, E, ends))
+        (source target : V)
+        (isPathGraph : Graph.IsPathGraph(pathGraph, source, target))
+        (cut vertex : V)
+        (isVertex : vertex ∈ Graph.vertices(pathGraph))
+        (distinctFromCut : ¬(vertex = cut))
+        (wellFormed : Graph.IsWellFormed(pathGraph))
+        : Graph.Reaches(Graph.deleteVertex(pathGraph, cut), vertex, source)
+          ∨ Graph.Reaches(Graph.deleteVertex(pathGraph, cut), vertex, target) := {
+  Graph.IsPath(pathGraph, source, Graph.edges(pathGraph), target)
+      by Graph.IsPathGraph.path;
+  done by cases {
+    case cut = source: {
+        ¬(vertex = source) by substituting (cut = source);
+        Graph.Reaches(Graph.deleteVertex(pathGraph, source), vertex, target)
+            by Graph.IsPathGraph.reaches_far_end;
+        Graph.Reaches(Graph.deleteVertex(pathGraph, cut), vertex, target)
+            by substituting (cut = source);
+        done
+      }
+    case cut = target: {
+        ¬(vertex = target) by substituting (cut = target);
+        Graph.Reaches(Graph.deleteVertex(pathGraph, target), vertex, source)
+            by Graph.IsPathGraph.reaches_near_end;
+        Graph.Reaches(Graph.deleteVertex(pathGraph, cut), vertex, source)
+            by substituting (cut = target);
+        done
+      }
+    otherwise: {
+        done by cases {
+          case cut ∈ Graph.vertices(pathGraph): {
+              choose prefixEdges, suffixEdges such that
+                  Graph.IsPath(pathGraph, source, prefixEdges, cut)
+                  ∧ Graph.IsPath(pathGraph, cut, suffixEdges, target)
+                  ∧ ∀ (candidate : V). candidate ∈ Graph.vertices(pathGraph)
+                      → candidate ∈ Graph.walkVertices(pathGraph, source, prefixEdges)
+                        ∨ candidate ∈ Graph.walkVertices(pathGraph, cut, suffixEdges)
+                  from Graph.IsPathGraph.halves(cut := cut);
+              Graph.IsPath(pathGraph, source, prefixEdges, cut);
+              Graph.IsPath(pathGraph, cut, suffixEdges, target);
+              ∀ (candidate : V). candidate ∈ Graph.vertices(pathGraph)
+                  → candidate ∈ Graph.walkVertices(pathGraph, source, prefixEdges)
+                    ∨ candidate ∈ Graph.walkVertices(pathGraph, cut, suffixEdges)
+                  as onSomeHalf;
+              vertex ∈ Graph.walkVertices(pathGraph, source, prefixEdges)
+                  ∨ vertex ∈ Graph.walkVertices(pathGraph, cut, suffixEdges)
+                  by onSomeHalf(vertex);
+              done by cases {
+                case vertex ∈ Graph.walkVertices(pathGraph, source, prefixEdges): {
+                    Graph.Reaches(Graph.deleteVertex(pathGraph, cut), vertex, source)
+                        by Graph.IsPath.reaches_source_avoiding_target;
+                    done
+                  }
+                case vertex ∈ Graph.walkVertices(pathGraph, cut, suffixEdges): {
+                    Graph.Reaches(Graph.deleteVertex(pathGraph, cut), vertex, target)
+                        by Graph.IsPath.reaches_target_avoiding_source;
+                    done
+                  }
+              }
+            }
+          otherwise: {
+              -- The cut is not a vertex of the path at all, so the path is
+              -- untouched and still runs from the vertex to its source.
+              ¬(cut ∈ Graph.vertices(pathGraph));
+              Graph.IsConnected(pathGraph) by Graph.IsPathGraph.IsConnected;
+              Graph.IsConnected(Graph.deleteVertex(pathGraph, cut))
+                  by Graph.IsConnected.after_outside_deletion;
+              source ∈ Graph.vertices(pathGraph) by Graph.IsPathGraph.source_is_vertex;
+              ¬(source = cut)
+                  by { suppose source = cut;
+                       cut ∈ Graph.vertices(pathGraph) by substituting (source = cut);
+                       done };
+              source ∈ Graph.vertices(Graph.deleteVertex(pathGraph, cut))
+                  by Graph.deleteVertex.keeps_vertex;
+              vertex ∈ Graph.vertices(Graph.deleteVertex(pathGraph, cut))
+                  by Graph.deleteVertex.keeps_vertex;
+              Graph.Reaches(Graph.deleteVertex(pathGraph, cut), vertex, source)
+                  by Graph.IsConnected.reaches;
+              done
+            }
+        }
+      }
+  }
 }

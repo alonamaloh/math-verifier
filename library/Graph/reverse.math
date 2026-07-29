@@ -25,6 +25,8 @@ import Lists.append
 import Graph.basics
 import Graph.walk
 import Graph.path
+import Graph.connected
+import Graph.vertex_deletion
 
 convention V : Type(0)
 convention E : Type(0)
@@ -286,3 +288,55 @@ theorem Graph.IsPath.reverse (graph : Graph(V, E, ends)) (source target : V)
         witness List.append(reversedRest, List.prepend(E, edge, List.empty(E)))
       }
   }
+
+-- ----------------------------------------------------------------------
+-- Reaching one end of a path without passing through the other.
+--
+-- The vertex is on the path, so the path splits there; the piece beyond
+-- it never returns to the far side, which is what the split's last clause
+-- says. The second lemma is the first one run on the reversed path.
+
+theorem Graph.IsPath.reaches_target_avoiding_source (graph : Graph(V, E, ends))
+        (source target vertex : V) (edgeList : List(E))
+        (path : Graph.IsPath(graph, source, edgeList, target))
+        (visited : vertex ∈ Graph.walkVertices(graph, source, edgeList))
+        (distinctFromSource : ¬(vertex = source))
+        : Graph.Reaches(Graph.deleteVertex(graph, source), vertex, target) := {
+  choose prefixEdges, suffixEdges such that
+      edgeList = List.append(prefixEdges, suffixEdges)
+      ∧ Graph.IsPath(graph, source, prefixEdges, vertex)
+      ∧ Graph.IsPath(graph, vertex, suffixEdges, target)
+      ∧ (vertex = source ∨ ¬(source ∈ Graph.walkVertices(graph, vertex, suffixEdges)))
+      from Graph.IsPath.split;
+  Graph.IsPath(graph, vertex, suffixEdges, target);
+  vertex = source ∨ ¬(source ∈ Graph.walkVertices(graph, vertex, suffixEdges));
+  ¬(source ∈ Graph.walkVertices(graph, vertex, suffixEdges))
+      by cases {
+        case vertex = source: done
+        case ¬(source ∈ Graph.walkVertices(graph, vertex, suffixEdges)): done
+      };
+  Graph.IsWalk(graph, vertex, suffixEdges, target) by Graph.IsPath.walk;
+  Graph.IsWalk(Graph.deleteVertex(graph, source), vertex, suffixEdges, target)
+      by Graph.IsWalk.avoiding_vertex;
+  witness suffixEdges
+}
+
+theorem Graph.IsPath.reaches_source_avoiding_target (graph : Graph(V, E, ends))
+        (source target vertex : V) (edgeList : List(E))
+        (path : Graph.IsPath(graph, source, edgeList, target))
+        (visited : vertex ∈ Graph.walkVertices(graph, source, edgeList))
+        (distinctFromTarget : ¬(vertex = target))
+        : Graph.Reaches(Graph.deleteVertex(graph, target), vertex, source) := {
+  choose reversed such that
+      Graph.IsPath(graph, target, reversed, source)
+      ∧ (∀ (candidate : V). candidate ∈ Graph.walkVertices(graph, target, reversed)
+           → candidate ∈ Graph.walkVertices(graph, source, edgeList))
+      ∧ (∀ (candidate : V). candidate ∈ Graph.walkVertices(graph, source, edgeList)
+           → candidate ∈ Graph.walkVertices(graph, target, reversed))
+      from Graph.IsPath.reverse;
+  Graph.IsPath(graph, target, reversed, source);
+  ∀ (candidate : V). candidate ∈ Graph.walkVertices(graph, source, edgeList)
+      → candidate ∈ Graph.walkVertices(graph, target, reversed) as forwardVisits;
+  vertex ∈ Graph.walkVertices(graph, target, reversed) by forwardVisits(vertex);
+  done by Graph.IsPath.reaches_target_avoiding_source(edgeList := reversed)
+}

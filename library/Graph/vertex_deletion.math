@@ -286,3 +286,34 @@ theorem Graph.IsConnected.after_outside_deletion (graph : Graph(V, E, ends))
            witness edgeList };
   done by Graph.IsConnected.from_hub(hub := someVertex)
 }
+
+-- Nothing reaches the vertex that was deleted, except by standing on it
+-- already: a walk that arrives there had to take an edge there, and those
+-- edges are gone.
+theorem Graph.Reaches.not_to_deleted (graph : Graph(V, E, ends)) (vertex source : V)
+        (distinct : ¬(source = vertex))
+        : ¬Graph.Reaches(Graph.deleteVertex(graph, vertex), source, vertex) := {
+  suppose Graph.Reaches(Graph.deleteVertex(graph, vertex), source, vertex);
+  choose edgeList such that
+      Graph.IsWalk(Graph.deleteVertex(graph, vertex), source, edgeList, vertex);
+  vertex ∈ Graph.walkVertices(Graph.deleteVertex(graph, vertex), source, edgeList)
+      by Graph.IsWalk.target_is_visited;
+  ∀ (candidate : E). candidate ∈ edgeList
+      → candidate ∈ Graph.edges(Graph.deleteVertex(graph, vertex))
+      by Graph.IsWalk.edge_is_edge as walkEdgesSurvive;
+  done by cases {
+    case vertex = source: {
+        source = vertex;
+        done
+      }
+    case vertex ∈ Graph.coveredVertices(Graph.deleteVertex(graph, vertex), edgeList): {
+        choose usedEdge such that usedEdge ∈ edgeList
+            ∧ Graph.Incident(Graph.deleteVertex(graph, vertex), usedEdge, vertex);
+        usedEdge ∈ edgeList;
+        Graph.Incident(graph, usedEdge, vertex);
+        usedEdge ∈ Graph.edges(Graph.deleteVertex(graph, vertex)) by walkEdgesSurvive;
+        ¬Graph.Incident(graph, usedEdge, vertex) by Graph.deleteVertex.edge_avoids;
+        done
+      }
+  }
+}
