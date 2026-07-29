@@ -22,6 +22,8 @@ import Logic.product
 import Equality.basics
 import Set.basics
 import Lists.list
+import Lists.length
+import Lists.remove
 import Graph.basics
 import Graph.walk
 
@@ -379,3 +381,18 @@ theorem Graph.IsPath.distinct_edges (graph : Graph(V, E, ends)) (source target :
         done by List.Distinct.prepend
       }
   }
+
+-- Hence a path is no longer than the graph it runs in: its edges are
+-- distinct edges of the graph, and a list without repetitions cannot
+-- outrun a list holding all of its elements.
+theorem Graph.IsPath.length_le_size (graph : Graph(V, E, ends)) (source target : V)
+        (edgeList : List(E))
+        (path : Graph.IsPath(graph, source, edgeList, target))
+        : length(edgeList) ≤ Graph.size(graph) := {
+  List.Distinct(E, edgeList) by Graph.IsPath.distinct_edges;
+  ∀ (edge : E). edge ∈ edgeList → edge ∈ Graph.edges(graph)
+      by Graph.IsPath.edge_is_edge;
+  length(edgeList) ≤ length(Graph.edges(graph))
+      by List.length_le_of_distinct_inclusion;
+  done
+}

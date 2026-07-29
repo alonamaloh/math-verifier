@@ -257,3 +257,48 @@ theorem List.length_remove_member (A : Type(0)) (x : A) (list : List(A))
           }
         }
   }
+
+-- ── Counting ──────────────────────────────────────────────────────────
+
+-- A list without repetitions is no longer than any list holding all of its
+-- elements. The head uses up one position of the larger list, and what is
+-- left of it still holds the whole tail — nothing in the tail is the head,
+-- because the smaller list repeats nothing.
+theorem List.length_le_of_distinct_inclusion (A : Type(0)) (small : List(A))
+        (distinct : List.Distinct(A, small))
+        : ∀ (big : List(A)).
+            (∀ (element : A). element ∈ small → element ∈ big)
+            → length(small) ≤ length(big) :=
+  by induction on small with IH {
+    case small = List.empty: {
+        take big : List(A);
+        suppose ∀ (element : A). element ∈ List.empty(A) → element ∈ big;
+        length(List.empty(A))
+           = 0
+           ≤ length(big)
+      }
+    case small = List.prepend(head, tail) for some head, tail: {
+        take big : List(A);
+        suppose ∀ (element : A). element ∈ List.prepend(A, head, tail) → element ∈ big;
+        head ∈ List.prepend(A, head, tail);
+        head ∈ big;
+        length(big) = 1 + length(big ∖ head) by List.length_remove_member;
+        ¬(head ∈ tail) by List.Distinct.head_not_member;
+        List.Distinct(A, tail) by List.Distinct.tail_distinct;
+        ∀ (element : A). element ∈ tail → element ∈ big ∖ head
+            by { take element : A;
+                 suppose element ∈ tail;
+                 element ∈ List.prepend(A, head, tail);
+                 element ∈ big;
+                 ¬(element = head)
+                     by { suppose element = head;
+                          head ∈ tail;
+                          done };
+                 done by List.remove_member_complete };
+        length(tail) ≤ length(big ∖ head) by IH;
+        length(List.prepend(A, head, tail))
+           = 1 + length(tail)
+           ≤ 1 + length(big ∖ head)
+           = length(big)
+      }
+  }

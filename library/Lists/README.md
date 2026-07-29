@@ -26,6 +26,8 @@ needed.
 - Ranges: `List.range_down_complete`, `List.range_up_complete`,
   `List.range_down_distinct`, and `List.range_up_distinct`
 - Pair cancellation: `List.product_one_of_paired_inverses`
+- Counting: `List.length_le_of_distinct_inclusion` — a list without
+  repetitions is no longer than any list holding all of its elements
 
 `filter` and `remove` use classical decisions and publish characterizing
 equations; reason through those theorems rather than unfolding their bodies.

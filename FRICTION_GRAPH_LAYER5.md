@@ -346,3 +346,63 @@ separately from the path-graph version); scope the competing fact inside a
 
 **Suggested fix.** Try the conclusion match before the premise search, and
 only report ambiguity for arguments the conclusion leaves open.
+
+---
+
+## G9 — `generalizing` silently drops every hypothesis about the scrutinee
+
+**Symptom.** `by induction on <x> with IH generalizing <y>` produces an
+induction whose motive has lost every premise. Auto-generalization — the
+documented behaviour that a hypothesis mentioning the inducted variable is
+reverted into the motive — does not happen at all once `generalizing` is
+present. The arm then fails far from the cause, with the auto-prover
+reporting "no in-scope hypothesis matches" for a fact the theorem assumed.
+
+**Minimal repro.** The two differ only in `generalizing m`, and
+`hypothesis` does not mention `m` at all:
+
+```math
+theorem Probe.generalizingWithScrutineeHypothesis (n m : ℕ) (hypothesis : n ≤ 0)
+        : n ≤ m :=
+  by induction on n with IH generalizing m {
+    case n = 0: sorry
+    case n = 1 + k: sorry
+  }
+```
+
+`--goal-at` in the `1 + k` arm:
+
+```
+  IH : (m : Natural) → k ≤ m          -- the `k ≤ 0` premise is GONE
+  m : Natural
+  ⊢ 1 + k ≤ m                          -- and so is the arm's own
+```
+
+Without `generalizing m`, the same theorem reports what it should:
+
+```
+  IH : k ≤ 0 → k ≤ m
+  hypothesis : 1 + k ≤ 0               -- refined, as documented
+  ⊢ 1 + k ≤ m
+```
+
+So the loaded induction proves a strictly weaker — here false — statement.
+It cannot be unsound (the arm goal is weakened in step with the IH, and the
+kernel still checks the result against the real theorem), but it is
+unusable: `generalizing` is exactly the tool for an induction that carries
+hypotheses, and it works only when there are none.
+
+**What the library does.** Puts the generalized binder and the premises
+that mention it in the CONCLUSION instead —
+`(small : List(A)) (distinct : …) : ∀ (big : List(A)). … → …` — and opens
+each arm with `take big; suppose …`. That is how
+`List.permutation_of_distinct_inclusion` and
+`List.length_le_of_distinct_inclusion` are both written, and why. The cost
+is that the premise reads as part of the conclusion rather than as a
+hypothesis; citation ergonomics are unaffected (`by
+List.length_le_of_distinct_inclusion` closes a consumer goal with the
+premises in context).
+
+**Suggested fix.** Run the same auto-generalization pass with
+`generalizing` as without it, reverting the listed binders IN ADDITION to
+the hypotheses that mention the scrutinee, rather than instead of them.

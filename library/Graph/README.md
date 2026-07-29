@@ -82,6 +82,8 @@ graph although they only read `ends`.
 - `Graph.IsWalk.transfer` — a walk moves to any graph holding its edges
 - `Graph.IsPath.split` — a path splits at any vertex it visits, and the
   far half never returns to the source
+- `Graph.IsPath.distinct_edges` and `Graph.IsPath.length_le_size` — a path
+  takes no edge twice, so it is no longer than the graph it runs in
 - `Graph.IsPath.reverse` — a path runs backwards over the same vertices;
   `Graph.IsPath.extend_at_target` is what grows one at the far end
 - `Graph.IsPathGraph.reaches_an_end` — whatever vertex is deleted, every
