@@ -1239,22 +1239,38 @@ ExpressionPointer Elaborator::elaborateDecideExpression(
 
 std::vector<std::string> Elaborator::scrutineeDependentBinders(
         const SurfaceExpressionPointer& scrutinee,
-        const std::vector<LocalBinder>& localBinders) {
+        const std::vector<LocalBinder>& localBinders,
+        const std::vector<std::string>& alsoGeneralized) {
+        int total = static_cast<int>(localBinders.size());
+        // The user's `generalizing` list, resolved to binder positions
+        // (innermost binding of each name wins, as everywhere else). A name
+        // that resolves to nothing is left for the revert telescope to
+        // report by its own name, so hand the list back untouched.
+        std::set<int> listedPositions;
+        for (const std::string& listed : alsoGeneralized) {
+            int position = -1;
+            for (int i = total - 1; i >= 0; --i) {
+                if (localBinders[i].name == listed) { position = i; break; }
+            }
+            if (position < 0) return alsoGeneralized;
+            listedPositions.insert(position);
+        }
         ExpressionPointer scrutineeKernel;
         try {
             scrutineeKernel =
                 elaborateExpression(*scrutinee, localBinders);
         } catch (const ElaborateError&) {
-            return {};
+            return alsoGeneralized;
         } catch (const TypeError&) {
-            return {};
+            return alsoGeneralized;
         }
         auto* boundVariable =
             std::get_if<BoundVariable>(&scrutineeKernel->node);
-        if (!boundVariable) return {};
-        int total = static_cast<int>(localBinders.size());
+        if (!boundVariable) return alsoGeneralized;
         int scrutineePosition = total - 1 - boundVariable->deBruijnIndex;
-        if (scrutineePosition < 0 || scrutineePosition >= total) return {};
+        if (scrutineePosition < 0 || scrutineePosition >= total) {
+            return alsoGeneralized;
+        }
 
         // Local-variable INDEX arguments of the scrutinee's type. Inducting on
         // an indexed value generalises those indices in the motive, so every
@@ -1320,9 +1336,10 @@ std::vector<std::string> Elaborator::scrutineeDependentBinders(
         // already had to be reverted, which were always unsound to keep).
         std::set<int> taintedPositions = indexRoots;
         taintedPositions.insert(scrutineePosition);
-        int earliestRoot = *taintedPositions.begin();
+        taintedPositions.insert(listedPositions.begin(),
+                                listedPositions.end());
         std::vector<std::string> names;
-        for (int i = earliestRoot + 1; i < total; ++i) {
+        for (int i = 0; i < total; ++i) {
             if (i == scrutineePosition) continue;
             bool referencesTainted = false;
             for (int root : taintedPositions) {
@@ -1336,7 +1353,7 @@ std::vector<std::string> Elaborator::scrutineeDependentBinders(
                     break;
                 }
             }
-            if (referencesTainted) {
+            if (referencesTainted || listedPositions.count(i)) {
                 taintedPositions.insert(i);
                 names.push_back(localBinders[i].name);
             }
@@ -1410,8 +1427,11 @@ ExpressionPointer Elaborator::elaborateCasesExpression(
             if (usesOnePlusVocabulary) {
                 if (!cases.refiningNames.empty()) {
                     return elaborateByInductionOnePlusReverted(
-                        cases, cases.refiningNames, localBinders,
-                        expectedType, line, column);
+                        cases,
+                        scrutineeDependentBinders(cases.scrutinee,
+                                                  localBinders,
+                                                  cases.refiningNames),
+                        localBinders, expectedType, line, column);
                 }
                 // Auto-generalize, mirroring the recursor path below: a
                 // hypothesis depending on the scrutinee is reverted into
@@ -1558,7 +1578,9 @@ ExpressionPointer Elaborator::elaborateCasesExpression(
                 }
                 if (!renamed.refiningNames.empty()) {
                     std::vector<std::string> refiningNames =
-                        renamed.refiningNames;
+                        scrutineeDependentBinders(renamed.scrutinee,
+                                                  localBinders,
+                                                  renamed.refiningNames);
                     renamed.refiningNames.clear();
                     return elaborateByInductionOnePlusReverted(
                         renamed, refiningNames, localBinders,
@@ -1826,8 +1848,14 @@ ExpressionPointer Elaborator::elaborateCasesExpressionInner(
                     "cases ... with <eq> refining ... is not supported; "
                     "use one or the other");
             }
+            // The listed binders are reverted ALONGSIDE the ones that
+            // depend on the scrutinee, never instead of them. Idempotent,
+            // so the auto-generalize path below can re-enter here.
+            SurfaceCases generalized = cases;
+            generalized.refiningNames = scrutineeDependentBinders(
+                cases.scrutinee, localBinders, cases.refiningNames);
             return elaborateCasesWithRefining(
-                cases, localBinders, expectedType, line, column);
+                generalized, localBinders, expectedType, line, column);
         }
         // The `cases X with equalityHypothesisName { … }` variant
         // routes through a dedicated convoy desugaring; everything

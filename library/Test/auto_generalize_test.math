@@ -58,11 +58,40 @@ theorem Test.one_plus_auto_generalize (b : Natural)
   }
 
 -- `generalizing` (induction loading): the listed binder is lifted into
--- the motive, so the IH quantifies over it. (The full semantic exercise
--- — an IH applied at a DIFFERENT value of the loaded binder — is
--- `Natural.distance_respects_integer_equivalent` in the library.)
+-- the motive, so the IH quantifies over it.
 theorem Test.generalizing_loads_ih (a m : Natural) : 0 ≤ a + m :=
   by induction on a with IH generalizing m {
     case zero:         done by Natural.zero_least
     case successor(k): done by Natural.zero_least
+  }
+
+-- `generalizing` ADDS to the automatic revert, it does not replace it:
+-- the listed binder is lifted into the motive AND the hypothesis about
+-- the scrutinee is still reverted, so the IH reads
+-- `(m : ℕ) → k ≤ 0 → k ≤ m` and the arm still has its own `1 + k ≤ 0`.
+-- Reverting only the listed binder left an IH with no premises at all —
+-- a strictly weaker induction, which failed far from the cause.
+theorem Test.generalizing_keeps_scrutinee_hypothesis (n m : Natural)
+        (hypothesis : n = 0)
+        : n ≤ m :=
+  by induction on n with IH generalizing m {
+    case n = 0: done by Natural.zero_least
+    case n = 1 + k: {
+        (1 : ℕ) + k = 0;
+        done by Natural.zero_not_one_plus
+      }
+  }
+
+-- The loaded binder carries its own hypotheses with it: `bound` mentions
+-- `m`, not the scrutinee, so only `generalizing m` reverts it — and it
+-- must, or the arm's `bound` would still speak of the outer `m`.
+theorem Test.generalizing_sweeps_transitively (n m : Natural)
+        (bound : m ≤ m) (hypothesis : n = 0)
+        : n ≤ m :=
+  by induction on n with IH generalizing m {
+    case n = 0: done by Natural.zero_least
+    case n = 1 + k: {
+        (1 : ℕ) + k = 0;
+        done by Natural.zero_not_one_plus
+      }
   }

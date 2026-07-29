@@ -351,6 +351,15 @@ only report ambiguity for arguments the conclusion leaves open.
 
 ## G9 — `generalizing` silently drops every hypothesis about the scrutinee
 
+**FIXED** (`scrutineeDependentBinders` in `elaborator/cases.cpp`, plus the
+three dispatch points that let the listed names short-circuit it). The
+user's list is now an ADDITIONAL set of roots for the same transitive
+sweep, never a replacement — so a hypothesis mentioning the scrutinee, or
+mentioning a loaded binder, is reverted alongside it. Locks:
+`Test/auto_generalize_test`, last two theorems.
+`List.length_le_of_distinct_inclusion` is written the natural way again,
+with `big` and its inclusion premise back in the binder list.
+
 **Symptom.** `by induction on <x> with IH generalizing <y>` produces an
 induction whose motive has lost every premise. Auto-generalization — the
 documented behaviour that a hypothesis mentioning the inducted variable is
@@ -392,16 +401,12 @@ kernel still checks the result against the real theorem), but it is
 unusable: `generalizing` is exactly the tool for an induction that carries
 hypotheses, and it works only when there are none.
 
-**What the library does.** Puts the generalized binder and the premises
+**What the library did.** Put the generalized binder and the premises
 that mention it in the CONCLUSION instead —
-`(small : List(A)) (distinct : …) : ∀ (big : List(A)). … → …` — and opens
-each arm with `take big; suppose …`. That is how
-`List.permutation_of_distinct_inclusion` and
-`List.length_le_of_distinct_inclusion` are both written, and why. The cost
-is that the premise reads as part of the conclusion rather than as a
-hypothesis; citation ergonomics are unaffected (`by
-List.length_le_of_distinct_inclusion` closes a consumer goal with the
-premises in context).
+`(small : List(A)) (distinct : …) : ∀ (big : List(A)). … → …` — and opened
+each arm with `take big; suppose …`. `List.permutation_of_distinct_inclusion`
+is still written that way and can now be restated with ordinary
+hypotheses.
 
 **Suggested fix.** Run the same auto-generalization pass with
 `generalizing` as without it, reverting the listed binders IN ADDITION to

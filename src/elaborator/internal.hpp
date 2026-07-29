@@ -5161,9 +5161,18 @@ private:
     // their stale type referring to the original scrutinee. Returns them
     // in array (outermost-first) order, a valid revert telescope. Empty
     // if the scrutinee isn't a local-binder variable.
+    //
+    // `alsoGeneralized` is the user's `generalizing b, c` list. Those
+    // binders are reverted IN ADDITION to the automatic ones, and they
+    // seed the same transitive sweep, so a hypothesis mentioning one of
+    // them is reverted too. They are additional roots, never a
+    // replacement: reverting only what the user listed drops every
+    // hypothesis about the scrutinee out of the motive, leaving a
+    // strictly weaker induction to prove.
     std::vector<std::string> scrutineeDependentBinders(
         const SurfaceExpressionPointer& scrutinee,
-        const std::vector<LocalBinder>& localBinders);
+        const std::vector<LocalBinder>& localBinders,
+        const std::vector<std::string>& alsoGeneralized = {});
 
     // `cases`/`by induction` entry. The plain form (no explicit
     // `refining`/`with`) gets an automatic generalize-fallback: if it

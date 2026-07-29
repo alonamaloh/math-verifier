@@ -264,22 +264,16 @@ theorem List.length_remove_member (A : Type(0)) (x : A) (list : List(A))
 -- elements. The head uses up one position of the larger list, and what is
 -- left of it still holds the whole tail — nothing in the tail is the head,
 -- because the smaller list repeats nothing.
-theorem List.length_le_of_distinct_inclusion (A : Type(0)) (small : List(A))
+theorem List.length_le_of_distinct_inclusion (A : Type(0)) (small big : List(A))
         (distinct : List.Distinct(A, small))
-        : ∀ (big : List(A)).
-            (∀ (element : A). element ∈ small → element ∈ big)
-            → length(small) ≤ length(big) :=
-  by induction on small with IH {
-    case small = List.empty: {
-        take big : List(A);
-        suppose ∀ (element : A). element ∈ List.empty(A) → element ∈ big;
+        (inclusion : ∀ (element : A). element ∈ small → element ∈ big)
+        : length(small) ≤ length(big) :=
+  by induction on small with IH generalizing big {
+    case small = List.empty:
         length(List.empty(A))
            = 0
            ≤ length(big)
-      }
     case small = List.prepend(head, tail) for some head, tail: {
-        take big : List(A);
-        suppose ∀ (element : A). element ∈ List.prepend(A, head, tail) → element ∈ big;
         head ∈ List.prepend(A, head, tail);
         head ∈ big;
         length(big) = 1 + length(big ∖ head) by List.length_remove_member;
