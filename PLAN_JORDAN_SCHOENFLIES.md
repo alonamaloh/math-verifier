@@ -442,8 +442,9 @@ What remains — the assembly:
 
 Abstract, no geometry. Keep it that way — Layer 6 maps into it.
 
-Built so far: `Graph/{basics,walk,path,connected,deletion,cycle}.math`,
-with `library/Graph/README.md` as the entry point.
+Built so far: `Graph/{basics,walk,path,connected,deletion,cycle,
+vertex_deletion,twoconnected,union}.math`, with `library/Graph/README.md`
+as the entry point. `Lists/union.math` was added underneath it.
 
 - **Settled: an edge is a NAME.** A graph lives over an ambient
   `(V, E, ends)` — vertex type, edge type, and `ends : E → Pair(V, V)` —
@@ -489,8 +490,26 @@ omitted the condition is the search key). G2/G3 stand, and are the reason
 each inductive here has a transparent reader and one wrapper per
 constructor.
 
-**Still to build.** Vertex deletion; degree counting and trees;
-2-connectivity and cut vertices; subdivisions and ears; then H5.
+- **Two-connectivity is the blueprint's convention, verbatim** — at least
+  three vertices, connected, still connected after any one vertex goes —
+  so the one-edge graph is not 2-connected and a two-vertex cycle is a
+  cycle without being 2-connected. `Graph.IsTwoConnected.no_bridge` is
+  proved by routing around rather than by naming the two components the
+  blueprint's proof looks at: a third vertex exists, the graph without one
+  end joins the other end to it, and a walk that survives a vertex
+  deletion cannot have used an edge there. `Graph.IsTwoConnected.union` is
+  `lem:union-two-connected`; its work is the case where the deleted vertex
+  belongs to only one of the two graphs.
+- **A union joins both lists with `List.union`** (the first list, then
+  what the second adds), because a concatenation would list a shared
+  vertex twice and make `Graph.order` wrong.
+
+**Still to build.** Degree counting and trees (`lem:three-leaf-tree` and
+the `n-1` edge count); subdivisions and ears
+(`lem:subdivision-ear-preserve`); then H5 (`lem:relative-ear`). The ear
+lemma wants a path presented AS A GRAPH and split at an internal vertex —
+`Graph.IsPath.split` is the missing piece, and the prefix half is the
+awkward one because the walk relation is built at the source end.
 
 **Definitions.** `Graph` on a finite vertex type with an edge multiset
 (parallel edges **allowed**, loops forbidden — the blueprint needs

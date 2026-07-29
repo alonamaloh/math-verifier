@@ -41,6 +41,12 @@ graph although they only read `ends`.
 - `Graph.deleteEdge` in [deletion.math](deletion.math)
 - `Graph.IsCycleThrough`, `Graph.LiesOnCycle` and `Graph.IsBridge` in
   [cycle.math](cycle.math)
+- `Graph.deleteVertex` and `Graph.IsCutVertex` in
+  [vertex_deletion.math](vertex_deletion.math)
+- `Graph.IsTwoConnected` in [twoconnected.math](twoconnected.math) — the
+  blueprint's convention: at least three vertices, connected, and still
+  connected after any one vertex goes
+- `Graph.union` in [union.math](union.math)
 
 ## Main theorems
 
@@ -58,6 +64,16 @@ graph although they only read `ends`.
 - `Graph.IsWalk.in_supergraph`, and for a deletion its two directions:
   `Graph.IsWalk.after_deletion` and `Graph.IsWalk.avoiding_edge`
 - `Graph.deleteEdge.{IsSubgraph,IsWellFormed,size}`
+- **`Graph.IsTwoConnected.no_bridge`** — a 2-connected graph has no bridge,
+  so every edge of one lies on a cycle
+  (`Graph.IsTwoConnected.edge_on_cycle`)
+- **`Graph.IsTwoConnected.union`** — two 2-connected graphs sharing two
+  vertices have a 2-connected union
+- `Graph.IsWalk.avoiding_vertex` / `.after_vertex_deletion`,
+  `Graph.deleteVertex.{IsSubgraph,IsWellFormed,monotone}`, and
+  `Graph.IsConnected.after_outside_deletion`
+- `Graph.third_vertex` — two named vertices of a graph on three or more
+  leave one over
 - **`Graph.LiesOnCycle.deletion_reaches`** and
   **`Graph.LiesOnCycle.of_deletion_reaches`** — an edge lies on a cycle
   exactly when the graph without it still joins its two ends; hence
