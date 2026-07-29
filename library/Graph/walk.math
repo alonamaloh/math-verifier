@@ -185,6 +185,20 @@ theorem Graph.walkVertices.before_step (graph : Graph(V, E, ends))
       }
   }
 
+-- A walk along fewer edges visits fewer vertices.
+theorem Graph.walkVertices.monotone (graph : Graph(V, E, ends)) (source vertex : V)
+        (fewer more : List(E))
+        (inclusion : ∀ (edge : E). edge ∈ fewer → edge ∈ more)
+        (visited : vertex ∈ Graph.walkVertices(graph, source, fewer))
+        : vertex ∈ Graph.walkVertices(graph, source, more) :=
+  done by cases {
+    case vertex = source: done
+    case vertex ∈ Graph.coveredVertices(graph, fewer): {
+        vertex ∈ Graph.coveredVertices(graph, more) by Graph.coveredVertices.monotone;
+        done
+      }
+  }
+
 theorem Graph.walkVertices.source (graph : Graph(V, E, ends)) (source : V)
         (edgeList : List(E))
         : source ∈ Graph.walkVertices(graph, source, edgeList) :=

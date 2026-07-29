@@ -234,3 +234,94 @@ theorem Graph.IsWalk.contains_path (graph : Graph(V, E, ends)) (source target : 
         }
       }
   }
+
+-- ----------------------------------------------------------------------
+-- Splitting a path at a vertex it visits.
+--
+-- The suffix alone is `Graph.IsPath.from_visited`; what an ear argument
+-- needs is both halves, and the prefix is the awkward one — the relation
+-- is built at the source end, so the prefix is what the induction has to
+-- carry forward rather than read off. It carries: the recursive call
+-- splits the rest, and the step's edge goes in front of the prefix, whose
+-- freshness is inherited because a prefix of the rest visits no more than
+-- the rest does.
+
+theorem Graph.IsPath.split (graph : Graph(V, E, ends)) (source target : V)
+        (edgeList : List(E))
+        (path : Graph.IsPath(graph, source, edgeList, target))
+        (vertex : V)
+        (visited : vertex ∈ Graph.walkVertices(graph, source, edgeList))
+        : ∃ (prefixEdges : List(E)). ∃ (suffixEdges : List(E)).
+            edgeList = List.append(prefixEdges, suffixEdges)
+            ∧ Graph.IsPath(graph, source, prefixEdges, vertex)
+            ∧ Graph.IsPath(graph, vertex, suffixEdges, target) :=
+  by induction on path with IH {
+    case Graph.IsPathOver.arrived(endpoint): {
+        done by cases {
+          case vertex = endpoint: {
+              Graph.IsPath(graph, endpoint, List.empty(E), endpoint) by Graph.IsPath.empty;
+              Graph.IsPath(graph, endpoint, List.empty(E), vertex)
+                  by substituting (vertex = endpoint);
+              Graph.IsPath(graph, vertex, List.empty(E), endpoint)
+                  by substituting (vertex = endpoint);
+              List.empty(E) = List.append(List.empty(E), List.empty(E));
+              witness List.empty(E) with witness List.empty(E)
+            }
+          case vertex ∈ Graph.coveredVertices(graph, List.empty(E)): {
+              ¬(vertex ∈ Graph.coveredVertices(graph, List.empty(E)))
+                  by Graph.coveredVertices.no_edges;
+              done
+            }
+        }
+      }
+    case Graph.IsPathOver.step(
+        stepSource, waypoint, stepTarget, edge, rest, isEdge, joins, restPath, fresh): {
+        vertex = stepSource ∨ vertex ∈ Graph.walkVertices(graph, waypoint, rest)
+            by Graph.walkVertices.after_step;
+        done by cases {
+          case vertex = stepSource: {
+              Graph.IsPath(graph, stepSource, List.empty(E), stepSource)
+                  by Graph.IsPath.empty;
+              Graph.IsPath(graph, stepSource, List.empty(E), vertex)
+                  by substituting (vertex = stepSource);
+              Graph.IsPath(graph, stepSource, List.prepend(E, edge, rest), stepTarget)
+                  by Graph.IsPath.extend;
+              Graph.IsPath(graph, vertex, List.prepend(E, edge, rest), stepTarget)
+                  by substituting (vertex = stepSource);
+              List.prepend(E, edge, rest)
+                 = List.append(List.empty(E), List.prepend(E, edge, rest));
+              witness List.empty(E) with witness List.prepend(E, edge, rest)
+            }
+          case vertex ∈ Graph.walkVertices(graph, waypoint, rest): {
+              choose earlyEdges, lateEdges such that
+                  rest = List.append(earlyEdges, lateEdges)
+                  ∧ Graph.IsPath(graph, waypoint, earlyEdges, vertex)
+                  ∧ Graph.IsPath(graph, vertex, lateEdges, stepTarget)
+                  from IH;
+              rest = List.append(earlyEdges, lateEdges) as restSplits;
+              Graph.IsPath(graph, waypoint, earlyEdges, vertex);
+              Graph.IsPath(graph, vertex, lateEdges, stepTarget);
+              -- The step's departure vertex is still fresh: the early
+              -- edges are among the rest, so they visit no more than it.
+              ∀ (candidate : E). candidate ∈ earlyEdges → candidate ∈ rest
+                  by { take candidate : E;
+                       suppose candidate ∈ earlyEdges;
+                       candidate ∈ List.append(earlyEdges, lateEdges)
+                           by List.member_append_left;
+                       done by substituting restSplits };
+              ¬(stepSource ∈ Graph.walkVertices(graph, waypoint, earlyEdges))
+                  by { suppose stepSource ∈ Graph.walkVertices(graph, waypoint, earlyEdges);
+                       stepSource ∈ Graph.walkVertices(graph, waypoint, rest)
+                           by Graph.walkVertices.monotone;
+                       done };
+              Graph.IsPath(graph, stepSource, List.prepend(E, edge, earlyEdges), vertex)
+                  by Graph.IsPath.extend;
+              List.prepend(E, edge, rest)
+                 = List.prepend(E, edge, List.append(earlyEdges, lateEdges))
+                       by substituting restSplits
+                 = List.append(List.prepend(E, edge, earlyEdges), lateEdges);
+              witness List.prepend(E, edge, earlyEdges) with witness lateEdges
+            }
+        }
+      }
+  }
