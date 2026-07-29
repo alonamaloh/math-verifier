@@ -56,3 +56,60 @@ theorem Test.near_scope_derives {m : MetricSpace} (x : m) (P Q R : m → Proposi
     Q(y);
     done by combine
   }
+
+-- ----------------------------------------------------------------------
+-- `within <region>` selects the RELATIVE filter. The region, like the
+-- point, is read off the goal — the words are the reader's, and the
+-- elaborator still names no filter beyond the phrase.
+
+theorem Test.near_within_scope {m : MetricSpace} (x : m)
+        (region : Set(m)) (P Q : m → Proposition)
+        (nearP : MetricSpace.NearWithin(x, region, P))
+        (nearQ : MetricSpace.NearWithin(x, region, Q))
+        : MetricSpace.NearWithin(x, region, (y : m) ↦ P(y) ∧ Q(y)) :=
+  for y sufficiently near x within region: {
+    P(y);
+    Q(y);
+    done
+  }
+
+theorem Test.near_within_scope_always {m : MetricSpace} (x : m)
+        (region : Set(m)) (P : m → Proposition)
+        (always : ∀ (z : m). P(z))
+        : MetricSpace.NearWithin(x, region, P) :=
+  for y sufficiently near x within region: {
+    done by always
+  }
+
+-- A fact for a DIFFERENT region is not folded in: the scope matches the
+-- filter's leading arguments, so `other` contributes nothing here and the
+-- proof still goes through on `nearP` alone.
+theorem Test.near_within_scope_ignores_other_region {m : MetricSpace} (x : m)
+        (region other : Set(m)) (P Q R : m → Proposition)
+        (nearP : MetricSpace.NearWithin(x, region, P))
+        (nearQ : MetricSpace.NearWithin(x, other, Q))
+        (weaken : ∀ (z : m). P(z) → R(z))
+        : MetricSpace.NearWithin(x, region, R) :=
+  for y sufficiently near x within region: {
+    P(y);
+    done by weaken
+  }
+
+-- The region membership is available as its own near-fact, which is what
+-- lets a body split on where in the region the point lies.
+theorem Test.near_within_scope_sees_the_region {m : MetricSpace} (x : m)
+        (left right : Set(m)) (P : m → Proposition)
+        (nearLeft : MetricSpace.NearWithin(x, left ∪ right,
+            (y : m) ↦ y ∈ left → P(y)))
+        (nearRight : MetricSpace.NearWithin(x, left ∪ right,
+            (y : m) ↦ y ∈ right → P(y)))
+        : MetricSpace.NearWithin(x, left ∪ right, P) := {
+  MetricSpace.NearWithin(x, left ∪ right, (y : m) ↦ y ∈ left ∪ right)
+      by MetricSpace.NearWithin.in_region;
+  for y sufficiently near x within left ∪ right: {
+    done by cases {
+      case y ∈ left: done
+      case y ∈ right: done
+    }
+  }
+}

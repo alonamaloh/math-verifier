@@ -20,28 +20,42 @@ theorem MetricSpace.IsCompact.image (source target : MetricSpace)
 And an `instance` per carrier lets an implicit `{m : MetricSpace}` resolve from
 a bare `Set(ℝ)` or `Set(Plane.Point)`, so consumers never pass the space.
 
-Everything is stated **relative to a carrier set** from the start; the absolute
-notions are the `carrier = Set.universe` case. Connectedness and compactness get
+Everything is stated **relative to a region** from the start; the absolute
+notions are the `region = Set.universe` case. Connectedness and compactness get
 applied to arcs and curves as subspaces, so relativising later would cost more
 than paying for it once.
+
+The relative notions describe the **trace** `subset ∩ region` and nothing else:
+a point outside the region is never tested for relative openness, never in a
+relative interior, and never a witness for a relative closure. (`subset ⊆ region`
+is *not* required — consumers that need the inclusion carry it separately — but
+where it holds, the relative notions say exactly what the absolute ones say
+about the subspace.)
 
 ## Main definitions
 
 - The bundle `MetricSpace`, `IsMetric`, `MetricSpace.carrier`,
   `MetricSpace.distance` — [space.math](space.math)
-- `MetricSpace.OpenIn`, `IsOpen`, `Ball`, `Closure` — [topology.math](topology.math)
-- `MetricSpace.ContinuousAt`, `ContinuousOn` — [continuity.math](continuity.math).
-  `MetricSpace.ContinuousAt.near` and `MetricSpace.ContinuousAt.of_near`
-  cross to the filter for continuity on the whole space;
-  `MetricSpace.ContinuousAt.near_on` and
-  `MetricSpace.ContinuousAt.of_near_on` do it relative to a carrier (the two
-  spellings differ only in the order of the membership and the ball
-  antecedent)
+- `MetricSpace.OpenIn`, `IsOpen`, `Ball`, `Closure` — [topology.math](topology.math).
+  `MetricSpace.IsOpen.ball_inside` and `MetricSpace.Closure.meets_every_ball`
+  (with their `of_…` converses) are the absolute readings, free of the
+  `Set.universe` membership the relative definitions carry
+- `MetricSpace.ContinuousWithinAt`, `ContinuousAt`, `ContinuousOn` —
+  [continuity.math](continuity.math). Continuity **within a region** at a point
+  is the primitive; `ContinuousAt(f, x)` is the whole-space case.
+  `MetricSpace.ContinuousAt.near` / `.of_near` cross to `Near`, and
+  `MetricSpace.ContinuousWithinAt.near` / `.of_near` to `NearWithin`
 - `MetricSpace.Near` — [near.math](near.math), the spatial twin of
   `Natural.Eventually`: "P holds throughout some ball around x". Same four
   moves, with the **minimum** of two radii where sequences take the maximum
   of two thresholds. **Unpunctured**, so it is proper with no
   non-isolated-point side condition (`MetricSpace.Near.at_centre`)
+- `MetricSpace.NearWithin` — the relative twin, "P holds at every point of the
+  region on some ball around x". A filter in its own right, so
+  `for y sufficiently near x within region: { … }` proves one, folding every
+  in-scope `NearWithin` fact **at the same region**. Its body is not handed the
+  region membership; state `MetricSpace.NearWithin.in_region` when the argument
+  splits on where in the region the point lies
 - `MetricSpace.SequenceConverges`, `IsBounded`, `SubsequenceConverges` —
   [sequence.math](sequence.math)
 - `MetricSpace.IsCompact`, `imageSet` — [compactness.math](compactness.math)
@@ -70,7 +84,7 @@ than paying for it once.
 `Real.distance(x, y)` is `abs(y - x)` — oriented that way on purpose, so a real
 ε–δ statement and its metric reading are the **same term** and need no
 translation between them. `Real.ContinuousAt` is then not a second notion; it
-is `MetricSpace.ContinuousAt(f, Set.universe(ℝ), x)` by definition, and the
+is `MetricSpace.ContinuousAt(f, x)` by definition, and the
 analysis layer reaches the generic theorems directly (see `Real/uniform.math`,
 which proves Heine–Cantor on `[0, 1]` by citing the generic one and nothing
 else).

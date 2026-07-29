@@ -3719,9 +3719,13 @@ private:
             && peekAt(3).kind == TokenKind::Identifier
             && (peekAt(3).lexeme == "large" || peekAt(3).lexeme == "near")) {
             bool isNear = peekAt(3).lexeme == "near";
-            // `large` is followed by `:`; `near` by its point then `:`.
+            // `large` is followed by `:`; `near` by its point and then
+            // either `:` or `within <region>:`, which selects the RELATIVE
+            // filter — the one whose facts only speak about the region.
             bool shaped = isNear
-                ? peekAt(5).kind == TokenKind::Colon
+                ? (peekAt(5).kind == TokenKind::Colon
+                   || (peekAt(5).kind == TokenKind::Identifier
+                       && peekAt(5).lexeme == "within"))
                 : peekAt(4).kind == TokenKind::Colon;
             if (shaped) {
                 Token head = consumeAny();  // 'for'
@@ -3730,16 +3734,26 @@ private:
                 std::string kind = consumeAny().lexeme;  // 'large' | 'near'
                 std::string phrase =
                     "for " + binderName + " sufficiently " + kind;
+                std::string filter =
+                    isNear ? "MetricSpace.Near" : "Natural.Eventually";
                 // The point — the goal supplies it, so nothing but the
                 // diagnostic phrase keeps it.
                 if (isNear) phrase += " " + consumeAny().lexeme;
+                if (isNear && peek().kind == TokenKind::Identifier
+                    && peek().lexeme == "within") {
+                    // The region, like the point, is read off the goal.
+                    filter = "MetricSpace.NearWithin";
+                    while (peek().kind != TokenKind::Colon
+                           && peek().kind != TokenKind::EndOfFile) {
+                        phrase += " " + consumeAny().lexeme;
+                    }
+                }
                 consumeAny();               // ':'
                 SurfaceExpressionPointer body =
                     parseBodyExpressionOrStatement();
                 return makeSurfaceEventuallyScope(
                     std::move(binderName), std::move(body),
-                    head.line, head.column,
-                    isNear ? "MetricSpace.Near" : "Natural.Eventually",
+                    head.line, head.column, std::move(filter),
                     std::move(phrase));
             }
         }

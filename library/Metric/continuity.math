@@ -8,6 +8,10 @@
 -- A map is continuous on a region when the usual ε-δ condition holds
 -- with both quantifiers restricted to it. Nothing is asked of the map
 -- off the region.
+--
+-- Continuity WITHIN A REGION at a point is the primitive, and continuity
+-- at a point is the case where the region is everything — the way a text
+-- has one notion and reads it relative to a subspace when it needs to.
 
 module Metric.continuity
 
@@ -21,7 +25,7 @@ import Metric.space
 import Metric.topology
 import Metric.near
 
-definition MetricSpace.ContinuousAt {source target : MetricSpace}
+definition MetricSpace.ContinuousWithinAt {source target : MetricSpace}
         (f : source → target)
         (region : Set(source))
         (x : source) : Proposition :=
@@ -31,12 +35,17 @@ definition MetricSpace.ContinuousAt {source target : MetricSpace}
         distance(x, y) < nearness →
           distance(f(x), f(y)) < tolerance
 
+definition MetricSpace.ContinuousAt {source target : MetricSpace}
+        (f : source → target)
+        (x : source) : Proposition :=
+  MetricSpace.ContinuousWithinAt(f, Set.universe(source), x)
+
 definition MetricSpace.ContinuousOn {source target : MetricSpace}
         (f : source → target)
         (region : Set(source))
         : Proposition :=
   ∀ (x : source). x ∈ region →
-    MetricSpace.ContinuousAt(f, region, x)
+    MetricSpace.ContinuousWithinAt(f, region, x)
 
 -- Continuity only sees the values on the region, so a map that agrees
 -- with a continuous one there is continuous there. This is what lets a
@@ -139,13 +148,13 @@ theorem MetricSpace.ContinuousOn.compose (source middle target : MetricSpace)
 
 -- Restricting the region only weakens the condition — pointwise. The
 -- same nearness serves, because there are fewer points left to test.
-theorem MetricSpace.ContinuousAt.restrict (source target : MetricSpace)
+theorem MetricSpace.ContinuousWithinAt.restrict (source target : MetricSpace)
         (f : source → target)
         (smaller larger : Set(source))
         (smallerInLarger : smaller ⊆ larger)
         (x : source)
-        (continuousAtInLarger : MetricSpace.ContinuousAt(f, larger, x))
-        : MetricSpace.ContinuousAt(f, smaller, x) := {
+        (continuousAtInLarger : MetricSpace.ContinuousWithinAt(f, larger, x))
+        : MetricSpace.ContinuousWithinAt(f, smaller, x) := {
   take tolerance : ℝ;
   suppose tolerance > 0;
   choose nearness such that nearness > 0 ∧
@@ -165,7 +174,8 @@ theorem MetricSpace.ContinuousAt.restrict (source target : MetricSpace)
   witness nearness
 }
 
--- Restricting the region only weakens the condition.
+-- Restricting the region only weakens the condition — pointwise, which is
+-- the theorem above, at every point of the smaller set.
 theorem MetricSpace.ContinuousOn.restrict (source target : MetricSpace)
         (f : source → target)
         (smaller larger : Set(source))
@@ -173,31 +183,10 @@ theorem MetricSpace.ContinuousOn.restrict (source target : MetricSpace)
         (continuousOnLarger : MetricSpace.ContinuousOn(f, larger))
         : MetricSpace.ContinuousOn(f, smaller) := {
   take x : source;
-  suppose x ∈ smaller as xInSmaller;
+  suppose x ∈ smaller;
   x ∈ larger by smallerInLarger;
-  take tolerance : ℝ;
-  suppose tolerance > 0 as tolerancePositive;
-  choose nearness such that nearness > 0 ∧
-      ∀ (y : source). y ∈ larger →
-        distance(x, y) < nearness →
-          distance(f(x), f(y)) < tolerance
-      from continuousOnLarger;
-  nearness > 0;
-  ∀ (y : source). y ∈ larger →
-      distance(x, y) < nearness →
-        distance(f(x), f(y)) < tolerance as largerBall;
-  witness nearness with {
-    nearness > 0;
-    ∀ (y : source). y ∈ smaller →
-        distance(x, y) < nearness →
-          distance(f(x), f(y)) < tolerance
-        by (y : source) (yInSmaller : y ∈ smaller)
-           (yClose : distance(x, y) < nearness) ↦ {
-             y ∈ larger by smallerInLarger;
-             done by largerBall
-           };
-    done
-  }
+  MetricSpace.ContinuousWithinAt(f, larger, x) by continuousOnLarger;
+  done by MetricSpace.ContinuousWithinAt.restrict
 }
 
 -- ----------------------------------------------------------------------
@@ -212,7 +201,7 @@ theorem MetricSpace.ContinuousAt.of_near {source target : MetricSpace}
         (nearby : ∀ (tolerance : ℝ). tolerance > 0 →
             MetricSpace.Near(x,
                 (y : source) ↦ distance(f(x), f(y)) < tolerance))
-        : MetricSpace.ContinuousAt(f, Set.universe(source), x) :=
+        : MetricSpace.ContinuousAt(f, x) :=
   unfold MetricSpace.Near in {
   take tolerance : ℝ;
   suppose tolerance > 0;
@@ -235,7 +224,7 @@ theorem MetricSpace.ContinuousAt.of_near {source target : MetricSpace}
 
 theorem MetricSpace.ContinuousAt.near {source target : MetricSpace}
         (f : source → target) (x : source)
-        (continuous : MetricSpace.ContinuousAt(f, Set.universe(source), x))
+        (continuous : MetricSpace.ContinuousAt(f, x))
         (tolerance : ℝ) (tolerancePositive : tolerance > 0)
         : MetricSpace.Near(x,
               (y : source) ↦ distance(f(x), f(y)) < tolerance) :=
@@ -255,61 +244,65 @@ theorem MetricSpace.ContinuousAt.near {source target : MetricSpace}
   witness radius
 }
 
--- The same crossing for continuity RELATIVE TO A REGION: the filter's
--- predicate carries the membership antecedent, so the two spellings
--- differ only in the order of the two antecedents — exactly as for
--- `OpenIn.near`. What they buy is that combining two continuity facts at
--- one point becomes `Near.and`, one radius taken by the filter, instead
--- of a minimum carried by hand.
+-- The same crossing for continuity WITHIN A REGION, over the relative
+-- filter: "f(y) is within the tolerance for y near x within the region".
+-- What it buys is that combining two continuity facts at one point
+-- becomes one `for y sufficiently near x within region`, instead of a
+-- minimum of two nearnesses carried by hand.
 
-theorem MetricSpace.ContinuousAt.near_on {source target : MetricSpace}
+theorem MetricSpace.ContinuousWithinAt.near {source target : MetricSpace}
         (f : source → target) (region : Set(source)) (x : source)
-        (continuous : MetricSpace.ContinuousAt(f, region, x))
+        (continuous : MetricSpace.ContinuousWithinAt(f, region, x))
         (tolerance : ℝ) (tolerancePositive : tolerance > 0)
-        : MetricSpace.Near(x,
-              (y : source) ↦ y ∈ region →
-                  distance(f(x), f(y)) < tolerance) :=
-  unfold MetricSpace.Near in {
-  choose radius such that radius > 0 ∧
-      ∀ (y : source). y ∈ region →
-        distance(x, y) < radius →
-          distance(f(x), f(y)) < tolerance
-      from continuous;
-  radius > 0;
-  ∀ (y : source). distance(x, y) < radius →
-      (y ∈ region → distance(f(x), f(y)) < tolerance)
-      by { take y : source;
-           suppose distance(x, y) < radius;
-           suppose y ∈ region;
-           done };
-  witness radius
-}
-
-theorem MetricSpace.ContinuousAt.of_near_on {source target : MetricSpace}
-        (f : source → target) (region : Set(source)) (x : source)
-        (nearby : ∀ (tolerance : ℝ). tolerance > 0 →
-            MetricSpace.Near(x,
-                (y : source) ↦ y ∈ region →
-                    distance(f(x), f(y)) < tolerance))
-        : MetricSpace.ContinuousAt(f, region, x) :=
-  unfold MetricSpace.Near in {
-  take tolerance : ℝ;
-  suppose tolerance > 0;
+        : MetricSpace.NearWithin(x, region,
+              (y : source) ↦ distance(f(x), f(y)) < tolerance) := {
   MetricSpace.Near(x,
       (y : source) ↦ y ∈ region → distance(f(x), f(y)) < tolerance)
-      by nearby;
-  choose radius such that radius > 0 ∧
-      ∀ (y : source). distance(x, y) < radius →
-        (y ∈ region → distance(f(x), f(y)) < tolerance);
-  radius > 0;
-  ∀ (y : source). y ∈ region →
-      distance(x, y) < radius →
-        distance(f(x), f(y)) < tolerance
-      by { take y : source;
-           suppose y ∈ region;
-           suppose distance(x, y) < radius;
-           done };
-  witness radius
+      by unfold MetricSpace.Near in {
+        choose radius such that radius > 0 ∧
+            ∀ (y : source). y ∈ region →
+              distance(x, y) < radius →
+                distance(f(x), f(y)) < tolerance
+            from continuous;
+        radius > 0;
+        ∀ (y : source). distance(x, y) < radius →
+            (y ∈ region → distance(f(x), f(y)) < tolerance)
+            by { take y : source;
+                 suppose distance(x, y) < radius;
+                 suppose y ∈ region;
+                 done };
+        witness radius
+      };
+  done by MetricSpace.NearWithin.of_near
+}
+
+theorem MetricSpace.ContinuousWithinAt.of_near {source target : MetricSpace}
+        (f : source → target) (region : Set(source)) (x : source)
+        (nearby : ∀ (tolerance : ℝ). tolerance > 0 →
+            MetricSpace.NearWithin(x, region,
+                (y : source) ↦ distance(f(x), f(y)) < tolerance))
+        : MetricSpace.ContinuousWithinAt(f, region, x) := {
+  take tolerance : ℝ;
+  suppose tolerance > 0;
+  MetricSpace.NearWithin(x, region,
+      (y : source) ↦ distance(f(x), f(y)) < tolerance) by nearby;
+  MetricSpace.Near(x,
+      (y : source) ↦ y ∈ region → distance(f(x), f(y)) < tolerance)
+      by MetricSpace.NearWithin.near;
+  unfold MetricSpace.Near in {
+    choose radius such that radius > 0 ∧
+        ∀ (y : source). distance(x, y) < radius →
+          (y ∈ region → distance(f(x), f(y)) < tolerance);
+    radius > 0;
+    ∀ (y : source). y ∈ region →
+        distance(x, y) < radius →
+          distance(f(x), f(y)) < tolerance
+        by { take y : source;
+             suppose y ∈ region;
+             suppose distance(x, y) < radius;
+             done };
+    witness radius
+  }
 }
 
 -- ----------------------------------------------------------------------
@@ -320,7 +313,7 @@ theorem MetricSpace.ContinuousAt.of_near_on {source target : MetricSpace}
 -- cannot combine on its own.
 theorem MetricSpace.Near.under {source target : MetricSpace}
         (g : source → target) (x : source)
-        (gContinuous : MetricSpace.ContinuousAt(g, Set.universe(source), x))
+        (gContinuous : MetricSpace.ContinuousAt(g, x))
         (P : target → Proposition)
         (nearP : MetricSpace.Near(g(x), P))
         : MetricSpace.Near(x, (y : source) ↦ P(g(y))) :=
@@ -362,36 +355,46 @@ theorem MetricSpace.pasteRadius (source target : MetricSpace)
         (pieceContinuous : MetricSpace.ContinuousOn(f, piece))
         (x : source) (xInUnion : x ∈ union)
         (tolerance : ℝ) (tolerancePositive : tolerance > 0)
-        : MetricSpace.Near(x,
-              (y : source) ↦ y ∈ union → y ∈ piece →
-                  distance(f(x), f(y)) < tolerance) :=
-  done by cases {
-    case x ∈ piece: {
-        MetricSpace.ContinuousAt(f, piece, x) by pieceContinuous;
-        MetricSpace.Near(x,
-            (y : source) ↦ y ∈ piece →
-                distance(f(x), f(y)) < tolerance)
-            by MetricSpace.ContinuousAt.near_on;
-        for y sufficiently near x: {
-          suppose y ∈ union;
-          suppose y ∈ piece;
-          done
-        }
-      }
-    otherwise as xOutsidePiece: {
-        x ∈ union ∖ piece;
-        MetricSpace.Near(x,
-            (y : source) ↦ y ∈ union → y ∈ union ∖ piece)
-            by MetricSpace.OpenIn.near(subset := union ∖ piece);
-        for y sufficiently near x: {
-          suppose y ∈ union;
-          suppose y ∈ piece;
-          y ∈ union ∖ piece;
-          ¬(y ∈ piece);
-          done
-        }
-      }
-  }
+        : MetricSpace.NearWithin(x, union,
+              (y : source) ↦ y ∈ piece →
+                  distance(f(x), f(y)) < tolerance) := {
+  MetricSpace.Near(x,
+      (y : source) ↦ y ∈ union → y ∈ piece →
+          distance(f(x), f(y)) < tolerance)
+      by cases {
+        case x ∈ piece: {
+            MetricSpace.ContinuousWithinAt(f, piece, x) by pieceContinuous;
+            MetricSpace.NearWithin(x, piece,
+                (y : source) ↦ distance(f(x), f(y)) < tolerance)
+                by MetricSpace.ContinuousWithinAt.near;
+            MetricSpace.Near(x,
+                (y : source) ↦ y ∈ piece →
+                    distance(f(x), f(y)) < tolerance)
+                by MetricSpace.NearWithin.near;
+            for y sufficiently near x: {
+              suppose y ∈ union;
+              suppose y ∈ piece;
+              done
+            }
+          }
+        otherwise as xOutsidePiece: {
+            x ∈ union ∖ piece;
+            MetricSpace.NearWithin(x, union, (y : source) ↦ y ∈ union ∖ piece)
+                by MetricSpace.OpenIn.near(subset := union ∖ piece);
+            MetricSpace.Near(x,
+                (y : source) ↦ y ∈ union → y ∈ union ∖ piece)
+                by MetricSpace.NearWithin.near;
+            for y sufficiently near x: {
+              suppose y ∈ union;
+              suppose y ∈ piece;
+              y ∈ union ∖ piece;
+              ¬(y ∈ piece);
+              done
+            }
+          }
+      };
+  done by MetricSpace.NearWithin.of_near
+}
 
 -- A map continuous on each of two relatively closed pieces is continuous
 -- on their union. This is what glues the interior and exterior extensions
@@ -407,25 +410,27 @@ theorem MetricSpace.ContinuousOn.paste (source target : MetricSpace)
   take x : source;
   suppose x ∈ first ∪ second as xInUnion;
   ∀ (tolerance : ℝ). tolerance > 0 →
-      MetricSpace.Near(x, (y : source) ↦ y ∈ first ∪ second →
-          distance(f(x), f(y)) < tolerance)
+      MetricSpace.NearWithin(x, first ∪ second,
+          (y : source) ↦ distance(f(x), f(y)) < tolerance)
       by { take tolerance : ℝ;
            suppose tolerance > 0;
-           MetricSpace.Near(x,
-               (y : source) ↦ y ∈ first ∪ second → y ∈ first →
+           MetricSpace.NearWithin(x, first ∪ second,
+               (y : source) ↦ y ∈ first →
                    distance(f(x), f(y)) < tolerance)
                by MetricSpace.pasteRadius(piece := first);
-           MetricSpace.Near(x,
-               (y : source) ↦ y ∈ first ∪ second → y ∈ second →
+           MetricSpace.NearWithin(x, first ∪ second,
+               (y : source) ↦ y ∈ second →
                    distance(f(x), f(y)) < tolerance)
                by MetricSpace.pasteRadius(piece := second);
-           for y sufficiently near x: {
-             suppose y ∈ first ∪ second;
+           MetricSpace.NearWithin(x, first ∪ second,
+               (y : source) ↦ y ∈ first ∪ second)
+               by MetricSpace.NearWithin.in_region;
+           for y sufficiently near x within first ∪ second: {
              done by cases {
                case y ∈ first: done
                case y ∈ second: done
              }
            } };
-  done by MetricSpace.ContinuousAt.of_near_on
+  done by MetricSpace.ContinuousWithinAt.of_near
 }
 

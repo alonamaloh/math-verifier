@@ -135,6 +135,109 @@ theorem MetricSpace.Near.not_false_nearby {m : MetricSpace} (x : m)
         : False :=
   unfold MetricSpace.Near in { done by MetricSpace.Near.at_centre }
 
+-- ----------------------------------------------------------------------
+-- "Near x within a region": the property holds at every point OF THE
+-- REGION on some ball around x. This is the filter every RELATIVE notion
+-- is stated over — relative openness, continuity within a region — and it
+-- is what keeps `y ∈ region → …` out of the propositions a proof reads.
+--
+-- It is a filter in its own right: `of_always`, `and` and `monotone` are
+-- what `for y sufficiently near x within region: { … }` runs on, exactly
+-- as the three below run the unrelativised scope. `Near` is the
+-- `region = universe` case, and the two cross by the pair of boundary
+-- lemmas after the trio.
+--
+-- OPAQUE for the same reason `Near` is: the scope has to recognise its own
+-- goal, and a transparent definition is δ-reduced away before it can.
+opaque definition MetricSpace.NearWithin {m : MetricSpace} (x : m)
+        (region : Set(m)) (P : m → Proposition) : Proposition :=
+  MetricSpace.Near(x, (y : m) ↦ y ∈ region → P(y))
+
+theorem MetricSpace.NearWithin.of_always {m : MetricSpace} (x : m)
+        (region : Set(m)) (P : m → Proposition)
+        (always : ∀ (y : m). P(y))
+        : MetricSpace.NearWithin(x, region, P) :=
+  unfold MetricSpace.NearWithin in {
+    for y sufficiently near x: {
+      suppose y ∈ region;
+      done by always
+    }
+  }
+
+theorem MetricSpace.NearWithin.and {m : MetricSpace} (x : m)
+        (region : Set(m)) (P Q : m → Proposition)
+        (nearP : MetricSpace.NearWithin(x, region, P))
+        (nearQ : MetricSpace.NearWithin(x, region, Q))
+        : MetricSpace.NearWithin(x, region, (y : m) ↦ P(y) ∧ Q(y)) :=
+  unfold MetricSpace.NearWithin in {
+    MetricSpace.Near(x, (y : m) ↦ y ∈ region → P(y));
+    MetricSpace.Near(x, (y : m) ↦ y ∈ region → Q(y));
+    for y sufficiently near x: {
+      suppose y ∈ region;
+      P(y);
+      Q(y);
+      done
+    }
+  }
+
+theorem MetricSpace.NearWithin.monotone {m : MetricSpace} (x : m)
+        (region : Set(m)) (P Q : m → Proposition)
+        (nearP : MetricSpace.NearWithin(x, region, P))
+        (pointwise : ∀ (y : m). P(y) → Q(y))
+        : MetricSpace.NearWithin(x, region, Q) :=
+  unfold MetricSpace.NearWithin in {
+    MetricSpace.Near(x, (y : m) ↦ y ∈ region → P(y));
+    for y sufficiently near x: {
+      suppose y ∈ region;
+      P(y);
+      done by pointwise
+    }
+  }
+
+-- Within a region, a point IS in the region. Trivial as a proposition,
+-- and the one fact `for y sufficiently near x within region: { … }` does
+-- not otherwise hand its body — state it when the argument splits on
+-- where in the region `y` lies.
+theorem MetricSpace.NearWithin.in_region {m : MetricSpace} (x : m)
+        (region : Set(m))
+        : MetricSpace.NearWithin(x, region, (y : m) ↦ y ∈ region) :=
+  unfold MetricSpace.NearWithin in {
+    ∀ (y : m). distance(x, y) < 1 → (y ∈ region → y ∈ region)
+        by { take y : m;
+             suppose distance(x, y) < 1;
+             suppose y ∈ region;
+             done };
+    unfold MetricSpace.Near in { witness (1 : ℝ) }
+  }
+
+-- Crossing between the two spellings. Everything relative is stated with
+-- `NearWithin`; the ε-δ definitions unfold to the implication form, and
+-- these two are the only place that difference is visible.
+
+theorem MetricSpace.NearWithin.near {m : MetricSpace} (x : m)
+        (region : Set(m)) (P : m → Proposition)
+        (nearby : MetricSpace.NearWithin(x, region, P))
+        : MetricSpace.Near(x, (y : m) ↦ y ∈ region → P(y)) :=
+  unfold MetricSpace.NearWithin in { done }
+
+theorem MetricSpace.NearWithin.of_near {m : MetricSpace} (x : m)
+        (region : Set(m)) (P : m → Proposition)
+        (nearby : MetricSpace.Near(x, (y : m) ↦ y ∈ region → P(y)))
+        : MetricSpace.NearWithin(x, region, P) :=
+  unfold MetricSpace.NearWithin in { done }
+
+-- The relative filter is proper AT a point of the region.
+theorem MetricSpace.NearWithin.at_centre {m : MetricSpace} (x : m)
+        (region : Set(m)) (inRegion : x ∈ region) (P : m → Proposition)
+        (nearP : MetricSpace.NearWithin(x, region, P))
+        : P(x) := {
+  MetricSpace.Near(x, (y : m) ↦ y ∈ region → P(y))
+      by MetricSpace.NearWithin.near;
+  x ∈ region → P(x) by MetricSpace.Near.at_centre;
+  done
+}
+
+-- ----------------------------------------------------------------------
 -- The ball is itself a neighbourhood: "y is within `radius` of x" holds
 -- near x. This is what lets a proof put a bound on `distance(x, y)` into
 -- the same filter as its other facts, instead of carrying that δ by hand.

@@ -101,40 +101,45 @@ theorem MetricSpace.IsOpen.of_ball_inside {m : MetricSpace}
 -- ----------------------------------------------------------------------
 -- The lattice laws. Each is the ε-ball argument a textbook gives.
 
--- `OpenIn` through the SPATIAL FILTER: a set is relatively open when, at
--- each of its points, belonging to it holds NEAR that point (for the
--- points of the region). The two spellings differ only in the order of
--- the two antecedents, so these cross between them; what they buy is that
--- combining two open sets becomes `Near.and` — one radius, taken by the
--- filter — instead of a minimum carried by hand.
+-- `OpenIn` through the RELATIVE SPATIAL FILTER: a set is relatively open
+-- when, at each of its points, belonging to it holds near that point
+-- WITHIN THE REGION. That is the same sentence the ε-ball definition
+-- says, with the radius inside the filter — so combining two open sets
+-- becomes one `for y sufficiently near x within region` and no minimum is
+-- carried by hand.
 
 theorem MetricSpace.OpenIn.near {m : MetricSpace}
         (subset region : Set(m))
         (isOpen : MetricSpace.OpenIn(subset, region))
         (x : m) (inSubset : x ∈ subset) (inRegion : x ∈ region)
-        : MetricSpace.Near(x, (y : m) ↦ y ∈ region → y ∈ subset) :=
-  unfold MetricSpace.Near in {
-    choose radius such that radius > 0 ∧
-        ∀ (y : m). y ∈ region → distance(x, y) < radius → y ∈ subset
-        from isOpen;
-    radius > 0;
-    ∀ (y : m). distance(x, y) < radius → (y ∈ region → y ∈ subset)
-        by { take y : m;
-             suppose distance(x, y) < radius;
-             suppose y ∈ region;
-             done };
-    witness radius
-  }
+        : MetricSpace.NearWithin(x, region, (y : m) ↦ y ∈ subset) := {
+  MetricSpace.Near(x, (y : m) ↦ y ∈ region → y ∈ subset)
+      by unfold MetricSpace.Near in {
+        choose radius such that radius > 0 ∧
+            ∀ (y : m). y ∈ region → distance(x, y) < radius → y ∈ subset
+            from isOpen;
+        radius > 0;
+        ∀ (y : m). distance(x, y) < radius → (y ∈ region → y ∈ subset)
+            by { take y : m;
+                 suppose distance(x, y) < radius;
+                 suppose y ∈ region;
+                 done };
+        witness radius
+      };
+  done by MetricSpace.NearWithin.of_near
+}
 
 theorem MetricSpace.OpenIn.of_near {m : MetricSpace}
         (subset region : Set(m))
         (nearby : ∀ (x : m). x ∈ subset → x ∈ region →
-            MetricSpace.Near(x, (y : m) ↦ y ∈ region → y ∈ subset))
+            MetricSpace.NearWithin(x, region, (y : m) ↦ y ∈ subset))
         : MetricSpace.OpenIn(subset, region) := {
   take x : m;
   suppose x ∈ subset;
   suppose x ∈ region;
-  MetricSpace.Near(x, (y : m) ↦ y ∈ region → y ∈ subset) by nearby;
+  MetricSpace.NearWithin(x, region, (y : m) ↦ y ∈ subset) by nearby;
+  MetricSpace.Near(x, (y : m) ↦ y ∈ region → y ∈ subset)
+      by MetricSpace.NearWithin.near;
   unfold MetricSpace.Near in {
     choose radius such that radius > 0 ∧
         ∀ (y : m). distance(x, y) < radius → (y ∈ region → y ∈ subset);
@@ -182,18 +187,17 @@ theorem MetricSpace.OpenIn.intersection (m : MetricSpace)
         (rightOpen : MetricSpace.OpenIn(right, region))
         : MetricSpace.OpenIn(left ∩ right, region) := {
   ∀ (x : m). x ∈ left ∩ right → x ∈ region →
-      MetricSpace.Near(x, (y : m) ↦ y ∈ region → y ∈ left ∩ right)
+      MetricSpace.NearWithin(x, region, (y : m) ↦ y ∈ left ∩ right)
       by { take x : m;
            suppose x ∈ left ∩ right;
            suppose x ∈ region;
            x ∈ left;
            x ∈ right;
-           MetricSpace.Near(x, (y : m) ↦ y ∈ region → y ∈ left)
+           MetricSpace.NearWithin(x, region, (y : m) ↦ y ∈ left)
                by MetricSpace.OpenIn.near;
-           MetricSpace.Near(x, (y : m) ↦ y ∈ region → y ∈ right)
+           MetricSpace.NearWithin(x, region, (y : m) ↦ y ∈ right)
                by MetricSpace.OpenIn.near;
-           for y sufficiently near x: {
-             suppose y ∈ region;
+           for y sufficiently near x within region: {
              y ∈ left;
              y ∈ right;
              done
@@ -209,25 +213,23 @@ theorem MetricSpace.OpenIn.union (m : MetricSpace)
         (rightOpen : MetricSpace.OpenIn(right, region))
         : MetricSpace.OpenIn(left ∪ right, region) := {
   ∀ (x : m). x ∈ left ∪ right → x ∈ region →
-      MetricSpace.Near(x, (y : m) ↦ y ∈ region → y ∈ left ∪ right)
+      MetricSpace.NearWithin(x, region, (y : m) ↦ y ∈ left ∪ right)
       by { take x : m;
            suppose x ∈ left ∪ right;
            suppose x ∈ region;
            done by cases {
              case x ∈ left: {
-                 MetricSpace.Near(x, (y : m) ↦ y ∈ region → y ∈ left)
+                 MetricSpace.NearWithin(x, region, (y : m) ↦ y ∈ left)
                      by MetricSpace.OpenIn.near;
-                 for y sufficiently near x: {
-                   suppose y ∈ region;
+                 for y sufficiently near x within region: {
                    y ∈ left;
                    done
                  }
                }
              case x ∈ right: {
-                 MetricSpace.Near(x, (y : m) ↦ y ∈ region → y ∈ right)
+                 MetricSpace.NearWithin(x, region, (y : m) ↦ y ∈ right)
                      by MetricSpace.OpenIn.near;
-                 for y sufficiently near x: {
-                   suppose y ∈ region;
+                 for y sufficiently near x within region: {
                    y ∈ right;
                    done
                  }

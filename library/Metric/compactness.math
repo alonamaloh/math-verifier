@@ -320,11 +320,11 @@ theorem MetricSpace.IsCompact.bounded (m : MetricSpace)
 
 -- Continuity is sequential: a sequence in the region converging to a
 -- point of it has its values converging to the value there.
-theorem MetricSpace.ContinuousAt.along_sequence (source target : MetricSpace)
+theorem MetricSpace.ContinuousWithinAt.along_sequence (source target : MetricSpace)
         (f : source → target)
         (region : Set(source))
         (x : source)
-        (continuous : MetricSpace.ContinuousAt(f, region, x))
+        (continuous : MetricSpace.ContinuousWithinAt(f, region, x))
         (s : ℕ → source)
         (inside : ∀ (k : ℕ). s(k) ∈ region)
         (converges : MetricSpace.SequenceConverges(s, x))
@@ -342,15 +342,11 @@ theorem MetricSpace.ContinuousAt.along_sequence (source target : MetricSpace)
       distance(x, y) < nearness →
         distance(f(x), f(y)) < tolerance
       as imagesClose;
-  choose threshold such that
-      ∀ (k : ℕ). threshold ≤ k → distance(x, s(k)) < nearness
-      as closeBeyond from converges;
-  witness threshold with
-      (k : ℕ) (beyond : threshold ≤ k) ↦ {
-        distance(x, s(k)) < nearness by closeBeyond;
-        s(k) ∈ region by inside;
-        done by imagesClose
-      }
+  eventually (k). distance(x, s(k)) < nearness by converges;
+  for k sufficiently large: {
+    s(k) ∈ region by inside;
+    done by imagesClose
+  }
 }
 
 definition MetricSpace.imageSet {source target : MetricSpace}
@@ -442,10 +438,11 @@ theorem MetricSpace.IsCompact.image (source target : MetricSpace)
   MetricSpace.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
       by MetricSpace.SubsequenceConverges.converges as converges;
   f(limit) ∈ MetricSpace.imageSet(f, region) by { witness limit };
+  MetricSpace.ContinuousWithinAt(f, region, limit) by continuous;
+  ∀ (k : ℕ). s(index(k)) ∈ region by { take k : ℕ; done by inside };
   MetricSpace.SequenceConverges((k : ℕ) ↦ f(s(index(k))), f(limit))
-      by MetricSpace.ContinuousAt.along_sequence(
-          source, target, f, region, limit, continuous(limit, limitInside),
-          (k : ℕ) ↦ s(index(k)), (k : ℕ) ↦ inside(index(k)), converges);
+      by MetricSpace.ContinuousWithinAt.along_sequence(
+          s := (k : ℕ) ↦ s(index(k)));
   ∀ (k : ℕ). f(s(index(k))) = t(index(k))
       by { take k : ℕ; done by chosen };
   ((k : ℕ) ↦ f(s(index(k)))) = ((k : ℕ) ↦ t(index(k)))
