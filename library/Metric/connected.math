@@ -80,13 +80,15 @@ theorem MetricSpace.OpenIn.preimage (source target : MetricSpace)
         : MetricSpace.OpenIn(MetricSpace.preimageIn(f, subset, region), region) := {
   take x : source;
   suppose x ∈ MetricSpace.preimageIn(f, subset, region) as inPreimage;
+  suppose x ∈ region;
   x ∈ region as inRegion;
   f(x) ∈ subset as valueInSubset;
+  f(x) ∈ MetricSpace.imageSet(f, region) by { witness x };
   choose radius such that
       radius > 0 ∧
       ∀ (w : target). w ∈ MetricSpace.imageSet(f, region) →
         distance(f(x), w) < radius → w ∈ subset
-      from targetOpen(f(x), valueInSubset);
+      from targetOpen;
   radius > 0 as radiusPositive;
   ∀ (w : target). w ∈ MetricSpace.imageSet(f, region) →
       distance(f(x), w) < radius → w ∈ subset
@@ -254,12 +256,14 @@ theorem MetricSpace.OpenIn.restrict (m : MetricSpace)
         : MetricSpace.OpenIn(piece ∩ smaller, smaller) := {
   take x : m;
   suppose x ∈ piece ∩ smaller as inBoth;
+  suppose x ∈ smaller;
   x ∈ piece;
+  x ∈ region by inside;
   choose radius such that
       radius > 0 ∧
       ∀ (y : m). y ∈ region →
         distance(x, y) < radius → y ∈ piece
-      from openInRegion(x, { x ∈ piece });
+      from openInRegion;
   radius > 0;
   ∀ (y : m). y ∈ region →
       distance(x, y) < radius → y ∈ piece as nearbyInPiece;
@@ -550,15 +554,15 @@ theorem MetricSpace.IsConnected.adjoin_limits (m : MetricSpace)
       distance(start, y) < radius → y ∈ piece as nearbyInPiece;
   start ∈ MetricSpace.ClosureIn(core, wide) by wideInClosure;
   ∀ (scale : ℝ). scale > 0 →
-      ∃ (y : m). y ∈ core ∧
+      ∃ (y : m). y ∈ wide ∧ y ∈ core ∧
         distance(start, y) < scale
       as coreIsNear;
   choose near : m such that
-      near ∈ core ∧ distance(start, near) < radius
+      near ∈ wide ∧ near ∈ core ∧ distance(start, near) < radius
       from coreIsNear;
+  near ∈ wide;
   near ∈ core;
   distance(start, near) < radius;
-  near ∈ wide by coreInside;
   near ∈ piece by nearbyInPiece;
   Set.IsNonempty(m, piece ∩ core)
       by { witness near };
@@ -573,22 +577,23 @@ theorem MetricSpace.IsConnected.adjoin_limits (m : MetricSpace)
               reach > 0 ∧
                 ∀ (y : m). y ∈ wide →
                   distance(x, y) < reach → y ∈ wide ∖ piece
-              from restOpen(x, { x ∈ wide ∖ piece });
+              from restOpen;
           reach > 0;
           ∀ (y : m). y ∈ wide →
               distance(x, y) < reach → y ∈ wide ∖ piece
               as nearbyOutside;
           x ∈ MetricSpace.ClosureIn(core, wide) by wideInClosure;
           ∀ (scale : ℝ). scale > 0 →
-              ∃ (y : m). y ∈ core ∧
+              ∃ (y : m). y ∈ wide ∧ y ∈ core ∧
                 distance(x, y) < scale
               as coreIsNearX;
           choose witnessPoint : m such that
-              witnessPoint ∈ core ∧ distance(x, witnessPoint) < reach
+              witnessPoint ∈ wide ∧ witnessPoint ∈ core
+                  ∧ distance(x, witnessPoint) < reach
               from coreIsNearX;
+          witnessPoint ∈ wide;
           witnessPoint ∈ core;
           distance(x, witnessPoint) < reach;
-          witnessPoint ∈ wide by coreInside;
           witnessPoint ∈ wide ∖ piece
               by nearbyOutside;
           ¬(witnessPoint ∈ piece);

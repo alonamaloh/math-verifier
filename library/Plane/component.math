@@ -290,6 +290,7 @@ theorem Plane.Component_IsOpen
         : Plane.IsOpen(Plane.Component(region, base)) := {
   take x : Plane.Point;
   suppose x ∈ Plane.Component(region, base) as xInComponent;
+  suppose x ∈ Set.universe(Plane.Point);
   choose part such that
       part ⊆ region ∧ Plane.IsConnected(part) ∧ base ∈ part ∧ x ∈ part
       from xInComponent;
@@ -357,37 +358,44 @@ theorem Plane.Component_boundary_outside_region
         : ¬(x ∈ region) := {
   Plane.OpenIn(Plane.Component(region, base), Set.universe(Plane.Point))
       by Plane.Component_IsOpen;
+  Plane.Component(region, base) ⊆ Set.universe(Plane.Point)
+      by Set.subset_universe;
+  Plane.BoundaryIn(Plane.Component(region, base), Set.universe(Plane.Point))
+      = Plane.ClosureIn(
+            Plane.Component(region, base), Set.universe(Plane.Point))
+          ∖ Plane.Component(region, base)
+      by Plane.BoundaryIn_eq_ClosureIn_difference as boundaryIsClosureEdge;
   x ∈ Plane.ClosureIn(
           Plane.Component(region, base), Set.universe(Plane.Point))
         ∖ Plane.Component(region, base)
-      by Plane.BoundaryIn_of_OpenIn;
+      by substituting boundaryIsClosureEdge;
   ¬(x ∈ Plane.Component(region, base));
-  x ∈ Plane.ClosureIn(
-      Plane.Component(region, base), Set.universe(Plane.Point));
+  x ∈ Plane.Closure(Plane.Component(region, base));
   ∀ (scale : ℝ). 0 < scale →
       ∃ (y : Plane.Point). y ∈ Plane.Component(region, base) ∧
         Plane.distance(x, y) < scale
+      by { take scale : ℝ;
+           suppose 0 < scale;
+           done by Plane.Closure.meets_every_ball }
       as componentIsNear;
 
   suppose x ∈ region as xInRegion;
   x ∈ Plane.Component(region, x) by Plane.base_in_Component;
   Plane.IsOpen(Plane.Component(region, x)) by Plane.Component_IsOpen;
   choose radius such that
-      0 < radius ∧
-        ∀ (y : Plane.Point). y ∈ Set.universe(Plane.Point) →
-          Plane.distance(x, y) < radius → y ∈ Plane.Component(region, x)
-      from { Plane.IsOpen(Plane.Component(region, x)) }(
-          x, { x ∈ Plane.Component(region, x) });
-  0 < radius;
-  ∀ (y : Plane.Point). y ∈ Set.universe(Plane.Point) →
-      Plane.distance(x, y) < radius → y ∈ Plane.Component(region, x)
+      radius > 0 ∧
+        ∀ (y : Plane.Point). Plane.distance(x, y) < radius
+          → y ∈ Plane.Component(region, x)
+      from Plane.IsOpen.ball_inside;
+  radius > 0;
+  ∀ (y : Plane.Point). Plane.distance(x, y) < radius
+      → y ∈ Plane.Component(region, x)
       as nearbyInOwnComponent;
   choose near such that
       near ∈ Plane.Component(region, base) ∧ Plane.distance(x, near) < radius
       from componentIsNear;
   near ∈ Plane.Component(region, base);
   Plane.distance(x, near) < radius;
-  near ∈ Set.universe(Plane.Point) by Set.member_universe;
   near ∈ Plane.Component(region, x)
       by nearbyInOwnComponent;
   Set.IsNonempty(Plane.Point,

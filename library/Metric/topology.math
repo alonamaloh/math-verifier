@@ -12,9 +12,14 @@
 -- cost more than paying for it once here.
 --
 -- `MetricSpace.OpenIn(subset, region)` does not require
--- `subset ⊆ region` — the ε-ball condition is meaningful without it,
--- and demanding it would add a proof obligation at every use. Consumers
--- that need the inclusion carry it separately.
+-- `subset ⊆ region` — demanding it would add a proof obligation at every
+-- use. Consumers that need the inclusion carry it separately. What every
+-- relative notion below DOES insist on is that it speak about the TRACE
+-- `subset ∩ region` and nothing else: a point outside the region is
+-- neither tested for openness, nor in a relative interior, nor available
+-- as a witness for a relative closure. Otherwise `ClosureIn({1, 1/2,
+-- 1/3, …}, {0})` would contain `0` while the trace it is the closure of
+-- is empty.
 
 module Metric.topology
 
@@ -32,7 +37,7 @@ import Metric.near
 
 definition MetricSpace.OpenIn {m : MetricSpace}
         (subset region : Set(m)) : Proposition :=
-  ∀ (x : m). x ∈ subset →
+  ∀ (x : m). x ∈ subset → x ∈ region →
     ∃ (radius : ℝ). radius > 0 ∧
       ∀ (y : m). y ∈ region →
         distance(x, y) < radius → y ∈ subset
@@ -44,6 +49,54 @@ definition MetricSpace.IsOpen {m : MetricSpace}
 definition MetricSpace.ClosedIn {m : MetricSpace}
         (subset region : Set(m)) : Proposition :=
   MetricSpace.OpenIn(Set.difference(region, subset), region)
+
+-- Openness in the whole space, read without the membership in the
+-- universe that the relative form asks for and the absolute one gets for
+-- free: an open set holds a whole ball around each of its points.
+theorem MetricSpace.IsOpen.ball_inside {m : MetricSpace}
+        (subset : Set(m)) (isOpen : MetricSpace.IsOpen(subset))
+        (x : m) (inSubset : x ∈ subset)
+        : ∃ (radius : ℝ). radius > 0 ∧
+            ∀ (y : m). distance(x, y) < radius → y ∈ subset := {
+  x ∈ Set.universe(m);
+  choose radius such that
+      radius > 0 ∧
+        ∀ (y : m). y ∈ Set.universe(m) →
+          distance(x, y) < radius → y ∈ subset
+      from isOpen;
+  radius > 0;
+  ∀ (y : m). y ∈ Set.universe(m) →
+      distance(x, y) < radius → y ∈ subset as ballInside;
+  ∀ (y : m). distance(x, y) < radius → y ∈ subset
+      by { take y : m;
+           suppose distance(x, y) < radius;
+           y ∈ Set.universe(m);
+           done by ballInside };
+  witness radius
+}
+
+theorem MetricSpace.IsOpen.of_ball_inside {m : MetricSpace}
+        (subset : Set(m))
+        (holdsBall : ∀ (x : m). x ∈ subset →
+            ∃ (radius : ℝ). radius > 0 ∧
+              ∀ (y : m). distance(x, y) < radius → y ∈ subset)
+        : MetricSpace.IsOpen(subset) := {
+  take x : m;
+  suppose x ∈ subset;
+  suppose x ∈ Set.universe(m);
+  choose radius such that
+      radius > 0 ∧ ∀ (y : m). distance(x, y) < radius → y ∈ subset
+      from holdsBall;
+  radius > 0;
+  ∀ (y : m). distance(x, y) < radius → y ∈ subset as ballInside;
+  ∀ (y : m). y ∈ Set.universe(m) →
+      distance(x, y) < radius → y ∈ subset
+      by { take y : m;
+           suppose y ∈ Set.universe(m);
+           suppose distance(x, y) < radius;
+           done by ballInside };
+  witness radius
+}
 
 -- ----------------------------------------------------------------------
 -- The lattice laws. Each is the ε-ball argument a textbook gives.
@@ -58,7 +111,7 @@ definition MetricSpace.ClosedIn {m : MetricSpace}
 theorem MetricSpace.OpenIn.near {m : MetricSpace}
         (subset region : Set(m))
         (isOpen : MetricSpace.OpenIn(subset, region))
-        (x : m) (inSubset : x ∈ subset)
+        (x : m) (inSubset : x ∈ subset) (inRegion : x ∈ region)
         : MetricSpace.Near(x, (y : m) ↦ y ∈ region → y ∈ subset) :=
   unfold MetricSpace.Near in {
     choose radius such that radius > 0 ∧
@@ -75,11 +128,12 @@ theorem MetricSpace.OpenIn.near {m : MetricSpace}
 
 theorem MetricSpace.OpenIn.of_near {m : MetricSpace}
         (subset region : Set(m))
-        (nearby : ∀ (x : m). x ∈ subset →
+        (nearby : ∀ (x : m). x ∈ subset → x ∈ region →
             MetricSpace.Near(x, (y : m) ↦ y ∈ region → y ∈ subset))
         : MetricSpace.OpenIn(subset, region) := {
   take x : m;
   suppose x ∈ subset;
+  suppose x ∈ region;
   MetricSpace.Near(x, (y : m) ↦ y ∈ region → y ∈ subset) by nearby;
   unfold MetricSpace.Near in {
     choose radius such that radius > 0 ∧
@@ -99,6 +153,7 @@ theorem MetricSpace.OpenIn.universe (m : MetricSpace)
         : MetricSpace.OpenIn(Set.universe(m), region) := {
   take x : m;
   suppose x ∈ Set.universe(m);
+  suppose x ∈ region;
   witness (1 : ℝ) with {
     (1 : ℝ) > 0;
     ∀ (y : m). y ∈ region →
@@ -126,10 +181,11 @@ theorem MetricSpace.OpenIn.intersection (m : MetricSpace)
         (leftOpen : MetricSpace.OpenIn(left, region))
         (rightOpen : MetricSpace.OpenIn(right, region))
         : MetricSpace.OpenIn(left ∩ right, region) := {
-  ∀ (x : m). x ∈ left ∩ right →
+  ∀ (x : m). x ∈ left ∩ right → x ∈ region →
       MetricSpace.Near(x, (y : m) ↦ y ∈ region → y ∈ left ∩ right)
       by { take x : m;
            suppose x ∈ left ∩ right;
+           suppose x ∈ region;
            x ∈ left;
            x ∈ right;
            MetricSpace.Near(x, (y : m) ↦ y ∈ region → y ∈ left)
@@ -146,58 +202,38 @@ theorem MetricSpace.OpenIn.intersection (m : MetricSpace)
 }
 
 -- A union of two relatively open sets is relatively open: whichever side
--- the point came from supplies the radius.
+-- the point came from holds nearby, and that side is inside the union.
 theorem MetricSpace.OpenIn.union (m : MetricSpace)
         (left right region : Set(m))
         (leftOpen : MetricSpace.OpenIn(left, region))
         (rightOpen : MetricSpace.OpenIn(right, region))
         : MetricSpace.OpenIn(left ∪ right, region) := {
-  take x : m;
-  suppose x ∈ left ∪ right as inEither;
-  done by cases {
-    case x ∈ left: {
-        choose radius such that
-            radius > 0 ∧
-              ∀ (y : m). y ∈ region →
-                distance(x, y) < radius → y ∈ left
-            from leftOpen;
-        radius > 0;
-        ∀ (y : m). y ∈ region →
-            distance(x, y) < radius → y ∈ left as leftBall;
-        witness radius with {
-          radius > 0;
-          ∀ (y : m). y ∈ region →
-              distance(x, y) < radius → y ∈ left ∪ right
-              by (y : m) (yInRegion : y ∈ region)
-                 (yClose : distance(x, y) < radius) ↦ {
-                   y ∈ left by leftBall;
-                   done by Set.subset_union_left
-                 };
-          done
-        }
-      }
-    case x ∈ right: {
-        choose radius such that
-            radius > 0 ∧
-              ∀ (y : m). y ∈ region →
-                distance(x, y) < radius → y ∈ right
-            from rightOpen;
-        radius > 0;
-        ∀ (y : m). y ∈ region →
-            distance(x, y) < radius → y ∈ right as rightBall;
-        witness radius with {
-          radius > 0;
-          ∀ (y : m). y ∈ region →
-              distance(x, y) < radius → y ∈ left ∪ right
-              by (y : m) (yInRegion : y ∈ region)
-                 (yClose : distance(x, y) < radius) ↦ {
-                   y ∈ right by rightBall;
-                   done by Set.subset_union_right
-                 };
-          done
-        }
-      }
-  }
+  ∀ (x : m). x ∈ left ∪ right → x ∈ region →
+      MetricSpace.Near(x, (y : m) ↦ y ∈ region → y ∈ left ∪ right)
+      by { take x : m;
+           suppose x ∈ left ∪ right;
+           suppose x ∈ region;
+           done by cases {
+             case x ∈ left: {
+                 MetricSpace.Near(x, (y : m) ↦ y ∈ region → y ∈ left)
+                     by MetricSpace.OpenIn.near;
+                 for y sufficiently near x: {
+                   suppose y ∈ region;
+                   y ∈ left;
+                   done
+                 }
+               }
+             case x ∈ right: {
+                 MetricSpace.Near(x, (y : m) ↦ y ∈ region → y ∈ right)
+                     by MetricSpace.OpenIn.near;
+                 for y sufficiently near x: {
+                   suppose y ∈ region;
+                   y ∈ right;
+                   done
+                 }
+               }
+           } };
+  done by MetricSpace.OpenIn.of_near
 }
 
 -- ----------------------------------------------------------------------
@@ -208,6 +244,7 @@ theorem MetricSpace.Ball_IsOpen (m : MetricSpace)
         : MetricSpace.IsOpen(MetricSpace.Ball(center, radius)) := {
   take x : m;
   suppose x ∈ MetricSpace.Ball(center, radius) as xInside;
+  suppose x ∈ Set.universe(m);
   distance(center, x) < radius;
   radius - distance(center, x) > 0;
   witness radius - distance(center, x) with {
@@ -298,6 +335,7 @@ theorem MetricSpace.openHull_IsOpen (m : MetricSpace)
         : MetricSpace.IsOpen(MetricSpace.openHull(subset, region)) := {
   take y : m;
   suppose y ∈ MetricSpace.openHull(subset, region) as inHull;
+  suppose y ∈ Set.universe(m);
   choose x, radius such that
       MetricSpace.BallWitness(subset, region, x, radius, y) from inHull;
   x ∈ subset by MetricSpace.BallWitness.centre_inside;
@@ -394,8 +432,10 @@ theorem MetricSpace.OpenIn_of_cut (m : MetricSpace)
         : MetricSpace.OpenIn(subset, region) := {
   take x : m;
   suppose x ∈ subset as xInSubset;
+  suppose x ∈ region;
   x ∈ cuttingSet ∩ region by substituting cut;
   x ∈ cuttingSet;
+  x ∈ Set.universe(m);
   choose radius such that
       radius > 0 ∧
         ∀ (y : m). y ∈ Set.universe(m) →
@@ -429,7 +469,7 @@ theorem MetricSpace.OpenIn_of_cut (m : MetricSpace)
 definition MetricSpace.InteriorIn {m : MetricSpace}
         (subset region : Set(m))
         : Set(m) :=
-  (x : m) ↦ x ∈ subset ∧
+  (x : m) ↦ x ∈ region ∧ x ∈ subset ∧
     ∃ (radius : ℝ). radius > 0 ∧
       ∀ (y : m). y ∈ region →
         distance(x, y) < radius → y ∈ subset
@@ -439,7 +479,7 @@ definition MetricSpace.ClosureIn {m : MetricSpace}
         : Set(m) :=
   (x : m) ↦ x ∈ region ∧
     ∀ (radius : ℝ). radius > 0 →
-      ∃ (y : m). y ∈ subset ∧
+      ∃ (y : m). y ∈ region ∧ y ∈ subset ∧
         distance(x, y) < radius
 
 definition MetricSpace.BoundaryIn {m : MetricSpace}
@@ -466,6 +506,7 @@ theorem MetricSpace.InteriorIn_OpenIn (m : MetricSpace)
         : MetricSpace.OpenIn(MetricSpace.InteriorIn(subset, region), region) := {
   take x : m;
   suppose x ∈ MetricSpace.InteriorIn(subset, region) as inInterior;
+  suppose x ∈ region;
   x ∈ subset;
   ∃ (radius : ℝ). radius > 0 ∧
       ∀ (y : m). y ∈ region →
@@ -515,13 +556,15 @@ theorem MetricSpace.InteriorIn_OpenIn (m : MetricSpace)
   }
 }
 
--- A relatively open subset is its own interior.
+-- A relatively open subset of the region is its own interior.
 theorem MetricSpace.subset_InteriorIn_of_OpenIn (m : MetricSpace)
         (subset region : Set(m))
+        (subsetInRegion : subset ⊆ region)
         (openInRegion : MetricSpace.OpenIn(subset, region))
         : subset ⊆ MetricSpace.InteriorIn(subset, region) := {
   take x : m;
   suppose x ∈ subset as xInSubset;
+  x ∈ region by subsetInRegion;
   ∃ (radius : ℝ). radius > 0 ∧
       ∀ (y : m). y ∈ region →
         distance(x, y) < radius → y ∈ subset
@@ -551,13 +594,14 @@ theorem MetricSpace.subset_ClosureIn (m : MetricSpace)
   suppose x ∈ subset as xInSubset;
   x ∈ region by subsetInRegion;
   ∀ (radius : ℝ). radius > 0 →
-      ∃ (y : m). y ∈ subset ∧
+      ∃ (y : m). y ∈ region ∧ y ∈ subset ∧
         distance(x, y) < radius
       by (radius : ℝ) (radiusPositive : radius > 0) ↦ {
         distance(x, x)
            = 0 by MetricSpace.distance_self
            < radius;
         witness x with {
+          x ∈ region;
           x ∈ subset;
           distance(x, x) < radius;
           done
@@ -580,20 +624,42 @@ theorem MetricSpace.BoundaryIn_subset_ClosureIn (m : MetricSpace)
 }
 
 -- For a relatively open subset the boundary is what the closure adds:
--- `∂U = closure(U) ∖ U`, because such a `U` is already its own interior.
-theorem MetricSpace.BoundaryIn_of_OpenIn (m : MetricSpace)
+-- `∂U = closure(U) ∖ U`, because such a `U` is exactly its own interior.
+theorem MetricSpace.BoundaryIn_eq_ClosureIn_difference (m : MetricSpace)
         (subset region : Set(m))
+        (subsetInRegion : subset ⊆ region)
         (openInRegion : MetricSpace.OpenIn(subset, region))
-        (x : m)
-        (onBoundary : x ∈ MetricSpace.BoundaryIn(subset, region))
-        : x ∈ MetricSpace.ClosureIn(subset, region) ∖ subset := {
-  x ∈ MetricSpace.ClosureIn(subset, region);
-  ¬(x ∈ MetricSpace.InteriorIn(subset, region));
-  ¬(x ∈ subset)
-      by (xInSubset : x ∈ subset) ↦ {
-        x ∈ MetricSpace.InteriorIn(subset, region)
-            by MetricSpace.subset_InteriorIn_of_OpenIn;
+        : MetricSpace.BoundaryIn(subset, region)
+              = MetricSpace.ClosureIn(subset, region) ∖ subset := {
+  subset ⊆ MetricSpace.InteriorIn(subset, region)
+      by MetricSpace.subset_InteriorIn_of_OpenIn;
+  MetricSpace.InteriorIn(subset, region) ⊆ subset
+      by MetricSpace.InteriorIn_subset;
+  MetricSpace.BoundaryIn(subset, region)
+      ⊆ MetricSpace.ClosureIn(subset, region) ∖ subset
+      by (x : m)
+         (onBoundary : x ∈ MetricSpace.BoundaryIn(subset, region)) ↦ {
+        x ∈ MetricSpace.ClosureIn(subset, region);
+        ¬(x ∈ MetricSpace.InteriorIn(subset, region));
+        ¬(x ∈ subset)
+            by (xInSubset : x ∈ subset) ↦ {
+              x ∈ MetricSpace.InteriorIn(subset, region);
+              done
+            };
         done
       };
-  done
+  MetricSpace.ClosureIn(subset, region) ∖ subset
+      ⊆ MetricSpace.BoundaryIn(subset, region)
+      by (x : m)
+         (inClosureOnly : x ∈ MetricSpace.ClosureIn(subset, region) ∖ subset) ↦ {
+        x ∈ MetricSpace.ClosureIn(subset, region);
+        ¬(x ∈ subset);
+        ¬(x ∈ MetricSpace.InteriorIn(subset, region))
+            by (inInterior : x ∈ MetricSpace.InteriorIn(subset, region)) ↦ {
+              x ∈ subset;
+              done
+            };
+        done
+      };
+  done by Set.equal_of_same_members
 }

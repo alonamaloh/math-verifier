@@ -52,6 +52,47 @@ definition MetricSpace.Closure {m : MetricSpace}
         (region : Set(m)) : Set(m) :=
   MetricSpace.ClosureIn(region, Set.universe(m))
 
+-- Its two faces, stated once so that no consumer carries the membership
+-- in the universe that the relative definition asks for and the absolute
+-- one gets for free: a point is in the closure exactly when every ball
+-- around it meets the set.
+
+theorem MetricSpace.Closure.meets_every_ball (m : MetricSpace)
+        (region : Set(m)) (x : m)
+        (inClosure : x ∈ MetricSpace.Closure(region))
+        (radius : ℝ) (radiusPositive : radius > 0)
+        : ∃ (y : m). y ∈ region ∧ distance(x, y) < radius := {
+  ∀ (scale : ℝ). scale > 0 →
+      ∃ (y : m). y ∈ Set.universe(m) ∧ y ∈ region ∧ distance(x, y) < scale
+      as everyBallMeets;
+  ∃ (y : m). y ∈ Set.universe(m) ∧ y ∈ region ∧ distance(x, y) < radius
+      by everyBallMeets;
+  choose y such that
+      y ∈ Set.universe(m) ∧ y ∈ region ∧ distance(x, y) < radius;
+  y ∈ region;
+  distance(x, y) < radius;
+  witness y
+}
+
+theorem MetricSpace.Closure.of_meets_every_ball (m : MetricSpace)
+        (region : Set(m)) (x : m)
+        (meetsEveryBall : ∀ (radius : ℝ). radius > 0 →
+            ∃ (y : m). y ∈ region ∧ distance(x, y) < radius)
+        : x ∈ MetricSpace.Closure(region) := {
+  x ∈ Set.universe(m);
+  ∀ (radius : ℝ). radius > 0 →
+      ∃ (y : m). y ∈ Set.universe(m) ∧ y ∈ region ∧ distance(x, y) < radius
+      by { take radius : ℝ;
+           suppose radius > 0;
+           ∃ (y : m). y ∈ region ∧ distance(x, y) < radius by meetsEveryBall;
+           choose y such that y ∈ region ∧ distance(x, y) < radius;
+           y ∈ Set.universe(m);
+           y ∈ region;
+           distance(x, y) < radius;
+           witness y };
+  done
+}
+
 -- ----------------------------------------------------------------------
 -- Closure and limits. The two directions are asymmetric: a limit of
 -- points of the set lands in the closure by definition, while producing
@@ -63,10 +104,8 @@ theorem MetricSpace.limit_in_Closure (m : MetricSpace)
         (limit : m)
         (converges : MetricSpace.SequenceConverges(s, limit))
         : limit ∈ MetricSpace.Closure(region) := {
-  limit ∈ Set.universe(m);
   ∀ (radius : ℝ). radius > 0 →
-      ∃ (y : m). y ∈ region ∧
-        distance(limit, y) < radius
+      ∃ (y : m). y ∈ region ∧ distance(limit, y) < radius
       by (radius : ℝ) (radiusPositive : radius > 0) ↦ {
         choose threshold such that
             ∀ (k : ℕ). threshold ≤ k → distance(limit, s(k)) < radius
@@ -76,7 +115,7 @@ theorem MetricSpace.limit_in_Closure (m : MetricSpace)
         distance(limit, s(threshold)) < radius by closeBeyond;
         witness s(threshold)
       };
-  done
+  done by MetricSpace.Closure.of_meets_every_ball
 }
 
 -- A point of the closure is the limit of a sequence from the set. For
@@ -88,8 +127,10 @@ theorem MetricSpace.sequence_to_Closure_point (m : MetricSpace)
         : ∃ (s : ℕ → m).
             (∀ (k : ℕ). s(k) ∈ region) ∧ MetricSpace.SequenceConverges(s, x) := {
   ∀ (radius : ℝ). radius > 0 →
-      ∃ (y : m). y ∈ region ∧
-        distance(x, y) < radius
+      ∃ (y : m). y ∈ region ∧ distance(x, y) < radius
+      by { take radius : ℝ;
+           suppose radius > 0;
+           done by MetricSpace.Closure.meets_every_ball }
       as meetsEveryBall;
   ∀ (n : ℕ). ∃ (y : m).
       y ∈ region ∧ distance(x, y) < Real.harmonic_term(n)
