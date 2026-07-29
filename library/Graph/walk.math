@@ -1,0 +1,226 @@
+-- Graph/walk.math
+--
+-- Walks. Layer 5 of PLAN_JORDAN_SCHOENFLIES.md.
+--
+-- A walk from `source` to `target` is a list of edges, each one taken
+-- from the vertex the previous one arrived at. It names its EDGES and
+-- not its vertices: with parallel edges around, the vertices would not
+-- determine the walk, while the edges always determine the vertices —
+-- an edge with two distinct ends leaves no choice about where taking it
+-- arrives (`Graph.Joins.unique`).
+--
+-- Read the relation as it is built: `Graph.IsWalk(graph, source,
+-- edgeList, target)` extends at the SOURCE end, because that is the end
+-- a list is extended at. Walking the other way — concatenating and
+-- reversing — is proved here, and after that no argument has to care.
+--
+-- The vertices a walk visits are a `Set(V)`, not a list: nothing counts
+-- them, and every consumer asks whether a particular vertex is on the
+-- walk.
+
+module Graph.walk
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Equality.basics
+import Set.basics
+import Lists.list
+import Lists.append
+import Graph.basics
+
+convention V : Type(0)
+convention E : Type(0)
+convention ends : E → Pair(V, V)
+
+inductive Graph.IsWalkOver (V : Type(0)) (E : Type(0)) (ends : E → Pair(V, V))
+        (graph : Graph(V, E, ends))
+        : V → List(E) → V → Proposition where
+  | Graph.IsWalkOver.arrived
+      : (vertex : V)
+        → Graph.IsWalkOver(V, E, ends, graph, vertex, List.empty(E), vertex)
+  | Graph.IsWalkOver.step
+      : (source : V) → (waypoint : V) → (target : V) → (edge : E) → (rest : List(E))
+        → edge ∈ Graph.edges(graph)
+        → Graph.Joins(graph, edge, source, waypoint)
+        → Graph.IsWalkOver(V, E, ends, graph, waypoint, rest, target)
+        → Graph.IsWalkOver(V, E, ends, graph, source, List.prepend(E, edge, rest), target)
+
+-- The reader every statement uses: it recovers the ambient from the
+-- graph, which the inductive itself cannot do — its parameters are
+-- explicit, and `ends` occurs in none of the indices. Transparent, so
+-- induction on a walk, the constructors, and every lemma below speak the
+-- same relation.
+definition Graph.IsWalk (graph : Graph(V, E, ends)) (source : V) (edgeList : List(E))
+        (target : V) : Proposition :=
+  Graph.IsWalkOver(V, E, ends, graph, source, edgeList, target)
+
+-- The two constructors, restated through the reader.
+theorem Graph.IsWalk.empty (graph : Graph(V, E, ends)) (vertex : V)
+        : Graph.IsWalk(graph, vertex, List.empty(E), vertex) :=
+  Graph.IsWalkOver.arrived(V, E, ends, graph, vertex)
+
+theorem Graph.IsWalk.extend (graph : Graph(V, E, ends))
+        (source waypoint target : V) (edge : E) (rest : List(E))
+        (isEdge : edge ∈ Graph.edges(graph))
+        (joins : Graph.Joins(graph, edge, source, waypoint))
+        (restWalk : Graph.IsWalk(graph, waypoint, rest, target))
+        : Graph.IsWalk(graph, source, List.prepend(E, edge, rest), target) :=
+  Graph.IsWalkOver.step(V, E, ends, graph, source, waypoint, target, edge, rest,
+                        isEdge, joins, restWalk)
+
+-- The vertices an edge list touches, and the vertices a walk visits: the
+-- source, plus the ends of every edge taken. A walk with no edges visits
+-- only its source, which is also its target.
+definition Graph.coveredVertices (graph : Graph(V, E, ends)) (edgeList : List(E)) : Set(V) :=
+  (vertex : V) ↦ ∃ (edge : E). edge ∈ edgeList ∧ Graph.Incident(graph, edge, vertex)
+
+definition Graph.walkVertices (graph : Graph(V, E, ends)) (source : V) (edgeList : List(E))
+        : Set(V) :=
+  (vertex : V) ↦ vertex = source ∨ vertex ∈ Graph.coveredVertices(graph, edgeList)
+
+-- ----------------------------------------------------------------------
+-- Building walks.
+
+theorem Graph.IsWalk.single (graph : Graph(V, E, ends)) (edge : E) (source target : V)
+        (isEdge : edge ∈ Graph.edges(graph))
+        (joins : Graph.Joins(graph, edge, source, target))
+        : Graph.IsWalk(graph, source, List.prepend(E, edge, List.empty(E)), target) := {
+  Graph.IsWalk(graph, target, List.empty(E), target) by Graph.IsWalk.empty;
+  done by Graph.IsWalk.extend
+}
+
+theorem Graph.IsWalk.append (graph : Graph(V, E, ends)) (source middle target : V)
+        (firstEdges secondEdges : List(E))
+        (firstWalk : Graph.IsWalk(graph, source, firstEdges, middle))
+        (secondWalk : Graph.IsWalk(graph, middle, secondEdges, target))
+        : Graph.IsWalk(graph, source, List.append(firstEdges, secondEdges), target) :=
+  by induction on firstWalk with IH {
+    case Graph.IsWalkOver.arrived(vertex): {
+        List.append(List.empty(E), secondEdges) = secondEdges;
+        done
+      }
+    case Graph.IsWalkOver.step(
+        stepSource, waypoint, stepTarget, edge, rest, isEdge, joins, restWalk): {
+        Graph.IsWalk(graph, waypoint, List.append(rest, secondEdges), target) by IH;
+        List.append(List.prepend(E, edge, rest), secondEdges)
+            = List.prepend(E, edge, List.append(rest, secondEdges));
+        done by Graph.IsWalk.extend
+      }
+  }
+
+-- A walk can be run backwards. The reversed edge list is not named: no
+-- consumer wants it, and building it would want a list reversal the
+-- library does not have.
+theorem Graph.IsWalk.reverse (graph : Graph(V, E, ends)) (source target : V)
+        (edgeList : List(E))
+        (walk : Graph.IsWalk(graph, source, edgeList, target))
+        : ∃ (reversed : List(E)). Graph.IsWalk(graph, target, reversed, source) :=
+  by induction on walk with IH {
+    case Graph.IsWalkOver.arrived(vertex): {
+        Graph.IsWalk(graph, vertex, List.empty(E), vertex) by Graph.IsWalk.empty;
+        witness List.empty(E)
+      }
+    case Graph.IsWalkOver.step(
+        stepSource, waypoint, stepTarget, edge, rest, isEdge, joins, restWalk): {
+        choose reversedRest such that Graph.IsWalk(graph, stepTarget, reversedRest, waypoint)
+            from IH;
+        Graph.Joins(graph, edge, waypoint, stepSource) by Graph.Joins.symmetric;
+        Graph.IsWalk(graph, waypoint, List.prepend(E, edge, List.empty(E)), stepSource)
+            by Graph.IsWalk.single;
+        Graph.IsWalk(graph, stepTarget,
+                     List.append(reversedRest, List.prepend(E, edge, List.empty(E))),
+                     stepSource)
+            by Graph.IsWalk.append;
+        witness List.append(reversedRest, List.prepend(E, edge, List.empty(E)))
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- What a walk lies in.
+
+theorem Graph.IsWalk.edge_is_edge (graph : Graph(V, E, ends)) (source target : V)
+        (edgeList : List(E))
+        (walk : Graph.IsWalk(graph, source, edgeList, target))
+        : ∀ (edge : E). edge ∈ edgeList → edge ∈ Graph.edges(graph) :=
+  by induction on walk with IH {
+    case Graph.IsWalkOver.arrived(vertex): {
+        take edge : E;
+        suppose edge ∈ List.empty(E) as impossible;
+        ¬(edge ∈ List.empty(E)) by List.no_member_empty;
+        done
+      }
+    case Graph.IsWalkOver.step(
+        stepSource, waypoint, stepTarget, takenEdge, rest, isEdge, joins, restWalk): {
+        ∀ (edge : E). edge ∈ rest → edge ∈ Graph.edges(graph) by IH as restEdges;
+        take edge : E;
+        suppose edge ∈ List.prepend(E, takenEdge, rest);
+        edge = takenEdge ∨ edge ∈ rest by List.member_prepend_invert;
+        done by cases {
+          case edge = takenEdge: done
+          case edge ∈ rest: done by restEdges
+        }
+      }
+  }
+
+theorem Graph.IsWalk.target_is_visited (graph : Graph(V, E, ends)) (source target : V)
+        (edgeList : List(E))
+        (walk : Graph.IsWalk(graph, source, edgeList, target))
+        : target ∈ Graph.walkVertices(graph, source, edgeList) :=
+  by induction on walk with IH {
+    case Graph.IsWalkOver.arrived(vertex): done
+    case Graph.IsWalkOver.step(
+        stepSource, waypoint, stepTarget, edge, rest, isEdge, joins, restWalk): {
+        stepTarget ∈ Graph.walkVertices(graph, waypoint, rest) by IH;
+        done by cases {
+          case stepTarget = waypoint: {
+              Graph.Joins(graph, edge, stepSource, stepTarget)
+                  by substituting (stepTarget = waypoint);
+              Graph.Incident(graph, edge, stepTarget)
+                  by Graph.Joins.incident_target;
+              edge ∈ List.prepend(E, edge, rest) by List.member.here;
+              stepTarget ∈ Graph.coveredVertices(graph, List.prepend(E, edge, rest))
+                  by { witness edge };
+              done
+            }
+          case stepTarget ∈ Graph.coveredVertices(graph, rest): {
+              choose usedEdge such that
+                  usedEdge ∈ rest ∧ Graph.Incident(graph, usedEdge, stepTarget);
+              usedEdge ∈ List.prepend(E, edge, rest) by List.member.there;
+              Graph.Incident(graph, usedEdge, stepTarget);
+              stepTarget ∈ Graph.coveredVertices(graph, List.prepend(E, edge, rest))
+                  by { witness usedEdge };
+              done
+            }
+        }
+      }
+  }
+
+-- Every vertex a walk visits is a vertex of the graph, as soon as its
+-- source is one: the ends of the edges it takes are vertices because the
+-- graph is well formed.
+theorem Graph.IsWalk.visits_vertices (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph)) (source target : V)
+        (edgeList : List(E))
+        (walk : Graph.IsWalk(graph, source, edgeList, target))
+        (sourceIsVertex : source ∈ Graph.vertices(graph))
+        : ∀ (vertex : V). vertex ∈ Graph.walkVertices(graph, source, edgeList)
+            → vertex ∈ Graph.vertices(graph) := {
+  ∀ (edge : E). edge ∈ edgeList → edge ∈ Graph.edges(graph)
+      by Graph.IsWalk.edge_is_edge as walkEdges;
+  take vertex : V;
+  suppose vertex ∈ Graph.walkVertices(graph, source, edgeList);
+  done by cases {
+    case vertex = source: done
+    case vertex ∈ Graph.coveredVertices(graph, edgeList): {
+        choose usedEdge such that usedEdge ∈ edgeList ∧ Graph.Incident(graph, usedEdge, vertex);
+        usedEdge ∈ edgeList;
+        Graph.Incident(graph, usedEdge, vertex) as incidentAtVertex;
+        usedEdge ∈ Graph.edges(graph) by walkEdges;
+        choose farEnd such that Graph.Joins(graph, usedEdge, vertex, farEnd)
+            from incidentAtVertex;
+        vertex ∈ Graph.vertices(graph) by Graph.IsWellFormed.end_is_vertex;
+        done
+      }
+  }
+}
