@@ -1,0 +1,141 @@
+-- Lists/sum.math
+--
+-- `List.sumOver(values, list)` — the sum of `values` over the members of
+-- a list, in order. Repetition counts: this is a sum over a LIST, not
+-- over a set, which is what a counting argument wants (the vertex list of
+-- a graph is repetition-free by `Graph.IsWellFormed`, and that is where
+-- the "each vertex once" comes from, not from the sum).
+--
+-- The laws below are the ones a double count needs: the sum splits along
+-- `append`, adds pointwise, only sees the values at members, and is a
+-- multiple of the length when the summand is constant.
+
+module Lists.sum
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+import Lists.list
+import Lists.length
+import Lists.append
+
+definition List.sumOver {A : Type(0)} (values : A → ℕ) : List(A) → ℕ
+  | List.empty               => 0
+  | List.prepend(head, tail) => values(head) + List.sumOver(values, tail)
+
+-- ── The two characterizing equations ──────────────────────────────────
+
+theorem List.sumOver_empty (A : Type(0)) (values : A → ℕ)
+        : List.sumOver(values, List.empty(A)) = 0 :=
+  done
+
+theorem List.sumOver_prepend (A : Type(0)) (values : A → ℕ)
+        (head : A) (tail : List(A))
+        : List.sumOver(values, List.prepend(A, head, tail))
+          = values(head) + List.sumOver(values, tail) :=
+  done
+
+-- ── Splitting and combining ───────────────────────────────────────────
+
+-- A sum splits where the list does.
+theorem List.sumOver_append (A : Type(0)) (values : A → ℕ)
+        (first second : List(A))
+        : List.sumOver(values, List.append(first, second))
+          = List.sumOver(values, first) + List.sumOver(values, second) :=
+  by induction on first with IH {
+    case first = List.empty:
+        List.sumOver(values, List.append(List.empty(A), second))
+           = List.sumOver(values, second)
+           = 0 + List.sumOver(values, second)
+    case first = List.prepend(head, tail) for some head, tail:
+        List.sumOver(values, List.append(List.prepend(A, head, tail), second))
+           = List.sumOver(values, List.prepend(A, head, List.append(tail, second)))
+           = values(head) + List.sumOver(values, List.append(tail, second))
+           = values(head)
+               + (List.sumOver(values, tail) + List.sumOver(values, second))  by IH
+           = (values(head) + List.sumOver(values, tail))
+               + List.sumOver(values, second)
+  }
+
+-- Summands add pointwise.
+theorem List.sumOver_add (A : Type(0)) (left right : A → ℕ) (list : List(A))
+        : List.sumOver((element : A) ↦ left(element) + right(element), list)
+          = List.sumOver(left, list) + List.sumOver(right, list) :=
+  by induction on list with IH {
+    case list = List.empty: done
+    case list = List.prepend(head, tail) for some head, tail:
+        List.sumOver((element : A) ↦ left(element) + right(element),
+                     List.prepend(A, head, tail))
+           = (left(head) + right(head))
+               + List.sumOver((element : A) ↦ left(element) + right(element), tail)
+           = (left(head) + right(head))
+               + (List.sumOver(left, tail) + List.sumOver(right, tail))   by IH
+           = (left(head) + List.sumOver(left, tail))
+               + (right(head) + List.sumOver(right, tail))
+  }
+
+-- ── Reading the summand ───────────────────────────────────────────────
+
+-- Only the values at members matter.
+theorem List.sumOver_congruence (A : Type(0)) (left right : A → ℕ)
+        (list : List(A))
+        (agree : ∀ (element : A). element ∈ list → left(element) = right(element))
+        : List.sumOver(left, list) = List.sumOver(right, list) :=
+  by induction on list with IH {
+    case list = List.empty: done
+    case list = List.prepend(head, tail) for some head, tail: {
+        head ∈ List.prepend(A, head, tail);
+        left(head) = right(head) by agree;
+        ∀ (element : A). element ∈ tail → left(element) = right(element)
+            by { take element : A;
+                 suppose element ∈ tail;
+                 element ∈ List.prepend(A, head, tail);
+                 done by agree };
+        List.sumOver(left, tail) = List.sumOver(right, tail) by IH;
+        List.sumOver(left, List.prepend(A, head, tail))
+           = left(head) + List.sumOver(left, tail)
+           = right(head) + List.sumOver(right, tail)
+           = List.sumOver(right, List.prepend(A, head, tail))
+      }
+  }
+
+-- A summand that vanishes on the list sums to nothing.
+theorem List.sumOver_zero (A : Type(0)) (values : A → ℕ) (list : List(A))
+        (vanishes : ∀ (element : A). element ∈ list → values(element) = 0)
+        : List.sumOver(values, list) = 0 :=
+  by induction on list with IH {
+    case list = List.empty: done
+    case list = List.prepend(head, tail) for some head, tail: {
+        head ∈ List.prepend(A, head, tail);
+        values(head) = 0 by vanishes;
+        ∀ (element : A). element ∈ tail → values(element) = 0
+            by { take element : A;
+                 suppose element ∈ tail;
+                 element ∈ List.prepend(A, head, tail);
+                 done by vanishes };
+        List.sumOver(values, tail) = 0 by IH;
+        List.sumOver(values, List.prepend(A, head, tail))
+           = values(head) + List.sumOver(values, tail)
+           = 0 + 0
+           = 0
+      }
+  }
+
+-- A constant summand counts the list.
+theorem List.sumOver_constant (A : Type(0)) (amount : ℕ) (list : List(A))
+        : List.sumOver((element : A) ↦ amount, list) = amount * length(list) :=
+  by induction on list with IH {
+    case list = List.empty:
+        List.sumOver((element : A) ↦ amount, List.empty(A))
+           = 0
+           = amount * 0
+           = amount * length(List.empty(A))
+    case list = List.prepend(head, tail) for some head, tail:
+        List.sumOver((element : A) ↦ amount, List.prepend(A, head, tail))
+           = amount + List.sumOver((element : A) ↦ amount, tail)
+           = amount + amount * length(tail)                                by IH
+           = amount * (1 + length(tail))
+           = amount * length(List.prepend(A, head, tail))
+  }

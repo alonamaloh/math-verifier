@@ -9,6 +9,8 @@ needed.
 - `List(A)`, `List.empty`, `List.prepend`, membership `List.member` / `∈`, and
   fold `List.product` in [list.math](list.math)
 - `List.append`, `List.map`, `List.length`, `List.filter`, and `List.remove`
+- `List.sumOver(values, list)` — the sum of a ℕ-valued function over a
+  list's members, in [sum.math](sum.math)
 - `List.range_down` for `1,…,n`, `List.range_up` for `0,…,n-1`, and
   `List.range_down_offset`
 - Pairwise distinctness `List.Distinct`
@@ -28,6 +30,8 @@ needed.
 - Pair cancellation: `List.product_one_of_paired_inverses`
 - Counting: `List.length_le_of_distinct_inclusion` — a list without
   repetitions is no longer than any list holding all of its elements
+- Sums: `List.sumOver_append`, `List.sumOver_add`,
+  `List.sumOver_congruence` and `List.sumOver_constant`
 
 `filter` and `remove` use classical decisions and publish characterizing
 equations; reason through those theorems rather than unfolding their bodies.
