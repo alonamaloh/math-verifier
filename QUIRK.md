@@ -755,3 +755,40 @@ fixes it gets a hypothesis about the wrong walk.
 elaborate but their equations do not reduce either. Not investigated, since
 the return-type shape removed the need; if someone wants two-element
 lookahead, start there.
+
+## Q18 — `*` refuses a mixed spelling of one carrier: `GaussianInteger` against `Ring.carrier(s)` (2026-07-29)
+
+**Symptom.** In `GaussianInteger/sum_of_two_squares.math`, with
+`let s : Ring := GaussianInteger.ring_bundle;`,
+`let bigP : GaussianInteger := …;` and `w : Ring.carrier(s)` (the witness a
+`choose` binds out of `Ring.IsUnit(s, bigP)`), the natural
+
+```math
+Ring.one(s) = bigP * w
+```
+
+does not elaborate:
+
+```
+operator '*' is not supported for operand type 'GaussianInteger';
+supported: +, *, ≤, <, ∣ on Natural; +, *, - on Integer; ∧, ∨ on Proposition
+```
+
+`bigP * factor` two lines below is fine — `let factor : GaussianInteger := w`
+first. So each operand's type resolves `*` on its own; it is the MIXED pair
+`(GaussianInteger, Ring.carrier(s))` — two spellings of one carrier,
+definitionally equal — that no registration joins. Not specific to `choose`: a
+bare `Ring.one(s) = bigP * w;` fails identically (checked), so this is the
+"equal spellings treated differently" family (`PLAN_ERGONOMICS.md` F1),
+neighbour to Q11's bundle-carrier numeral join.
+
+**Two defects, really.** The message names one operand and lists only the
+builtin registrations, so it reads as "GaussianInteger has no `*`" — which is
+false and sends the author looking in the wrong place. It should name the pair
+and say that one side is a bundle carrier that reduces to the other.
+
+**Workaround.** `Ring.multiply(s, bigP, w)`, which is what the site now says —
+an ugly spelling next to the `bigP * factor` on the following line. The
+`choose … such that` condition check (`FRICTION_GRAPH_LAYER5.md` G1) is what
+surfaced it: the clause had been the one place such a spelling was never
+elaborated.

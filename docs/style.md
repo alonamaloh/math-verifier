@@ -720,10 +720,15 @@ judgment: which form reads as mathematics where.
   and the kernel verifies — *what the witness satisfies* in place, and
   avoids the `⟨…⟩` tuple pattern. `from` takes a hypothesis (naming *which*
   `∃` when several are in scope), a lemma cited argument-free, or any
-  applied term of existential type; omitted, the most recent in-scope `∃`
-  is used. `such that` is preferred (the full existential body — a
-  conjunction is fine), and doubles as the disambiguator for a lemma
-  source. Omit `as` unless the condition is later cited by name.
+  applied term of existential type; omitted, the condition itself picks the
+  fact — the most recent one in scope that binds it. `such that` is
+  preferred (the full existential body — a conjunction is fine), and
+  doubles as the disambiguator for a lemma source. State the condition **as
+  the source gives it**: the check is definitional, so a consequence of it
+  (the case's `d` already replaced by `0`, membership in the tail rather
+  than in the list) is refused, with both propositions printed — derive
+  that on the next line instead. Omit `as` unless the condition is later
+  cited by name.
   Example: `choose gap such that a + (1 + gap) = b from Natural.lt_elim;`.
 - A context **conjunction's legs are facts on their own**: a hypothesis
   `A ∧ B` lets you prove/cite `A` or `B` directly — no manual `And.left`/

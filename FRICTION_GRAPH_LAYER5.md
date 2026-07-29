@@ -14,6 +14,15 @@ Both of those are what the entries below are about.
 
 ## G1 — `choose … such that P` is unverified unless the source is a lemma
 
+**FIXED** (`chooseConditionType` / `checkChooseCondition` in
+`elaborator/induction.cpp`). The condition is checked in every form, and with
+`from` omitted it is the search key, so the walk-past that produced this entry
+is now the behaviour rather than the bug. Measured over library + tests: no
+partial restatements, no site whose scan result changed, and six that stated a
+provable reformulation instead of the fact — all six restated. Fixtures:
+`ErrorTest/choose_such_that_{unrelated,misstated}_condition`,
+`Test/choose_condition_selects_source`.
+
 **Symptom.** The `such that` clause is silently discarded. The witness is
 bound with whatever type the scanned existential happens to have, and the
 condition the proof text claims is never checked.
@@ -160,6 +169,17 @@ author wrote.
 ---
 
 ## G5 — `choose … from <IH>` cannot read the witness type through a premise
+
+**FIXED, by removing the requirement rather than widening the read.** An
+unreadable witness type now falls back to the `such that`-less path — cite the
+lemma argument-free, premises discharging from context — and the condition is
+checked against the citation's own conclusion (G1's machinery) instead of
+shaping the citation. So the condition no longer has to be readable *ahead* of
+the citation, and no annotation is needed. This also retired the
+`error_message_inbox` entry beside it: `choose y such that … from <a ∀-fact
+whose body is an ∃>` elaborates now, and the two `Metric/compactness.math`
+sites that restated the `∃` a line above the `choose` are written the natural
+way. Lock: `Test/choose_condition_selects_source`, last theorem.
 
 **Symptom.** In an induction whose hypothesis was generalised over a
 premise, `choose tailEdges such that … from IH` reports

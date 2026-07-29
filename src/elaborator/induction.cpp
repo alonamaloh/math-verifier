@@ -673,19 +673,22 @@ ExpressionPointer Elaborator::elaborateChoose(
                 && !std::get_if<SurfaceIdentifier>(&choose.source->node)) {
                 std::rethrow_exception(sourceProbeError);
             }
-            // `such that` on a fact-shaped source: the condition the proof
-            // text states must be the one the destructure binds. (A lemma
-            // source is checked by the ascription its branch builds.)
-            if (choose.predicate && sourceExistentialClosed) {
+            // The condition the proof text states must be the one the
+            // destructure binds. (The shaped-lemma branch below states it
+            // as the ascription it builds, so it is checked there.)
+            auto verifyCondition = [&](ExpressionPointer existentialClosed) {
                 std::string report;
                 ChooseConditionVerdict verdict = checkChooseCondition(
-                    choose, localBinders, sourceExistentialClosed, &report);
+                    choose, localBinders, existentialClosed, &report);
                 if (verdict == ChooseConditionVerdict::Mismatch) {
                     reportConditionMismatch(report, std::string());
                 }
                 if (verdict == ChooseConditionVerdict::PartialConjunct) {
                     warnPartialCondition(report);
                 }
+            };
+            if (choose.predicate && sourceExistentialClosed) {
+                verifyCondition(sourceExistentialClosed);
             }
             if (sourceIsStatement) {
                 scrutinee = makeSurfaceGiven(choose.source, line, column);
@@ -728,20 +731,10 @@ ExpressionPointer Elaborator::elaborateChoose(
                     if (!annotation) { allAnnotated = false; break; }
                 }
                 std::vector<std::string> witnessTypeNames;
-                auto failSimpleWitness = [&]() {
-                    throwElaborate(
-                        "choose " + choose.name + " from <lemma>: could not "
-                        "read a simple (closed) witness type from the "
-                        "lemma's existential conclusion (one ∃ layer per "
-                        "witness name). Annotate the witness type directly "
-                        "— `choose " + choose.name
-                        + " : <T> such that <prop> from <lemma>` — or use "
-                        "the explicit form `claim ∃ ("
-                        + choose.name + " : <T>). <prop> by <lemma>; choose "
-                        + choose.name + " …`.");
-                };
+                bool witnessTypesReadable = true;
                 for (size_t w = 0;
-                     w < witnessNames.size() && !allAnnotated; ++w) {
+                     w < witnessNames.size() && !allAnnotated
+                         && witnessTypesReadable; ++w) {
                     // Peel premises (syntactic Pis, then WHNF-exposed ones)
                     // until the cursor is Exists-headed.
                     while (true) {
@@ -772,7 +765,10 @@ ExpressionPointer Elaborator::elaborateChoose(
                     }
                     auto* witnessConstant = witnessType
                         ? std::get_if<Constant>(&witnessType->node) : nullptr;
-                    if (!witnessConstant) failSimpleWitness();
+                    if (!witnessConstant) {
+                        witnessTypesReadable = false;
+                        break;
+                    }
                     witnessTypeNames.push_back(witnessConstant->name);
                     if (w + 1 == witnessNames.size()) break;
                     // Descend into the next ∃ layer: the motive is a
@@ -783,34 +779,56 @@ ExpressionPointer Elaborator::elaborateChoose(
                     auto* motiveLambda = motiveExpression
                         ? std::get_if<Lambda>(&motiveExpression->node)
                         : nullptr;
-                    if (!motiveLambda) failSimpleWitness();
+                    if (!motiveLambda) {
+                        witnessTypesReadable = false;
+                        break;
+                    }
                     conclusion = motiveLambda->body;
                 }
-                // Assemble the nested surface existential around the
-                // user's predicate, innermost-first. An annotated witness
-                // uses its `: T` expression directly; otherwise the type
-                // name read off the lemma's conclusion.
-                SurfaceExpressionPointer existential = choose.predicate;
-                for (size_t w = witnessNames.size(); w-- > 0;) {
-                    SurfaceExpressionPointer witnessTypeSurface =
-                        allAnnotated
-                            ? choose.witnessTypes[w]
-                            : makeSurfaceIdentifier(witnessTypeNames[w], {},
-                                  line, column);
-                    SurfaceBinder witnessBinder;
-                    witnessBinder.names = {witnessNames[w]};
-                    witnessBinder.type = witnessTypeSurface;
-                    SurfaceExpressionPointer motive = makeSurfaceLambda(
-                        witnessBinder, existential, line, column);
-                    existential = makeSurfaceApplication(
-                        makeSurfaceIdentifier("Exists", {}, line, column),
-                        std::vector<SurfaceExpressionPointer>{
-                            witnessTypeSurface, motive},
-                        line, column);
+                if (!allAnnotated && !witnessTypesReadable) {
+                    // The lemma's conclusion does not hand over a closed
+                    // witness type — an induction hypothesis generalised
+                    // over a premise says `∃ (tailEdges : List(E)). …`, and
+                    // a parameter-typed existential only instantiates at
+                    // the use site. Cite it argument-free, exactly as the
+                    // `such that`-less form does, and check the stated
+                    // condition against the citation's own conclusion
+                    // rather than shaping the citation with it. The
+                    // condition still has to be the one bound; it just no
+                    // longer has to be readable ahead of the citation.
+                    scrutinee = makeSurfaceCiteInferred(
+                        choose.source, line, column);
+                    ExpressionPointer citedTerm = elaborateExpression(
+                        *scrutinee, localBinders);
+                    verifyCondition(
+                        inferTypeInLocalContext(localBinders, citedTerm));
+                } else {
+                    // Assemble the nested surface existential around the
+                    // user's predicate, innermost-first. An annotated witness
+                    // uses its `: T` expression directly; otherwise the type
+                    // name read off the lemma's conclusion.
+                    SurfaceExpressionPointer existential = choose.predicate;
+                    for (size_t w = witnessNames.size(); w-- > 0;) {
+                        SurfaceExpressionPointer witnessTypeSurface =
+                            allAnnotated
+                                ? choose.witnessTypes[w]
+                                : makeSurfaceIdentifier(witnessTypeNames[w],
+                                      {}, line, column);
+                        SurfaceBinder witnessBinder;
+                        witnessBinder.names = {witnessNames[w]};
+                        witnessBinder.type = witnessTypeSurface;
+                        SurfaceExpressionPointer motive = makeSurfaceLambda(
+                            witnessBinder, existential, line, column);
+                        existential = makeSurfaceApplication(
+                            makeSurfaceIdentifier("Exists", {}, line, column),
+                            std::vector<SurfaceExpressionPointer>{
+                                witnessTypeSurface, motive},
+                            line, column);
+                    }
+                    scrutinee = makeSurfaceAscription(
+                        makeSurfaceCiteInferred(choose.source, line, column),
+                        existential, line, column);
                 }
-                scrutinee = makeSurfaceAscription(
-                    makeSurfaceCiteInferred(choose.source, line, column),
-                    existential, line, column);
             }
         } else {
             // No `from`: the STATED CONDITION is the search key. The most

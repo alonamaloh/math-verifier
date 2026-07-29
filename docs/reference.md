@@ -208,7 +208,10 @@ choose x, y such that R(x, y) from source;
 ```
 
 The source may be a hypothesis, an applied term, or an argument-free theorem
-name whose premises are available in context.
+name whose premises are available in context. The `such that` condition is
+checked against what the source binds, definitionally; with `from` omitted it
+is also the search key, so the scan takes the most recent fact in scope whose
+witnesses satisfy exactly it (a nearer, unrelated `∃` is passed over).
 
 ## Eventually — "from some index on"
 

@@ -40,8 +40,14 @@ first does not help (tried). Workaround used: let the
 elaborator constructs the `and`/`monotone` chain itself and never has to
 match. That workaround is a good tell: the machinery can already do it.
 
-**OPEN — `choose … from <a ∀-fact whose body is an ∃>` is rejected, and
-the message names the wrong culprit.** With
+**FIXED — `choose … from <a ∀-fact whose body is an ∃>` is rejected, and
+the message names the wrong culprit.** The guard is gone rather than the
+message improved: a witness type the lemma's conclusion does not hand over
+(applied, parameter-typed, or sitting under a ∀ the citation still has to
+instantiate) now falls back to citing the source argument-free, and the
+`such that` condition is checked against what that citation concludes. Both
+`Metric/compactness.math` sites are written the natural way; the entry below
+is the symptom as recorded. With
 `everyBallMeets : ∀ (scale : ℝ). scale > 0 → ∃ (y : m). …` in context,
 `choose y such that … from everyBallMeets;` gives:
 
