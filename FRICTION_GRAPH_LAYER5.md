@@ -60,8 +60,10 @@ Graph.Joins(graph, usedEdge, vertex, farEnd)` was written with the
 intended existential (`Graph.Incident`) sitting inside a conjunction and
 behind a definition, so the scan reached past it to an unrelated `∃` over
 the *edge* type and bound `farEnd : E`. The proof then failed a citation
-several lines later, with nothing pointing at the real mistake. Fixed in
-the library by naming the source: `from incidentAtVertex`.
+several lines later, with nothing pointing at the real mistake. It was
+worked around by naming the source, `from incidentAtVertex`; with the
+condition now the search key, the `from` is gone again and the site reads
+as first written.
 
 **Suggested fix.** Assemble the nested `∃ (name : T). predicate` in every
 branch, not just the lemma one, and ascribe the scrutinee to it — the code

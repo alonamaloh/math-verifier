@@ -172,7 +172,7 @@ TEST_MATHV_IFACE_FILES := $(TEST_MATHV_FILES:.mathv=.mathv.iface)
 PROJECT_MATHV_IFACE_FILES := $(PROJECT_MATHV_FILES:.mathv=.mathv.iface)
 
 .PHONY: library library-clean plane tests error-tests checker-tests \
-        premise-block-warning-check \
+        premise-block-warning-check partial-choose-condition-check \
         clean-check clean-status projects projects-clean project-tests all
 
 # Bare `make` VERIFIES THE LIBRARY — not just builds the kernel binary. The
@@ -227,7 +227,8 @@ plane: $(PLANE_MATHV_FILES) $(PLANE_MATHV_FILES:.mathv=.mathv.iface) \
 
 tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES) checker-tests \
 	carrier-normal-form-check matrix-ergonomics-statement-check \
-	premise-block-warning-check no-generated-in-library
+	premise-block-warning-check partial-choose-condition-check \
+	no-generated-in-library
 
 # The fifteen theorem's own gates. Separate from `tests` for the same reason
 # its proofs are separate from `library`: they re-render ~290k lines of
@@ -256,6 +257,22 @@ premise-block-warning-check:
 	  exit 1; \
 	fi; \
 	echo "premise-block-warning-check: PASS"
+
+# `choose … such that` states the condition the source binds, checked
+# definitionally. Naming only SOME of its conjuncts is honest but incomplete,
+# so it warns and goes through — the one verdict between "restates it" and
+# "says something else", and the one no library site currently exercises.
+# This asserts it stays a warning (a regression either way is silent).
+partial-choose-condition-check:
+	@output=$$(./kernel verify --source library/Test/choose_condition_selects_source.math \
+	    --output build/partial-choose-condition.mathv --cache-root build 2>&1); \
+	hits=$$(printf '%s\n' "$$output" | grep -c "states only part of the condition"); \
+	if [ "$$hits" != "1" ]; then \
+	  echo "partial-choose-condition-check: FAIL — expected exactly 1 warning, got $$hits"; \
+	  printf '%s\n' "$$output" | sed 's/^/  /'; \
+	  exit 1; \
+	fi; \
+	echo "partial-choose-condition-check: PASS"
 
 no-generated-in-library:
 	@found=$$(find library -name '*_generated.math' | sort); \

@@ -34,6 +34,17 @@ theorem Test.chooseThroughConjunctionToNestedExistential (A : Type(0))
   witness first with witness second with related
 }
 
+-- Stating only some of the conjuncts the source binds is honest but
+-- incomplete: it WARNS (naming the rest) and goes through, where a condition
+-- that is not among them is refused outright. Asserted by the Makefile's
+-- `partial-choose-condition-check`, which is why this theorem is here.
+theorem Test.choosePartialCondition (A : Type(0)) (P Q : A → Proposition)
+        (fact : ∃ (a : A). P(a) ∧ Q(a))
+        : ∃ (a : A). P(a) := {
+  choose value such that P(value) from fact;
+  witness value
+}
+
 -- The source is a hypothesis with a premise to discharge — an induction
 -- hypothesis generalised over one — and its witness type is APPLIED
 -- (`List(A)`), so the condition cannot be shaped into an existential ahead
@@ -41,7 +52,7 @@ theorem Test.chooseThroughConjunctionToNestedExistential (A : Type(0))
 -- checked against what it concludes, so no `: List(A)` annotation is needed.
 theorem Test.chooseAppliedWitnessTypeThroughPremise (A : Type(0))
         (Q : Proposition) (P : List(A) → Proposition)
-        (holds : Q)
+        (premiseHolds : Q)
         (fact : Q → ∃ (edgeList : List(A)). P(edgeList))
         : ∃ (edgeList : List(A)). P(edgeList) := {
   choose edgeList such that P(edgeList) as satisfies from fact;
