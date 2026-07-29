@@ -23,6 +23,7 @@ import Equality.basics
 import Set.basics
 import Lists.list
 import Lists.append
+import Lists.distinct
 import Graph.basics
 import Graph.walk
 import Graph.path
@@ -299,4 +300,84 @@ theorem Graph.IsPathGraph.reaches_an_end (pathGraph : Graph(V, E, ends))
         }
       }
   }
+}
+
+-- ----------------------------------------------------------------------
+-- Building the path graph.
+--
+-- Every `Graph.IsPathGraph` above is a hypothesis; this is where one is
+-- made. An ear is a path of the big graph presented as a graph of its
+-- own, so that it can be unioned back in.
+
+definition Graph.pathGraphOf (graph : Graph(V, E, ends)) (source : V)
+        (edgeList : List(E)) : Graph(V, E, ends) :=
+  Graph.make(Graph.walkVertexList(graph, source, edgeList), edgeList)
+
+theorem Graph.pathGraphOf.IsPathGraph (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph))
+        (source target : V) (edgeList : List(E))
+        (path : Graph.IsPath(graph, source, edgeList, target))
+        : Graph.IsPathGraph(Graph.pathGraphOf(graph, source, edgeList),
+                            source, target) := {
+  ∀ (candidate : E). candidate ∈ edgeList
+      → candidate ∈ Graph.edges(Graph.pathGraphOf(graph, source, edgeList))
+      by { take candidate : E;
+           suppose candidate ∈ edgeList;
+           done };
+  Graph.IsPath(Graph.pathGraphOf(graph, source, edgeList), source, edgeList, target)
+      by Graph.IsPath.transfer;
+
+  ∀ (vertex : V).
+      vertex ∈ Graph.vertices(Graph.pathGraphOf(graph, source, edgeList))
+      → vertex ∈ Graph.walkVertices(Graph.pathGraphOf(graph, source, edgeList),
+                                    source, edgeList)
+      by { take vertex : V;
+           suppose vertex ∈ Graph.vertices(Graph.pathGraphOf(graph, source, edgeList));
+           vertex ∈ Graph.walkVertexList(graph, source, edgeList);
+           done by Graph.walkVertexList.visits };
+
+  Graph.IsWalk(graph, source, edgeList, target) by Graph.IsPath.walk;
+  ∀ (vertex : V).
+      vertex ∈ Graph.walkVertices(Graph.pathGraphOf(graph, source, edgeList),
+                                  source, edgeList)
+      → vertex ∈ Graph.vertices(Graph.pathGraphOf(graph, source, edgeList))
+      by { take vertex : V;
+           suppose vertex ∈ Graph.walkVertices(
+               Graph.pathGraphOf(graph, source, edgeList), source, edgeList);
+           vertex ∈ Graph.walkVertices(graph, source, edgeList);
+           done by Graph.walkVertexList.complete };
+  done
+}
+
+theorem Graph.pathGraphOf.IsWellFormed (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph))
+        (source target : V) (edgeList : List(E))
+        (path : Graph.IsPath(graph, source, edgeList, target))
+        : Graph.IsWellFormed(Graph.pathGraphOf(graph, source, edgeList)) := {
+  List.Distinct(V, Graph.walkVertexList(graph, source, edgeList))
+      by Graph.IsPath.vertexList_distinct;
+  List.Distinct(E, edgeList) by Graph.IsPath.distinct_edges;
+  Graph.IsWalk(graph, source, edgeList, target) by Graph.IsPath.walk;
+  ∀ (edge : E). ∀ (u v : V).
+      edge ∈ Graph.edges(Graph.pathGraphOf(graph, source, edgeList))
+      → Graph.Joins(Graph.pathGraphOf(graph, source, edgeList), edge, u, v)
+      → u ∈ Graph.vertices(Graph.pathGraphOf(graph, source, edgeList)) ∧ ¬(u = v)
+      by { take edge : E;
+           take u : V;
+           take v : V;
+           suppose edge ∈ Graph.edges(Graph.pathGraphOf(graph, source, edgeList));
+           suppose Graph.Joins(Graph.pathGraphOf(graph, source, edgeList), edge, u, v);
+           edge ∈ edgeList;
+           Graph.Joins(graph, edge, u, v);
+           edge ∈ Graph.edges(graph) by Graph.IsWalk.edge_is_edge;
+           ¬(u = v) by Graph.IsWellFormed.no_loop;
+           Graph.Incident(graph, edge, u) by Graph.Joins.incident_source;
+           u ∈ Graph.coveredVertices(graph, edgeList)
+               by Graph.coveredVertices.of_edge;
+           u ∈ Graph.walkVertices(graph, source, edgeList);
+           u ∈ Graph.walkVertexList(graph, source, edgeList)
+               by Graph.walkVertexList.complete;
+           u ∈ Graph.vertices(Graph.pathGraphOf(graph, source, edgeList));
+           done };
+  done
 }

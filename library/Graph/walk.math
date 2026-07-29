@@ -508,3 +508,125 @@ theorem Graph.walkVertexList.length (graph : Graph(V, E, ends)) (edgeList : List
            = 1 + length(List.prepend(E, edge, rest))
       }
   }
+
+-- The list and the set agree, one direction each. Listed vertices are
+-- visited: the source is, and each later one is an end of an edge taken.
+theorem Graph.walkVertexList.visits (graph : Graph(V, E, ends)) (edgeList : List(E))
+        : ∀ (source vertex : V).
+            vertex ∈ Graph.walkVertexList(graph, source, edgeList)
+            → vertex ∈ Graph.walkVertices(graph, source, edgeList) :=
+  by induction on edgeList with IH {
+    case edgeList = List.empty: {
+        take source : V;
+        take vertex : V;
+        suppose vertex ∈ Graph.walkVertexList(graph, source, List.empty(E));
+        vertex ∈ List.prepend(V, source, List.empty(V));
+        vertex = source ∨ vertex ∈ List.empty(V) by List.member_prepend_invert;
+        done by cases {
+          case vertex = source: done
+          case vertex ∈ List.empty(V): {
+              ¬(vertex ∈ List.empty(V)) by List.no_member_empty;
+              done
+            }
+        }
+      }
+    case edgeList = List.prepend(edge, rest) for some edge, rest: {
+        take source : V;
+        take vertex : V;
+        suppose vertex ∈ Graph.walkVertexList(graph, source,
+                                              List.prepend(E, edge, rest));
+        vertex ∈ List.prepend(V, source,
+            Graph.walkVertexList(graph, Graph.otherEnd(graph, edge, source), rest));
+        vertex = source
+            ∨ vertex ∈ Graph.walkVertexList(graph,
+                           Graph.otherEnd(graph, edge, source), rest)
+            by List.member_prepend_invert;
+        done by cases {
+          case vertex = source: done
+          case vertex ∈ Graph.walkVertexList(graph,
+                            Graph.otherEnd(graph, edge, source), rest): {
+              vertex ∈ Graph.walkVertices(graph,
+                            Graph.otherEnd(graph, edge, source), rest) by IH;
+              done by cases {
+                case vertex = Graph.otherEnd(graph, edge, source) as isFarEnd: {
+                    Graph.Incident(graph, edge, Graph.otherEnd(graph, edge, source))
+                        by Graph.otherEnd.incident;
+                    Graph.Incident(graph, edge, vertex) by substituting isFarEnd;
+                    edge ∈ List.prepend(E, edge, rest);
+                    vertex ∈ Graph.coveredVertices(graph, List.prepend(E, edge, rest))
+                        by Graph.coveredVertices.of_edge;
+                    done
+                  }
+                case vertex ∈ Graph.coveredVertices(graph, rest): {
+                    ∀ (candidate : E). candidate ∈ rest
+                        → candidate ∈ List.prepend(E, edge, rest)
+                        by { take candidate : E;
+                             suppose candidate ∈ rest;
+                             done };
+                    vertex ∈ Graph.coveredVertices(graph, List.prepend(E, edge, rest))
+                        by Graph.coveredVertices.monotone;
+                    done
+                  }
+              }
+            }
+        }
+      }
+  }
+
+-- And conversely, for a walk of a graph with no loops: every vertex the
+-- walk visits is listed, because each step really does arrive at the
+-- other end of the edge it takes.
+theorem Graph.walkVertexList.complete (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph))
+        (source target : V) (edgeList : List(E))
+        (walk : Graph.IsWalk(graph, source, edgeList, target))
+        : ∀ (vertex : V). vertex ∈ Graph.walkVertices(graph, source, edgeList)
+            → vertex ∈ Graph.walkVertexList(graph, source, edgeList) :=
+  by induction on walk with IH {
+    case Graph.IsWalkOver.arrived(endpoint): {
+        take vertex : V;
+        suppose vertex ∈ Graph.walkVertices(graph, endpoint, List.empty(E));
+        done by cases {
+          case vertex = endpoint as isEndpoint: {
+              vertex ∈ List.prepend(V, endpoint, List.empty(V))
+                  by substituting isEndpoint;
+              done
+            }
+          case vertex ∈ Graph.coveredVertices(graph, List.empty(E)): {
+              ¬(vertex ∈ Graph.coveredVertices(graph, List.empty(E)))
+                  by Graph.coveredVertices.no_edges;
+              done
+            }
+        }
+      }
+    case Graph.IsWalkOver.step(
+        stepSource, waypoint, stepTarget, edge, rest, isEdge, joins, restWalk): {
+        take vertex : V;
+        suppose vertex ∈ Graph.walkVertices(graph, stepSource,
+                                            List.prepend(E, edge, rest));
+        ¬(stepSource = waypoint) by Graph.IsWellFormed.no_loop;
+        Graph.otherEnd(graph, edge, stepSource) = waypoint
+            by Graph.otherEnd.of_joins as arrivesAtWaypoint;
+        vertex = stepSource ∨ vertex ∈ Graph.walkVertices(graph, waypoint, rest)
+            by Graph.walkVertices.after_step;
+        done by cases {
+          case vertex = stepSource as isSource: {
+              vertex ∈ List.prepend(V, stepSource,
+                  Graph.walkVertexList(graph,
+                      Graph.otherEnd(graph, edge, stepSource), rest))
+                  by substituting isSource;
+              done
+            }
+          case vertex ∈ Graph.walkVertices(graph, waypoint, rest): {
+              vertex ∈ Graph.walkVertexList(graph, waypoint, rest) by IH;
+              vertex ∈ Graph.walkVertexList(graph,
+                  Graph.otherEnd(graph, edge, stepSource), rest)
+                  by substituting arrivesAtWaypoint;
+              vertex ∈ List.prepend(V, stepSource,
+                  Graph.walkVertexList(graph,
+                      Graph.otherEnd(graph, edge, stepSource), rest));
+              done
+            }
+        }
+      }
+  }

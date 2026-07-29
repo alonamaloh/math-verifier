@@ -114,6 +114,52 @@ theorem Graph.otherEnd.of_joins (graph : Graph(V, E, ends)) (edge : E) (u v : V)
       }
   }
 
+-- Whichever end `otherEnd` picks, it is an end.
+theorem Graph.otherEnd.incident (graph : Graph(V, E, ends)) (edge : E) (vertex : V)
+        : Graph.Incident(graph, edge, Graph.otherEnd(graph, edge, vertex)) := {
+  ∃ (x y : V). Graph.Joins(graph, edge, x, y) by Graph.edge_has_ends;
+  choose u, v such that Graph.Joins(graph, edge, u, v);
+  Graph.Joins(graph, edge, v, u) by Graph.Joins.symmetric;
+  done by cases {
+    case ends(edge) = Product.make(u, v) as endsEquation: {
+        done by cases {
+          case u = vertex as picksSecond: {
+              Graph.otherEnd(graph, edge, vertex)
+                 = (if u = vertex then v else u : V)  by substituting endsEquation
+                 = v                                  by Logic.if_positive;
+              Graph.Incident(graph, edge, v) by witness u;
+              done
+            }
+          otherwise: {
+              Graph.otherEnd(graph, edge, vertex)
+                 = (if u = vertex then v else u : V)  by substituting endsEquation
+                 = u                                  by Logic.if_negative;
+              Graph.Incident(graph, edge, u) by witness v;
+              done
+            }
+        }
+      }
+    case ends(edge) = Product.make(v, u) as endsEquation: {
+        done by cases {
+          case v = vertex as picksSecond: {
+              Graph.otherEnd(graph, edge, vertex)
+                 = (if v = vertex then u else v : V)  by substituting endsEquation
+                 = u                                  by Logic.if_positive;
+              Graph.Incident(graph, edge, u) by witness v;
+              done
+            }
+          otherwise: {
+              Graph.otherEnd(graph, edge, vertex)
+                 = (if v = vertex then u else v : V)  by substituting endsEquation
+                 = v                                  by Logic.if_negative;
+              Graph.Incident(graph, edge, v) by witness u;
+              done
+            }
+        }
+      }
+  }
+}
+
 -- An edge with two distinct ends has no third one: knowing where it
 -- starts pins where it arrives, which is what lets a walk name only the
 -- edges it takes.

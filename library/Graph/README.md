@@ -57,6 +57,8 @@ graph although they only read `ends`.
   blueprint's convention: at least three vertices, connected, and still
   connected after any one vertex goes
 - `Graph.union` in [union.math](union.math)
+- `Graph.pathGraphOf(graph, source, edgeList)` — a path of `graph`
+  presented as a graph of its own, which is how an ear is built
 - `Graph.IsPathGraph` in [pathgraph.math](pathgraph.math) — a graph whose
   own edge list walks from one end to the other, and whose vertices are
   exactly what that walk visits
@@ -92,6 +94,10 @@ graph although they only read `ends`.
 - `Graph.IsWalk.transfer` — a walk moves to any graph holding its edges
 - `Graph.IsPath.split` — a path splits at any vertex it visits, and the
   far half never returns to the source
+- `Graph.pathGraphOf.IsPathGraph` and `.IsWellFormed` — and so a path of a
+  well-formed graph really is a path graph, ready to hand to
+  `Graph.IsTwoConnected.ear`; `Graph.IsPath.vertexList_distinct` is what
+  makes it well-formed, and `Graph.IsPath.transfer` moves the path down
 - `Graph.IsPath.distinct_edges` and `Graph.IsPath.length_le_size` — a path
   takes no edge twice, so it is no longer than the graph it runs in
 - `Graph.longest_path` — and so a graph over an inhabited vertex type runs

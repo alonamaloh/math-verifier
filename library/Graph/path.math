@@ -24,6 +24,7 @@ import Set.basics
 import Lists.list
 import Lists.length
 import Lists.remove
+import Lists.distinct
 import Natural.least_number
 import Graph.basics
 import Graph.walk
@@ -472,5 +473,70 @@ theorem Graph.IsPath.first_edge (graph : Graph(V, E, ends))
         edge ∈ List.prepend(E, edge, rest);
         Graph.Incident(graph, edge, stepSource) by witness waypoint;
         witness edge
+      }
+  }
+
+-- A path moves to any graph holding its edges — the walk transfers, and
+-- the freshness condition reads only the ends, which are the ambient's.
+theorem Graph.IsPath.transfer (graph other : Graph(V, E, ends))
+        (source target : V) (edgeList : List(E))
+        (path : Graph.IsPath(graph, source, edgeList, target))
+        (edgesSurvive : ∀ (candidate : E). candidate ∈ edgeList
+            → candidate ∈ Graph.edges(other))
+        : Graph.IsPath(other, source, edgeList, target) :=
+  by induction on path with IH {
+    case Graph.IsPathOver.arrived(endpoint): done by Graph.IsPath.empty
+    case Graph.IsPathOver.step(
+        stepSource, waypoint, stepTarget, edge, rest, isEdge, joins, restPath,
+        fresh): {
+        ∀ (candidate : E). candidate ∈ rest → candidate ∈ Graph.edges(other)
+            by { take candidate : E;
+                 suppose candidate ∈ rest;
+                 candidate ∈ List.prepend(E, edge, rest);
+                 done by edgesSurvive };
+        Graph.IsPath(other, waypoint, rest, stepTarget) by IH;
+        edge ∈ List.prepend(E, edge, rest);
+        edge ∈ Graph.edges(other) by edgesSurvive;
+        Graph.Joins(other, edge, stepSource, waypoint);
+        ¬(stepSource ∈ Graph.walkVertices(other, waypoint, rest));
+        done by Graph.IsPath.extend
+      }
+  }
+
+-- A path never returns to a vertex it has left, so the vertices it
+-- visits, listed in order, repeat nothing.
+theorem Graph.IsPath.vertexList_distinct (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph))
+        (source target : V) (edgeList : List(E))
+        (path : Graph.IsPath(graph, source, edgeList, target))
+        : List.Distinct(V, Graph.walkVertexList(graph, source, edgeList)) :=
+  by induction on path with IH {
+    case Graph.IsPathOver.arrived(endpoint): {
+        ¬(endpoint ∈ List.empty(V)) by List.no_member_empty;
+        List.Distinct(V, List.empty(V)) by List.Distinct.empty;
+        List.Distinct(V, List.prepend(V, endpoint, List.empty(V)))
+            by List.Distinct.prepend;
+        done
+      }
+    case Graph.IsPathOver.step(
+        stepSource, waypoint, stepTarget, edge, rest, isEdge, joins, restPath,
+        fresh): {
+        List.Distinct(V, Graph.walkVertexList(graph, waypoint, rest)) by IH;
+        ¬(stepSource = waypoint) by Graph.IsWellFormed.no_loop;
+        Graph.otherEnd(graph, edge, stepSource) = waypoint
+            by Graph.otherEnd.of_joins as arrivesAtWaypoint;
+        ¬(stepSource ∈ Graph.walkVertexList(graph, waypoint, rest))
+            by { suppose stepSource ∈ Graph.walkVertexList(graph, waypoint, rest);
+                 stepSource ∈ Graph.walkVertices(graph, waypoint, rest)
+                     by Graph.walkVertexList.visits;
+                 done };
+        List.Distinct(V, List.prepend(V, stepSource,
+            Graph.walkVertexList(graph, waypoint, rest)))
+            by List.Distinct.prepend;
+        List.Distinct(V, List.prepend(V, stepSource,
+            Graph.walkVertexList(graph,
+                Graph.otherEnd(graph, edge, stepSource), rest)))
+            by substituting arrivesAtWaypoint;
+        done
       }
   }
