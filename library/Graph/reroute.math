@@ -1,0 +1,117 @@
+-- Graph/reroute.math
+--
+-- Replacing one edge by a route. Layer 5 of PLAN_JORDAN_SCHOENFLIES.md.
+--
+-- If every edge but one survives into a second graph, and the two ends of
+-- the exception are joined there by some other means, then everything the
+-- first graph reaches the second one reaches too: a walk that took the
+-- missing edge takes the replacement route instead.
+--
+-- This is what a subdivision needs — the new vertex splits an edge into
+-- two, and old walks are rerouted through it — and it is also how an edge
+-- that lies on a cycle can simply be deleted without disconnecting
+-- anything.
+
+module Graph.reroute
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Equality.basics
+import Lists.list
+import Graph.basics
+import Graph.walk
+import Graph.connected
+import Graph.deletion
+import Graph.cycle
+
+convention V : Type(0)
+convention E : Type(0)
+convention ends : E → Pair(V, V)
+
+theorem Graph.Reaches.reroute (graph bigger : Graph(V, E, ends)) (edge : E) (u v : V)
+        (endsDistinct : ¬(u = v))
+        (joins : Graph.Joins(graph, edge, u, v))
+        (otherEdgesSurvive : ∀ (candidate : E). candidate ∈ Graph.edges(graph)
+            → ¬(candidate = edge) → candidate ∈ Graph.edges(bigger))
+        (endsJoined : Graph.Reaches(bigger, u, v))
+        (source target : V)
+        (reaches : Graph.Reaches(graph, source, target))
+        : Graph.Reaches(bigger, source, target) := {
+  choose edgeList such that Graph.IsWalk(graph, source, edgeList, target)
+      as theWalk from reaches;
+  done by induction on theWalk with IH {
+    case Graph.IsWalkOver.arrived(endpoint): done by Graph.Reaches.reflexive
+    case Graph.IsWalkOver.step(
+        stepSource, waypoint, stepTarget, takenEdge, rest, isEdge, stepJoins, restWalk): {
+        Graph.Reaches(graph, waypoint, stepTarget) by { witness rest };
+        Graph.Reaches(bigger, waypoint, stepTarget) by IH;
+        Graph.Reaches(bigger, stepSource, waypoint)
+            by cases {
+              case takenEdge = edge: {
+                  -- The step took the missing edge, so it ran between the
+                  -- two ends, one way or the other.
+                  Graph.Joins(graph, edge, stepSource, waypoint)
+                      by substituting (takenEdge = edge);
+                  (stepSource = u ∧ waypoint = v) ∨ (stepSource = v ∧ waypoint = u)
+                      by Graph.Joins.ends_agree;
+                  done by cases {
+                    case stepSource = u ∧ waypoint = v: {
+                        stepSource = u;
+                        waypoint = v;
+                        Graph.Reaches(bigger, stepSource, v)
+                            by substituting (stepSource = u);
+                        done by substituting (waypoint = v)
+                      }
+                    case stepSource = v ∧ waypoint = u: {
+                        stepSource = v;
+                        waypoint = u;
+                        Graph.Reaches(bigger, v, u) by Graph.Reaches.symmetric;
+                        Graph.Reaches(bigger, stepSource, u)
+                            by substituting (stepSource = v);
+                        done by substituting (waypoint = u)
+                      }
+                  }
+                }
+              otherwise: {
+                  ¬(takenEdge = edge);
+                  takenEdge ∈ Graph.edges(bigger) by otherEdgesSurvive;
+                  Graph.Joins(bigger, takenEdge, stepSource, waypoint);
+                  Graph.IsWalk(bigger, stepSource,
+                               List.prepend(E, takenEdge, List.empty(E)), waypoint)
+                      by Graph.IsWalk.single;
+                  witness List.prepend(E, takenEdge, List.empty(E))
+                }
+            };
+        done by Graph.Reaches.transitive(middle := waypoint)
+      }
+  }
+}
+
+-- An edge on a cycle can go: its ends are still joined without it, and
+-- every walk that used it takes the rest of the cycle instead.
+theorem Graph.IsConnected.after_edge_deletion (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph))
+        (connected : Graph.IsConnected(graph)) (edge : E) (u v : V)
+        (isEdge : edge ∈ Graph.edges(graph))
+        (joins : Graph.Joins(graph, edge, u, v))
+        (endsStillJoined : Graph.Reaches(Graph.deleteEdge(graph, edge), u, v))
+        : Graph.IsConnected(Graph.deleteEdge(graph, edge)) := {
+  ¬(u = v) by Graph.IsWellFormed.no_loop;
+  ∀ (candidate : E). candidate ∈ Graph.edges(graph) → ¬(candidate = edge)
+      → candidate ∈ Graph.edges(Graph.deleteEdge(graph, edge))
+      by { take candidate : E;
+           suppose candidate ∈ Graph.edges(graph);
+           suppose ¬(candidate = edge);
+           done by Graph.deleteEdge.keeps };
+  choose hub such that hub ∈ Graph.vertices(graph) from Graph.IsConnected.has_vertex;
+  hub ∈ Graph.vertices(Graph.deleteEdge(graph, edge));
+  ∀ (target : V). target ∈ Graph.vertices(Graph.deleteEdge(graph, edge))
+      → Graph.Reaches(Graph.deleteEdge(graph, edge), hub, target)
+      by { take target : V;
+           suppose target ∈ Graph.vertices(Graph.deleteEdge(graph, edge));
+           target ∈ Graph.vertices(graph);
+           Graph.Reaches(graph, hub, target) by Graph.IsConnected.reaches;
+           done by Graph.Reaches.reroute(bigger := Graph.deleteEdge(graph, edge)) };
+  done by Graph.IsConnected.from_hub(hub := hub)
+}
