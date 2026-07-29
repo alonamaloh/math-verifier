@@ -1,0 +1,218 @@
+-- Graph/ear.math
+--
+-- Adding an ear. Layer 5 of PLAN_JORDAN_SCHOENFLIES.md, the second half
+-- of the blueprint's `lem:subdivision-ear-preserve`.
+--
+-- An ear is a path whose two distinct ends already lie in the graph. The
+-- blueprint adds that its internal vertices are new; the proof below does
+-- not use that, so it is not assumed — what carries the argument is only
+-- that a path still reaches one of its ends after any single vertex is
+-- deleted, and that both ends live in a graph that is 2-connected.
+--
+-- Deleting a vertex from the union leaves each side connected (the ear
+-- because it is a path, the graph because it is 2-connected or because
+-- the vertex was never in it), and one of the ear's two ends survives to
+-- be a common vertex. That end is the hub everything is routed through.
+
+module Graph.ear
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Lists.list
+import Lists.length
+import Graph.basics
+import Graph.walk
+import Graph.path
+import Graph.connected
+import Graph.vertex_deletion
+import Graph.twoconnected
+import Graph.union
+import Graph.reverse
+import Graph.pathgraph
+
+convention V : Type(0)
+convention E : Type(0)
+convention ends : E → Pair(V, V)
+
+theorem Graph.IsTwoConnected.ear (graph earGraph : Graph(V, E, ends))
+        (graphWellFormed : Graph.IsWellFormed(graph))
+        (earWellFormed : Graph.IsWellFormed(earGraph))
+        (twoConnected : Graph.IsTwoConnected(graph))
+        (nearEnd farEnd : V)
+        (isEar : Graph.IsPathGraph(earGraph, nearEnd, farEnd))
+        (endsDistinct : ¬(nearEnd = farEnd))
+        (nearEndInGraph : nearEnd ∈ Graph.vertices(graph))
+        (farEndInGraph : farEnd ∈ Graph.vertices(graph))
+        : Graph.IsTwoConnected(Graph.union(graph, earGraph)) := {
+  nearEnd ∈ Graph.vertices(earGraph) by Graph.IsPathGraph.source_is_vertex;
+  farEnd ∈ Graph.vertices(earGraph) by Graph.IsPathGraph.target_is_vertex;
+  Graph.IsConnected(graph) by Graph.IsTwoConnected.connected;
+  Graph.IsConnected(earGraph) by Graph.IsPathGraph.IsConnected;
+  Graph.IsSubgraph(graph, Graph.union(graph, earGraph)) by Graph.union.IsSubgraph_left;
+  Graph.IsSubgraph(earGraph, Graph.union(graph, earGraph)) by Graph.union.IsSubgraph_right;
+
+  Graph.IsWellFormed(Graph.union(graph, earGraph)) by Graph.union.IsWellFormed;
+  Graph.IsConnected(Graph.union(graph, earGraph))
+      by Graph.union.IsConnected(common := nearEnd);
+  3 ≤ Graph.order(graph);
+  Graph.order(graph) ≤ Graph.order(Graph.union(graph, earGraph))
+      by Graph.union.order_left;
+  3 ≤ Graph.order(Graph.union(graph, earGraph));
+
+  ∀ (deleted : V). deleted ∈ Graph.vertices(Graph.union(graph, earGraph))
+      → Graph.IsConnected(Graph.deleteVertex(Graph.union(graph, earGraph), deleted))
+      by { take deleted : V;
+           suppose deleted ∈ Graph.vertices(Graph.union(graph, earGraph));
+
+           -- One of the ear's two ends survives, and it is the hub.
+           ∃ (hub : V). hub ∈ Graph.vertices(graph) ∧ hub ∈ Graph.vertices(earGraph)
+                 ∧ ¬(hub = deleted)
+               by cases {
+                 case nearEnd = deleted: {
+                     ¬(farEnd = deleted) by substituting (nearEnd = deleted);
+                     witness farEnd
+                   }
+                 otherwise: { ¬(nearEnd = deleted); witness nearEnd }
+               };
+           choose hub such that hub ∈ Graph.vertices(graph)
+               ∧ hub ∈ Graph.vertices(earGraph) ∧ ¬(hub = deleted);
+           hub ∈ Graph.vertices(graph);
+           ¬(hub = deleted);
+
+           -- The graph side survives the deletion, either because it is
+           -- 2-connected or because the vertex was never in it.
+           Graph.IsConnected(Graph.deleteVertex(graph, deleted))
+               by cases {
+                 case deleted ∈ Graph.vertices(graph):
+                     done by Graph.IsTwoConnected.survives_deletion
+                 otherwise: {
+                     ¬(deleted ∈ Graph.vertices(graph));
+                     done by Graph.IsConnected.after_outside_deletion(graph := graph)
+                   }
+               };
+           Graph.IsSubgraph(Graph.deleteVertex(graph, deleted),
+                            Graph.deleteVertex(Graph.union(graph, earGraph), deleted))
+               by Graph.deleteVertex.monotone(part := graph);
+           Graph.IsSubgraph(Graph.deleteVertex(earGraph, deleted),
+                            Graph.deleteVertex(Graph.union(graph, earGraph), deleted))
+               by Graph.deleteVertex.monotone(part := earGraph);
+           hub ∈ Graph.vertices(Graph.deleteVertex(graph, deleted))
+               by Graph.deleteVertex.keeps_vertex(graph := graph);
+           hub ∈ Graph.vertices(Graph.union(graph, earGraph))
+               by Graph.union.vertex_left;
+           hub ∈ Graph.vertices(Graph.deleteVertex(Graph.union(graph, earGraph), deleted))
+               by Graph.deleteVertex.keeps_vertex;
+
+           -- Every surviving vertex of the graph side reaches the hub.
+           ∀ (endpoint : V). endpoint ∈ Graph.vertices(graph) → ¬(endpoint = deleted)
+               → Graph.Reaches(
+                     Graph.deleteVertex(Graph.union(graph, earGraph), deleted),
+                     endpoint, hub)
+               by { take endpoint : V;
+                    suppose endpoint ∈ Graph.vertices(graph);
+                    suppose ¬(endpoint = deleted);
+                    endpoint ∈ Graph.vertices(Graph.deleteVertex(graph, deleted))
+                        by Graph.deleteVertex.keeps_vertex(graph := graph);
+                    Graph.Reaches(Graph.deleteVertex(graph, deleted), endpoint, hub)
+                        by Graph.IsConnected.reaches;
+                    done by Graph.Reaches.in_supergraph(
+                                part := Graph.deleteVertex(graph, deleted)) }
+               as graphSideReachesHub;
+
+           ∀ (target : V).
+               target ∈ Graph.vertices(Graph.deleteVertex(Graph.union(graph, earGraph),
+                            deleted))
+               → Graph.Reaches(Graph.deleteVertex(Graph.union(graph, earGraph), deleted),
+                               target, hub)
+               by { take target : V;
+                    suppose target ∈ Graph.vertices(
+                        Graph.deleteVertex(Graph.union(graph, earGraph), deleted));
+                    ¬(target = deleted) by Graph.deleteVertex.drops;
+                    target ∈ Graph.vertices(Graph.union(graph, earGraph))
+                        by Graph.deleteVertex.is_vertex;
+                    target ∈ Graph.vertices(graph) ∨ target ∈ Graph.vertices(earGraph)
+                        by Graph.union.vertex_invert;
+                    done by cases {
+                      case target ∈ Graph.vertices(graph): done by graphSideReachesHub
+                      case target ∈ Graph.vertices(earGraph): {
+                          -- On the ear, the deletion still leaves one of the
+                          -- two ends reachable; that end is in the graph, and
+                          -- it survived, so it reaches the hub.
+                          Graph.Reaches(Graph.deleteVertex(earGraph, deleted),
+                                        target, nearEnd)
+                              ∨ Graph.Reaches(Graph.deleteVertex(earGraph, deleted),
+                                              target, farEnd)
+                              by Graph.IsPathGraph.reaches_an_end(cut := deleted);
+                          done by cases {
+                            case Graph.Reaches(Graph.deleteVertex(earGraph, deleted),
+                                     target, nearEnd): {
+                                ¬(nearEnd = deleted)
+                                    by { suppose nearEnd = deleted;
+                                         Graph.Reaches(
+                                             Graph.deleteVertex(earGraph, deleted),
+                                             target, deleted)
+                                             by substituting (nearEnd = deleted);
+                                         ¬Graph.Reaches(
+                                             Graph.deleteVertex(earGraph, deleted),
+                                             target, deleted)
+                                             by Graph.Reaches.not_to_deleted;
+                                         done };
+                                Graph.Reaches(
+                                    Graph.deleteVertex(Graph.union(graph, earGraph),
+                                        deleted), target, nearEnd)
+                                    by Graph.Reaches.in_supergraph(
+                                          part := Graph.deleteVertex(earGraph, deleted));
+                                Graph.Reaches(
+                                    Graph.deleteVertex(Graph.union(graph, earGraph),
+                                        deleted), nearEnd, hub)
+                                    by graphSideReachesHub;
+                                done by Graph.Reaches.transitive(middle := nearEnd)
+                              }
+                            case Graph.Reaches(Graph.deleteVertex(earGraph, deleted),
+                                     target, farEnd): {
+                                ¬(farEnd = deleted)
+                                    by { suppose farEnd = deleted;
+                                         Graph.Reaches(
+                                             Graph.deleteVertex(earGraph, deleted),
+                                             target, deleted)
+                                             by substituting (farEnd = deleted);
+                                         ¬Graph.Reaches(
+                                             Graph.deleteVertex(earGraph, deleted),
+                                             target, deleted)
+                                             by Graph.Reaches.not_to_deleted;
+                                         done };
+                                Graph.Reaches(
+                                    Graph.deleteVertex(Graph.union(graph, earGraph),
+                                        deleted), target, farEnd)
+                                    by Graph.Reaches.in_supergraph(
+                                          part := Graph.deleteVertex(earGraph, deleted));
+                                Graph.Reaches(
+                                    Graph.deleteVertex(Graph.union(graph, earGraph),
+                                        deleted), farEnd, hub)
+                                    by graphSideReachesHub;
+                                done by Graph.Reaches.transitive(middle := farEnd)
+                              }
+                          }
+                        }
+                    } }
+               as everythingReachesHub;
+
+           ∀ (target : V).
+               target ∈ Graph.vertices(Graph.deleteVertex(Graph.union(graph, earGraph),
+                            deleted))
+               → Graph.Reaches(Graph.deleteVertex(Graph.union(graph, earGraph), deleted),
+                               hub, target)
+               by { take target : V;
+                    suppose target ∈ Graph.vertices(
+                        Graph.deleteVertex(Graph.union(graph, earGraph), deleted));
+                    Graph.Reaches(Graph.deleteVertex(Graph.union(graph, earGraph),
+                                      deleted), target, hub)
+                        by everythingReachesHub;
+                    done by Graph.Reaches.symmetric };
+           done by Graph.IsConnected.from_hub(hub := hub) };
+  done
+}
