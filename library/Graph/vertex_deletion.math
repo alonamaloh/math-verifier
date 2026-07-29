@@ -196,6 +196,24 @@ theorem Graph.IsWalk.avoiding_vertex (graph : Graph(V, E, ends)) (vertex : V)
       }
   }
 
+-- A walk that survives the deletion never takes an edge at the deleted
+-- vertex — there are none left to take. This is how an argument that
+-- routes around a vertex ends up avoiding a particular edge.
+theorem Graph.IsWalk.in_vertex_deletion_misses (graph : Graph(V, E, ends)) (vertex : V)
+        (source target : V) (edgeList : List(E))
+        (walk : Graph.IsWalk(Graph.deleteVertex(graph, vertex), source, edgeList, target))
+        (edge : E)
+        (incident : Graph.Incident(graph, edge, vertex))
+        : ¬(edge ∈ edgeList) := {
+  ∀ (candidate : E). candidate ∈ edgeList
+      → candidate ∈ Graph.edges(Graph.deleteVertex(graph, vertex))
+      by Graph.IsWalk.edge_is_edge as walkEdgesSurvive;
+  suppose edge ∈ edgeList;
+  edge ∈ Graph.edges(Graph.deleteVertex(graph, vertex)) by walkEdgesSurvive;
+  ¬Graph.Incident(graph, edge, vertex) by Graph.deleteVertex.edge_avoids;
+  done
+}
+
 -- ----------------------------------------------------------------------
 -- Cut vertices.
 

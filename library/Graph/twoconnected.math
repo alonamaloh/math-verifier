@@ -1,0 +1,171 @@
+-- Graph/twoconnected.math
+--
+-- Two-connectivity. Layer 5 of PLAN_JORDAN_SCHOENFLIES.md.
+--
+-- The blueprint's convention, adopted verbatim: a finite graph is
+-- 2-connected if it has at least three vertices, is connected, and stays
+-- connected after any one vertex is deleted. So a 2-connected graph has
+-- no cut vertex, and the one-edge graph is not 2-connected. Two-vertex
+-- cycles are still cycles — they appear as face boundaries inside a
+-- larger 2-connected graph — but they are not themselves 2-connected.
+--
+-- The result the rest of the development leans on is that a 2-connected
+-- graph has no bridge. The blueprint proves it by looking at the two
+-- components left when the bridge is removed; the proof here routes
+-- around instead, which needs no components: a third vertex `w` exists,
+-- the graph without `v` joins `u` to `w`, the graph without `u` joins `w`
+-- to `v`, and neither of those walks can have used an edge at the vertex
+-- that was deleted.
+
+module Graph.twoconnected
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Lists.list
+import Lists.length
+import Lists.distinct
+import Lists.remove
+import Graph.basics
+import Graph.walk
+import Graph.path
+import Graph.connected
+import Graph.deletion
+import Graph.cycle
+import Graph.vertex_deletion
+
+convention V : Type(0)
+convention E : Type(0)
+convention ends : E → Pair(V, V)
+
+definition Graph.IsTwoConnected (graph : Graph(V, E, ends)) : Proposition :=
+  3 ≤ Graph.order(graph)
+  ∧ Graph.IsConnected(graph)
+  ∧ ∀ (vertex : V). vertex ∈ Graph.vertices(graph)
+      → Graph.IsConnected(Graph.deleteVertex(graph, vertex))
+
+theorem Graph.IsTwoConnected.connected (graph : Graph(V, E, ends))
+        (twoConnected : Graph.IsTwoConnected(graph))
+        : Graph.IsConnected(graph) :=
+  done
+
+theorem Graph.IsTwoConnected.survives_deletion (graph : Graph(V, E, ends))
+        (twoConnected : Graph.IsTwoConnected(graph)) (vertex : V)
+        (isVertex : vertex ∈ Graph.vertices(graph))
+        : Graph.IsConnected(Graph.deleteVertex(graph, vertex)) := {
+  ∀ (candidate : V). candidate ∈ Graph.vertices(graph)
+      → Graph.IsConnected(Graph.deleteVertex(graph, candidate)) as everyDeletion;
+  done by everyDeletion(vertex)
+}
+
+theorem Graph.IsTwoConnected.no_cut_vertex (graph : Graph(V, E, ends))
+        (twoConnected : Graph.IsTwoConnected(graph)) (vertex : V)
+        : ¬Graph.IsCutVertex(graph, vertex) := {
+  suppose Graph.IsCutVertex(graph, vertex);
+  vertex ∈ Graph.vertices(graph);
+  ¬Graph.IsConnected(Graph.deleteVertex(graph, vertex)) as disconnected;
+  Graph.IsConnected(Graph.deleteVertex(graph, vertex))
+      by Graph.IsTwoConnected.survives_deletion;
+  done by disconnected
+}
+
+-- ----------------------------------------------------------------------
+-- A third vertex.
+--
+-- Two named vertices of a graph on three or more leave one over. The
+-- count is the whole argument: removing each of them in turn shortens the
+-- vertex list by one, and what is left is not empty.
+
+theorem Graph.third_vertex (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph)) (u v : V)
+        (uIsVertex : u ∈ Graph.vertices(graph))
+        (vIsVertex : v ∈ Graph.vertices(graph))
+        (distinct : ¬(u = v))
+        (atLeastThree : 3 ≤ Graph.order(graph))
+        : ∃ (w : V). w ∈ Graph.vertices(graph) ∧ ¬(w = u) ∧ ¬(w = v) := {
+  List.Distinct(V, Graph.vertices(graph)) by Graph.IsWellFormed.vertices_distinct;
+  List.Distinct(V, Graph.vertices(graph) ∖ u) by List.remove_distinct;
+  ¬(v = u) by Equality.not_equal_symmetric;
+  v ∈ Graph.vertices(graph) ∖ u by List.remove_member_complete;
+  length(Graph.vertices(graph) ∖ u) = 1 + length(Graph.vertices(graph) ∖ u ∖ v)
+      by List.length_remove_member;
+  3 ≤ length(Graph.vertices(graph))
+        = 1 + length(Graph.vertices(graph) ∖ u)   by List.length_remove_member
+        = 1 + (1 + length(Graph.vertices(graph) ∖ u ∖ v))
+        = 2 + length(Graph.vertices(graph) ∖ u ∖ v);
+  (2 : ℕ) + 1 ≤ 2 + length(Graph.vertices(graph) ∖ u ∖ v);
+  1 ≤ length(Graph.vertices(graph) ∖ u ∖ v) by Natural.add_left_le_cancel;
+  choose w such that w ∈ Graph.vertices(graph) ∖ u ∖ v
+      from List.member_of_positive_length;
+  ¬(w = v) by List.remove_member_ne;
+  w ∈ Graph.vertices(graph) ∖ u by List.remove_member_subset;
+  ¬(w = u) by List.remove_member_ne;
+  w ∈ Graph.vertices(graph) by List.remove_member_subset;
+  witness w
+}
+
+-- ----------------------------------------------------------------------
+-- No bridge.
+
+theorem Graph.IsTwoConnected.no_bridge (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph))
+        (twoConnected : Graph.IsTwoConnected(graph)) (edge : E) (u v : V)
+        (isEdge : edge ∈ Graph.edges(graph))
+        (joins : Graph.Joins(graph, edge, u, v))
+        : Graph.Reaches(Graph.deleteEdge(graph, edge), u, v) := {
+  u ∈ Graph.vertices(graph) by Graph.IsWellFormed.end_is_vertex;
+  v ∈ Graph.vertices(graph) by Graph.IsWellFormed.other_end_is_vertex;
+  ¬(u = v) by Graph.IsWellFormed.no_loop;
+  Graph.Incident(graph, edge, u) by Graph.Joins.incident_source;
+  Graph.Incident(graph, edge, v) by Graph.Joins.incident_target;
+  3 ≤ Graph.order(graph);
+  choose w such that w ∈ Graph.vertices(graph) ∧ ¬(w = u) ∧ ¬(w = v)
+      from Graph.third_vertex;
+  ¬(v = u) by Equality.not_equal_symmetric;
+  w ∈ Graph.vertices(graph);
+  ¬(w = u);
+  ¬(w = v);
+
+  -- From `u` to `w` without ever meeting `v`.
+  Graph.IsConnected(Graph.deleteVertex(graph, v))
+      by Graph.IsTwoConnected.survives_deletion;
+  u ∈ Graph.vertices(Graph.deleteVertex(graph, v)) by Graph.deleteVertex.keeps_vertex;
+  w ∈ Graph.vertices(Graph.deleteVertex(graph, v)) by Graph.deleteVertex.keeps_vertex;
+  Graph.Reaches(Graph.deleteVertex(graph, v), u, w) by Graph.IsConnected.reaches;
+  choose firstEdges such that Graph.IsWalk(Graph.deleteVertex(graph, v), u, firstEdges, w);
+  ¬(edge ∈ firstEdges) by Graph.IsWalk.in_vertex_deletion_misses;
+  Graph.IsWalk(graph, u, firstEdges, w) by Graph.IsWalk.after_vertex_deletion;
+  Graph.IsWalk(Graph.deleteEdge(graph, edge), u, firstEdges, w)
+      by Graph.IsWalk.avoiding_edge;
+  Graph.Reaches(Graph.deleteEdge(graph, edge), u, w) by { witness firstEdges };
+
+  -- From `w` to `v` without ever meeting `u`.
+  Graph.IsConnected(Graph.deleteVertex(graph, u))
+      by Graph.IsTwoConnected.survives_deletion;
+  w ∈ Graph.vertices(Graph.deleteVertex(graph, u)) by Graph.deleteVertex.keeps_vertex;
+  v ∈ Graph.vertices(Graph.deleteVertex(graph, u)) by Graph.deleteVertex.keeps_vertex;
+  Graph.Reaches(Graph.deleteVertex(graph, u), w, v) by Graph.IsConnected.reaches;
+  choose secondEdges such that Graph.IsWalk(Graph.deleteVertex(graph, u), w, secondEdges, v);
+  ¬(edge ∈ secondEdges) by Graph.IsWalk.in_vertex_deletion_misses;
+  Graph.IsWalk(graph, w, secondEdges, v) by Graph.IsWalk.after_vertex_deletion;
+  Graph.IsWalk(Graph.deleteEdge(graph, edge), w, secondEdges, v)
+      by Graph.IsWalk.avoiding_edge;
+  Graph.Reaches(Graph.deleteEdge(graph, edge), w, v) by { witness secondEdges };
+
+  done by Graph.Reaches.transitive(middle := w)
+}
+
+-- Hence every edge of a 2-connected graph lies on a cycle.
+theorem Graph.IsTwoConnected.edge_on_cycle (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph))
+        (twoConnected : Graph.IsTwoConnected(graph)) (edge : E)
+        (isEdge : edge ∈ Graph.edges(graph))
+        : Graph.LiesOnCycle(graph, edge) := {
+  ∃ (x y : V). Graph.Joins(graph, edge, x, y) by Graph.edge_has_ends;
+  choose u, v such that Graph.Joins(graph, edge, u, v);
+  Graph.Reaches(Graph.deleteEdge(graph, edge), u, v) by Graph.IsTwoConnected.no_bridge;
+  done by Graph.LiesOnCycle.of_deletion_reaches
+}
