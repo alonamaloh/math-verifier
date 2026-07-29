@@ -67,10 +67,22 @@ def run_verify(path, check_flags):
 
 
 def run_check(path):
-    """Run all three redundancy diagnostics in one pass (cost-limited)."""
+    """Run all three redundancy diagnostics in one pass (cost-limited).
+
+    A run that FAILS produces no warnings, which must never be reported as
+    "clean" — a stale import cache (the usual cause: a sibling file was
+    edited in the same batch) would then silently pass every file after the
+    first as needing no work.
+    """
     result = run_verify(path, ["--check-redundant-by",
                                "--check-redundant-by-non-eq",
                                "--check-redundant-calc-steps"])
+    if result.returncode != 0:
+        sys.stderr.write(
+            f"{path}: the redundancy run FAILED, so it found nothing — this "
+            f"is not a clean file.\n")
+        sys.stderr.write((result.stdout + result.stderr).rstrip() + "\n")
+        sys.exit(1)
     return result.stdout + result.stderr
 
 
