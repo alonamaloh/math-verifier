@@ -197,3 +197,84 @@ witness type is `List(E)`, not a bare constant, and that is the whole
 reason the read fails (`witnessConstant` in `elaborateChoose` requires the
 witness type to be a `Constant`). A generalised IH over a list-valued
 existential is a common enough shape that reading applied types would pay.
+
+---
+
+## G6 — naming an argument can BREAK a citation that works bare
+
+**Symptom.** `¬(target = deleted) by Graph.deleteVertex.drops(graph := Graph.union(first, second));`
+fails with
+
+```
+unbound internal variable: _hole_2_Graph.deleteVertex.drops
+```
+
+while the same citation with no argument at all — `by Graph.deleteVertex.drops` —
+succeeds. Seen again at `Graph.IsPath.reverse(edgeList := prefixEdges)`:
+`could not infer hole(s) at positions 2 3 7`, where the bare citation had been
+rejected only for ambiguity.
+
+**Why it matters.** `named_arguments_over_positional` says to pass the one
+un-inferable argument by name, and G8 below is exactly the situation that
+calls for it — but the named-argument path solves *fewer* holes than the
+bare one, so the documented escape hatch is sometimes unavailable. The
+workaround is structural: put the competing fact inside a `by { … }` block
+so it is not in scope at the citation, or factor the step into its own
+lemma whose conclusion pins the arguments.
+
+**Not always.** `Graph.IsPathGraph.halves(cut := cut)` and
+`Graph.Reaches.transitive(middle := w)` both work. The failures are the
+ones where the named argument is a *graph-valued* expression and other
+arguments have to be solved from the goal at the same time.
+
+---
+
+## G7 — an implication as the last conjunct of an existential body
+
+**Symptom.** With the conclusion
+
+```math
+∃ (prefixEdges : List(E)). ∃ (suffixEdges : List(E)).
+    … ∧ (¬(vertex = source) → ¬(source ∈ Graph.walkVertices(graph, vertex, suffixEdges)))
+```
+
+every `witness A with witness B` in the proof fails with
+
+```
+`witness E with P` lost its expected type — P is a one-step relation chain,
+so its `= … by …` was read as the enclosing statement's
+```
+
+which names a construct the proof does not contain. Parenthesising the
+implication, braces around the inner witness, and `with done` all leave it
+unchanged. Restating the clause as a disjunction —
+`vertex = source ∨ ¬(source ∈ …)` — fixes it and reads better anyway.
+
+**Guess at the cause.** The witness's expected type is derived by peeling
+the existential; a trailing `→` in the body seems to be mistaken for the
+statement-level implication that separates a claim from its proof.
+
+---
+
+## G8 — premise ambiguity is reported even when the goal pins the arguments
+
+**Symptom.** Recurring, roughly once per fifty lines in this layer:
+
+```
+ambiguous `by Graph.IsPathGraph.halves` citation: the premise
+`List.memberOf @V ? (Graph.vertices @V @E @ends @pathGraph)` is matched by
+several hypotheses that pin different arguments
+```
+
+with `cut ∈ vertices(pathGraph)` and `vertex ∈ vertices(pathGraph)` both in
+scope. The conclusion often determines which is meant, but the matcher
+decides on the premise first and gives up.
+
+**What the library does.** Three workarounds, in order of preference:
+factor the step into a lemma whose *conclusion* mentions the disputed
+argument (this is why `Graph.IsPath.reaches_target_avoiding_source` exists
+separately from the path-graph version); scope the competing fact inside a
+`by { … }` block; or name the argument (G6 permitting).
+
+**Suggested fix.** Try the conclusion match before the premise search, and
+only report ambiguity for arguments the conclusion leaves open.
