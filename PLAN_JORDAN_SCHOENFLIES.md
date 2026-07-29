@@ -438,9 +438,52 @@ What remains — the assembly:
    the "exhibit a parametrisation" step only; the set-level covering and
    meeting facts above hold uniformly and must not be duplicated.
 
-## Layer 5 — `Graph/` : finite graphs
+## Layer 5 — `Graph/` : finite graphs — **STARTED 2026-07-29**
 
 Abstract, no geometry. Keep it that way — Layer 6 maps into it.
+
+Built so far: `Graph/{basics,walk,path,connected}.math`, with
+`library/Graph/README.md` as the entry point.
+
+- **Settled: an edge is a NAME.** A graph lives over an ambient
+  `(V, E, ends)` — vertex type, edge type, and `ends : E → Pair(V, V)` —
+  and is itself two finite lists. Two names with the same ends are two
+  parallel edges, which is what a two-vertex cycle needs and what a list
+  of vertex pairs cannot express: a walk along one of two parallel edges
+  could not say which. The ambient is a parameter of the *type*, so a
+  subgraph, a deletion and a union all have the same type and their edges
+  are comparable; it is carried by file-level `convention`s, so no
+  statement spells it.
+- **Loops are excluded by `Graph.IsWellFormed`**, together with
+  repetition-freeness of the two lists and the requirement that an edge's
+  ends be vertices of the graph — a predicate, not a constructor
+  obligation, so deletions and unions stay easy to build.
+- **A walk is a list of edges** (`Graph.IsWalk`), taken from where the
+  last one arrived. Naming edges rather than vertices is forced by
+  parallel edges, and costs nothing: an edge with two distinct ends
+  determines where taking it arrives (`Graph.Joins.unique`).
+  Concatenation and reversal are proved once, so no later argument cares
+  which end a walk was built at.
+- **A path carries its own freshness** — the vertex a step departs from is
+  not among those the rest of the path visits — rather than a
+  distinctness condition on a separately computed vertex list. The
+  visited vertices are a `Set(V)`, since nothing counts them.
+- **`Graph.IsWalk.contains_path`**: every walk contains a path between the
+  same two vertices, using only the walk's own edges. Its engine is
+  `Graph.IsPath.from_visited` (cut a path at a vertex it passes through),
+  so the construction never lengthens anything.
+- `Graph.Reaches` is stated with walks, not paths — walks concatenate and
+  reverse without a side condition — and a path is recovered on demand.
+
+**Frictions.** `FRICTION_GRAPH_LAYER5.md`. The headline is **G1**: a
+`choose … such that P` clause is *unverified* unless its source is an
+unapplied lemma, so ~1465 library sites read as checked and are not. G2/G3
+are the reason each inductive here has a transparent reader and one
+wrapper per constructor.
+
+**Still to build.** Cycles; edge and vertex deletion; degree counting and
+trees; 2-connectivity, cut vertices and bridges; subdivisions and ears;
+then H5.
 
 **Definitions.** `Graph` on a finite vertex type with an edge multiset
 (parallel edges **allowed**, loops forbidden — the blueprint needs
