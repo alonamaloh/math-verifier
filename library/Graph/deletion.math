@@ -1,0 +1,153 @@
+-- Graph/deletion.math
+--
+-- Deleting an edge. Layer 5 of PLAN_JORDAN_SCHOENFLIES.md.
+--
+-- `Graph.deleteEdge(graph, edge)` keeps every vertex and drops one edge
+-- name. Which graph an edge joins its ends in is not a question — the
+-- ambient answers it — so the whole content of a deletion is which names
+-- survive, and the two transfer lemmas at the bottom say it: a walk in
+-- the deletion is a walk in the graph, and a walk in the graph that never
+-- takes the deleted edge is a walk in the deletion.
+--
+-- Those two are what "deleting this edge does not disconnect its ends"
+-- will be argued with.
+
+module Graph.deletion
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Equality.basics
+import Natural.basics
+import Lists.list
+import Lists.length
+import Lists.distinct
+import Lists.remove
+import Graph.basics
+import Graph.walk
+
+convention V : Type(0)
+convention E : Type(0)
+convention ends : E → Pair(V, V)
+
+definition Graph.deleteEdge (graph : Graph(V, E, ends)) (edge : E) : Graph(V, E, ends) :=
+  Graph.make(Graph.vertices(graph), Graph.edges(graph) ∖ edge)
+
+theorem Graph.deleteEdge.vertices (graph : Graph(V, E, ends)) (edge : E)
+        : Graph.vertices(Graph.deleteEdge(graph, edge)) = Graph.vertices(graph) :=
+  done
+
+theorem Graph.deleteEdge.edges (graph : Graph(V, E, ends)) (edge : E)
+        : Graph.edges(Graph.deleteEdge(graph, edge)) = Graph.edges(graph) ∖ edge :=
+  done
+
+theorem Graph.deleteEdge.is_edge (graph : Graph(V, E, ends)) (edge survivor : E)
+        (survives : survivor ∈ Graph.edges(Graph.deleteEdge(graph, edge)))
+        : survivor ∈ Graph.edges(graph) := {
+  survivor ∈ Graph.edges(graph) ∖ edge;
+  done by List.remove_member_subset
+}
+
+theorem Graph.deleteEdge.keeps (graph : Graph(V, E, ends)) (edge survivor : E)
+        (isEdge : survivor ∈ Graph.edges(graph))
+        (distinctFromDeleted : ¬(survivor = edge))
+        : survivor ∈ Graph.edges(Graph.deleteEdge(graph, edge)) := {
+  survivor ∈ Graph.edges(graph) ∖ edge by List.remove_member_complete;
+  done
+}
+
+-- The deleted name is gone — provided the graph listed it once, which is
+-- what well-formedness says.
+theorem Graph.deleteEdge.drops (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph)) (edge survivor : E)
+        (survives : survivor ∈ Graph.edges(Graph.deleteEdge(graph, edge)))
+        : ¬(survivor = edge) := {
+  List.Distinct(E, Graph.edges(graph)) by Graph.IsWellFormed.edges_distinct;
+  survivor ∈ Graph.edges(graph) ∖ edge;
+  done by List.remove_member_ne
+}
+
+theorem Graph.deleteEdge.IsSubgraph (graph : Graph(V, E, ends)) (edge : E)
+        : Graph.IsSubgraph(Graph.deleteEdge(graph, edge), graph) := {
+  ∀ (vertex : V). vertex ∈ Graph.vertices(Graph.deleteEdge(graph, edge))
+      → vertex ∈ Graph.vertices(graph)
+      by { take vertex : V;
+           suppose vertex ∈ Graph.vertices(Graph.deleteEdge(graph, edge));
+           done };
+  ∀ (survivor : E). survivor ∈ Graph.edges(Graph.deleteEdge(graph, edge))
+      → survivor ∈ Graph.edges(graph)
+      by { take survivor : E;
+           suppose survivor ∈ Graph.edges(Graph.deleteEdge(graph, edge));
+           done by Graph.deleteEdge.is_edge };
+  done
+}
+
+theorem Graph.deleteEdge.IsWellFormed (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph)) (edge : E)
+        : Graph.IsWellFormed(Graph.deleteEdge(graph, edge)) := {
+  List.Distinct(V, Graph.vertices(graph)) by Graph.IsWellFormed.vertices_distinct;
+  List.Distinct(V, Graph.vertices(Graph.deleteEdge(graph, edge)));
+  List.Distinct(E, Graph.edges(graph)) by Graph.IsWellFormed.edges_distinct;
+  List.Distinct(E, Graph.edges(graph) ∖ edge) by List.remove_distinct;
+  List.Distinct(E, Graph.edges(Graph.deleteEdge(graph, edge)));
+  ∀ (survivor : E). ∀ (u v : V).
+      survivor ∈ Graph.edges(Graph.deleteEdge(graph, edge))
+      → Graph.Joins(Graph.deleteEdge(graph, edge), survivor, u, v)
+      → u ∈ Graph.vertices(Graph.deleteEdge(graph, edge)) ∧ ¬(u = v)
+      by { take survivor : E;
+           take u : V;
+           take v : V;
+           suppose survivor ∈ Graph.edges(Graph.deleteEdge(graph, edge));
+           suppose Graph.Joins(Graph.deleteEdge(graph, edge), survivor, u, v);
+           survivor ∈ Graph.edges(graph) by Graph.deleteEdge.is_edge;
+           Graph.Joins(graph, survivor, u, v);
+           u ∈ Graph.vertices(graph) by Graph.IsWellFormed.end_is_vertex;
+           ¬(u = v) by Graph.IsWellFormed.no_loop;
+           u ∈ Graph.vertices(Graph.deleteEdge(graph, edge));
+           done };
+  done
+}
+
+-- One name fewer, so one edge fewer.
+theorem Graph.deleteEdge.size (graph : Graph(V, E, ends)) (edge : E)
+        (isEdge : edge ∈ Graph.edges(graph))
+        : Graph.size(graph) = 1 + Graph.size(Graph.deleteEdge(graph, edge)) := {
+  length(Graph.edges(graph)) = 1 + length(Graph.edges(graph) ∖ edge)
+      by List.length_remove_member;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- Walks across the deletion.
+
+theorem Graph.IsWalk.after_deletion (graph : Graph(V, E, ends)) (edge : E)
+        (source target : V) (edgeList : List(E))
+        (walk : Graph.IsWalk(Graph.deleteEdge(graph, edge), source, edgeList, target))
+        : Graph.IsWalk(graph, source, edgeList, target) := {
+  Graph.IsSubgraph(Graph.deleteEdge(graph, edge), graph) by Graph.deleteEdge.IsSubgraph;
+  done by Graph.IsWalk.in_supergraph
+}
+
+theorem Graph.IsWalk.avoiding_edge (graph : Graph(V, E, ends)) (edge : E)
+        (source target : V) (edgeList : List(E))
+        (walk : Graph.IsWalk(graph, source, edgeList, target))
+        (avoided : ¬(edge ∈ edgeList))
+        : Graph.IsWalk(Graph.deleteEdge(graph, edge), source, edgeList, target) :=
+  by induction on walk with IH {
+    case Graph.IsWalkOver.arrived(vertex): done by Graph.IsWalk.empty
+    case Graph.IsWalkOver.step(
+        stepSource, waypoint, stepTarget, takenEdge, rest, isEdge, joins, restWalk): {
+        ¬(edge ∈ rest)
+            by { suppose edge ∈ rest;
+                 edge ∈ List.prepend(E, takenEdge, rest) by List.member.there;
+                 done };
+        Graph.IsWalk(Graph.deleteEdge(graph, edge), waypoint, rest, stepTarget) by IH;
+        ¬(takenEdge = edge)
+            by { suppose takenEdge = edge;
+                 edge ∈ List.prepend(E, takenEdge, rest) by substituting (takenEdge = edge);
+                 done };
+        takenEdge ∈ Graph.edges(Graph.deleteEdge(graph, edge)) by Graph.deleteEdge.keeps;
+        Graph.Joins(Graph.deleteEdge(graph, edge), takenEdge, stepSource, waypoint);
+        done by Graph.IsWalk.extend
+      }
+  }

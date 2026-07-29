@@ -280,6 +280,27 @@ theorem Graph.IsWalk.edge_is_edge (graph : Graph(V, E, ends)) (source target : V
       }
   }
 
+-- A walk in a subgraph is a walk in the graph. Which graph an edge joins
+-- its ends in is not a question — `Graph.Joins` reads the ambient — so
+-- only edge membership has to travel.
+theorem Graph.IsWalk.in_supergraph (part whole : Graph(V, E, ends))
+        (isSubgraph : Graph.IsSubgraph(part, whole))
+        (source target : V) (edgeList : List(E))
+        (walk : Graph.IsWalk(part, source, edgeList, target))
+        : Graph.IsWalk(whole, source, edgeList, target) := {
+  ∀ (e : E). e ∈ Graph.edges(part) → e ∈ Graph.edges(whole) as partEdges;
+  done by induction on walk with IH {
+    case Graph.IsWalkOver.arrived(vertex): done by Graph.IsWalk.empty
+    case Graph.IsWalkOver.step(
+        stepSource, waypoint, stepTarget, edge, rest, isEdge, joins, restWalk): {
+        Graph.IsWalk(whole, waypoint, rest, stepTarget) by IH;
+        edge ∈ Graph.edges(whole) by partEdges;
+        Graph.Joins(whole, edge, stepSource, waypoint);
+        done by Graph.IsWalk.extend
+      }
+  }
+}
+
 theorem Graph.IsWalk.target_is_visited (graph : Graph(V, E, ends)) (source target : V)
         (edgeList : List(E))
         (walk : Graph.IsWalk(graph, source, edgeList, target))
