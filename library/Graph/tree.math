@@ -178,3 +178,75 @@ theorem Graph.IsAcyclic.longest_path_source_is_leaf (graph : Graph(V, E, ends))
      = 1;
   done by Natural.le_antisymmetric
 }
+
+-- ----------------------------------------------------------------------
+-- A tree on two or more vertices has a leaf.
+
+-- Connectedness gives a path between two distinct vertices, so a longest
+-- path is not the empty one, and its source is an end of an edge.
+theorem Graph.IsTree.has_leaf (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph))
+        (isTree : Graph.IsTree(graph))
+        (atLeastTwo : 2 ≤ Graph.order(graph))
+        : ∃ (vertex : V). Graph.IsLeaf(graph, vertex) := {
+  Graph.IsConnected(graph);
+  Graph.IsAcyclic(graph);
+  List.Distinct(V, Graph.vertices(graph)) by Graph.IsWellFormed.vertices_distinct;
+
+  -- Two distinct vertices, the second taken from what the first leaves.
+  ∃ (vertex : V). vertex ∈ Graph.vertices(graph);
+  choose firstVertex such that firstVertex ∈ Graph.vertices(graph);
+  length(Graph.vertices(graph))
+      = 1 + length(Graph.vertices(graph) ∖ firstVertex)
+      by List.length_remove_member;
+  (1 : ℕ) + 1
+     ≤ Graph.order(graph)
+     = length(Graph.vertices(graph))
+     = 1 + length(Graph.vertices(graph) ∖ firstVertex);
+  1 ≤ length(Graph.vertices(graph) ∖ firstVertex) by Natural.add_left_le_cancel;
+  choose secondVertex such that secondVertex ∈ Graph.vertices(graph) ∖ firstVertex
+      from List.member_of_positive_length;
+  ¬(secondVertex = firstVertex) by List.remove_member_ne;
+  secondVertex ∈ Graph.vertices(graph) by List.remove_member_subset;
+
+  -- So some path between them takes at least one edge.
+  Graph.Reaches(graph, firstVertex, secondVertex) by Graph.IsConnected.reaches;
+  choose someEdges such that Graph.IsPath(graph, firstVertex, someEdges, secondVertex)
+      from Graph.Reaches.path;
+  ¬(someEdges = List.empty(E))
+      by { suppose someEdges = List.empty(E);
+           Graph.IsWalk(graph, firstVertex, someEdges, secondVertex)
+               by Graph.IsPath.walk;
+           firstVertex = secondVertex by Graph.IsWalk.empty_endpoints;
+           secondVertex = firstVertex;
+           done };
+  1 ≤ length(someEdges) by List.length_positive_of_nonempty;
+
+  -- A longest path is at least that long, so it too departs along an edge.
+  choose longestSource, longestTarget, longestEdges such that
+      Graph.IsPath(graph, longestSource, longestEdges, longestTarget)
+      ∧ ∀ (otherSource otherTarget : V). ∀ (otherEdges : List(E)).
+          Graph.IsPath(graph, otherSource, otherEdges, otherTarget)
+          → length(otherEdges) ≤ length(longestEdges)
+      from Graph.longest_path(someVertex := firstVertex);
+  Graph.IsPath(graph, longestSource, longestEdges, longestTarget);
+  ∀ (otherSource otherTarget : V). ∀ (otherEdges : List(E)).
+      Graph.IsPath(graph, otherSource, otherEdges, otherTarget)
+      → length(otherEdges) ≤ length(longestEdges) as nothingLonger;
+  1 ≤ length(someEdges) ≤ length(longestEdges) by nothingLonger;
+  ∃ (edge : E). edge ∈ Graph.edges(graph)
+      ∧ Graph.Incident(graph, edge, longestSource)
+      by Graph.IsPath.first_edge;
+  choose departure such that departure ∈ Graph.edges(graph)
+      ∧ Graph.Incident(graph, departure, longestSource);
+  departure ∈ Graph.edges(graph);
+  Graph.Incident(graph, departure, longestSource);
+  departure ∈ Graph.incidentEdges(graph, longestSource)
+      by Graph.incidentEdges_member;
+  1 ≤ Graph.degree(graph, longestSource) by List.length_positive_of_member;
+  Graph.degree(graph, longestSource) = 1
+      by Graph.IsAcyclic.longest_path_source_is_leaf;
+  choose farEnd such that Graph.Joins(graph, departure, longestSource, farEnd);
+  longestSource ∈ Graph.vertices(graph) by Graph.IsWellFormed.end_is_vertex;
+  witness longestSource
+}

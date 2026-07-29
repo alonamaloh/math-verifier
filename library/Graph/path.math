@@ -452,3 +452,23 @@ theorem Graph.longest_path (graph : Graph(V, E, ends)) (someVertex : V)
            done };
   witness source with witness target with witness edgeList
 }
+
+-- A path that goes anywhere at all departs along an edge of the graph.
+theorem Graph.IsPath.first_edge (graph : Graph(V, E, ends))
+        (source target : V) (edgeList : List(E))
+        (path : Graph.IsPath(graph, source, edgeList, target))
+        (nonempty : 1 ≤ length(edgeList))
+        : ∃ (edge : E). edge ∈ Graph.edges(graph) ∧ Graph.Incident(graph, edge, source) :=
+  by induction on path {
+    case Graph.IsPathOver.arrived(endpoint): {
+        (1 : ℕ) ≤ length(List.empty(E))
+           = 0;
+        done
+      }
+    case Graph.IsPathOver.step(
+        stepSource, waypoint, stepTarget, edge, rest, isEdge, joins, restPath,
+        fresh): {
+        Graph.Incident(graph, edge, stepSource) by witness waypoint;
+        witness edge
+      }
+  }

@@ -668,8 +668,24 @@ ExpressionPointer Elaborator::elaborateChoose(
             // source that failed the probe is a real error in the
             // application itself — re-raise it rather than mislabeling it
             // a malformed lemma name downstream.
+            // An applied source WITH `such that` is the escape hatch —
+            // `Lemma(seed := v)`, naming the one argument the conclusion
+            // cannot pin. Probing it without an expected type is exactly
+            // what it cannot survive, so let it through to the shaped
+            // branch below, which supplies one. Without a `such that`
+            // there is nothing to shape it with, and a failed probe is a
+            // real error in the application.
+            const SurfaceExpression* sourceApplicationHead =
+                choose.source.get();
+            if (auto* application = std::get_if<SurfaceApplication>(
+                    &sourceApplicationHead->node)) {
+                sourceApplicationHead = application->function.get();
+            }
+            bool sourceIsAppliedLemma = choose.predicate
+                && std::get_if<SurfaceIdentifier>(
+                       &sourceApplicationHead->node) != nullptr;
             if (!sourceIsStatement && !sourceIsFact
-                && sourceProbeError
+                && sourceProbeError && !sourceIsAppliedLemma
                 && !std::get_if<SurfaceIdentifier>(&choose.source->node)) {
                 std::rethrow_exception(sourceProbeError);
             }
@@ -733,8 +749,21 @@ ExpressionPointer Elaborator::elaborateChoose(
                 // type is readable at all. Falls back to the inferred form
                 // for a source that is not a bare name.
                 ExpressionPointer conclusion;
+                // A source with arguments — `Lemma(seed := v)`, the escape
+                // hatch when one argument cannot be inferred — states its
+                // conclusion over the SAME parameter names as the bare
+                // name does; the arguments instantiate that conclusion,
+                // they do not reshape it. So read the head's own type
+                // here too, rather than dropping to the inferred form
+                // (where every parameter is an unsolved hole) and losing
+                // the shaping that naming an argument was meant to help.
+                const SurfaceExpression* sourceHead = choose.source.get();
+                if (auto* application =
+                        std::get_if<SurfaceApplication>(&sourceHead->node)) {
+                    sourceHead = application->function.get();
+                }
                 if (auto* sourceName =
-                        std::get_if<SurfaceIdentifier>(&choose.source->node)) {
+                        std::get_if<SurfaceIdentifier>(&sourceHead->node)) {
                     for (int index = N - 1; index >= 0 && !conclusion; --index) {
                         if (localBinders[index].name
                                 == sourceName->qualifiedName) {
@@ -906,8 +935,14 @@ ExpressionPointer Elaborator::elaborateChoose(
                                 witnessTypeSurface, motive},
                             line, column);
                     }
+                    // A source that already carries arguments is ascribed
+                    // as written; only a bare name needs the all-holes
+                    // expansion `Lemma(?, …, ?)`.
                     scrutinee = makeSurfaceAscription(
-                        makeSurfaceCiteInferred(choose.source, line, column),
+                        std::get_if<SurfaceIdentifier>(&choose.source->node)
+                            ? makeSurfaceCiteInferred(
+                                  choose.source, line, column)
+                            : choose.source,
                         existential, line, column);
                     // A widened read spells the witness type over names the
                     // caller happens to share with the lemma (its
