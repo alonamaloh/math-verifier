@@ -357,3 +357,25 @@ theorem Graph.IsPath.split (graph : Graph(V, E, ends)) (source target : V)
         }
       }
   }
+
+-- A path takes no edge twice: an edge it took again would put the vertex
+-- it departed from back among the ones the rest of the path visits.
+theorem Graph.IsPath.distinct_edges (graph : Graph(V, E, ends)) (source target : V)
+        (edgeList : List(E))
+        (path : Graph.IsPath(graph, source, edgeList, target))
+        : List.Distinct(E, edgeList) :=
+  by induction on path with IH {
+    case Graph.IsPathOver.arrived(endpoint): done by List.Distinct.empty
+    case Graph.IsPathOver.step(
+        stepSource, waypoint, stepTarget, edge, rest, isEdge, joins, restPath, fresh): {
+        List.Distinct(E, rest) by IH;
+        Graph.Incident(graph, edge, stepSource) by Graph.Joins.incident_source;
+        ¬(edge ∈ rest)
+            by { suppose edge ∈ rest;
+                 stepSource ∈ Graph.coveredVertices(graph, rest)
+                     by Graph.coveredVertices.of_edge;
+                 stepSource ∈ Graph.walkVertices(graph, waypoint, rest);
+                 done };
+        done by List.Distinct.prepend
+      }
+  }
