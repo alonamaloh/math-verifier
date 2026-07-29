@@ -1,0 +1,122 @@
+-- Lists/union.math
+--
+-- `List.union(first, second)`: the elements of `first`, then those of
+-- `second` that are not already there. Built for the union of two graphs,
+-- where the vertex and edge lists must stay repetition-free — a plain
+-- concatenation would list a shared vertex twice and make every count
+-- wrong.
+--
+-- The definition is `first` appended with `second` filtered, so the two
+-- membership directions and distinctness all come from the append and
+-- filter lemmas; nothing here needs its own induction.
+
+module Lists.union
+
+import axioms
+import Logic.basics
+import Natural.basics
+import Natural.order
+import Natural.add_order
+import Natural.classical_decidable
+import Equality.basics
+import Lists.list
+import Lists.append
+import Lists.length
+import Lists.filter
+import Lists.distinct
+
+-- Concatenation adds the lengths. Stated here rather than in
+-- `Lists/length.math` so that adding it does not re-verify the library
+-- below it; move it there when something else wants it.
+theorem List.length_append (A : Type(0)) (second first : List(A))
+        : length(List.append(first, second)) = length(first) + length(second) :=
+  by induction on first with IH {
+    case List.empty:
+        length(List.append(List.empty(A), second))
+           = length(second)
+           = 0 + length(second)
+           = length(List.empty(A)) + length(second)   by List.length_empty
+    case List.prepend(head, tail):
+        length(List.append(List.prepend(A, head, tail), second))
+           = length(List.prepend(A, head, List.append(tail, second)))
+           = 1 + length(List.append(tail, second))    by List.length_prepend
+           = 1 + (length(tail) + length(second))
+           = (1 + length(tail)) + length(second)
+           = length(List.prepend(A, head, tail)) + length(second)
+                 by List.length_prepend
+  }
+
+definition List.NotAlreadyIn {A : Type(0)} (first : List(A)) (element : A) : Proposition :=
+  ¬(element ∈ first)
+
+definition List.union {A : Type(0)} (first second : List(A)) : List(A) :=
+  List.append(first, List.filter(List.NotAlreadyIn(first), second))
+
+-- ----------------------------------------------------------------------
+-- Membership: the union holds exactly the members of the two lists.
+
+theorem List.union_member_left (A : Type(0)) (element : A) (first second : List(A))
+        (isMember : element ∈ first)
+        : element ∈ List.union(first, second) :=
+  done by List.member_append_left
+
+theorem List.union_member_right (A : Type(0)) (element : A) (first second : List(A))
+        (isMember : element ∈ second)
+        : element ∈ List.union(first, second) :=
+  done by cases {
+    case element ∈ first: done by List.union_member_left
+    otherwise: {
+        List.NotAlreadyIn(first, element);
+        element ∈ List.filter(List.NotAlreadyIn(first), second)
+            by List.filter_member_complete;
+        done by List.member_append_right
+      }
+  }
+
+theorem List.union_member_invert (A : Type(0)) (element : A) (first second : List(A))
+        (isMember : element ∈ List.union(first, second))
+        : element ∈ first ∨ element ∈ second := {
+  element ∈ List.append(first, List.filter(List.NotAlreadyIn(first), second));
+  element ∈ first ∨ element ∈ List.filter(List.NotAlreadyIn(first), second)
+      by List.member_append_invert;
+  done by cases {
+    case element ∈ first: done
+    case element ∈ List.filter(List.NotAlreadyIn(first), second): {
+        element ∈ second by List.filter_member_subset;
+        done
+      }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- Distinctness: the second list's contribution is disjoint from the first
+-- by construction.
+
+theorem List.union_distinct (A : Type(0)) (first second : List(A))
+        (firstDistinct : List.Distinct(A, first))
+        (secondDistinct : List.Distinct(A, second))
+        : List.Distinct(A, List.union(first, second)) := {
+  List.Distinct(A, List.filter(List.NotAlreadyIn(first), second))
+      by List.filter_distinct;
+  ∀ (x : A). x ∈ first → ¬(x ∈ List.filter(List.NotAlreadyIn(first), second))
+      by { take x : A;
+           suppose x ∈ first;
+           suppose x ∈ List.filter(List.NotAlreadyIn(first), second);
+           List.NotAlreadyIn(first, x) by List.filter_member_property;
+           ¬(x ∈ first);
+           done };
+  List.Distinct(A, List.append(first, List.filter(List.NotAlreadyIn(first), second)))
+      by List.distinct_append;
+  done
+}
+
+-- The union is at least as long as its first list, which is how a size
+-- bound survives a union.
+theorem List.length_le_union (A : Type(0)) (first second : List(A))
+        : length(first) ≤ length(List.union(first, second)) := {
+  length(List.union(first, second))
+     = length(first) + length(List.filter(List.NotAlreadyIn(first), second))
+           by List.length_append;
+  length(first) + 0 ≤ length(first) + length(List.filter(List.NotAlreadyIn(first), second));
+  done
+}
