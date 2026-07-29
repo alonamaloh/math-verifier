@@ -38,6 +38,7 @@ graph although they only read `ends`.
   a vertex the rest of it visits
 - `Graph.Reaches` and `Graph.IsConnected` in
   [connected.math](connected.math)
+- `Graph.deleteEdge` in [deletion.math](deletion.math)
 
 ## Main theorems
 
@@ -52,6 +53,9 @@ graph although they only read `ends`.
   same two vertices, using only the walk's own edges
 - `Graph.Reaches.{reflexive,symmetric,transitive,path}` and
   `Graph.IsConnected.from_hub`
+- `Graph.IsWalk.in_supergraph`, and for a deletion its two directions:
+  `Graph.IsWalk.after_deletion` and `Graph.IsWalk.avoiding_edge`
+- `Graph.deleteEdge.{IsSubgraph,IsWellFormed,size}`
 
 ## Working here
 
