@@ -219,3 +219,70 @@ theorem Graph.IsWalk.in_vertex_deletion_misses (graph : Graph(V, E, ends)) (vert
 
 definition Graph.IsCutVertex (graph : Graph(V, E, ends)) (vertex : V) : Proposition :=
   vertex ∈ Graph.vertices(graph) ∧ ¬Graph.IsConnected(Graph.deleteVertex(graph, vertex))
+
+-- Deleting the same vertex from both sides of an inclusion keeps it. The
+-- vertex side needs the part's own well-formedness: without it, removing
+-- one occurrence of a repeated vertex would leave another behind.
+theorem Graph.deleteVertex.monotone (part whole : Graph(V, E, ends))
+        (partWellFormed : Graph.IsWellFormed(part))
+        (isSubgraph : Graph.IsSubgraph(part, whole)) (vertex : V)
+        : Graph.IsSubgraph(Graph.deleteVertex(part, vertex),
+                           Graph.deleteVertex(whole, vertex)) := {
+  ∀ (candidate : V). candidate ∈ Graph.vertices(part)
+      → candidate ∈ Graph.vertices(whole) as partVertices;
+  ∀ (candidate : E). candidate ∈ Graph.edges(part)
+      → candidate ∈ Graph.edges(whole) as partEdges;
+  ∀ (candidate : V). candidate ∈ Graph.vertices(Graph.deleteVertex(part, vertex))
+      → candidate ∈ Graph.vertices(Graph.deleteVertex(whole, vertex))
+      by { take candidate : V;
+           suppose candidate ∈ Graph.vertices(Graph.deleteVertex(part, vertex));
+           ¬(candidate = vertex) by Graph.deleteVertex.drops;
+           candidate ∈ Graph.vertices(part) by Graph.deleteVertex.is_vertex;
+           candidate ∈ Graph.vertices(whole) by partVertices;
+           done by Graph.deleteVertex.keeps_vertex };
+  ∀ (candidate : E). candidate ∈ Graph.edges(Graph.deleteVertex(part, vertex))
+      → candidate ∈ Graph.edges(Graph.deleteVertex(whole, vertex))
+      by { take candidate : E;
+           suppose candidate ∈ Graph.edges(Graph.deleteVertex(part, vertex));
+           ¬Graph.Incident(part, candidate, vertex) by Graph.deleteVertex.edge_avoids;
+           candidate ∈ Graph.edges(part) by Graph.deleteVertex.is_edge;
+           candidate ∈ Graph.edges(whole) by partEdges;
+           ¬Graph.Incident(whole, candidate, vertex);
+           done by Graph.deleteVertex.keeps_edge };
+  done
+}
+
+-- Deleting a vertex the graph does not have changes nothing that matters:
+-- every walk already avoided it.
+theorem Graph.IsConnected.after_outside_deletion (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph))
+        (connected : Graph.IsConnected(graph)) (outsider : V)
+        (notVertex : ¬(outsider ∈ Graph.vertices(graph)))
+        : Graph.IsConnected(Graph.deleteVertex(graph, outsider)) := {
+  choose someVertex such that someVertex ∈ Graph.vertices(graph)
+      from Graph.IsConnected.has_vertex;
+  ¬(someVertex = outsider)
+      by { suppose someVertex = outsider;
+           outsider ∈ Graph.vertices(graph) by substituting (someVertex = outsider);
+           done };
+  someVertex ∈ Graph.vertices(Graph.deleteVertex(graph, outsider))
+      by Graph.deleteVertex.keeps_vertex;
+  ∀ (target : V). target ∈ Graph.vertices(Graph.deleteVertex(graph, outsider))
+      → Graph.Reaches(Graph.deleteVertex(graph, outsider), someVertex, target)
+      by { take target : V;
+           suppose target ∈ Graph.vertices(Graph.deleteVertex(graph, outsider));
+           target ∈ Graph.vertices(graph) by Graph.deleteVertex.is_vertex;
+           Graph.Reaches(graph, someVertex, target) by Graph.IsConnected.reaches;
+           choose edgeList such that Graph.IsWalk(graph, someVertex, edgeList, target);
+           ∀ (visited : V). visited ∈ Graph.walkVertices(graph, someVertex, edgeList)
+               → visited ∈ Graph.vertices(graph)
+               by Graph.IsWalk.visits_vertices as walkStaysInGraph;
+           ¬(outsider ∈ Graph.walkVertices(graph, someVertex, edgeList))
+               by { suppose outsider ∈ Graph.walkVertices(graph, someVertex, edgeList);
+                    outsider ∈ Graph.vertices(graph) by walkStaysInGraph;
+                    done };
+           Graph.IsWalk(Graph.deleteVertex(graph, outsider), someVertex, edgeList, target)
+               by Graph.IsWalk.avoiding_vertex;
+           witness edgeList };
+  done by Graph.IsConnected.from_hub(hub := someVertex)
+}

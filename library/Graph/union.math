@@ -1,0 +1,345 @@
+-- Graph/union.math
+--
+-- The union of two graphs, and the blueprint's `lem:union-two-connected`.
+-- Layer 5 of PLAN_JORDAN_SCHOENFLIES.md.
+--
+-- Both lists are joined with `List.union`, which keeps what the second
+-- list adds and nothing it repeats — a plain concatenation would list a
+-- shared vertex twice and make `Graph.order` wrong.
+--
+-- The blueprint's proof of the two-connectivity lemma is one sentence:
+-- after deleting one vertex, each graph remains connected and at least
+-- one common vertex remains. The work here is in making "each graph
+-- remains connected" true also when the deleted vertex belongs to only
+-- one of them — the other graph never had it, so nothing was deleted, and
+-- that is `Graph.IsConnected.after_outside_deletion`.
+
+module Graph.union
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Lists.list
+import Lists.length
+import Lists.distinct
+import Lists.union
+import Graph.basics
+import Graph.walk
+import Graph.connected
+import Graph.vertex_deletion
+import Graph.twoconnected
+
+convention V : Type(0)
+convention E : Type(0)
+convention ends : E → Pair(V, V)
+
+definition Graph.union (first second : Graph(V, E, ends)) : Graph(V, E, ends) :=
+  Graph.make(List.union(Graph.vertices(first), Graph.vertices(second)),
+             List.union(Graph.edges(first), Graph.edges(second)))
+
+-- ----------------------------------------------------------------------
+-- Membership.
+
+theorem Graph.union.vertex_left (first second : Graph(V, E, ends)) (vertex : V)
+        (isVertex : vertex ∈ Graph.vertices(first))
+        : vertex ∈ Graph.vertices(Graph.union(first, second)) := {
+  vertex ∈ List.union(Graph.vertices(first), Graph.vertices(second))
+      by List.union_member_left;
+  done
+}
+
+theorem Graph.union.vertex_right (first second : Graph(V, E, ends)) (vertex : V)
+        (isVertex : vertex ∈ Graph.vertices(second))
+        : vertex ∈ Graph.vertices(Graph.union(first, second)) := {
+  vertex ∈ List.union(Graph.vertices(first), Graph.vertices(second))
+      by List.union_member_right;
+  done
+}
+
+theorem Graph.union.vertex_invert (first second : Graph(V, E, ends)) (vertex : V)
+        (isVertex : vertex ∈ Graph.vertices(Graph.union(first, second)))
+        : vertex ∈ Graph.vertices(first) ∨ vertex ∈ Graph.vertices(second) := {
+  vertex ∈ List.union(Graph.vertices(first), Graph.vertices(second));
+  done by List.union_member_invert
+}
+
+theorem Graph.union.edge_left (first second : Graph(V, E, ends)) (edge : E)
+        (isEdge : edge ∈ Graph.edges(first))
+        : edge ∈ Graph.edges(Graph.union(first, second)) := {
+  edge ∈ List.union(Graph.edges(first), Graph.edges(second)) by List.union_member_left;
+  done
+}
+
+theorem Graph.union.edge_right (first second : Graph(V, E, ends)) (edge : E)
+        (isEdge : edge ∈ Graph.edges(second))
+        : edge ∈ Graph.edges(Graph.union(first, second)) := {
+  edge ∈ List.union(Graph.edges(first), Graph.edges(second)) by List.union_member_right;
+  done
+}
+
+theorem Graph.union.edge_invert (first second : Graph(V, E, ends)) (edge : E)
+        (isEdge : edge ∈ Graph.edges(Graph.union(first, second)))
+        : edge ∈ Graph.edges(first) ∨ edge ∈ Graph.edges(second) := {
+  edge ∈ List.union(Graph.edges(first), Graph.edges(second));
+  done by List.union_member_invert
+}
+
+theorem Graph.union.IsSubgraph_left (first second : Graph(V, E, ends))
+        : Graph.IsSubgraph(first, Graph.union(first, second)) := {
+  ∀ (vertex : V). vertex ∈ Graph.vertices(first)
+      → vertex ∈ Graph.vertices(Graph.union(first, second))
+      by { take vertex : V;
+           suppose vertex ∈ Graph.vertices(first);
+           done by Graph.union.vertex_left };
+  ∀ (edge : E). edge ∈ Graph.edges(first)
+      → edge ∈ Graph.edges(Graph.union(first, second))
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(first);
+           done by Graph.union.edge_left };
+  done
+}
+
+theorem Graph.union.IsSubgraph_right (first second : Graph(V, E, ends))
+        : Graph.IsSubgraph(second, Graph.union(first, second)) := {
+  ∀ (vertex : V). vertex ∈ Graph.vertices(second)
+      → vertex ∈ Graph.vertices(Graph.union(first, second))
+      by { take vertex : V;
+           suppose vertex ∈ Graph.vertices(second);
+           done by Graph.union.vertex_right };
+  ∀ (edge : E). edge ∈ Graph.edges(second)
+      → edge ∈ Graph.edges(Graph.union(first, second))
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(second);
+           done by Graph.union.edge_right };
+  done
+}
+
+theorem Graph.union.order_left (first second : Graph(V, E, ends))
+        : Graph.order(first) ≤ Graph.order(Graph.union(first, second)) := {
+  length(Graph.vertices(first))
+      ≤ length(List.union(Graph.vertices(first), Graph.vertices(second)))
+      by List.length_le_union;
+  done
+}
+
+theorem Graph.union.IsWellFormed (first second : Graph(V, E, ends))
+        (firstWellFormed : Graph.IsWellFormed(first))
+        (secondWellFormed : Graph.IsWellFormed(second))
+        : Graph.IsWellFormed(Graph.union(first, second)) := {
+  List.Distinct(V, Graph.vertices(first)) by Graph.IsWellFormed.vertices_distinct;
+  List.Distinct(V, Graph.vertices(second)) by Graph.IsWellFormed.vertices_distinct;
+  List.Distinct(V, List.union(Graph.vertices(first), Graph.vertices(second)))
+      by List.union_distinct;
+  List.Distinct(V, Graph.vertices(Graph.union(first, second)));
+  List.Distinct(E, Graph.edges(first)) by Graph.IsWellFormed.edges_distinct;
+  List.Distinct(E, Graph.edges(second)) by Graph.IsWellFormed.edges_distinct;
+  List.Distinct(E, List.union(Graph.edges(first), Graph.edges(second)))
+      by List.union_distinct;
+  List.Distinct(E, Graph.edges(Graph.union(first, second)));
+  ∀ (edge : E). ∀ (u v : V).
+      edge ∈ Graph.edges(Graph.union(first, second))
+      → Graph.Joins(Graph.union(first, second), edge, u, v)
+      → u ∈ Graph.vertices(Graph.union(first, second)) ∧ ¬(u = v)
+      by { take edge : E;
+           take u : V;
+           take v : V;
+           suppose edge ∈ Graph.edges(Graph.union(first, second));
+           suppose Graph.Joins(Graph.union(first, second), edge, u, v);
+           edge ∈ Graph.edges(first) ∨ edge ∈ Graph.edges(second)
+               by Graph.union.edge_invert;
+           done by cases {
+             case edge ∈ Graph.edges(first): {
+                 Graph.Joins(first, edge, u, v);
+                 u ∈ Graph.vertices(first) by Graph.IsWellFormed.end_is_vertex;
+                 ¬(u = v) by Graph.IsWellFormed.no_loop;
+                 u ∈ Graph.vertices(Graph.union(first, second))
+                     by Graph.union.vertex_left;
+                 done
+               }
+             case edge ∈ Graph.edges(second): {
+                 Graph.Joins(second, edge, u, v);
+                 u ∈ Graph.vertices(second) by Graph.IsWellFormed.end_is_vertex;
+                 ¬(u = v) by Graph.IsWellFormed.no_loop;
+                 u ∈ Graph.vertices(Graph.union(first, second))
+                     by Graph.union.vertex_right;
+                 done
+               }
+           } };
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- Connectedness through a common vertex.
+
+theorem Graph.union.IsConnected (first second : Graph(V, E, ends))
+        (firstConnected : Graph.IsConnected(first))
+        (secondConnected : Graph.IsConnected(second))
+        (common : V)
+        (commonInFirst : common ∈ Graph.vertices(first))
+        (commonInSecond : common ∈ Graph.vertices(second))
+        : Graph.IsConnected(Graph.union(first, second)) := {
+  Graph.IsSubgraph(first, Graph.union(first, second)) by Graph.union.IsSubgraph_left;
+  Graph.IsSubgraph(second, Graph.union(first, second)) by Graph.union.IsSubgraph_right;
+  common ∈ Graph.vertices(Graph.union(first, second)) by Graph.union.vertex_left;
+  ∀ (target : V). target ∈ Graph.vertices(Graph.union(first, second))
+      → Graph.Reaches(Graph.union(first, second), common, target)
+      by { take target : V;
+           suppose target ∈ Graph.vertices(Graph.union(first, second));
+           target ∈ Graph.vertices(first) ∨ target ∈ Graph.vertices(second)
+               by Graph.union.vertex_invert;
+           done by cases {
+             case target ∈ Graph.vertices(first): {
+                 Graph.Reaches(first, common, target) by Graph.IsConnected.reaches;
+                 choose edgeList such that Graph.IsWalk(first, common, edgeList, target);
+                 Graph.IsWalk(Graph.union(first, second), common, edgeList, target)
+                     by Graph.IsWalk.in_supergraph(part := first);
+                 witness edgeList
+               }
+             case target ∈ Graph.vertices(second): {
+                 Graph.Reaches(second, common, target) by Graph.IsConnected.reaches;
+                 choose edgeList such that Graph.IsWalk(second, common, edgeList, target);
+                 Graph.IsWalk(Graph.union(first, second), common, edgeList, target)
+                     by Graph.IsWalk.in_supergraph(part := second);
+                 witness edgeList
+               }
+           } };
+  done by Graph.IsConnected.from_hub(hub := common)
+}
+
+-- ----------------------------------------------------------------------
+-- The blueprint's lemma.
+
+theorem Graph.IsTwoConnected.union (first second : Graph(V, E, ends))
+        (firstWellFormed : Graph.IsWellFormed(first))
+        (secondWellFormed : Graph.IsWellFormed(second))
+        (firstTwoConnected : Graph.IsTwoConnected(first))
+        (secondTwoConnected : Graph.IsTwoConnected(second))
+        (commonOne commonTwo : V)
+        (commonOneDistinct : ¬(commonOne = commonTwo))
+        (oneInFirst : commonOne ∈ Graph.vertices(first))
+        (oneInSecond : commonOne ∈ Graph.vertices(second))
+        (twoInFirst : commonTwo ∈ Graph.vertices(first))
+        (twoInSecond : commonTwo ∈ Graph.vertices(second))
+        : Graph.IsTwoConnected(Graph.union(first, second)) := {
+  Graph.IsWellFormed(Graph.union(first, second)) by Graph.union.IsWellFormed;
+  Graph.IsConnected(first) by Graph.IsTwoConnected.connected;
+  Graph.IsConnected(second) by Graph.IsTwoConnected.connected;
+  Graph.IsConnected(Graph.union(first, second))
+      by Graph.union.IsConnected(common := commonOne);
+
+  3 ≤ Graph.order(first);
+  Graph.order(first) ≤ Graph.order(Graph.union(first, second)) by Graph.union.order_left;
+  3 ≤ Graph.order(Graph.union(first, second));
+
+  ∀ (deleted : V). deleted ∈ Graph.vertices(Graph.union(first, second))
+      → Graph.IsConnected(Graph.deleteVertex(Graph.union(first, second), deleted))
+      by { take deleted : V;
+           suppose deleted ∈ Graph.vertices(Graph.union(first, second));
+
+           -- One of the two common vertices survives the deletion.
+           ∃ (survivor : V). survivor ∈ Graph.vertices(first)
+                 ∧ survivor ∈ Graph.vertices(second) ∧ ¬(survivor = deleted)
+               by cases {
+                 case commonOne = deleted: {
+                     ¬(commonTwo = deleted) by substituting (commonOne = deleted);
+                     witness commonTwo
+                   }
+                 otherwise: { ¬(commonOne = deleted); witness commonOne }
+               };
+           choose survivor such that survivor ∈ Graph.vertices(first)
+               ∧ survivor ∈ Graph.vertices(second) ∧ ¬(survivor = deleted);
+           survivor ∈ Graph.vertices(first);
+           survivor ∈ Graph.vertices(second);
+           ¬(survivor = deleted);
+
+           -- Each side stays connected: if it has the deleted vertex,
+           -- because it is 2-connected; if not, because nothing was
+           -- deleted from it.
+           Graph.IsConnected(Graph.deleteVertex(first, deleted))
+               by cases {
+                 case deleted ∈ Graph.vertices(first):
+                     done by Graph.IsTwoConnected.survives_deletion
+                 otherwise: {
+                     ¬(deleted ∈ Graph.vertices(first));
+                     done by Graph.IsConnected.after_outside_deletion(graph := first)
+                   }
+               };
+           Graph.IsConnected(Graph.deleteVertex(second, deleted))
+               by cases {
+                 case deleted ∈ Graph.vertices(second):
+                     done by Graph.IsTwoConnected.survives_deletion
+                 otherwise: {
+                     ¬(deleted ∈ Graph.vertices(second));
+                     done by Graph.IsConnected.after_outside_deletion(graph := second)
+                   }
+               };
+
+           -- Both deletions sit inside the union's deletion, and they
+           -- share the surviving vertex.
+           Graph.IsSubgraph(first, Graph.union(first, second))
+               by Graph.union.IsSubgraph_left;
+           Graph.IsSubgraph(second, Graph.union(first, second))
+               by Graph.union.IsSubgraph_right;
+           Graph.IsSubgraph(Graph.deleteVertex(first, deleted),
+                            Graph.deleteVertex(Graph.union(first, second), deleted))
+               by Graph.deleteVertex.monotone(part := first);
+           Graph.IsSubgraph(Graph.deleteVertex(second, deleted),
+                            Graph.deleteVertex(Graph.union(first, second), deleted))
+               by Graph.deleteVertex.monotone(part := second);
+           survivor ∈ Graph.vertices(Graph.deleteVertex(first, deleted))
+               by Graph.deleteVertex.keeps_vertex(graph := first);
+           survivor ∈ Graph.vertices(Graph.deleteVertex(second, deleted))
+               by Graph.deleteVertex.keeps_vertex(graph := second);
+           survivor ∈ Graph.vertices(Graph.union(first, second))
+               by Graph.union.vertex_left;
+           survivor ∈ Graph.vertices(Graph.deleteVertex(Graph.union(first, second), deleted))
+               by Graph.deleteVertex.keeps_vertex;
+
+           ∀ (target : V).
+               target ∈ Graph.vertices(Graph.deleteVertex(Graph.union(first, second), deleted))
+               → Graph.Reaches(Graph.deleteVertex(Graph.union(first, second), deleted),
+                               survivor, target)
+               by { take target : V;
+                    suppose target ∈ Graph.vertices(
+                        Graph.deleteVertex(Graph.union(first, second), deleted));
+                    ¬(target = deleted) by Graph.deleteVertex.drops;
+                    target ∈ Graph.vertices(Graph.union(first, second))
+                        by Graph.deleteVertex.is_vertex;
+                    target ∈ Graph.vertices(first) ∨ target ∈ Graph.vertices(second)
+                        by Graph.union.vertex_invert;
+                    done by cases {
+                      case target ∈ Graph.vertices(first): {
+                          target ∈ Graph.vertices(Graph.deleteVertex(first, deleted))
+                              by Graph.deleteVertex.keeps_vertex(graph := first);
+                          Graph.Reaches(Graph.deleteVertex(first, deleted), survivor, target)
+                              by Graph.IsConnected.reaches;
+                          choose edgeList such that
+                              Graph.IsWalk(Graph.deleteVertex(first, deleted),
+                                           survivor, edgeList, target);
+                          Graph.IsWalk(Graph.deleteVertex(Graph.union(first, second), deleted),
+                                       survivor, edgeList, target)
+                              by Graph.IsWalk.in_supergraph(
+                                    part := Graph.deleteVertex(first, deleted));
+                          witness edgeList
+                        }
+                      case target ∈ Graph.vertices(second): {
+                          target ∈ Graph.vertices(Graph.deleteVertex(second, deleted))
+                              by Graph.deleteVertex.keeps_vertex(graph := second);
+                          Graph.Reaches(Graph.deleteVertex(second, deleted), survivor, target)
+                              by Graph.IsConnected.reaches;
+                          choose edgeList such that
+                              Graph.IsWalk(Graph.deleteVertex(second, deleted),
+                                           survivor, edgeList, target);
+                          Graph.IsWalk(Graph.deleteVertex(Graph.union(first, second), deleted),
+                                       survivor, edgeList, target)
+                              by Graph.IsWalk.in_supergraph(
+                                    part := Graph.deleteVertex(second, deleted));
+                          witness edgeList
+                        }
+                    } };
+           done by Graph.IsConnected.from_hub(hub := survivor) };
+  done
+}
