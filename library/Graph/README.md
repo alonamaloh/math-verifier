@@ -109,6 +109,10 @@ graph although they only read `ends`.
   minus a leaf is a tree
 - **`Graph.IsTree.edge_count`** — and hence a tree has one edge fewer
   than it has vertices
+- **`Graph.IsTree.three_leaves`** — a tree with exactly three leaves has a
+  vertex of degree three; `Graph.leaves` / `Graph.innerVertices` name the
+  two classes, and `Graph.IsConnected.degree_positive` says nothing in a
+  connected graph on two or more vertices is isolated
 - `Graph.IsPath.reverse` — a path runs backwards over the same vertices;
   `Graph.IsPath.extend_at_target` is what grows one at the far end
 - `Graph.IsPathGraph.reaches_an_end` — whatever vertex is deleted, every

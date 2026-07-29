@@ -537,9 +537,16 @@ both its ends are leaves in an acyclic graph
 (`Graph.IsAcyclic.longest_path_source_is_leaf`), and a tree on two or
 more vertices therefore has one (`Graph.IsTree.has_leaf`).
 
-**Still to build.** The rest of trees: *a tree minus a leaf is a tree* —
-acyclicity is easy, connectivity is the work — and on top of it the `n-1`
-edge count and `lem:three-leaf-tree`. Then H5
+**Trees are DONE.** `Graph.IsTree.delete_leaf` (a tree minus a leaf is a
+tree — connectivity survives because `Graph.IsLeaf.path_avoids`: a path
+whose ends are elsewhere never visits a degree-one vertex), the `n-1`
+edge count `Graph.IsTree.edge_count` by peeling leaves, and
+`lem:three-leaf-tree` = `Graph.IsTree.three_leaves`, where the handshake
+lemma finally pays: three leaves contribute one apiece, every other
+vertex two plus what it carries above two, and the totals leave exactly
+one degree to carry.
+
+**Still to build.** H5
 (`lem:relative-ear`), which wants the components of `G` minus a subgraph's
 vertices, and a shortest path through one of them — neither of which
 exists yet, and both of which are real work: "component" needs a

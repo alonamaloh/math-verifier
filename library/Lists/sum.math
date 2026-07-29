@@ -354,3 +354,124 @@ theorem List.filter_length_complement (A : Type(0)) (holds : A → Proposition)
         }
       }
   }
+
+-- A condition splits a sum the same way it splits the list.
+theorem List.sumOver_filter_complement (A : Type(0)) (values : A → ℕ)
+        (holds : A → Proposition) (list : List(A))
+        : List.sumOver(values, List.filter(holds, list))
+            + List.sumOver(values,
+                  List.filter((element : A) ↦ ¬holds(element), list))
+          = List.sumOver(values, list) :=
+  by induction on list with IH {
+    case list = List.empty: done
+    case list = List.prepend(head, tail) for some head, tail: {
+        List.sumOver(values, List.filter(holds, tail))
+           + List.sumOver(values,
+                 List.filter((element : A) ↦ ¬holds(element), tail))
+           = List.sumOver(values, tail) by IH as tailSplit;
+        done by cases {
+          case holds(head): {
+              ¬(¬holds(head)) by { suppose ¬holds(head); done };
+              List.filter(holds, List.prepend(A, head, tail))
+                 = List.prepend(A, head, List.filter(holds, tail))
+                 by List.filter_prepend_positive;
+              List.filter((element : A) ↦ ¬holds(element),
+                          List.prepend(A, head, tail))
+                 = List.filter((element : A) ↦ ¬holds(element), tail)
+                 by List.filter_prepend_negative;
+              List.sumOver(values, List.filter(holds, List.prepend(A, head, tail)))
+                 + List.sumOver(values,
+                       List.filter((element : A) ↦ ¬holds(element),
+                                   List.prepend(A, head, tail)))
+                 = (values(head) + List.sumOver(values, List.filter(holds, tail)))
+                     + List.sumOver(values,
+                           List.filter((element : A) ↦ ¬holds(element), tail))
+                 = values(head)
+                     + (List.sumOver(values, List.filter(holds, tail))
+                          + List.sumOver(values,
+                                List.filter((element : A) ↦ ¬holds(element), tail)))
+                 = values(head) + List.sumOver(values, tail)
+                     by substituting tailSplit
+                 = List.sumOver(values, List.prepend(A, head, tail))
+            }
+          otherwise: {
+              List.filter(holds, List.prepend(A, head, tail))
+                 = List.filter(holds, tail)
+                 by List.filter_prepend_negative;
+              List.filter((element : A) ↦ ¬holds(element),
+                          List.prepend(A, head, tail))
+                 = List.prepend(A, head,
+                       List.filter((element : A) ↦ ¬holds(element), tail))
+                 by List.filter_prepend_positive;
+              List.sumOver(values, List.filter(holds, List.prepend(A, head, tail)))
+                 + List.sumOver(values,
+                       List.filter((element : A) ↦ ¬holds(element),
+                                   List.prepend(A, head, tail)))
+                 = List.sumOver(values, List.filter(holds, tail))
+                     + (values(head)
+                          + List.sumOver(values,
+                                List.filter((element : A) ↦ ¬holds(element), tail)))
+                 = values(head)
+                     + (List.sumOver(values, List.filter(holds, tail))
+                          + List.sumOver(values,
+                                List.filter((element : A) ↦ ¬holds(element), tail)))
+                 = values(head) + List.sumOver(values, tail)
+                     by substituting tailSplit
+                 = List.sumOver(values, List.prepend(A, head, tail))
+            }
+        }
+      }
+  }
+
+-- A sum of one is one member's.
+theorem List.sumOver_one_member (A : Type(0)) (values : A → ℕ) (list : List(A))
+        (total : List.sumOver(values, list) = 1)
+        : ∃ (element : A). element ∈ list ∧ values(element) = 1 :=
+  by induction on list with IH {
+    case list = List.empty: {
+        (0 : ℕ)
+           = List.sumOver(values, List.empty(A))
+           = 1;
+        done
+      }
+    case list = List.prepend(head, tail) for some head, tail: {
+        values(head) + List.sumOver(values, tail)
+           = List.sumOver(values, List.prepend(A, head, tail))
+           = 1;
+        values(head) = 0 ∨ ∃ (k : ℕ). values(head) = 1 + k
+            by Natural.zero_or_one_plus;
+        done by cases {
+          case values(head) = 0 as headIsZero: {
+              List.sumOver(values, tail)
+                 = 0 + List.sumOver(values, tail)
+                 = values(head) + List.sumOver(values, tail)
+                     by substituting headIsZero
+                 = 1;
+              ∃ (element : A). element ∈ tail ∧ values(element) = 1 by IH;
+              choose found such that found ∈ tail ∧ values(found) = 1;
+              found ∈ tail;
+              values(found) = 1;
+              found ∈ List.prepend(A, head, tail);
+              witness found
+            }
+          case ∃ (k : ℕ). values(head) = 1 + k as headIsPositive: {
+              choose excess such that values(head) = 1 + excess
+                  from headIsPositive;
+              1 + (excess + List.sumOver(values, tail))
+                 = (1 + excess) + List.sumOver(values, tail)
+                 = values(head) + List.sumOver(values, tail)
+                 = 1
+                 = 1 + 0;
+              excess + List.sumOver(values, tail) = 0
+                  by Natural.add_cancel_left;
+              excess = 0 by Natural.add_eq_zero_implies_left_zero;
+              values(head)
+                 = 1 + excess
+                 = 1 + 0
+                 = 1;
+              head ∈ List.prepend(A, head, tail);
+              witness head
+            }
+        }
+      }
+  }

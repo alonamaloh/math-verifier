@@ -20,6 +20,7 @@ import Natural.basics
 import Natural.order
 import Natural.add_order
 import Natural.subtraction
+import Natural.monus
 import Lists.list
 import Lists.length
 import Lists.filter
@@ -590,4 +591,180 @@ theorem Graph.IsTree.edge_count (graph : Graph(V, E, ends))
         : 1 + Graph.size(graph) = Graph.order(graph) := {
   Graph.order(graph) ≤ Graph.order(graph);
   done by Graph.IsTree.edge_count_below(bound := Graph.order(graph))
+}
+
+-- ----------------------------------------------------------------------
+-- A tree with three leaves has a vertex of degree three.
+
+-- In a connected graph on two or more vertices nothing is isolated.
+theorem Graph.IsConnected.degree_positive (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph))
+        (connected : Graph.IsConnected(graph))
+        (atLeastTwo : 2 ≤ Graph.order(graph))
+        (vertex : V) (isVertex : vertex ∈ Graph.vertices(graph))
+        : 1 ≤ Graph.degree(graph, vertex) := {
+  List.Distinct(V, Graph.vertices(graph)) by Graph.IsWellFormed.vertices_distinct;
+  length(Graph.vertices(graph)) = 1 + length(Graph.vertices(graph) ∖ vertex)
+      by List.length_remove_member;
+  (1 : ℕ) + 1
+     ≤ Graph.order(graph)
+     = length(Graph.vertices(graph))
+     = 1 + length(Graph.vertices(graph) ∖ vertex);
+  1 ≤ length(Graph.vertices(graph) ∖ vertex) by Natural.add_left_le_cancel;
+  choose other such that other ∈ Graph.vertices(graph) ∖ vertex
+      from List.member_of_positive_length;
+  ¬(other = vertex) by List.remove_member_ne;
+  other ∈ Graph.vertices(graph) by List.remove_member_subset;
+  Graph.Reaches(graph, vertex, other) by Graph.IsConnected.reaches;
+  choose route such that Graph.IsPath(graph, vertex, route, other)
+      from Graph.Reaches.path;
+  ¬(route = List.empty(E))
+      by { suppose route = List.empty(E);
+           Graph.IsWalk(graph, vertex, route, other) by Graph.IsPath.walk;
+           vertex = other by Graph.IsWalk.empty_endpoints;
+           other = vertex;
+           done };
+  1 ≤ length(route) by List.length_positive_of_nonempty;
+  ∃ (edge : E). edge ∈ route ∧ edge ∈ Graph.edges(graph)
+      ∧ Graph.Incident(graph, edge, vertex) by Graph.IsPath.first_edge;
+  choose departure such that departure ∈ route ∧ departure ∈ Graph.edges(graph)
+      ∧ Graph.Incident(graph, departure, vertex);
+  departure ∈ Graph.edges(graph);
+  Graph.Incident(graph, departure, vertex);
+  departure ∈ Graph.incidentEdges(graph, vertex) by Graph.incidentEdges_member;
+  done by List.length_positive_of_member
+}
+
+-- The leaves of a graph, and the vertices that are not leaves.
+definition Graph.leaves (graph : Graph(V, E, ends)) : List(V) :=
+  List.filter((vertex : V) ↦ Graph.IsLeaf(graph, vertex), Graph.vertices(graph))
+
+definition Graph.innerVertices (graph : Graph(V, E, ends)) : List(V) :=
+  List.filter((vertex : V) ↦ ¬Graph.IsLeaf(graph, vertex), Graph.vertices(graph))
+
+-- Three leaves, and every other vertex on at least two edges: the degrees
+-- add up to twice the edges, which is two per vertex less two, so between
+-- them the inner vertices carry exactly one degree above two apiece.
+-- Whichever one carries it has degree three.
+theorem Graph.IsTree.three_leaves (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph))
+        (isTree : Graph.IsTree(graph))
+        (atLeastTwo : 2 ≤ Graph.order(graph))
+        (threeLeaves : length(Graph.leaves(graph)) = 3)
+        : ∃ (vertex : V). vertex ∈ Graph.vertices(graph)
+            ∧ Graph.degree(graph, vertex) = 3 := {
+  Graph.IsConnected(graph);
+
+  -- Each leaf contributes one to the degree sum.
+  ∀ (vertex : V). vertex ∈ Graph.leaves(graph) → Graph.degree(graph, vertex) = 1
+      by { take vertex : V;
+           suppose vertex ∈ Graph.leaves(graph);
+           Graph.IsLeaf(graph, vertex) by List.filter_member_property;
+           done };
+  List.sumOver((vertex : V) ↦ Graph.degree(graph, vertex), Graph.leaves(graph))
+     = List.sumOver((vertex : V) ↦ 1, Graph.leaves(graph))
+         by List.sumOver_congruence
+     = 1 * length(Graph.leaves(graph))          by List.sumOver_constant
+     = 1 * 3
+     = 3                                        as leafDegreeSum;
+
+  -- Each inner vertex is on at least two edges, so contributes two plus
+  -- whatever it carries above that.
+  ∀ (vertex : V). vertex ∈ Graph.innerVertices(graph)
+      → Graph.degree(graph, vertex) = 2 + (Graph.degree(graph, vertex) ∸ 2)
+      by { take vertex : V;
+           suppose vertex ∈ Graph.innerVertices(graph);
+           vertex ∈ Graph.vertices(graph) by List.filter_member_subset;
+           ¬Graph.IsLeaf(graph, vertex) by List.filter_member_property;
+           1 ≤ Graph.degree(graph, vertex) by Graph.IsConnected.degree_positive;
+           ¬(Graph.degree(graph, vertex) = 1)
+               by { suppose Graph.degree(graph, vertex) = 1;
+                    Graph.IsLeaf(graph, vertex);
+                    done };
+           1 + 1 ≤ Graph.degree(graph, vertex);
+           (2 : ℕ)
+              = 1 + 1
+              ≤ Graph.degree(graph, vertex);
+           done by Natural.add_monus_of_le } as everyInnerVertexCarries;
+  List.sumOver((vertex : V) ↦ Graph.degree(graph, vertex),
+               Graph.innerVertices(graph))
+     = List.sumOver((vertex : V) ↦ 2 + (Graph.degree(graph, vertex) ∸ 2),
+                    Graph.innerVertices(graph))
+         by List.sumOver_congruence
+     = List.sumOver((vertex : V) ↦ 2, Graph.innerVertices(graph))
+       + List.sumOver((vertex : V) ↦ Graph.degree(graph, vertex) ∸ 2,
+                      Graph.innerVertices(graph))
+         by List.sumOver_add
+     = 2 * length(Graph.innerVertices(graph))
+       + List.sumOver((vertex : V) ↦ Graph.degree(graph, vertex) ∸ 2,
+                      Graph.innerVertices(graph))
+         by List.sumOver_constant                as innerDegreeSum;
+
+  -- Leaves and inner vertices between them are the whole graph.
+  List.sumOver((vertex : V) ↦ Graph.degree(graph, vertex), Graph.leaves(graph))
+    + List.sumOver((vertex : V) ↦ Graph.degree(graph, vertex),
+                   Graph.innerVertices(graph))
+    = List.sumOver((vertex : V) ↦ Graph.degree(graph, vertex),
+                   Graph.vertices(graph))
+    by List.sumOver_filter_complement;
+  List.sumOver((vertex : V) ↦ Graph.degree(graph, vertex), Graph.vertices(graph))
+     = 2 * Graph.size(graph) by Graph.degree_sum;
+  length(Graph.leaves(graph)) + length(Graph.innerVertices(graph))
+    = length(Graph.vertices(graph)) by List.filter_length_complement;
+
+  -- Counting: the inner vertices carry exactly one degree between them.
+  1 + Graph.size(graph) = Graph.order(graph) by Graph.IsTree.edge_count;
+  (3 : ℕ) + length(Graph.innerVertices(graph))
+     = length(Graph.leaves(graph)) + length(Graph.innerVertices(graph))
+     = length(Graph.vertices(graph))
+     = Graph.order(graph);
+  1 + Graph.size(graph)
+     = Graph.order(graph)
+     = 3 + length(Graph.innerVertices(graph))
+     = 1 + (2 + length(Graph.innerVertices(graph)));
+  Graph.size(graph) = 2 + length(Graph.innerVertices(graph))
+      by Natural.add_cancel_left as sizeFromInner;
+  (3 : ℕ) + List.sumOver((vertex : V) ↦ Graph.degree(graph, vertex) ∸ 2,
+                         Graph.innerVertices(graph))
+       + 2 * length(Graph.innerVertices(graph))
+     = 3 + (2 * length(Graph.innerVertices(graph))
+              + List.sumOver((vertex : V) ↦ Graph.degree(graph, vertex) ∸ 2,
+                             Graph.innerVertices(graph)))
+     = List.sumOver((vertex : V) ↦ Graph.degree(graph, vertex), Graph.leaves(graph))
+         + (2 * length(Graph.innerVertices(graph))
+              + List.sumOver((vertex : V) ↦ Graph.degree(graph, vertex) ∸ 2,
+                             Graph.innerVertices(graph)))
+         by substituting leafDegreeSum
+     = List.sumOver((vertex : V) ↦ Graph.degree(graph, vertex), Graph.leaves(graph))
+         + List.sumOver((vertex : V) ↦ Graph.degree(graph, vertex),
+                        Graph.innerVertices(graph))
+         by substituting innerDegreeSum
+     = List.sumOver((vertex : V) ↦ Graph.degree(graph, vertex),
+                    Graph.vertices(graph))
+     = 2 * Graph.size(graph)
+     = 2 * (2 + length(Graph.innerVertices(graph)))  by substituting sizeFromInner
+     = 4 + 2 * length(Graph.innerVertices(graph));
+  (3 : ℕ) + List.sumOver((vertex : V) ↦ Graph.degree(graph, vertex) ∸ 2,
+                         Graph.innerVertices(graph))
+     = 4 by Natural.add_cancel_right;
+  (3 : ℕ) + List.sumOver((vertex : V) ↦ Graph.degree(graph, vertex) ∸ 2,
+                         Graph.innerVertices(graph))
+     = 4
+     = 3 + 1;
+  List.sumOver((vertex : V) ↦ Graph.degree(graph, vertex) ∸ 2,
+               Graph.innerVertices(graph)) = 1 by Natural.add_cancel_left;
+
+  -- And whichever inner vertex carries it has degree three.
+  ∃ (vertex : V). vertex ∈ Graph.innerVertices(graph)
+      ∧ Graph.degree(graph, vertex) ∸ 2 = 1 by List.sumOver_one_member;
+  choose branchVertex such that branchVertex ∈ Graph.innerVertices(graph)
+      ∧ Graph.degree(graph, branchVertex) ∸ 2 = 1;
+  branchVertex ∈ Graph.innerVertices(graph);
+  Graph.degree(graph, branchVertex) ∸ 2 = 1 as carriesOne;
+  branchVertex ∈ Graph.vertices(graph) by List.filter_member_subset;
+  Graph.degree(graph, branchVertex)
+     = 2 + (Graph.degree(graph, branchVertex) ∸ 2) by everyInnerVertexCarries
+     = 2 + 1                                       by substituting carriesOne
+     = 3;
+  witness branchVertex
 }
