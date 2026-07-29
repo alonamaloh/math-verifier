@@ -442,8 +442,8 @@ What remains — the assembly:
 
 Abstract, no geometry. Keep it that way — Layer 6 maps into it.
 
-Built so far: `Graph/{basics,walk,path,connected}.math`, with
-`library/Graph/README.md` as the entry point.
+Built so far: `Graph/{basics,walk,path,connected,deletion,cycle}.math`,
+with `library/Graph/README.md` as the entry point.
 
 - **Settled: an edge is a NAME.** A graph lives over an ambient
   `(V, E, ends)` — vertex type, edge type, and `ends : E → Pair(V, V)` —
@@ -474,16 +474,23 @@ Built so far: `Graph/{basics,walk,path,connected}.math`, with
   so the construction never lengthens anything.
 - `Graph.Reaches` is stated with walks, not paths — walks concatenate and
   reverse without a side condition — and a path is recovered on demand.
+- **A cycle is presented through one of its edges**: the edge plus a path
+  between its two ends that avoids it. Every question the blueprint asks
+  is of that shape, so the closed walk is never assembled and the path
+  relation already forbids the repetitions a closed walk would have to
+  rule out by hand. Length two is included, and is the reason edges are
+  names. `Graph.LiesOnCycle.deletion_reaches` and its converse are the
+  plan's "an edge lies on a cycle iff deleting it does not disconnect its
+  endpoints"; `Graph.IsBridge` is read off them.
 
-**Frictions.** `FRICTION_GRAPH_LAYER5.md`. The headline is **G1**: a
-`choose … such that P` clause is *unverified* unless its source is an
-unapplied lemma, so ~1465 library sites read as checked and are not. G2/G3
-are the reason each inductive here has a transparent reader and one
-wrapper per constructor.
+**Frictions.** `FRICTION_GRAPH_LAYER5.md`. **G1 and G5 are FIXED** (a
+`choose … such that` clause is now checked in every form, and with `from`
+omitted the condition is the search key). G2/G3 stand, and are the reason
+each inductive here has a transparent reader and one wrapper per
+constructor.
 
-**Still to build.** Cycles; edge and vertex deletion; degree counting and
-trees; 2-connectivity, cut vertices and bridges; subdivisions and ears;
-then H5.
+**Still to build.** Vertex deletion; degree counting and trees;
+2-connectivity and cut vertices; subdivisions and ears; then H5.
 
 **Definitions.** `Graph` on a finite vertex type with an edge multiset
 (parallel edges **allowed**, loops forbidden — the blueprint needs

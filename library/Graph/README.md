@@ -39,6 +39,8 @@ graph although they only read `ends`.
 - `Graph.Reaches` and `Graph.IsConnected` in
   [connected.math](connected.math)
 - `Graph.deleteEdge` in [deletion.math](deletion.math)
+- `Graph.IsCycleThrough`, `Graph.LiesOnCycle` and `Graph.IsBridge` in
+  [cycle.math](cycle.math)
 
 ## Main theorems
 
@@ -56,6 +58,10 @@ graph although they only read `ends`.
 - `Graph.IsWalk.in_supergraph`, and for a deletion its two directions:
   `Graph.IsWalk.after_deletion` and `Graph.IsWalk.avoiding_edge`
 - `Graph.deleteEdge.{IsSubgraph,IsWellFormed,size}`
+- **`Graph.LiesOnCycle.deletion_reaches`** and
+  **`Graph.LiesOnCycle.of_deletion_reaches`** — an edge lies on a cycle
+  exactly when the graph without it still joins its two ends; hence
+  `Graph.IsBridge.separates_ends` and `Graph.IsBridge.of_separated_ends`
 
 ## Working here
 
