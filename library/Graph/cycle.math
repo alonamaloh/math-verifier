@@ -1,0 +1,144 @@
+-- Graph/cycle.math
+--
+-- Cycles, and the edges that lie on one. Layer 5 of
+-- PLAN_JORDAN_SCHOENFLIES.md.
+--
+-- A cycle is presented THROUGH one of its edges: the edge, together with
+-- a path between its two ends that does not use it. Every question the
+-- blueprint asks is of that shape — is this edge on a cycle, does
+-- deleting it disconnect its ends — so the closed walk never has to be
+-- assembled, and the path relation already forbids the repetitions that
+-- a closed walk would have to rule out by hand.
+--
+-- Length two is included, and is the reason edges are names: an edge and
+-- a one-edge return along a parallel edge is a cycle.
+--
+-- The theorem is that an edge lies on a cycle exactly when the graph
+-- without it still joins its two ends. A bridge is an edge on no cycle,
+-- so a bridge is exactly an edge whose deletion separates its ends.
+
+module Graph.cycle
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Equality.basics
+import Lists.list
+import Graph.basics
+import Graph.walk
+import Graph.path
+import Graph.connected
+import Graph.deletion
+
+convention V : Type(0)
+convention E : Type(0)
+convention ends : E → Pair(V, V)
+
+definition Graph.IsCycleThrough (graph : Graph(V, E, ends)) (edge : E) (u v : V)
+        (detour : List(E)) : Proposition :=
+  edge ∈ Graph.edges(graph)
+  ∧ Graph.Joins(graph, edge, u, v)
+  ∧ Graph.IsPath(graph, u, detour, v)
+  ∧ ¬(edge ∈ detour)
+
+definition Graph.LiesOnCycle (graph : Graph(V, E, ends)) (edge : E) : Proposition :=
+  ∃ (u v : V). ∃ (detour : List(E)).
+      Graph.IsCycleThrough(graph, edge, u, v, detour)
+
+definition Graph.IsBridge (graph : Graph(V, E, ends)) (edge : E) : Proposition :=
+  edge ∈ Graph.edges(graph) ∧ ¬Graph.LiesOnCycle(graph, edge)
+
+-- ----------------------------------------------------------------------
+-- A cycle through an edge, and the deletion of that edge, say the same
+-- thing about its two ends.
+
+theorem Graph.LiesOnCycle.deletion_reaches (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph)) (edge : E) (u v : V)
+        (isEdge : edge ∈ Graph.edges(graph))
+        (joins : Graph.Joins(graph, edge, u, v))
+        (onCycle : Graph.LiesOnCycle(graph, edge))
+        : Graph.Reaches(Graph.deleteEdge(graph, edge), u, v) := {
+  choose cycleSource, cycleTarget, detour such that
+      Graph.IsCycleThrough(graph, edge, cycleSource, cycleTarget, detour)
+      from onCycle;
+  Graph.Joins(graph, edge, cycleSource, cycleTarget);
+  Graph.IsPath(graph, cycleSource, detour, cycleTarget);
+  ¬(edge ∈ detour);
+  Graph.IsWalk(graph, cycleSource, detour, cycleTarget) by Graph.IsPath.walk;
+  Graph.IsWalk(Graph.deleteEdge(graph, edge), cycleSource, detour, cycleTarget)
+      by Graph.IsWalk.avoiding_edge;
+  Graph.Reaches(Graph.deleteEdge(graph, edge), cycleSource, cycleTarget)
+      by { witness detour };
+  ¬(u = v) by Graph.IsWellFormed.no_loop;
+  (cycleSource = u ∧ cycleTarget = v) ∨ (cycleSource = v ∧ cycleTarget = u)
+      by Graph.Joins.ends_agree;
+  done by cases {
+    case cycleSource = u ∧ cycleTarget = v: {
+        cycleSource = u;
+        cycleTarget = v;
+        Graph.Reaches(Graph.deleteEdge(graph, edge), u, cycleTarget)
+            by substituting (cycleSource = u);
+        done by substituting (cycleTarget = v)
+      }
+    case cycleSource = v ∧ cycleTarget = u: {
+        cycleSource = v;
+        cycleTarget = u;
+        Graph.Reaches(Graph.deleteEdge(graph, edge), v, cycleTarget)
+            by substituting (cycleSource = v);
+        Graph.Reaches(Graph.deleteEdge(graph, edge), v, u)
+            by substituting (cycleTarget = u);
+        done by Graph.Reaches.symmetric
+      }
+  }
+}
+
+theorem Graph.LiesOnCycle.of_deletion_reaches (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph)) (edge : E) (u v : V)
+        (isEdge : edge ∈ Graph.edges(graph))
+        (joins : Graph.Joins(graph, edge, u, v))
+        (reaches : Graph.Reaches(Graph.deleteEdge(graph, edge), u, v))
+        : Graph.LiesOnCycle(graph, edge) := {
+  choose detour such that Graph.IsPath(Graph.deleteEdge(graph, edge), u, detour, v)
+      from Graph.Reaches.path;
+  ∀ (e : E). e ∈ detour → e ∈ Graph.edges(Graph.deleteEdge(graph, edge))
+      by Graph.IsPath.edge_is_edge as detourEdgesSurvive;
+  -- The deleted name is not among them, so the detour avoids it.
+  ¬(edge ∈ detour)
+      by { suppose edge ∈ detour;
+           edge ∈ Graph.edges(Graph.deleteEdge(graph, edge)) by detourEdgesSurvive;
+           ¬(edge = edge) by Graph.deleteEdge.drops;
+           done };
+  Graph.IsSubgraph(Graph.deleteEdge(graph, edge), graph) by Graph.deleteEdge.IsSubgraph;
+  Graph.IsPath(graph, u, detour, v) by Graph.IsPath.in_supergraph;
+  Graph.IsCycleThrough(graph, edge, u, v, detour);
+  witness u with witness v with witness detour
+}
+
+-- ----------------------------------------------------------------------
+-- Bridges, read off the equivalence.
+
+theorem Graph.IsBridge.separates_ends (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph)) (edge : E) (u v : V)
+        (bridge : Graph.IsBridge(graph, edge))
+        (joins : Graph.Joins(graph, edge, u, v))
+        : ¬Graph.Reaches(Graph.deleteEdge(graph, edge), u, v) := {
+  edge ∈ Graph.edges(graph);
+  ¬Graph.LiesOnCycle(graph, edge) as noCycle;
+  suppose Graph.Reaches(Graph.deleteEdge(graph, edge), u, v);
+  Graph.LiesOnCycle(graph, edge) by Graph.LiesOnCycle.of_deletion_reaches;
+  done by noCycle
+}
+
+theorem Graph.IsBridge.of_separated_ends (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph)) (edge : E) (u v : V)
+        (isEdge : edge ∈ Graph.edges(graph))
+        (joins : Graph.Joins(graph, edge, u, v))
+        (separated : ¬Graph.Reaches(Graph.deleteEdge(graph, edge), u, v))
+        : Graph.IsBridge(graph, edge) := {
+  ¬Graph.LiesOnCycle(graph, edge)
+      by { suppose Graph.LiesOnCycle(graph, edge);
+           Graph.Reaches(Graph.deleteEdge(graph, edge), u, v)
+               by Graph.LiesOnCycle.deletion_reaches;
+           done };
+  done
+}

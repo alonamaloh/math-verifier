@@ -177,6 +177,33 @@ theorem Graph.Incident.is_end (graph : Graph(V, E, ends)) (edge : E) (u v vertex
   }
 }
 
+-- Two readings of the same edge name the same two vertices, in one order
+-- or the other.
+theorem Graph.Joins.ends_agree (graph : Graph(V, E, ends)) (edge : E) (u v x y : V)
+        (joins : Graph.Joins(graph, edge, u, v))
+        (otherReading : Graph.Joins(graph, edge, x, y))
+        (endsDistinct : ¬(u = v))
+        : (x = u ∧ y = v) ∨ (x = v ∧ y = u) := {
+  Graph.Incident(graph, edge, x) by Graph.Joins.incident_source;
+  x = u ∨ x = v by Graph.Incident.is_end;
+  done by cases {
+    case x = u: {
+        Graph.Joins(graph, edge, u, y) by substituting (x = u);
+        y = v by Graph.Joins.unique;
+        x = u ∧ y = v;
+        done by Or.introduceLeft
+      }
+    case x = v: {
+        Graph.Joins(graph, edge, v, u) by Graph.Joins.symmetric;
+        Graph.Joins(graph, edge, v, y) by substituting (x = v);
+        ¬(v = u) by Equality.not_equal_symmetric;
+        y = u by Graph.Joins.unique;
+        x = v ∧ y = u;
+        done by Or.introduceRight
+      }
+  }
+}
+
 theorem Graph.Adjacent.symmetric (graph : Graph(V, E, ends)) (u v : V)
         (adjacent : Graph.Adjacent(graph, u, v))
         : Graph.Adjacent(graph, v, u) := {

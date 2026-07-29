@@ -74,6 +74,36 @@ theorem Graph.IsPath.walk (graph : Graph(V, E, ends)) (source target : V)
       }
   }
 
+-- A path in a subgraph is a path in the graph. Its freshness clause reads
+-- only which vertices the remaining edges touch, and that is a question
+-- for the ambient, so — as for a walk — only edge membership travels.
+theorem Graph.IsPath.in_supergraph (part whole : Graph(V, E, ends))
+        (isSubgraph : Graph.IsSubgraph(part, whole))
+        (source target : V) (edgeList : List(E))
+        (path : Graph.IsPath(part, source, edgeList, target))
+        : Graph.IsPath(whole, source, edgeList, target) := {
+  ∀ (e : E). e ∈ Graph.edges(part) → e ∈ Graph.edges(whole) as partEdges;
+  done by induction on path with IH {
+    case Graph.IsPathOver.arrived(endpoint): done by Graph.IsPath.empty
+    case Graph.IsPathOver.step(
+        stepSource, waypoint, stepTarget, edge, rest, isEdge, joins, restPath, fresh): {
+        Graph.IsPath(whole, waypoint, rest, stepTarget) by IH;
+        edge ∈ Graph.edges(whole) by partEdges;
+        Graph.Joins(whole, edge, stepSource, waypoint);
+        ¬(stepSource ∈ Graph.walkVertices(whole, waypoint, rest));
+        done by Graph.IsPath.extend
+      }
+  }
+}
+
+theorem Graph.IsPath.edge_is_edge (graph : Graph(V, E, ends)) (source target : V)
+        (edgeList : List(E))
+        (path : Graph.IsPath(graph, source, edgeList, target))
+        : ∀ (edge : E). edge ∈ edgeList → edge ∈ Graph.edges(graph) := {
+  Graph.IsWalk(graph, source, edgeList, target) by Graph.IsPath.walk;
+  done by Graph.IsWalk.edge_is_edge
+}
+
 -- ----------------------------------------------------------------------
 -- Cutting a path at a vertex it visits.
 --
