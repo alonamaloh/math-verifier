@@ -1,0 +1,313 @@
+-- Graph/basics.math
+--
+-- Finite multigraphs, abstractly. Layer 5 of PLAN_JORDAN_SCHOENFLIES.md.
+--
+-- A graph is a finite list of vertices and a finite list of edges. The
+-- edges are NAMES, not pairs of vertices: the ambient assignment `ends`
+-- says which two vertices a name is attached to, and two names with the
+-- same ends are two parallel edges. Parallel edges are what the plane
+-- development needs — a Jordan curve cut at two points is a cycle with
+-- two vertices and two edges — and they are what a list of pairs cannot
+-- express, since a walk along one of two parallel edges could not say
+-- which one it took.
+--
+-- The ambient `(V, E, ends)` is a parameter of the type rather than a
+-- field of the record, so every graph over it — a subgraph, a deletion,
+-- a union — has the SAME type and their edges are comparable. That is
+-- also why `Graph.Joins(graph, edge, u, v)` names the graph although it
+-- only reads `ends`: the graph is what fixes the ambient, and an edge is
+-- never discussed except as an edge of a graph.
+--
+-- Nothing here is finite by construction: the two lists are, and every
+-- counting statement reads their length.
+
+module Graph.basics
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Equality.basics
+import Natural.basics
+import Lists.list
+import Lists.length
+import Lists.distinct
+import Lists.filter
+
+-- Throughout: vertices are drawn from `V`, edge names from `E`, and
+-- `ends` attaches each name to its two endpoints.
+convention V : Type(0)
+convention E : Type(0)
+convention ends : E → Pair(V, V)
+
+inductive Graph (V : Type(0)) (E : Type(0)) (ends : E → Pair(V, V)) : Type(0) where
+  | Graph.make
+      : (vertices : List(V)) → (edges : List(E)) → Graph(V, E, ends)
+
+definition Graph.vertices (graph : Graph(V, E, ends)) : List(V) :=
+  let ⟨vertices, edges⟩ := graph in vertices
+
+definition Graph.edges (graph : Graph(V, E, ends)) : List(E) :=
+  let ⟨vertices, edges⟩ := graph in edges
+
+definition Graph.order (graph : Graph(V, E, ends)) : ℕ :=
+  length(Graph.vertices(graph))
+
+definition Graph.size (graph : Graph(V, E, ends)) : ℕ :=
+  length(Graph.edges(graph))
+
+-- ----------------------------------------------------------------------
+-- Incidence.
+--
+-- `Joins` is the one place the ordered pair behind `ends` is read; every
+-- later result speaks through the four lemmas below it, which is why the
+-- order the pair happens to carry never becomes visible.
+
+definition Graph.Joins (graph : Graph(V, E, ends)) (edge : E) (u v : V) : Proposition :=
+  ends(edge) = Product.make(u, v) ∨ ends(edge) = Product.make(v, u)
+
+definition Graph.Incident (graph : Graph(V, E, ends)) (edge : E) (vertex : V) : Proposition :=
+  ∃ (other : V). Graph.Joins(graph, edge, vertex, other)
+
+definition Graph.Adjacent (graph : Graph(V, E, ends)) (u v : V) : Proposition :=
+  ∃ (edge : E). edge ∈ Graph.edges(graph) ∧ Graph.Joins(graph, edge, u, v)
+
+theorem Graph.Joins.symmetric (graph : Graph(V, E, ends)) (edge : E) (u v : V)
+        (joins : Graph.Joins(graph, edge, u, v))
+        : Graph.Joins(graph, edge, v, u) :=
+  done by cases {
+    case ends(edge) = Product.make(u, v): done
+    case ends(edge) = Product.make(v, u): done
+  }
+
+-- Every edge joins a pair of vertices: the two its ends assignment names.
+theorem Graph.edge_has_ends (graph : Graph(V, E, ends)) (edge : E)
+        : ∃ (u v : V). Graph.Joins(graph, edge, u, v) := {
+  ends(edge) = Product.make(Product.first(ends(edge)), Product.second(ends(edge)))
+      by Product.eta;
+  witness Product.first(ends(edge)) with witness Product.second(ends(edge))
+}
+
+-- An edge with two distinct ends has no third one: knowing where it
+-- starts pins where it arrives, which is what lets a walk name only the
+-- edges it takes.
+theorem Graph.Joins.unique (graph : Graph(V, E, ends)) (edge : E) (u v w : V)
+        (joinsToV : Graph.Joins(graph, edge, u, v))
+        (joinsToW : Graph.Joins(graph, edge, u, w))
+        (endsDistinct : ¬(u = v))
+        : v = w :=
+  done by cases {
+    case ends(edge) = Product.make(u, v):
+        done by cases {
+          case ends(edge) = Product.make(u, w):
+              v  = Product.second(Product.make(u, v))
+                 = Product.second(ends(edge))
+                 = Product.second(Product.make(u, w))
+                 = w
+          case ends(edge) = Product.make(w, u): {
+              u  = Product.second(Product.make(w, u))
+                 = Product.second(ends(edge))
+                 = Product.second(Product.make(u, v))
+                 = v;
+              done
+            }
+        }
+    case ends(edge) = Product.make(v, u):
+        done by cases {
+          case ends(edge) = Product.make(u, w): {
+              u  = Product.first(Product.make(u, w))
+                 = Product.first(ends(edge))
+                 = Product.first(Product.make(v, u))
+                 = v;
+              done
+            }
+          case ends(edge) = Product.make(w, u):
+              v  = Product.first(Product.make(v, u))
+                 = Product.first(ends(edge))
+                 = Product.first(Product.make(w, u))
+                 = w
+        }
+  }
+
+theorem Graph.Joins.incident_source (graph : Graph(V, E, ends)) (edge : E) (u v : V)
+        (joins : Graph.Joins(graph, edge, u, v))
+        : Graph.Incident(graph, edge, u) :=
+  witness v with joins
+
+theorem Graph.Joins.incident_target (graph : Graph(V, E, ends)) (edge : E) (u v : V)
+        (joins : Graph.Joins(graph, edge, u, v))
+        : Graph.Incident(graph, edge, v) := {
+  Graph.Joins(graph, edge, v, u) by Graph.Joins.symmetric;
+  done by Graph.Joins.incident_source
+}
+
+theorem Graph.Adjacent.symmetric (graph : Graph(V, E, ends)) (u v : V)
+        (adjacent : Graph.Adjacent(graph, u, v))
+        : Graph.Adjacent(graph, v, u) := {
+  choose edge such that edge ∈ Graph.edges(graph) ∧ Graph.Joins(graph, edge, u, v)
+      from adjacent;
+  Graph.Joins(graph, edge, v, u) by Graph.Joins.symmetric;
+  edge ∈ Graph.edges(graph);
+  witness edge with done
+}
+
+-- ----------------------------------------------------------------------
+-- Well-formedness.
+--
+-- The two lists list each vertex and each edge once, and every edge runs
+-- between two distinct vertices of the graph. Loops are excluded here
+-- rather than in the ambient because it is the graph's own edges that
+-- must avoid them.
+
+definition Graph.IsWellFormed (graph : Graph(V, E, ends)) : Proposition :=
+  List.Distinct(V, Graph.vertices(graph))
+  ∧ List.Distinct(E, Graph.edges(graph))
+  ∧ ∀ (edge : E). ∀ (u v : V).
+      edge ∈ Graph.edges(graph) → Graph.Joins(graph, edge, u, v)
+      → u ∈ Graph.vertices(graph) ∧ ¬(u = v)
+
+theorem Graph.IsWellFormed.vertices_distinct (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph))
+        : List.Distinct(V, Graph.vertices(graph)) :=
+  done
+
+theorem Graph.IsWellFormed.edges_distinct (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph))
+        : List.Distinct(E, Graph.edges(graph)) :=
+  done
+
+theorem Graph.IsWellFormed.end_is_vertex (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph)) (edge : E) (u v : V)
+        (isEdge : edge ∈ Graph.edges(graph))
+        (joins : Graph.Joins(graph, edge, u, v))
+        : u ∈ Graph.vertices(graph) := {
+  ∀ (e : E). ∀ (x y : V).
+      e ∈ Graph.edges(graph) → Graph.Joins(graph, e, x, y)
+      → x ∈ Graph.vertices(graph) ∧ ¬(x = y) as endsAreVertices;
+  u ∈ Graph.vertices(graph) ∧ ¬(u = v) by endsAreVertices(edge, u, v);
+  done
+}
+
+theorem Graph.IsWellFormed.no_loop (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph)) (edge : E) (u v : V)
+        (isEdge : edge ∈ Graph.edges(graph))
+        (joins : Graph.Joins(graph, edge, u, v))
+        : ¬(u = v) := {
+  ∀ (e : E). ∀ (x y : V).
+      e ∈ Graph.edges(graph) → Graph.Joins(graph, e, x, y)
+      → x ∈ Graph.vertices(graph) ∧ ¬(x = y) as endsAreVertices;
+  u ∈ Graph.vertices(graph) ∧ ¬(u = v) by endsAreVertices(edge, u, v);
+  done
+}
+
+-- The other end of an edge of a well-formed graph is a vertex too, by
+-- the same clause read at the reversed pair.
+theorem Graph.IsWellFormed.other_end_is_vertex (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph)) (edge : E) (u v : V)
+        (isEdge : edge ∈ Graph.edges(graph))
+        (joins : Graph.Joins(graph, edge, u, v))
+        : v ∈ Graph.vertices(graph) := {
+  Graph.Joins(graph, edge, v, u) by Graph.Joins.symmetric;
+  done by Graph.IsWellFormed.end_is_vertex
+}
+
+theorem Graph.Adjacent.distinct (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph)) (u v : V)
+        (adjacent : Graph.Adjacent(graph, u, v))
+        : ¬(u = v) := {
+  choose edge such that edge ∈ Graph.edges(graph) ∧ Graph.Joins(graph, edge, u, v)
+      from adjacent;
+  edge ∈ Graph.edges(graph);
+  Graph.Joins(graph, edge, u, v);
+  done by Graph.IsWellFormed.no_loop
+}
+
+theorem Graph.Adjacent.is_vertex (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph)) (u v : V)
+        (adjacent : Graph.Adjacent(graph, u, v))
+        : u ∈ Graph.vertices(graph) := {
+  choose edge such that edge ∈ Graph.edges(graph) ∧ Graph.Joins(graph, edge, u, v)
+      from adjacent;
+  edge ∈ Graph.edges(graph);
+  Graph.Joins(graph, edge, u, v);
+  done by Graph.IsWellFormed.end_is_vertex
+}
+
+-- ----------------------------------------------------------------------
+-- Degree.
+
+definition Graph.incidentEdges (graph : Graph(V, E, ends)) (vertex : V) : List(E) :=
+  List.filter((edge : E) ↦ Graph.Incident(graph, edge, vertex), Graph.edges(graph))
+
+definition Graph.degree (graph : Graph(V, E, ends)) (vertex : V) : ℕ :=
+  length(Graph.incidentEdges(graph, vertex))
+
+theorem Graph.incidentEdges_member (graph : Graph(V, E, ends)) (vertex : V) (edge : E)
+        (isEdge : edge ∈ Graph.edges(graph))
+        (incident : Graph.Incident(graph, edge, vertex))
+        : edge ∈ Graph.incidentEdges(graph, vertex) :=
+  done by List.filter_member_complete
+
+theorem Graph.incidentEdges_is_edge (graph : Graph(V, E, ends)) (vertex : V) (edge : E)
+        (member : edge ∈ Graph.incidentEdges(graph, vertex))
+        : edge ∈ Graph.edges(graph) :=
+  done by List.filter_member_subset
+
+theorem Graph.incidentEdges_incident (graph : Graph(V, E, ends)) (vertex : V) (edge : E)
+        (member : edge ∈ Graph.incidentEdges(graph, vertex))
+        : Graph.Incident(graph, edge, vertex) :=
+  done by List.filter_member_property
+
+-- ----------------------------------------------------------------------
+-- Subgraphs.
+
+definition Graph.IsSubgraph (part whole : Graph(V, E, ends)) : Proposition :=
+  (∀ (vertex : V). vertex ∈ Graph.vertices(part) → vertex ∈ Graph.vertices(whole))
+  ∧ (∀ (edge : E). edge ∈ Graph.edges(part) → edge ∈ Graph.edges(whole))
+
+theorem Graph.IsSubgraph.reflexive (graph : Graph(V, E, ends))
+        : Graph.IsSubgraph(graph, graph) := {
+  ∀ (vertex : V). vertex ∈ Graph.vertices(graph) → vertex ∈ Graph.vertices(graph)
+      by { take vertex : V; suppose vertex ∈ Graph.vertices(graph); done };
+  ∀ (edge : E). edge ∈ Graph.edges(graph) → edge ∈ Graph.edges(graph)
+      by { take edge : E; suppose edge ∈ Graph.edges(graph); done };
+  done
+}
+
+theorem Graph.IsSubgraph.transitive (small middle large : Graph(V, E, ends))
+        (smallInMiddle : Graph.IsSubgraph(small, middle))
+        (middleInLarge : Graph.IsSubgraph(middle, large))
+        : Graph.IsSubgraph(small, large) := {
+  ∀ (vertex : V). vertex ∈ Graph.vertices(small) → vertex ∈ Graph.vertices(middle)
+      as smallVertices;
+  ∀ (vertex : V). vertex ∈ Graph.vertices(middle) → vertex ∈ Graph.vertices(large)
+      as middleVertices;
+  ∀ (edge : E). edge ∈ Graph.edges(small) → edge ∈ Graph.edges(middle) as smallEdges;
+  ∀ (edge : E). edge ∈ Graph.edges(middle) → edge ∈ Graph.edges(large) as middleEdges;
+  ∀ (vertex : V). vertex ∈ Graph.vertices(small) → vertex ∈ Graph.vertices(large)
+      by { take vertex : V;
+           suppose vertex ∈ Graph.vertices(small);
+           vertex ∈ Graph.vertices(middle) by smallVertices;
+           done by middleVertices };
+  ∀ (edge : E). edge ∈ Graph.edges(small) → edge ∈ Graph.edges(large)
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(small);
+           edge ∈ Graph.edges(middle) by smallEdges;
+           done by middleEdges };
+  done
+}
+
+-- An edge of a subgraph joins the same vertices it joins in the ambient
+-- graph, so a subgraph of a well-formed graph is loop-free for free; only
+-- its own two lists have to be checked.
+theorem Graph.IsSubgraph.no_loop (part whole : Graph(V, E, ends))
+        (isSubgraph : Graph.IsSubgraph(part, whole))
+        (wholeWellFormed : Graph.IsWellFormed(whole))
+        (edge : E) (u v : V)
+        (isEdge : edge ∈ Graph.edges(part))
+        (joins : Graph.Joins(part, edge, u, v))
+        : ¬(u = v) := {
+  ∀ (e : E). e ∈ Graph.edges(part) → e ∈ Graph.edges(whole) as partEdges;
+  edge ∈ Graph.edges(whole) by partEdges;
+  Graph.Joins(whole, edge, u, v);
+  done by Graph.IsWellFormed.no_loop
+}
