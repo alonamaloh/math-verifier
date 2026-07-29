@@ -411,3 +411,71 @@ hypotheses.
 **Suggested fix.** Run the same auto-generalization pass with
 `generalizing` as without it, reverting the listed binders IN ADDITION to
 the hypotheses that mention the scrutinee, rather than instead of them.
+
+---
+
+## G10 — `choose … such that P from <lemma>` can bind a proposition that is not P
+
+**Symptom.** The witness is bound and the `such that` is accepted, but the
+condition that joins the context is a *different* proposition — so every
+later step about it fails with "no in-scope hypothesis matches
+structurally" for a fact the `choose` line appears to have established.
+This is G1's guarantee failing again, in the one branch G1 said was
+covered ("the shaped-lemma branch states it as the ascription it builds,
+so it is checked there").
+
+It bites when the cited lemma states its conclusion through a **predicate
+variable** and the stated condition needs the witness ABSTRACTED out of it.
+`Natural.least_witness` concludes
+`∃ minimum. predicate(minimum) ∧ ∀ k. predicate(k) → minimum ≤ k`; asking
+for the least *shortfall* means solving
+`?predicate := shortfall ↦ ∃ point. …  bound = shortfall + point`, which is
+not a first-order match.
+
+**Minimal repro.**
+
+```math
+theorem Probe.abstractedPredicate (predicate : ℕ → Proposition)
+        (n bound shortfallAtN : ℕ) (witnessAtN : predicate(n))
+        (seed : ∃ (point : ℕ). predicate(point) ∧ bound = shortfallAtN + point)
+        : True := {
+  choose leastShortfall such that
+      (∃ (point : ℕ). predicate(point) ∧ bound = leastShortfall + point)
+      ∧ ∀ (k : ℕ). (∃ (point : ℕ). predicate(point) ∧ bound = k + point)
+          → leastShortfall ≤ k
+      as leastProperties from Natural.least_witness;
+  sorry
+}
+```
+
+`--goal-at` on the `sorry`:
+
+```
+  leastProperties : And (predicate leastShortfall)
+                        ((k : Natural) → predicate k → leastShortfall ≤ k)
+```
+
+— `?predicate` was solved to the theorem's own `predicate` (from the
+`witnessAtN` premise, by match-and-unify), the stated condition was never
+enforced, and no error was reported. Not unsound: what is bound is true.
+But the proof text claims something else, which is exactly what G1 was
+about.
+
+**Contrast.** With the predicate a variable *applied to the witness*
+(`predicate(minimum) ∧ ∀ k. …`) every leg is bound and usable, from a
+lemma source and from a hypothesis source alike — four fixtures, all pass.
+So the trigger is specifically the abstraction, not `choose`.
+
+**What the library does.** Names the predicate, so the match is
+first-order again: `Graph.HasPathOfLength(graph, edgeCount)` is a
+definition, and `choose longest such that Graph.HasPathOfLength(graph,
+longest) ∧ …` binds exactly what it says. Where naming it would be pure
+machinery, restructure the proof to avoid the abstraction —
+`Natural.greatest_witness` walks the bound down by induction rather than
+taking a least shortfall, and needs no predicate of its own.
+
+**Suggested fix.** Two parts, and the first matters more than the second:
+enforce the ascription (a citation that resolves at a type other than the
+`such that` existential must be an error, not a silent substitution), and
+solve the predicate metavariable from the ASCRIPTION before the premise
+discharge gets to guess it from `witnessAtN`.

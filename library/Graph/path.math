@@ -24,6 +24,7 @@ import Set.basics
 import Lists.list
 import Lists.length
 import Lists.remove
+import Natural.least_number
 import Graph.basics
 import Graph.walk
 
@@ -395,4 +396,59 @@ theorem Graph.IsPath.length_le_size (graph : Graph(V, E, ends)) (source target :
   length(edgeList) ≤ length(Graph.edges(graph))
       by List.length_le_of_distinct_inclusion;
   done
+}
+
+-- ----------------------------------------------------------------------
+-- A longest path.
+
+-- `graph` runs a path of exactly this many edges.
+definition Graph.HasPathOfLength (graph : Graph(V, E, ends)) (edgeCount : ℕ)
+        : Proposition :=
+  ∃ (source target : V). ∃ (edgeList : List(E)).
+      Graph.IsPath(graph, source, edgeList, target) ∧ length(edgeList) = edgeCount
+
+-- Every graph over an inhabited vertex type runs a path no shorter than
+-- any other. There is one to beat — the empty path at any vertex — and
+-- none can beat the edge count, so among the lengths that occur there is
+-- a greatest.
+theorem Graph.longest_path (graph : Graph(V, E, ends)) (someVertex : V)
+        : ∃ (source target : V). ∃ (edgeList : List(E)).
+            Graph.IsPath(graph, source, edgeList, target)
+            ∧ ∀ (otherSource otherTarget : V). ∀ (otherEdges : List(E)).
+                Graph.IsPath(graph, otherSource, otherEdges, otherTarget)
+                → length(otherEdges) ≤ length(edgeList) := {
+  Graph.IsPath(graph, someVertex, List.empty(E), someVertex);
+  Graph.HasPathOfLength(graph, 0)
+      by { witness someVertex with witness someVertex with witness List.empty(E) };
+  ∀ (k : ℕ). Graph.HasPathOfLength(graph, k) → k ≤ Graph.size(graph)
+      by { take k : ℕ;
+           suppose Graph.HasPathOfLength(graph, k);
+           choose pathSource, pathTarget, pathEdges such that
+               Graph.IsPath(graph, pathSource, pathEdges, pathTarget)
+               ∧ length(pathEdges) = k;
+           length(pathEdges) ≤ Graph.size(graph) by Graph.IsPath.length_le_size;
+           done };
+  choose longest such that Graph.HasPathOfLength(graph, longest)
+      ∧ ∀ (k : ℕ). Graph.HasPathOfLength(graph, k) → k ≤ longest
+      from Natural.greatest_witness(n := 0);
+  Graph.HasPathOfLength(graph, longest) as longestOccurs;
+  ∀ (k : ℕ). Graph.HasPathOfLength(graph, k) → k ≤ longest;
+  choose source, target, edgeList such that
+      Graph.IsPath(graph, source, edgeList, target) ∧ length(edgeList) = longest
+      from longestOccurs;
+  Graph.IsPath(graph, source, edgeList, target);
+  length(edgeList) = longest;
+  ∀ (otherSource otherTarget : V). ∀ (otherEdges : List(E)).
+      Graph.IsPath(graph, otherSource, otherEdges, otherTarget)
+      → length(otherEdges) ≤ length(edgeList)
+      by { take otherSource : V;
+           take otherTarget : V;
+           take otherEdges : List(E);
+           suppose Graph.IsPath(graph, otherSource, otherEdges, otherTarget);
+           Graph.HasPathOfLength(graph, length(otherEdges))
+               by { witness otherSource with witness otherTarget
+                        with witness otherEdges };
+           length(otherEdges) ≤ longest;
+           done };
+  witness source with witness target with witness edgeList
 }

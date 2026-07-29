@@ -21,6 +21,7 @@ import Natural.peano
 import Natural.order
 import Natural.division
 import Natural.strong_recursion
+import Natural.add_order
 
 -- A minimal witness: a point where the predicate holds with nothing
 -- below it doing so.
@@ -88,3 +89,39 @@ theorem Natural.least_witness (predicate : ℕ → Proposition)
          } as minimumIsLeast;
   witness minimum with And.introduction(predicateAtMinimum, minimumIsLeast)
 }
+
+-- ----------------------------------------------------------------------
+-- The greatest witness, dual to the least: a predicate that holds
+-- somewhere and never above a bound holds at a greatest point. Induction
+-- walks the bound down — either the predicate reaches the bound, and that
+-- is the maximum, or it never does and the bound below it serves.
+theorem Natural.greatest_witness (predicate : ℕ → Proposition)
+        (n bound : ℕ) (witnessAtN : predicate(n))
+        (isBound : ∀ (k : ℕ). predicate(k) → k ≤ bound)
+        : ∃ (maximum : ℕ).
+            predicate(maximum) ∧ (∀ (k : ℕ). predicate(k) → k ≤ maximum) :=
+  by induction on bound with IH {
+    case bound = 0: {
+        n ≤ 0;
+        n = 0;
+        predicate(0);
+        witness 0
+      }
+    case bound = 1 + predecessor: {
+        done by cases {
+          case predicate(1 + predecessor): witness (1 + predecessor)
+          otherwise as missesTheBound: {
+              ∀ (k : ℕ). predicate(k) → k ≤ predecessor
+                  by { take k : ℕ;
+                       suppose predicate(k);
+                       k ≤ 1 + predecessor;
+                       ¬(k = 1 + predecessor)
+                           by { suppose k = 1 + predecessor;
+                                predicate(1 + predecessor);
+                                done };
+                       done by Natural.le_of_le_one_plus_of_ne };
+              done by IH
+            }
+        }
+      }
+  }

@@ -73,6 +73,10 @@ recursion, or [number-theory.md](number-theory.md) for division, gcd, and primes
 - Induction: `Natural.induction_on_one_plus` and `Natural.strong_induction` in
   [one_plus_induction.math](one_plus_induction.math) and
   [strong_recursion.math](strong_recursion.math).
+- Extremal witnesses in [least_number.math](least_number.math):
+  `Natural.least_witness` (well-ordering — a predicate that holds anywhere
+  holds at a least point) and `Natural.greatest_witness`, its dual for a
+  predicate that also never holds above a bound.
 - Division: `Natural.floor_divide_modulo_decompose`, `Natural.modulo_bound`,
   and the existential `Natural.divide_with_remainder`.
 - GCD and Bézout: `Natural.gcd_is_gcd` and `Natural.bezout`.
