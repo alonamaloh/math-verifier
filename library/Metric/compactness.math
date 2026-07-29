@@ -205,22 +205,25 @@ theorem MetricSpace.IsCompact.Closure_subset (m : MetricSpace)
 }
 
 -- ----------------------------------------------------------------------
--- A compact set is bounded. If it were not, some point of it would escape
--- every distance from a fixed centre, and countable choice assembles
--- those escapes into a sequence. Compactness thins it to a convergent
--- one — but a convergent sequence stays within one unit of its limit
--- past some threshold, while the escapes pass every natural.
+-- A compact set is bounded. If its distances from a point were unbounded,
+-- some point of it would escape every one of them, and countable choice
+-- assembles those escapes into a sequence. Compactness thins it to a
+-- convergent one — but a convergent sequence stays within one unit of its
+-- limit past some threshold, while the escapes pass every natural.
 --
--- The centre is an argument: a metric space need not have a distinguished
--- point, and boundedness is measured from somewhere.
+-- Measuring needs a centre, so the argument runs about one; the theorem
+-- does not, because an empty region is bounded for free and a nonempty
+-- one supplies its own centre.
 
--- "The region is not bounded, so past every natural lies a point of it."
--- The block is what pushing the negation through the quantifiers costs;
--- quarantined here so the theorem below can just say the sentence.
+-- "The distances from the centre are unbounded, so past every natural
+-- lies a point of the region." The block is what pushing the negation
+-- through the quantifiers costs; quarantined here so the theorem below
+-- can just say the sentence.
 theorem MetricSpace.point_past_every_scale (m : MetricSpace)
         (region : Set(m))
         (centre : m)
-        (unbounded : ¬MetricSpace.IsBounded(region))
+        (unbounded : ¬(∃ (bound : ℝ). ∀ (x : m). x ∈ region →
+            distance(centre, x) ≤ bound))
         (n : ℕ)
         : ∃ (x : m).
             x ∈ region ∧ (1 + n : ℝ) < distance(centre, x) := {
@@ -241,19 +244,22 @@ theorem MetricSpace.point_past_every_scale (m : MetricSpace)
           };
           done
         };
-    MetricSpace.IsBounded(region)
-        by { witness centre with { witness (1 + n : ℝ) } };
+    ∃ (bound : ℝ). ∀ (x : m). x ∈ region → distance(centre, x) ≤ bound
+        by { witness (1 + n : ℝ) };
     done
   };
   done
 }
 
-theorem MetricSpace.IsCompact.bounded (m : MetricSpace)
+theorem MetricSpace.IsCompact.bounded_about (m : MetricSpace)
         (region : Set(m))
         (centre : m)
         (compact : MetricSpace.IsCompact(region))
-        : MetricSpace.IsBounded(region) := {
-  suppose ¬MetricSpace.IsBounded(region) as unbounded for contradiction {
+        : ∃ (bound : ℝ). ∀ (x : m). x ∈ region →
+            distance(centre, x) ≤ bound := {
+  suppose ¬(∃ (bound : ℝ). ∀ (x : m). x ∈ region →
+      distance(centre, x) ≤ bound)
+      as unbounded for contradiction {
     -- Past every natural, some point of the region.
     ∀ (n : ℕ). ∃ (x : m).
         x ∈ region ∧ (1 + n : ℝ) < distance(centre, x)
@@ -314,6 +320,34 @@ theorem MetricSpace.IsCompact.bounded (m : MetricSpace)
   };
   done
 }
+
+-- An empty region is bounded outright; a nonempty one measures from a
+-- point of itself.
+theorem MetricSpace.IsCompact.bounded (m : MetricSpace)
+        (region : Set(m))
+        (compact : MetricSpace.IsCompact(region))
+        : MetricSpace.IsBounded(region) :=
+  done by cases {
+    case Set.IsNonempty(m, region) as inhabited: {
+        choose centre such that centre ∈ region from inhabited;
+        ∃ (bound : ℝ). ∀ (x : m). x ∈ region → distance(centre, x) ≤ bound
+            by MetricSpace.IsCompact.bounded_about;
+        choose bound such that
+            ∀ (x : m). x ∈ region → distance(centre, x) ≤ bound;
+        done by MetricSpace.IsBounded.of_centre
+      }
+    otherwise as noPoint: {
+        ∀ (x : m). x ∈ region → ∀ (y : m). y ∈ region →
+            distance(x, y) ≤ (0 : ℝ)
+            by { take x : m;
+                 suppose x ∈ region;
+                 take y : m;
+                 suppose y ∈ region;
+                 Set.IsNonempty(m, region) by { witness x };
+                 done };
+        witness (0 : ℝ)
+      }
+  }
 
 -- ----------------------------------------------------------------------
 -- Continuous images.

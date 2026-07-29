@@ -99,15 +99,17 @@ theorem Plane.compact_of_closed_bounded (region : Set(Plane.Point))
         : Plane.IsCompact(region) := {
   take s : ℕ → Plane.Point;
   suppose ∀ (m : ℕ). s(m) ∈ region as inside;
-  choose centre such that
-      ∃ (bound : ℝ). ∀ (x : Plane.Point). x ∈ region →
-          Plane.distance(centre, x) ≤ bound
-      as boundExists from bounded;
+  -- The sequence lies in the region, so the region is measured from its
+  -- own first term.
+  s(0) ∈ region by inside;
+  ∃ (bound : ℝ). ∀ (x : Plane.Point). x ∈ region →
+      Plane.distance(s(0), x) ≤ bound
+      by MetricSpace.IsBounded.about(centre := s(0));
   choose bound such that
-      ∀ (x : Plane.Point). x ∈ region → Plane.distance(centre, x) ≤ bound
-      as insideBall from boundExists;
+      ∀ (x : Plane.Point). x ∈ region → Plane.distance(s(0), x) ≤ bound
+      as insideBall;
   Plane.SequenceIsBounded(s)
-      by { witness centre with { witness bound with
+      by { witness s(0) with { witness bound with
              (m : ℕ) ↦ insideBall(s(m), inside(m)) } };
   choose index : ℕ → ℕ, limit : Plane.Point such that
       Natural.IsStrictlyIncreasing(index)
@@ -126,13 +128,11 @@ theorem Plane.compact_of_closed_bounded (region : Set(Plane.Point))
 }
 
 -- The remaining direction, so the characterisation is an equivalence: a
--- compact set is bounded. Boundedness is measured from somewhere, and a
--- metric space has no distinguished point — the plane does, so this is
--- where the generic theorem gets its centre.
+-- compact set is bounded.
 theorem Plane.IsCompact.bounded (region : Set(Plane.Point))
         (compact : Plane.IsCompact(region))
         : Plane.IsBounded(region) :=
-  done by MetricSpace.IsCompact.bounded(centre := Plane.Point.make(0, 0))
+  done by MetricSpace.IsCompact.bounded
 
 -- ----------------------------------------------------------------------
 -- Continuous images.

@@ -27,11 +27,55 @@ definition MetricSpace.SequenceConverges {m : MetricSpace}
   ∀ (tolerance : ℝ). tolerance > 0 →
     eventually (k). distance(limit, s(k)) < tolerance
 
+-- Bounded: the distances between its own points do not exceed some
+-- bound. Said this way it asks for no centre, hence for no point at all,
+-- so the empty set is bounded — and no theorem about boundedness has to
+-- take a point of the space as an argument in order to measure from it.
 definition MetricSpace.IsBounded {m : MetricSpace}
         (region : Set(m)) : Proposition :=
-  ∃ (center : m). ∃ (bound : ℝ).
-    ∀ (x : m). x ∈ region →
-      distance(center, x) ≤ bound
+  ∃ (bound : ℝ). ∀ (x : m). x ∈ region →
+    ∀ (y : m). y ∈ region → distance(x, y) ≤ bound
+
+-- Bounded ABOUT A CENTRE is the working form, and the two cross freely:
+-- twice a radius bounds the distances inside it, and a point of the
+-- region measures them from itself.
+
+theorem MetricSpace.IsBounded.of_centre (m : MetricSpace)
+        (region : Set(m)) (centre : m) (bound : ℝ)
+        (inBall : ∀ (x : m). x ∈ region → distance(centre, x) ≤ bound)
+        : MetricSpace.IsBounded(region) := {
+  ∀ (x : m). x ∈ region → ∀ (y : m). y ∈ region →
+      distance(x, y) ≤ bound + bound
+      by { take x : m;
+           suppose x ∈ region;
+           take y : m;
+           suppose y ∈ region;
+           distance(centre, x) ≤ bound by inBall;
+           distance(centre, y) ≤ bound by inBall;
+           distance(x, y)
+              ≤ distance(x, centre) + distance(centre, y)
+                    by MetricSpace.distance_triangle
+              = distance(centre, x) + distance(centre, y)
+                    by substituting MetricSpace.distance_symmetric(m, x, centre)
+              ≤ bound + bound;
+           done };
+  witness bound + bound
+}
+
+theorem MetricSpace.IsBounded.about (m : MetricSpace)
+        (region : Set(m)) (centre : m) (inRegion : centre ∈ region)
+        (bounded : MetricSpace.IsBounded(region))
+        : ∃ (bound : ℝ). ∀ (x : m). x ∈ region →
+            distance(centre, x) ≤ bound := {
+  choose bound such that
+      ∀ (x : m). x ∈ region → ∀ (y : m). y ∈ region → distance(x, y) ≤ bound
+      from bounded;
+  ∀ (x : m). x ∈ region → distance(centre, x) ≤ bound
+      by { take x : m;
+           suppose x ∈ region;
+           done };
+  witness bound
+}
 
 definition MetricSpace.SequenceIsBounded {m : MetricSpace}
         (s : ℕ → m) : Proposition :=
