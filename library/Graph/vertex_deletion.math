@@ -1,0 +1,203 @@
+-- Graph/vertex_deletion.math
+--
+-- Deleting a vertex. Layer 5 of PLAN_JORDAN_SCHOENFLIES.md.
+--
+-- `Graph.deleteVertex(graph, vertex)` drops the vertex and every edge
+-- incident to it. Unlike an edge deletion it is not a matter of one list:
+-- an edge left behind with a missing end would break well-formedness, so
+-- the edges go with the vertex.
+--
+-- The transfer lemmas are the same two as for an edge, with the avoidance
+-- condition read off the walk's visited set: a walk in the deletion is a
+-- walk in the graph, and a walk that never visits the vertex is a walk in
+-- the deletion. Cut vertices are named here; what they are for is
+-- two-connectivity.
+
+module Graph.vertex_deletion
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Equality.basics
+import Lists.list
+import Lists.distinct
+import Lists.filter
+import Lists.remove
+import Graph.basics
+import Graph.walk
+import Graph.connected
+
+convention V : Type(0)
+convention E : Type(0)
+convention ends : E → Pair(V, V)
+
+-- The edges that survive a vertex deletion are the ones that miss it.
+-- Named, rather than written as a lambda in the filter, so that the
+-- membership lemmas below can be stated in the filtered form the list
+-- lemmas speak.
+definition Graph.Misses (graph : Graph(V, E, ends)) (vertex : V) (edge : E)
+        : Proposition :=
+  ¬Graph.Incident(graph, edge, vertex)
+
+definition Graph.deleteVertex (graph : Graph(V, E, ends)) (vertex : V)
+        : Graph(V, E, ends) :=
+  Graph.make(Graph.vertices(graph) ∖ vertex,
+             List.filter(Graph.Misses(graph, vertex), Graph.edges(graph)))
+
+-- ----------------------------------------------------------------------
+-- What survives.
+
+theorem Graph.deleteVertex.is_vertex (graph : Graph(V, E, ends)) (vertex survivor : V)
+        (survives : survivor ∈ Graph.vertices(Graph.deleteVertex(graph, vertex)))
+        : survivor ∈ Graph.vertices(graph) := {
+  survivor ∈ Graph.vertices(graph) ∖ vertex;
+  done by List.remove_member_subset
+}
+
+theorem Graph.deleteVertex.drops (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph)) (vertex survivor : V)
+        (survives : survivor ∈ Graph.vertices(Graph.deleteVertex(graph, vertex)))
+        : ¬(survivor = vertex) := {
+  List.Distinct(V, Graph.vertices(graph)) by Graph.IsWellFormed.vertices_distinct;
+  survivor ∈ Graph.vertices(graph) ∖ vertex;
+  done by List.remove_member_ne
+}
+
+theorem Graph.deleteVertex.keeps_vertex (graph : Graph(V, E, ends)) (vertex survivor : V)
+        (isVertex : survivor ∈ Graph.vertices(graph))
+        (distinctFromDeleted : ¬(survivor = vertex))
+        : survivor ∈ Graph.vertices(Graph.deleteVertex(graph, vertex)) := {
+  survivor ∈ Graph.vertices(graph) ∖ vertex by List.remove_member_complete;
+  done
+}
+
+theorem Graph.deleteVertex.is_edge (graph : Graph(V, E, ends)) (vertex : V) (edge : E)
+        (survives : edge ∈ Graph.edges(Graph.deleteVertex(graph, vertex)))
+        : edge ∈ Graph.edges(graph) := {
+  edge ∈ List.filter(Graph.Misses(graph, vertex), Graph.edges(graph));
+  done by List.filter_member_subset
+}
+
+theorem Graph.deleteVertex.edge_avoids (graph : Graph(V, E, ends)) (vertex : V) (edge : E)
+        (survives : edge ∈ Graph.edges(Graph.deleteVertex(graph, vertex)))
+        : ¬Graph.Incident(graph, edge, vertex) := {
+  edge ∈ List.filter(Graph.Misses(graph, vertex), Graph.edges(graph));
+  Graph.Misses(graph, vertex, edge) by List.filter_member_property;
+  done
+}
+
+theorem Graph.deleteVertex.keeps_edge (graph : Graph(V, E, ends)) (vertex : V) (edge : E)
+        (isEdge : edge ∈ Graph.edges(graph))
+        (avoids : ¬Graph.Incident(graph, edge, vertex))
+        : edge ∈ Graph.edges(Graph.deleteVertex(graph, vertex)) := {
+  Graph.Misses(graph, vertex, edge);
+  edge ∈ List.filter(Graph.Misses(graph, vertex), Graph.edges(graph))
+      by List.filter_member_complete;
+  done
+}
+
+theorem Graph.deleteVertex.IsSubgraph (graph : Graph(V, E, ends)) (vertex : V)
+        : Graph.IsSubgraph(Graph.deleteVertex(graph, vertex), graph) := {
+  ∀ (survivor : V). survivor ∈ Graph.vertices(Graph.deleteVertex(graph, vertex))
+      → survivor ∈ Graph.vertices(graph)
+      by { take survivor : V;
+           suppose survivor ∈ Graph.vertices(Graph.deleteVertex(graph, vertex));
+           done by Graph.deleteVertex.is_vertex };
+  ∀ (edge : E). edge ∈ Graph.edges(Graph.deleteVertex(graph, vertex))
+      → edge ∈ Graph.edges(graph)
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(Graph.deleteVertex(graph, vertex));
+           done by Graph.deleteVertex.is_edge };
+  done
+}
+
+theorem Graph.deleteVertex.IsWellFormed (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph)) (vertex : V)
+        : Graph.IsWellFormed(Graph.deleteVertex(graph, vertex)) := {
+  List.Distinct(V, Graph.vertices(graph)) by Graph.IsWellFormed.vertices_distinct;
+  List.Distinct(V, Graph.vertices(graph) ∖ vertex) by List.remove_distinct;
+  List.Distinct(V, Graph.vertices(Graph.deleteVertex(graph, vertex)));
+  List.Distinct(E, Graph.edges(graph)) by Graph.IsWellFormed.edges_distinct;
+  List.Distinct(E, List.filter(Graph.Misses(graph, vertex), Graph.edges(graph)))
+      by List.filter_distinct;
+  List.Distinct(E, Graph.edges(Graph.deleteVertex(graph, vertex)));
+  ∀ (edge : E). ∀ (u v : V).
+      edge ∈ Graph.edges(Graph.deleteVertex(graph, vertex))
+      → Graph.Joins(Graph.deleteVertex(graph, vertex), edge, u, v)
+      → u ∈ Graph.vertices(Graph.deleteVertex(graph, vertex)) ∧ ¬(u = v)
+      by { take edge : E;
+           take u : V;
+           take v : V;
+           suppose edge ∈ Graph.edges(Graph.deleteVertex(graph, vertex));
+           suppose Graph.Joins(Graph.deleteVertex(graph, vertex), edge, u, v);
+           edge ∈ Graph.edges(graph) by Graph.deleteVertex.is_edge;
+           ¬Graph.Incident(graph, edge, vertex) by Graph.deleteVertex.edge_avoids;
+           Graph.Joins(graph, edge, u, v);
+           u ∈ Graph.vertices(graph) by Graph.IsWellFormed.end_is_vertex;
+           ¬(u = v) by Graph.IsWellFormed.no_loop;
+           -- `u` is not the deleted vertex: the edge would be incident to it.
+           ¬(u = vertex)
+               by { suppose u = vertex;
+                    Graph.Joins(graph, edge, vertex, v) by substituting (u = vertex);
+                    Graph.Incident(graph, edge, vertex) by Graph.Joins.incident_source;
+                    done };
+           u ∈ Graph.vertices(Graph.deleteVertex(graph, vertex))
+               by Graph.deleteVertex.keeps_vertex;
+           done };
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- Walks across the deletion.
+
+theorem Graph.IsWalk.after_vertex_deletion (graph : Graph(V, E, ends)) (vertex : V)
+        (source target : V) (edgeList : List(E))
+        (walk : Graph.IsWalk(Graph.deleteVertex(graph, vertex), source, edgeList, target))
+        : Graph.IsWalk(graph, source, edgeList, target) := {
+  Graph.IsSubgraph(Graph.deleteVertex(graph, vertex), graph)
+      by Graph.deleteVertex.IsSubgraph;
+  done by Graph.IsWalk.in_supergraph
+}
+
+theorem Graph.IsWalk.avoiding_vertex (graph : Graph(V, E, ends)) (vertex : V)
+        (source target : V) (edgeList : List(E))
+        (walk : Graph.IsWalk(graph, source, edgeList, target))
+        (avoided : ¬(vertex ∈ Graph.walkVertices(graph, source, edgeList)))
+        : Graph.IsWalk(Graph.deleteVertex(graph, vertex), source, edgeList, target) :=
+  by induction on walk with IH {
+    case Graph.IsWalkOver.arrived(endpoint): done by Graph.IsWalk.empty
+    case Graph.IsWalkOver.step(
+        stepSource, waypoint, stepTarget, edge, rest, isEdge, joins, restWalk): {
+        -- Everything the remainder visits, the whole walk visits.
+        ¬(vertex ∈ Graph.walkVertices(graph, waypoint, rest))
+            by { suppose vertex ∈ Graph.walkVertices(graph, waypoint, rest);
+                 vertex ∈ Graph.walkVertices(graph, stepSource, List.prepend(E, edge, rest))
+                     by Graph.walkVertices.before_step;
+                 done };
+        Graph.IsWalk(Graph.deleteVertex(graph, vertex), waypoint, rest, stepTarget) by IH;
+        -- The edge taken is incident only to its two ends, and the walk
+        -- visits both of them.
+        ¬Graph.Incident(graph, edge, vertex)
+            by { suppose Graph.Incident(graph, edge, vertex);
+                 vertex = stepSource ∨ vertex = waypoint by Graph.Incident.is_end;
+                 vertex ∈ Graph.walkVertices(graph, stepSource, List.prepend(E, edge, rest))
+                     by cases {
+                       case vertex = stepSource: done
+                       case vertex = waypoint: {
+                           vertex ∈ Graph.walkVertices(graph, waypoint, rest);
+                           done by Graph.walkVertices.before_step
+                         }
+                     };
+                 done };
+        edge ∈ Graph.edges(Graph.deleteVertex(graph, vertex))
+            by Graph.deleteVertex.keeps_edge;
+        Graph.Joins(Graph.deleteVertex(graph, vertex), edge, stepSource, waypoint);
+        done by Graph.IsWalk.extend
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- Cut vertices.
+
+definition Graph.IsCutVertex (graph : Graph(V, E, ends)) (vertex : V) : Proposition :=
+  vertex ∈ Graph.vertices(graph) ∧ ¬Graph.IsConnected(Graph.deleteVertex(graph, vertex))
