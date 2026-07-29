@@ -76,6 +76,27 @@ theorem MetricSpace.SequenceConverges.unique (m : MetricSpace)
   done by MetricSpace.equal_of_distance_zero
 }
 
+-- Convergence sees only the values, so a sequence that agrees with a
+-- convergent one at every index converges to the same limit. This is what
+-- a proof reaches for instead of rewriting one sequence into the other by
+-- function extensionality.
+theorem MetricSpace.SequenceConverges.of_pointwise_equal (m : MetricSpace)
+        (s t : ℕ → m) (limit : m)
+        (agree : ∀ (k : ℕ). s(k) = t(k))
+        (converges : MetricSpace.SequenceConverges(s, limit))
+        : MetricSpace.SequenceConverges(t, limit) := {
+  take tolerance : ℝ;
+  suppose tolerance > 0;
+  eventually (k). distance(limit, s(k)) < tolerance by converges;
+  for k sufficiently large: {
+    s(k) = t(k) by agree;
+    distance(limit, t(k))
+       = distance(limit, s(k))
+       < tolerance;
+    done
+  }
+}
+
 -- ----------------------------------------------------------------------
 -- Thinning, as a named relation.
 
@@ -116,13 +137,6 @@ theorem MetricSpace.SequenceConverges.subsequence (m : MetricSpace)
         : MetricSpace.SequenceConverges((k : ℕ) ↦ s(index(k)), limit) := {
   take tolerance : ℝ;
   suppose tolerance > 0;
-  choose threshold such that
-      ∀ (k : ℕ). threshold ≤ k → distance(limit, s(k)) < tolerance
-      as closeBeyond from converges;
-  witness threshold with
-      (k : ℕ) (beyond : threshold ≤ k) ↦ {
-        k ≤ index(k) by Natural.IsStrictlyIncreasing.LessOrEqual;
-        threshold ≤ index(k);
-        done by closeBeyond
-      }
+  eventually (n). distance(limit, s(n)) < tolerance by converges;
+  done by Natural.Eventually.thinned
 }

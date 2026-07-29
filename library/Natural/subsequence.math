@@ -18,6 +18,7 @@ import Natural.basics
 import Natural.peano
 import Natural.order
 import Natural.add_order
+import Natural.eventually
 
 definition Natural.IsStrictlyIncreasing (index : ℕ → ℕ) : Proposition :=
   ∀ (k : ℕ). index(k) < index(1 + k)
@@ -86,4 +87,21 @@ theorem Natural.IsStrictlyIncreasing.compose (outer inner : ℕ → ℕ)
   inner(k) < inner(1 + k) by innerIncreasing(k);
   done by Natural.IsStrictlyIncreasing.monotone(
       outer, outerIncreasing, inner(k), inner(1 + k))
+}
+
+-- A subsequence inherits every eventual fact: the index never falls
+-- behind its own argument, so it is already past whatever threshold the
+-- fact came with. This is the whole content of "thinning preserves a
+-- limit", and every convergence proof that thins reaches for it.
+theorem Natural.Eventually.thinned (P : ℕ → Proposition) (index : ℕ → ℕ)
+        (eventualP : Natural.Eventually(P))
+        (increasing : Natural.IsStrictlyIncreasing(index))
+        : Natural.Eventually((k : ℕ) ↦ P(index(k))) := {
+  choose threshold such that ∀ (n : ℕ). threshold ≤ n → P(n) from eventualP;
+  witness threshold with
+      (k : ℕ) (beyond : threshold ≤ k) ↦ {
+        k ≤ index(k) by Natural.IsStrictlyIncreasing.LessOrEqual;
+        threshold ≤ index(k);
+        done
+      }
 }

@@ -14,7 +14,7 @@ theorem MetricSpace.IsCompact.image (source target : MetricSpace)
         (region : Set(source))
         (compact : MetricSpace.IsCompact(region))
         (continuous : MetricSpace.ContinuousOn(f, region))
-        : MetricSpace.IsCompact(MetricSpace.imageSet(f, region))
+        : MetricSpace.IsCompact(Set.image(f, region))
 ```
 
 And an `instance` per carrier lets an implicit `{m : MetricSpace}` resolve from
@@ -58,7 +58,8 @@ about the subspace.)
   splits on where in the region the point lies
 - `MetricSpace.SequenceConverges`, `IsBounded`, `SubsequenceConverges` —
   [sequence.math](sequence.math)
-- `MetricSpace.IsCompact`, `imageSet` — [compactness.math](compactness.math)
+- `MetricSpace.IsCompact` — [compactness.math](compactness.math). Its image
+  theorem is stated over the ordinary `Set.image`, which involves no metric
 - `MetricSpace.IsConnected`, `preimageIn` — [connected.math](connected.math)
 - `MetricSpace.UniformlyContinuousOn` — [uniform.math](uniform.math)
 - `MetricSpace.InjectiveOn`, `HasContinuousInverseOn`, `IsHomeomorphismOn` —

@@ -51,7 +51,7 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
 - `Plane.SequenceConverges`, `Plane.IsBounded` —
   [sequence.math](sequence.math); `Plane.SubsequenceConverges` —
   [compact.math](compact.math)
-- `Plane.IsCompact` (**sequential**), `Plane.Closure`, `Plane.imageSet` —
+- `Plane.IsCompact` (**sequential**), `Plane.Closure` —
   [compactness.math](compactness.math)
 - `Plane.RealContinuousOn`, `Plane.image`, `Plane.UniformlyContinuousOn` —
   [extremum.math](extremum.math)
@@ -172,7 +172,7 @@ definition. The parameter domain is a subset of **ℝ**, and the topology it
 carries is the generic one of `Metric/`, so everything above applies
 unchanged: a
 parametrisation is an ordinary `Plane.Point → Plane.Point` map, its
-continuity is `ContinuousOn`, its image is `imageSet`, its compactness is
+continuity is `ContinuousOn`, its image is `Set.image`, its compactness is
 `IsCompact`. Parametrising by `[0,1] ⊆ ℝ` would need a second relative
 topology for real-domain maps, and a circle would need a quotient.
 

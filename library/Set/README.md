@@ -7,6 +7,9 @@ enumerability, equinumerosity, and the finite counting layer.
 
 - `Set(T) := T → Proposition`, membership `Set.member` (`∈`), subset
   `Set.subset` (`⊆`), and `Set.IsNonempty` in [basics.math](basics.math)
+- The Boolean operations `∪`, `∩`, `∖`, `Set.universe`, `Set.empty`,
+  `Set.complement`, extensionality `Set.equal_of_same_members`, and the image
+  `Set.image(f, subset)` in [algebra.math](algebra.math)
 - Predicate subtype `Subtype(A, P)` in [subtype.math](subtype.math)
 - Countability `IsEnumerable(X)` in [enumerable.math](enumerable.math)
 - Explicit-inverse cardinal equivalence `Equinumerous(A, B)` in

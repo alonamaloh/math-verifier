@@ -13,6 +13,7 @@ module Set.algebra
 import Logic.basics
 import Logic.excluded_middle
 import Equality.basics
+import Logic.exists
 import Logic.functions
 import Set.basics
 
@@ -242,4 +243,58 @@ theorem Set.member_of_equal {T : Type(0)} (source target : Set(T))
         : subject ∈ target := {
   subject ∈ target by substituting same;
   done
+}
+
+-- ----------------------------------------------------------------------
+-- Images. No structure is involved — this is the set of values a function
+-- takes on a subset, and it is what a metric or topological image
+-- theorem is stated about.
+
+definition Set.image {A B : Type(0)} (f : A → B) (subset : Set(A))
+        : Set(B) :=
+  (y : B) ↦ ∃ (x : A). x ∈ subset ∧ f(x) = y
+
+-- Taking images commutes with union: a point of the image of a union came
+-- from one side or the other.
+theorem Set.image_union {A B : Type(0)} (f : A → B)
+        (left right : Set(A))
+        : Set.image(f, left ∪ right)
+              = Set.image(f, left) ∪ Set.image(f, right) := {
+  Set.image(f, left ∪ right) ⊆ Set.image(f, left) ∪ Set.image(f, right)
+      by (y : B) (onImage : y ∈ Set.image(f, left ∪ right)) ↦ {
+        choose origin such that origin ∈ left ∪ right ∧ f(origin) = y;
+        origin ∈ left ∪ right;
+        f(origin) = y;
+        done by cases {
+          case origin ∈ left as fromLeft: {
+              y ∈ Set.image(f, left) by { witness origin };
+              done
+            }
+          case origin ∈ right as fromRight: {
+              y ∈ Set.image(f, right) by { witness origin };
+              done
+            }
+        }
+      };
+  Set.image(f, left) ∪ Set.image(f, right) ⊆ Set.image(f, left ∪ right)
+      by (y : B)
+         (onEither : y ∈ Set.image(f, left) ∪ Set.image(f, right)) ↦ {
+        done by cases {
+          case y ∈ Set.image(f, left) as onLeft: {
+              choose origin such that origin ∈ left ∧ f(origin) = y from onLeft;
+              origin ∈ left;
+              f(origin) = y;
+              origin ∈ left ∪ right;
+              done by { witness origin }
+            }
+          case y ∈ Set.image(f, right) as onRight: {
+              choose origin such that origin ∈ right ∧ f(origin) = y from onRight;
+              origin ∈ right;
+              f(origin) = y;
+              origin ∈ left ∪ right;
+              done by { witness origin }
+            }
+        }
+      };
+  done by Set.equal_of_same_members
 }

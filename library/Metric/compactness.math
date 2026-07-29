@@ -349,63 +349,6 @@ theorem MetricSpace.ContinuousWithinAt.along_sequence (source target : MetricSpa
   }
 }
 
-definition MetricSpace.imageSet {source target : MetricSpace}
-        (f : source → target)
-        (region : Set(source))
-        : Set(target) :=
-  (y : target) ↦
-    ∃ (x : source). x ∈ region ∧ f(x) = y
-
--- Taking images commutes with union: a point of the image of a union came
--- from one side or the other.
-theorem MetricSpace.imageSet_union (source target : MetricSpace)
-        (f : source → target)
-        (left right : Set(source))
-        : MetricSpace.imageSet(f, left ∪ right)
-              = MetricSpace.imageSet(f, left) ∪ MetricSpace.imageSet(f, right) := {
-  MetricSpace.imageSet(f, left ∪ right)
-      ⊆ MetricSpace.imageSet(f, left) ∪ MetricSpace.imageSet(f, right)
-      by (y : target)
-         (onImage : y ∈ MetricSpace.imageSet(f, left ∪ right)) ↦ {
-        choose source such that source ∈ left ∪ right ∧ f(source) = y;
-        source ∈ left ∪ right;
-        f(source) = y;
-        done by cases {
-          case source ∈ left as fromLeft: {
-              y ∈ MetricSpace.imageSet(f, left) by { witness source };
-              done
-            }
-          case source ∈ right as fromRight: {
-              y ∈ MetricSpace.imageSet(f, right) by { witness source };
-              done
-            }
-        }
-      };
-  MetricSpace.imageSet(f, left) ∪ MetricSpace.imageSet(f, right)
-      ⊆ MetricSpace.imageSet(f, left ∪ right)
-      by (y : target)
-         (onEither : y ∈ MetricSpace.imageSet(f, left)
-             ∪ MetricSpace.imageSet(f, right)) ↦ {
-        done by cases {
-          case y ∈ MetricSpace.imageSet(f, left) as onLeft: {
-              choose source such that source ∈ left ∧ f(source) = y from onLeft;
-              source ∈ left;
-              f(source) = y;
-              source ∈ left ∪ right;
-              done by { witness source }
-            }
-          case y ∈ MetricSpace.imageSet(f, right) as onRight: {
-              choose source such that source ∈ right ∧ f(source) = y from onRight;
-              source ∈ right;
-              f(source) = y;
-              source ∈ left ∪ right;
-              done by { witness source }
-            }
-        }
-      };
-  done by Set.equal_of_same_members
-}
-
 -- The continuous image of a compact set is compact. A sequence in the
 -- image has preimages — countable choice again — which compactness thins
 -- to a convergent one; continuity carries that convergence forward.
@@ -414,9 +357,9 @@ theorem MetricSpace.IsCompact.image (source target : MetricSpace)
         (region : Set(source))
         (compact : MetricSpace.IsCompact(region))
         (continuous : MetricSpace.ContinuousOn(f, region))
-        : MetricSpace.IsCompact(MetricSpace.imageSet(f, region)) := {
+        : MetricSpace.IsCompact(Set.image(f, region)) := {
   take t : ℕ → target;
-  suppose ∀ (k : ℕ). t(k) ∈ MetricSpace.imageSet(f, region) as inImage;
+  suppose ∀ (k : ℕ). t(k) ∈ Set.image(f, region) as inImage;
   ∀ (n : ℕ). ∃ (x : source). x ∈ region ∧ f(x) = t(n)
       by (n : ℕ) ↦ inImage(n)
       as preimages;
@@ -437,7 +380,7 @@ theorem MetricSpace.IsCompact.image (source target : MetricSpace)
   limit ∈ region as limitInside;
   MetricSpace.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
       by MetricSpace.SubsequenceConverges.converges as converges;
-  f(limit) ∈ MetricSpace.imageSet(f, region) by { witness limit };
+  f(limit) ∈ Set.image(f, region) by { witness limit };
   MetricSpace.ContinuousWithinAt(f, region, limit) by continuous;
   ∀ (k : ℕ). s(index(k)) ∈ region by { take k : ℕ; done by inside };
   MetricSpace.SequenceConverges((k : ℕ) ↦ f(s(index(k))), f(limit))
@@ -445,8 +388,8 @@ theorem MetricSpace.IsCompact.image (source target : MetricSpace)
           s := (k : ℕ) ↦ s(index(k)));
   ∀ (k : ℕ). f(s(index(k))) = t(index(k))
       by { take k : ℕ; done by chosen };
-  ((k : ℕ) ↦ f(s(index(k)))) = ((k : ℕ) ↦ t(index(k)))
-      by Function.extensionality;
-  MetricSpace.SequenceConverges((k : ℕ) ↦ t(index(k)), f(limit));
+  MetricSpace.SequenceConverges((k : ℕ) ↦ t(index(k)), f(limit))
+      by MetricSpace.SequenceConverges.of_pointwise_equal(
+          s := (k : ℕ) ↦ f(s(index(k))));
   witness index with { witness f(limit) }
 }
