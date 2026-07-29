@@ -25,6 +25,8 @@ import Lists.filter
 import Lists.distinct
 import Lists.sum
 import Graph.basics
+import Graph.walk
+import Graph.vertex_deletion
 
 convention V : Type(0)
 convention E : Type(0)
@@ -158,4 +160,19 @@ theorem Graph.degree_sum (graph : Graph(V, E, ends))
            Graph.vertices(graph))
      = 2 * length(Graph.edges(graph))       by Graph.incidence_sum
      = 2 * Graph.size(graph)
+}
+
+-- Deleting a vertex removes exactly the edges that meet it, and keeps the
+-- rest: the two filters are complementary.
+theorem Graph.deleteVertex.size (graph : Graph(V, E, ends)) (vertex : V)
+        : Graph.degree(graph, vertex)
+            + Graph.size(Graph.deleteVertex(graph, vertex))
+          = Graph.size(graph) := {
+  length(List.filter((edge : E) ↦ Graph.Incident(graph, edge, vertex),
+                     Graph.edges(graph)))
+      + length(List.filter((edge : E) ↦ ¬Graph.Incident(graph, edge, vertex),
+                           Graph.edges(graph)))
+      = length(Graph.edges(graph))
+      by List.filter_length_complement;
+  done
 }

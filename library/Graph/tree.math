@@ -29,7 +29,9 @@ import Graph.walk
 import Graph.path
 import Graph.connected
 import Graph.deletion
+import Graph.vertex_deletion
 import Graph.cycle
+import Graph.degree
 
 convention V : Type(0)
 convention E : Type(0)
@@ -234,10 +236,11 @@ theorem Graph.IsTree.has_leaf (graph : Graph(V, E, ends))
       Graph.IsPath(graph, otherSource, otherEdges, otherTarget)
       → length(otherEdges) ≤ length(longestEdges) as nothingLonger;
   1 ≤ length(someEdges) ≤ length(longestEdges) by nothingLonger;
-  ∃ (edge : E). edge ∈ Graph.edges(graph)
+  ∃ (edge : E). edge ∈ longestEdges ∧ edge ∈ Graph.edges(graph)
       ∧ Graph.Incident(graph, edge, longestSource)
       by Graph.IsPath.first_edge;
-  choose departure such that departure ∈ Graph.edges(graph)
+  choose departure such that departure ∈ longestEdges
+      ∧ departure ∈ Graph.edges(graph)
       ∧ Graph.Incident(graph, departure, longestSource);
   departure ∈ Graph.edges(graph);
   Graph.Incident(graph, departure, longestSource);
@@ -249,4 +252,342 @@ theorem Graph.IsTree.has_leaf (graph : Graph(V, E, ends))
   choose farEnd such that Graph.Joins(graph, departure, longestSource, farEnd);
   longestSource ∈ Graph.vertices(graph) by Graph.IsWellFormed.end_is_vertex;
   witness longestSource
+}
+
+-- ----------------------------------------------------------------------
+-- A path steers clear of a leaf.
+
+-- To pass through a vertex of degree one a path would have to arrive and
+-- leave along that vertex's single edge, and a path takes no edge twice.
+-- So a path whose two ends are elsewhere never visits it at all.
+theorem Graph.IsLeaf.path_avoids (graph : Graph(V, E, ends)) (leaf : V)
+        (degreeOne : Graph.degree(graph, leaf) = 1)
+        (source target : V) (edgeList : List(E))
+        (path : Graph.IsPath(graph, source, edgeList, target))
+        (sourceIsNotLeaf : ¬(source = leaf))
+        (targetIsNotLeaf : ¬(target = leaf))
+        : ¬(leaf ∈ Graph.walkVertices(graph, source, edgeList)) :=
+  by induction on path with IH {
+    case Graph.IsPathOver.arrived(endpoint): {
+        suppose leaf ∈ Graph.walkVertices(graph, endpoint, List.empty(E));
+        leaf = endpoint ∨ leaf ∈ Graph.coveredVertices(graph, List.empty(E));
+        done by cases {
+          case leaf = endpoint: {
+              endpoint = leaf;
+              done
+            }
+          case leaf ∈ Graph.coveredVertices(graph, List.empty(E)): {
+              ¬(leaf ∈ Graph.coveredVertices(graph, List.empty(E)))
+                  by Graph.coveredVertices.no_edges;
+              done
+            }
+        }
+      }
+    case Graph.IsPathOver.step(
+        stepSource, waypoint, stepTarget, edge, rest, isEdge, joins, restPath,
+        fresh): {
+        suppose leaf ∈ Graph.walkVertices(graph, stepSource,
+                                          List.prepend(E, edge, rest));
+        leaf = stepSource ∨ leaf ∈ Graph.walkVertices(graph, waypoint, rest)
+            by Graph.walkVertices.after_step;
+        done by cases {
+          case leaf = stepSource: {
+              stepSource = leaf;
+              done
+            }
+          case leaf ∈ Graph.walkVertices(graph, waypoint, rest): {
+              done by cases {
+                case waypoint = leaf: {
+                    -- The step arrives at the leaf, so the rest has to
+                    -- leave it — along the leaf's one edge, which the
+                    -- step has already used.
+                    ¬(rest = List.empty(E))
+                        by { suppose rest = List.empty(E);
+                             Graph.IsWalk(graph, waypoint, rest, stepTarget)
+                                 by Graph.IsPath.walk;
+                             waypoint = stepTarget
+                                 by Graph.IsWalk.empty_endpoints;
+                             stepTarget = leaf by substituting (waypoint = leaf);
+                             done };
+                    1 ≤ length(rest) by List.length_positive_of_nonempty;
+                    ∃ (next : E). next ∈ rest ∧ next ∈ Graph.edges(graph)
+                        ∧ Graph.Incident(graph, next, waypoint)
+                        by Graph.IsPath.first_edge;
+                    choose departure such that departure ∈ rest
+                        ∧ departure ∈ Graph.edges(graph)
+                        ∧ Graph.Incident(graph, departure, waypoint);
+                    departure ∈ rest;
+                    departure ∈ Graph.edges(graph);
+                    Graph.Incident(graph, departure, waypoint);
+                    Graph.Incident(graph, departure, leaf)
+                        by substituting (waypoint = leaf);
+                    departure ∈ Graph.incidentEdges(graph, leaf)
+                        by Graph.incidentEdges_member;
+                    Graph.Incident(graph, edge, waypoint)
+                        by Graph.Joins.incident_target;
+                    Graph.Incident(graph, edge, leaf)
+                        by substituting (waypoint = leaf);
+                    edge ∈ Graph.incidentEdges(graph, leaf)
+                        by Graph.incidentEdges_member;
+                    length(Graph.incidentEdges(graph, leaf)) = 1;
+                    edge = departure by List.members_equal_of_length_one;
+
+                    -- But the step's own edge is not in the rest.
+                    Graph.Incident(graph, edge, stepSource)
+                        by Graph.Joins.incident_source;
+                    ¬(edge ∈ rest)
+                        by { suppose edge ∈ rest;
+                             stepSource ∈ Graph.coveredVertices(graph, rest)
+                                 by Graph.coveredVertices.of_edge;
+                             stepSource ∈ Graph.walkVertices(graph, waypoint, rest);
+                             done };
+                    edge ∈ rest by substituting (edge = departure);
+                    done
+                  }
+                otherwise: {
+                    ¬(leaf ∈ Graph.walkVertices(graph, waypoint, rest)) by IH;
+                    done
+                  }
+              }
+            }
+        }
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- Deleting a leaf leaves a tree.
+
+-- Acyclicity passes to any subgraph: a cycle downstairs is a cycle
+-- upstairs, over the same edge and the same detour.
+theorem Graph.IsAcyclic.in_subgraph (part whole : Graph(V, E, ends))
+        (isSubgraph : Graph.IsSubgraph(part, whole))
+        (acyclic : Graph.IsAcyclic(whole))
+        : Graph.IsAcyclic(part) := {
+  ∀ (candidate : E). candidate ∈ Graph.edges(part) → candidate ∈ Graph.edges(whole)
+      as partEdges;
+  take edge : E;
+  suppose edge ∈ Graph.edges(part);
+  suppose Graph.LiesOnCycle(part, edge);
+  choose cycleSource, cycleTarget, detour such that
+      Graph.IsCycleThrough(part, edge, cycleSource, cycleTarget, detour);
+  Graph.Joins(part, edge, cycleSource, cycleTarget);
+  Graph.IsPath(part, cycleSource, detour, cycleTarget);
+  ¬(edge ∈ detour);
+  edge ∈ Graph.edges(whole) by partEdges;
+  Graph.Joins(whole, edge, cycleSource, cycleTarget);
+  Graph.IsPath(whole, cycleSource, detour, cycleTarget) by Graph.IsPath.in_supergraph;
+  Graph.LiesOnCycle(whole, edge)
+      by witness cycleSource with witness cycleTarget with witness detour;
+  ¬Graph.LiesOnCycle(whole, edge) by acyclic;
+  done
+}
+
+-- A tree minus a leaf is a tree. Acyclicity is inherited; connectedness
+-- survives because every path between two surviving vertices already
+-- steered clear of the leaf.
+theorem Graph.IsTree.delete_leaf (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph))
+        (isTree : Graph.IsTree(graph))
+        (leaf : V) (isLeaf : Graph.IsLeaf(graph, leaf))
+        (atLeastTwo : 2 ≤ Graph.order(graph))
+        : Graph.IsTree(Graph.deleteVertex(graph, leaf)) := {
+  Graph.IsConnected(graph);
+  Graph.IsAcyclic(graph);
+  leaf ∈ Graph.vertices(graph);
+  Graph.degree(graph, leaf) = 1;
+  Graph.IsSubgraph(Graph.deleteVertex(graph, leaf), graph)
+      by Graph.deleteVertex.IsSubgraph;
+  Graph.IsAcyclic(Graph.deleteVertex(graph, leaf)) by Graph.IsAcyclic.in_subgraph;
+
+  -- Something survives the deletion.
+  List.Distinct(V, Graph.vertices(graph)) by Graph.IsWellFormed.vertices_distinct;
+  length(Graph.vertices(graph)) = 1 + length(Graph.vertices(graph) ∖ leaf)
+      by List.length_remove_member;
+  (1 : ℕ) + 1
+     ≤ Graph.order(graph)
+     = length(Graph.vertices(graph))
+     = 1 + length(Graph.vertices(graph) ∖ leaf);
+  1 ≤ length(Graph.vertices(graph) ∖ leaf) by Natural.add_left_le_cancel;
+  choose survivor such that survivor ∈ Graph.vertices(graph) ∖ leaf
+      from List.member_of_positive_length;
+  ∃ (vertex : V). vertex ∈ Graph.vertices(Graph.deleteVertex(graph, leaf))
+      by witness survivor;
+
+  -- And every two survivors still reach each other.
+  ∀ (u w : V). u ∈ Graph.vertices(Graph.deleteVertex(graph, leaf))
+      → w ∈ Graph.vertices(Graph.deleteVertex(graph, leaf))
+      → Graph.Reaches(Graph.deleteVertex(graph, leaf), u, w)
+      by { take u : V;
+           take w : V;
+           suppose u ∈ Graph.vertices(Graph.deleteVertex(graph, leaf));
+           suppose w ∈ Graph.vertices(Graph.deleteVertex(graph, leaf));
+           ¬(u = leaf) by Graph.deleteVertex.drops;
+           ¬(w = leaf) by Graph.deleteVertex.drops;
+           u ∈ Graph.vertices(graph) by Graph.deleteVertex.is_vertex;
+           w ∈ Graph.vertices(graph) by Graph.deleteVertex.is_vertex;
+           Graph.Reaches(graph, u, w) by Graph.IsConnected.reaches;
+           choose route such that Graph.IsPath(graph, u, route, w)
+               from Graph.Reaches.path;
+           ¬(leaf ∈ Graph.walkVertices(graph, u, route))
+               by Graph.IsLeaf.path_avoids;
+           Graph.IsWalk(graph, u, route, w) by Graph.IsPath.walk;
+           Graph.IsWalk(Graph.deleteVertex(graph, leaf), u, route, w)
+               by Graph.IsWalk.avoiding_vertex;
+           witness route };
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- A tree has one edge fewer than it has vertices.
+
+-- Bounded, so the induction has a number to walk down: peel a leaf and
+-- recurse on what is left, which is a tree with one vertex and one edge
+-- fewer.
+theorem Graph.IsTree.edge_count_below (bound : ℕ)
+        : ∀ (graph : Graph(V, E, ends)). Graph.order(graph) ≤ bound
+            → Graph.IsWellFormed(graph) → Graph.IsTree(graph)
+            → 1 + Graph.size(graph) = Graph.order(graph) :=
+  by induction on bound with IH {
+    case bound = 0: {
+        take graph : Graph(V, E, ends);
+        suppose Graph.order(graph) ≤ 0;
+        suppose Graph.IsWellFormed(graph);
+        suppose Graph.IsTree(graph);
+        Graph.IsConnected(graph);
+        ∃ (vertex : V). vertex ∈ Graph.vertices(graph);
+        choose inhabitant such that inhabitant ∈ Graph.vertices(graph);
+        1 ≤ length(Graph.vertices(graph)) by List.length_positive_of_member;
+        (1 : ℕ) + 0
+           = 1
+           ≤ Graph.order(graph)
+           ≤ 0;
+        done by Natural.not_one_plus_le_zero
+      }
+    case bound = 1 + smaller: {
+        take graph : Graph(V, E, ends);
+        suppose Graph.order(graph) ≤ 1 + smaller as orderBound;
+        suppose Graph.IsWellFormed(graph);
+        suppose Graph.IsTree(graph);
+        Graph.IsConnected(graph);
+        List.Distinct(V, Graph.vertices(graph))
+            by Graph.IsWellFormed.vertices_distinct;
+        done by cases {
+          case 2 ≤ Graph.order(graph): {
+              ∃ (vertex : V). Graph.IsLeaf(graph, vertex) by Graph.IsTree.has_leaf;
+              choose leaf such that Graph.IsLeaf(graph, leaf);
+              leaf ∈ Graph.vertices(graph);
+              Graph.degree(graph, leaf) = 1;
+              Graph.IsTree(Graph.deleteVertex(graph, leaf))
+                  by Graph.IsTree.delete_leaf;
+              Graph.IsWellFormed(Graph.deleteVertex(graph, leaf))
+                  by Graph.deleteVertex.IsWellFormed;
+
+              -- One vertex and one edge fewer.
+              1 + Graph.order(Graph.deleteVertex(graph, leaf))
+                 = 1 + length(Graph.vertices(graph) ∖ leaf)
+                 = length(Graph.vertices(graph))     by List.length_remove_member
+                 = Graph.order(graph)                as orderDrops;
+              Graph.degree(graph, leaf)
+                  + Graph.size(Graph.deleteVertex(graph, leaf))
+                  = Graph.size(graph) by Graph.deleteVertex.size;
+              1 + Graph.size(Graph.deleteVertex(graph, leaf))
+                 = Graph.degree(graph, leaf)
+                     + Graph.size(Graph.deleteVertex(graph, leaf))
+                 = Graph.size(graph)                 as sizeDrops;
+
+              -- What is left is small enough to recurse on.
+              1 + Graph.order(Graph.deleteVertex(graph, leaf))
+                 = Graph.order(graph)
+                 ≤ 1 + smaller;
+              Graph.order(Graph.deleteVertex(graph, leaf)) ≤ smaller
+                  by Natural.add_left_le_cancel;
+              1 + Graph.size(Graph.deleteVertex(graph, leaf))
+                  = Graph.order(Graph.deleteVertex(graph, leaf)) by IH;
+              1 + Graph.size(graph)
+                 = 1 + (1 + Graph.size(Graph.deleteVertex(graph, leaf)))
+                     by substituting sizeDrops
+                 = 1 + Graph.order(Graph.deleteVertex(graph, leaf))
+                 = Graph.order(graph)                by orderDrops
+            }
+          otherwise: {
+              -- A single vertex, and no edge: an edge would need two.
+              ∃ (vertex : V). vertex ∈ Graph.vertices(graph);
+              choose inhabitant such that inhabitant ∈ Graph.vertices(graph);
+              1 ≤ length(Graph.vertices(graph)) by List.length_positive_of_member;
+              ¬(1 ≤ Graph.size(graph))
+                  by { suppose 1 ≤ Graph.size(graph);
+                       choose someEdge such that someEdge ∈ Graph.edges(graph)
+                           from List.member_of_positive_length(
+                                    list := Graph.edges(graph));
+                       ∃ (x y : V). Graph.Joins(graph, someEdge, x, y)
+                           by Graph.edge_has_ends;
+                       choose endOne, endTwo such that
+                           Graph.Joins(graph, someEdge, endOne, endTwo);
+                       endOne ∈ Graph.vertices(graph)
+                           by Graph.IsWellFormed.end_is_vertex;
+                       endTwo ∈ Graph.vertices(graph)
+                           by Graph.IsWellFormed.other_end_is_vertex;
+                       ¬(endOne = endTwo) by Graph.IsWellFormed.no_loop;
+                       ¬(endTwo = endOne) by Equality.not_equal_symmetric;
+                       endTwo ∈ Graph.vertices(graph) ∖ endOne
+                           by List.remove_member_complete;
+                       1 ≤ length(Graph.vertices(graph) ∖ endOne)
+                           by List.length_positive_of_member;
+                       (2 : ℕ)
+                          = 1 + 1
+                          ≤ 1 + length(Graph.vertices(graph) ∖ endOne)
+                          = length(Graph.vertices(graph))
+                              by List.length_remove_member
+                          = Graph.order(graph);
+                       done };
+              Graph.size(graph) = 0
+                  by { Graph.size(graph) = 0 ∨ ∃ (k : ℕ). Graph.size(graph) = 1 + k
+                           by Natural.zero_or_one_plus;
+                       done by cases {
+                         case Graph.size(graph) = 0: done
+                         case ∃ (k : ℕ). Graph.size(graph) = 1 + k as positive: {
+                             choose gap such that Graph.size(graph) = 1 + gap
+                                 from positive;
+                             (1 : ℕ)
+                                ≤ 1 + gap
+                                = Graph.size(graph);
+                             done
+                           }
+                       } } as noEdges;
+              Graph.order(graph) < 2 ∨ Graph.order(graph) = 2
+                  ∨ 2 < Graph.order(graph) by Natural.lt_trichotomy;
+              Graph.order(graph) ≤ 1
+                  by done by cases {
+                    case Graph.order(graph) < 2: {
+                        Graph.order(graph)
+                           < 2
+                           = 1 + 1;
+                        done by Natural.le_of_lt_add_one
+                      }
+                    case Graph.order(graph) = 2: {
+                        (2 : ℕ) ≤ Graph.order(graph);
+                        done
+                      }
+                    case 2 < Graph.order(graph): {
+                        (2 : ℕ) ≤ Graph.order(graph) by Natural.LessThan.weaken;
+                        done
+                      }
+                  };
+              Graph.order(graph) = 1 by Natural.le_antisymmetric;
+              1 + Graph.size(graph)
+                 = 1 + 0                             by substituting noEdges
+                 = 1
+                 = Graph.order(graph)
+            }
+        }
+      }
+  }
+
+-- A tree has one edge fewer than it has vertices.
+theorem Graph.IsTree.edge_count (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph))
+        (isTree : Graph.IsTree(graph))
+        : 1 + Graph.size(graph) = Graph.order(graph) := {
+  Graph.order(graph) ≤ Graph.order(graph);
+  done by Graph.IsTree.edge_count_below(bound := Graph.order(graph))
 }

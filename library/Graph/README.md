@@ -103,6 +103,12 @@ graph although they only read `ends`.
 - **`Graph.degree_sum`** — the handshake lemma: the degrees of a
   well-formed graph's vertices add up to twice its number of edges, by
   the double count `Graph.incidence_sum` over the edge list
+- `Graph.IsTree.has_leaf` — a tree on two or more vertices has one
+- `Graph.IsLeaf.path_avoids` — a path whose ends are elsewhere never
+  visits a vertex of degree one, so `Graph.IsTree.delete_leaf`: a tree
+  minus a leaf is a tree
+- **`Graph.IsTree.edge_count`** — and hence a tree has one edge fewer
+  than it has vertices
 - `Graph.IsPath.reverse` — a path runs backwards over the same vertices;
   `Graph.IsPath.extend_at_target` is what grows one at the far end
 - `Graph.IsPathGraph.reaches_an_end` — whatever vertex is deleted, every

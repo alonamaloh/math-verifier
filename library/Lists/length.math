@@ -123,3 +123,43 @@ theorem List.length_positive_of_nonempty (A : Type(0)) (list : List(A))
            ≤ 1 + length(tail)
            = length(List.prepend(A, head, tail))
   }
+
+-- A one-element list has only the one element.
+theorem List.members_equal_of_length_one (A : Type(0)) (list : List(A))
+        (single : length(list) = 1) (x y : A)
+        (xMember : x ∈ list) (yMember : y ∈ list)
+        : x = y :=
+  done by cases {
+    case list = List.empty(A): {
+        (0 : ℕ)
+           = length(List.empty(A))
+           = length(list)
+           = 1;
+        done
+      }
+    case list = List.prepend(A, head, tail) for some (head : A), (tail : List(A)): {
+        (1 : ℕ) + length(tail)
+           = length(List.prepend(A, head, tail))
+           = length(list)
+           = 1
+           = 1 + 0;
+        length(tail) = 0 by Natural.add_cancel_left;
+        ∀ (candidate : A). candidate ∈ List.prepend(A, head, tail) → candidate = head
+            by { take candidate : A;
+                 suppose candidate ∈ List.prepend(A, head, tail);
+                 candidate = head ∨ candidate ∈ tail by List.member_prepend_invert;
+                 done by cases {
+                   case candidate = head: done
+                   case candidate ∈ tail: {
+                       1 ≤ length(tail) by List.length_positive_of_member;
+                       (1 : ℕ) ≤ length(tail) = 0;
+                       done
+                     }
+                 } } as everyMemberIsTheHead;
+        x ∈ List.prepend(A, head, tail);
+        y ∈ List.prepend(A, head, tail);
+        x = head by everyMemberIsTheHead;
+        y = head by everyMemberIsTheHead;
+        done
+      }
+  }

@@ -299,3 +299,58 @@ theorem List.filter_length_two (A : Type(0)) (holds : A → Proposition)
   (2 : ℕ) ≤ length(List.filter(holds, list));
   done by Natural.le_antisymmetric
 }
+
+-- A condition and its negation split a list between them.
+theorem List.filter_length_complement (A : Type(0)) (holds : A → Proposition)
+        (list : List(A))
+        : length(List.filter(holds, list))
+            + length(List.filter((element : A) ↦ ¬holds(element), list))
+          = length(list) :=
+  by induction on list with IH {
+    case list = List.empty: done
+    case list = List.prepend(head, tail) for some head, tail: {
+        length(List.filter(holds, tail))
+           + length(List.filter((element : A) ↦ ¬holds(element), tail))
+           = length(tail) by IH as tailSplit;
+        done by cases {
+          case holds(head): {
+              ¬(¬holds(head)) by { suppose ¬holds(head); done };
+              List.filter(holds, List.prepend(A, head, tail))
+                 = List.prepend(A, head, List.filter(holds, tail))
+                 by List.filter_prepend_positive;
+              List.filter((element : A) ↦ ¬holds(element),
+                          List.prepend(A, head, tail))
+                 = List.filter((element : A) ↦ ¬holds(element), tail)
+                 by List.filter_prepend_negative;
+              length(List.filter(holds, List.prepend(A, head, tail)))
+                 + length(List.filter((element : A) ↦ ¬holds(element),
+                                      List.prepend(A, head, tail)))
+                 = (1 + length(List.filter(holds, tail)))
+                     + length(List.filter((element : A) ↦ ¬holds(element), tail))
+                 = 1 + (length(List.filter(holds, tail))
+                          + length(List.filter((element : A) ↦ ¬holds(element), tail)))
+                 = 1 + length(tail)                        by substituting tailSplit
+                 = length(List.prepend(A, head, tail))
+            }
+          otherwise: {
+              List.filter(holds, List.prepend(A, head, tail))
+                 = List.filter(holds, tail)
+                 by List.filter_prepend_negative;
+              List.filter((element : A) ↦ ¬holds(element),
+                          List.prepend(A, head, tail))
+                 = List.prepend(A, head,
+                       List.filter((element : A) ↦ ¬holds(element), tail))
+                 by List.filter_prepend_positive;
+              length(List.filter(holds, List.prepend(A, head, tail)))
+                 + length(List.filter((element : A) ↦ ¬holds(element),
+                                      List.prepend(A, head, tail)))
+                 = length(List.filter(holds, tail))
+                     + (1 + length(List.filter((element : A) ↦ ¬holds(element), tail)))
+                 = 1 + (length(List.filter(holds, tail))
+                          + length(List.filter((element : A) ↦ ¬holds(element), tail)))
+                 = 1 + length(tail)                        by substituting tailSplit
+                 = length(List.prepend(A, head, tail))
+            }
+        }
+      }
+  }
