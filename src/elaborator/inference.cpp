@@ -2473,8 +2473,26 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
         auto elaborateArgumentAt = [&](size_t i) {
             ExpressionPointer expectedDomain =
                 substituteFreeVariables(piDomains[i], assignment);
-            ExpressionPointer kernelArg = elaborateExpression(
-                *surfaceArgs[i], localBinders, expectedDomain);
+            // A domain that still carries this call's own holes cannot CHECK
+            // the argument: elaborating `Graph.union(first, second)` against
+            // `Graph(V, E, ?ends)` pushes the hole down into the sub-call,
+            // where the argument's real type then fails to match it, and the
+            // hole the argument was named to PIN is still open afterwards.
+            // Infer such an argument bottom-up and let the unification below
+            // read the holes off its own type.
+            ExpressionPointer kernelArg;
+            if (containsNamedFreeVariable(expectedDomain, metavariableNames)) {
+                try {
+                    kernelArg = elaborateExpression(
+                        *surfaceArgs[i], localBinders);
+                } catch (const ElaborateError&) {
+                } catch (const TypeError&) {
+                }
+            }
+            if (!kernelArg) {
+                kernelArg = elaborateExpression(
+                    *surfaceArgs[i], localBinders, expectedDomain);
+            }
             // Bare-proposition-as-proof (and the other diff coercions): the
             // same treatment the constructor and plain function-call paths
             // give their arguments, so e.g. `f(?, 6 = 2 * 3)` discharges the
