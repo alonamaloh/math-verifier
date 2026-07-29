@@ -17,9 +17,14 @@ import Equality.basics
 import Natural.basics
 import Natural.arithmetic
 import Natural.order
+import Natural.subtraction
+import Natural.classical_decidable
 import Lists.list
 import Lists.length
 import Lists.append
+import Lists.distinct
+import Lists.filter
+import Lists.remove
 
 definition List.sumOver {A : Type(0)} (values : A → ℕ) : List(A) → ℕ
   | List.empty               => 0
@@ -87,12 +92,12 @@ theorem List.sumOver_congruence (A : Type(0)) (left right : A → ℕ)
     case list = List.empty: done
     case list = List.prepend(head, tail) for some head, tail: {
         head ∈ List.prepend(A, head, tail);
-        left(head) = right(head) by agree;
+        left(head) = right(head);
         ∀ (element : A). element ∈ tail → left(element) = right(element)
             by { take element : A;
                  suppose element ∈ tail;
                  element ∈ List.prepend(A, head, tail);
-                 done by agree };
+                 done };
         List.sumOver(left, tail) = List.sumOver(right, tail) by IH;
         List.sumOver(left, List.prepend(A, head, tail))
            = left(head) + List.sumOver(left, tail)
@@ -109,12 +114,12 @@ theorem List.sumOver_zero (A : Type(0)) (values : A → ℕ) (list : List(A))
     case list = List.empty: done
     case list = List.prepend(head, tail) for some head, tail: {
         head ∈ List.prepend(A, head, tail);
-        values(head) = 0 by vanishes;
+        values(head) = 0;
         ∀ (element : A). element ∈ tail → values(element) = 0
             by { take element : A;
                  suppose element ∈ tail;
                  element ∈ List.prepend(A, head, tail);
-                 done by vanishes };
+                 done };
         List.sumOver(values, tail) = 0 by IH;
         List.sumOver(values, List.prepend(A, head, tail))
            = values(head) + List.sumOver(values, tail)
@@ -139,3 +144,132 @@ theorem List.sumOver_constant (A : Type(0)) (amount : ℕ) (list : List(A))
            = amount * (1 + length(tail))
            = amount * length(List.prepend(A, head, tail))
   }
+
+-- ── Counting members ─────────────────────────────────────────────────
+
+-- Summing one for each member that satisfies a condition counts them.
+theorem List.sumOver_indicator (A : Type(0)) (holds : A → Proposition)
+        (list : List(A))
+        : List.sumOver((element : A) ↦ (if holds(element) then 1 else 0 : ℕ), list)
+          = length(List.filter(holds, list)) :=
+  by induction on list with IH {
+    case list = List.empty: done
+    case list = List.prepend(head, tail) for some head, tail: {
+        List.sumOver((element : A) ↦ (if holds(element) then 1 else 0 : ℕ), tail)
+           = length(List.filter(holds, tail)) by IH;
+        done by cases {
+          case holds(head): {
+              (if holds(head) then 1 else 0 : ℕ) = 1 by Logic.if_positive;
+              List.filter(holds, List.prepend(A, head, tail))
+                 = List.prepend(A, head, List.filter(holds, tail))
+                 by List.filter_prepend_positive;
+              List.sumOver((element : A) ↦ (if holds(element) then 1 else 0 : ℕ),
+                           List.prepend(A, head, tail))
+                 = (if holds(head) then 1 else 0 : ℕ)
+                     + List.sumOver((element : A) ↦ (if holds(element) then 1 else 0 : ℕ),
+                                    tail)
+                 = 1 + length(List.filter(holds, tail))
+                 = length(List.prepend(A, head, List.filter(holds, tail)))
+                 = length(List.filter(holds, List.prepend(A, head, tail)))
+            }
+          otherwise: {
+              (if holds(head) then 1 else 0 : ℕ) = 0 by Logic.if_negative;
+              List.filter(holds, List.prepend(A, head, tail))
+                 = List.filter(holds, tail)
+                 by List.filter_prepend_negative;
+              List.sumOver((element : A) ↦ (if holds(element) then 1 else 0 : ℕ),
+                           List.prepend(A, head, tail))
+                 = (if holds(head) then 1 else 0 : ℕ)
+                     + List.sumOver((element : A) ↦ (if holds(element) then 1 else 0 : ℕ),
+                                    tail)
+                 = 0 + length(List.filter(holds, tail))
+                 = length(List.filter(holds, tail))
+                 = length(List.filter(holds, List.prepend(A, head, tail)))
+            }
+        }
+      }
+  }
+
+-- Exactly two members satisfy a condition that two distinct members
+-- satisfy and no other member does. Both bounds are the same counting
+-- lemma, read in the two directions.
+theorem List.filter_length_two (A : Type(0)) (holds : A → Proposition)
+        (list : List(A)) (distinct : List.Distinct(A, list))
+        (first second : A)
+        (firstMember : first ∈ list) (secondMember : second ∈ list)
+        (apart : ¬(first = second))
+        (firstHolds : holds(first)) (secondHolds : holds(second))
+        (onlyThose : ∀ (element : A). element ∈ list → holds(element)
+            → element = first ∨ element = second)
+        : length(List.filter(holds, list)) = 2 := {
+  ¬(first ∈ List.prepend(A, second, List.empty(A)))
+      by { suppose first ∈ List.prepend(A, second, List.empty(A));
+           first = second ∨ first ∈ List.empty(A) by List.member_prepend_invert;
+           done by cases {
+             case first = second: done
+             case first ∈ List.empty(A): {
+                 ¬(first ∈ List.empty(A)) by List.no_member_empty;
+                 done
+               }
+           } };
+  ¬(second ∈ List.empty(A)) by List.no_member_empty;
+  List.Distinct(A, List.empty(A));
+  List.Distinct(A, List.prepend(A, second, List.empty(A)));
+  List.Distinct(A, List.prepend(A, first, List.prepend(A, second, List.empty(A))));
+  List.Distinct(A, List.filter(holds, list)) by List.filter_distinct;
+  length(List.prepend(A, first, List.prepend(A, second, List.empty(A))))
+     = 1 + length(List.prepend(A, second, List.empty(A)))
+     = 1 + (1 + length(List.empty(A)))
+     = 1 + (1 + 0)
+     = 2;
+
+  ∀ (element : A). element ∈ List.filter(holds, list)
+      → element ∈ List.prepend(A, first, List.prepend(A, second, List.empty(A)))
+      by { take element : A;
+           suppose element ∈ List.filter(holds, list);
+           element ∈ list by List.filter_member_subset;
+           holds(element) by List.filter_member_property;
+           element = first ∨ element = second;
+           done by cases {
+             case element = first: done
+             case element = second: {
+                 second ∈ List.prepend(A, second, List.empty(A));
+                 done
+               }
+           } };
+  length(List.filter(holds, list))
+      ≤ length(List.prepend(A, first, List.prepend(A, second, List.empty(A))))
+      by List.length_le_of_distinct_inclusion;
+
+  ∀ (element : A). element ∈ List.prepend(A, first, List.prepend(A, second, List.empty(A)))
+      → element ∈ List.filter(holds, list)
+      by { take element : A;
+           suppose element ∈ List.prepend(A, first, List.prepend(A, second, List.empty(A)));
+           element = first ∨ element ∈ List.prepend(A, second, List.empty(A))
+               by List.member_prepend_invert;
+           done by cases {
+             case element = first: {
+                 first ∈ List.filter(holds, list) by List.filter_member_complete;
+                 done
+               }
+             case element ∈ List.prepend(A, second, List.empty(A)): {
+                 element = second ∨ element ∈ List.empty(A)
+                     by List.member_prepend_invert;
+                 done by cases {
+                   case element = second: {
+                       second ∈ List.filter(holds, list)
+                           by List.filter_member_complete;
+                       done
+                     }
+                   case element ∈ List.empty(A): {
+                       ¬(element ∈ List.empty(A)) by List.no_member_empty;
+                       done
+                     }
+                 }
+               }
+           } };
+  length(List.prepend(A, first, List.prepend(A, second, List.empty(A)))) ≤ length(List.filter(holds, list))
+      by List.length_le_of_distinct_inclusion;
+  (2 : ℕ) ≤ length(List.filter(holds, list));
+  done by Natural.le_antisymmetric
+}

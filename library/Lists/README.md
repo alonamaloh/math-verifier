@@ -32,6 +32,8 @@ needed.
   repetitions is no longer than any list holding all of its elements
 - Sums: `List.sumOver_append`, `List.sumOver_add`,
   `List.sumOver_congruence` and `List.sumOver_constant`
+- Counting members: `List.sumOver_indicator` — summing one per member
+  that satisfies a condition counts them — and `List.filter_length_two`
 
 `filter` and `remove` use classical decisions and publish characterizing
 equations; reason through those theorems rather than unfolding their bodies.
