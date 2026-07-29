@@ -47,9 +47,7 @@ theorem Test.choosePartialCondition (A : Type(0)) (P Q : A → Proposition)
 
 -- The source is a hypothesis with a premise to discharge — an induction
 -- hypothesis generalised over one — and its witness type is APPLIED
--- (`List(A)`), so the condition cannot be shaped into an existential ahead
--- of the citation. The lemma is cited argument-free and the condition
--- checked against what it concludes, so no `: List(A)` annotation is needed.
+-- (`List(A)`) rather than a bare name. No `: List(A)` annotation is needed.
 theorem Test.chooseAppliedWitnessTypeThroughPremise (A : Type(0))
         (Q : Proposition) (P : List(A) → Proposition)
         (premiseHolds : Q)
@@ -57,4 +55,40 @@ theorem Test.chooseAppliedWitnessTypeThroughPremise (A : Type(0))
         : ∃ (edgeList : List(A)). P(edgeList) := {
   choose edgeList such that P(edgeList) as satisfies from fact;
   witness edgeList with satisfies
+}
+
+-- What the `such that` is FOR: the source's premise is matched by two
+-- hypotheses that pin different arguments, and the stated condition says
+-- which is meant. It can only do that if the existential it shapes reaches
+-- the citation, so the witness type — applied, and stated over the source's
+-- own parameter — has to read.
+theorem Test.chooseConditionSettlesPremiseAmbiguity (A : Type(0))
+        (Member : A → Proposition) (P : A → List(A) → Proposition)
+        (first second : A)
+        (firstIsMember : Member(first))
+        (secondIsMember : Member(second))
+        (fact : ∀ (a : A). Member(a) → ∃ (values : List(A)). P(a, values))
+        : ∃ (values : List(A)). P(second, values) := {
+  choose values such that P(second, values) as satisfies from fact;
+  witness values with satisfies
+}
+
+-- The same, where the witness type is the source's own AMBIENT parameter.
+-- Both sides carry it by `convention`, so the type the lemma states its
+-- existential over is a name the caller has in scope — which is what lets
+-- the condition be shaped into an existential here too.
+convention Ambient : Type(0)
+
+theorem Test.ambientPartner (element : Ambient) (P : Ambient → Ambient → Proposition)
+        (holds : P(element, element))
+        : ∃ (partner : Ambient). P(element, partner) := { witness element }
+
+theorem Test.chooseAmbientWitnessType (element other : Ambient)
+        (P : Ambient → Ambient → Proposition)
+        (atElement : P(element, element))
+        (atOther : P(other, other))
+        : ∃ (partner : Ambient). P(other, partner) := {
+  choose partner such that P(other, partner) as satisfies
+      from Test.ambientPartner;
+  witness partner with satisfies
 }

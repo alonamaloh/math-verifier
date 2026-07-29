@@ -2939,6 +2939,21 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                     }
                     ExpressionPointer slotType =
                         substituteFreeVariables(piDomains[i], assignment);
+                    // A slot whose TYPE is itself an unsolved metavariable is
+                    // a data or type argument, not a premise: a bare pattern
+                    // variable unifies with every hypothesis in scope, so the
+                    // search below "matches" all of them and reports
+                    // ambiguity for an argument no hypothesis was ever going
+                    // to pin. (`Graph.edge_has_ends` takes no premises at all
+                    // and still listed every binder in scope, ∧-legs
+                    // included.) Such a slot is the conclusion's to solve.
+                    if (auto* slotVariable =
+                            std::get_if<FreeVariable>(&slotType->node)) {
+                        if (dischargeMetavars.count(slotVariable->name)) {
+                            stillUnresolved.push_back(i);
+                            continue;
+                        }
+                    }
                     ExpressionPointer slotOpened;
                     try {
                         slotOpened = zetaUnfoldOpened(openOverLocalBinders(

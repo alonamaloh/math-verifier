@@ -710,12 +710,6 @@ ExpressionPointer Elaborator::elaborateChoose(
                 // name. Premise peeling iterates through WHNF so a
                 // conclusion spelled through a definition (`IsCauchy(…)` =
                 // ∀ε. 0 < ε → ∃N. …) exposes its buried Pis and ∃s.
-                ExpressionPointer lemmaTerm = elaborateExpression(
-                    *choose.source, localBinders);
-                ExpressionPointer lemmaType = inferTypeInLocalContext(
-                    localBinders, lemmaTerm);
-                ExpressionPointer conclusion = openOverLocalBinders(
-                    lemmaType, localBinders, N);
                 std::vector<std::string> witnessNames = {choose.name};
                 for (const std::string& extra : choose.additionalNames) {
                     witnessNames.push_back(extra);
@@ -730,16 +724,100 @@ ExpressionPointer Elaborator::elaborateChoose(
                 for (const auto& annotation : choose.witnessTypes) {
                     if (!annotation) { allAnnotated = false; break; }
                 }
-                std::vector<std::string> witnessTypeNames;
+                // Where the conclusion is read from. The cited fact's OWN
+                // type — the declaration's (or hypothesis's) full Pi chain,
+                // before any argument inference — is what states the witness
+                // types over the lemma's parameter NAMES (`List(E)`, `V`).
+                // Inferring the arguments first replaces those names with
+                // holes the citation has not solved yet, and then no witness
+                // type is readable at all. Falls back to the inferred form
+                // for a source that is not a bare name.
+                ExpressionPointer conclusion;
+                if (auto* sourceName =
+                        std::get_if<SurfaceIdentifier>(&choose.source->node)) {
+                    for (int index = N - 1; index >= 0 && !conclusion; --index) {
+                        if (localBinders[index].name
+                                == sourceName->qualifiedName) {
+                            conclusion = openOverLocalBinders(
+                                liftBoundVariables(localBinders[index].type,
+                                                   N - index, 0),
+                                localBinders, N);
+                        }
+                    }
+                    if (!conclusion) {
+                        if (const Declaration* declaration =
+                                environment_.lookup(
+                                    sourceName->qualifiedName)) {
+                            conclusion = declarationType(*declaration);
+                        }
+                    }
+                }
+                if (!conclusion) {
+                    ExpressionPointer lemmaTerm = elaborateExpression(
+                        *choose.source, localBinders);
+                    conclusion = openOverLocalBinders(
+                        inferTypeInLocalContext(localBinders, lemmaTerm),
+                        localBinders, N);
+                }
+                // Names the assembled existential may mention: everything in
+                // scope at the `choose`, plus the witness names it binds
+                // itself (a later witness's type may be stated over an
+                // earlier one).
+                std::set<std::string> namesInScope;
+                for (const LocalBinder& binder : localBinders) {
+                    namesInScope.insert(binder.name);
+                }
+                // A witness type as surface text. Constants and in-scope
+                // names applied to one another is everything a witness type
+                // is in practice; anything else — an argument the citation
+                // has not solved, a lambda — is not renderable, and the read
+                // gives up as it always has.
+                std::function<SurfaceExpressionPointer(ExpressionPointer)>
+                    renderWitnessType =
+                        [&](ExpressionPointer type) -> SurfaceExpressionPointer {
+                    if (auto* constant = std::get_if<Constant>(&type->node)) {
+                        return makeSurfaceIdentifier(
+                            constant->name, {}, line, column);
+                    }
+                    if (auto* variable =
+                            std::get_if<FreeVariable>(&type->node)) {
+                        if (!namesInScope.count(variable->name)) return nullptr;
+                        return makeSurfaceIdentifier(
+                            variable->name, {}, line, column);
+                    }
+                    if (auto* application =
+                            std::get_if<Application>(&type->node)) {
+                        SurfaceExpressionPointer function =
+                            renderWitnessType(application->function);
+                        SurfaceExpressionPointer argument =
+                            renderWitnessType(application->argument);
+                        if (!function || !argument) return nullptr;
+                        return makeSurfaceApplication(
+                            function,
+                            std::vector<SurfaceExpressionPointer>{argument},
+                            line, column);
+                    }
+                    return nullptr;
+                };
+                std::vector<SurfaceExpressionPointer> witnessTypeSurfaces;
                 bool witnessTypesReadable = true;
+                // A type read as a bare constant is what the read has always
+                // accepted; anything wider is new, and the assembled
+                // existential is probed before it replaces the argument-free
+                // citation.
+                bool readIsWidened = false;
                 for (size_t w = 0;
                      w < witnessNames.size() && !allAnnotated
                          && witnessTypesReadable; ++w) {
                     // Peel premises (syntactic Pis, then WHNF-exposed ones)
-                    // until the cursor is Exists-headed.
+                    // until the cursor is Exists-headed. Each Pi is opened
+                    // under its own binder name, so a witness type stated
+                    // over an earlier parameter still reads.
                     while (true) {
                         if (auto* pi = std::get_if<Pi>(&conclusion->node)) {
-                            conclusion = pi->codomain;
+                            conclusion = openBinder(
+                                pi->codomain, pi->displayHint,
+                                FreeVariableOrigin::User);
                             continue;
                         }
                         ExpressionPointer reduced = weakHeadNormalForm(
@@ -763,19 +841,21 @@ ExpressionPointer Elaborator::elaborateChoose(
                             }
                         }
                     }
-                    auto* witnessConstant = witnessType
-                        ? std::get_if<Constant>(&witnessType->node) : nullptr;
-                    if (!witnessConstant) {
+                    SurfaceExpressionPointer rendered = witnessType
+                        ? renderWitnessType(witnessType) : nullptr;
+                    if (!rendered) {
                         witnessTypesReadable = false;
                         break;
                     }
-                    witnessTypeNames.push_back(witnessConstant->name);
+                    if (!std::get_if<Constant>(&witnessType->node)) {
+                        readIsWidened = true;
+                    }
+                    witnessTypeSurfaces.push_back(std::move(rendered));
+                    namesInScope.insert(witnessNames[w]);
                     if (w + 1 == witnessNames.size()) break;
-                    // Descend into the next ∃ layer: the motive is a
-                    // lambda whose body holds it. (The body's reference
-                    // to this witness doesn't matter here — only the
-                    // remaining layers' TYPES are read, and each must be
-                    // a closed constant anyway.)
+                    // Descend into the next ∃ layer: the motive is a lambda
+                    // whose body holds it, opened under this witness's name
+                    // so the layers below can be stated over it.
                     auto* motiveLambda = motiveExpression
                         ? std::get_if<Lambda>(&motiveExpression->node)
                         : nullptr;
@@ -783,7 +863,9 @@ ExpressionPointer Elaborator::elaborateChoose(
                         witnessTypesReadable = false;
                         break;
                     }
-                    conclusion = motiveLambda->body;
+                    conclusion = openBinder(motiveLambda->body,
+                                            witnessNames[w],
+                                            FreeVariableOrigin::User);
                 }
                 if (!allAnnotated && !witnessTypesReadable) {
                     // The lemma's conclusion does not hand over a closed
@@ -806,14 +888,13 @@ ExpressionPointer Elaborator::elaborateChoose(
                     // Assemble the nested surface existential around the
                     // user's predicate, innermost-first. An annotated witness
                     // uses its `: T` expression directly; otherwise the type
-                    // name read off the lemma's conclusion.
+                    // read off the lemma's conclusion.
                     SurfaceExpressionPointer existential = choose.predicate;
                     for (size_t w = witnessNames.size(); w-- > 0;) {
                         SurfaceExpressionPointer witnessTypeSurface =
                             allAnnotated
                                 ? choose.witnessTypes[w]
-                                : makeSurfaceIdentifier(witnessTypeNames[w],
-                                      {}, line, column);
+                                : witnessTypeSurfaces[w];
                         SurfaceBinder witnessBinder;
                         witnessBinder.names = {witnessNames[w]};
                         witnessBinder.type = witnessTypeSurface;
@@ -828,6 +909,31 @@ ExpressionPointer Elaborator::elaborateChoose(
                     scrutinee = makeSurfaceAscription(
                         makeSurfaceCiteInferred(choose.source, line, column),
                         existential, line, column);
+                    // A widened read spells the witness type over names the
+                    // caller happens to share with the lemma (its
+                    // conventions, normally). Where that reading is wrong the
+                    // assembled existential simply does not typecheck, so
+                    // probe it and keep the argument-free citation otherwise
+                    // — the shaped form can only ever add citations, never
+                    // take one away.
+                    if (readIsWidened) {
+                        bool shapedFits = true;
+                        try {
+                            elaborateExpression(*scrutinee, localBinders);
+                        } catch (const ElaborateError&) {
+                            shapedFits = false;
+                        } catch (const TypeError&) {
+                            shapedFits = false;
+                        }
+                        if (!shapedFits) {
+                            scrutinee = makeSurfaceCiteInferred(
+                                choose.source, line, column);
+                            ExpressionPointer citedTerm = elaborateExpression(
+                                *scrutinee, localBinders);
+                            verifyCondition(inferTypeInLocalContext(
+                                localBinders, citedTerm));
+                        }
+                    }
                 }
             }
         } else {
