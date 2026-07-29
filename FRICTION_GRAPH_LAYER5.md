@@ -202,6 +202,41 @@ existential is a common enough shape that reading applied types would pay.
 
 ## G6 — naming an argument can BREAK a citation that works bare
 
+**Root cause — found; fix written and gated, awaiting the owner's call.**
+An argument is elaborated AGAINST its Pi domain, and a domain that still
+carries the call's own unsolved holes cannot check anything: elaborating
+`Graph.union(first, second)` against `Graph(V, E, ?ends)` pushes `?ends`
+down into the sub-call, where `first`'s real type then fails to match it.
+The argument's elaboration throws, it is deferred to the retry after the
+context discharge — and by then nothing has pinned the holes, because the
+argument that was named to pin them is the one that did not elaborate.
+Bottom-up, `Graph.union(first, second)` needs no expected type at all: its
+type is determined by `first`, and unifying that against the domain solves
+all three holes at once.
+
+So the shape is exactly "the named argument's domain still mentions
+unsolved holes". `halves(cut := cut)` and `Reaches.transitive(middle := w)`
+work because their domain is `V`, which the goal pins first;
+`drops(graph := …)` and `IsPath.reverse(edgeList := …)` fail because
+`Graph(?V, ?E, ?ends)` and `List(?E)` do not.
+
+**Candidate fix** (one hunk in `elaborateArgumentAt`,
+`elaborator/inference.cpp`): when the domain still mentions this call's
+metavariables, infer the argument bottom-up and let the existing
+unification read the holes off its own type; fall back to the checked
+elaboration when bottom-up fails, so an argument that genuinely needs its
+expected type (a bare numeral) is unaffected. Both reported spellings then
+verify, `library` + `tests` + `error-tests` are unchanged (87/0), and the
+one deliberately-wrong probe — `drops(graph := first)`, where no
+`IsWellFormed(first)` is in scope — now reports `could not infer hole(s) at
+positions 4 7` instead of leaking `unbound internal variable:
+_hole_2_Graph.deleteVertex.drops`.
+
+**Left standing.** That leak is a separate defect: when the call fails, a
+fallback path hands the kernel a term with the elaborator's internal hole
+names still in it, and the user sees `_hole_2_<lemma>`. The fix above
+removes the two known ways in, not the leak itself.
+
 **Symptom.** `¬(target = deleted) by Graph.deleteVertex.drops(graph := Graph.union(first, second));`
 fails with
 
@@ -257,6 +292,41 @@ statement-level implication that separates a claim from its proof.
 ---
 
 ## G8 — premise ambiguity is reported even when the goal pins the arguments
+
+**FIXED** (`elaborateChoose` in `elaborator/induction.cpp`, plus one guard in
+`inferCallWithHoles`). Locks:
+`Test/choose_condition_selects_source`, last three theorems. The three
+workarounds are out of `Graph/`: `twoconnected.math`'s two-step
+`∃ … by Graph.edge_has_ends; choose …`, `pathgraph.math`'s
+`halves(cut := cut)`, and the `¬(v = u)` that had been pushed past the
+`choose` that would otherwise have captured it.
+
+**Root cause — found, and not where the guess below points.** The
+conclusion match already runs before the premise search; the trouble is that
+in this layer the citation had no conclusion to match against. `choose … such
+that P from <lemma>` shapes its citation by assembling `∃ (name : T). P` and
+ascribing the citation to it — but only when it can read `T` off the lemma's
+conclusion, and the read accepted a bare `Constant` only. Over an ambient
+triple no witness type ever is one: `∃ (prefixEdges : List(E))` is an
+application, and `∃ (u : V)` is one of the lemma's own parameters, which the
+read saw as an unsolved hole because it looked at the conclusion AFTER
+argument inference. Every `from` in the layer therefore fell back to the
+argument-free citation, which has no goal at all — so the premise search was
+left to guess arguments the stated condition had already named.
+
+The read now peels the cited fact's OWN type, opening each Pi under its
+binder name, and renders the witness type as surface text (constants, names
+in scope, applications of those). `List(E)` and `V` are names the caller
+shares, because both sides carry them by `convention`. A reading wider than
+the old bare constant is probed before it replaces the argument-free
+citation, so a name the caller happens to share for something else costs
+nothing.
+
+The premise-less sub-shape was a second, independent bug: a slot whose TYPE
+is itself an unsolved metavariable (`edge : ?E`) is a data argument, not a
+premise, and a bare pattern variable unifies with every hypothesis in scope
+— which is why a lemma with no premises listed every binder in scope,
+∧-legs included. Such a slot is now left to the conclusion.
 
 **Symptom.** Recurring, roughly once per fifty lines in this layer:
 
