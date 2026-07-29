@@ -117,6 +117,33 @@ theorem Graph.coveredVertices.invert (graph : Graph(V, E, ends)) (edge : E)
   }
 }
 
+-- A vertex covered by a concatenation is covered by one of the halves.
+theorem Graph.coveredVertices.append_invert (graph : Graph(V, E, ends))
+        (firstEdges secondEdges : List(E)) (vertex : V)
+        (covered : vertex ∈ Graph.coveredVertices(graph,
+                       List.append(firstEdges, secondEdges)))
+        : vertex ∈ Graph.coveredVertices(graph, firstEdges)
+          ∨ vertex ∈ Graph.coveredVertices(graph, secondEdges) := {
+  choose usedEdge such that
+      usedEdge ∈ List.append(firstEdges, secondEdges)
+      ∧ Graph.Incident(graph, usedEdge, vertex);
+  usedEdge ∈ List.append(firstEdges, secondEdges);
+  Graph.Incident(graph, usedEdge, vertex);
+  usedEdge ∈ firstEdges ∨ usedEdge ∈ secondEdges by List.member_append_invert;
+  done by cases {
+    case usedEdge ∈ firstEdges: {
+        vertex ∈ Graph.coveredVertices(graph, firstEdges)
+            by Graph.coveredVertices.of_edge;
+        done
+      }
+    case usedEdge ∈ secondEdges: {
+        vertex ∈ Graph.coveredVertices(graph, secondEdges)
+            by Graph.coveredVertices.of_edge;
+        done
+      }
+  }
+}
+
 -- A longer edge list covers everything a shorter one does.
 theorem Graph.coveredVertices.monotone (graph : Graph(V, E, ends))
         (fewer more : List(E)) (vertex : V)

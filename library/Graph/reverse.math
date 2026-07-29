@@ -1,0 +1,288 @@
+-- Graph/reverse.math
+--
+-- Running a path backwards. Layer 5 of PLAN_JORDAN_SCHOENFLIES.md.
+--
+-- `Graph.IsPath` is built at the SOURCE end — a path is one edge followed
+-- by a path — so growing one at its target end is not a constructor but a
+-- theorem, and reversing one is that theorem applied along an induction.
+-- Both are needed by the ear argument, where an ear has to be walked from
+-- either of its two ends depending on which one has been deleted.
+--
+-- What makes reversal worth stating rather than routing through
+-- `Graph.IsWalk.reverse` is the second conclusion: the reversed path
+-- visits exactly the same vertices. A walk reversed and then thinned to a
+-- path could visit fewer.
+
+module Graph.reverse
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Equality.basics
+import Set.basics
+import Lists.list
+import Lists.append
+import Graph.basics
+import Graph.walk
+import Graph.path
+
+convention V : Type(0)
+convention E : Type(0)
+convention ends : E → Pair(V, V)
+
+-- The vertices a path visits, after one more edge at the far end: the old
+-- ones, plus the new endpoint. (The other end of the new edge was already
+-- the path's target.)
+theorem Graph.walkVertices.after_append (graph : Graph(V, E, ends))
+        (source middle target vertex : V) (edgeList : List(E)) (edge : E)
+        (joins : Graph.Joins(graph, edge, middle, target))
+        (middleVisited : middle ∈ Graph.walkVertices(graph, source, edgeList))
+        (visited : vertex ∈ Graph.walkVertices(graph, source,
+                       List.append(edgeList, List.prepend(E, edge, List.empty(E)))))
+        : vertex ∈ Graph.walkVertices(graph, source, edgeList) ∨ vertex = target :=
+  done by cases {
+    case vertex = source: done
+    case vertex ∈ Graph.coveredVertices(graph,
+             List.append(edgeList, List.prepend(E, edge, List.empty(E)))): {
+        vertex ∈ Graph.coveredVertices(graph, edgeList)
+            ∨ vertex ∈ Graph.coveredVertices(graph, List.prepend(E, edge, List.empty(E)))
+            by Graph.coveredVertices.append_invert;
+        done by cases {
+          case vertex ∈ Graph.coveredVertices(graph, edgeList): {
+              vertex ∈ Graph.walkVertices(graph, source, edgeList);
+              done
+            }
+          case vertex ∈ Graph.coveredVertices(graph,
+                   List.prepend(E, edge, List.empty(E))): {
+              Graph.Incident(graph, edge, vertex)
+                  ∨ vertex ∈ Graph.coveredVertices(graph, List.empty(E))
+                  by Graph.coveredVertices.invert;
+              done by cases {
+                case Graph.Incident(graph, edge, vertex): {
+                    vertex = middle ∨ vertex = target by Graph.Incident.is_end;
+                    done by cases {
+                      case vertex = middle: {
+                          vertex ∈ Graph.walkVertices(graph, source, edgeList)
+                              by substituting (vertex = middle);
+                          done
+                        }
+                      case vertex = target: done
+                    }
+                  }
+                case vertex ∈ Graph.coveredVertices(graph, List.empty(E)): {
+                    ¬(vertex ∈ Graph.coveredVertices(graph, List.empty(E)))
+                        by Graph.coveredVertices.no_edges;
+                    done
+                  }
+              }
+            }
+        }
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- Growing a path at its target end.
+
+theorem Graph.IsPath.extend_at_target (graph : Graph(V, E, ends))
+        (source middle target : V) (edgeList : List(E)) (edge : E)
+        (path : Graph.IsPath(graph, source, edgeList, middle))
+        (isEdge : edge ∈ Graph.edges(graph))
+        (joins : Graph.Joins(graph, edge, middle, target))
+        (fresh : ¬(target ∈ Graph.walkVertices(graph, source, edgeList)))
+        : Graph.IsPath(graph, source,
+                       List.append(edgeList, List.prepend(E, edge, List.empty(E))),
+                       target) :=
+  by induction on path with IH {
+    case Graph.IsPathOver.arrived(endpoint): {
+        -- The path is a single edge; its far end is fresh because the
+        -- empty path visits only where it stands.
+        endpoint ∈ Graph.walkVertices(graph, endpoint, List.empty(E));
+        ¬(target = endpoint)
+            by { suppose target = endpoint;
+                 target ∈ Graph.walkVertices(graph, endpoint, List.empty(E))
+                     by substituting (target = endpoint);
+                 done };
+        Graph.IsPath(graph, target, List.empty(E), target) by Graph.IsPath.empty;
+        ¬(endpoint ∈ Graph.walkVertices(graph, target, List.empty(E)))
+            by { suppose endpoint ∈ Graph.walkVertices(graph, target, List.empty(E));
+                 done by cases {
+                   case endpoint = target: {
+                       target = endpoint;
+                       done
+                     }
+                   case endpoint ∈ Graph.coveredVertices(graph, List.empty(E)): {
+                       ¬(endpoint ∈ Graph.coveredVertices(graph, List.empty(E)))
+                           by Graph.coveredVertices.no_edges;
+                       done
+                     }
+                 } };
+        Graph.IsPath(graph, endpoint, List.prepend(E, edge, List.empty(E)), target)
+            by Graph.IsPath.extend;
+        List.append(List.empty(E), List.prepend(E, edge, List.empty(E)))
+           = List.prepend(E, edge, List.empty(E));
+        done
+      }
+    case Graph.IsPathOver.step(
+        stepSource, waypoint, stepMiddle, stepEdge, rest, isStepEdge, stepJoins,
+        restPath, stepFresh): {
+        -- The far end is fresh for the rest of the path too.
+        ¬(target ∈ Graph.walkVertices(graph, waypoint, rest))
+            by { suppose target ∈ Graph.walkVertices(graph, waypoint, rest);
+                 target ∈ Graph.walkVertices(graph, stepSource,
+                              List.prepend(E, stepEdge, rest))
+                     by Graph.walkVertices.before_step;
+                 done };
+        Graph.IsPath(graph, waypoint,
+                     List.append(rest, List.prepend(E, edge, List.empty(E))), target)
+            by IH;
+        -- Its departure vertex is still fresh: the longer path visits the
+        -- old vertices and the new endpoint, and it is neither.
+        Graph.IsWalk(graph, waypoint, rest, stepMiddle) by Graph.IsPath.walk;
+        stepMiddle ∈ Graph.walkVertices(graph, waypoint, rest)
+            by Graph.IsWalk.target_is_visited;
+        stepSource ∈ Graph.walkVertices(graph, stepSource,
+                         List.prepend(E, stepEdge, rest));
+        ¬(stepSource = target)
+            by { suppose stepSource = target;
+                 target ∈ Graph.walkVertices(graph, stepSource,
+                              List.prepend(E, stepEdge, rest))
+                     by substituting (stepSource = target);
+                 done };
+        ¬(stepSource ∈ Graph.walkVertices(graph, waypoint,
+              List.append(rest, List.prepend(E, edge, List.empty(E)))))
+            by { suppose stepSource ∈ Graph.walkVertices(graph, waypoint,
+                     List.append(rest, List.prepend(E, edge, List.empty(E))));
+                 stepSource ∈ Graph.walkVertices(graph, waypoint, rest)
+                     ∨ stepSource = target
+                     by Graph.walkVertices.after_append(middle := stepMiddle);
+                 done by cases {
+                   case stepSource ∈ Graph.walkVertices(graph, waypoint, rest): done
+                   case stepSource = target: done
+                 } };
+        Graph.IsPath(graph, stepSource,
+                     List.prepend(E, stepEdge,
+                         List.append(rest, List.prepend(E, edge, List.empty(E)))),
+                     target)
+            by Graph.IsPath.extend;
+        List.append(List.prepend(E, stepEdge, rest), List.prepend(E, edge, List.empty(E)))
+           = List.prepend(E, stepEdge,
+                 List.append(rest, List.prepend(E, edge, List.empty(E))));
+        done
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- Reversal.
+
+theorem Graph.IsPath.reverse (graph : Graph(V, E, ends)) (source target : V)
+        (edgeList : List(E))
+        (path : Graph.IsPath(graph, source, edgeList, target))
+        : ∃ (reversed : List(E)). Graph.IsPath(graph, target, reversed, source)
+            ∧ (∀ (vertex : V). vertex ∈ Graph.walkVertices(graph, target, reversed)
+                 → vertex ∈ Graph.walkVertices(graph, source, edgeList))
+            ∧ (∀ (vertex : V). vertex ∈ Graph.walkVertices(graph, source, edgeList)
+                 → vertex ∈ Graph.walkVertices(graph, target, reversed)) :=
+  by induction on path with IH {
+    case Graph.IsPathOver.arrived(endpoint): {
+        Graph.IsPath(graph, endpoint, List.empty(E), endpoint) by Graph.IsPath.empty;
+        ∀ (vertex : V). vertex ∈ Graph.walkVertices(graph, endpoint, List.empty(E))
+            → vertex ∈ Graph.walkVertices(graph, endpoint, List.empty(E))
+            by { take vertex : V;
+                 suppose vertex ∈ Graph.walkVertices(graph, endpoint, List.empty(E));
+                 done };
+        witness List.empty(E)
+      }
+    case Graph.IsPathOver.step(
+        stepSource, waypoint, stepTarget, edge, rest, isEdge, joins, restPath, fresh): {
+        choose reversedRest such that
+            Graph.IsPath(graph, stepTarget, reversedRest, waypoint)
+            ∧ (∀ (vertex : V).
+                 vertex ∈ Graph.walkVertices(graph, stepTarget, reversedRest)
+                 → vertex ∈ Graph.walkVertices(graph, waypoint, rest))
+            ∧ (∀ (vertex : V). vertex ∈ Graph.walkVertices(graph, waypoint, rest)
+                 → vertex ∈ Graph.walkVertices(graph, stepTarget, reversedRest))
+            from IH;
+        Graph.IsPath(graph, stepTarget, reversedRest, waypoint);
+        ∀ (vertex : V). vertex ∈ Graph.walkVertices(graph, stepTarget, reversedRest)
+            → vertex ∈ Graph.walkVertices(graph, waypoint, rest) as reversedInside;
+        ∀ (vertex : V). vertex ∈ Graph.walkVertices(graph, waypoint, rest)
+            → vertex ∈ Graph.walkVertices(graph, stepTarget, reversedRest)
+            as forwardInside;
+        Graph.Joins(graph, edge, waypoint, stepSource) by Graph.Joins.symmetric;
+        -- The old source is fresh for the reversed rest, because it was
+        -- fresh for the rest.
+        ¬(stepSource ∈ Graph.walkVertices(graph, stepTarget, reversedRest))
+            by { suppose stepSource ∈ Graph.walkVertices(graph, stepTarget, reversedRest);
+                 stepSource ∈ Graph.walkVertices(graph, waypoint, rest)
+                     by reversedInside;
+                 done };
+        Graph.IsPath(graph, stepTarget,
+                     List.append(reversedRest, List.prepend(E, edge, List.empty(E))),
+                     stepSource)
+            by Graph.IsPath.extend_at_target(middle := waypoint);
+        waypoint ∈ Graph.walkVertices(graph, stepTarget, reversedRest) by forwardInside;
+        -- The vertices match: the longer reversal adds exactly the old
+        -- source, which is what the step added at the front.
+        ∀ (vertex : V).
+            vertex ∈ Graph.walkVertices(graph, stepTarget,
+                         List.append(reversedRest, List.prepend(E, edge, List.empty(E))))
+            → vertex ∈ Graph.walkVertices(graph, stepSource,
+                           List.prepend(E, edge, rest))
+            by { take vertex : V;
+                 suppose vertex ∈ Graph.walkVertices(graph, stepTarget,
+                     List.append(reversedRest, List.prepend(E, edge, List.empty(E))));
+                 vertex ∈ Graph.walkVertices(graph, stepTarget, reversedRest)
+                     ∨ vertex = stepSource
+                     by Graph.walkVertices.after_append(middle := waypoint);
+                 done by cases {
+                   case vertex ∈ Graph.walkVertices(graph, stepTarget, reversedRest): {
+                       vertex ∈ Graph.walkVertices(graph, waypoint, rest)
+                           by reversedInside;
+                       done by Graph.walkVertices.before_step
+                     }
+                   case vertex = stepSource: {
+                       vertex ∈ Graph.walkVertices(graph, stepSource,
+                           List.prepend(E, edge, rest));
+                       done
+                     }
+                 } };
+        ∀ (vertex : V).
+            vertex ∈ Graph.walkVertices(graph, stepSource, List.prepend(E, edge, rest))
+            → vertex ∈ Graph.walkVertices(graph, stepTarget,
+                           List.append(reversedRest, List.prepend(E, edge, List.empty(E))))
+            by { take vertex : V;
+                 suppose vertex ∈ Graph.walkVertices(graph, stepSource,
+                     List.prepend(E, edge, rest));
+                 vertex = stepSource ∨ vertex ∈ Graph.walkVertices(graph, waypoint, rest)
+                     by Graph.walkVertices.after_step;
+                 done by cases {
+                   case vertex = stepSource: {
+                       Graph.Incident(graph, edge, stepSource)
+                           by Graph.Joins.incident_target;
+                       Graph.Incident(graph, edge, vertex)
+                           by substituting (vertex = stepSource);
+                       edge ∈ List.prepend(E, edge, List.empty(E)) by List.member.here;
+                       edge ∈ List.append(reversedRest,
+                                  List.prepend(E, edge, List.empty(E)))
+                           by List.member_append_right;
+                       vertex ∈ Graph.coveredVertices(graph,
+                           List.append(reversedRest,
+                               List.prepend(E, edge, List.empty(E))))
+                           by Graph.coveredVertices.of_edge;
+                       done
+                     }
+                   case vertex ∈ Graph.walkVertices(graph, waypoint, rest): {
+                       vertex ∈ Graph.walkVertices(graph, stepTarget, reversedRest)
+                           by forwardInside;
+                       ∀ (candidate : E). candidate ∈ reversedRest
+                           → candidate ∈ List.append(reversedRest,
+                                 List.prepend(E, edge, List.empty(E)))
+                           by { take candidate : E;
+                                suppose candidate ∈ reversedRest;
+                                done by List.member_append_left };
+                       done by Graph.walkVertices.monotone
+                     }
+                 } };
+        witness List.append(reversedRest, List.prepend(E, edge, List.empty(E)))
+      }
+  }
