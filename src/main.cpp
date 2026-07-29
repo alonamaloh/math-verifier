@@ -6131,14 +6131,46 @@ int emitDeps(const std::vector<std::string>& sourcePaths,
                       << ": " << error.what() << "\n";
         }
     }
-    // Second pass: emit Makefile dependency lines.
+    // Second pass: the TRANSITIVE closure of imports.
+    //
+    // Transitive, not direct. A module's proofs must be re-verified when
+    // anything above it changes meaning, and an intermediate module's
+    // interface does not always record that a change happened: the body
+    // `Plane.IsBounded := MetricSpace.IsBounded(region)` is byte-identical
+    // whatever `MetricSpace.IsBounded` is defined to be, so with direct
+    // edges alone, editing that definition left every consumer of
+    // `Plane.IsBounded` unchecked — and `make` reported success over
+    // proofs that no longer held.
+    std::map<std::string, const SourceInfo*> byModule;
+    for (const auto& info : infos) byModule[info.moduleName] = &info;
+    std::map<std::string, std::set<std::string>> transitiveImports;
+    std::function<const std::set<std::string>&(const std::string&)> closureOf =
+        [&](const std::string& moduleName) -> const std::set<std::string>& {
+            auto found = transitiveImports.find(moduleName);
+            if (found != transitiveImports.end()) return found->second;
+            // Seed the entry before recursing, so an import cycle (which
+            // the elaborator rejects anyway) terminates here.
+            auto& collected = transitiveImports[moduleName];
+            auto source = byModule.find(moduleName);
+            if (source == byModule.end()) return collected;
+            for (const auto& importName : source->second->imports) {
+                if (byModule.find(importName) == byModule.end()) continue;
+                collected.insert(importName);
+                for (const auto& deeper : closureOf(importName)) {
+                    collected.insert(deeper);
+                }
+            }
+            return collected;
+        };
+
+    // Third pass: emit Makefile dependency lines.
     for (const auto& info : infos) {
         std::string cachePath = makeCachePath(info.sourcePath, cacheRoot);
         // Emit dep line. Source-file prerequisite handled by pattern rule.
         // Only emit if there are .mathv prerequisites (otherwise the
         // pattern rule alone suffices and we save a line).
         std::vector<std::string> depCachePaths;
-        for (const auto& importName : info.imports) {
+        for (const auto& importName : closureOf(info.moduleName)) {
             auto iterator = moduleToSource.find(importName);
             if (iterator != moduleToSource.end()) {
                 // Depend on the import's *interface* cache, not its full
@@ -6151,12 +6183,13 @@ int emitDeps(const std::vector<std::string>& sourcePaths,
             }
         }
         if (depCachePaths.empty()) continue;
-        // Two-stage edges. Stage 1: this module's interface is built from its
-        // imports' interfaces (the interface DAG). Stage 2: this module's full
-        // verification depends on its imports' interfaces too, so an upstream
-        // *interface* change re-checks this module's proofs (an upstream proof
-        // change does not — its .iface is unchanged). The `X.mathv:
-        // X.mathv.iface` edge comes from the Makefile's stage-2 pattern rule.
+        // Two-stage edges. Stage 1: this module's interface is built from the
+        // interfaces it imports, directly or through another module. Stage 2:
+        // this module's full verification depends on those interfaces too, so
+        // an upstream *interface* change anywhere above it re-checks its
+        // proofs (an upstream proof change does not — that .iface is
+        // unchanged). The `X.mathv: X.mathv.iface` edge comes from the
+        // Makefile's stage-2 pattern rule.
         std::cout << cachePath << ".iface:";
         for (const auto& dep : depCachePaths) std::cout << " " << dep;
         std::cout << "\n";
