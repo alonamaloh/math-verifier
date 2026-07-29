@@ -529,8 +529,17 @@ constructor.
   replaced edge was not a bridge), or not at all (the deleted vertex is an
   end of the replaced edge, so no surviving walk could have taken it).
 
-**Still to build.** Degree counting and trees (`lem:three-leaf-tree` and
-the `n-1` edge count), which want a longest path and a degree sum. Then H5
+**Degree counting is DONE.** `Graph.degree_sum` (the handshake lemma) over
+`List.sumOver` in `Lists/sum.math`, by a double count on the edge list
+whose only content is that an edge meets exactly two vertices. A longest
+path exists too (`Graph.longest_path`, over `Natural.greatest_witness`),
+both its ends are leaves in an acyclic graph
+(`Graph.IsAcyclic.longest_path_source_is_leaf`), and a tree on two or
+more vertices therefore has one (`Graph.IsTree.has_leaf`).
+
+**Still to build.** The rest of trees: *a tree minus a leaf is a tree* —
+acyclicity is easy, connectivity is the work — and on top of it the `n-1`
+edge count and `lem:three-leaf-tree`. Then H5
 (`lem:relative-ear`), which wants the components of `G` minus a subgraph's
 vertices, and a shortest path through one of them — neither of which
 exists yet, and both of which are real work: "component" needs a
