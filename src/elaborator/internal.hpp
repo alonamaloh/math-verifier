@@ -3223,9 +3223,12 @@ private:
     // arm are NOT linted: folding those needs a disjunctive-syllogism
     // prover step (B-workstream gap), so the split is currently the
     // honest spelling. Advisory; gated with the other style warnings.
+    // `armGoal` gates the whole check: inside a reductio the arm's goal is
+    // already `False`, and then EVERY arm concludes by contradiction —
+    // "two ways out, both closed" is the argument being made, not a smell.
     void warnIfArmIsContradictionOnly(
         ExpressionPointer armBody, size_t armCount, bool hasOtherwise,
-        const SurfaceStructuredClaimArm& arm);
+        const SurfaceStructuredClaimArm& arm, ExpressionPointer armGoal);
 
     // Whether a user-written pattern-match `cases` scrutinee is a COMPUTED
     // expression (a function/constructor application), directly or laundered

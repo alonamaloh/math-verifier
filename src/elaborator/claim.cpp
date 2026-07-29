@@ -1372,7 +1372,8 @@ ExpressionPointer Elaborator::elaborateClaimByCases(
                     *arm.body, innerBinders, armGoal);
                 body = coerceToExpectedTypeViaDiff(
                     innerBinders, body, armGoal);
-                warnIfArmIsContradictionOnly(body, armCount, hasOtherwise, arm);
+                warnIfArmIsContradictionOnly(body, armCount, hasOtherwise, arm,
+                                             armGoal);
                 if (substitutedIndexInner >= 0) {
                     // body : goal[v := rhs]. Transport back to goal(v)
                     // along rhs = v (the equation reversed).
@@ -1545,7 +1546,8 @@ ExpressionPointer Elaborator::elaborateClaimByCases(
             // `cases` arms, instead of demanding an explicit `Or.introduceLeft`.
             body = coerceToExpectedTypeViaDiff(
                 extendedBinders, body, armGoal);
-            warnIfArmIsContradictionOnly(body, armCount, hasOtherwise, arm);
+            warnIfArmIsContradictionOnly(body, armCount, hasOtherwise, arm,
+                                             armGoal);
             // If the (coerced) body still doesn't prove the goal, report it
             // here, at the arm, with a math-shaped message — rather than
             // letting the mismatch surface later as a kernel Pi-domain error

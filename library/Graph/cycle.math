@@ -24,6 +24,7 @@ import Logic.exists
 import Logic.product
 import Equality.basics
 import Lists.list
+import Lists.append
 import Graph.basics
 import Graph.walk
 import Graph.path
@@ -141,4 +142,32 @@ theorem Graph.IsBridge.of_separated_ends (graph : Graph(V, E, ends))
                by Graph.LiesOnCycle.deletion_reaches;
            done };
   done
+}
+
+-- ----------------------------------------------------------------------
+-- A chord of a path lies on a cycle: an edge joining the path's source to
+-- a vertex the path already visits closes the piece of path between them.
+theorem Graph.IsPath.chord_on_cycle (graph : Graph(V, E, ends))
+        (source target : V) (edgeList : List(E))
+        (path : Graph.IsPath(graph, source, edgeList, target))
+        (edge : E) (far : V)
+        (isEdge : edge ∈ Graph.edges(graph))
+        (joins : Graph.Joins(graph, edge, source, far))
+        (offPath : ¬(edge ∈ edgeList))
+        (visited : far ∈ Graph.walkVertices(graph, source, edgeList))
+        : Graph.LiesOnCycle(graph, edge) := {
+  choose prefixEdges, suffixEdges such that
+      edgeList = List.append(prefixEdges, suffixEdges)
+      ∧ Graph.IsPath(graph, source, prefixEdges, far)
+      ∧ Graph.IsPath(graph, far, suffixEdges, target)
+      ∧ (far = source ∨ ¬(source ∈ Graph.walkVertices(graph, far, suffixEdges)))
+      from Graph.IsPath.split;
+  edgeList = List.append(prefixEdges, suffixEdges) as edgesSplit;
+  Graph.IsPath(graph, source, prefixEdges, far);
+  ¬(edge ∈ prefixEdges)
+      by { suppose edge ∈ prefixEdges;
+           edge ∈ List.append(prefixEdges, suffixEdges) by List.member_append_left;
+           edge ∈ edgeList by substituting edgesSplit;
+           done };
+  witness source with witness far with witness prefixEdges
 }

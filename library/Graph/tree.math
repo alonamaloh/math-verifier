@@ -1,0 +1,84 @@
+-- Graph/tree.math
+--
+-- Trees. Layer 5 of PLAN_JORDAN_SCHOENFLIES.md.
+--
+-- A tree is a connected graph in which no edge lies on a cycle. What the
+-- blueprint asks of trees is always about their leaves, and every such
+-- question starts the same way: take a longest path. Neither of its ends
+-- can carry a second edge — an edge back onto the path would close a
+-- cycle, and an edge off it would make a longer path — so both ends are
+-- leaves.
+
+module Graph.tree
+
+import Logic.basics
+import Logic.exists
+import Logic.excluded_middle
+import Logic.product
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.add_order
+import Lists.list
+import Lists.length
+import Lists.filter
+import Graph.basics
+import Graph.walk
+import Graph.path
+import Graph.connected
+import Graph.deletion
+import Graph.cycle
+
+convention V : Type(0)
+convention E : Type(0)
+convention ends : E → Pair(V, V)
+
+-- ----------------------------------------------------------------------
+-- Acyclicity, trees, and leaves.
+
+definition Graph.IsAcyclic (graph : Graph(V, E, ends)) : Proposition :=
+  ∀ (edge : E). edge ∈ Graph.edges(graph) → ¬Graph.LiesOnCycle(graph, edge)
+
+definition Graph.IsTree (graph : Graph(V, E, ends)) : Proposition :=
+  Graph.IsConnected(graph) ∧ Graph.IsAcyclic(graph)
+
+definition Graph.IsLeaf (graph : Graph(V, E, ends)) (vertex : V) : Proposition :=
+  vertex ∈ Graph.vertices(graph) ∧ Graph.degree(graph, vertex) = 1
+
+-- ----------------------------------------------------------------------
+-- The end of a longest path carries no edge but the path's own.
+
+-- In an acyclic graph, every edge at the source of a longest path is one
+-- of the path's edges. The two ways out are both closed: an edge onto a
+-- vertex the path visits closes a cycle, and an edge to a vertex it does
+-- not visit extends the path.
+theorem Graph.IsAcyclic.longest_path_source_edge (graph : Graph(V, E, ends))
+        (acyclic : Graph.IsAcyclic(graph))
+        (source target : V) (edgeList : List(E))
+        (path : Graph.IsPath(graph, source, edgeList, target))
+        (longest : ∀ (otherSource otherTarget : V). ∀ (otherEdges : List(E)).
+            Graph.IsPath(graph, otherSource, otherEdges, otherTarget)
+            → length(otherEdges) ≤ length(edgeList))
+        (edge : E)
+        (isEdge : edge ∈ Graph.edges(graph))
+        (incident : Graph.Incident(graph, edge, source))
+        : edge ∈ edgeList := {
+  suppose ¬(edge ∈ edgeList) for contradiction;
+  choose far such that Graph.Joins(graph, edge, source, far);
+  done by cases {
+    case far ∈ Graph.walkVertices(graph, source, edgeList): {
+        Graph.LiesOnCycle(graph, edge) by Graph.IsPath.chord_on_cycle;
+        ¬Graph.LiesOnCycle(graph, edge) by acyclic;
+        done
+      }
+    otherwise: {
+        Graph.Joins(graph, edge, far, source) by Graph.Joins.symmetric;
+        Graph.IsPath(graph, far, List.prepend(E, edge, edgeList), target)
+            by Graph.IsPath.extend;
+        1 + length(edgeList)
+           = length(List.prepend(E, edge, edgeList))
+           ≤ length(edgeList) by longest;
+        done
+      }
+  }
+}

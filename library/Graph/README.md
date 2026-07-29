@@ -41,6 +41,9 @@ graph although they only read `ends`.
 - `Graph.deleteEdge` in [deletion.math](deletion.math)
 - `Graph.IsCycleThrough`, `Graph.LiesOnCycle` and `Graph.IsBridge` in
   [cycle.math](cycle.math)
+- `Graph.IsAcyclic`, `Graph.IsTree` and `Graph.IsLeaf` in
+  [tree.math](tree.math) — a tree is connected with no edge on a cycle,
+  and a leaf is a vertex of degree one
 - `Graph.deleteVertex` and `Graph.IsCutVertex` in
   [vertex_deletion.math](vertex_deletion.math)
 - `Graph.IsTwoConnected` in [twoconnected.math](twoconnected.math) — the
@@ -87,6 +90,10 @@ graph although they only read `ends`.
 - `Graph.longest_path` — and so a graph over an inhabited vertex type runs
   a path no shorter than any other (`Graph.HasPathOfLength` names the
   lengths that occur)
+- `Graph.IsPath.chord_on_cycle` — an edge from a path's source to a vertex
+  the path visits closes the piece between them into a cycle
+- `Graph.IsAcyclic.longest_path_source_edge` — hence in an acyclic graph
+  every edge at the end of a longest path is one of the path's own
 - `Graph.IsPath.reverse` — a path runs backwards over the same vertices;
   `Graph.IsPath.extend_at_target` is what grows one at the far end
 - `Graph.IsPathGraph.reaches_an_end` — whatever vertex is deleted, every

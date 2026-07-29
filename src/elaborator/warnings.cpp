@@ -491,8 +491,22 @@ bool Elaborator::proofConcludesByExFalso(ExpressionPointer expression) {
 
 void Elaborator::warnIfArmIsContradictionOnly(
         ExpressionPointer armBody, size_t armCount, bool hasOtherwise,
-        const SurfaceStructuredClaimArm& arm) {
+        const SurfaceStructuredClaimArm& arm, ExpressionPointer armGoal) {
         if (!reportUnusedNames_) return;
+        // Already inside a reductio: the arm's goal IS `False`, so every arm
+        // ends on a contradiction and the advice below — hoist the reductio
+        // out and keep the other arm's reasoning — has nothing to hoist and
+        // no other arm. "Both ways out are closed" is the argument.
+        if (armGoal) {
+            ExpressionPointer goalHead = armGoal;
+            try {
+                goalHead = weakHeadNormalForm(environment_, armGoal);
+            } catch (const TypeError&) {
+            }
+            if (auto* constant = std::get_if<Constant>(&goalHead->node)) {
+                if (constant->name == "False") return;
+            }
+        }
         // Standing lint: EM splits only (the fold there is always clean).
         // MATH_LINT_CONTRADICTION_ARMS_ALL widens to every by-cases arm —
         // the sweep instrument for cited-disjunction splits whose refuted
