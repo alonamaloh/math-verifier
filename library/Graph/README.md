@@ -94,6 +94,10 @@ graph although they only read `ends`.
   the path visits closes the piece between them into a cycle
 - `Graph.IsAcyclic.longest_path_source_edge` — hence in an acyclic graph
   every edge at the end of a longest path is one of the path's own
+- `Graph.IsPath.one_edge_at_source` — a path leaves its source once and
+  for all, so two of its edges there are the same edge
+- **`Graph.IsAcyclic.longest_path_source_is_leaf`** — and so a non-isolated
+  end of a longest path in an acyclic graph has degree one
 - `Graph.IsPath.reverse` — a path runs backwards over the same vertices;
   `Graph.IsPath.extend_at_target` is what grows one at the far end
 - `Graph.IsPathGraph.reaches_an_end` — whatever vertex is deleted, every

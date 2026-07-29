@@ -19,9 +19,11 @@ import Equality.basics
 import Natural.basics
 import Natural.order
 import Natural.add_order
+import Natural.subtraction
 import Lists.list
 import Lists.length
 import Lists.filter
+import Lists.remove
 import Graph.basics
 import Graph.walk
 import Graph.path
@@ -68,7 +70,7 @@ theorem Graph.IsAcyclic.longest_path_source_edge (graph : Graph(V, E, ends))
   done by cases {
     case far ∈ Graph.walkVertices(graph, source, edgeList): {
         Graph.LiesOnCycle(graph, edge) by Graph.IsPath.chord_on_cycle;
-        ¬Graph.LiesOnCycle(graph, edge) by acyclic;
+        ¬Graph.LiesOnCycle(graph, edge);
         done
       }
     otherwise: {
@@ -81,4 +83,98 @@ theorem Graph.IsAcyclic.longest_path_source_edge (graph : Graph(V, E, ends))
         done
       }
   }
+}
+
+-- A path leaves its source once and for all: two of its edges incident to
+-- the source are the same edge. The step that departs is the only
+-- candidate — a later edge at the source would put the source among the
+-- vertices the rest of the path visits, which is what a path forbids.
+theorem Graph.IsPath.one_edge_at_source (graph : Graph(V, E, ends))
+        (source target : V) (edgeList : List(E))
+        (path : Graph.IsPath(graph, source, edgeList, target))
+        : ∀ (first second : E). first ∈ edgeList → second ∈ edgeList
+            → Graph.Incident(graph, first, source)
+            → Graph.Incident(graph, second, source)
+            → first = second :=
+  by induction on path {
+    case Graph.IsPathOver.arrived(endpoint): {
+        take first : E;
+        take second : E;
+        suppose first ∈ List.empty(E);
+        ¬(first ∈ List.empty(E)) by List.no_member_empty;
+        done
+      }
+    case Graph.IsPathOver.step(
+        stepSource, waypoint, stepTarget, stepEdge, rest, isEdge, joins,
+        restPath, fresh): {
+        take first : E;
+        take second : E;
+        suppose first ∈ List.prepend(E, stepEdge, rest);
+        suppose second ∈ List.prepend(E, stepEdge, rest);
+        suppose Graph.Incident(graph, first, stepSource);
+        suppose Graph.Incident(graph, second, stepSource);
+        ∀ (candidate : E). candidate ∈ List.prepend(E, stepEdge, rest)
+            → Graph.Incident(graph, candidate, stepSource)
+            → candidate = stepEdge
+            by { take candidate : E;
+                 suppose candidate ∈ List.prepend(E, stepEdge, rest);
+                 suppose Graph.Incident(graph, candidate, stepSource);
+                 candidate = stepEdge ∨ candidate ∈ rest
+                     by List.member_prepend_invert;
+                 done by cases {
+                   case candidate = stepEdge: done
+                   case candidate ∈ rest: {
+                       stepSource ∈ Graph.coveredVertices(graph, rest)
+                           by Graph.coveredVertices.of_edge;
+                       stepSource ∈ Graph.walkVertices(graph, waypoint, rest);
+                       done
+                     }
+                 } };
+        first = stepEdge;
+        second = stepEdge;
+        done
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- Both ends of a longest path are leaves.
+
+-- A non-isolated end of a longest path in an acyclic graph has degree
+-- one: every edge there is one of the path's, and the path leaves the
+-- vertex only once, so they are all the same edge.
+theorem Graph.IsAcyclic.longest_path_source_is_leaf (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph))
+        (acyclic : Graph.IsAcyclic(graph))
+        (source target : V) (edgeList : List(E))
+        (path : Graph.IsPath(graph, source, edgeList, target))
+        (longest : ∀ (otherSource otherTarget : V). ∀ (otherEdges : List(E)).
+            Graph.IsPath(graph, otherSource, otherEdges, otherTarget)
+            → length(otherEdges) ≤ length(edgeList))
+        (notIsolated : 1 ≤ Graph.degree(graph, source))
+        : Graph.degree(graph, source) = 1 := {
+  choose someEdge such that someEdge ∈ Graph.incidentEdges(graph, source)
+      from List.member_of_positive_length;
+  someEdge ∈ Graph.edges(graph) by Graph.incidentEdges_is_edge;
+  Graph.Incident(graph, someEdge, source) by Graph.incidentEdges_incident;
+  someEdge ∈ edgeList by Graph.IsAcyclic.longest_path_source_edge;
+
+  ∀ (candidate : E). candidate ∈ Graph.incidentEdges(graph, source)
+      → candidate ∈ List.prepend(E, someEdge, List.empty(E))
+      by { take candidate : E;
+           suppose candidate ∈ Graph.incidentEdges(graph, source);
+           candidate ∈ Graph.edges(graph) by Graph.incidentEdges_is_edge;
+           Graph.Incident(graph, candidate, source) by Graph.incidentEdges_incident;
+           candidate ∈ edgeList by Graph.IsAcyclic.longest_path_source_edge;
+           candidate = someEdge by Graph.IsPath.one_edge_at_source;
+           done };
+  List.Distinct(E, Graph.edges(graph));
+  List.Distinct(E, Graph.incidentEdges(graph, source)) by List.filter_distinct;
+  Graph.degree(graph, source)
+     = length(Graph.incidentEdges(graph, source))
+     ≤ length(List.prepend(E, someEdge, List.empty(E)))
+         by List.length_le_of_distinct_inclusion
+     = 1 + length(List.empty(E))
+     = 1 + 0                      by List.length_empty
+     = 1;
+  done by Natural.le_antisymmetric
 }
