@@ -443,9 +443,9 @@ What remains — the assembly:
 Abstract, no geometry. Keep it that way — Layer 6 maps into it.
 
 Built so far: `Graph/{basics,walk,path,connected,deletion,cycle,
-vertex_deletion,twoconnected,union,reverse,pathgraph,ear}.math` (~3.4k
-lines), with `library/Graph/README.md` as the entry point.
-`Lists/union.math` was added underneath it.
+vertex_deletion,twoconnected,union,reverse,pathgraph,ear,reroute,
+subdivision}.math` (~4.2k lines), with `library/Graph/README.md` as the
+entry point. `Lists/union.math` was added underneath it.
 
 - **Settled: an edge is a NAME.** A graph lives over an ambient
   `(V, E, ends)` — vertex type, edge type, and `ends : E → Pair(V, V)` —
@@ -519,14 +519,23 @@ constructor.
   theorem rather than a constructor, because the relation is built at the
   source end.
 
-**Still to build.** Subdivision, `lem:subdivision-ear-preserve` (a) — the
-plan is `subdivide(graph, edge) = deleteEdge(graph, edge) ∪ P` for the
-two-edge path `P`, and the one real step is rerouting a walk that used the
-old edge through the new vertex. Degree counting and trees
-(`lem:three-leaf-tree` and the `n-1` edge count), which want a longest
-path and a degree sum. Then H5 (`lem:relative-ear`), which wants the
-components of `G` minus a subgraph's vertices, and a shortest path
-through one of them.
+- **`lem:subdivision-ear-preserve` is COMPLETE**, both halves.
+  `Graph.IsTwoConnected.replace_edge_by_path` is (a), stated for a path
+  rather than a single new vertex because nothing in the argument cares how
+  long the replacement is. Its engine is `Graph.Reaches.reroute` — one edge
+  swapped for any route between its ends — whose `routed` premise carries
+  the three cases: reroute along the new path (the deleted vertex is not on
+  it), around the old graph (it is, so the old graph is untouched and the
+  replaced edge was not a bridge), or not at all (the deleted vertex is an
+  end of the replaced edge, so no surviving walk could have taken it).
+
+**Still to build.** Degree counting and trees (`lem:three-leaf-tree` and
+the `n-1` edge count), which want a longest path and a degree sum. Then H5
+(`lem:relative-ear`), which wants the components of `G` minus a subgraph's
+vertices, and a shortest path through one of them — neither of which
+exists yet, and both of which are real work: "component" needs a
+comprehension over vertices like `Plane.Component`, and "shortest" needs a
+minimum over a set of walk lengths.
 
 **Definitions.** `Graph` on a finite vertex type with an edge multiset
 (parallel edges **allowed**, loops forbidden — the blueprint needs

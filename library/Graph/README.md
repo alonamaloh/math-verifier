@@ -74,6 +74,12 @@ graph although they only read `ends`.
   vertices have a 2-connected union
 - **`Graph.IsTwoConnected.ear`** — attaching a path whose two distinct ends
   lie in a 2-connected graph keeps it 2-connected
+- **`Graph.IsTwoConnected.replace_edge_by_path`** — and replacing one of its
+  edges by a path does too, which is subdivision
+- `Graph.Reaches.reroute` and `.across_edge_replacement` — one edge swapped
+  for any route between its ends; `Graph.IsConnected.after_edge_deletion`
+  reads off the first
+- `Graph.IsWalk.transfer` — a walk moves to any graph holding its edges
 - `Graph.IsPath.split` — a path splits at any vertex it visits, and the
   far half never returns to the source
 - `Graph.IsPath.reverse` — a path runs backwards over the same vertices;
