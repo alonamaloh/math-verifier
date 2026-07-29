@@ -16,6 +16,68 @@ Workflow:
 
 Keep entries here only until triaged — the corpus is the durable record.
 
+## Metric-space rework — 2026-07-29
+
+**OPEN — `by <Lemma>` cannot infer a predicate argument that needs
+higher-order matching under a binder.** Proving `NearWithin.and`, with two
+`Near` facts in context and the goal
+`Near(x, λy. (y ∈ region → P y) ∧ (y ∈ region → Q y))`:
+
+```
+the `MetricSpace.Near.and` citation does not prove this goal
+  goal:        MetricSpace.Near m x (λ(y : …). And (Set.member … y region → P y) (Set.member … y region → Q y))
+  `MetricSpace.Near.and` has type: … → MetricSpace.Near m x (λ(y : …). And (P y) (Q y))
+the conclusion shape fits, but an argument could not be inferred from the goal
+```
+
+diagnosis: solving `P' y ≟ (y ∈ region → P y)` is a Miller pattern, so it
+IS solvable, but the matcher does not attempt it. The message is accurate
+and points at the right thing; the capability is what is missing. It bites
+every `∧`-closure / monotonicity lemma of a filter, which is exactly the
+shape a filter library is made of. Hoisting the premises into context
+first does not help (tried). Workaround used: let the
+`for y sufficiently near x: { … }` scope build the term instead — the
+elaborator constructs the `and`/`monotone` chain itself and never has to
+match. That workaround is a good tell: the machinery can already do it.
+
+**OPEN — `choose … from <a ∀-fact whose body is an ∃>` is rejected, and
+the message names the wrong culprit.** With
+`everyBallMeets : ∀ (scale : ℝ). scale > 0 → ∃ (y : m). …` in context,
+`choose y such that … from everyBallMeets;` gives:
+
+```
+choose y from <lemma>: could not read a simple (closed) witness type from the
+lemma's existential conclusion (one ∃ layer per witness name). Annotate the
+witness type directly — `choose y : <T> such that <prop> from <lemma>` — or use
+the explicit form `claim ∃ (y : <T>). <prop> by <lemma>; choose y …`
+```
+
+diagnosis: the source is a ∀-fact that must first be INSTANTIATED at the
+value the `such that` mentions; "could not read a witness type" describes
+the symptom, not that. The suggested `choose y : <T> …` annotation does
+not fix it either — only the `claim ∃ …; choose …` form does, which means
+restating the existential body verbatim one line above the `choose`. Two
+sites in `Metric/compactness.math` pay it. Better: instantiate the ∀ from
+the `such that` pattern, or say "the source is a ∀ — instantiate it first".
+
+**FIXED (build logic, not a message) — `make` skipped modules whose
+meaning had changed.** `kernel deps` emitted only DIRECT import
+interfaces. `Plane.IsBounded := MetricSpace.IsBounded(region)` is the same
+bytes whatever the right-hand side is defined to be, so editing
+`MetricSpace.IsBounded` left `Plane/sequence.mathv.iface` untouched and
+every module importing it was never re-verified: `make -j 16 library`
+printed nothing and exited 0 while `Plane/model.math` no longer
+elaborated. Now emits the transitive closure. Worth a regression test that
+edits a definition behind a one-line wrapper and asserts the consumer
+rebuilds.
+
+**FIXED (tooling) — `.mark_redundant.py` reported "clean" for a FAILED
+run.** A stale import cache (the usual cause: a sibling file edited
+earlier in the same batch) made the kernel exit non-zero with no warnings,
+which the script printed as `<file>: clean`. Every file after the first in
+a batch was silently passed as needing no work. It now exits 1 and prints
+the kernel's output.
+
 ## Staleness sweep — 2026-06-29
 
 Re-reproduced every open entry against the current build. Most were already
