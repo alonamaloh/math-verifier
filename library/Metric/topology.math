@@ -75,6 +75,17 @@ theorem MetricSpace.IsOpen.ball_inside {m : MetricSpace}
   witness radius
 }
 
+theorem MetricSpace.IsOpen.near {m : MetricSpace}
+        (subset : Set(m)) (isOpen : MetricSpace.IsOpen(subset))
+        (x : m) (inSubset : x ∈ subset)
+        : MetricSpace.Near(x, (y : m) ↦ y ∈ subset) :=
+  unfold MetricSpace.Near in {
+    ∃ (radius : ℝ). radius > 0 ∧
+        ∀ (y : m). distance(x, y) < radius → y ∈ subset
+        by MetricSpace.IsOpen.ball_inside;
+    done
+  }
+
 theorem MetricSpace.IsOpen.of_ball_inside {m : MetricSpace}
         (subset : Set(m))
         (holdsBall : ∀ (x : m). x ∈ subset →
@@ -238,8 +249,14 @@ theorem MetricSpace.Ball_IsOpen (m : MetricSpace)
 
 -- ----------------------------------------------------------------------
 -- The textbook characterization: relatively open means "cut out of the
--- region by an open set". The ε-ball form above is what the proofs
--- manipulate; this is what a reader expects to see.
+-- region by an open set". The pair at the end of this section —
+-- `MetricSpace.OpenIn.cut_by_open` and `.of_cut_by_open` — is the whole
+-- reader-facing statement, and the only thing a consumer should need.
+--
+-- Everything between here and there is the WITNESS MACHINERY that proves
+-- the forward direction, kept only because the kernel needs a set to
+-- point at. Do not state a theorem about `openHull` or `BallWitness`
+-- outside this file.
 
 -- Witness for the forward direction: the union of every ball the ε-ball
 -- condition supplies. A comprehension, so no indexed unions are needed.
@@ -330,60 +347,83 @@ theorem MetricSpace.openHull_IsOpen (m : MetricSpace)
   done by MetricSpace.IsOpen.of_ball_inside
 }
 
--- Forward: a relatively open subset is cut out by its own open hull.
-theorem MetricSpace.subset_openHull_intersection (m : MetricSpace)
+-- The hull cuts the region along exactly the trace of the subset: every
+-- point of the trace is the centre of one of its balls, and every ball is
+-- inside the subset wherever it meets the region.
+theorem MetricSpace.openHull_cuts_the_trace (m : MetricSpace)
         (subset region : Set(m))
-        (subsetInRegion : subset ⊆ region)
         (openInRegion : MetricSpace.OpenIn(subset, region))
-        : subset ⊆ MetricSpace.openHull(subset, region) ∩ region := {
-  take y : m;
-  suppose y ∈ subset;
-  y ∈ region by subsetInRegion;
-  choose radius such that
-      radius > 0 ∧
+        : subset ∩ region = MetricSpace.openHull(subset, region) ∩ region := {
+  subset ∩ region ⊆ MetricSpace.openHull(subset, region) ∩ region
+      by (y : m) (inTrace : y ∈ subset ∩ region) ↦ {
+        y ∈ subset;
+        y ∈ region;
+        choose radius such that
+            radius > 0 ∧
+              ∀ (z : m). z ∈ region →
+                distance(y, z) < radius → z ∈ subset
+            from openInRegion;
+        radius > 0;
         ∀ (z : m). z ∈ region →
-          distance(y, z) < radius → z ∈ subset
-      from openInRegion;
-  radius > 0;
-  ∀ (z : m). z ∈ region →
-      distance(y, z) < radius → z ∈ subset;
-  distance(y, y)
-     = 0 by MetricSpace.distance_self
-     < radius;
-  MetricSpace.BallWitness(subset, region, y, radius, y) as witnessHolds;
-  y ∈ MetricSpace.openHull(subset, region)
-      by { witness y with witness radius with witnessHolds };
-  done
+            distance(y, z) < radius → z ∈ subset;
+        distance(y, y)
+           = 0 by MetricSpace.distance_self
+           < radius;
+        MetricSpace.BallWitness(subset, region, y, radius, y) as witnessHolds;
+        y ∈ MetricSpace.openHull(subset, region)
+            by { witness y with witness radius with witnessHolds };
+        done
+      };
+  MetricSpace.openHull(subset, region) ∩ region ⊆ subset ∩ region
+      by (y : m)
+         (inBoth : y ∈ MetricSpace.openHull(subset, region) ∩ region) ↦ {
+        y ∈ MetricSpace.openHull(subset, region) as inHull;
+        y ∈ region;
+        choose x, radius such that
+            MetricSpace.BallWitness(subset, region, x, radius, y) from inHull;
+        ∀ (z : m). z ∈ region →
+            distance(x, z) < radius → z ∈ subset
+            by MetricSpace.BallWitness.ball_inside as ballProperty;
+        distance(x, y) < radius by MetricSpace.BallWitness.reaches;
+        y ∈ subset by ballProperty;
+        done
+      };
+  done by Set.equal_of_same_members
 }
 
--- Backward: whatever the hull cuts out of the region was already in the
--- subset — that is precisely what each ball property says.
-theorem MetricSpace.openHull_intersection_subset (m : MetricSpace)
+-- ----------------------------------------------------------------------
+-- The characterization itself, in both directions. `S` is open in `C`
+-- exactly when some open `U` cuts `C` along `S`.
+
+theorem MetricSpace.OpenIn.cut_by_open (m : MetricSpace)
         (subset region : Set(m))
-        : MetricSpace.openHull(subset, region) ∩ region ⊆ subset := {
-  take y : m;
-  suppose y ∈ MetricSpace.openHull(subset, region) ∩ region as inBoth;
-  y ∈ MetricSpace.openHull(subset, region) as inHull;
-  y ∈ region;
-  choose x, radius such that
-      MetricSpace.BallWitness(subset, region, x, radius, y) from inHull;
-  ∀ (z : m). z ∈ region →
-      distance(x, z) < radius → z ∈ subset
-      by MetricSpace.BallWitness.ball_inside as ballProperty;
-  distance(x, y) < radius by MetricSpace.BallWitness.reaches;
-  done by ballProperty
+        (openInRegion : MetricSpace.OpenIn(subset, region))
+        : ∃ (cuttingSet : Set(m)). MetricSpace.IsOpen(cuttingSet)
+            ∧ subset ∩ region = cuttingSet ∩ region := {
+  MetricSpace.IsOpen(MetricSpace.openHull(subset, region))
+      by MetricSpace.openHull_IsOpen;
+  subset ∩ region = MetricSpace.openHull(subset, region) ∩ region
+      by MetricSpace.openHull_cuts_the_trace;
+  witness MetricSpace.openHull(subset, region)
 }
 
-theorem MetricSpace.OpenIn_cut_by_open (m : MetricSpace)
+-- With the inclusion in hand the trace is the subset itself, which is how
+-- a text states it.
+theorem MetricSpace.OpenIn.cut_out_of_region (m : MetricSpace)
         (subset region : Set(m))
         (subsetInRegion : subset ⊆ region)
         (openInRegion : MetricSpace.OpenIn(subset, region))
-        : subset = MetricSpace.openHull(subset, region) ∩ region := {
-  subset ⊆ MetricSpace.openHull(subset, region) ∩ region
-      by MetricSpace.subset_openHull_intersection;
-  MetricSpace.openHull(subset, region) ∩ region ⊆ subset
-      by MetricSpace.openHull_intersection_subset;
-  done by Set.equal_of_same_members
+        : ∃ (cuttingSet : Set(m)). MetricSpace.IsOpen(cuttingSet)
+            ∧ subset = cuttingSet ∩ region := {
+  subset ∩ region = subset by Set.intersection_of_subset;
+  ∃ (cuttingSet : Set(m)). MetricSpace.IsOpen(cuttingSet)
+      ∧ subset ∩ region = cuttingSet ∩ region
+      by MetricSpace.OpenIn.cut_by_open;
+  choose cuttingSet such that MetricSpace.IsOpen(cuttingSet)
+      ∧ subset ∩ region = cuttingSet ∩ region;
+  MetricSpace.IsOpen(cuttingSet);
+  subset = cuttingSet ∩ region by substituting (subset ∩ region = subset);
+  witness cuttingSet
 }
 
 -- The converse, and the direction consumers use to BUILD relatively open
@@ -391,35 +431,42 @@ theorem MetricSpace.OpenIn_cut_by_open (m : MetricSpace)
 theorem MetricSpace.OpenIn_of_cut (m : MetricSpace)
         (subset region cuttingSet : Set(m))
         (cuttingSetOpen : MetricSpace.IsOpen(cuttingSet))
-        (cut : subset = cuttingSet ∩ region)
+        (cut : subset ∩ region = cuttingSet ∩ region)
         : MetricSpace.OpenIn(subset, region) := {
-  take x : m;
-  suppose x ∈ subset as xInSubset;
-  suppose x ∈ region;
-  x ∈ cuttingSet ∩ region by substituting cut;
-  x ∈ cuttingSet;
-  x ∈ Set.universe(m);
-  choose radius such that
-      radius > 0 ∧
-        ∀ (y : m). y ∈ Set.universe(m) →
-          distance(x, y) < radius → y ∈ cuttingSet
-      from cuttingSetOpen;
-  radius > 0;
-  ∀ (y : m). y ∈ Set.universe(m) →
-      distance(x, y) < radius → y ∈ cuttingSet as cuttingSetBall;
-  witness radius with {
-    radius > 0;
-    ∀ (y : m). y ∈ region →
-        distance(x, y) < radius → y ∈ subset
-        by (y : m) (yInRegion : y ∈ region)
-           (yClose : distance(x, y) < radius) ↦ {
-             y ∈ Set.universe(m);
-             y ∈ cuttingSet by cuttingSetBall;
+  ∀ (x : m). x ∈ subset → x ∈ region →
+      MetricSpace.NearWithin(x, region, (y : m) ↦ y ∈ subset)
+      by { take x : m;
+           suppose x ∈ subset;
+           suppose x ∈ region;
+           x ∈ subset ∩ region;
+           x ∈ cuttingSet ∩ region by substituting cut;
+           x ∈ cuttingSet;
+           MetricSpace.Near(x, (y : m) ↦ y ∈ cuttingSet)
+               by MetricSpace.IsOpen.near;
+           MetricSpace.NearWithin(x, region, (y : m) ↦ y ∈ cuttingSet)
+               by MetricSpace.NearWithin.of_everywhere;
+           MetricSpace.NearWithin(x, region, (y : m) ↦ y ∈ region)
+               by MetricSpace.NearWithin.in_region;
+           for y sufficiently near x within region: {
+             y ∈ cuttingSet;
+             y ∈ region;
              y ∈ cuttingSet ∩ region;
-             done by substituting cut
-           };
-    done
-  }
+             y ∈ subset ∩ region by substituting cut;
+             done
+           } };
+  done by MetricSpace.OpenIn.of_near
+}
+
+theorem MetricSpace.OpenIn.of_cut_by_open (m : MetricSpace)
+        (subset region : Set(m))
+        (cutOut : ∃ (cuttingSet : Set(m)). MetricSpace.IsOpen(cuttingSet)
+            ∧ subset ∩ region = cuttingSet ∩ region)
+        : MetricSpace.OpenIn(subset, region) := {
+  choose cuttingSet such that MetricSpace.IsOpen(cuttingSet)
+      ∧ subset ∩ region = cuttingSet ∩ region from cutOut;
+  MetricSpace.IsOpen(cuttingSet);
+  subset ∩ region = cuttingSet ∩ region;
+  done by MetricSpace.OpenIn_of_cut
 }
 
 -- ----------------------------------------------------------------------

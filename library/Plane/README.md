@@ -46,8 +46,8 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
 - `Plane.OpenIn`, `Plane.IsOpen`, `Plane.ClosedIn`, `Plane.InteriorIn`,
   `Plane.ClosureIn`, `Plane.BoundaryIn`, `Plane.ContinuousAt`,
   `Plane.ContinuousOn` — [topology.math](topology.math). **Relative to a
-  carrier from the start**; the absolute notions are the
-  `carrier = universe` case.
+  region from the start**; the absolute notions are the
+  `region = universe` case.
 - `Plane.SequenceConverges`, `Plane.IsBounded` —
   [sequence.math](sequence.math); `Plane.SubsequenceConverges` —
   [compact.math](compact.math)
@@ -197,7 +197,7 @@ Two consequences worth knowing before extending this area:
   a point as its first coordinate; that bridging vocabulary is gone.)
 
 The inverse of a homeomorphism is never named:
-`Plane.HasContinuousInverseOn(f, carrier)` says points whose images are
+`Plane.HasContinuousInverseOn(f, region)` says points whose images are
 close are themselves close. That is the form consumers use, and it avoids
 choosing a preimage for every point of the image.
 
@@ -218,8 +218,8 @@ built on.
 
 ## Relative topology
 
-`Plane.OpenIn(subset, carrier)` is the ε-ball condition with the ball cut
-down to the carrier: only `y ∈ carrier` within the radius is constrained.
+`Plane.OpenIn(subset, region)` is the ε-ball condition with the ball cut
+down to the region: only `y ∈ region` within the radius is constrained.
 Drop that clause and you have ordinary openness, which is why
 `Plane.IsOpen(U)` is literally `OpenIn(U, Set.universe)` rather than a
 second definition.
@@ -230,11 +230,13 @@ so "the relatively open subarcs form a basis" cannot even be *stated*
 absolutely. Connectedness will be applied to arcs as subspaces for the
 same reason.
 
-`OpenIn` deliberately does **not** require `subset ⊆ carrier`: the ε-ball
-condition is meaningful without it and demanding it would put a proof
-obligation at every use. `Plane.OpenIn_cut_by_open` supplies the textbook
-characterization (`subset = openHull ∩ carrier`) where the inclusion is
-genuinely needed, and `Plane.OpenIn_of_cut` is the converse — the
+`OpenIn` deliberately does **not** require `subset ⊆ region`: demanding it
+would put a proof obligation at every use. What it does insist on is that it
+speak about the **trace** `subset ∩ region` and nothing else.
+`Plane.OpenIn.cut_by_open` supplies the textbook characterization — some open
+set cuts the region along that trace — with `Plane.OpenIn.cut_out_of_region`
+as the `subset ⊆ region` reading (`subset = cuttingSet ∩ region`), and
+`Plane.OpenIn_of_cut` / `Plane.OpenIn.of_cut_by_open` are the converse, the
 direction consumers use to *build* relatively open sets.
 
 ## Orientation instead of angles
