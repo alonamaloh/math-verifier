@@ -630,3 +630,39 @@ theorem Graph.walkVertexList.complete (graph : Graph(V, E, ends))
         }
       }
   }
+
+-- A walk that starts inside a region and ends outside it crosses the
+-- boundary: one of its edges joins an inside vertex to an outside one.
+theorem Graph.IsWalk.crossing (graph : Graph(V, E, ends)) (region : List(V))
+        (source target : V) (edgeList : List(E))
+        (walk : Graph.IsWalk(graph, source, edgeList, target))
+        (sourceInside : source ∈ region)
+        (targetOutside : ¬(target ∈ region))
+        : ∃ (edge : E). ∃ (u w : V). edge ∈ edgeList
+            ∧ Graph.Joins(graph, edge, u, w) ∧ u ∈ region ∧ ¬(w ∈ region) :=
+  by induction on walk with IH {
+    case Graph.IsWalkOver.arrived(endpoint): done
+    case Graph.IsWalkOver.step(
+        stepSource, waypoint, stepTarget, edge, rest, isEdge, joins, restWalk): {
+        done by cases {
+          case waypoint ∈ region: {
+              ∃ (crosser : E). ∃ (u w : V). crosser ∈ rest
+                  ∧ Graph.Joins(graph, crosser, u, w) ∧ u ∈ region ∧ ¬(w ∈ region)
+                  by IH;
+              choose crosser, insideEnd, outsideEnd such that
+                  crosser ∈ rest ∧ Graph.Joins(graph, crosser, insideEnd, outsideEnd)
+                  ∧ insideEnd ∈ region ∧ ¬(outsideEnd ∈ region);
+              crosser ∈ rest;
+              Graph.Joins(graph, crosser, insideEnd, outsideEnd);
+              insideEnd ∈ region;
+              ¬(outsideEnd ∈ region);
+              crosser ∈ List.prepend(E, edge, rest);
+              witness crosser with witness insideEnd with witness outsideEnd
+            }
+          otherwise: {
+              edge ∈ List.prepend(E, edge, rest);
+              witness edge with witness stepSource with witness waypoint
+            }
+        }
+      }
+  }

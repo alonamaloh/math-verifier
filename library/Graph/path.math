@@ -540,3 +540,23 @@ theorem Graph.IsPath.vertexList_distinct (graph : Graph(V, E, ends))
         done
       }
   }
+
+-- One edge between two distinct vertices is a path.
+theorem Graph.IsPath.single (graph : Graph(V, E, ends)) (edge : E) (u v : V)
+        (isEdge : edge ∈ Graph.edges(graph))
+        (joins : Graph.Joins(graph, edge, u, v))
+        (distinct : ¬(u = v))
+        : Graph.IsPath(graph, u, List.prepend(E, edge, List.empty(E)), v) := {
+  Graph.IsPath(graph, v, List.empty(E), v) by Graph.IsPath.empty;
+  ¬(u ∈ Graph.walkVertices(graph, v, List.empty(E)))
+      by { suppose u ∈ Graph.walkVertices(graph, v, List.empty(E));
+           done by cases {
+             case u = v: done
+             case u ∈ Graph.coveredVertices(graph, List.empty(E)): {
+                 ¬(u ∈ Graph.coveredVertices(graph, List.empty(E)))
+                     by Graph.coveredVertices.no_edges;
+                 done
+               }
+           } };
+  done by Graph.IsPath.extend
+}

@@ -343,3 +343,39 @@ theorem Graph.IsTwoConnected.union (first second : Graph(V, E, ends))
            done by Graph.IsConnected.from_hub(hub := survivor) };
   done
 }
+
+-- A union of two subgraphs of the same graph is one too.
+theorem Graph.union.IsSubgraph_into (first second whole : Graph(V, E, ends))
+        (firstInside : Graph.IsSubgraph(first, whole))
+        (secondInside : Graph.IsSubgraph(second, whole))
+        : Graph.IsSubgraph(Graph.union(first, second), whole) := {
+  ∀ (vertex : V). vertex ∈ Graph.vertices(first) → vertex ∈ Graph.vertices(whole)
+      as firstVertices;
+  ∀ (edge : E). edge ∈ Graph.edges(first) → edge ∈ Graph.edges(whole)
+      as firstEdges;
+  ∀ (vertex : V). vertex ∈ Graph.vertices(second) → vertex ∈ Graph.vertices(whole)
+      as secondVertices;
+  ∀ (edge : E). edge ∈ Graph.edges(second) → edge ∈ Graph.edges(whole)
+      as secondEdges;
+  ∀ (vertex : V). vertex ∈ Graph.vertices(Graph.union(first, second))
+      → vertex ∈ Graph.vertices(whole)
+      by { take vertex : V;
+           suppose vertex ∈ Graph.vertices(Graph.union(first, second));
+           vertex ∈ Graph.vertices(first) ∨ vertex ∈ Graph.vertices(second)
+               by Graph.union.vertex_invert;
+           done by cases {
+             case vertex ∈ Graph.vertices(first): done by firstVertices
+             case vertex ∈ Graph.vertices(second): done by secondVertices
+           } };
+  ∀ (edge : E). edge ∈ Graph.edges(Graph.union(first, second))
+      → edge ∈ Graph.edges(whole)
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(Graph.union(first, second));
+           edge ∈ Graph.edges(first) ∨ edge ∈ Graph.edges(second)
+               by Graph.union.edge_invert;
+           done by cases {
+             case edge ∈ Graph.edges(first): done by firstEdges
+             case edge ∈ Graph.edges(second): done by secondEdges
+           } };
+  done
+}

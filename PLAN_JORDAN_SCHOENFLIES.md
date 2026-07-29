@@ -546,7 +546,17 @@ lemma finally pays: three leaves contribute one apiece, every other
 vertex two plus what it carries above two, and the totals leave exactly
 one degree to carry.
 
-**Still to build.** H5
+**H5 IS DONE** — `Graph.IsTwoConnected.grows_by_ear`, over
+`Graph.IsTwoConnected.ear_exists`. It needed neither components nor a
+shortest path: the ear is found by walking out of the subgraph, taking
+the edge where the walk first leaves it (`Graph.IsWalk.crossing`), and
+walking back to a DIFFERENT vertex of the subgraph in the big graph minus
+that edge's inner end — which is connected because the big graph is
+2-connected. The real prerequisite turned out to be that nothing had ever
+CONSTRUCTED a path graph; `Graph.pathGraphOf` does, over the walk's
+vertices as an ordered list.
+
+**Was still to build.** H5
 (`lem:relative-ear`), which wants the components of `G` minus a subgraph's
 vertices, and a shortest path through one of them — neither of which
 exists yet, and both of which are real work: "component" needs a

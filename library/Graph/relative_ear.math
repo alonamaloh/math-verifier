@@ -1,0 +1,266 @@
+-- Graph/relative_ear.math
+--
+-- H5 of PLAN_JORDAN_SCHOENFLIES.md: a 2-connected subgraph of a
+-- 2-connected graph that is not all of it grows by an ear.
+--
+-- The ear is found, not chosen: if the subgraph already has every vertex
+-- then a missing edge joins two of them and is an ear by itself.
+-- Otherwise some vertex is outside, a walk to it crosses the boundary
+-- along an edge, and deleting that edge's inner end leaves the big graph
+-- connected — so the outer end walks back to a DIFFERENT vertex of the
+-- subgraph without passing through the first. That walk, with the
+-- crossing edge in front, is the ear.
+
+module Graph.relative_ear
+
+import Logic.basics
+import Logic.exists
+import Logic.excluded_middle
+import Logic.product
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.add_order
+import Lists.list
+import Lists.length
+import Lists.distinct
+import Lists.remove
+import Graph.basics
+import Graph.walk
+import Graph.path
+import Graph.connected
+import Graph.deletion
+import Graph.vertex_deletion
+import Graph.pathgraph
+import Graph.union
+import Graph.twoconnected
+import Graph.ear
+
+convention V : Type(0)
+convention E : Type(0)
+convention ends : E → Pair(V, V)
+
+theorem Graph.IsTwoConnected.ear_exists (graph part : Graph(V, E, ends))
+        (graphWellFormed : Graph.IsWellFormed(graph))
+        (partWellFormed : Graph.IsWellFormed(part))
+        (twoConnected : Graph.IsTwoConnected(graph))
+        (partTwoConnected : Graph.IsTwoConnected(part))
+        (isSubgraph : Graph.IsSubgraph(part, graph))
+        (proper : (∃ (vertex : V). vertex ∈ Graph.vertices(graph)
+                       ∧ ¬(vertex ∈ Graph.vertices(part)))
+                  ∨ (∃ (edge : E). edge ∈ Graph.edges(graph)
+                       ∧ ¬(edge ∈ Graph.edges(part))))
+        : ∃ (nearEnd farEnd : V). ∃ (earEdges : List(E)). ∃ (newEdge : E).
+            Graph.IsPath(graph, nearEnd, earEdges, farEnd)
+            ∧ ¬(nearEnd = farEnd)
+            ∧ nearEnd ∈ Graph.vertices(part)
+            ∧ farEnd ∈ Graph.vertices(part)
+            ∧ newEdge ∈ earEdges
+            ∧ ¬(newEdge ∈ Graph.edges(part)) := {
+  Graph.IsConnected(graph) by Graph.IsTwoConnected.connected;
+  Graph.IsConnected(part) by Graph.IsTwoConnected.connected;
+  3 ≤ Graph.order(part);
+  ∀ (vertex : V). vertex ∈ Graph.vertices(part) → vertex ∈ Graph.vertices(graph)
+      as partVertices;
+  List.Distinct(V, Graph.vertices(part)) by Graph.IsWellFormed.vertices_distinct;
+
+  done by cases {
+    case ∃ (vertex : V). vertex ∈ Graph.vertices(graph)
+             ∧ ¬(vertex ∈ Graph.vertices(part)) as someOutside: {
+        choose outside such that outside ∈ Graph.vertices(graph)
+            ∧ ¬(outside ∈ Graph.vertices(part)) from someOutside;
+        outside ∈ Graph.vertices(graph);
+        ¬(outside ∈ Graph.vertices(part));
+
+        -- A walk from the subgraph out to it crosses the boundary.
+        ∃ (vertex : V). vertex ∈ Graph.vertices(part);
+        choose anchor such that anchor ∈ Graph.vertices(part);
+        anchor ∈ Graph.vertices(graph) by partVertices;
+        Graph.Reaches(graph, anchor, outside) by Graph.IsConnected.reaches;
+        choose route such that Graph.IsWalk(graph, anchor, route, outside);
+        ∃ (edge : E). ∃ (u w : V). edge ∈ route
+            ∧ Graph.Joins(graph, edge, u, w)
+            ∧ u ∈ Graph.vertices(part) ∧ ¬(w ∈ Graph.vertices(part))
+            by Graph.IsWalk.crossing(region := Graph.vertices(part));
+        choose crossingEdge, nearEnd, outerEnd such that
+            crossingEdge ∈ route
+            ∧ Graph.Joins(graph, crossingEdge, nearEnd, outerEnd)
+            ∧ nearEnd ∈ Graph.vertices(part)
+            ∧ ¬(outerEnd ∈ Graph.vertices(part));
+        crossingEdge ∈ route;
+        Graph.Joins(graph, crossingEdge, nearEnd, outerEnd);
+        nearEnd ∈ Graph.vertices(part);
+        ¬(outerEnd ∈ Graph.vertices(part));
+        crossingEdge ∈ Graph.edges(graph) by Graph.IsWalk.edge_is_edge;
+        nearEnd ∈ Graph.vertices(graph) by partVertices;
+        outerEnd ∈ Graph.vertices(graph)
+            by Graph.IsWellFormed.other_end_is_vertex;
+        ¬(nearEnd = outerEnd) by Graph.IsWellFormed.no_loop;
+
+        -- The subgraph has a second vertex to come back to.
+        length(Graph.vertices(part)) = 1 + length(Graph.vertices(part) ∖ nearEnd)
+            by List.length_remove_member;
+        (1 : ℕ) + 1
+           ≤ 3
+           ≤ Graph.order(part)
+           = length(Graph.vertices(part))
+           = 1 + length(Graph.vertices(part) ∖ nearEnd);
+        1 ≤ length(Graph.vertices(part) ∖ nearEnd) by Natural.add_left_le_cancel;
+        choose farEnd such that farEnd ∈ Graph.vertices(part) ∖ nearEnd
+            from List.member_of_positive_length;
+        ¬(farEnd = nearEnd) by List.remove_member_ne;
+        farEnd ∈ Graph.vertices(part) by List.remove_member_subset;
+        farEnd ∈ Graph.vertices(graph) by partVertices;
+
+        -- Deleting the near end leaves the big graph connected, so the
+        -- outer end walks back to the far end without meeting it.
+        Graph.IsConnected(Graph.deleteVertex(graph, nearEnd))
+            by Graph.IsTwoConnected.survives_deletion;
+        Graph.IsWellFormed(Graph.deleteVertex(graph, nearEnd))
+            by Graph.deleteVertex.IsWellFormed;
+        ¬(outerEnd = nearEnd) by Equality.not_equal_symmetric;
+        outerEnd ∈ Graph.vertices(Graph.deleteVertex(graph, nearEnd))
+            by Graph.deleteVertex.keeps_vertex;
+        farEnd ∈ Graph.vertices(Graph.deleteVertex(graph, nearEnd))
+            by Graph.deleteVertex.keeps_vertex;
+        Graph.Reaches(Graph.deleteVertex(graph, nearEnd), outerEnd, farEnd)
+            by Graph.IsConnected.reaches;
+        choose detour such that
+            Graph.IsPath(Graph.deleteVertex(graph, nearEnd), outerEnd, detour, farEnd)
+            from Graph.Reaches.path;
+        Graph.IsWalk(Graph.deleteVertex(graph, nearEnd), outerEnd, detour, farEnd)
+            by Graph.IsPath.walk;
+        Graph.IsSubgraph(Graph.deleteVertex(graph, nearEnd), graph)
+            by Graph.deleteVertex.IsSubgraph;
+        Graph.IsPath(graph, outerEnd, detour, farEnd) by Graph.IsPath.in_supergraph;
+        ¬(nearEnd ∈ Graph.walkVertices(graph, outerEnd, detour))
+            by { suppose nearEnd ∈ Graph.walkVertices(graph, outerEnd, detour);
+                 nearEnd ∈ Graph.walkVertices(Graph.deleteVertex(graph, nearEnd),
+                                              outerEnd, detour);
+                 nearEnd ∈ Graph.vertices(Graph.deleteVertex(graph, nearEnd))
+                     by Graph.IsWalk.visits_vertices;
+                 ¬(nearEnd = nearEnd) by Graph.deleteVertex.drops;
+                 done };
+        Graph.IsPath(graph, nearEnd, List.prepend(E, crossingEdge, detour), farEnd)
+            by Graph.IsPath.extend;
+
+        -- And the crossing edge is one the subgraph does not have.
+        ¬(crossingEdge ∈ Graph.edges(part))
+            by { suppose crossingEdge ∈ Graph.edges(part);
+                 Graph.Joins(part, crossingEdge, nearEnd, outerEnd);
+                 outerEnd ∈ Graph.vertices(part)
+                     by Graph.IsWellFormed.other_end_is_vertex;
+                 done };
+        crossingEdge ∈ List.prepend(E, crossingEdge, detour);
+        ¬(nearEnd = farEnd) by Equality.not_equal_symmetric;
+        witness nearEnd with witness farEnd
+            with witness List.prepend(E, crossingEdge, detour)
+            with witness crossingEdge
+      }
+    otherwise as everyVertexIsInPart: {
+        -- Every vertex is already there, so a missing edge joins two of
+        -- them and is an ear on its own.
+        ∀ (vertex : V). vertex ∈ Graph.vertices(graph)
+            → vertex ∈ Graph.vertices(part)
+            by { take vertex : V;
+                 suppose vertex ∈ Graph.vertices(graph);
+                 suppose ¬(vertex ∈ Graph.vertices(part)) for contradiction;
+                 ∃ (candidate : V). candidate ∈ Graph.vertices(graph)
+                     ∧ ¬(candidate ∈ Graph.vertices(part)) by witness vertex;
+                 done } as everyVertexInPart;
+        ∃ (edge : E). edge ∈ Graph.edges(graph) ∧ ¬(edge ∈ Graph.edges(part))
+            by { done by cases {
+                   case ∃ (vertex : V). vertex ∈ Graph.vertices(graph)
+                            ∧ ¬(vertex ∈ Graph.vertices(part)): done
+                   case ∃ (edge : E). edge ∈ Graph.edges(graph)
+                            ∧ ¬(edge ∈ Graph.edges(part)): done
+                 } } as someMissingEdge;
+        choose newEdge such that newEdge ∈ Graph.edges(graph)
+            ∧ ¬(newEdge ∈ Graph.edges(part)) from someMissingEdge;
+        newEdge ∈ Graph.edges(graph);
+        ¬(newEdge ∈ Graph.edges(part));
+        ∃ (x y : V). Graph.Joins(graph, newEdge, x, y) by Graph.edge_has_ends;
+        choose nearEnd, farEnd such that Graph.Joins(graph, newEdge, nearEnd, farEnd);
+        nearEnd ∈ Graph.vertices(graph) by Graph.IsWellFormed.end_is_vertex;
+        farEnd ∈ Graph.vertices(graph) by Graph.IsWellFormed.other_end_is_vertex;
+        ¬(nearEnd = farEnd) by Graph.IsWellFormed.no_loop;
+        nearEnd ∈ Graph.vertices(part) by everyVertexInPart;
+        farEnd ∈ Graph.vertices(part) by everyVertexInPart;
+        Graph.IsPath(graph, nearEnd, List.prepend(E, newEdge, List.empty(E)), farEnd)
+            by Graph.IsPath.single;
+        newEdge ∈ List.prepend(E, newEdge, List.empty(E));
+        witness nearEnd with witness farEnd
+            with witness List.prepend(E, newEdge, List.empty(E))
+            with witness newEdge
+      }
+  }
+}
+
+-- H5. The ear, added: a 2-connected subgraph that is not all of the graph
+-- grows to a bigger 2-connected subgraph.
+theorem Graph.IsTwoConnected.grows_by_ear (graph part : Graph(V, E, ends))
+        (graphWellFormed : Graph.IsWellFormed(graph))
+        (partWellFormed : Graph.IsWellFormed(part))
+        (twoConnected : Graph.IsTwoConnected(graph))
+        (partTwoConnected : Graph.IsTwoConnected(part))
+        (isSubgraph : Graph.IsSubgraph(part, graph))
+        (proper : (∃ (vertex : V). vertex ∈ Graph.vertices(graph)
+                       ∧ ¬(vertex ∈ Graph.vertices(part)))
+                  ∨ (∃ (edge : E). edge ∈ Graph.edges(graph)
+                       ∧ ¬(edge ∈ Graph.edges(part))))
+        : ∃ (bigger : Graph(V, E, ends)).
+            Graph.IsTwoConnected(bigger)
+            ∧ Graph.IsWellFormed(bigger)
+            ∧ Graph.IsSubgraph(part, bigger)
+            ∧ Graph.IsSubgraph(bigger, graph)
+            ∧ (∃ (edge : E). edge ∈ Graph.edges(bigger)
+                 ∧ ¬(edge ∈ Graph.edges(part))) := {
+  ∀ (vertex : V). vertex ∈ Graph.vertices(part) → vertex ∈ Graph.vertices(graph)
+      as partVertices;
+  ∃ (nearEnd farEnd : V). ∃ (earEdges : List(E)). ∃ (newEdge : E).
+      Graph.IsPath(graph, nearEnd, earEdges, farEnd)
+      ∧ ¬(nearEnd = farEnd)
+      ∧ nearEnd ∈ Graph.vertices(part)
+      ∧ farEnd ∈ Graph.vertices(part)
+      ∧ newEdge ∈ earEdges
+      ∧ ¬(newEdge ∈ Graph.edges(part))
+      by Graph.IsTwoConnected.ear_exists;
+  choose nearEnd, farEnd, earEdges, newEdge such that
+      Graph.IsPath(graph, nearEnd, earEdges, farEnd)
+      ∧ ¬(nearEnd = farEnd)
+      ∧ nearEnd ∈ Graph.vertices(part)
+      ∧ farEnd ∈ Graph.vertices(part)
+      ∧ newEdge ∈ earEdges
+      ∧ ¬(newEdge ∈ Graph.edges(part));
+  nearEnd ∈ Graph.vertices(graph) by partVertices;
+
+  -- The path, presented as a graph, is the ear.
+  Graph.IsPathGraph(Graph.pathGraphOf(graph, nearEnd, earEdges), nearEnd, farEnd)
+      by Graph.pathGraphOf.IsPathGraph;
+  Graph.IsWellFormed(Graph.pathGraphOf(graph, nearEnd, earEdges))
+      by Graph.pathGraphOf.IsWellFormed;
+  Graph.IsSubgraph(Graph.pathGraphOf(graph, nearEnd, earEdges), graph)
+      by Graph.pathGraphOf.IsSubgraph;
+  Graph.IsTwoConnected(
+      Graph.union(part, Graph.pathGraphOf(graph, nearEnd, earEdges)))
+      by Graph.IsTwoConnected.ear;
+  Graph.IsWellFormed(
+      Graph.union(part, Graph.pathGraphOf(graph, nearEnd, earEdges)))
+      by Graph.union.IsWellFormed;
+  Graph.IsSubgraph(part,
+      Graph.union(part, Graph.pathGraphOf(graph, nearEnd, earEdges)))
+      by Graph.union.IsSubgraph_left;
+  Graph.IsSubgraph(
+      Graph.union(part, Graph.pathGraphOf(graph, nearEnd, earEdges)), graph)
+      by Graph.union.IsSubgraph_into;
+
+  -- And it brings an edge the subgraph did not have.
+  newEdge ∈ Graph.edges(Graph.pathGraphOf(graph, nearEnd, earEdges));
+  newEdge ∈ Graph.edges(
+      Graph.union(part, Graph.pathGraphOf(graph, nearEnd, earEdges)))
+      by Graph.union.edge_right;
+  ∃ (edge : E). edge ∈ Graph.edges(
+          Graph.union(part, Graph.pathGraphOf(graph, nearEnd, earEdges)))
+      ∧ ¬(edge ∈ Graph.edges(part)) by witness newEdge;
+  witness Graph.union(part, Graph.pathGraphOf(graph, nearEnd, earEdges))
+}

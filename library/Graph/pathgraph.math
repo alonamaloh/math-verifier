@@ -381,3 +381,29 @@ theorem Graph.pathGraphOf.IsWellFormed (graph : Graph(V, E, ends))
            done };
   done
 }
+
+-- And it sits inside the graph it was cut from.
+theorem Graph.pathGraphOf.IsSubgraph (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph))
+        (source target : V) (edgeList : List(E))
+        (path : Graph.IsPath(graph, source, edgeList, target))
+        (sourceIsVertex : source ∈ Graph.vertices(graph))
+        : Graph.IsSubgraph(Graph.pathGraphOf(graph, source, edgeList), graph) := {
+  Graph.IsWalk(graph, source, edgeList, target) by Graph.IsPath.walk;
+  ∀ (vertex : V).
+      vertex ∈ Graph.vertices(Graph.pathGraphOf(graph, source, edgeList))
+      → vertex ∈ Graph.vertices(graph)
+      by { take vertex : V;
+           suppose vertex ∈ Graph.vertices(Graph.pathGraphOf(graph, source, edgeList));
+           vertex ∈ Graph.walkVertexList(graph, source, edgeList);
+           vertex ∈ Graph.walkVertices(graph, source, edgeList)
+               by Graph.walkVertexList.visits;
+           done by Graph.IsWalk.visits_vertices };
+  ∀ (edge : E). edge ∈ Graph.edges(Graph.pathGraphOf(graph, source, edgeList))
+      → edge ∈ Graph.edges(graph)
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(Graph.pathGraphOf(graph, source, edgeList));
+           edge ∈ edgeList;
+           done by Graph.IsWalk.edge_is_edge };
+  done
+}

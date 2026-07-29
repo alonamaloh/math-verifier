@@ -98,6 +98,12 @@ graph although they only read `ends`.
   well-formed graph really is a path graph, ready to hand to
   `Graph.IsTwoConnected.ear`; `Graph.IsPath.vertexList_distinct` is what
   makes it well-formed, and `Graph.IsPath.transfer` moves the path down
+- `Graph.IsWalk.crossing` — a walk from inside a set of vertices to
+  outside it crosses the boundary along one of its edges
+- **`Graph.IsTwoConnected.grows_by_ear`** (H5, in
+  [relative_ear.math](relative_ear.math)) — a 2-connected subgraph that is
+  not all of a 2-connected graph grows to a bigger one by adding an ear;
+  `Graph.IsTwoConnected.ear_exists` finds the ear as a path
 - `Graph.IsPath.distinct_edges` and `Graph.IsPath.length_le_size` — a path
   takes no edge twice, so it is no longer than the graph it runs in
 - `Graph.longest_path` — and so a graph over an inhabited vertex type runs
