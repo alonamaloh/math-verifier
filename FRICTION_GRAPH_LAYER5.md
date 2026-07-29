@@ -202,7 +202,7 @@ existential is a common enough shape that reading applied types would pay.
 
 ## G6 — naming an argument can BREAK a citation that works bare
 
-**Root cause — found; fix written and gated, awaiting the owner's call.**
+**FIXED** (`elaborateArgumentAt` in `elaborator/inference.cpp`).
 An argument is elaborated AGAINST its Pi domain, and a domain that still
 carries the call's own unsolved holes cannot check anything: elaborating
 `Graph.union(first, second)` against `Graph(V, E, ?ends)` pushes `?ends`
@@ -216,21 +216,19 @@ all three holes at once.
 
 So the shape is exactly "the named argument's domain still mentions
 unsolved holes". `halves(cut := cut)` and `Reaches.transitive(middle := w)`
-work because their domain is `V`, which the goal pins first;
-`drops(graph := …)` and `IsPath.reverse(edgeList := …)` fail because
+worked because their domain is `V`, which the goal pins first;
+`drops(graph := …)` and `IsPath.reverse(edgeList := …)` failed because
 `Graph(?V, ?E, ?ends)` and `List(?E)` do not.
 
-**Candidate fix** (one hunk in `elaborateArgumentAt`,
-`elaborator/inference.cpp`): when the domain still mentions this call's
-metavariables, infer the argument bottom-up and let the existing
-unification read the holes off its own type; fall back to the checked
-elaboration when bottom-up fails, so an argument that genuinely needs its
-expected type (a bare numeral) is unaffected. Both reported spellings then
-verify, `library` + `tests` + `error-tests` are unchanged (87/0), and the
-one deliberately-wrong probe — `drops(graph := first)`, where no
-`IsWellFormed(first)` is in scope — now reports `could not infer hole(s) at
-positions 4 7` instead of leaking `unbound internal variable:
-_hole_2_Graph.deleteVertex.drops`.
+**The fix.** When the domain still mentions this call's metavariables,
+infer the argument bottom-up and let the existing unification read the
+holes off its own type; the checked elaboration stays as the fallback, so
+an argument that genuinely needs its expected type (a bare numeral) is
+unaffected. Both reported spellings then verify, `library` + `tests` +
+`error-tests` are unchanged (87/0), and the one deliberately-wrong probe —
+`drops(graph := first)`, where no `IsWellFormed(first)` is in scope — now
+reports `could not infer hole(s) at positions 4 7` instead of leaking
+`unbound internal variable: _hole_2_Graph.deleteVertex.drops`.
 
 **Left standing.** That leak is a separate defect: when the call fails, a
 fallback path hands the kernel a term with the elaborator's internal hole
