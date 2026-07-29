@@ -190,6 +190,32 @@ theorem List.sumOver_indicator (A : Type(0)) (holds : A → Proposition)
       }
   }
 
+-- One more member to filter: it either survives or it does not.
+theorem List.filter_length_prepend (A : Type(0)) (holds : A → Proposition)
+        (head : A) (tail : List(A))
+        : length(List.filter(holds, List.prepend(A, head, tail)))
+          = (if holds(head) then 1 else 0 : ℕ) + length(List.filter(holds, tail)) :=
+  done by cases {
+    case holds(head): {
+        (if holds(head) then 1 else 0 : ℕ) = 1 by Logic.if_positive;
+        List.filter(holds, List.prepend(A, head, tail))
+           = List.prepend(A, head, List.filter(holds, tail))
+           by List.filter_prepend_positive;
+        length(List.filter(holds, List.prepend(A, head, tail)))
+           = length(List.prepend(A, head, List.filter(holds, tail)))
+           = 1 + length(List.filter(holds, tail))
+      }
+    otherwise: {
+        (if holds(head) then 1 else 0 : ℕ) = 0 by Logic.if_negative;
+        List.filter(holds, List.prepend(A, head, tail))
+           = List.filter(holds, tail)
+           by List.filter_prepend_negative;
+        length(List.filter(holds, List.prepend(A, head, tail)))
+           = length(List.filter(holds, tail))
+           = 0 + length(List.filter(holds, tail))
+      }
+  }
+
 -- Exactly two members satisfy a condition that two distinct members
 -- satisfy and no other member does. Both bounds are the same counting
 -- lemma, read in the two directions.

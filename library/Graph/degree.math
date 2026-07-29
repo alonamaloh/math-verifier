@@ -1,0 +1,161 @@
+-- Graph/degree.math
+--
+-- The degree sum. Layer 5 of PLAN_JORDAN_SCHOENFLIES.md.
+--
+-- Adding up the degrees of all the vertices counts each edge twice, once
+-- at each of its two ends: `Σ deg v = 2·|E|`. The proof is the double
+-- count spelled as an induction on the edge list — one more edge raises
+-- the degree of exactly two vertices by one, and "exactly two" is the
+-- whole content (`List.filter_length_two` over the vertex list, whose
+-- repetition-freeness is what makes each end count once).
+
+module Graph.degree
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+import Natural.classical_decidable
+import Lists.list
+import Lists.length
+import Lists.filter
+import Lists.distinct
+import Lists.sum
+import Graph.basics
+
+convention V : Type(0)
+convention E : Type(0)
+convention ends : E → Pair(V, V)
+
+-- How many of `edgeList`'s edges meet `vertex`. At the graph's own edge
+-- list this is the degree.
+definition Graph.incidenceCount (graph : Graph(V, E, ends)) (edgeList : List(E))
+        (vertex : V) : ℕ :=
+  length(List.filter((edge : E) ↦ Graph.Incident(graph, edge, vertex), edgeList))
+
+theorem Graph.incidenceCount_at_edges (graph : Graph(V, E, ends)) (vertex : V)
+        : Graph.incidenceCount(graph, Graph.edges(graph), vertex)
+          = Graph.degree(graph, vertex) :=
+  done
+
+-- An edge of the graph meets exactly two of its vertices — its two ends,
+-- which a well-formed graph keeps distinct.
+theorem Graph.incident_vertex_count (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph)) (edge : E)
+        (isEdge : edge ∈ Graph.edges(graph))
+        : List.sumOver(
+              (vertex : V) ↦ (if Graph.Incident(graph, edge, vertex) then 1 else 0 : ℕ),
+              Graph.vertices(graph))
+          = 2 := {
+  ∃ (x y : V). Graph.Joins(graph, edge, x, y) by Graph.edge_has_ends;
+  choose u, v such that Graph.Joins(graph, edge, u, v);
+  u ∈ Graph.vertices(graph) by Graph.IsWellFormed.end_is_vertex;
+  v ∈ Graph.vertices(graph) by Graph.IsWellFormed.other_end_is_vertex;
+  ¬(u = v) by Graph.IsWellFormed.no_loop;
+  Graph.Incident(graph, edge, u) by Graph.Joins.incident_source;
+  Graph.Incident(graph, edge, v) by Graph.Joins.incident_target;
+  List.Distinct(V, Graph.vertices(graph));
+  ∀ (vertex : V). vertex ∈ Graph.vertices(graph)
+      → Graph.Incident(graph, edge, vertex) → vertex = u ∨ vertex = v
+      by { take vertex : V;
+           suppose vertex ∈ Graph.vertices(graph);
+           suppose Graph.Incident(graph, edge, vertex);
+           done by Graph.Incident.is_end };
+  List.sumOver(
+      (vertex : V) ↦ (if Graph.Incident(graph, edge, vertex) then 1 else 0 : ℕ),
+      Graph.vertices(graph))
+     = length(List.filter((vertex : V) ↦ Graph.Incident(graph, edge, vertex),
+                          Graph.vertices(graph)))
+         by List.sumOver_indicator
+     = 2 by List.filter_length_two
+}
+
+-- The double count, over any sublist of the graph's edges.
+theorem Graph.incidence_sum (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph)) (edgeList : List(E))
+        (areEdges : ∀ (edge : E). edge ∈ edgeList → edge ∈ Graph.edges(graph))
+        : List.sumOver((vertex : V) ↦ Graph.incidenceCount(graph, edgeList, vertex),
+                       Graph.vertices(graph))
+          = 2 * length(edgeList) :=
+  by induction on edgeList with IH {
+    case edgeList = List.empty: {
+        ∀ (vertex : V). vertex ∈ Graph.vertices(graph)
+            → Graph.incidenceCount(graph, List.empty(E), vertex) = 0
+            by { take vertex : V;
+                 suppose vertex ∈ Graph.vertices(graph);
+                 Graph.incidenceCount(graph, List.empty(E), vertex)
+                    = length(List.filter(
+                          (edge : E) ↦ Graph.Incident(graph, edge, vertex),
+                          List.empty(E)))
+                    = length(List.empty(E))
+                    = 0
+               };
+        List.sumOver((vertex : V) ↦ Graph.incidenceCount(graph, List.empty(E), vertex),
+                     Graph.vertices(graph))
+           = 0 by List.sumOver_zero
+           = 2 * 0
+           = 2 * length(List.empty(E))
+      }
+    case edgeList = List.prepend(head, tail) for some head, tail: {
+        head ∈ List.prepend(E, head, tail);
+        head ∈ Graph.edges(graph);
+        ∀ (edge : E). edge ∈ tail → edge ∈ Graph.edges(graph)
+            by { take edge : E;
+                 suppose edge ∈ tail;
+                 edge ∈ List.prepend(E, head, tail);
+                 done };
+        List.sumOver((vertex : V) ↦ Graph.incidenceCount(graph, tail, vertex),
+                     Graph.vertices(graph))
+           = 2 * length(tail) by IH;
+
+        ∀ (vertex : V). vertex ∈ Graph.vertices(graph)
+            → Graph.incidenceCount(graph, List.prepend(E, head, tail), vertex)
+              = (if Graph.Incident(graph, head, vertex) then 1 else 0 : ℕ)
+                + Graph.incidenceCount(graph, tail, vertex)
+            by { take vertex : V;
+                 suppose vertex ∈ Graph.vertices(graph);
+                 done by List.filter_length_prepend };
+        List.sumOver(
+            (vertex : V) ↦ Graph.incidenceCount(graph, List.prepend(E, head, tail), vertex),
+            Graph.vertices(graph))
+           = List.sumOver(
+                 (vertex : V) ↦ (if Graph.Incident(graph, head, vertex) then 1 else 0 : ℕ)
+                     + Graph.incidenceCount(graph, tail, vertex),
+                 Graph.vertices(graph))
+               by List.sumOver_congruence
+           = List.sumOver(
+                 (vertex : V) ↦ (if Graph.Incident(graph, head, vertex) then 1 else 0 : ℕ),
+                 Graph.vertices(graph))
+             + List.sumOver((vertex : V) ↦ Graph.incidenceCount(graph, tail, vertex),
+                            Graph.vertices(graph))
+               by List.sumOver_add
+           = 2 + List.sumOver((vertex : V) ↦ Graph.incidenceCount(graph, tail, vertex),
+                              Graph.vertices(graph))
+               by Graph.incident_vertex_count
+           = 2 + 2 * length(tail)
+           = 2 * (1 + length(tail))
+           = 2 * length(List.prepend(E, head, tail))
+      }
+  }
+
+-- The handshake lemma: the degrees of a well-formed graph's vertices add
+-- up to twice its number of edges.
+theorem Graph.degree_sum (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph))
+        : List.sumOver((vertex : V) ↦ Graph.degree(graph, vertex),
+                       Graph.vertices(graph))
+          = 2 * Graph.size(graph) := {
+  ∀ (edge : E). edge ∈ Graph.edges(graph) → edge ∈ Graph.edges(graph)
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           done };
+  List.sumOver((vertex : V) ↦ Graph.degree(graph, vertex), Graph.vertices(graph))
+     = List.sumOver(
+           (vertex : V) ↦ Graph.incidenceCount(graph, Graph.edges(graph), vertex),
+           Graph.vertices(graph))
+     = 2 * length(Graph.edges(graph))       by Graph.incidence_sum
+     = 2 * Graph.size(graph)
+}

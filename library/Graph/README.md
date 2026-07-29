@@ -44,6 +44,8 @@ graph although they only read `ends`.
 - `Graph.IsAcyclic`, `Graph.IsTree` and `Graph.IsLeaf` in
   [tree.math](tree.math) — a tree is connected with no edge on a cycle,
   and a leaf is a vertex of degree one
+- `Graph.incidenceCount` in [degree.math](degree.math) — how many of an
+  edge list's edges meet a vertex; at the graph's own edges, the degree
 - `Graph.deleteVertex` and `Graph.IsCutVertex` in
   [vertex_deletion.math](vertex_deletion.math)
 - `Graph.IsTwoConnected` in [twoconnected.math](twoconnected.math) — the
@@ -98,6 +100,9 @@ graph although they only read `ends`.
   for all, so two of its edges there are the same edge
 - **`Graph.IsAcyclic.longest_path_source_is_leaf`** — and so a non-isolated
   end of a longest path in an acyclic graph has degree one
+- **`Graph.degree_sum`** — the handshake lemma: the degrees of a
+  well-formed graph's vertices add up to twice its number of edges, by
+  the double count `Graph.incidence_sum` over the edge list
 - `Graph.IsPath.reverse` — a path runs backwards over the same vertices;
   `Graph.IsPath.extend_at_target` is what grows one at the far end
 - `Graph.IsPathGraph.reaches_an_end` — whatever vertex is deleted, every
