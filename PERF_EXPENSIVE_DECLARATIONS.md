@@ -275,10 +275,22 @@ Measured on `Metric/connected.math`, where the bridge is 74 invocations,
   all** (15.0 s / 15.0 s) — the losing searches each stay under the cap, so
   nothing is cut.
 
-There is no single step-count cap that both keeps the library green and cuts
-the cost: the searches that must be allowed and the searches that waste time
-are not separated by total step count. A different discriminator is needed —
-or the congruence-closure rewrite above.
+- **Bounding the NUMBER of recursive proves per bridge invocation** (the cheap
+  discriminator, aimed at exactly the waste — equations whose endpoint does not
+  occur are already free, so the cost is entirely equations that rewrite and
+  then fail): caps of 1 / 2 / 3 break **4 / 6 / 6** library files, and a cap of
+  6 keeps them green while giving **no speedup at all** (14.68 s).
+
+Four discriminators, all budgets — kernel steps, passes, prove counts — and
+all fail identically. That is the finding:
+
+> The searches that must be allowed and the searches that waste time are **not
+> separated by how much they cost.** A bound cheap enough to cut the waste
+> removes wins; a bound loose enough to keep the wins cuts nothing.
+
+Tuning is therefore ruled out for this rung. The design options that remain —
+a restricted `by … using [lemmas]`, a directed non-searching rewrite, and
+congruence closure — are in `PLAN_CHEAP_TACTICS.md`.
 
 **Kept from the attempt:** `CheapProveWindow` (`internal.hpp`), a correct
 self-contained low-effort window. `RedundancyBudgetGuard` only lowers the
