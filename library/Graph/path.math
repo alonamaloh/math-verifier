@@ -44,7 +44,7 @@ inductive Graph.IsPathOver (V : Type(0)) (E : Type(0)) (ends : E → Pair(V, V))
         → edge ∈ Graph.edges(graph)
         → Graph.Joins(graph, edge, source, waypoint)
         → Graph.IsPathOver(V, E, ends, graph, waypoint, rest, target)
-        → ¬(source ∈ Graph.walkVertices(graph, waypoint, rest))
+        → source ∉ Graph.walkVertices(graph, waypoint, rest)
         → Graph.IsPathOver(V, E, ends, graph, source, List.prepend(E, edge, rest), target)
 
 definition Graph.IsPath (graph : Graph(V, E, ends)) (source : V) (edgeList : List(E))
@@ -60,7 +60,7 @@ theorem Graph.IsPath.extend (graph : Graph(V, E, ends))
         (isEdge : edge ∈ Graph.edges(graph))
         (joins : Graph.Joins(graph, edge, source, waypoint))
         (restPath : Graph.IsPath(graph, waypoint, rest, target))
-        (fresh : ¬(source ∈ Graph.walkVertices(graph, waypoint, rest)))
+        (fresh : source ∉ Graph.walkVertices(graph, waypoint, rest))
         : Graph.IsPath(graph, source, List.prepend(E, edge, rest), target) :=
   Graph.IsPathOver.step(V, E, ends, graph, source, waypoint, target, edge, rest,
                         isEdge, joins, restPath, fresh)
@@ -94,7 +94,7 @@ theorem Graph.IsPath.in_supergraph (part whole : Graph(V, E, ends))
         Graph.IsPath(whole, waypoint, rest, stepTarget) by IH;
         edge ∈ Graph.edges(whole) by partEdges;
         Graph.Joins(whole, edge, stepSource, waypoint);
-        ¬(stepSource ∈ Graph.walkVertices(whole, waypoint, rest));
+        stepSource ∉ Graph.walkVertices(whole, waypoint, rest);
         done by Graph.IsPath.extend
       }
   }
@@ -135,7 +135,7 @@ theorem Graph.IsPath.from_visited (graph : Graph(V, E, ends)) (source target : V
               witness List.empty(E)
             }
           case vertex ∈ Graph.coveredVertices(graph, List.empty(E)): {
-              ¬(vertex ∈ Graph.coveredVertices(graph, List.empty(E)))
+              vertex ∉ Graph.coveredVertices(graph, List.empty(E))
                   by Graph.coveredVertices.no_edges;
               done
             }
@@ -206,7 +206,7 @@ theorem Graph.IsWalk.contains_path (graph : Graph(V, E, ends)) (source target : 
               witness tailEdges
             }
           otherwise: {
-              ¬(stepSource ∈ Graph.walkVertices(graph, waypoint, pathEdges));
+              stepSource ∉ Graph.walkVertices(graph, waypoint, pathEdges);
               Graph.IsPath(graph, stepSource, List.prepend(E, edge, pathEdges), stepTarget)
                   by Graph.IsPath.extend;
               List.prepend(E, edge, pathEdges) ⊆ List.prepend(E, edge, rest)
@@ -238,7 +238,7 @@ theorem Graph.IsPath.split (graph : Graph(V, E, ends)) (source target : V)
             ∧ Graph.IsPath(graph, source, prefixEdges, vertex)
             ∧ Graph.IsPath(graph, vertex, suffixEdges, target)
             ∧ (vertex = source
-                 ∨ ¬(source ∈ Graph.walkVertices(graph, vertex, suffixEdges))) :=
+                 ∨ source ∉ Graph.walkVertices(graph, vertex, suffixEdges)) :=
   by induction on path with IH {
     case Graph.IsPathOver.arrived(endpoint): {
         done by cases {
@@ -250,11 +250,11 @@ theorem Graph.IsPath.split (graph : Graph(V, E, ends)) (source target : V)
                   by substituting (vertex = endpoint);
               List.empty(E) = List.append(List.empty(E), List.empty(E));
               vertex = endpoint
-                  ∨ ¬(endpoint ∈ Graph.walkVertices(graph, vertex, List.empty(E)));
+                  ∨ endpoint ∉ Graph.walkVertices(graph, vertex, List.empty(E));
               witness List.empty(E) with witness List.empty(E) with done
             }
           case vertex ∈ Graph.coveredVertices(graph, List.empty(E)): {
-              ¬(vertex ∈ Graph.coveredVertices(graph, List.empty(E)))
+              vertex ∉ Graph.coveredVertices(graph, List.empty(E))
                   by Graph.coveredVertices.no_edges;
               done
             }
@@ -277,8 +277,8 @@ theorem Graph.IsPath.split (graph : Graph(V, E, ends)) (source target : V)
               List.prepend(E, edge, rest)
                  = List.append(List.empty(E), List.prepend(E, edge, rest));
               vertex = stepSource
-                  ∨ ¬(stepSource ∈ Graph.walkVertices(graph, vertex,
-                          List.prepend(E, edge, rest)));
+                  ∨ stepSource ∉ Graph.walkVertices(graph, vertex,
+                                     List.prepend(E, edge, rest));
               witness List.empty(E) with witness List.prepend(E, edge, rest)
             }
           case vertex ∈ Graph.walkVertices(graph, waypoint, rest): {
@@ -287,7 +287,7 @@ theorem Graph.IsPath.split (graph : Graph(V, E, ends)) (source target : V)
                   ∧ Graph.IsPath(graph, waypoint, earlyEdges, vertex)
                   ∧ Graph.IsPath(graph, vertex, lateEdges, stepTarget)
                   ∧ (vertex = waypoint
-                       ∨ ¬(waypoint ∈ Graph.walkVertices(graph, vertex, lateEdges)))
+                       ∨ waypoint ∉ Graph.walkVertices(graph, vertex, lateEdges))
                   from IH;
               rest = List.append(earlyEdges, lateEdges) as restSplits;
               Graph.IsPath(graph, waypoint, earlyEdges, vertex);
@@ -297,7 +297,7 @@ theorem Graph.IsPath.split (graph : Graph(V, E, ends)) (source target : V)
               earlyEdges ⊆ List.append(earlyEdges, lateEdges)
                   by List.Includes.append_left;
               earlyEdges ⊆ rest by substituting restSplits;
-              ¬(stepSource ∈ Graph.walkVertices(graph, waypoint, earlyEdges))
+              stepSource ∉ Graph.walkVertices(graph, waypoint, earlyEdges)
                   by { suppose stepSource ∈ Graph.walkVertices(graph, waypoint, earlyEdges);
                        stepSource ∈ Graph.walkVertices(graph, waypoint, rest)
                            by Graph.walkVertices.monotone;
@@ -313,7 +313,7 @@ theorem Graph.IsPath.split (graph : Graph(V, E, ends)) (source target : V)
               lateEdges ⊆ List.append(earlyEdges, lateEdges)
                   by List.Includes.append_right;
               lateEdges ⊆ rest by substituting restSplits;
-              ¬(stepSource ∈ Graph.walkVertices(graph, vertex, lateEdges))
+              stepSource ∉ Graph.walkVertices(graph, vertex, lateEdges)
                   by { suppose stepSource ∈ Graph.walkVertices(graph, vertex, lateEdges);
                        done by cases {
                          case stepSource = vertex: {
@@ -346,7 +346,7 @@ theorem Graph.IsPath.distinct_edges (graph : Graph(V, E, ends)) (source target :
         stepSource, waypoint, stepTarget, edge, rest, isEdge, joins, restPath, fresh): {
         List.Distinct(E, rest) by IH;
         Graph.Incident(graph, edge, stepSource) by Graph.Joins.incident_source;
-        ¬(edge ∈ rest)
+        edge ∉ rest
             by { suppose edge ∈ rest;
                  stepSource ∈ Graph.coveredVertices(graph, rest)
                      by Graph.coveredVertices.of_edge;
@@ -465,7 +465,7 @@ theorem Graph.IsPath.transfer (graph other : Graph(V, E, ends))
         edge ∈ List.prepend(E, edge, rest);
         edge ∈ Graph.edges(other) by edgesSurvive;
         Graph.Joins(other, edge, stepSource, waypoint);
-        ¬(stepSource ∈ Graph.walkVertices(other, waypoint, rest));
+        stepSource ∉ Graph.walkVertices(other, waypoint, rest);
         done by Graph.IsPath.extend
       }
   }
@@ -479,7 +479,7 @@ theorem Graph.IsPath.vertexList_distinct (graph : Graph(V, E, ends))
         : List.Distinct(V, Graph.walkVertexList(graph, source, edgeList)) :=
   by induction on path with IH {
     case Graph.IsPathOver.arrived(endpoint): {
-        ¬(endpoint ∈ List.empty(V)) by List.no_member_empty;
+        endpoint ∉ List.empty(V) by List.no_member_empty;
         List.Distinct(V, List.empty(V)) by List.Distinct.empty;
         List.Distinct(V, List.prepend(V, endpoint, List.empty(V)))
             by List.Distinct.prepend;
@@ -492,7 +492,7 @@ theorem Graph.IsPath.vertexList_distinct (graph : Graph(V, E, ends))
         stepSource ≠ waypoint by Graph.IsWellFormed.no_loop;
         Graph.otherEnd(graph, edge, stepSource) = waypoint
             by Graph.otherEnd.of_joins as arrivesAtWaypoint;
-        ¬(stepSource ∈ Graph.walkVertexList(graph, waypoint, rest))
+        stepSource ∉ Graph.walkVertexList(graph, waypoint, rest)
             by { suppose stepSource ∈ Graph.walkVertexList(graph, waypoint, rest);
                  stepSource ∈ Graph.walkVertices(graph, waypoint, rest)
                      by Graph.walkVertexList.visits;
@@ -515,12 +515,12 @@ theorem Graph.IsPath.single (graph : Graph(V, E, ends)) (edge : E) (u v : V)
         (distinct : u ≠ v)
         : Graph.IsPath(graph, u, List.prepend(E, edge, List.empty(E)), v) := {
   Graph.IsPath(graph, v, List.empty(E), v) by Graph.IsPath.empty;
-  ¬(u ∈ Graph.walkVertices(graph, v, List.empty(E)))
+  u ∉ Graph.walkVertices(graph, v, List.empty(E))
       by { suppose u ∈ Graph.walkVertices(graph, v, List.empty(E));
            done by cases {
              case u = v: done
              case u ∈ Graph.coveredVertices(graph, List.empty(E)): {
-                 ¬(u ∈ Graph.coveredVertices(graph, List.empty(E)))
+                 u ∉ Graph.coveredVertices(graph, List.empty(E))
                      by Graph.coveredVertices.no_edges;
                  done
                }

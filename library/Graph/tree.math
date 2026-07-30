@@ -68,7 +68,7 @@ theorem Graph.IsAcyclic.longest_path_source_edge (graph : Graph(V, E, ends))
         (isEdge : edge ∈ Graph.edges(graph))
         (incident : Graph.Incident(graph, edge, source))
         : edge ∈ edgeList := {
-  suppose ¬(edge ∈ edgeList) for contradiction;
+  suppose edge ∉ edgeList for contradiction;
   choose far such that Graph.Joins(graph, edge, source, far);
   done by cases {
     case far ∈ Graph.walkVertices(graph, source, edgeList): {
@@ -104,7 +104,7 @@ theorem Graph.IsPath.one_edge_at_source (graph : Graph(V, E, ends))
         take first : E;
         take second : E;
         suppose first ∈ List.empty(E);
-        ¬(first ∈ List.empty(E)) by List.no_member_empty;
+        first ∉ List.empty(E) by List.no_member_empty;
         done
       }
     case Graph.IsPathOver.step(
@@ -260,7 +260,7 @@ theorem Graph.IsLeaf.path_avoids (graph : Graph(V, E, ends)) (leaf : V)
         (path : Graph.IsPath(graph, source, edgeList, target))
         (sourceIsNotLeaf : source ≠ leaf)
         (targetIsNotLeaf : target ≠ leaf)
-        : ¬(leaf ∈ Graph.walkVertices(graph, source, edgeList)) :=
+        : leaf ∉ Graph.walkVertices(graph, source, edgeList) :=
   by induction on path with IH {
     case Graph.IsPathOver.arrived(endpoint): {
         suppose leaf ∈ Graph.walkVertices(graph, endpoint, List.empty(E));
@@ -271,7 +271,7 @@ theorem Graph.IsLeaf.path_avoids (graph : Graph(V, E, ends)) (leaf : V)
               done
             }
           case leaf ∈ Graph.coveredVertices(graph, List.empty(E)): {
-              ¬(leaf ∈ Graph.coveredVertices(graph, List.empty(E)))
+              leaf ∉ Graph.coveredVertices(graph, List.empty(E))
                   by Graph.coveredVertices.no_edges;
               done
             }
@@ -329,7 +329,7 @@ theorem Graph.IsLeaf.path_avoids (graph : Graph(V, E, ends)) (leaf : V)
                     -- But the step's own edge is not in the rest.
                     Graph.Incident(graph, edge, stepSource)
                         by Graph.Joins.incident_source;
-                    ¬(edge ∈ rest)
+                    edge ∉ rest
                         by { suppose edge ∈ rest;
                              stepSource ∈ Graph.coveredVertices(graph, rest)
                                  by Graph.coveredVertices.of_edge;
@@ -339,7 +339,7 @@ theorem Graph.IsLeaf.path_avoids (graph : Graph(V, E, ends)) (leaf : V)
                     done
                   }
                 otherwise: {
-                    ¬(leaf ∈ Graph.walkVertices(graph, waypoint, rest)) by IH;
+                    leaf ∉ Graph.walkVertices(graph, waypoint, rest) by IH;
                     done
                   }
               }
@@ -366,7 +366,7 @@ theorem Graph.IsAcyclic.in_subgraph (part whole : Graph(V, E, ends))
       Graph.IsCycleThrough(part, edge, cycleSource, cycleTarget, detour);
   Graph.Joins(part, edge, cycleSource, cycleTarget);
   Graph.IsPath(part, cycleSource, detour, cycleTarget);
-  ¬(edge ∈ detour);
+  edge ∉ detour;
   edge ∈ Graph.edges(whole) by partEdges;
   Graph.Joins(whole, edge, cycleSource, cycleTarget);
   Graph.IsPath(whole, cycleSource, detour, cycleTarget) by Graph.IsPath.in_supergraph;
@@ -418,7 +418,7 @@ theorem Graph.IsTree.delete_leaf (graph : Graph(V, E, ends))
            Graph.Reaches(graph, u, w) by Graph.IsConnected.reaches;
            choose route such that Graph.IsPath(graph, u, route, w)
                from Graph.Reaches.path;
-           ¬(leaf ∈ Graph.walkVertices(graph, u, route))
+           leaf ∉ Graph.walkVertices(graph, u, route)
                by Graph.IsLeaf.path_avoids;
            Graph.IsWalk(graph, u, route, w) by Graph.IsPath.walk;
            Graph.IsWalk(Graph.deleteVertex(graph, leaf), u, route, w)

@@ -47,16 +47,16 @@ theorem Graph.IsTwoConnected.ear_exists (graph part : Graph(V, E, ends))
         (partTwoConnected : Graph.IsTwoConnected(part))
         (isSubgraph : Graph.IsSubgraph(part, graph))
         (proper : (∃ (vertex : V). vertex ∈ Graph.vertices(graph)
-                       ∧ ¬(vertex ∈ Graph.vertices(part)))
+                       ∧ vertex ∉ Graph.vertices(part))
                   ∨ (∃ (edge : E). edge ∈ Graph.edges(graph)
-                       ∧ ¬(edge ∈ Graph.edges(part))))
+                       ∧ edge ∉ Graph.edges(part)))
         : ∃ (nearEnd farEnd : V). ∃ (earEdges : List(E)). ∃ (newEdge : E).
             Graph.IsPath(graph, nearEnd, earEdges, farEnd)
             ∧ nearEnd ≠ farEnd
             ∧ nearEnd ∈ Graph.vertices(part)
             ∧ farEnd ∈ Graph.vertices(part)
             ∧ newEdge ∈ earEdges
-            ∧ ¬(newEdge ∈ Graph.edges(part)) := {
+            ∧ newEdge ∉ Graph.edges(part) := {
   Graph.IsConnected(graph) by Graph.IsTwoConnected.connected;
   Graph.IsConnected(part) by Graph.IsTwoConnected.connected;
   3 ≤ Graph.order(part);
@@ -66,11 +66,11 @@ theorem Graph.IsTwoConnected.ear_exists (graph part : Graph(V, E, ends))
 
   done by cases {
     case ∃ (vertex : V). vertex ∈ Graph.vertices(graph)
-             ∧ ¬(vertex ∈ Graph.vertices(part)) as someOutside: {
+             ∧ vertex ∉ Graph.vertices(part) as someOutside: {
         choose outside such that outside ∈ Graph.vertices(graph)
-            ∧ ¬(outside ∈ Graph.vertices(part)) from someOutside;
+            ∧ outside ∉ Graph.vertices(part) from someOutside;
         outside ∈ Graph.vertices(graph);
-        ¬(outside ∈ Graph.vertices(part));
+        outside ∉ Graph.vertices(part);
 
         -- A walk from the subgraph out to it crosses the boundary.
         ∃ (vertex : V). vertex ∈ Graph.vertices(part);
@@ -80,17 +80,17 @@ theorem Graph.IsTwoConnected.ear_exists (graph part : Graph(V, E, ends))
         choose route such that Graph.IsWalk(graph, anchor, route, outside);
         ∃ (edge : E). ∃ (u w : V). edge ∈ route
             ∧ Graph.Joins(graph, edge, u, w)
-            ∧ u ∈ Graph.vertices(part) ∧ ¬(w ∈ Graph.vertices(part))
+            ∧ u ∈ Graph.vertices(part) ∧ w ∉ Graph.vertices(part)
             by Graph.IsWalk.crossing(region := Graph.vertices(part));
         choose crossingEdge, nearEnd, outerEnd such that
             crossingEdge ∈ route
             ∧ Graph.Joins(graph, crossingEdge, nearEnd, outerEnd)
             ∧ nearEnd ∈ Graph.vertices(part)
-            ∧ ¬(outerEnd ∈ Graph.vertices(part));
+            ∧ outerEnd ∉ Graph.vertices(part);
         crossingEdge ∈ route;
         Graph.Joins(graph, crossingEdge, nearEnd, outerEnd);
         nearEnd ∈ Graph.vertices(part);
-        ¬(outerEnd ∈ Graph.vertices(part));
+        outerEnd ∉ Graph.vertices(part);
         crossingEdge ∈ Graph.edges(graph) by Graph.IsWalk.edge_is_edge;
         nearEnd ∈ Graph.vertices(graph) by partVertices;
         outerEnd ∈ Graph.vertices(graph)
@@ -127,7 +127,7 @@ theorem Graph.IsTwoConnected.ear_exists (graph part : Graph(V, E, ends))
         Graph.IsSubgraph(Graph.deleteVertex(graph, nearEnd), graph)
             by Graph.deleteVertex.IsSubgraph;
         Graph.IsPath(graph, outerEnd, detour, farEnd) by Graph.IsPath.in_supergraph;
-        ¬(nearEnd ∈ Graph.walkVertices(graph, outerEnd, detour))
+        nearEnd ∉ Graph.walkVertices(graph, outerEnd, detour)
             by { suppose nearEnd ∈ Graph.walkVertices(graph, outerEnd, detour);
                  nearEnd ∈ Graph.walkVertices(Graph.deleteVertex(graph, nearEnd),
                                               outerEnd, detour);
@@ -139,7 +139,7 @@ theorem Graph.IsTwoConnected.ear_exists (graph part : Graph(V, E, ends))
             by Graph.IsPath.extend;
 
         -- And the crossing edge is one the subgraph does not have.
-        ¬(crossingEdge ∈ Graph.edges(part))
+        crossingEdge ∉ Graph.edges(part)
             by { suppose crossingEdge ∈ Graph.edges(part);
                  Graph.Joins(part, crossingEdge, nearEnd, outerEnd);
                  outerEnd ∈ Graph.vertices(part)
@@ -158,21 +158,21 @@ theorem Graph.IsTwoConnected.ear_exists (graph part : Graph(V, E, ends))
             → vertex ∈ Graph.vertices(part)
             by { take vertex : V;
                  suppose vertex ∈ Graph.vertices(graph);
-                 suppose ¬(vertex ∈ Graph.vertices(part)) for contradiction;
+                 suppose vertex ∉ Graph.vertices(part) for contradiction;
                  ∃ (candidate : V). candidate ∈ Graph.vertices(graph)
-                     ∧ ¬(candidate ∈ Graph.vertices(part)) by witness vertex;
+                     ∧ candidate ∉ Graph.vertices(part) by witness vertex;
                  done } as everyVertexInPart;
-        ∃ (edge : E). edge ∈ Graph.edges(graph) ∧ ¬(edge ∈ Graph.edges(part))
+        ∃ (edge : E). edge ∈ Graph.edges(graph) ∧ edge ∉ Graph.edges(part)
             by { done by cases {
                    case ∃ (vertex : V). vertex ∈ Graph.vertices(graph)
-                            ∧ ¬(vertex ∈ Graph.vertices(part)): done
+                            ∧ vertex ∉ Graph.vertices(part): done
                    case ∃ (edge : E). edge ∈ Graph.edges(graph)
-                            ∧ ¬(edge ∈ Graph.edges(part)): done
+                            ∧ edge ∉ Graph.edges(part): done
                  } } as someMissingEdge;
         choose newEdge such that newEdge ∈ Graph.edges(graph)
-            ∧ ¬(newEdge ∈ Graph.edges(part)) from someMissingEdge;
+            ∧ newEdge ∉ Graph.edges(part) from someMissingEdge;
         newEdge ∈ Graph.edges(graph);
-        ¬(newEdge ∈ Graph.edges(part));
+        newEdge ∉ Graph.edges(part);
         ∃ (x y : V). Graph.Joins(graph, newEdge, x, y) by Graph.edge_has_ends;
         choose nearEnd, farEnd such that Graph.Joins(graph, newEdge, nearEnd, farEnd);
         nearEnd ∈ Graph.vertices(graph) by Graph.IsWellFormed.end_is_vertex;
@@ -199,16 +199,16 @@ theorem Graph.IsTwoConnected.grows_by_ear (graph part : Graph(V, E, ends))
         (partTwoConnected : Graph.IsTwoConnected(part))
         (isSubgraph : Graph.IsSubgraph(part, graph))
         (proper : (∃ (vertex : V). vertex ∈ Graph.vertices(graph)
-                       ∧ ¬(vertex ∈ Graph.vertices(part)))
+                       ∧ vertex ∉ Graph.vertices(part))
                   ∨ (∃ (edge : E). edge ∈ Graph.edges(graph)
-                       ∧ ¬(edge ∈ Graph.edges(part))))
+                       ∧ edge ∉ Graph.edges(part)))
         : ∃ (bigger : Graph(V, E, ends)).
             Graph.IsTwoConnected(bigger)
             ∧ Graph.IsWellFormed(bigger)
             ∧ Graph.IsSubgraph(part, bigger)
             ∧ Graph.IsSubgraph(bigger, graph)
             ∧ (∃ (edge : E). edge ∈ Graph.edges(bigger)
-                 ∧ ¬(edge ∈ Graph.edges(part))) := {
+                 ∧ edge ∉ Graph.edges(part)) := {
   ∀ (vertex : V). vertex ∈ Graph.vertices(part) → vertex ∈ Graph.vertices(graph)
       as partVertices;
   ∃ (nearEnd farEnd : V). ∃ (earEdges : List(E)). ∃ (newEdge : E).
@@ -217,7 +217,7 @@ theorem Graph.IsTwoConnected.grows_by_ear (graph part : Graph(V, E, ends))
       ∧ nearEnd ∈ Graph.vertices(part)
       ∧ farEnd ∈ Graph.vertices(part)
       ∧ newEdge ∈ earEdges
-      ∧ ¬(newEdge ∈ Graph.edges(part))
+      ∧ newEdge ∉ Graph.edges(part)
       by Graph.IsTwoConnected.ear_exists;
   choose nearEnd, farEnd, earEdges, newEdge such that
       Graph.IsPath(graph, nearEnd, earEdges, farEnd)
@@ -225,7 +225,7 @@ theorem Graph.IsTwoConnected.grows_by_ear (graph part : Graph(V, E, ends))
       ∧ nearEnd ∈ Graph.vertices(part)
       ∧ farEnd ∈ Graph.vertices(part)
       ∧ newEdge ∈ earEdges
-      ∧ ¬(newEdge ∈ Graph.edges(part));
+      ∧ newEdge ∉ Graph.edges(part);
   nearEnd ∈ Graph.vertices(graph) by partVertices;
 
   -- The path, presented as a graph, is the ear; the subgraph with the ear
@@ -243,7 +243,7 @@ theorem Graph.IsTwoConnected.grows_by_ear (graph part : Graph(V, E, ends))
   -- And it brings an edge the subgraph did not have.
   newEdge ∈ Graph.edges(ear);
   newEdge ∈ Graph.edges(bigger) by Graph.union.edge_right;
-  ∃ (edge : E). edge ∈ Graph.edges(bigger) ∧ ¬(edge ∈ Graph.edges(part))
+  ∃ (edge : E). edge ∈ Graph.edges(bigger) ∧ edge ∉ Graph.edges(part)
       by witness newEdge;
   witness bigger
 }
