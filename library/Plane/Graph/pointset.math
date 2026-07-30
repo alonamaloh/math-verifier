@@ -71,7 +71,7 @@ definition Plane.Graph.pointSet (graph : Graph(Plane.Point, E, ends))
 theorem Plane.Graph.vertexSet_member (graph : Graph(Plane.Point, E, ends))
         (vertex : Plane.Point) (isVertex : vertex ∈ Graph.vertices(graph))
         : vertex ∈ Plane.Graph.vertexSet(graph) := {
-  vertex ∈ Set.singleton(Plane.Point, vertex) by Set.singleton_member;
+  vertex ∈ Set.singleton(Plane.Point, vertex);
   done by List.unionOver_member
 }
 
@@ -84,7 +84,7 @@ theorem Plane.Graph.vertexSet_member_invert (graph : Graph(Plane.Point, E, ends)
   vertex ∈ Graph.vertices(graph);
   x ∈ Set.singleton(Plane.Point, vertex);
   x = vertex;
-  done by substituting (x = vertex)
+  done
 }
 
 theorem Plane.Graph.edgeSet_member (graph : Graph(Plane.Point, E, ends))
@@ -135,6 +135,46 @@ theorem Plane.Graph.pointSet_member_invert (graph : Graph(Plane.Point, E, ends))
         done
       }
   }
+
+theorem Plane.Graph.arc_subset_pointSet (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (edge : E) (isEdge : edge ∈ Graph.edges(graph))
+        : Plane.arc(drawing(edge)) ⊆ Plane.Graph.pointSet(graph, drawing) := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.arc(drawing(edge));
+  done by Plane.Graph.pointSet_member_arc
+}
+
+-- A subgraph occupies less of the plane, so it leaves more of it over.
+theorem Plane.Graph.pointSet_subset (whole part : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (isSubgraph : Graph.IsSubgraph(part, whole))
+        : Plane.Graph.pointSet(part, drawing)
+              ⊆ Plane.Graph.pointSet(whole, drawing) := {
+  ∀ (edge : E). edge ∈ Graph.edges(part) → edge ∈ Graph.edges(whole);
+  ∀ (vertex : Plane.Point).
+      vertex ∈ Graph.vertices(part) → vertex ∈ Graph.vertices(whole);
+  take x : Plane.Point;
+  suppose x ∈ Plane.Graph.pointSet(part, drawing);
+  x ∈ Graph.vertices(part)
+      ∨ (∃ (edge : E). edge ∈ Graph.edges(part) ∧ x ∈ Plane.arc(drawing(edge)))
+      by Plane.Graph.pointSet_member_invert;
+  done by cases {
+    case x ∈ Graph.vertices(part): {
+        x ∈ Graph.vertices(whole);
+        done by Plane.Graph.pointSet_member_vertex
+      }
+    case ∃ (edge : E). edge ∈ Graph.edges(part) ∧ x ∈ Plane.arc(drawing(edge))
+           as onSomeEdge: {
+        choose edge such that
+            edge ∈ Graph.edges(part) ∧ x ∈ Plane.arc(drawing(edge)) from onSomeEdge;
+        edge ∈ Graph.edges(part);
+        edge ∈ Graph.edges(whole);
+        x ∈ Plane.arc(drawing(edge));
+        done by Plane.Graph.pointSet_member_arc
+      }
+  }
+}
 
 -- ----------------------------------------------------------------------
 -- The drawing is closed, so its complement is open.
@@ -230,7 +270,7 @@ theorem Plane.Graph.base_in_face (graph : Graph(Plane.Point, E, ends))
         (drawing : E → (ℝ → Plane.Point)) (base : Plane.Point)
         (offDrawing : ¬(base ∈ Plane.Graph.pointSet(graph, drawing)))
         : base ∈ Plane.Graph.face(graph, drawing, base) := {
-  base ∈ Plane.Graph.exterior(graph, drawing) by Plane.Graph.member_exterior;
+  base ∈ Plane.Graph.exterior(graph, drawing);
   done by Plane.base_in_Component
 }
 
@@ -242,7 +282,7 @@ theorem Plane.Graph.face_IsRegion (graph : Graph(Plane.Point, E, ends))
         : Plane.IsRegion(Plane.Graph.face(graph, drawing, base)) := {
   Plane.IsOpen(Plane.Graph.exterior(graph, drawing))
       by Plane.Graph.exterior_IsOpen;
-  base ∈ Plane.Graph.exterior(graph, drawing) by Plane.Graph.member_exterior;
+  base ∈ Plane.Graph.exterior(graph, drawing);
   done by Plane.Component_IsRegion
 }
 
@@ -258,8 +298,8 @@ theorem Plane.Graph.face.equal_of_meeting (graph : Graph(Plane.Point, E, ends))
                 ∩ Plane.Graph.face(graph, drawing, second)))
         : Plane.Graph.face(graph, drawing, first)
               = Plane.Graph.face(graph, drawing, second) := {
-  first ∈ Plane.Graph.exterior(graph, drawing) by Plane.Graph.member_exterior;
-  second ∈ Plane.Graph.exterior(graph, drawing) by Plane.Graph.member_exterior;
+  first ∈ Plane.Graph.exterior(graph, drawing);
+  second ∈ Plane.Graph.exterior(graph, drawing);
   done by Plane.Component.equal_of_meeting
 }
 

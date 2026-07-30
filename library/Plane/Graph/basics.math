@@ -111,8 +111,8 @@ theorem Plane.Graph.IsDrawing.vertex_off_interior (graph : Graph(Plane.Point, E,
         : ¬(vertex ∈ Plane.openArc(drawing(edge))) := {
   ∀ (e : E). ∀ (v : Plane.Point).
       e ∈ Graph.edges(graph) → v ∈ Graph.vertices(graph) →
-      ¬(v ∈ Plane.openArc(drawing(e))) as interiorsMissVertices;
-  done by interiorsMissVertices(edge, vertex)
+      ¬(v ∈ Plane.openArc(drawing(e)));
+  done
 }
 
 theorem Plane.Graph.IsDrawing.interiors_disjoint (graph : Graph(Plane.Point, E, ends))
@@ -125,9 +125,8 @@ theorem Plane.Graph.IsDrawing.interiors_disjoint (graph : Graph(Plane.Point, E, 
         : ¬(x ∈ Plane.openArc(drawing(other))) := {
   ∀ (e f : E). ∀ (y : Plane.Point).
       e ∈ Graph.edges(graph) → f ∈ Graph.edges(graph) → e ≠ f →
-      y ∈ Plane.openArc(drawing(e)) → ¬(y ∈ Plane.openArc(drawing(f)))
-      as interiorsAreDisjoint;
-  done by interiorsAreDisjoint(edge, other, x)
+      y ∈ Plane.openArc(drawing(e)) → ¬(y ∈ Plane.openArc(drawing(f)));
+  done
 }
 
 -- ----------------------------------------------------------------------
@@ -172,6 +171,66 @@ theorem Plane.Graph.IsDrawing.arc_ends_distinct (graph : Graph(Plane.Point, E, e
 }
 
 -- ----------------------------------------------------------------------
+-- Passing to a subgraph.
+--
+-- A subgraph is drawn by the SAME family of arcs. `Graph.Joins` reads only
+-- the ambient `ends`, so an edge joins the same two points in the part as
+-- in the whole, and every clause of the condition is inherited by
+-- restricting its quantifiers. Only the part's own two lists have to be
+-- checked, which is what `Graph.IsWellFormed(part)` says.
+
+theorem Plane.Graph.IsDrawing.subgraph (whole part : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (isDrawing : Plane.Graph.IsDrawing(whole, drawing))
+        (isSubgraph : Graph.IsSubgraph(part, whole))
+        (partWellFormed : Graph.IsWellFormed(part))
+        : Plane.Graph.IsDrawing(part, drawing) := {
+  ∀ (edge : E). edge ∈ Graph.edges(part) → edge ∈ Graph.edges(whole);
+  ∀ (vertex : Plane.Point).
+      vertex ∈ Graph.vertices(part) → vertex ∈ Graph.vertices(whole);
+
+  ∀ (edge : E). edge ∈ Graph.edges(part) →
+      Plane.IsArc(drawing(edge))
+      ∧ Graph.Joins(part, edge,
+            Plane.arcStart(drawing(edge)), Plane.arcFinish(drawing(edge)))
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(part);
+           edge ∈ Graph.edges(whole);
+           Plane.IsArc(drawing(edge)) by Plane.Graph.IsDrawing.IsArc;
+           Graph.Joins(whole, edge,
+               Plane.arcStart(drawing(edge)), Plane.arcFinish(drawing(edge)))
+               by Plane.Graph.IsDrawing.joins_ends;
+           done };
+
+  ∀ (edge : E). ∀ (vertex : Plane.Point).
+      edge ∈ Graph.edges(part) → vertex ∈ Graph.vertices(part) →
+      ¬(vertex ∈ Plane.openArc(drawing(edge)))
+      by { take edge : E;
+           take vertex : Plane.Point;
+           suppose edge ∈ Graph.edges(part);
+           suppose vertex ∈ Graph.vertices(part);
+           edge ∈ Graph.edges(whole);
+           vertex ∈ Graph.vertices(whole);
+           done by Plane.Graph.IsDrawing.vertex_off_interior };
+
+  ∀ (edge other : E). ∀ (x : Plane.Point).
+      edge ∈ Graph.edges(part) → other ∈ Graph.edges(part) → edge ≠ other →
+      x ∈ Plane.openArc(drawing(edge)) → ¬(x ∈ Plane.openArc(drawing(other)))
+      by { take edge : E;
+           take other : E;
+           take x : Plane.Point;
+           suppose edge ∈ Graph.edges(part);
+           suppose other ∈ Graph.edges(part);
+           suppose edge ≠ other;
+           suppose x ∈ Plane.openArc(drawing(edge));
+           edge ∈ Graph.edges(whole);
+           other ∈ Graph.edges(whole);
+           done by Plane.Graph.IsDrawing.interiors_disjoint };
+
+  done
+}
+
+-- ----------------------------------------------------------------------
 -- Where two edge arcs can meet.
 --
 -- A point of an edge arc is read off its parameter: the two ends of the
@@ -197,7 +256,7 @@ theorem Plane.Graph.IsDrawing.endpoint_or_interior (graph : Graph(Plane.Point, E
         Plane.arcStart(drawing(edge)) = x;
         Graph.Incident(graph, edge, Plane.arcStart(drawing(edge)))
             by Graph.Joins.incident_source;
-        Graph.Incident(graph, edge, x) by substituting (Plane.arcStart(drawing(edge)) = x);
+        Graph.Incident(graph, edge, x);
         done
       }
     otherwise as notAtStart: done by cases {
@@ -205,8 +264,7 @@ theorem Plane.Graph.IsDrawing.endpoint_or_interior (graph : Graph(Plane.Point, E
             Plane.arcFinish(drawing(edge)) = x;
             Graph.Incident(graph, edge, Plane.arcFinish(drawing(edge)))
                 by Graph.Joins.incident_target;
-            Graph.Incident(graph, edge, x)
-                by substituting (Plane.arcFinish(drawing(edge)) = x);
+            Graph.Incident(graph, edge, x);
             done
           }
         otherwise as notAtFinish: {
@@ -246,12 +304,11 @@ theorem Plane.Graph.IsDrawing.arcs_meet_at_vertex (graph : Graph(Plane.Point, E,
            suppose e ∈ Graph.edges(graph);
            suppose Graph.Incident(graph, e, x);
            choose farEnd such that Graph.Joins(graph, e, x, farEnd);
-           done by Graph.IsWellFormed.end_is_vertex }
-      as incidenceMakesVertex;
+           done by Graph.IsWellFormed.end_is_vertex };
 
   done by cases {
     case Graph.Incident(graph, edge, x): {
-        x ∈ Graph.vertices(graph) by incidenceMakesVertex(edge);
+        x ∈ Graph.vertices(graph);
         ¬(x ∈ Plane.openArc(drawing(other)))
             by Plane.Graph.IsDrawing.vertex_off_interior;
         Graph.Incident(graph, other, x);
@@ -261,10 +318,33 @@ theorem Plane.Graph.IsDrawing.arcs_meet_at_vertex (graph : Graph(Plane.Point, E,
         ¬(x ∈ Plane.openArc(drawing(other)))
             by Plane.Graph.IsDrawing.interiors_disjoint;
         Graph.Incident(graph, other, x);
-        x ∈ Graph.vertices(graph) by incidenceMakesVertex(other);
+        x ∈ Graph.vertices(graph);
         ¬(x ∈ Plane.openArc(drawing(edge)))
             by Plane.Graph.IsDrawing.vertex_off_interior;
         done
       }
   }
+}
+
+-- Away from the vertices an edge is determined by any one of its points:
+-- the form in which the overlay reads the drawing back off the plane.
+theorem Plane.Graph.IsDrawing.unique_edge_at (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
+        (edge other : E)
+        (isEdge : edge ∈ Graph.edges(graph)) (otherIsEdge : other ∈ Graph.edges(graph))
+        (x : Plane.Point) (notVertex : ¬(x ∈ Graph.vertices(graph)))
+        (onEdge : x ∈ Plane.arc(drawing(edge)))
+        (onOther : x ∈ Plane.arc(drawing(other)))
+        : edge = other := {
+  Graph.IsWellFormed(graph) by Plane.Graph.IsDrawing.IsWellFormed;
+  suppose edge ≠ other for contradiction {
+    Graph.Incident(graph, edge, x) ∧ Graph.Incident(graph, other, x)
+        by Plane.Graph.IsDrawing.arcs_meet_at_vertex;
+    Graph.Incident(graph, edge, x);
+    choose farEnd such that Graph.Joins(graph, edge, x, farEnd);
+    x ∈ Graph.vertices(graph) by Graph.IsWellFormed.end_is_vertex;
+    done
+  };
+  done
 }

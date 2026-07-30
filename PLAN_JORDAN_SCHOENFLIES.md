@@ -586,15 +586,73 @@ vertices have 2-connected union; subdivisions and ears preserve
 **Size:** 8–12k lines. The largest foundation layer, and the least risky —
 it is pure finite combinatorics over `Lists`/`HasSize`.
 
-## Layer 6 — `Plane/Graph/` : plane graphs and arrangements
+## Layer 6 — `Plane/Graph/` : plane graphs and arrangements — **STARTED 2026-07-29**
 
 Where the two halves meet, and the layer I would expect to hurt.
 
-**Definitions.** `Plane.Graph`: distinct vertex points, edges as simple
-arcs with pairwise disjoint interiors avoiding all vertices;
-`Plane.Graph.face` as a component of the complement;
-`Plane.Graph.outerFace`; `Plane.Graph.overlay` — the subdivision of a
-finite union of polygonal graphs at all intersections.
+`library/Plane/Graph/` is the repo's first **nested** module directory
+(`module Plane.Graph.basics` ↔ `library/Plane/Graph/basics.math`). It works
+end to end — the Makefile's `find` is recursive and import resolution maps
+dots to slashes — and it is what keeps 5–9k lines of plane-graph material
+out of the already-large flat `Plane/` area.
+
+### Settled: a plane graph is a graph PLUS a drawing, unbundled
+
+There is no `Plane.Graph` type. A plane graph is an abstract
+`Graph(Plane.Point, E, ends)` together with `drawing : E → (ℝ → Plane.Point)`,
+related by `Plane.Graph.IsDrawing(graph, drawing)`. The abstract graph stays
+itself, so **every theorem of Layer 5 applies with nothing to project
+through** — and "a plane graph realises an abstract finite graph", one of
+this layer's listed main results, is true by construction rather than a
+theorem. Bundling would put a record projection inside every combinatorial
+citation.
+
+The vertices being plane points is what makes the definition short: "the
+vertices are distinct" is already `Graph.IsWellFormed`'s distinctness of the
+vertex list, and loops are already excluded there.
+
+### Done 2026-07-29 (~920 lines)
+
+`library/Plane/Graph/{basics,pointset}.math`, plus `Lists/set_union.math`
+and `Metric/finite_union.math` underneath. Area guide:
+`library/Plane/Graph/README.md`.
+
+- **`Plane.Graph.IsDrawing`** with a reader per clause, the two ends of an
+  edge arc as vertices, and `Plane.Graph.IsDrawing.subgraph` (a well-formed
+  subgraph is drawn by the same arcs — `Graph.Joins` reads only the ambient
+  `ends`, so an edge joins the same two points in the part as in the whole).
+- **`Plane.Graph.IsDrawing.arcs_meet_at_vertex`** — the blueprint's
+  "distinct edges of a plane graph meet only at shared vertices", over
+  `endpoint_or_interior` (a point of an edge arc is read off its parameter;
+  the two ends of the unit interval are the two vertices). Its corollary
+  `unique_edge_at` is the form the overlay wants: away from the vertices a
+  point of the drawing lies on exactly one edge.
+- **`Plane.Graph.pointSet`** — both halves are `List.unionOver` over the
+  graph's own vertex and edge lists, so finiteness is carried by the lists
+  the graph already has. Monotone in the subgraph order.
+- **`Plane.Graph.exterior` is open**, through
+  `MetricSpace.complement_unionOver_IsOpen`: a finite union of closed sets
+  has an open complement, reduced to a point being closed and an arc being
+  compact. The classical negation of "every ball meets the set" is taken
+  **once**, in `MetricSpace.complement_IsOpen`.
+- **`Plane.Graph.face(graph, drawing, base)`** — the component of the
+  exterior through a point off the drawing. Named by a point rather than
+  indexed, so no face has to be produced before it is spoken about; a region,
+  and the faces partition the exterior.
+
+**Deferred, deliberately.** The **outer face**: that exactly one face is
+unbounded needs the exterior of a large disk to be connected, which is a
+genuine plane fact and not a consequence of anything above.
+
+**Next**, in dependency order: the segment trichotomy (two segments meet in
+nothing, a point, or a segment — Layer 0 geometry, independent of everything
+here), then the overlay, then H6. "The realisation of a cycle is a Jordan
+curve" wants the edge arcs of a cycle concatenated in order.
+
+**Definitions.** `Plane.Graph.IsDrawing` (**settled** — see above, not a
+`Plane.Graph` type); `Plane.Graph.face` as a component of the complement
+(**done**); `Plane.Graph.outerFace`; `Plane.Graph.overlay` — the
+subdivision of a finite union of polygonal graphs at all intersections.
 
 **Main results.** The overlay of finitely many finite polygonal plane
 graphs is a plane graph after subdividing at all crossings and identifying
@@ -683,6 +741,11 @@ Flagging these rather than deciding them, per the always-apply rule.
    predicate; every later result assumes it.
 
 ## Frictions found so far
+
+`FRICTION_PLANE_LAYER6.md` — the running log from Layer 6. One entry so far
+(L1: *destructuring* list membership is plumbing the auto-prover doesn't do —
+building one is already by-less), plus the note that nested module
+directories work with no build change.
 
 `FRICTION_PLANE_LAYER0.md` — the running log from Layer 0, in
 `QUIRK.md`'s format. Section I is inequalities and is the priority: every

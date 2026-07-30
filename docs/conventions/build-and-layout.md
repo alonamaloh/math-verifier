@@ -97,6 +97,13 @@ library/
 Each module's files are layered (basics → operations → laws →
 instances). Imports flow up; you can't import a layer above you.
 
+An area may **nest** when it grows a self-contained sub-area:
+`library/Plane/Graph/basics.math` declares `module Plane.Graph.basics`, gets
+its own `README.md`, and needs no build change — the Makefile's `find` is
+recursive and import resolution just maps dots to slashes
+(`modulePathWithExtension` in `src/main.cpp`). Nest to keep a large flat area
+readable, not by default.
+
 ## Projects
 
 A development that *uses* the library without being part of it lives under
