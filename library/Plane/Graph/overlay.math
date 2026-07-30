@@ -53,22 +53,44 @@ import Plane.Graph.segments
 import Plane.Graph.subdivide
 
 -- ----------------------------------------------------------------------
+-- What the cut points have to cover.
+--
+-- Two conditions, and between them they are the blueprint's "subdivide at all
+-- old endpoints, isolated intersections, and endpoints of overlapping
+-- intervals". The second asks for SOME pair of ends of each meet rather than
+-- every pair, because that is what a construction can supply: a meet is
+-- `segment(u, v)` and `segment(v, u)` alike, and knowing that a nondegenerate
+-- segment's ends are determined by its point set is a theorem this
+-- development does not have and does not need.
+
+definition Plane.meetOf (piece source : Plane.Segment) : Set(Plane.Point) :=
+  Plane.segment(Product.first(piece), Product.second(piece))
+      ∩ Plane.segment(Product.first(source), Product.second(source))
+
+theorem Plane.meetOf_symmetric (piece source : Plane.Segment)
+        : Plane.meetOf(piece, source) = Plane.meetOf(source, piece) :=
+  done by Set.intersection_commutative
+
+definition Plane.EndsAreCut (pieces : List(Plane.Segment))
+        (points : List(Plane.Point)) : Proposition :=
+  ∀ (piece : Plane.Segment). piece ∈ pieces →
+      ∀ (point : Plane.Point). Plane.IsEndOf(point, piece) → point ∈ points
+
+definition Plane.MeetsAreCut (pieces : List(Plane.Segment))
+        (points : List(Plane.Point)) : Proposition :=
+  ∀ (piece source : Plane.Segment). piece ∈ pieces → source ∈ pieces →
+      piece ≠ source → Set.IsNonempty(Plane.Point, Plane.meetOf(piece, source)) →
+      ∃ (u v : Plane.Point). Plane.meetOf(piece, source) = Plane.segment(u, v)
+          ∧ u ∈ points ∧ v ∈ points
+
+-- ----------------------------------------------------------------------
 -- Collinearity: two pieces that share an interior point lie in one segment.
 
 theorem Plane.subdivide_common_segment (points : List(Plane.Point))
         (pieces : List(Plane.Segment))
         (allDistinct : ∀ (piece : Plane.Segment). piece ∈ pieces →
             Product.first(piece) ≠ Product.second(piece))
-        (meetsCut : ∀ (piece source : Plane.Segment). piece ∈ pieces → source ∈ pieces →
-            piece ≠ source →
-            Set.IsNonempty(Plane.Point,
-                Plane.segment(Product.first(piece), Product.second(piece))
-                    ∩ Plane.segment(Product.first(source), Product.second(source))) →
-            ∃ (u v : Plane.Point).
-                Plane.segment(Product.first(piece), Product.second(piece))
-                    ∩ Plane.segment(Product.first(source), Product.second(source))
-                    = Plane.segment(u, v)
-                ∧ u ∈ points ∧ v ∈ points)
+        (meetsCut : Plane.MeetsAreCut(pieces, points))
         (part other : Plane.Segment)
         (isPart : part ∈ Plane.subdivide(pieces, points))
         (isOther : other ∈ Plane.subdivide(pieces, points))
@@ -234,18 +256,8 @@ theorem Plane.subdivide_separated (points : List(Plane.Point))
         (pieces : List(Plane.Segment))
         (allDistinct : ∀ (piece : Plane.Segment). piece ∈ pieces →
             Product.first(piece) ≠ Product.second(piece))
-        (endsCut : ∀ (piece : Plane.Segment). piece ∈ pieces →
-            ∀ (point : Plane.Point). Plane.IsEndOf(point, piece) → point ∈ points)
-        (meetsCut : ∀ (piece source : Plane.Segment). piece ∈ pieces → source ∈ pieces →
-            piece ≠ source →
-            Set.IsNonempty(Plane.Point,
-                Plane.segment(Product.first(piece), Product.second(piece))
-                    ∩ Plane.segment(Product.first(source), Product.second(source))) →
-            ∃ (u v : Plane.Point).
-                Plane.segment(Product.first(piece), Product.second(piece))
-                    ∩ Plane.segment(Product.first(source), Product.second(source))
-                    = Plane.segment(u, v)
-                ∧ u ∈ points ∧ v ∈ points)
+        (endsCut : Plane.EndsAreCut(pieces, points))
+        (meetsCut : Plane.MeetsAreCut(pieces, points))
         (part other : Plane.Segment)
         (isPart : part ∈ Plane.subdivide(pieces, points))
         (isOther : other ∈ Plane.subdivide(pieces, points))
@@ -329,3 +341,250 @@ theorem Plane.subdivide_separated (points : List(Plane.Point))
       }
   }
 }
+
+-- ----------------------------------------------------------------------
+-- Producing the cut points.
+--
+-- Nothing computes them. The overlay is stated existentially, so the list is
+-- built by the induction that proves it exists, and `Plane.segment_meet`
+-- hands over the ends of a meet the moment the meet is known to be nonempty.
+-- That is what keeps `Logic.the` out of this: `segment_meet`'s witnesses are
+-- not unique, so there is nothing for a definite description to name.
+
+-- One piece against a list: a point list holding both ends of every meet.
+theorem Plane.exists_meet_points (piece : Plane.Segment)
+        (others : List(Plane.Segment))
+        : ∃ (points : List(Plane.Point)).
+              ∀ (source : Plane.Segment). source ∈ others →
+                  Set.IsNonempty(Plane.Point, Plane.meetOf(piece, source)) →
+                  ∃ (u v : Plane.Point). Plane.meetOf(piece, source) = Plane.segment(u, v)
+                      ∧ u ∈ points ∧ v ∈ points :=
+  by induction on others with IH {
+    case others = List.empty:
+        witness List.empty(Plane.Point) with {
+          take source : Plane.Segment;
+          suppose source ∈ List.empty(Plane.Segment);
+          done by List.no_member_empty
+        }
+    case others = List.prepend(head, tail) for some head, tail: {
+        choose tailPoints such that
+            ∀ (source : Plane.Segment). source ∈ tail →
+                Set.IsNonempty(Plane.Point, Plane.meetOf(piece, source)) →
+                ∃ (u v : Plane.Point). Plane.meetOf(piece, source) = Plane.segment(u, v)
+                    ∧ u ∈ tailPoints ∧ v ∈ tailPoints
+            as tailMeetsCut from IH;
+        done by cases {
+          case Set.IsNonempty(Plane.Point, Plane.meetOf(piece, head)) as headMeets: {
+              choose meetNear, meetFar such that
+                  Plane.meetOf(piece, head) = Plane.segment(meetNear, meetFar)
+                  from Plane.segment_meet;
+              let grown : List(Plane.Point) := List.prepend(Plane.Point, meetNear,
+                               List.prepend(Plane.Point, meetFar, tailPoints));
+              witness grown with {
+                take source : Plane.Segment;
+                suppose source ∈ List.prepend(Plane.Segment, head, tail);
+                suppose Set.IsNonempty(Plane.Point, Plane.meetOf(piece, source));
+                source = head ∨ source ∈ tail by List.member_prepend_invert;
+                done by cases {
+                  case source = head: {
+                      meetNear ∈ grown;
+                      meetFar ∈ List.prepend(Plane.Point, meetFar, tailPoints);
+                      meetFar ∈ grown;
+                      witness meetNear with witness meetFar
+                    }
+                  case source ∈ tail: {
+                      choose u, v such that
+                          Plane.meetOf(piece, source) = Plane.segment(u, v)
+                          ∧ u ∈ tailPoints ∧ v ∈ tailPoints
+                          from tailMeetsCut;
+                      u ∈ tailPoints;
+                      v ∈ tailPoints;
+                      u ∈ List.prepend(Plane.Point, meetFar, tailPoints);
+                      v ∈ List.prepend(Plane.Point, meetFar, tailPoints);
+                      u ∈ grown;
+                      v ∈ grown;
+                      witness u with witness v
+                    }
+                }
+              }
+            }
+          otherwise as headMisses: {
+              witness tailPoints with {
+                take source : Plane.Segment;
+                suppose source ∈ List.prepend(Plane.Segment, head, tail);
+                suppose Set.IsNonempty(Plane.Point, Plane.meetOf(piece, source));
+                source = head ∨ source ∈ tail by List.member_prepend_invert;
+                done by cases {
+                  case source = head as sourceIsHead: {
+                      Set.IsNonempty(Plane.Point, Plane.meetOf(piece, head))
+                          by substituting sourceIsHead;
+                      done
+                    }
+                  case source ∈ tail:
+                      done by tailMeetsCut
+                }
+              }
+            }
+        }
+      }
+  }
+
+-- And the whole list: the ends of each piece, and both ends of each meet.
+theorem Plane.exists_cut_points (pieces : List(Plane.Segment))
+        : ∃ (points : List(Plane.Point)).
+              Plane.EndsAreCut(pieces, points) ∧ Plane.MeetsAreCut(pieces, points) :=
+  by induction on pieces with IH {
+    case pieces = List.empty:
+        witness List.empty(Plane.Point) with {
+          Plane.EndsAreCut(List.empty(Plane.Segment), List.empty(Plane.Point))
+              by { take piece : Plane.Segment;
+                   suppose piece ∈ List.empty(Plane.Segment);
+                   done by List.no_member_empty };
+          Plane.MeetsAreCut(List.empty(Plane.Segment), List.empty(Plane.Point))
+              by { take piece : Plane.Segment;
+                   take source : Plane.Segment;
+                   suppose piece ∈ List.empty(Plane.Segment);
+                   done by List.no_member_empty };
+          done
+        }
+    case pieces = List.prepend(head, tail) for some head, tail: {
+        choose tailPoints such that Plane.EndsAreCut(tail, tailPoints)
+            ∧ Plane.MeetsAreCut(tail, tailPoints) from IH;
+        Plane.EndsAreCut(tail, tailPoints) as tailEndsCut;
+        Plane.MeetsAreCut(tail, tailPoints) as tailMeetsCut;
+        choose meetPoints such that
+            ∀ (source : Plane.Segment). source ∈ tail →
+                Set.IsNonempty(Plane.Point, Plane.meetOf(head, source)) →
+                ∃ (u v : Plane.Point). Plane.meetOf(head, source) = Plane.segment(u, v)
+                    ∧ u ∈ meetPoints ∧ v ∈ meetPoints
+            as headMeetsCut from Plane.exists_meet_points;
+        let grown : List(Plane.Point) :=
+            List.prepend(Plane.Point, Product.first(head),
+                List.prepend(Plane.Point, Product.second(head),
+                    List.append(meetPoints, tailPoints)));
+
+        -- The head's two ends open the list; the tail's ends are already in
+        -- `tailPoints`.
+        Plane.EndsAreCut(List.prepend(Plane.Segment, head, tail), grown)
+            by { take piece : Plane.Segment;
+                 suppose piece ∈ List.prepend(Plane.Segment, head, tail);
+                 take point : Plane.Point;
+                 suppose Plane.IsEndOf(point, piece);
+                 piece = head ∨ piece ∈ tail by List.member_prepend_invert;
+                 done by cases {
+                   case piece = head as pieceIsHead: {
+                       Plane.IsEndOf(point, head) by substituting pieceIsHead;
+                       point = Product.first(head) ∨ point = Product.second(head);
+                       done by cases {
+                         case point = Product.first(head) as atFirstEnd:
+                             done by substituting atFirstEnd
+                         case point = Product.second(head) as atSecondEnd: {
+                             Product.second(head)
+                                 ∈ List.prepend(Plane.Point, Product.second(head),
+                                       List.append(meetPoints, tailPoints));
+                             Product.second(head) ∈ grown;
+                             done by substituting atSecondEnd
+                           }
+                       }
+                     }
+                   case piece ∈ tail: {
+                       point ∈ tailPoints by tailEndsCut;
+                       point ∈ List.append(meetPoints, tailPoints)
+                           by List.member_append_right;
+                       point ∈ List.prepend(Plane.Point, Product.second(head),
+                                   List.append(meetPoints, tailPoints));
+                       done
+                     }
+                 } };
+
+        -- A pair involving the head is covered by `meetPoints`, in whichever
+        -- order it is asked for — a meet does not care which piece is named
+        -- first. A pair inside the tail was covered already.
+        Plane.MeetsAreCut(List.prepend(Plane.Segment, head, tail), grown)
+            by { take piece : Plane.Segment;
+                 take source : Plane.Segment;
+                 suppose piece ∈ List.prepend(Plane.Segment, head, tail);
+                 suppose source ∈ List.prepend(Plane.Segment, head, tail);
+                 suppose piece ≠ source;
+                 suppose Set.IsNonempty(Plane.Point, Plane.meetOf(piece, source));
+                 piece = head ∨ piece ∈ tail by List.member_prepend_invert;
+                 source = head ∨ source ∈ tail by List.member_prepend_invert;
+                 done by cases {
+                   case piece = head as pieceIsHead:
+                       done by cases {
+                         case source = head as sourceIsHead: {
+                             piece = source;
+                             done
+                           }
+                         case source ∈ tail: {
+                             Set.IsNonempty(Plane.Point, Plane.meetOf(head, source))
+                                 by substituting pieceIsHead;
+                             choose u, v such that
+                                 Plane.meetOf(head, source) = Plane.segment(u, v)
+                                 ∧ u ∈ meetPoints ∧ v ∈ meetPoints from headMeetsCut;
+                             u ∈ meetPoints;
+                             v ∈ meetPoints;
+                             u ∈ List.append(meetPoints, tailPoints)
+                                 by List.member_append_left;
+                             v ∈ List.append(meetPoints, tailPoints)
+                                 by List.member_append_left;
+                             u ∈ List.prepend(Plane.Point, Product.second(head),
+                                     List.append(meetPoints, tailPoints));
+                             v ∈ List.prepend(Plane.Point, Product.second(head),
+                                     List.append(meetPoints, tailPoints));
+                             u ∈ grown;
+                             v ∈ grown;
+                             witness u with witness v
+                           }
+                       }
+                   case piece ∈ tail:
+                       done by cases {
+                         case source = head as sourceIsHead: {
+                             Set.IsNonempty(Plane.Point, Plane.meetOf(piece, head))
+                                 by substituting sourceIsHead;
+                             Plane.meetOf(head, piece) = Plane.meetOf(piece, head)
+                                 by Plane.meetOf_symmetric as meetReversed;
+                             Set.IsNonempty(Plane.Point, Plane.meetOf(head, piece))
+                                 by substituting meetReversed;
+                             choose u, v such that
+                                 Plane.meetOf(head, piece) = Plane.segment(u, v)
+                                 ∧ u ∈ meetPoints ∧ v ∈ meetPoints from headMeetsCut;
+                             u ∈ meetPoints;
+                             v ∈ meetPoints;
+                             u ∈ List.append(meetPoints, tailPoints)
+                                 by List.member_append_left;
+                             v ∈ List.append(meetPoints, tailPoints)
+                                 by List.member_append_left;
+                             u ∈ List.prepend(Plane.Point, Product.second(head),
+                                     List.append(meetPoints, tailPoints));
+                             v ∈ List.prepend(Plane.Point, Product.second(head),
+                                     List.append(meetPoints, tailPoints));
+                             u ∈ grown;
+                             v ∈ grown;
+                             Plane.meetOf(piece, head) = Plane.segment(u, v)
+                                 by substituting meetReversed;
+                             done by { witness u with witness v }
+                           }
+                         case source ∈ tail: {
+                             choose u, v such that
+                                 Plane.meetOf(piece, source) = Plane.segment(u, v)
+                                 ∧ u ∈ tailPoints ∧ v ∈ tailPoints from tailMeetsCut;
+                             u ∈ tailPoints;
+                             v ∈ tailPoints;
+                             u ∈ List.append(meetPoints, tailPoints)
+                                 by List.member_append_right;
+                             v ∈ List.append(meetPoints, tailPoints)
+                                 by List.member_append_right;
+                             u ∈ List.prepend(Plane.Point, Product.second(head),
+                                     List.append(meetPoints, tailPoints));
+                             v ∈ List.prepend(Plane.Point, Product.second(head),
+                                     List.append(meetPoints, tailPoints));
+                             u ∈ grown;
+                             v ∈ grown;
+                             witness u with witness v
+                           }
+                       }
+                 } };
+        witness grown
+      }
+  }
