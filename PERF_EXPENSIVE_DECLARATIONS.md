@@ -186,6 +186,48 @@ Patterns worth naming, since they recur down the list:
   library; worth revisiting when the `by`-citation discharge path is
   understood.
 
+## Optimisation attempts so far — both failed, measured
+
+Recorded so the next attempt does not repeat them.
+
+1. **Lazy goal forms in `elaborateClaimBySubstitution`.** The function builds
+   up to five normalisations of the goal — deep WHNF through application
+   spines, a force-unfold of opaque heads, head WHNF, a ζ-expansion and its
+   deep WHNF — **eagerly, before trying the surface form that usually
+   works**. On a goal mentioning `Plane.orientSegment`, whose body is a
+   classical `if`, deep-WHNF grinds through the choice operator. Making the
+   forms materialise on demand (same forms, same order, same dedup) is
+   obviously right in principle and, measured serially on
+   `Algebra.characteristic_polynomial`, worth **20.9 s → 20.5 s: 2%, i.e.
+   noise**. Reverted. Do not re-attempt without first showing the deep forms
+   are actually being built.
+2. **Reading a 2× win off a parallel build.** `-j 16` wall-clock per claim is
+   heavily contended: the same declaration measures 13–16 s under `-j 16` and
+   9.7 s serially. An "improvement" measured across the two is meaningless.
+   **Measure serially, one file, or not at all.**
+
+## Where the substitution cost is NOT
+
+`by substituting <eq>` takes four of the top eleven and looked like one shared
+root cause. It is not in the obvious place:
+
+- instrumenting `elaborateClaimBySubstitution`'s attempt loop (occurrence
+  search, rewritten-goal typecheck, defeq probe, prover call) records **zero
+  attempts** for `Matrix.characteristic_entry_leading:388`, a 9.8 s claim;
+- instrumenting the candidate-preparation phase that runs before that loop —
+  elaborating the hint, auto-proving a bare-proposition equation, inferring a
+  quantified equation's arguments — records **under a millisecond**.
+
+So the 9.8 s (and by extension the 194 s outlier) is spent on a **third path**
+that a `bySubstitution` claim can take, which `elaborateClaimBySubstitution`
+is not on. `internal.hpp`'s `if (claim.bySubstitution)` near the structured
+claim dispatch is the next thing to read; `induction.cpp:1753` is the only
+call site found so far and it is reached from the induction/cases route, not
+from a plain statement claim.
+
+**Find that path before optimising anything.** Both failed attempts above came
+from optimising code that the expensive claims never execute.
+
 ## Directions worth trying
 
 - **Shrink the context.** These proofs state ~30 facts before using any of
