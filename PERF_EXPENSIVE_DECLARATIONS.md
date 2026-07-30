@@ -233,6 +233,62 @@ claims 499 s → 297 s (−40%)**. Zero errors, `tests` and `docs-check` green.
 
 `by substituting` no longer appears anywhere in the top 10.
 
+## What `contextEqualityBridge` actually does — and why it is not linear
+
+Worth writing down, because the natural mental model is wrong and the wrong
+model suggests the wrong fixes.
+
+It is **not** congruence closure. It does not build a graph of known-equal
+terms and search for a path from the goal's LHS to its RHS. For each equality
+`a = b` in context, and each of the two directions, it:
+
+1. searches the GOAL structurally for occurrences of one endpoint;
+2. rewrites them — building a motive plus `Equality.transport_proposition`;
+3. **calls the full auto-prover recursively on the rewritten goal.**
+
+So it is depth-1 rewriting followed by a complete proof search, per equation,
+per direction. The transitive "path" a reader imagines is not enumerated by
+the bridge; it emerges only because the recursive prove can re-enter the
+bridge (bounded by `budget - 1`). That is where the cost lives: one candidate
+rewrite spawns a whole search, and the search may spawn more.
+
+A real congruence-closure / union-find pass over the context equalities WOULD
+be near-linear, and would make this rung cheap. It is also a genuinely
+different algorithm, not a tuning change.
+
+## Attempt: capping the bridge's recursive prove — FAILED
+
+Measured on `Metric/connected.math`, where the bridge is 74 invocations,
+**ONE win**, and 10.4 s of the file's 24 s.
+
+- **Cheap-pass-first** (the shape that fixed `by substituting`): **worse**,
+  14.7 s → 15.6 s. That fix works by finding a cheap winner before an
+  expensive loser spends the budget. Here there is a winner in 1 case out of
+  74, so there is almost never a cheap winner to find and the extra pass is
+  pure overhead. *The same shape does not transfer to a rung with a low win
+  rate.*
+- **Capping the recursive prove outright** at the redundancy budget: 14.7 s →
+  **4.9 s**, but **breaks 4 library files** (`Algebra/integral_domain`,
+  `Natural/cancellation`, `Natural/arithmetic`, `Natural/binomial`). Some of
+  the rare wins genuinely need the room.
+- **Capping at 200k / 400k kernel steps**: library green, but **no speedup at
+  all** (15.0 s / 15.0 s) — the losing searches each stay under the cap, so
+  nothing is cut.
+
+There is no single step-count cap that both keeps the library green and cuts
+the cost: the searches that must be allowed and the searches that waste time
+are not separated by total step count. A different discriminator is needed —
+or the congruence-closure rewrite above.
+
+**Kept from the attempt:** `CheapProveWindow` (`internal.hpp`), a correct
+self-contained low-effort window. `RedundancyBudgetGuard` only lowers the
+ceiling, and since the budget is cumulative from the armed frame's snapshot,
+lowering it mid-search trips instantly AND leaves `autoProveBudgetTripped_`
+set, poisoning the rest of the claim — which is exactly how the first version
+of this attempt broke `Metric/connected.math`. `CheapProveWindow` saves and
+restores the snapshot, ceiling, trip flag and active flag. The
+`by substituting` fix now uses it.
+
 ## Optimisation attempts so far — both failed, measured
 
 Recorded so the next attempt does not repeat them.

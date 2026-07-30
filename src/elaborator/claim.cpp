@@ -481,9 +481,9 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
                         AutoProveCallerLabelGuard callerLabel(
                             *this, "`by substituting` re-proof");
                         PhaseTimer proveTimer(substTimingOn, proveMicros);
-                        std::unique_ptr<RedundancyBudgetGuard> cheapGuard;
+                        std::unique_ptr<CheapProveWindow> cheapGuard;
                         if (cheapProver) {
-                            cheapGuard.reset(new RedundancyBudgetGuard(*this));
+                            cheapGuard.reset(new CheapProveWindow(*this));
                         }
                         ExpressionPointer proofRewritten = autoProveClaim(
                             rewrittenGoal, localBinders, line, budget);

@@ -7081,6 +7081,45 @@ private:
     // re-proof that would exceed the threshold trips the budget and yields
     // no proof, so the hint is (correctly) left in place. A zero threshold
     // leaves the budget untouched (cost gate disabled).
+    // A self-contained low-effort window for a SPECULATIVE prover call.
+    //
+    // `RedundancyBudgetGuard` only lowers the ceiling, and the budget is
+    // cumulative from the armed frame's snapshot — so inside a search that has
+    // already spent something, lowering the ceiling trips instantly AND leaves
+    // `autoProveBudgetTripped_` set, poisoning the rest of the claim. This
+    // guard opens a fresh window instead: its own snapshot, its own low
+    // ceiling, and the trip flag saved and restored, so a speculative attempt
+    // that overruns is invisible to everything outside it.
+    struct CheapProveWindow {
+        Elaborator& elaborator;
+        long long savedLimit;
+        uint64_t savedSnapshot;
+        bool savedTripped;
+        bool savedActive;
+        // `cap` in kernel reduction steps; 0 means "use the redundancy
+        // budget". A rung with a low win rate wants a cap of its own —
+        // low enough to cut the losing searches, high enough to keep the
+        // wins it does have.
+        CheapProveWindow(Elaborator& e, long long cap = 0)
+            : elaborator(e),
+              savedLimit(e.autoProveBudgetLimit_),
+              savedSnapshot(e.autoProveStepSnapshot_),
+              savedTripped(e.autoProveBudgetTripped_),
+              savedActive(e.autoProveBudgetActive_) {
+            if (cap <= 0) cap = e.redundancyBudget();
+            if (cap > 0) e.autoProveBudgetLimit_ = cap;
+            e.autoProveStepSnapshot_ = kernelStepsSoFar();
+            e.autoProveBudgetTripped_ = false;
+            e.autoProveBudgetActive_ = true;
+        }
+        ~CheapProveWindow() {
+            elaborator.autoProveBudgetLimit_ = savedLimit;
+            elaborator.autoProveStepSnapshot_ = savedSnapshot;
+            elaborator.autoProveBudgetTripped_ = savedTripped;
+            elaborator.autoProveBudgetActive_ = savedActive;
+        }
+    };
+
     struct RedundancyBudgetGuard {
         Elaborator& elaborator;
         long long saved;
