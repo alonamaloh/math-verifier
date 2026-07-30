@@ -24,7 +24,10 @@ three theorems being reported as verified when they had not been compiled.
 2. **Name the object under construction with `let`.** Citations unify through
    a `let`-bound term, including in a `case` label and when the theorem's own
    conclusion spells the term out.
-3. **`a ≠ b`, never `¬(a = b)`.**
+3. **`a ≠ b`, never `¬(a = b)`; `a ∉ S`, never `¬(a ∈ S)`.** One exception,
+   forced: `suppose x ∉ S for contradiction` is not recognised as a reductio
+   (friction L3 in `FRICTION_PLANE_LAYER6.md`) — that one position keeps the
+   `¬(…)` spelling until the matcher is fixed.
 4. **Introduce binders with `take` / `suppose`, never a restated-type
    lambda** (`by (y : Plane.Point) (h : …) ↦ { … }`) — `docs/style.md` names
    this a raw-CIC tell.
@@ -47,6 +50,12 @@ Measured and found to be pure noise — removing them changed nothing:
 - all 7 positional ∀-hypothesis citations.
 So there is no G6/G8-adjacent friction here, contrary to what the review
 suspected.
+
+## Notation — DONE in both areas
+
+`≠` (134 sites in Graph/) and `∉` (~150 lines across both) are swept; both
+areas are clean apart from the one L3-forced exception. Numeral ascriptions
+dropped in Graph/ (11) and confirmed load-bearing in Plane/.
 
 ## `Plane/` — IN PROGRESS
 
