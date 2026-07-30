@@ -106,6 +106,62 @@ theorem Plane.openArc_segmentDrawing (piece : Plane.Segment)
 }
 
 -- ----------------------------------------------------------------------
+-- Two names for one segment.
+--
+-- `(a, b)` and `(b, a)` are distinct edge names drawing the same points, and
+-- a graph may hold only one of them (they would be distinct edges with equal
+-- interiors). So a construction has to recognise when two names are one
+-- segment — and this is also the strongest conclusion the overlay's
+-- separation argument can reach: overlapping collinear pieces coincide after
+-- enough cuts, they do not come apart.
+
+definition Plane.reverseSegment (piece : Plane.Segment) : Plane.Segment :=
+  Product.make(Product.second(piece), Product.first(piece))
+
+definition Plane.SameSegment (piece other : Plane.Segment) : Proposition :=
+  piece = other ∨ piece = Plane.reverseSegment(other)
+
+theorem Plane.SameSegment.reflexive (piece : Plane.Segment)
+        : Plane.SameSegment(piece, piece) := {
+  piece = piece;
+  done
+}
+
+theorem Plane.SameSegment.segment (piece other : Plane.Segment)
+        (same : Plane.SameSegment(piece, other))
+        : Plane.segment(Product.first(piece), Product.second(piece))
+          = Plane.segment(Product.first(other), Product.second(other)) :=
+  done by cases {
+    case piece = other:
+        done
+    case piece = Plane.reverseSegment(other) as isReversed: {
+        Plane.segment(Product.first(Plane.reverseSegment(other)),
+                      Product.second(Plane.reverseSegment(other)))
+            = Plane.segment(Product.second(other), Product.first(other))
+            = Plane.segment(Product.first(other), Product.second(other))
+                  by Plane.segment_symmetric;
+        done by substituting isReversed
+      }
+  }
+
+theorem Plane.SameSegment.openSegment (piece other : Plane.Segment)
+        (same : Plane.SameSegment(piece, other))
+        : Plane.openSegment(Product.first(piece), Product.second(piece))
+          = Plane.openSegment(Product.first(other), Product.second(other)) :=
+  done by cases {
+    case piece = other:
+        done
+    case piece = Plane.reverseSegment(other) as isReversed: {
+        Plane.openSegment(Product.first(Plane.reverseSegment(other)),
+                          Product.second(Plane.reverseSegment(other)))
+            = Plane.openSegment(Product.second(other), Product.first(other))
+            = Plane.openSegment(Product.first(other), Product.second(other))
+                  by Plane.openSegment_symmetric;
+        done by substituting isReversed
+      }
+  }
+
+-- ----------------------------------------------------------------------
 -- The two ends of a segment edge, read off the graph.
 --
 -- With `ends` the identity, `Graph.Joins.at_components` says exactly that

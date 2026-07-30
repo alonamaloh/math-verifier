@@ -372,7 +372,7 @@ theorem Plane.distance_right_LessOrEqual_of_not_interior
 -- piece crossing the overlap transversally would meet it and avoid its ends
 -- without lying inside it, so every point named is a point of one ambient
 -- segment.
-theorem Plane.segment_inside_of_ends_outside (a b : Plane.Point) (distinct : a ≠ b)
+theorem Plane.segment_inside_of_ends_outside_oriented (a b : Plane.Point) (distinct : a ≠ b)
         (pieceNear pieceFar : Plane.Point)
         (pieceNearOn : pieceNear ∈ Plane.segment(a, b))
         (pieceFarOn : pieceFar ∈ Plane.segment(a, b))
@@ -427,7 +427,7 @@ theorem Plane.segment_inside_of_ends_outside (a b : Plane.Point) (distinct : a �
 -- separation the overlay runs on: once every piece's ends are cut points,
 -- and so interior to nothing, two pieces that share an interior point
 -- cannot merely overlap — they coincide.
-theorem Plane.same_ends_of_meeting_interiors (a b : Plane.Point) (distinct : a ≠ b)
+theorem Plane.same_ends_of_meeting_interiors_oriented (a b : Plane.Point) (distinct : a ≠ b)
         (firstNear firstFar : Plane.Point)
         (firstNearOn : firstNear ∈ Plane.segment(a, b))
         (firstFarOn : firstFar ∈ Plane.segment(a, b))
@@ -475,4 +475,152 @@ theorem Plane.same_ends_of_meeting_interiors (a b : Plane.Point) (distinct : a �
       by Real.LessOrEqual.antisymmetric;
   firstFar = secondFar by Plane.equal_of_distance_from_left;
   done
+}
+
+-- ----------------------------------------------------------------------
+-- The same two, asking the caller nothing about orientation.
+--
+-- A piece is a pair of ends, and which of them is nearer `a` is none of the
+-- caller's business — `Plane.segment` and `Plane.openSegment` do not care.
+-- The oriented forms above are stated near-end-first because that is what
+-- the arithmetic wants; these decide the orientation themselves, and they
+-- are what the overlay uses. Every hypothesis is restated in both spellings
+-- first, so each of the four cases is just "which way round, then cite".
+
+theorem Plane.segment_inside_of_ends_outside (a b : Plane.Point) (distinct : a ≠ b)
+        (pieceLeft pieceRight : Plane.Point)
+        (pieceLeftOn : pieceLeft ∈ Plane.segment(a, b))
+        (pieceRightOn : pieceRight ∈ Plane.segment(a, b))
+        (overlapLeft overlapRight : Plane.Point)
+        (overlapLeftOn : overlapLeft ∈ Plane.segment(a, b))
+        (overlapRightOn : overlapRight ∈ Plane.segment(a, b))
+        (x : Plane.Point)
+        (onPiece : x ∈ Plane.openSegment(pieceLeft, pieceRight))
+        (inOverlap : x ∈ Plane.openSegment(overlapLeft, overlapRight))
+        (leftOutside : overlapLeft ∉ Plane.openSegment(pieceLeft, pieceRight))
+        (rightOutside : overlapRight ∉ Plane.openSegment(pieceLeft, pieceRight))
+        : Plane.segment(pieceLeft, pieceRight)
+              ⊆ Plane.segment(overlapLeft, overlapRight) := {
+  Plane.openSegment(pieceLeft, pieceRight) = Plane.openSegment(pieceRight, pieceLeft)
+      by Plane.openSegment_symmetric as pieceInteriorReversed;
+  Plane.segment(pieceLeft, pieceRight) = Plane.segment(pieceRight, pieceLeft)
+      by Plane.segment_symmetric as pieceReversed;
+  Plane.openSegment(overlapLeft, overlapRight)
+      = Plane.openSegment(overlapRight, overlapLeft)
+      by Plane.openSegment_symmetric as overlapInteriorReversed;
+  Plane.segment(overlapLeft, overlapRight) = Plane.segment(overlapRight, overlapLeft)
+      by Plane.segment_symmetric as overlapReversed;
+  x ∈ Plane.openSegment(pieceRight, pieceLeft) by substituting pieceInteriorReversed;
+  x ∈ Plane.openSegment(overlapRight, overlapLeft)
+      by substituting overlapInteriorReversed;
+  overlapLeft ∉ Plane.openSegment(pieceRight, pieceLeft)
+      by substituting pieceInteriorReversed;
+  overlapRight ∉ Plane.openSegment(pieceRight, pieceLeft)
+      by substituting pieceInteriorReversed;
+  done by cases {
+    case Plane.distance(a, pieceLeft) ≤ Plane.distance(a, pieceRight):
+        done by cases {
+          case Plane.distance(a, overlapLeft) ≤ Plane.distance(a, overlapRight):
+              done by Plane.segment_inside_of_ends_outside_oriented
+          otherwise: {
+              Plane.distance(a, overlapRight) ≤ Plane.distance(a, overlapLeft)
+                  by Real.not_LessOrEqual_implies;
+              Plane.segment(pieceLeft, pieceRight)
+                  ⊆ Plane.segment(overlapRight, overlapLeft)
+                  by Plane.segment_inside_of_ends_outside_oriented;
+              done by substituting overlapReversed
+            }
+        }
+    otherwise: {
+        Plane.distance(a, pieceRight) ≤ Plane.distance(a, pieceLeft)
+            by Real.not_LessOrEqual_implies;
+        done by cases {
+          case Plane.distance(a, overlapLeft) ≤ Plane.distance(a, overlapRight): {
+              Plane.segment(pieceRight, pieceLeft)
+                  ⊆ Plane.segment(overlapLeft, overlapRight)
+                  by Plane.segment_inside_of_ends_outside_oriented;
+              done by substituting pieceReversed
+            }
+          otherwise: {
+              Plane.distance(a, overlapRight) ≤ Plane.distance(a, overlapLeft)
+                  by Real.not_LessOrEqual_implies;
+              Plane.segment(pieceRight, pieceLeft)
+                  ⊆ Plane.segment(overlapRight, overlapLeft)
+                  by Plane.segment_inside_of_ends_outside_oriented;
+              Plane.segment(pieceRight, pieceLeft)
+                  ⊆ Plane.segment(overlapLeft, overlapRight)
+                  by substituting overlapReversed;
+              done by substituting pieceReversed
+            }
+        }
+      }
+  }
+}
+
+-- Two pieces whose interiors meet, each keeping the other's ends out of its
+-- interior, are the same pair of points — in one order or the other.
+theorem Plane.same_ends_of_meeting_interiors (a b : Plane.Point) (distinct : a ≠ b)
+        (firstLeft firstRight : Plane.Point)
+        (firstLeftOn : firstLeft ∈ Plane.segment(a, b))
+        (firstRightOn : firstRight ∈ Plane.segment(a, b))
+        (secondLeft secondRight : Plane.Point)
+        (secondLeftOn : secondLeft ∈ Plane.segment(a, b))
+        (secondRightOn : secondRight ∈ Plane.segment(a, b))
+        (x : Plane.Point)
+        (onFirst : x ∈ Plane.openSegment(firstLeft, firstRight))
+        (onSecond : x ∈ Plane.openSegment(secondLeft, secondRight))
+        (secondLeftOutside : secondLeft ∉ Plane.openSegment(firstLeft, firstRight))
+        (secondRightOutside : secondRight ∉ Plane.openSegment(firstLeft, firstRight))
+        (firstLeftOutside : firstLeft ∉ Plane.openSegment(secondLeft, secondRight))
+        (firstRightOutside : firstRight ∉ Plane.openSegment(secondLeft, secondRight))
+        : (firstLeft = secondLeft ∧ firstRight = secondRight)
+          ∨ (firstLeft = secondRight ∧ firstRight = secondLeft) := {
+  Plane.openSegment(firstLeft, firstRight) = Plane.openSegment(firstRight, firstLeft)
+      by Plane.openSegment_symmetric as firstReversed;
+  Plane.openSegment(secondLeft, secondRight)
+      = Plane.openSegment(secondRight, secondLeft)
+      by Plane.openSegment_symmetric as secondReversed;
+  x ∈ Plane.openSegment(firstRight, firstLeft) by substituting firstReversed;
+  x ∈ Plane.openSegment(secondRight, secondLeft) by substituting secondReversed;
+  secondLeft ∉ Plane.openSegment(firstRight, firstLeft) by substituting firstReversed;
+  secondRight ∉ Plane.openSegment(firstRight, firstLeft) by substituting firstReversed;
+  firstLeft ∉ Plane.openSegment(secondRight, secondLeft) by substituting secondReversed;
+  firstRight ∉ Plane.openSegment(secondRight, secondLeft) by substituting secondReversed;
+  done by cases {
+    case Plane.distance(a, firstLeft) ≤ Plane.distance(a, firstRight):
+        done by cases {
+          case Plane.distance(a, secondLeft) ≤ Plane.distance(a, secondRight): {
+              firstLeft = secondLeft ∧ firstRight = secondRight
+                  by Plane.same_ends_of_meeting_interiors_oriented;
+              done by Or.introduceLeft
+            }
+          otherwise: {
+              Plane.distance(a, secondRight) ≤ Plane.distance(a, secondLeft)
+                  by Real.not_LessOrEqual_implies;
+              firstLeft = secondRight ∧ firstRight = secondLeft
+                  by Plane.same_ends_of_meeting_interiors_oriented;
+              done by Or.introduceRight
+            }
+        }
+    otherwise: {
+        Plane.distance(a, firstRight) ≤ Plane.distance(a, firstLeft)
+            by Real.not_LessOrEqual_implies;
+        done by cases {
+          case Plane.distance(a, secondLeft) ≤ Plane.distance(a, secondRight): {
+              firstRight = secondLeft ∧ firstLeft = secondRight
+                  by Plane.same_ends_of_meeting_interiors_oriented;
+              firstLeft = secondRight ∧ firstRight = secondLeft;
+              done by Or.introduceRight
+            }
+          otherwise: {
+              Plane.distance(a, secondRight) ≤ Plane.distance(a, secondLeft)
+                  by Real.not_LessOrEqual_implies;
+              firstRight = secondRight ∧ firstLeft = secondLeft
+                  by Plane.same_ends_of_meeting_interiors_oriented;
+              firstLeft = secondLeft ∧ firstRight = secondRight;
+              done by Or.introduceLeft
+            }
+        }
+      }
+  }
 }
