@@ -206,27 +206,34 @@ Recorded so the next attempt does not repeat them.
    9.7 s serially. An "improvement" measured across the two is meaningless.
    **Measure serially, one file, or not at all.**
 
-## Where the substitution cost is NOT
+## Where the substitution cost is — routing confirmed
 
-`by substituting <eq>` takes four of the top eleven and looked like one shared
-root cause. It is not in the obvious place:
+`by substituting <eq>` takes four of the top eleven and looks like one shared
+root cause. The routing is confirmed:
 
-- instrumenting `elaborateClaimBySubstitution`'s attempt loop (occurrence
-  search, rewritten-goal typecheck, defeq probe, prover call) records **zero
-  attempts** for `Matrix.characteristic_entry_leading:388`, a 9.8 s claim;
-- instrumenting the candidate-preparation phase that runs before that loop —
-  elaborating the hint, auto-proving a bare-proposition equation, inferring a
-  quantified equation's arguments — records **under a millisecond**.
+```
+dispatch.cpp  SurfaceStructuredClaim
+  → induction.cpp:1677  Elaborator::elaborateStructuredClaim
+      → induction.cpp:1753  if (claim.bySubstitution)
+          → claim.cpp:9     elaborateClaimBySubstitution
+```
 
-So the 9.8 s (and by extension the 194 s outlier) is spent on a **third path**
-that a `bySubstitution` claim can take, which `elaborateClaimBySubstitution`
-is not on. `internal.hpp`'s `if (claim.bySubstitution)` near the structured
-claim dispatch is the next thing to read; `induction.cpp:1753` is the only
-call site found so far and it is reached from the induction/cases route, not
-from a plain statement claim.
+**Correction to an earlier note here.** I recorded that the expensive claims
+"never execute `elaborateClaimBySubstitution`", on the strength of sub-phase
+counters that reported zero attempts. That conclusion was wrong: the counters
+were being reset by NESTED `ClaimCostScope`s (an enclosing claim's tally wiped
+by the claims inside it). The reset bug was fixed but never re-validated on
+the right row before the whole batch was reverted, so the "zero attempts"
+reading should be treated as unmeasured, not as a fact about the code.
 
-**Find that path before optimising anything.** Both failed attempts above came
-from optimising code that the expensive claims never execute.
+`reportClaimHintDiagnostics`, which runs right after the substitution returns,
+is gated behind `classifyHintsEnabled()` / the redundancy flags, so it is NOT
+a suspect in an ordinary build.
+
+**Next step: re-instrument with the nested-reset fix in place, and confirm
+which phase of `elaborateClaimBySubstitution` holds the 9.8 s** before
+optimising anything. Both failed attempts below came from acting ahead of
+that measurement.
 
 ## Directions worth trying
 
