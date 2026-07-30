@@ -137,6 +137,55 @@ Known imprecision: `closed by` is the last prover win anywhere in the claim's
 subtree, so for a hinted claim it may name a premise's winner rather than the
 claim's own. The self-time column is the reliable number.
 
+## Library-wide ranking (2026-07-30, `MATH_TIME_CLAIMS=1`, cold)
+
+**Nothing below is fixed yet.** This is the baseline the fixes get measured
+against.
+
+Over a cold `make library`: 2537 claims reported (only from declarations above
+the 200 ms floor), **1087 s of claim self-time in total**. The distribution is
+extremely concentrated:
+
+- **top 10 claims = 499 s = 46%** of all reported claim time
+- top 20 claims = 617 s = 57%
+
+By area: `Plane` 448 s, `Algebra` 424 s, `Real` 60 s, `Natural` 40 s,
+`Metric` 25 s, `Graph` 24 s, `Polynomial` 21 s.
+
+| ms | declaration | line | hint as written | closed by |
+| --- | --- | --- | --- | --- |
+| **193758** | `Plane.Graph.orient Plane.IsEndOf.orientSegment` | 202 | `by substituting <eq>` | `localFactExactMatch` |
+| **48010** | `Algebra.basis_pruning VectorSpace.size_one_finite_dimensional` | 808 | `by pointNonzero` | `contextFactDiffBridge` |
+| **47162** | `Plane.Graph.overlay Plane.subdivide_common_segment` | 248 | `by <proof>` | `localFactExactMatch` |
+| **46566** | `Plane.Graph.overlay Plane.subdivide_common_segment` | 251 | `by <proof>` | *nothing — hint checked directly, or it failed* |
+| **40108** | `Plane.Graph.overlay Plane.subdivide_separated` | 323 | `by <proof>` | `contextEqualityBridge (library lemma Plane.segmentDrawing_arcFinish)` |
+| **37154** | `Algebra.schur_complement Matrix.quadraticForm_schurComplement` | 575 | `by Matrix.quadraticForm_bordered` | *nothing — hint checked directly, or it failed* |
+| **24980** | `Algebra.rank_nullity LinearMap.appended_images_independent` | 1836 | `by <proof>` | *nothing — hint checked directly, or it failed* |
+| **23080** | `Plane.concatenate Plane.IsLoop.concatenate` | 798 | `by Plane.concatenate_across_seam_of_loop` | *nothing — hint checked directly, or it failed* |
+| **20061** | `Algebra.characteristic_polynomial Matrix.characteristic_entry_leading` | 388 | `by substituting <eq>` | `equalityBattery` |
+| **18195** | `Algebra.characteristic_polynomial Matrix.characteristic_entry_constant` | 415 | `by substituting <eq>` | `equalityBattery` |
+| **17619** | `Real.arithmetic_geometric_mean Real.means_inequality_doubling` | 269 | `by substituting <eq>` | `contextFactMatch (local binder _claim_anon_268_9)` |
+| **16152** | `Natural.floor_divide Natural.monus_succ_implies_gt` | 370 | `by cases` | `monotonicityRecursion` |
+| **13532** | `Algebra.rank_four_diagonal_branch Matrix.diagonalExtension_apply_appendCoordinate_general` | 178 | `by cases` | `contextFactDiffBridge` |
+| **11322** | `Real.arithmetic_geometric_mean Real.means_inequality_downward` | 296 | `by substituting <eq>` | `contextFactMatch (local binder atIndex)` |
+| **11247** | `Algebra.rank_nullity VectorSpace.independent_append_outside_span` | 724 | `by <proof>` | `localFactExactMatch` |
+
+Patterns worth naming, since they recur down the list:
+
+- **`by substituting <eq>` is the single worst hint form.** It takes four of
+  the top eleven, including the 194 s outlier. In each case the rewritten goal
+  is then closed by a cheap rung (`localFactExactMatch`, `equalityBattery`,
+  an exact context fact) — so the cost is the REWRITE SEARCH, not the proof.
+- **"closed by nothing" appears four times in the top ten.** Those are claims
+  whose hint was checked directly (so the prover's verdict is empty) or which
+  failed and fell back. Either way, seconds spent with no prover win to show
+  for it.
+- **`Plane.IsLoop.concatenate:798` (23 s) is mine**, added in this session's
+  cycle→Jordan-curve work. `by Plane.concatenate_across_seam_of_loop` is the
+  right lemma mathematically and it is the 8th most expensive claim in the
+  library; worth revisiting when the `by`-citation discharge path is
+  understood.
+
 ## Directions worth trying
 
 - **Shrink the context.** These proofs state ~30 facts before using any of
