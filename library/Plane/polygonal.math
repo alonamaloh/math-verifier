@@ -104,11 +104,11 @@ theorem Plane.segment_inside_of_open
   ∀ (y : Plane.Point). y ∈ Set.universe(Plane.Point) →
       Plane.distance(center, y) < radius → y ∈ region as nearbyInRegion;
   Plane.Ball(center, radius) ⊆ region
-      by (y : Plane.Point) (yInBall : y ∈ Plane.Ball(center, radius)) ↦ {
-        Plane.distance(center, y) < radius;
-        y ∈ Set.universe(Plane.Point) by Set.member_universe;
-        done by nearbyInRegion
-      };
+      by { take y : Plane.Point;
+           suppose y ∈ Plane.Ball(center, radius);
+           Plane.distance(center, y) < radius;
+           y ∈ Set.universe(Plane.Point) by Set.member_universe;
+           done by nearbyInRegion };
   Plane.distance(center, center) = 0 by Plane.distance_self;
   Plane.distance(center, center) < radius;
   center ∈ Plane.Ball(center, radius);
@@ -116,13 +116,13 @@ theorem Plane.segment_inside_of_open
     0 < radius;
     ∀ (y : Plane.Point). Plane.distance(center, y) < radius →
         Plane.segment(center, y) ⊆ region
-        by (y : Plane.Point) (yNear : Plane.distance(center, y) < radius) ↦ {
-          y ∈ Plane.Ball(center, radius);
-          Plane.IsConvex(Plane.Ball(center, radius)) by Plane.Ball_IsConvex;
-          Plane.segment(center, y) ⊆ Plane.Ball(center, radius)
-              by Plane.IsConvex.segment_inside;
-          done by Set.subset.transitive(b := Plane.Ball(center, radius))
-        };
+        by { take y : Plane.Point;
+             suppose Plane.distance(center, y) < radius;
+             y ∈ Plane.Ball(center, radius);
+             Plane.IsConvex(Plane.Ball(center, radius)) by Plane.Ball_IsConvex;
+             Plane.segment(center, y) ⊆ Plane.Ball(center, radius)
+                 by Plane.IsConvex.segment_inside;
+             done by Set.subset.transitive(b := Plane.Ball(center, radius)) };
     done
   }
 }
@@ -151,13 +151,13 @@ theorem Plane.reachableFrom_OpenIn
     ∀ (y : Plane.Point). y ∈ region →
         Plane.distance(x, y) < radius →
           y ∈ Plane.reachableFrom(region, source)
-        by (y : Plane.Point) (yInRegion : y ∈ region)
-           (yNear : Plane.distance(x, y) < radius) ↦ {
-          Plane.segment(x, y) ⊆ region by nearbySegments;
-          Plane.PolygonalReach(region, source, y)
-              by Plane.PolygonalReach.extend(waypoint := x);
-          done
-        };
+        by { take y : Plane.Point;
+             suppose y ∈ region;
+             suppose Plane.distance(x, y) < radius;
+             Plane.segment(x, y) ⊆ region by nearbySegments;
+             Plane.PolygonalReach(region, source, y)
+                 by Plane.PolygonalReach.extend(waypoint := x);
+             done };
     done
   }
 }
@@ -184,18 +184,19 @@ theorem Plane.reachableFrom_ClosedIn
     ∀ (y : Plane.Point). y ∈ region →
         Plane.distance(x, y) < radius →
           y ∈ region ∖ Plane.reachableFrom(region, source)
-        by (y : Plane.Point) (yInRegion : y ∈ region)
-           (yNear : Plane.distance(x, y) < radius) ↦ {
-          Plane.segment(x, y) ⊆ region by nearbySegments;
-          Plane.segment(y, x) ⊆ region by substituting Plane.segment_symmetric;
-          suppose y ∈ Plane.reachableFrom(region, source) for contradiction {
-            Plane.PolygonalReach(region, source, y);
-            Plane.PolygonalReach(region, source, x) by Plane.PolygonalReach.extend(waypoint := y);
-            x ∈ Plane.reachableFrom(region, source);
-            done
-          };
-          done
-        };
+        by { take y : Plane.Point;
+             suppose y ∈ region;
+             suppose Plane.distance(x, y) < radius;
+             Plane.segment(x, y) ⊆ region by nearbySegments;
+             Plane.segment(y, x) ⊆ region by substituting Plane.segment_symmetric;
+             suppose y ∈ Plane.reachableFrom(region, source) for contradiction {
+               Plane.PolygonalReach(region, source, y);
+               Plane.PolygonalReach(region, source, x)
+                   by Plane.PolygonalReach.extend(waypoint := y);
+               x ∈ Plane.reachableFrom(region, source);
+               done
+             };
+             done };
     done
   }
 }
