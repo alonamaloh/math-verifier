@@ -144,7 +144,7 @@ break as a proof to improve works, and the fixes are improvements:
 | prove cap | files failing | state |
 | --- | --- | --- |
 | 6 | 3 → **0** | done — three proofs written out |
-| 3 | 16 | next |
+| 3 | 16 → **13** | in progress — every break explains itself |
 | 1 | 35 | the goal; worth 14.9 s → 6.4 s on the profiled file |
 
 The three fixed: `Natural/distance.math` (`le_add_distance` was hiding
@@ -153,6 +153,45 @@ The three fixed: `Natural/distance.math` (`le_add_distance` was hiding
 unfolded on both sides), `Natural/binomial.math` (a by-less `≤` step hiding
 `Natural.le_successor` and a transitivity). All three now name what they use,
 which is what the style guide asks for anyway.
+
+### Lowering the cap: the theory pans out, but the fixes are not all trivial
+
+At cap 3, **14 files failed and 14 of 14 explained themselves** — every break
+named the exact lemma the deeper search used. That part of the theory is
+confirmed outright: the messages remove all the reverse-engineering.
+
+The fixes split into two classes, and only one is mechanical.
+
+**Mechanical (fixed, 4 sites).** A bare claim whose rewrite is a single named
+equation. Every one of these was the same shape:
+
+```math
+¬(1 + k = 0);                                    -- before
+¬(1 + k = 0) by substituting Natural.one_add;    -- after
+```
+
+`Natural/binomial.math`, `Integer/integral_domain.math`,
+`Polynomial/units.math` all took exactly that edit.
+
+**Not mechanical.** Fixing the first site in a file usually moves the failure
+to a *second* site in the same file, and the later ones are real proof edits.
+`Natural/binomial.math` after its easy fix reports
+
+```
+calc step 2 at line 125
+  The deeper search rewrote with:
+    - local binder _claim_anon_118_9
+    - library lemma Natural.binomial_pascal
+```
+
+— a calc step that needs an anonymous local claim AND Pascal's rule. The
+message says *what was used*, not *how to restructure the step*; turning that
+into named steps is ordinary proof work.
+
+So: **the diagnosis is free, the surgery is not.** Estimate for the rest of
+the ladder: 13 files at cap 3, then ~34 at cap 1, several sites each — a real
+sweep of maybe two sessions, but a guided one, with every edit improving the
+proof by the style guide's own standard.
 
 ### Deep search as an error-message generator — BUILT 2026-07-30
 
