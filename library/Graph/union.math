@@ -130,7 +130,7 @@ theorem Graph.union.IsWellFormed (first second : Graph(V, E, ends))
   ∀ (edge : E). ∀ (u v : V).
       edge ∈ Graph.edges(Graph.union(first, second))
       → Graph.Joins(Graph.union(first, second), edge, u, v)
-      → u ∈ Graph.vertices(Graph.union(first, second)) ∧ ¬(u = v)
+      → u ∈ Graph.vertices(Graph.union(first, second)) ∧ u ≠ v
       by { take edge : E;
            take u : V;
            take v : V;
@@ -142,7 +142,7 @@ theorem Graph.union.IsWellFormed (first second : Graph(V, E, ends))
              case edge ∈ Graph.edges(first): {
                  Graph.Joins(first, edge, u, v);
                  u ∈ Graph.vertices(first) by Graph.IsWellFormed.end_is_vertex;
-                 ¬(u = v) by Graph.IsWellFormed.no_loop;
+                 u ≠ v by Graph.IsWellFormed.no_loop;
                  u ∈ Graph.vertices(Graph.union(first, second))
                      by Graph.union.vertex_left;
                  done
@@ -150,7 +150,7 @@ theorem Graph.union.IsWellFormed (first second : Graph(V, E, ends))
              case edge ∈ Graph.edges(second): {
                  Graph.Joins(second, edge, u, v);
                  u ∈ Graph.vertices(second) by Graph.IsWellFormed.end_is_vertex;
-                 ¬(u = v) by Graph.IsWellFormed.no_loop;
+                 u ≠ v by Graph.IsWellFormed.no_loop;
                  u ∈ Graph.vertices(Graph.union(first, second))
                      by Graph.union.vertex_right;
                  done
@@ -206,7 +206,7 @@ theorem Graph.IsTwoConnected.union (first second : Graph(V, E, ends))
         (firstTwoConnected : Graph.IsTwoConnected(first))
         (secondTwoConnected : Graph.IsTwoConnected(second))
         (commonOne commonTwo : V)
-        (commonOneDistinct : ¬(commonOne = commonTwo))
+        (commonOneDistinct : commonOne ≠ commonTwo)
         (oneInFirst : commonOne ∈ Graph.vertices(first))
         (oneInSecond : commonOne ∈ Graph.vertices(second))
         (twoInFirst : commonTwo ∈ Graph.vertices(first))
@@ -229,19 +229,19 @@ theorem Graph.IsTwoConnected.union (first second : Graph(V, E, ends))
 
            -- One of the two common vertices survives the deletion.
            ∃ (survivor : V). survivor ∈ Graph.vertices(first)
-                 ∧ survivor ∈ Graph.vertices(second) ∧ ¬(survivor = deleted)
+                 ∧ survivor ∈ Graph.vertices(second) ∧ survivor ≠ deleted
                by cases {
                  case commonOne = deleted: {
-                     ¬(commonTwo = deleted) by substituting (commonOne = deleted);
+                     commonTwo ≠ deleted by substituting (commonOne = deleted);
                      witness commonTwo
                    }
-                 otherwise: { ¬(commonOne = deleted); witness commonOne }
+                 otherwise: { commonOne ≠ deleted; witness commonOne }
                };
            choose survivor such that survivor ∈ Graph.vertices(first)
-               ∧ survivor ∈ Graph.vertices(second) ∧ ¬(survivor = deleted);
+               ∧ survivor ∈ Graph.vertices(second) ∧ survivor ≠ deleted;
            survivor ∈ Graph.vertices(first);
            survivor ∈ Graph.vertices(second);
-           ¬(survivor = deleted);
+           survivor ≠ deleted;
 
            -- Each side stays connected: if it has the deleted vertex,
            -- because it is 2-connected; if not, because nothing was
@@ -293,7 +293,7 @@ theorem Graph.IsTwoConnected.union (first second : Graph(V, E, ends))
                by { take target : V;
                     suppose target ∈ Graph.vertices(
                         Graph.deleteVertex(Graph.union(first, second), deleted));
-                    ¬(target = deleted) by Graph.deleteVertex.drops;
+                    target ≠ deleted by Graph.deleteVertex.drops;
                     target ∈ Graph.vertices(Graph.union(first, second))
                         by Graph.deleteVertex.is_vertex;
                     target ∈ Graph.vertices(first) ∨ target ∈ Graph.vertices(second)

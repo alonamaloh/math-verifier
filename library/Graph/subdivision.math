@@ -52,7 +52,7 @@ theorem Graph.IsTwoConnected.replace_edge_by_path
         (joins : Graph.Joins(graph, edge, u, v))
         (isPath : Graph.IsPathGraph(pathGraph, u, v))
         (interiorIsNew : ∀ (candidate : V). candidate ∈ Graph.vertices(pathGraph)
-            → ¬(candidate = u) → ¬(candidate = v)
+            → candidate ≠ u → candidate ≠ v
             → ¬(candidate ∈ Graph.vertices(graph)))
         : Graph.IsTwoConnected(
               Graph.union(Graph.deleteEdge(graph, edge), pathGraph)) := {
@@ -62,7 +62,7 @@ theorem Graph.IsTwoConnected.replace_edge_by_path
   let subdivided : Graph(V, E, ends) := Graph.union(trimmed, pathGraph);
   u ∈ Graph.vertices(graph) by Graph.IsWellFormed.end_is_vertex;
   v ∈ Graph.vertices(graph) by Graph.IsWellFormed.other_end_is_vertex;
-  ¬(u = v) by Graph.IsWellFormed.no_loop;
+  u ≠ v by Graph.IsWellFormed.no_loop;
   u ∈ Graph.vertices(pathGraph) by Graph.IsPathGraph.source_is_vertex;
   v ∈ Graph.vertices(pathGraph) by Graph.IsPathGraph.target_is_vertex;
   Graph.IsConnected(graph) by Graph.IsTwoConnected.connected;
@@ -77,11 +77,11 @@ theorem Graph.IsTwoConnected.replace_edge_by_path
       by Graph.union.IsSubgraph_right;
 
   -- An old edge other than the replaced one is still there.
-  ∀ (candidate : E). candidate ∈ Graph.edges(graph) → ¬(candidate = edge)
+  ∀ (candidate : E). candidate ∈ Graph.edges(graph) → candidate ≠ edge
       → candidate ∈ Graph.edges(subdivided)
       by { take candidate : E;
            suppose candidate ∈ Graph.edges(graph);
-           suppose ¬(candidate = edge);
+           suppose candidate ≠ edge;
            candidate ∈ Graph.edges(trimmed)
                by Graph.deleteEdge.keeps;
            done by Graph.union.edge_left }
@@ -125,9 +125,7 @@ theorem Graph.IsTwoConnected.replace_edge_by_path
              case target ∈ Graph.vertices(trimmed): {
                  target ∈ Graph.vertices(graph);
                  Graph.Reaches(graph, u, target) by Graph.IsConnected.reaches;
-                 done by Graph.Reaches.reroute(
-                             bigger := Graph.union(trimmed,
-                                                   pathGraph))
+                 done by Graph.Reaches.reroute(bigger := subdivided)
                }
              case target ∈ Graph.vertices(pathGraph): {
                  Graph.Reaches(pathGraph, u, target) by Graph.IsConnected.reaches;
@@ -150,22 +148,22 @@ theorem Graph.IsTwoConnected.replace_edge_by_path
       → Graph.IsConnected(Graph.deleteVertex(
             subdivided, deleted))
       by { take deleted : V;
-           suppose deleted ∈ Graph.vertices(
-               subdivided);
+           suppose deleted ∈ Graph.vertices(subdivided);
+           let pruned : Graph(V, E, ends) := Graph.deleteVertex(subdivided, deleted);
 
            -- One end of the replaced edge survives; it is the hub.
-           ∃ (hub : V). (hub = u ∨ hub = v) ∧ ¬(hub = deleted)
+           ∃ (hub : V). (hub = u ∨ hub = v) ∧ hub ≠ deleted
                by cases {
                  case u = deleted: {
-                     ¬(v = deleted) by substituting (u = deleted);
+                     v ≠ deleted by substituting (u = deleted);
                      v = u ∨ v = v;
                      witness v
                    }
-                 otherwise: { ¬(u = deleted); u = u ∨ u = v; witness u }
+                 otherwise: { u ≠ deleted; u = u ∨ u = v; witness u }
                };
-           choose hub such that (hub = u ∨ hub = v) ∧ ¬(hub = deleted);
+           choose hub such that (hub = u ∨ hub = v) ∧ hub ≠ deleted;
            hub = u ∨ hub = v;
-           ¬(hub = deleted);
+           hub ≠ deleted;
            hub ∈ Graph.vertices(graph)
                by cases {
                  case hub = u: { u ∈ Graph.vertices(graph); done by substituting (hub = u) }
@@ -178,8 +176,7 @@ theorem Graph.IsTwoConnected.replace_edge_by_path
                      done by Graph.IsTwoConnected.survives_deletion
                  otherwise: {
                      ¬(deleted ∈ Graph.vertices(graph));
-                     done by Graph.IsConnected.after_outside_deletion(graph := graph)
-                   }
+                     done by Graph.IsConnected.after_outside_deletion                   }
                };
            Graph.IsSubgraph(Graph.deleteVertex(pathGraph, deleted),
                             Graph.deleteVertex(
@@ -190,12 +187,12 @@ theorem Graph.IsTwoConnected.replace_edge_by_path
            -- The surviving old edges are edges of the deleted union.
            ∀ (candidate : E).
                candidate ∈ Graph.edges(Graph.deleteVertex(graph, deleted))
-               → ¬(candidate = edge)
+               → candidate ≠ edge
                → candidate ∈ Graph.edges(Graph.deleteVertex(
                      subdivided, deleted))
                by { take candidate : E;
                     suppose candidate ∈ Graph.edges(Graph.deleteVertex(graph, deleted));
-                    suppose ¬(candidate = edge);
+                    suppose candidate ≠ edge;
                     candidate ∈ Graph.edges(graph) by Graph.deleteVertex.is_edge;
                     ¬Graph.Incident(graph, candidate, deleted)
                         by Graph.deleteVertex.edge_avoids;
@@ -226,11 +223,11 @@ theorem Graph.IsTwoConnected.replace_edge_by_path
                      done
                    }
                  otherwise: {
-                     ¬(deleted = u)
+                     deleted ≠ u
                          by { suppose deleted = u;
                               deleted = u ∨ deleted = v;
                               done };
-                     ¬(deleted = v)
+                     deleted ≠ v
                          by { suppose deleted = v;
                               deleted = u ∨ deleted = v;
                               done };
@@ -244,11 +241,11 @@ theorem Graph.IsTwoConnected.replace_edge_by_path
                            Graph.IsConnected(Graph.deleteVertex(pathGraph, deleted))
                                by Graph.IsConnected.after_outside_deletion(
                                      graph := pathGraph);
-                           ¬(u = deleted)
+                           u ≠ deleted
                                by { suppose u = deleted;
                                     deleted = u by substituting (u = deleted);
                                     done };
-                           ¬(v = deleted)
+                           v ≠ deleted
                                by { suppose v = deleted;
                                     deleted = v by substituting (v = deleted);
                                     done };
@@ -269,29 +266,15 @@ theorem Graph.IsTwoConnected.replace_edge_by_path
                            -- The deleted vertex is not in the old graph, so the
                            -- old graph's own route around the edge survives.
                            ¬(deleted ∈ Graph.vertices(graph));
-                           choose aroundEdge such that
-                               Graph.IsWalk(trimmed, u,
-                                            aroundEdge, v);
-                           ∀ (candidate : E). candidate ∈ aroundEdge
-                               → candidate ∈ Graph.edges(Graph.deleteVertex(
-                                     Graph.union(trimmed,
-                                                 pathGraph), deleted))
+                           choose aroundEdge such that Graph.IsWalk(trimmed, u, aroundEdge, v);
+                           aroundEdge ⊆ Graph.edges(pruned)
                                by { take candidate : E;
                                     suppose candidate ∈ aroundEdge;
-                                    candidate ∈ Graph.edges(trimmed)
-                                        by Graph.IsWalk.edge_is_edge;
-                                    candidate ∈ Graph.edges(graph)
-                                        by Graph.deleteEdge.is_edge;
-                                    ¬Graph.Incident(graph, candidate, deleted)
-                                        by oldEdgesMeetOldVertices;
-                                    candidate ∈ Graph.edges(
-                                        Graph.union(trimmed,
-                                                    pathGraph))
-                                        by Graph.union.edge_left;
-                                    ¬Graph.Incident(
-                                        Graph.union(trimmed,
-                                                    pathGraph),
-                                        candidate, deleted);
+                                    candidate ∈ Graph.edges(trimmed) by Graph.IsWalk.edge_is_edge;
+                                    candidate ∈ Graph.edges(graph) by Graph.deleteEdge.is_edge;
+                                    ¬Graph.Incident(graph, candidate, deleted) by oldEdgesMeetOldVertices;
+                                    candidate ∈ Graph.edges(subdivided) by Graph.union.edge_left;
+                                    ¬Graph.Incident(subdivided, candidate, deleted);
                                     done by Graph.deleteVertex.keeps_edge };
                            Graph.IsWalk(Graph.deleteVertex(
                                    subdivided,
@@ -308,13 +291,13 @@ theorem Graph.IsTwoConnected.replace_edge_by_path
                };
 
            -- Every surviving old vertex reaches the hub.
-           ∀ (endpoint : V). endpoint ∈ Graph.vertices(graph) → ¬(endpoint = deleted)
+           ∀ (endpoint : V). endpoint ∈ Graph.vertices(graph) → endpoint ≠ deleted
                → Graph.Reaches(Graph.deleteVertex(
                      subdivided, deleted),
                      endpoint, hub)
                by { take endpoint : V;
                     suppose endpoint ∈ Graph.vertices(graph);
-                    suppose ¬(endpoint = deleted);
+                    suppose endpoint ≠ deleted;
                     endpoint ∈ Graph.vertices(Graph.deleteVertex(graph, deleted))
                         by Graph.deleteVertex.keeps_vertex(graph := graph);
                     hub ∈ Graph.vertices(Graph.deleteVertex(graph, deleted))
@@ -344,7 +327,7 @@ theorem Graph.IsTwoConnected.replace_edge_by_path
                by { take target : V;
                     suppose target ∈ Graph.vertices(Graph.deleteVertex(
                         subdivided, deleted));
-                    ¬(target = deleted) by Graph.deleteVertex.drops;
+                    target ≠ deleted by Graph.deleteVertex.drops;
                     target ∈ Graph.vertices(
                         subdivided)
                         by Graph.deleteVertex.is_vertex;
@@ -368,7 +351,7 @@ theorem Graph.IsTwoConnected.replace_edge_by_path
                               done by cases {
                                 case Graph.Reaches(Graph.deleteVertex(pathGraph, deleted),
                                          target, u): {
-                                    ¬(u = deleted)
+                                    u ≠ deleted
                                         by { suppose u = deleted;
                                              Graph.Reaches(
                                                  Graph.deleteVertex(pathGraph, deleted),
@@ -379,21 +362,16 @@ theorem Graph.IsTwoConnected.replace_edge_by_path
                                                  target, deleted)
                                                  by Graph.Reaches.not_to_deleted;
                                              done };
-                                    Graph.Reaches(Graph.deleteVertex(
-                                            Graph.union(trimmed,
-                                                        pathGraph), deleted), target, u)
+                                    Graph.Reaches(pruned, target, u)
                                         by Graph.Reaches.in_supergraph(
-                                              part := Graph.deleteVertex(pathGraph,
-                                                          deleted));
-                                    Graph.Reaches(Graph.deleteVertex(
-                                            Graph.union(trimmed,
-                                                        pathGraph), deleted), u, hub)
+                                               part := Graph.deleteVertex(pathGraph, deleted));
+                                    Graph.Reaches(pruned, u, hub)
                                         by oldSideReachesHub;
                                     done by Graph.Reaches.transitive(middle := u)
                                   }
                                 case Graph.Reaches(Graph.deleteVertex(pathGraph, deleted),
                                          target, v): {
-                                    ¬(v = deleted)
+                                    v ≠ deleted
                                         by { suppose v = deleted;
                                              Graph.Reaches(
                                                  Graph.deleteVertex(pathGraph, deleted),
@@ -404,15 +382,10 @@ theorem Graph.IsTwoConnected.replace_edge_by_path
                                                  target, deleted)
                                                  by Graph.Reaches.not_to_deleted;
                                              done };
-                                    Graph.Reaches(Graph.deleteVertex(
-                                            Graph.union(trimmed,
-                                                        pathGraph), deleted), target, v)
+                                    Graph.Reaches(pruned, target, v)
                                         by Graph.Reaches.in_supergraph(
-                                              part := Graph.deleteVertex(pathGraph,
-                                                          deleted));
-                                    Graph.Reaches(Graph.deleteVertex(
-                                            Graph.union(trimmed,
-                                                        pathGraph), deleted), v, hub)
+                                               part := Graph.deleteVertex(pathGraph, deleted));
+                                    Graph.Reaches(pruned, v, hub)
                                         by oldSideReachesHub;
                                     done by Graph.Reaches.transitive(middle := v)
                                   }
@@ -420,6 +393,6 @@ theorem Graph.IsTwoConnected.replace_edge_by_path
                             }
                         };
                     done by Graph.Reaches.symmetric };
-           done by Graph.IsConnected.from_hub(hub := hub) };
+           done by Graph.IsConnected.from_hub };
   done
 }

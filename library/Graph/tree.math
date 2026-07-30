@@ -200,10 +200,10 @@ theorem Graph.IsTree.has_leaf (graph : Graph(V, E, ends))
   ∃ (vertex : V). vertex ∈ Graph.vertices(graph);
   choose firstVertex such that firstVertex ∈ Graph.vertices(graph);
   choose secondVertex such that
-      secondVertex ∈ Graph.vertices(graph) ∧ ¬(secondVertex = firstVertex)
+      secondVertex ∈ Graph.vertices(graph) ∧ secondVertex ≠ firstVertex
       from Graph.other_vertex;
   secondVertex ∈ Graph.vertices(graph);
-  ¬(secondVertex = firstVertex);
+  secondVertex ≠ firstVertex;
 
   -- So some path between them takes at least one edge.
   Graph.Reaches(graph, firstVertex, secondVertex) by Graph.IsConnected.reaches;
@@ -258,8 +258,8 @@ theorem Graph.IsLeaf.path_avoids (graph : Graph(V, E, ends)) (leaf : V)
         (degreeOne : Graph.degree(graph, leaf) = 1)
         (source target : V) (edgeList : List(E))
         (path : Graph.IsPath(graph, source, edgeList, target))
-        (sourceIsNotLeaf : ¬(source = leaf))
-        (targetIsNotLeaf : ¬(target = leaf))
+        (sourceIsNotLeaf : source ≠ leaf)
+        (targetIsNotLeaf : target ≠ leaf)
         : ¬(leaf ∈ Graph.walkVertices(graph, source, edgeList)) :=
   by induction on path with IH {
     case Graph.IsPathOver.arrived(endpoint): {
@@ -394,16 +394,12 @@ theorem Graph.IsTree.delete_leaf (graph : Graph(V, E, ends))
   Graph.IsAcyclic(Graph.deleteVertex(graph, leaf)) by Graph.IsAcyclic.in_subgraph;
 
   -- Something survives the deletion.
-  List.Distinct(V, Graph.vertices(graph)) by Graph.IsWellFormed.vertices_distinct;
-  length(Graph.vertices(graph)) = 1 + length(Graph.vertices(graph) ∖ leaf)
-      by List.length_remove_member;
-  (1 : ℕ) + 1
-     ≤ Graph.order(graph)
-     = length(Graph.vertices(graph))
-     = 1 + length(Graph.vertices(graph) ∖ leaf);
-  1 ≤ length(Graph.vertices(graph) ∖ leaf) by Natural.add_left_le_cancel;
-  choose survivor such that survivor ∈ Graph.vertices(graph) ∖ leaf
-      from List.member_of_positive_length;
+  choose survivor such that
+      survivor ∈ Graph.vertices(graph) ∧ survivor ≠ leaf from Graph.other_vertex;
+  survivor ∈ Graph.vertices(graph);
+  survivor ≠ leaf;
+  survivor ∈ Graph.vertices(Graph.deleteVertex(graph, leaf))
+      by Graph.deleteVertex.keeps_vertex;
   ∃ (vertex : V). vertex ∈ Graph.vertices(Graph.deleteVertex(graph, leaf))
       by witness survivor;
 
@@ -415,8 +411,8 @@ theorem Graph.IsTree.delete_leaf (graph : Graph(V, E, ends))
            take w : V;
            suppose u ∈ Graph.vertices(Graph.deleteVertex(graph, leaf));
            suppose w ∈ Graph.vertices(Graph.deleteVertex(graph, leaf));
-           ¬(u = leaf) by Graph.deleteVertex.drops;
-           ¬(w = leaf) by Graph.deleteVertex.drops;
+           u ≠ leaf by Graph.deleteVertex.drops;
+           w ≠ leaf by Graph.deleteVertex.drops;
            u ∈ Graph.vertices(graph) by Graph.deleteVertex.is_vertex;
            w ∈ Graph.vertices(graph) by Graph.deleteVertex.is_vertex;
            Graph.Reaches(graph, u, w) by Graph.IsConnected.reaches;
@@ -521,8 +517,8 @@ theorem Graph.IsTree.edge_count_below (bound : ℕ)
                            by Graph.IsWellFormed.end_is_vertex;
                        endTwo ∈ Graph.vertices(graph)
                            by Graph.IsWellFormed.other_end_is_vertex;
-                       ¬(endOne = endTwo) by Graph.IsWellFormed.no_loop;
-                       ¬(endTwo = endOne) by Equality.not_equal_symmetric;
+                       endOne ≠ endTwo by Graph.IsWellFormed.no_loop;
+                       endTwo ≠ endOne by Equality.not_equal_symmetric;
                        endTwo ∈ Graph.vertices(graph) ∖ endOne
                            by List.remove_member_complete;
                        1 ≤ length(Graph.vertices(graph) ∖ endOne)
@@ -568,10 +564,10 @@ theorem Graph.IsConnected.degree_positive (graph : Graph(V, E, ends))
         (atLeastTwo : 2 ≤ Graph.order(graph))
         (vertex : V) (isVertex : vertex ∈ Graph.vertices(graph))
         : 1 ≤ Graph.degree(graph, vertex) := {
-  choose other such that other ∈ Graph.vertices(graph) ∧ ¬(other = vertex)
+  choose other such that other ∈ Graph.vertices(graph) ∧ other ≠ vertex
       from Graph.other_vertex;
   other ∈ Graph.vertices(graph);
-  ¬(other = vertex);
+  other ≠ vertex;
   Graph.Reaches(graph, vertex, other) by Graph.IsConnected.reaches;
   choose route such that Graph.IsPath(graph, vertex, route, other)
       from Graph.Reaches.path;

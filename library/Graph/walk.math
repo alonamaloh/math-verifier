@@ -148,7 +148,7 @@ theorem Graph.coveredVertices.append_invert (graph : Graph(V, E, ends))
 -- A longer edge list covers everything a shorter one does.
 theorem Graph.coveredVertices.monotone (graph : Graph(V, E, ends))
         (fewer more : List(E)) (vertex : V)
-        (inclusion : ∀ (edge : E). edge ∈ fewer → edge ∈ more)
+        (inclusion : fewer ⊆ more)
         (covered : vertex ∈ Graph.coveredVertices(graph, fewer))
         : vertex ∈ Graph.coveredVertices(graph, more) := {
   choose usedEdge such that usedEdge ∈ fewer ∧ Graph.Incident(graph, usedEdge, vertex);
@@ -205,8 +205,7 @@ theorem Graph.walkVertices.before_step (graph : Graph(V, E, ends))
         done
       }
     case vertex ∈ Graph.coveredVertices(graph, rest): {
-        ∀ (e : E). e ∈ rest → e ∈ List.prepend(E, edge, rest)
-            by { take e : E; suppose e ∈ rest; done };
+        rest ⊆ List.prepend(E, edge, rest) by List.Includes.prepend;
         vertex ∈ Graph.coveredVertices(graph, List.prepend(E, edge, rest))
             by Graph.coveredVertices.monotone;
         done
@@ -216,7 +215,7 @@ theorem Graph.walkVertices.before_step (graph : Graph(V, E, ends))
 -- A walk along fewer edges visits fewer vertices.
 theorem Graph.walkVertices.monotone (graph : Graph(V, E, ends)) (source vertex : V)
         (fewer more : List(E))
-        (inclusion : ∀ (edge : E). edge ∈ fewer → edge ∈ more)
+        (inclusion : fewer ⊆ more)
         (visited : vertex ∈ Graph.walkVertices(graph, source, fewer))
         : vertex ∈ Graph.walkVertices(graph, source, more) :=
   done by cases {
@@ -301,17 +300,16 @@ theorem Graph.IsWalk.reverse (graph : Graph(V, E, ends)) (source target : V)
 theorem Graph.IsWalk.edge_is_edge (graph : Graph(V, E, ends)) (source target : V)
         (edgeList : List(E))
         (walk : Graph.IsWalk(graph, source, edgeList, target))
-        : ∀ (edge : E). edge ∈ edgeList → edge ∈ Graph.edges(graph) :=
+        : edgeList ⊆ Graph.edges(graph) :=
   by induction on walk with IH {
     case Graph.IsWalkOver.arrived(vertex): {
         take edge : E;
-        suppose edge ∈ List.empty(E) as impossible;
-        ¬(edge ∈ List.empty(E)) by List.no_member_empty;
+        suppose edge ∈ List.empty(E);
         done
       }
     case Graph.IsWalkOver.step(
         stepSource, waypoint, stepTarget, takenEdge, rest, isEdge, joins, restWalk): {
-        ∀ (edge : E). edge ∈ rest → edge ∈ Graph.edges(graph) by IH as restEdges;
+        rest ⊆ Graph.edges(graph) by IH as restEdges;
         take edge : E;
         suppose edge ∈ List.prepend(E, takenEdge, rest);
         edge = takenEdge ∨ edge ∈ rest by List.member_prepend_invert;
@@ -330,7 +328,7 @@ theorem Graph.IsWalk.in_supergraph (part whole : Graph(V, E, ends))
         (source target : V) (edgeList : List(E))
         (walk : Graph.IsWalk(part, source, edgeList, target))
         : Graph.IsWalk(whole, source, edgeList, target) := {
-  ∀ (e : E). e ∈ Graph.edges(part) → e ∈ Graph.edges(whole) as partEdges;
+  Graph.edges(part) ⊆ Graph.edges(whole) as partEdges;
   done by induction on walk with IH {
     case Graph.IsWalkOver.arrived(vertex): done by Graph.IsWalk.empty
     case Graph.IsWalkOver.step(
@@ -356,13 +354,9 @@ theorem Graph.IsWalk.transfer (graph other : Graph(V, E, ends))
     case Graph.IsWalkOver.arrived(endpoint): done by Graph.IsWalk.empty
     case Graph.IsWalkOver.step(
         stepSource, waypoint, stepTarget, edge, rest, isEdge, joins, restWalk): {
-        ∀ (candidate : E). candidate ∈ List.prepend(E, edge, rest)
-            → candidate ∈ Graph.edges(other) as takenEdgesSurvive;
-        ∀ (candidate : E). candidate ∈ rest → candidate ∈ Graph.edges(other)
-            by { take candidate : E;
-                 suppose candidate ∈ rest;
-                 candidate ∈ List.prepend(E, edge, rest);
-                 done by takenEdgesSurvive };
+        List.prepend(E, edge, rest) ⊆ Graph.edges(other) as takenEdgesSurvive;
+        rest ⊆ List.prepend(E, edge, rest) by List.Includes.prepend;
+        rest ⊆ Graph.edges(other) by List.Includes.transitive;
         Graph.IsWalk(other, waypoint, rest, stepTarget) by IH;
         edge ∈ List.prepend(E, edge, rest);
         edge ∈ Graph.edges(other) by takenEdgesSurvive;
@@ -388,7 +382,7 @@ theorem Graph.IsWalk.target_is_visited (graph : Graph(V, E, ends)) (source targe
                   by Graph.Joins.incident_target;
               edge ∈ List.prepend(E, edge, rest);
               stepTarget ∈ Graph.coveredVertices(graph, List.prepend(E, edge, rest))
-                  by { witness edge };
+                  by Graph.coveredVertices.of_edge;
               done
             }
           case stepTarget ∈ Graph.coveredVertices(graph, rest): {
@@ -414,8 +408,7 @@ theorem Graph.IsWalk.visits_vertices (graph : Graph(V, E, ends))
         (sourceIsVertex : source ∈ Graph.vertices(graph))
         : ∀ (vertex : V). vertex ∈ Graph.walkVertices(graph, source, edgeList)
             → vertex ∈ Graph.vertices(graph) := {
-  ∀ (edge : E). edge ∈ edgeList → edge ∈ Graph.edges(graph)
-      by Graph.IsWalk.edge_is_edge as walkEdges;
+  edgeList ⊆ Graph.edges(graph) by Graph.IsWalk.edge_is_edge as walkEdges;
   take vertex : V;
   suppose vertex ∈ Graph.walkVertices(graph, source, edgeList);
   done by cases {
@@ -604,7 +597,7 @@ theorem Graph.walkVertexList.complete (graph : Graph(V, E, ends))
         take vertex : V;
         suppose vertex ∈ Graph.walkVertices(graph, stepSource,
                                             List.prepend(E, edge, rest));
-        ¬(stepSource = waypoint) by Graph.IsWellFormed.no_loop;
+        stepSource ≠ waypoint by Graph.IsWellFormed.no_loop;
         Graph.otherEnd(graph, edge, stepSource) = waypoint
             by Graph.otherEnd.of_joins as arrivesAtWaypoint;
         vertex = stepSource ∨ vertex ∈ Graph.walkVertices(graph, waypoint, rest)

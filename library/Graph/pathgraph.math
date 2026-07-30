@@ -55,7 +55,7 @@ theorem Graph.IsPathGraph.visits (pathGraph : Graph(V, E, ends)) (source target 
   ∀ (candidate : V). candidate ∈ Graph.vertices(pathGraph)
       → candidate ∈ Graph.walkVertices(pathGraph, source, Graph.edges(pathGraph))
       as verticesAreVisited;
-  done by verticesAreVisited(vertex)
+  done by verticesAreVisited
 }
 
 theorem Graph.IsPathGraph.is_vertex (pathGraph : Graph(V, E, ends)) (source target : V)
@@ -65,7 +65,7 @@ theorem Graph.IsPathGraph.is_vertex (pathGraph : Graph(V, E, ends)) (source targ
   ∀ (candidate : V).
       candidate ∈ Graph.walkVertices(pathGraph, source, Graph.edges(pathGraph))
       → candidate ∈ Graph.vertices(pathGraph) as visitedAreVertices;
-  done by visitedAreVertices(vertex)
+  done by visitedAreVertices
 }
 
 theorem Graph.IsPathGraph.source_is_vertex (pathGraph : Graph(V, E, ends))
@@ -96,7 +96,7 @@ theorem Graph.IsPathGraph.reaches_far_end (pathGraph : Graph(V, E, ends))
         (isPathGraph : Graph.IsPathGraph(pathGraph, source, target))
         (vertex : V)
         (isVertex : vertex ∈ Graph.vertices(pathGraph))
-        (distinctFromSource : ¬(vertex = source))
+        (distinctFromSource : vertex ≠ source)
         : Graph.Reaches(Graph.deleteVertex(pathGraph, source), vertex, target) := {
   Graph.IsPath(pathGraph, source, Graph.edges(pathGraph), target)
       by Graph.IsPathGraph.path;
@@ -110,7 +110,7 @@ theorem Graph.IsPathGraph.reaches_near_end (pathGraph : Graph(V, E, ends))
         (isPathGraph : Graph.IsPathGraph(pathGraph, source, target))
         (vertex : V)
         (isVertex : vertex ∈ Graph.vertices(pathGraph))
-        (distinctFromTarget : ¬(vertex = target))
+        (distinctFromTarget : vertex ≠ target)
         : Graph.Reaches(Graph.deleteVertex(pathGraph, target), vertex, source) := {
   Graph.IsPath(pathGraph, source, Graph.edges(pathGraph), target)
       by Graph.IsPathGraph.path;
@@ -222,7 +222,7 @@ theorem Graph.IsPathGraph.reaches_an_end (pathGraph : Graph(V, E, ends))
         (isPathGraph : Graph.IsPathGraph(pathGraph, source, target))
         (cut vertex : V)
         (isVertex : vertex ∈ Graph.vertices(pathGraph))
-        (distinctFromCut : ¬(vertex = cut))
+        (distinctFromCut : vertex ≠ cut)
         (wellFormed : Graph.IsWellFormed(pathGraph))
         : Graph.Reaches(Graph.deleteVertex(pathGraph, cut), vertex, source)
           ∨ Graph.Reaches(Graph.deleteVertex(pathGraph, cut), vertex, target) := {
@@ -230,7 +230,7 @@ theorem Graph.IsPathGraph.reaches_an_end (pathGraph : Graph(V, E, ends))
       by Graph.IsPathGraph.path;
   done by cases {
     case cut = source: {
-        ¬(vertex = source) by substituting (cut = source);
+        vertex ≠ source by substituting (cut = source);
         Graph.Reaches(Graph.deleteVertex(pathGraph, source), vertex, target)
             by Graph.IsPathGraph.reaches_far_end;
         Graph.Reaches(Graph.deleteVertex(pathGraph, cut), vertex, target)
@@ -238,7 +238,7 @@ theorem Graph.IsPathGraph.reaches_an_end (pathGraph : Graph(V, E, ends))
         done
       }
     case cut = target: {
-        ¬(vertex = target) by substituting (cut = target);
+        vertex ≠ target by substituting (cut = target);
         Graph.Reaches(Graph.deleteVertex(pathGraph, target), vertex, source)
             by Graph.IsPathGraph.reaches_near_end;
         Graph.Reaches(Graph.deleteVertex(pathGraph, cut), vertex, source)
@@ -263,7 +263,7 @@ theorem Graph.IsPathGraph.reaches_an_end (pathGraph : Graph(V, E, ends))
                   as onSomeHalf;
               vertex ∈ Graph.walkVertices(pathGraph, source, prefixEdges)
                   ∨ vertex ∈ Graph.walkVertices(pathGraph, cut, suffixEdges)
-                  by onSomeHalf(vertex);
+                  by onSomeHalf;
               done by cases {
                 case vertex ∈ Graph.walkVertices(pathGraph, source, prefixEdges): {
                     Graph.Reaches(Graph.deleteVertex(pathGraph, cut), vertex, source)
@@ -285,7 +285,7 @@ theorem Graph.IsPathGraph.reaches_an_end (pathGraph : Graph(V, E, ends))
               Graph.IsConnected(Graph.deleteVertex(pathGraph, cut))
                   by Graph.IsConnected.after_outside_deletion;
               source ∈ Graph.vertices(pathGraph) by Graph.IsPathGraph.source_is_vertex;
-              ¬(source = cut)
+              source ≠ cut
                   by { suppose source = cut;
                        cut ∈ Graph.vertices(pathGraph) by substituting (source = cut);
                        done };
@@ -319,11 +319,8 @@ theorem Graph.pathGraphOf.IsPathGraph (graph : Graph(V, E, ends))
         (path : Graph.IsPath(graph, source, edgeList, target))
         : Graph.IsPathGraph(Graph.pathGraphOf(graph, source, edgeList),
                             source, target) := {
-  ∀ (candidate : E). candidate ∈ edgeList
-      → candidate ∈ Graph.edges(Graph.pathGraphOf(graph, source, edgeList))
-      by { take candidate : E;
-           suppose candidate ∈ edgeList;
-           done };
+  edgeList ⊆ Graph.edges(Graph.pathGraphOf(graph, source, edgeList))
+      by List.Includes.reflexive;
   Graph.IsPath(Graph.pathGraphOf(graph, source, edgeList), source, edgeList, target)
       by Graph.IsPath.transfer;
 
@@ -361,7 +358,7 @@ theorem Graph.pathGraphOf.IsWellFormed (graph : Graph(V, E, ends))
   ∀ (edge : E). ∀ (u v : V).
       edge ∈ Graph.edges(Graph.pathGraphOf(graph, source, edgeList))
       → Graph.Joins(Graph.pathGraphOf(graph, source, edgeList), edge, u, v)
-      → u ∈ Graph.vertices(Graph.pathGraphOf(graph, source, edgeList)) ∧ ¬(u = v)
+      → u ∈ Graph.vertices(Graph.pathGraphOf(graph, source, edgeList)) ∧ u ≠ v
       by { take edge : E;
            take u : V;
            take v : V;
@@ -370,7 +367,7 @@ theorem Graph.pathGraphOf.IsWellFormed (graph : Graph(V, E, ends))
            edge ∈ edgeList;
            Graph.Joins(graph, edge, u, v);
            edge ∈ Graph.edges(graph) by Graph.IsWalk.edge_is_edge;
-           ¬(u = v) by Graph.IsWellFormed.no_loop;
+           u ≠ v by Graph.IsWellFormed.no_loop;
            Graph.Incident(graph, edge, u) by Graph.Joins.incident_source;
            u ∈ Graph.coveredVertices(graph, edgeList)
                by Graph.coveredVertices.of_edge;

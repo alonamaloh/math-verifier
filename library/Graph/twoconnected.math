@@ -58,7 +58,7 @@ theorem Graph.IsTwoConnected.survives_deletion (graph : Graph(V, E, ends))
         : Graph.IsConnected(Graph.deleteVertex(graph, vertex)) := {
   ∀ (candidate : V). candidate ∈ Graph.vertices(graph)
       → Graph.IsConnected(Graph.deleteVertex(graph, candidate)) as everyDeletion;
-  done by everyDeletion(vertex)
+  done by everyDeletion
 }
 
 theorem Graph.IsTwoConnected.no_cut_vertex (graph : Graph(V, E, ends))
@@ -84,12 +84,12 @@ theorem Graph.third_vertex (graph : Graph(V, E, ends))
         (wellFormed : Graph.IsWellFormed(graph)) (u v : V)
         (uIsVertex : u ∈ Graph.vertices(graph))
         (vIsVertex : v ∈ Graph.vertices(graph))
-        (distinct : ¬(u = v))
+        (distinct : u ≠ v)
         (atLeastThree : 3 ≤ Graph.order(graph))
-        : ∃ (w : V). w ∈ Graph.vertices(graph) ∧ ¬(w = u) ∧ ¬(w = v) := {
+        : ∃ (w : V). w ∈ Graph.vertices(graph) ∧ w ≠ u ∧ w ≠ v := {
   List.Distinct(V, Graph.vertices(graph)) by Graph.IsWellFormed.vertices_distinct;
   List.Distinct(V, Graph.vertices(graph) ∖ u) by List.remove_distinct;
-  ¬(v = u) by Equality.not_equal_symmetric;
+  v ≠ u by Equality.not_equal_symmetric;
   v ∈ Graph.vertices(graph) ∖ u by List.remove_member_complete;
   length(Graph.vertices(graph) ∖ u) = 1 + length(Graph.vertices(graph) ∖ u ∖ v)
       by List.length_remove_member;
@@ -101,9 +101,9 @@ theorem Graph.third_vertex (graph : Graph(V, E, ends))
   1 ≤ length(Graph.vertices(graph) ∖ u ∖ v) by Natural.add_left_le_cancel;
   choose w such that w ∈ Graph.vertices(graph) ∖ u ∖ v
       from List.member_of_positive_length;
-  ¬(w = v) by List.remove_member_ne;
+  w ≠ v by List.remove_member_ne;
   w ∈ Graph.vertices(graph) ∖ u by List.remove_member_subset;
-  ¬(w = u) by List.remove_member_ne;
+  w ≠ u by List.remove_member_ne;
   w ∈ Graph.vertices(graph) by List.remove_member_subset;
   witness w
 }
@@ -119,16 +119,16 @@ theorem Graph.IsTwoConnected.no_bridge (graph : Graph(V, E, ends))
         : Graph.Reaches(Graph.deleteEdge(graph, edge), u, v) := {
   u ∈ Graph.vertices(graph) by Graph.IsWellFormed.end_is_vertex;
   v ∈ Graph.vertices(graph) by Graph.IsWellFormed.other_end_is_vertex;
-  ¬(u = v) by Graph.IsWellFormed.no_loop;
-  ¬(v = u) by Equality.not_equal_symmetric;
+  u ≠ v by Graph.IsWellFormed.no_loop;
+  v ≠ u by Equality.not_equal_symmetric;
   Graph.Incident(graph, edge, u) by Graph.Joins.incident_source;
   Graph.Incident(graph, edge, v) by Graph.Joins.incident_target;
   3 ≤ Graph.order(graph);
-  choose w such that w ∈ Graph.vertices(graph) ∧ ¬(w = u) ∧ ¬(w = v)
+  choose w such that w ∈ Graph.vertices(graph) ∧ w ≠ u ∧ w ≠ v
       from Graph.third_vertex;
   w ∈ Graph.vertices(graph);
-  ¬(w = u);
-  ¬(w = v);
+  w ≠ u;
+  w ≠ v;
 
   -- From `u` to `w` without ever meeting `v`.
   Graph.IsConnected(Graph.deleteVertex(graph, v))

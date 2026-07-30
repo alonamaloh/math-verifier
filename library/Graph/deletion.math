@@ -50,7 +50,7 @@ theorem Graph.deleteEdge.is_edge (graph : Graph(V, E, ends)) (edge survivor : E)
 
 theorem Graph.deleteEdge.keeps (graph : Graph(V, E, ends)) (edge survivor : E)
         (isEdge : survivor ∈ Graph.edges(graph))
-        (distinctFromDeleted : ¬(survivor = edge))
+        (distinctFromDeleted : survivor ≠ edge)
         : survivor ∈ Graph.edges(Graph.deleteEdge(graph, edge)) := {
   survivor ∈ Graph.edges(graph) ∖ edge by List.remove_member_complete;
   done
@@ -61,7 +61,7 @@ theorem Graph.deleteEdge.keeps (graph : Graph(V, E, ends)) (edge survivor : E)
 theorem Graph.deleteEdge.drops (graph : Graph(V, E, ends))
         (wellFormed : Graph.IsWellFormed(graph)) (edge survivor : E)
         (survives : survivor ∈ Graph.edges(Graph.deleteEdge(graph, edge)))
-        : ¬(survivor = edge) := {
+        : survivor ≠ edge := {
   List.Distinct(E, Graph.edges(graph)) by Graph.IsWellFormed.edges_distinct;
   survivor ∈ Graph.edges(graph) ∖ edge;
   done by List.remove_member_ne
@@ -93,7 +93,7 @@ theorem Graph.deleteEdge.IsWellFormed (graph : Graph(V, E, ends))
   ∀ (survivor : E). ∀ (u v : V).
       survivor ∈ Graph.edges(Graph.deleteEdge(graph, edge))
       → Graph.Joins(Graph.deleteEdge(graph, edge), survivor, u, v)
-      → u ∈ Graph.vertices(Graph.deleteEdge(graph, edge)) ∧ ¬(u = v)
+      → u ∈ Graph.vertices(Graph.deleteEdge(graph, edge)) ∧ u ≠ v
       by { take survivor : E;
            take u : V;
            take v : V;
@@ -102,7 +102,7 @@ theorem Graph.deleteEdge.IsWellFormed (graph : Graph(V, E, ends))
            survivor ∈ Graph.edges(graph) by Graph.deleteEdge.is_edge;
            Graph.Joins(graph, survivor, u, v);
            u ∈ Graph.vertices(graph) by Graph.IsWellFormed.end_is_vertex;
-           ¬(u = v) by Graph.IsWellFormed.no_loop;
+           u ≠ v by Graph.IsWellFormed.no_loop;
            u ∈ Graph.vertices(Graph.deleteEdge(graph, edge));
            done };
   done
@@ -142,7 +142,7 @@ theorem Graph.IsWalk.avoiding_edge (graph : Graph(V, E, ends)) (edge : E)
                  edge ∈ List.prepend(E, takenEdge, rest);
                  done };
         Graph.IsWalk(Graph.deleteEdge(graph, edge), waypoint, rest, stepTarget) by IH;
-        ¬(takenEdge = edge)
+        takenEdge ≠ edge
             by { suppose takenEdge = edge;
                  edge ∈ List.prepend(E, takenEdge, rest) by substituting (takenEdge = edge);
                  done };

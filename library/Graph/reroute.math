@@ -31,10 +31,10 @@ convention E : Type(0)
 convention ends : E → Pair(V, V)
 
 theorem Graph.Reaches.reroute (graph bigger : Graph(V, E, ends)) (edge : E) (u v : V)
-        (endsDistinct : ¬(u = v))
+        (endsDistinct : u ≠ v)
         (joins : Graph.Joins(graph, edge, u, v))
         (otherEdgesSurvive : ∀ (candidate : E). candidate ∈ Graph.edges(graph)
-            → ¬(candidate = edge) → candidate ∈ Graph.edges(bigger))
+            → candidate ≠ edge → candidate ∈ Graph.edges(bigger))
         (endsJoined : Graph.Reaches(bigger, u, v))
         (source target : V)
         (reaches : Graph.Reaches(graph, source, target))
@@ -75,7 +75,7 @@ theorem Graph.Reaches.reroute (graph bigger : Graph(V, E, ends)) (edge : E) (u v
                   }
                 }
               otherwise: {
-                  ¬(takenEdge = edge);
+                  takenEdge ≠ edge;
                   takenEdge ∈ Graph.edges(bigger) by otherEdgesSurvive;
                   Graph.Joins(bigger, takenEdge, stepSource, waypoint);
                   Graph.IsWalk(bigger, stepSource,
@@ -98,12 +98,12 @@ theorem Graph.IsConnected.after_edge_deletion (graph : Graph(V, E, ends))
         (joins : Graph.Joins(graph, edge, u, v))
         (endsStillJoined : Graph.Reaches(Graph.deleteEdge(graph, edge), u, v))
         : Graph.IsConnected(Graph.deleteEdge(graph, edge)) := {
-  ¬(u = v) by Graph.IsWellFormed.no_loop;
-  ∀ (candidate : E). candidate ∈ Graph.edges(graph) → ¬(candidate = edge)
+  u ≠ v by Graph.IsWellFormed.no_loop;
+  ∀ (candidate : E). candidate ∈ Graph.edges(graph) → candidate ≠ edge
       → candidate ∈ Graph.edges(Graph.deleteEdge(graph, edge))
       by { take candidate : E;
            suppose candidate ∈ Graph.edges(graph);
-           suppose ¬(candidate = edge);
+           suppose candidate ≠ edge;
            done by Graph.deleteEdge.keeps };
   choose hub such that hub ∈ Graph.vertices(graph) from Graph.IsConnected.has_vertex;
   hub ∈ Graph.vertices(Graph.deleteEdge(graph, edge));
@@ -114,8 +114,7 @@ theorem Graph.IsConnected.after_edge_deletion (graph : Graph(V, E, ends))
            target ∈ Graph.vertices(graph);
            Graph.Reaches(graph, hub, target) by Graph.IsConnected.reaches;
            done by Graph.Reaches.reroute(bigger := Graph.deleteEdge(graph, edge)) };
-  done by Graph.IsConnected.from_hub(hub := hub)
-}
+  done by Graph.IsConnected.from_hub}
 
 -- The form a subdivision needs. A walk in the graph minus one vertex
 -- transfers to any graph holding the surviving edges, provided either the
@@ -123,11 +122,11 @@ theorem Graph.IsConnected.after_edge_deletion (graph : Graph(V, E, ends))
 -- to the deleted vertex — in which case the walk could not have taken it.
 theorem Graph.Reaches.across_edge_replacement (graph bigger : Graph(V, E, ends))
         (edge : E) (u v deleted : V)
-        (endsDistinct : ¬(u = v))
+        (endsDistinct : u ≠ v)
         (joins : Graph.Joins(graph, edge, u, v))
         (otherEdgesSurvive : ∀ (candidate : E).
             candidate ∈ Graph.edges(Graph.deleteVertex(graph, deleted))
-            → ¬(candidate = edge) → candidate ∈ Graph.edges(bigger))
+            → candidate ≠ edge → candidate ∈ Graph.edges(bigger))
         (routed : Graph.Reaches(bigger, u, v) ∨ Graph.Incident(graph, edge, deleted))
         (source target : V)
         (reaches : Graph.Reaches(Graph.deleteVertex(graph, deleted), source, target))
@@ -147,7 +146,7 @@ theorem Graph.Reaches.across_edge_replacement (graph bigger : Graph(V, E, ends))
                      by Graph.IsWalk.edge_is_edge;
                  ¬Graph.Incident(graph, candidate, deleted)
                      by Graph.deleteVertex.edge_avoids;
-                 ¬(candidate = edge)
+                 candidate ≠ edge
                      by { suppose candidate = edge;
                           Graph.Incident(graph, candidate, deleted)
                               by substituting (candidate = edge);

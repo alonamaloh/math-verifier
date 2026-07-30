@@ -59,9 +59,13 @@ definition Graph.size (graph : Graph(V, E, ends)) : ℕ :=
 -- ----------------------------------------------------------------------
 -- Incidence.
 --
--- `Joins` is the one place the ordered pair behind `ends` is read; every
--- later result speaks through the four lemmas below it, which is why the
--- order the pair happens to carry never becomes visible.
+-- `Joins` is the one place the ordered pair behind `ends` is read. Two
+-- lemmas are its whole interface — `Joins.at_components`, that an edge joins
+-- its own two components, and `Joins.canonical`, that any other reading
+-- names those same two in one order or the other — and everything below
+-- argues in equations between VERTICES. That is why the order the pair
+-- happens to carry never becomes visible, and why no `Product` appears
+-- outside this section.
 
 definition Graph.Joins (graph : Graph(V, E, ends)) (edge : E) (u v : V) : Proposition :=
   ends(edge) = Product.make(u, v) ∨ ends(edge) = Product.make(v, u)
@@ -93,11 +97,7 @@ theorem Graph.Joins.incident_target (graph : Graph(V, E, ends)) (edge : E) (u v 
   done by Graph.Joins.incident_source
 }
 
--- An edge joins the two components of its own ends pair. Together with
--- `Graph.Joins.canonical` below this is the whole interface to the pair:
--- one fact says the components ARE ends, the other says an arbitrary
--- reading names those same two, and no proof past this section reads a
--- `Product` again.
+-- An edge joins the two components of its own ends pair.
 theorem Graph.Joins.at_components (graph : Graph(V, E, ends)) (edge : E)
         : Graph.Joins(graph, edge,
               Product.first(ends(edge)), Product.second(ends(edge))) := {
@@ -148,7 +148,7 @@ definition Graph.otherEnd (graph : Graph(V, E, ends)) (edge : E) (vertex : V) : 
 -- At an edge's own end, `otherEnd` names the other one.
 theorem Graph.otherEnd.of_joins (graph : Graph(V, E, ends)) (edge : E) (u v : V)
         (joins : Graph.Joins(graph, edge, u, v))
-        (distinct : ¬(u = v))
+        (distinct : u ≠ v)
         : Graph.otherEnd(graph, edge, u) = v :=
   done by cases {
     case ends(edge) = Product.make(u, v) as endsEquation: {
@@ -157,7 +157,7 @@ theorem Graph.otherEnd.of_joins (graph : Graph(V, E, ends)) (edge : E) (u v : V)
            = v                              by Logic.if_positive
       }
     case ends(edge) = Product.make(v, u) as endsEquation: {
-        ¬(v = u) by Equality.not_equal_symmetric;
+        v ≠ u by Equality.not_equal_symmetric;
         Graph.otherEnd(graph, edge, u)
            = (if v = u then u else v : V)   by substituting endsEquation
            = v                              by Logic.if_negative
@@ -208,7 +208,7 @@ theorem Graph.otherEnd.incident (graph : Graph(V, E, ends)) (edge : E) (vertex :
 theorem Graph.Joins.unique (graph : Graph(V, E, ends)) (edge : E) (u v w : V)
         (joinsToV : Graph.Joins(graph, edge, u, v))
         (joinsToW : Graph.Joins(graph, edge, u, w))
-        (endsDistinct : ¬(u = v))
+        (endsDistinct : u ≠ v)
         : v = w := {
   (u = Product.first(ends(edge)) ∧ v = Product.second(ends(edge)))
       ∨ (u = Product.second(ends(edge)) ∧ v = Product.first(ends(edge)))
@@ -279,7 +279,7 @@ theorem Graph.Incident.is_end (graph : Graph(V, E, ends)) (edge : E) (u v vertex
 theorem Graph.Joins.ends_agree (graph : Graph(V, E, ends)) (edge : E) (u v x y : V)
         (joins : Graph.Joins(graph, edge, u, v))
         (otherReading : Graph.Joins(graph, edge, x, y))
-        (endsDistinct : ¬(u = v))
+        (endsDistinct : u ≠ v)
         : (x = u ∧ y = v) ∨ (x = v ∧ y = u) := {
   Graph.Incident(graph, edge, x) by Graph.Joins.incident_source;
   x = u ∨ x = v by Graph.Incident.is_end;
@@ -293,7 +293,7 @@ theorem Graph.Joins.ends_agree (graph : Graph(V, E, ends)) (edge : E) (u v x y :
     case x = v: {
         Graph.Joins(graph, edge, v, u) by Graph.Joins.symmetric;
         Graph.Joins(graph, edge, v, y) by substituting (x = v);
-        ¬(v = u) by Equality.not_equal_symmetric;
+        v ≠ u by Equality.not_equal_symmetric;
         y = u by Graph.Joins.unique;
         x = v ∧ y = u;
         done
@@ -324,7 +324,7 @@ definition Graph.IsWellFormed (graph : Graph(V, E, ends)) : Proposition :=
   ∧ List.Distinct(E, Graph.edges(graph))
   ∧ ∀ (edge : E). ∀ (u v : V).
       edge ∈ Graph.edges(graph) → Graph.Joins(graph, edge, u, v)
-      → u ∈ Graph.vertices(graph) ∧ ¬(u = v)
+      → u ∈ Graph.vertices(graph) ∧ u ≠ v
 
 theorem Graph.IsWellFormed.vertices_distinct (graph : Graph(V, E, ends))
         (wellFormed : Graph.IsWellFormed(graph))
@@ -343,8 +343,8 @@ theorem Graph.IsWellFormed.end_is_vertex (graph : Graph(V, E, ends))
         : u ∈ Graph.vertices(graph) := {
   ∀ (e : E). ∀ (x y : V).
       e ∈ Graph.edges(graph) → Graph.Joins(graph, e, x, y)
-      → x ∈ Graph.vertices(graph) ∧ ¬(x = y) as endsAreVertices;
-  u ∈ Graph.vertices(graph) ∧ ¬(u = v) by endsAreVertices(edge, u, v);
+      → x ∈ Graph.vertices(graph) ∧ x ≠ y as endsAreVertices;
+  u ∈ Graph.vertices(graph) ∧ u ≠ v;
   done
 }
 
@@ -352,11 +352,11 @@ theorem Graph.IsWellFormed.no_loop (graph : Graph(V, E, ends))
         (wellFormed : Graph.IsWellFormed(graph)) (edge : E) (u v : V)
         (isEdge : edge ∈ Graph.edges(graph))
         (joins : Graph.Joins(graph, edge, u, v))
-        : ¬(u = v) := {
+        : u ≠ v := {
   ∀ (e : E). ∀ (x y : V).
       e ∈ Graph.edges(graph) → Graph.Joins(graph, e, x, y)
-      → x ∈ Graph.vertices(graph) ∧ ¬(x = y) as endsAreVertices;
-  u ∈ Graph.vertices(graph) ∧ ¬(u = v) by endsAreVertices(edge, u, v);
+      → x ∈ Graph.vertices(graph) ∧ x ≠ y as endsAreVertices;
+  u ∈ Graph.vertices(graph) ∧ u ≠ v;
   done
 }
 
@@ -374,7 +374,7 @@ theorem Graph.IsWellFormed.other_end_is_vertex (graph : Graph(V, E, ends))
 theorem Graph.Adjacent.distinct (graph : Graph(V, E, ends))
         (wellFormed : Graph.IsWellFormed(graph)) (u v : V)
         (adjacent : Graph.Adjacent(graph, u, v))
-        : ¬(u = v) := {
+        : u ≠ v := {
   choose edge such that edge ∈ Graph.edges(graph) ∧ Graph.Joins(graph, edge, u, v)
       from adjacent;
   edge ∈ Graph.edges(graph);
@@ -450,7 +450,7 @@ theorem Graph.IsSubgraph.no_loop (part whole : Graph(V, E, ends))
         (edge : E) (u v : V)
         (isEdge : edge ∈ Graph.edges(part))
         (joins : Graph.Joins(part, edge, u, v))
-        : ¬(u = v) := {
+        : u ≠ v := {
   ∀ (e : E). e ∈ Graph.edges(part) → e ∈ Graph.edges(whole) as partEdges;
   edge ∈ Graph.edges(whole) by partEdges;
   Graph.Joins(whole, edge, u, v);
