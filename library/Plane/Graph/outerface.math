@@ -1,0 +1,269 @@
+-- Plane/Graph/outerface.math
+--
+-- The outer face. Layer 6 of PLAN_JORDAN_SCHOENFLIES.md.
+--
+-- A plane graph occupies a bounded piece of the plane — finitely many
+-- points and finitely many arcs, each of them compact — so it fits inside
+-- some square about the origin, and everything beyond that square is left
+-- over. What `Plane/exterior.math` supplies is that the outside of a square
+-- is CONNECTED, and that is the whole of the outer face: the outside lies
+-- in one face, that face is unbounded because the outside is, and no second
+-- face can be unbounded because an unbounded face has to reach past the
+-- square and therefore meets the same outside.
+--
+-- So "exactly one face is unbounded" comes out as an existence theorem and
+-- a uniqueness theorem, with no face ever produced as data — the same
+-- convention `Plane.Graph.face` itself follows, where a face is named by a
+-- point of it.
+
+module Plane.Graph.outerface
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Equality.basics
+import axioms
+import Set.basics
+import Set.algebra
+import Lists.list
+import Lists.set_union
+import Real.interface
+import Real.order
+import Real.absolute_value
+import Real.absolute_value_order
+import Metric.space
+import Metric.sequence
+import Plane.point
+import Plane.metric
+import Plane.topology
+import Plane.sequence
+import Plane.compactness
+import Plane.connected
+import Plane.component
+import Plane.curve
+import Plane.exterior
+import Graph.basics
+import Plane.Graph.basics
+import Plane.Graph.pointset
+
+convention E : Type(0)
+convention ends : E → Pair(Plane.Point, Plane.Point)
+
+-- ----------------------------------------------------------------------
+-- The drawing fits inside a square.
+
+theorem Plane.Graph.vertexSet_inside_square (graph : Graph(Plane.Point, E, ends))
+        : ∃ (radius : ℝ).
+            radius ≥ 0 ∧ Plane.Graph.vertexSet(graph) ⊆ Plane.square(radius) := {
+  ∀ (vertex : Plane.Point). vertex ∈ Graph.vertices(graph) →
+      ∃ (radius : ℝ).
+        radius ≥ 0 ∧ Set.singleton(Plane.Point, vertex) ⊆ Plane.square(radius)
+      by {
+        take vertex : Plane.Point;
+        suppose vertex ∈ Graph.vertices(graph);
+        let reach : ℝ :=
+            abs(Plane.Point.first(vertex)) + abs(Plane.Point.second(vertex));
+        abs(Plane.Point.first(vertex)) ≥ 0;
+        abs(Plane.Point.second(vertex)) ≥ 0;
+        reach ≥ 0 by ordered_field;
+        abs(Plane.Point.first(vertex)) ≤ reach by ordered_field;
+        abs(Plane.Point.second(vertex)) ≤ reach by ordered_field;
+        vertex ∈ Plane.square(reach);
+        Set.singleton(Plane.Point, vertex) ⊆ Plane.square(reach)
+            by Set.singleton_subset;
+        done by { witness reach }
+      };
+  done by Plane.unionOver_inside_square
+}
+
+theorem Plane.Graph.edgeSet_inside_square (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
+        : ∃ (radius : ℝ).
+            radius ≥ 0 ∧ Plane.Graph.edgeSet(graph, drawing) ⊆ Plane.square(radius) := {
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      ∃ (radius : ℝ).
+        radius ≥ 0 ∧ Plane.arc(drawing(edge)) ⊆ Plane.square(radius)
+      by {
+        take edge : E;
+        suppose edge ∈ Graph.edges(graph);
+        Plane.IsArc(drawing(edge)) by Plane.Graph.IsDrawing.IsArc;
+        Plane.IsCompact(Plane.arc(drawing(edge))) by Plane.IsArc.IsCompact;
+        Plane.IsBounded(Plane.arc(drawing(edge))) by Plane.IsCompact.bounded;
+        Plane.arcStart(drawing(edge)) ∈ Plane.arc(drawing(edge))
+            by Plane.arcStart_in_arc;
+        done by Plane.IsBounded.inside_square
+      };
+  done by Plane.unionOver_inside_square
+}
+
+theorem Plane.Graph.pointSet_inside_square (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
+        : ∃ (radius : ℝ).
+            radius ≥ 0
+              ∧ Plane.Graph.pointSet(graph, drawing) ⊆ Plane.square(radius) := {
+  choose vertexRadius such that
+      vertexRadius ≥ 0 ∧ Plane.Graph.vertexSet(graph) ⊆ Plane.square(vertexRadius)
+      from Plane.Graph.vertexSet_inside_square;
+  vertexRadius ≥ 0;
+  Plane.Graph.vertexSet(graph) ⊆ Plane.square(vertexRadius) as verticesInside;
+  choose edgeRadius such that
+      edgeRadius ≥ 0
+        ∧ Plane.Graph.edgeSet(graph, drawing) ⊆ Plane.square(edgeRadius)
+      from Plane.Graph.edgeSet_inside_square;
+  edgeRadius ≥ 0;
+  Plane.Graph.edgeSet(graph, drawing) ⊆ Plane.square(edgeRadius) as edgesInside;
+
+  vertexRadius + edgeRadius ≥ 0 by ordered_field;
+  vertexRadius ≤ vertexRadius + edgeRadius by ordered_field;
+  edgeRadius ≤ vertexRadius + edgeRadius by ordered_field;
+  Plane.square(vertexRadius) ⊆ Plane.square(vertexRadius + edgeRadius)
+      by Plane.square_monotone;
+  Plane.square(edgeRadius) ⊆ Plane.square(vertexRadius + edgeRadius)
+      by Plane.square_monotone;
+  Plane.Graph.pointSet(graph, drawing) ⊆ Plane.square(vertexRadius + edgeRadius)
+      by { take x : Plane.Point;
+           suppose x ∈ Plane.Graph.pointSet(graph, drawing);
+           done by cases {
+             case x ∈ Plane.Graph.vertexSet(graph): {
+                 x ∈ Plane.square(vertexRadius) by verticesInside;
+                 done
+               }
+             case x ∈ Plane.Graph.edgeSet(graph, drawing): {
+                 x ∈ Plane.square(edgeRadius) by edgesInside;
+                 done
+               }
+           } };
+  witness vertexRadius + edgeRadius
+}
+
+-- ----------------------------------------------------------------------
+-- Beyond the square, the plane is untouched — and all one face.
+
+theorem Plane.Graph.beyondSquare_in_exterior (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point)) (radius : ℝ)
+        (drawingInside
+            : Plane.Graph.pointSet(graph, drawing) ⊆ Plane.square(radius))
+        : Plane.beyondSquare(radius) ⊆ Plane.Graph.exterior(graph, drawing) := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.beyondSquare(radius);
+  x ∉ Plane.Graph.pointSet(graph, drawing)
+      by { suppose x ∈ Plane.Graph.pointSet(graph, drawing);
+           x ∈ Plane.square(radius) by drawingInside;
+           x ∉ Plane.beyondSquare(radius) by Plane.square_off_beyondSquare;
+           done };
+  done by Plane.Graph.member_exterior
+}
+
+-- A face named by a point beyond the square swallows the whole outside:
+-- the outside is a connected part of the exterior through that point.
+theorem Plane.Graph.beyondSquare_inside_face (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point)) (radius : ℝ)
+        (drawingInside
+            : Plane.Graph.pointSet(graph, drawing) ⊆ Plane.square(radius))
+        (base : Plane.Point) (baseBeyond : base ∈ Plane.beyondSquare(radius))
+        : Plane.beyondSquare(radius) ⊆ Plane.Graph.face(graph, drawing, base) := {
+  Plane.beyondSquare(radius) ⊆ Plane.Graph.exterior(graph, drawing)
+      by Plane.Graph.beyondSquare_in_exterior;
+  Plane.IsConnected(Plane.beyondSquare(radius)) by Plane.beyondSquare_IsConnected;
+  done by Plane.Component_contains
+}
+
+-- ----------------------------------------------------------------------
+-- Exactly one face is unbounded.
+
+theorem Plane.Graph.exists_outer_face (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
+        : ∃ (base : Plane.Point).
+            base ∉ Plane.Graph.pointSet(graph, drawing)
+              ∧ ¬Plane.IsBounded(Plane.Graph.face(graph, drawing, base)) := {
+  choose radius such that
+      radius ≥ 0 ∧ Plane.Graph.pointSet(graph, drawing) ⊆ Plane.square(radius)
+      from Plane.Graph.pointSet_inside_square;
+  radius ≥ 0;
+  Plane.Graph.pointSet(graph, drawing) ⊆ Plane.square(radius);
+
+  let far : Plane.Point := Plane.Point.make(radius + 1, 0);
+  radius < radius + 1;
+  far ∈ Plane.farRight(radius);
+  far ∈ Plane.beyondSquare(radius) by Plane.farRight_beyondSquare;
+  Plane.beyondSquare(radius) ⊆ Plane.Graph.exterior(graph, drawing)
+      by Plane.Graph.beyondSquare_in_exterior as outsideIsFree;
+  far ∈ Plane.Graph.exterior(graph, drawing) by outsideIsFree;
+  far ∉ Plane.Graph.pointSet(graph, drawing);
+
+  Plane.beyondSquare(radius) ⊆ Plane.Graph.face(graph, drawing, far)
+      by Plane.Graph.beyondSquare_inside_face;
+  ¬Plane.IsBounded(Plane.Graph.face(graph, drawing, far))
+      by Plane.beyondSquare_IsUnbounded;
+  witness far
+}
+
+theorem Plane.Graph.outer_face_unique (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
+        (firstBase secondBase : Plane.Point)
+        (firstOffDrawing : firstBase ∉ Plane.Graph.pointSet(graph, drawing))
+        (secondOffDrawing : secondBase ∉ Plane.Graph.pointSet(graph, drawing))
+        (firstUnbounded
+            : ¬Plane.IsBounded(Plane.Graph.face(graph, drawing, firstBase)))
+        (secondUnbounded
+            : ¬Plane.IsBounded(Plane.Graph.face(graph, drawing, secondBase)))
+        : Plane.Graph.face(graph, drawing, firstBase)
+              = Plane.Graph.face(graph, drawing, secondBase) := {
+  choose radius such that
+      radius ≥ 0 ∧ Plane.Graph.pointSet(graph, drawing) ⊆ Plane.square(radius)
+      from Plane.Graph.pointSet_inside_square;
+  Plane.Graph.pointSet(graph, drawing) ⊆ Plane.square(radius);
+
+  -- Each unbounded face reaches past the square, and is therefore named by
+  -- a point of the outside — which it then swallows whole.
+  choose firstEscape such that
+      firstEscape ∈ Plane.Graph.face(graph, drawing, firstBase)
+        ∧ firstEscape ∈ Plane.beyondSquare(radius)
+      from Plane.unbounded_escapes_square(
+          region := Plane.Graph.face(graph, drawing, firstBase));
+  firstEscape ∈ Plane.Graph.face(graph, drawing, firstBase);
+  firstEscape ∈ Plane.beyondSquare(radius);
+  Plane.Graph.face(graph, drawing, firstBase)
+      = Plane.Graph.face(graph, drawing, firstEscape)
+      by Plane.Graph.face.equal_of_member as firstNamedByEscape;
+  Plane.beyondSquare(radius)
+      ⊆ Plane.Graph.face(graph, drawing, firstEscape)
+      by Plane.Graph.beyondSquare_inside_face;
+  Plane.beyondSquare(radius) ⊆ Plane.Graph.face(graph, drawing, firstBase)
+      by substituting firstNamedByEscape as firstSwallowsOutside;
+
+  choose secondEscape such that
+      secondEscape ∈ Plane.Graph.face(graph, drawing, secondBase)
+        ∧ secondEscape ∈ Plane.beyondSquare(radius)
+      from Plane.unbounded_escapes_square(
+          region := Plane.Graph.face(graph, drawing, secondBase));
+  secondEscape ∈ Plane.Graph.face(graph, drawing, secondBase);
+  secondEscape ∈ Plane.beyondSquare(radius);
+  Plane.Graph.face(graph, drawing, secondBase)
+      = Plane.Graph.face(graph, drawing, secondEscape)
+      by Plane.Graph.face.equal_of_member as secondNamedByEscape;
+  Plane.beyondSquare(radius)
+      ⊆ Plane.Graph.face(graph, drawing, secondEscape)
+      by Plane.Graph.beyondSquare_inside_face;
+  Plane.beyondSquare(radius) ⊆ Plane.Graph.face(graph, drawing, secondBase)
+      by substituting secondNamedByEscape as secondSwallowsOutside;
+
+  Set.IsNonempty(Plane.Point, Plane.beyondSquare(radius))
+      by Plane.beyondSquare_IsNonempty;
+  choose witnessPoint such that witnessPoint ∈ Plane.beyondSquare(radius);
+  witnessPoint ∈ Plane.Graph.face(graph, drawing, firstBase)
+      by firstSwallowsOutside;
+  witnessPoint ∈ Plane.Graph.face(graph, drawing, secondBase)
+      by secondSwallowsOutside;
+  witnessPoint ∈ Plane.Graph.face(graph, drawing, firstBase)
+                     ∩ Plane.Graph.face(graph, drawing, secondBase);
+  Set.IsNonempty(Plane.Point,
+      Plane.Graph.face(graph, drawing, firstBase)
+          ∩ Plane.Graph.face(graph, drawing, secondBase))
+      by { witness witnessPoint };
+  done by Plane.Graph.face.equal_of_meeting
+}

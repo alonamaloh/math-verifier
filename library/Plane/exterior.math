@@ -1,0 +1,652 @@
+-- Plane/exterior.math
+--
+-- The plane outside a square, and the fact that it is connected. Layer 3.
+--
+-- This is the "genuine plane fact" the outer face waits on: far enough from
+-- the origin the plane is all one piece. It needs no trigonometry and no
+-- traversal of a circle, because the region outside a SQUARE — rather than
+-- outside a disk — is exactly a union of four half-planes:
+--
+--     |x₁| > r  or  |x₂| > r   ⟺   x₁ > r,  or  x₂ > r,  or  -x₁ > r,  or  -x₂ > r.
+--
+-- Each half-plane is convex, hence connected, and consecutive ones share a
+-- corner, so the four glue into one connected set. A disk would not do:
+-- the exterior of a disk is not a union of half-planes, and pulling it
+-- apart into pieces that are would need the polar decomposition this
+-- development deliberately withholds.
+--
+-- The closed square is here too, as the shape a bounded set is caught
+-- inside: it is what turns "the drawing is compact" into "the drawing
+-- leaves the whole outside untouched".
+
+module Plane.exterior
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import axioms
+import Set.basics
+import Set.algebra
+import Lists.list
+import Lists.set_union
+import Real.interface
+import Real.order
+import Real.order_field
+import Real.linearity
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.maximum
+import Metric.space
+import Metric.sequence
+import Plane.vector
+import Plane.point
+import Plane.norm
+import Plane.metric
+import Plane.segment
+import Plane.topology
+import Plane.sequence
+import Plane.compact
+import Plane.compactness
+import Plane.connected
+
+-- ----------------------------------------------------------------------
+-- Half-planes.
+--
+-- A half-plane is where an affine coordinate exceeds a bound. Stating it
+-- for an arbitrary affine coordinate rather than four times over is what
+-- makes one convexity proof serve all four sides of the square: the
+-- negated coordinate is affine too, so "left of `-r`" is "beyond `r`" for
+-- the coordinate `-x₁`.
+
+definition Plane.IsAffineCoordinate (coordinate : Plane.Point → ℝ) : Proposition :=
+  ∀ (a b : Plane.Point). ∀ (t : ℝ).
+    coordinate(Plane.between(a, b, t))
+        = coordinate(a) + t * (coordinate(b) - coordinate(a))
+
+definition Plane.HalfPlane (coordinate : Plane.Point → ℝ) (bound : ℝ)
+        : Set(Plane.Point) :=
+  (x : Plane.Point) ↦ coordinate(x) > bound
+
+theorem Plane.first_IsAffineCoordinate
+        : Plane.IsAffineCoordinate(Plane.Point.first) := {
+  take a : Plane.Point;
+  take b : Plane.Point;
+  take t : ℝ;
+  done by Plane.Point.first_between
+}
+
+theorem Plane.second_IsAffineCoordinate
+        : Plane.IsAffineCoordinate(Plane.Point.second) := {
+  take a : Plane.Point;
+  take b : Plane.Point;
+  take t : ℝ;
+  done by Plane.Point.second_between
+}
+
+theorem Plane.IsAffineCoordinate.negate (coordinate : Plane.Point → ℝ)
+        (affine : Plane.IsAffineCoordinate(coordinate))
+        : Plane.IsAffineCoordinate((x : Plane.Point) ↦ -coordinate(x)) := {
+  take a : Plane.Point;
+  take b : Plane.Point;
+  take t : ℝ;
+  coordinate(Plane.between(a, b, t))
+      = coordinate(a) + t * (coordinate(b) - coordinate(a)) by affine as walks;
+  -coordinate(Plane.between(a, b, t))
+     = -(coordinate(a) + t * (coordinate(b) - coordinate(a))) by substituting walks
+     = -coordinate(a) + t * (-coordinate(b) - -coordinate(a)) by ring;
+  done
+}
+
+-- A half-plane is convex: the coordinate along a walk is the walk of the
+-- coordinates, and a walk between two numbers above a bound stays above it.
+theorem Plane.HalfPlane_IsConvex (coordinate : Plane.Point → ℝ)
+        (affine : Plane.IsAffineCoordinate(coordinate)) (bound : ℝ)
+        : Plane.IsConvex(Plane.HalfPlane(coordinate, bound)) := {
+  take a : Plane.Point;
+  suppose a ∈ Plane.HalfPlane(coordinate, bound);
+  take b : Plane.Point;
+  suppose b ∈ Plane.HalfPlane(coordinate, bound);
+  take t : ℝ;
+  suppose 0 ≤ t;
+  suppose t ≤ 1;
+  coordinate(a) > bound;
+  coordinate(b) > bound;
+  coordinate(Plane.between(a, b, t))
+     = coordinate(a) + t * (coordinate(b) - coordinate(a)) by affine
+     = coordinate(a) * (1 - t) + coordinate(b) * t by ring
+     as mixture;
+  Real.IsNonneg(1 - t);
+  Real.IsNonneg(t);
+  bound * (1 - t) ≤ coordinate(a) * (1 - t)
+      by Real.LessOrEqual.multiply_by_nonneg_right;
+  bound * t ≤ coordinate(b) * t by Real.LessOrEqual.multiply_by_nonneg_right;
+
+  -- One of the two weights is positive, and that is where the strictness
+  -- comes from. At `t = 0` the walk has not left `a`.
+  bound < coordinate(Plane.between(a, b, t))
+      by cases {
+        case t = 0 as standsStill: {
+            Plane.between(a, b, t)
+               = Plane.between(a, b, 0) by substituting standsStill
+               = a by Plane.between_zero
+               as atStart;
+            coordinate(Plane.between(a, b, t)) = coordinate(a) by atStart;
+            done
+          }
+        otherwise: {
+            (0 : ℝ) ≠ t;
+            t > 0;
+            bound * t < coordinate(b) * t
+                by Real.LessThan.multiply_by_positive_right;
+            bound
+               = bound * (1 - t) + bound * t by ring
+               < coordinate(a) * (1 - t) + coordinate(b) * t by ordered_field
+               = coordinate(Plane.between(a, b, t)) by mixture;
+            done
+          }
+      };
+  done
+}
+
+theorem Plane.HalfPlane_IsConnected (coordinate : Plane.Point → ℝ)
+        (affine : Plane.IsAffineCoordinate(coordinate)) (bound : ℝ)
+        : Plane.IsConnected(Plane.HalfPlane(coordinate, bound)) := {
+  Plane.IsConvex(Plane.HalfPlane(coordinate, bound)) by Plane.HalfPlane_IsConvex;
+  done by Plane.IsConvex.connected
+}
+
+-- ----------------------------------------------------------------------
+-- The square, and what lies beyond it.
+
+definition Plane.square (radius : ℝ) : Set(Plane.Point) :=
+  (x : Plane.Point) ↦
+    abs(Plane.Point.first(x)) ≤ radius ∧ abs(Plane.Point.second(x)) ≤ radius
+
+definition Plane.farRight (radius : ℝ) : Set(Plane.Point) :=
+  Plane.HalfPlane(Plane.Point.first, radius)
+
+definition Plane.farAbove (radius : ℝ) : Set(Plane.Point) :=
+  Plane.HalfPlane(Plane.Point.second, radius)
+
+definition Plane.farLeft (radius : ℝ) : Set(Plane.Point) :=
+  Plane.HalfPlane((x : Plane.Point) ↦ -Plane.Point.first(x), radius)
+
+definition Plane.farBelow (radius : ℝ) : Set(Plane.Point) :=
+  Plane.HalfPlane((x : Plane.Point) ↦ -Plane.Point.second(x), radius)
+
+-- Listed so that consecutive sides share a corner, which is what the
+-- connectedness proof walks along.
+definition Plane.beyondSquare (radius : ℝ) : Set(Plane.Point) :=
+  ((Plane.farRight(radius) ∪ Plane.farAbove(radius)) ∪ Plane.farLeft(radius))
+      ∪ Plane.farBelow(radius)
+
+-- Each side is part of the outside. Stated once each, because the nested
+-- union is three disjunction-introductions deep and no argument below
+-- should have to walk them.
+
+theorem Plane.farRight_beyondSquare (radius : ℝ) (x : Plane.Point)
+        (onSide : x ∈ Plane.farRight(radius))
+        : x ∈ Plane.beyondSquare(radius) := {
+  x ∈ Plane.farRight(radius) ∪ Plane.farAbove(radius);
+  x ∈ (Plane.farRight(radius) ∪ Plane.farAbove(radius)) ∪ Plane.farLeft(radius);
+  done
+}
+
+theorem Plane.farAbove_beyondSquare (radius : ℝ) (x : Plane.Point)
+        (onSide : x ∈ Plane.farAbove(radius))
+        : x ∈ Plane.beyondSquare(radius) := {
+  x ∈ Plane.farRight(radius) ∪ Plane.farAbove(radius);
+  x ∈ (Plane.farRight(radius) ∪ Plane.farAbove(radius)) ∪ Plane.farLeft(radius);
+  done
+}
+
+theorem Plane.farLeft_beyondSquare (radius : ℝ) (x : Plane.Point)
+        (onSide : x ∈ Plane.farLeft(radius))
+        : x ∈ Plane.beyondSquare(radius) := {
+  x ∈ (Plane.farRight(radius) ∪ Plane.farAbove(radius)) ∪ Plane.farLeft(radius);
+  done
+}
+
+theorem Plane.farBelow_beyondSquare (radius : ℝ) (x : Plane.Point)
+        (onSide : x ∈ Plane.farBelow(radius))
+        : x ∈ Plane.beyondSquare(radius) :=
+  done
+
+-- ----------------------------------------------------------------------
+-- Inside and outside are complementary.
+
+theorem Plane.square_off_beyondSquare (radius : ℝ) (x : Plane.Point)
+        (inSquare : x ∈ Plane.square(radius))
+        : x ∉ Plane.beyondSquare(radius) := {
+  abs(Plane.Point.first(x)) ≤ radius;
+  abs(Plane.Point.second(x)) ≤ radius;
+  Plane.Point.first(x) ≤ abs(Plane.Point.first(x))
+                      ≤ radius;
+  -Plane.Point.first(x) ≤ abs(Plane.Point.first(x))
+                       ≤ radius;
+  Plane.Point.second(x) ≤ abs(Plane.Point.second(x))
+                       ≤ radius;
+  -Plane.Point.second(x) ≤ abs(Plane.Point.second(x))
+                        ≤ radius;
+  suppose x ∈ Plane.beyondSquare(radius);
+  done by cases {
+    case x ∈ (Plane.farRight(radius) ∪ Plane.farAbove(radius))
+               ∪ Plane.farLeft(radius): done by cases {
+        case x ∈ Plane.farRight(radius) ∪ Plane.farAbove(radius): done by cases {
+            case x ∈ Plane.farRight(radius): {
+                radius < Plane.Point.first(x)
+                       ≤ radius;
+                done
+              }
+            case x ∈ Plane.farAbove(radius): {
+                radius < Plane.Point.second(x)
+                       ≤ radius;
+                done
+              }
+          }
+        case x ∈ Plane.farLeft(radius): {
+            radius < -Plane.Point.first(x)
+                   ≤ radius;
+            done
+          }
+      }
+    case x ∈ Plane.farBelow(radius): {
+        radius < -Plane.Point.second(x)
+               ≤ radius;
+        done
+      }
+  }
+}
+
+theorem Plane.square_of_not_beyondSquare (radius : ℝ) (x : Plane.Point)
+        (notBeyond : x ∉ Plane.beyondSquare(radius))
+        : x ∈ Plane.square(radius) := {
+  ¬(radius < Plane.Point.first(x))
+      by { suppose radius < Plane.Point.first(x);
+           x ∈ Plane.farRight(radius);
+           x ∈ Plane.beyondSquare(radius) by Plane.farRight_beyondSquare;
+           done };
+  Plane.Point.first(x) ≤ radius by Real.LessOrEqual_of_not_LessThan;
+  ¬(radius < -Plane.Point.first(x))
+      by { suppose radius < -Plane.Point.first(x);
+           x ∈ Plane.farLeft(radius);
+           x ∈ Plane.beyondSquare(radius) by Plane.farLeft_beyondSquare;
+           done };
+  -Plane.Point.first(x) ≤ radius by Real.LessOrEqual_of_not_LessThan;
+  -radius ≤ Plane.Point.first(x) by ordered_field;
+  abs(Plane.Point.first(x)) ≤ radius by Real.absolute_value_LessOrEqual_of_bounds;
+
+  ¬(radius < Plane.Point.second(x))
+      by { suppose radius < Plane.Point.second(x);
+           x ∈ Plane.farAbove(radius);
+           x ∈ Plane.beyondSquare(radius) by Plane.farAbove_beyondSquare;
+           done };
+  Plane.Point.second(x) ≤ radius by Real.LessOrEqual_of_not_LessThan;
+  ¬(radius < -Plane.Point.second(x))
+      by { suppose radius < -Plane.Point.second(x);
+           x ∈ Plane.farBelow(radius);
+           x ∈ Plane.beyondSquare(radius) by Plane.farBelow_beyondSquare;
+           done };
+  -Plane.Point.second(x) ≤ radius by Real.LessOrEqual_of_not_LessThan;
+  -radius ≤ Plane.Point.second(x) by ordered_field;
+  abs(Plane.Point.second(x)) ≤ radius by Real.absolute_value_LessOrEqual_of_bounds;
+  done
+}
+
+theorem Plane.beyondSquare_of_not_square (radius : ℝ) (x : Plane.Point)
+        (outside : x ∉ Plane.square(radius))
+        : x ∈ Plane.beyondSquare(radius) := {
+  suppose x ∉ Plane.beyondSquare(radius) for contradiction;
+  x ∈ Plane.square(radius) by Plane.square_of_not_beyondSquare;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The outside is connected.
+--
+-- Right and above share the corner `(r + 1, r + 1)`, above and left share
+-- `(-(r + 1), r + 1)`, and left and below share `(-(r + 1), -(r + 1))`. So
+-- the four sides glue in that order, each to the piece already assembled.
+
+theorem Plane.farRight_IsConnected (radius : ℝ)
+        : Plane.IsConnected(Plane.farRight(radius)) := {
+  Plane.IsAffineCoordinate(Plane.Point.first) by Plane.first_IsAffineCoordinate;
+  done by Plane.HalfPlane_IsConnected
+}
+
+theorem Plane.farAbove_IsConnected (radius : ℝ)
+        : Plane.IsConnected(Plane.farAbove(radius)) := {
+  Plane.IsAffineCoordinate(Plane.Point.second) by Plane.second_IsAffineCoordinate;
+  done by Plane.HalfPlane_IsConnected
+}
+
+theorem Plane.farLeft_IsConnected (radius : ℝ)
+        : Plane.IsConnected(Plane.farLeft(radius)) := {
+  Plane.IsAffineCoordinate(Plane.Point.first) by Plane.first_IsAffineCoordinate;
+  Plane.IsAffineCoordinate((x : Plane.Point) ↦ -Plane.Point.first(x))
+      by Plane.IsAffineCoordinate.negate;
+  done by Plane.HalfPlane_IsConnected
+}
+
+theorem Plane.farBelow_IsConnected (radius : ℝ)
+        : Plane.IsConnected(Plane.farBelow(radius)) := {
+  Plane.IsAffineCoordinate(Plane.Point.second) by Plane.second_IsAffineCoordinate;
+  Plane.IsAffineCoordinate((x : Plane.Point) ↦ -Plane.Point.second(x))
+      by Plane.IsAffineCoordinate.negate;
+  done by Plane.HalfPlane_IsConnected
+}
+
+theorem Plane.beyondSquare_IsConnected (radius : ℝ)
+        : Plane.IsConnected(Plane.beyondSquare(radius)) := {
+  Plane.IsConnected(Plane.farRight(radius)) by Plane.farRight_IsConnected;
+  Plane.IsConnected(Plane.farAbove(radius)) by Plane.farAbove_IsConnected;
+  Plane.IsConnected(Plane.farLeft(radius)) by Plane.farLeft_IsConnected;
+  Plane.IsConnected(Plane.farBelow(radius)) by Plane.farBelow_IsConnected;
+
+  let upperRight : Plane.Point := Plane.Point.make(radius + 1, radius + 1);
+  let upperLeft : Plane.Point := Plane.Point.make(-(radius + 1), radius + 1);
+  let lowerLeft : Plane.Point := Plane.Point.make(-(radius + 1), -(radius + 1));
+  radius < radius + 1;
+  radius < -(-(radius + 1)) by ordered_field;
+  upperRight ∈ Plane.farRight(radius);
+  upperRight ∈ Plane.farAbove(radius);
+  upperLeft ∈ Plane.farAbove(radius);
+  upperLeft ∈ Plane.farLeft(radius);
+  lowerLeft ∈ Plane.farLeft(radius);
+  lowerLeft ∈ Plane.farBelow(radius);
+
+  Plane.IsConnected(Plane.farRight(radius) ∪ Plane.farAbove(radius))
+      by Plane.IsConnected.union(shared := upperRight);
+  upperLeft ∈ Plane.farRight(radius) ∪ Plane.farAbove(radius);
+  Plane.IsConnected(
+      (Plane.farRight(radius) ∪ Plane.farAbove(radius)) ∪ Plane.farLeft(radius))
+      by Plane.IsConnected.union(shared := upperLeft);
+  lowerLeft ∈ (Plane.farRight(radius) ∪ Plane.farAbove(radius))
+                  ∪ Plane.farLeft(radius);
+  done by Plane.IsConnected.union(shared := lowerLeft)
+}
+
+-- ----------------------------------------------------------------------
+-- Inside the square is bounded; outside it is not.
+
+theorem Plane.square_IsBounded (radius : ℝ)
+        : Plane.IsBounded(Plane.square(radius)) := {
+  ∀ (x : Plane.Point). x ∈ Plane.square(radius) →
+      ∀ (y : Plane.Point). y ∈ Plane.square(radius) →
+        Plane.distance(x, y) ≤ 4 * radius
+      by {
+        take x : Plane.Point;
+        suppose x ∈ Plane.square(radius);
+        take y : Plane.Point;
+        suppose y ∈ Plane.square(radius);
+        abs(Plane.Point.first(x)) ≤ radius;
+        abs(Plane.Point.second(x)) ≤ radius;
+        abs(Plane.Point.first(y)) ≤ radius;
+        abs(Plane.Point.second(y)) ≤ radius;
+        Plane.Point.first(x) ≤ abs(Plane.Point.first(x)) ≤ radius;
+        -Plane.Point.first(x) ≤ abs(Plane.Point.first(x)) ≤ radius;
+        Plane.Point.first(y) ≤ abs(Plane.Point.first(y)) ≤ radius;
+        -Plane.Point.first(y) ≤ abs(Plane.Point.first(y)) ≤ radius;
+        Plane.Point.second(x) ≤ abs(Plane.Point.second(x)) ≤ radius;
+        -Plane.Point.second(x) ≤ abs(Plane.Point.second(x)) ≤ radius;
+        Plane.Point.second(y) ≤ abs(Plane.Point.second(y)) ≤ radius;
+        -Plane.Point.second(y) ≤ abs(Plane.Point.second(y)) ≤ radius;
+
+        Plane.Vector.first(y - x) = Plane.Point.first(y) - Plane.Point.first(x)
+            by Plane.Point.first_difference as firstGap;
+        Plane.Vector.second(y - x) = Plane.Point.second(y) - Plane.Point.second(x)
+            by Plane.Point.second_difference as secondGap;
+        Plane.Point.first(y) - Plane.Point.first(x) ≤ 2 * radius by ordered_field;
+        -(Plane.Point.first(y) - Plane.Point.first(x)) ≤ 2 * radius by ordered_field;
+        abs(Plane.Point.first(y) - Plane.Point.first(x)) ≤ 2 * radius
+            by Real.absolute_value_LessOrEqual_of_bounds;
+        Plane.Point.second(y) - Plane.Point.second(x) ≤ 2 * radius by ordered_field;
+        -(Plane.Point.second(y) - Plane.Point.second(x)) ≤ 2 * radius by ordered_field;
+        abs(Plane.Point.second(y) - Plane.Point.second(x)) ≤ 2 * radius
+            by Real.absolute_value_LessOrEqual_of_bounds;
+        abs(Plane.Vector.first(y - x)) ≤ 2 * radius by substituting firstGap;
+        abs(Plane.Vector.second(y - x)) ≤ 2 * radius by substituting secondGap;
+        Plane.Vector.supNorm(y - x) ≤ 2 * radius by Real.maximum_LessOrEqual;
+        Plane.distance(x, y)
+           = Plane.Vector.norm(y - x)
+           ≤ 2 * Plane.Vector.supNorm(y - x)
+                 by Plane.Vector.norm_LessOrEqual_two_supNorm
+           ≤ 2 * (2 * radius) by Real.LessOrEqual.multiply_by_nonneg_left
+           = 4 * radius by ring;
+        done
+      };
+  witness 4 * radius
+}
+
+-- Nothing that swallows the outside of a square is bounded: two points on
+-- opposite sides are as far apart as one likes.
+theorem Plane.beyondSquare_IsUnbounded (radius : ℝ) (radiusNonneg : radius ≥ 0)
+        (region : Set(Plane.Point))
+        (swallowsOutside : Plane.beyondSquare(radius) ⊆ region)
+        : ¬Plane.IsBounded(region) := {
+  suppose Plane.IsBounded(region) as bounded;
+  choose bound such that
+      ∀ (x : Plane.Point). x ∈ region →
+        ∀ (y : Plane.Point). y ∈ region → Plane.distance(x, y) ≤ bound
+      from bounded;
+  let reach : ℝ := radius + 1 + abs(bound);
+  bound ≤ abs(bound);
+  abs(bound) ≥ 0;
+  reach > radius by ordered_field;
+  radius < -(-reach) by ordered_field;
+
+  let east : Plane.Point := Plane.Point.make(reach, 0);
+  let west : Plane.Point := Plane.Point.make(-reach, 0);
+  east ∈ Plane.farRight(radius);
+  west ∈ Plane.farLeft(radius);
+  east ∈ Plane.beyondSquare(radius) by Plane.farRight_beyondSquare;
+  west ∈ Plane.beyondSquare(radius) by Plane.farLeft_beyondSquare;
+  east ∈ region by swallowsOutside;
+  west ∈ region by swallowsOutside;
+  Plane.distance(east, west) ≤ bound;
+
+  2 * reach ≥ 0 by ordered_field;
+  Plane.Point.first(east) = reach by Plane.Point.first_make as eastCoordinate;
+  Plane.Point.first(west) = -reach by Plane.Point.first_make as westCoordinate;
+  Plane.Point.first(west) - Plane.Point.first(east)
+     = -reach - Plane.Point.first(east) by westCoordinate
+     = -reach - reach by eastCoordinate
+     = -(2 * reach) by ring
+     as opposite;
+  abs(Plane.Point.first(west) - Plane.Point.first(east))
+     = abs(-(2 * reach)) by opposite
+     = abs(2 * reach) by Real.absolute_value_negate
+     = 2 * reach by Real.absolute_value_when_nonneg
+     as gapIsWidth;
+  2 * reach = abs(Plane.Point.first(west) - Plane.Point.first(east)) by gapIsWidth
+            ≤ Plane.distance(east, west) by Plane.first_gap_below_distance
+            ≤ bound;
+  done by ordered_field
+}
+
+theorem Plane.beyondSquare_IsNonempty (radius : ℝ)
+        : Set.IsNonempty(Plane.Point, Plane.beyondSquare(radius)) := {
+  let east : Plane.Point := Plane.Point.make(radius + 1, 0);
+  radius < radius + 1;
+  east ∈ Plane.farRight(radius);
+  east ∈ Plane.beyondSquare(radius) by Plane.farRight_beyondSquare;
+  witness east
+}
+
+theorem Plane.IsBounded.subset (small large : Set(Plane.Point))
+        (inside : small ⊆ large) (bounded : Plane.IsBounded(large))
+        : Plane.IsBounded(small) := {
+  choose bound such that
+      ∀ (x : Plane.Point). x ∈ large →
+        ∀ (y : Plane.Point). y ∈ large → Plane.distance(x, y) ≤ bound
+      as withinBound from bounded;
+  ∀ (x : Plane.Point). x ∈ small →
+      ∀ (y : Plane.Point). y ∈ small → Plane.distance(x, y) ≤ bound
+      by { take x : Plane.Point;
+           suppose x ∈ small;
+           take y : Plane.Point;
+           suppose y ∈ small;
+           x ∈ large by inside;
+           y ∈ large by inside;
+           done by withinBound };
+  witness bound
+}
+
+-- An unbounded set reaches past every square: were it caught inside one it
+-- would inherit that square's bound.
+theorem Plane.unbounded_escapes_square (radius : ℝ) (region : Set(Plane.Point))
+        (unbounded : ¬Plane.IsBounded(region))
+        : ∃ (escape : Plane.Point).
+            escape ∈ region ∧ escape ∈ Plane.beyondSquare(radius) := {
+  suppose ¬(∃ (escape : Plane.Point).
+              escape ∈ region ∧ escape ∈ Plane.beyondSquare(radius))
+      for contradiction;
+  region ⊆ Plane.square(radius)
+      by { take x : Plane.Point;
+           suppose x ∈ region;
+           x ∉ Plane.beyondSquare(radius)
+               by { suppose x ∈ Plane.beyondSquare(radius);
+                    ∃ (escape : Plane.Point).
+                        escape ∈ region ∧ escape ∈ Plane.beyondSquare(radius)
+                        by { witness x };
+                    done };
+           done by Plane.square_of_not_beyondSquare };
+  Plane.IsBounded(Plane.square(radius)) by Plane.square_IsBounded;
+  Plane.IsBounded(region) by Plane.IsBounded.subset;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- Catching a bounded set inside a square.
+--
+-- Stated with a radius that is nonnegative, because that is what lets two
+-- squares be merged by ADDING their radii — no maximum, and no case split
+-- on which of the two is larger.
+
+theorem Plane.square_monotone (small large : ℝ) (ordered : small ≤ large)
+        : Plane.square(small) ⊆ Plane.square(large) := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.square(small);
+  abs(Plane.Point.first(x)) ≤ small
+                           ≤ large;
+  abs(Plane.Point.second(x)) ≤ small
+                            ≤ large;
+  done
+}
+
+theorem Plane.IsBounded.inside_square (region : Set(Plane.Point))
+        (center : Plane.Point) (centerInside : center ∈ region)
+        (bounded : Plane.IsBounded(region))
+        : ∃ (radius : ℝ). radius ≥ 0 ∧ region ⊆ Plane.square(radius) := {
+  ∃ (bound : ℝ). ∀ (x : Plane.Point). x ∈ region →
+      Plane.distance(center, x) ≤ bound
+      by MetricSpace.IsBounded.about;
+  choose bound such that
+      ∀ (x : Plane.Point). x ∈ region → Plane.distance(center, x) ≤ bound
+      as withinBound;
+  let radius : ℝ :=
+      abs(Plane.Point.first(center)) + abs(Plane.Point.second(center)) + abs(bound);
+  abs(Plane.Point.first(center)) ≥ 0;
+  abs(Plane.Point.second(center)) ≥ 0;
+  abs(bound) ≥ 0;
+  radius ≥ 0 by ordered_field;
+
+  region ⊆ Plane.square(radius)
+      by {
+        take x : Plane.Point;
+        suppose x ∈ region;
+        Plane.distance(center, x) ≤ bound by withinBound;
+        bound ≤ abs(bound);
+        abs(Plane.Point.first(x) - Plane.Point.first(center))
+            ≤ Plane.distance(center, x) by Plane.first_gap_below_distance;
+        abs(Plane.Point.second(x) - Plane.Point.second(center))
+            ≤ Plane.distance(center, x) by Plane.second_gap_below_distance;
+        Plane.Point.first(x) - Plane.Point.first(center)
+            ≤ abs(Plane.Point.first(x) - Plane.Point.first(center));
+        -(Plane.Point.first(x) - Plane.Point.first(center))
+            ≤ abs(Plane.Point.first(x) - Plane.Point.first(center));
+        Plane.Point.second(x) - Plane.Point.second(center)
+            ≤ abs(Plane.Point.second(x) - Plane.Point.second(center));
+        -(Plane.Point.second(x) - Plane.Point.second(center))
+            ≤ abs(Plane.Point.second(x) - Plane.Point.second(center));
+        Plane.Point.first(center) ≤ abs(Plane.Point.first(center));
+        -Plane.Point.first(center) ≤ abs(Plane.Point.first(center));
+        Plane.Point.second(center) ≤ abs(Plane.Point.second(center));
+        -Plane.Point.second(center) ≤ abs(Plane.Point.second(center));
+
+        Plane.Point.first(x) ≤ radius by ordered_field;
+        -Plane.Point.first(x) ≤ radius by ordered_field;
+        abs(Plane.Point.first(x)) ≤ radius
+            by Real.absolute_value_LessOrEqual_of_bounds;
+        Plane.Point.second(x) ≤ radius by ordered_field;
+        -Plane.Point.second(x) ≤ radius by ordered_field;
+        abs(Plane.Point.second(x)) ≤ radius
+            by Real.absolute_value_LessOrEqual_of_bounds;
+        done
+      };
+  witness radius
+}
+
+-- A finite union of sets, each caught inside a square, is caught inside
+-- one: add the radii.
+theorem Plane.unionOver_inside_square (A : Type(0)) (pieces : A → Set(Plane.Point))
+        (list : List(A))
+        (eachInside : ∀ (item : A). item ∈ list →
+             ∃ (radius : ℝ). radius ≥ 0 ∧ pieces(item) ⊆ Plane.square(radius))
+        : ∃ (radius : ℝ).
+            radius ≥ 0 ∧ List.unionOver(pieces, list) ⊆ Plane.square(radius) :=
+  by induction on list with IH {
+    case list = List.empty: {
+        (0 : ℝ) ≥ 0;
+        List.unionOver(pieces, List.empty(A)) ⊆ Plane.square(0)
+            by { take x : Plane.Point;
+                 suppose x ∈ List.unionOver(pieces, List.empty(A));
+                 x ∈ Set.empty(Plane.Point);
+                 done };
+        witness (0 : ℝ)
+      }
+    case list = List.prepend(head, tail) for some head, tail: {
+        head ∈ List.prepend(A, head, tail);
+        ∃ (radius : ℝ). radius ≥ 0 ∧ pieces(head) ⊆ Plane.square(radius)
+            by eachInside;
+        choose headRadius such that
+            headRadius ≥ 0 ∧ pieces(head) ⊆ Plane.square(headRadius);
+        headRadius ≥ 0;
+        pieces(head) ⊆ Plane.square(headRadius) as headInside;
+
+        ∀ (item : A). item ∈ tail →
+            ∃ (radius : ℝ). radius ≥ 0 ∧ pieces(item) ⊆ Plane.square(radius)
+            by { take item : A;
+                 suppose item ∈ tail;
+                 item ∈ List.prepend(A, head, tail);
+                 done by eachInside };
+        choose tailRadius such that
+            tailRadius ≥ 0 ∧ List.unionOver(pieces, tail) ⊆ Plane.square(tailRadius)
+            from IH;
+        tailRadius ≥ 0;
+        List.unionOver(pieces, tail) ⊆ Plane.square(tailRadius) as tailInside;
+
+        headRadius + tailRadius ≥ 0 by ordered_field;
+        headRadius ≤ headRadius + tailRadius by ordered_field;
+        tailRadius ≤ headRadius + tailRadius by ordered_field;
+        Plane.square(headRadius) ⊆ Plane.square(headRadius + tailRadius)
+            by Plane.square_monotone;
+        Plane.square(tailRadius) ⊆ Plane.square(headRadius + tailRadius)
+            by Plane.square_monotone;
+        List.unionOver(pieces, List.prepend(A, head, tail))
+            ⊆ Plane.square(headRadius + tailRadius)
+            by { take x : Plane.Point;
+                 suppose x ∈ List.unionOver(pieces, List.prepend(A, head, tail));
+                 done by cases {
+                   case x ∈ pieces(head): {
+                       x ∈ Plane.square(headRadius) by headInside;
+                       done
+                     }
+                   case x ∈ List.unionOver(pieces, tail): {
+                       x ∈ Plane.square(tailRadius) by tailInside;
+                       done
+                     }
+                 } };
+        witness headRadius + tailRadius
+      }
+  }
