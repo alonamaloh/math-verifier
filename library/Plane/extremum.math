@@ -83,8 +83,10 @@ theorem Plane.RealContinuousOn.negate
     0 < nearness;
     ∀ (y : Plane.Point). y ∈ region →
         Plane.distance(x, y) < nearness → abs(-f(y) - -f(x)) < tolerance
-        by (y : Plane.Point) (inRegionY : y ∈ region)
-           (near : Plane.distance(x, y) < nearness) ↦ {
+        by {
+          take y : Plane.Point;
+          suppose y ∈ region;
+          suppose Plane.distance(x, y) < nearness;
              abs(f(y) - f(x)) < tolerance by valuesClose;
              -f(x) - -f(y) = -(f(x) - f(y)) by ring;
              abs(-f(y) - -f(x))
@@ -114,8 +116,10 @@ theorem Plane.RealContinuousOn.distance_from (center : Plane.Point)
     tolerance > 0;
     ∀ (y : Plane.Point). y ∈ region → Plane.distance(x, y) < tolerance
         → abs(Plane.distance(center, y) - Plane.distance(center, x)) < tolerance
-        by (y : Plane.Point) (inRegionY : y ∈ region)
-           (near : Plane.distance(x, y) < tolerance) ↦ {
+        by {
+          take y : Plane.Point;
+          suppose y ∈ region;
+          suppose Plane.distance(x, y) < tolerance;
              abs(Plane.distance(center, y) - Plane.distance(center, x))
                 ≤ Plane.distance(x, y) by Plane.distance_shift_bound
                 < tolerance;
@@ -177,7 +181,9 @@ theorem Plane.value_past_every_scale (f : Plane.Point → ℝ)
   suppose ¬(∃ (x : Plane.Point). x ∈ region ∧ (1 + n : ℝ) < f(x))
       as noneBeyond for contradiction {
     Real.IsUpperBound(Plane.image(f, region), (1 + n : ℝ))
-        by (value : ℝ) (inImage : value ∈ Plane.image(f, region)) ↦ {
+        by {
+          take value : ℝ;
+          suppose value ∈ Plane.image(f, region) as inImage;
           choose x such that x ∈ region ∧ f(x) = value from inImage;
           x ∈ region;
           f(x) = value;
@@ -281,10 +287,10 @@ theorem Plane.attains_maximum (f : Plane.Point → ℝ)
       from Real.supremum_exists;
   Real.IsUpperBound(Plane.image(f, region), peak) as isUpperBound;
   ∀ (x : Plane.Point). x ∈ region → f(x) ≤ peak
-      by (x : Plane.Point) (inRegion : x ∈ region) ↦ {
-        f(x) ∈ Plane.image(f, region) by { witness x };
-        done by isUpperBound
-      }
+      by { take x : Plane.Point;
+           suppose x ∈ region;
+           f(x) ∈ Plane.image(f, region) by { witness x };
+           done by isUpperBound }
       as belowPeak;
 
   -- The supremum is approached: at every scale some value of `f` is
@@ -338,7 +344,9 @@ theorem Plane.attains_maximum (f : Plane.Point → ℝ)
           s := (k : ℕ) ↦ s(index(k)),
           inside := (k : ℕ) ↦ inside(index(k)));
   Real.SequenceConverges((k : ℕ) ↦ f(s(index(k))), peak)
-      by (tolerance : ℝ) (tolerancePositive : tolerance > 0) ↦ {
+      by {
+        take tolerance : ℝ;
+        suppose tolerance > 0;
         choose scale such that Real.harmonic_term(scale) < tolerance
             from Real.exists_harmonic_term_below;
         witness scale with
@@ -361,8 +369,9 @@ theorem Plane.attains_maximum (f : Plane.Point → ℝ)
       };
   f(p) = peak by Real.SequenceConverges.unique;
   ∀ (x : Plane.Point). x ∈ region → f(x) ≤ f(p)
-      by (x : Plane.Point) (inRegionX : x ∈ region) ↦ {
-        f(x) ≤ peak by belowPeak;
+      by { take x : Plane.Point;
+           suppose x ∈ region;
+           f(x) ≤ peak by belowPeak;
         f(p) = peak;
         done
       };
@@ -385,10 +394,10 @@ theorem Plane.attains_minimum (f : Plane.Point → ℝ)
   p ∈ region;
   ∀ (x : Plane.Point). x ∈ region → -f(x) ≤ -f(p) as negatedBelow;
   ∀ (x : Plane.Point). x ∈ region → f(p) ≤ f(x)
-      by (x : Plane.Point) (inRegionX : x ∈ region) ↦ {
-        -f(x) ≤ -f(p) by negatedBelow;
-        done
-      };
+      by { take x : Plane.Point;
+           suppose x ∈ region;
+           -f(x) ≤ -f(p) by negatedBelow;
+           done };
   witness p
 }
 

@@ -65,9 +65,10 @@ theorem Real.between_ContinuousOn (a b : ℝ)
         distance(x, y) < Real.parameterGap(tolerance, a, b) →
           distance(Real.between(a, b, x), Real.between(a, b, y))
               < tolerance
-        by (y : ℝ) (inside : y ∈ Real.unitInterval)
-           (near : distance(x, y)
-                       < Real.parameterGap(tolerance, a, b)) ↦ {
+        by {
+          take y : ℝ;
+          suppose y ∈ Real.unitInterval as inside;
+          suppose distance(x, y) < Real.parameterGap(tolerance, a, b);
           abs(y - x)
              = abs(x - y) by Real.absolute_value_subtract_swap
              = distance(x, y)
@@ -127,14 +128,18 @@ theorem Plane.IsArc.subarc_on_subsegment (parametrisation : ℝ → Plane.Point)
   Real.segment(a, b) ⊆ Real.unitInterval
       by Real.IsConvex.segment_inside as subsegmentInside;
   ∀ (t : ℝ). t ∈ Real.unitInterval → Real.between(a, b, t) ∈ Real.segment(a, b)
-      by (t : ℝ) (inside : t ∈ Real.unitInterval) ↦ {
+      by {
+        take t : ℝ;
+        suppose t ∈ Real.unitInterval;
         t ≥ 0 by Real.unitInterval_nonneg;
         t ≤ 1 by Real.unitInterval_atMostOne;
         done by Real.between_lands
       }
       as landsInSubsegment;
   ∀ (t : ℝ). t ∈ Real.unitInterval → Real.between(a, b, t) ∈ Real.unitInterval
-      by (t : ℝ) (inside : t ∈ Real.unitInterval) ↦ {
+      by {
+        take t : ℝ;
+        suppose t ∈ Real.unitInterval;
         Real.between(a, b, t) ∈ Real.segment(a, b) by landsInSubsegment;
         done by subsegmentInside
       };
@@ -151,10 +156,13 @@ theorem Plane.IsArc.subarc_on_subsegment (parametrisation : ℝ → Plane.Point)
       by Real.between_InjectiveOn as walkInjective;
   MetricSpace.InjectiveOn(
       Plane.subarc(parametrisation, a, b), Real.unitInterval)
-      by (x : ℝ) (xInside : x ∈ Real.unitInterval)
-         (y : ℝ) (yInside : y ∈ Real.unitInterval)
-         (sameValue : Plane.subarc(parametrisation, a, b)(x)
-                          = Plane.subarc(parametrisation, a, b)(y)) ↦ {
+      by {
+        take x : ℝ;
+        suppose x ∈ Real.unitInterval as xInside;
+        take y : ℝ;
+        suppose y ∈ Real.unitInterval as yInside;
+        suppose Plane.subarc(parametrisation, a, b)(x)
+                    = Plane.subarc(parametrisation, a, b)(y) as sameValue;
         Real.between(a, b, x) ∈ Real.segment(a, b) by landsInSubsegment;
         Real.between(a, b, y) ∈ Real.segment(a, b) by landsInSubsegment;
         parametrisation(Real.between(a, b, x))
@@ -178,9 +186,12 @@ theorem Plane.IsArc.subarc (parametrisation : ℝ → Plane.Point)
   Real.segment(a, b) ⊆ Real.unitInterval
       by Real.IsConvex.segment_inside as subsegmentInside;
   MetricSpace.InjectiveOn(parametrisation, Real.segment(a, b))
-      by (x : ℝ) (xOnSubsegment : x ∈ Real.segment(a, b))
-         (y : ℝ) (yOnSubsegment : y ∈ Real.segment(a, b))
-         (sameValue : parametrisation(x) = parametrisation(y)) ↦ {
+      by {
+        take x : ℝ;
+        suppose x ∈ Real.segment(a, b) as xOnSubsegment;
+        take y : ℝ;
+        suppose y ∈ Real.segment(a, b) as yOnSubsegment;
+        suppose parametrisation(x) = parametrisation(y) as sameValue;
         x ∈ Real.unitInterval by subsegmentInside;
         y ∈ Real.unitInterval by subsegmentInside;
         done by injective
@@ -195,8 +206,9 @@ theorem Plane.subarc_image (parametrisation : ℝ → Plane.Point) (a b : ℝ)
               = Set.image(parametrisation, Real.segment(a, b)) := {
   Plane.arc(Plane.subarc(parametrisation, a, b))
       ⊆ Set.image(parametrisation, Real.segment(a, b))
-      by (y : Plane.Point)
-         (onSubarc : y ∈ Plane.arc(Plane.subarc(parametrisation, a, b))) ↦ {
+      by {
+        take y : Plane.Point;
+        suppose y ∈ Plane.arc(Plane.subarc(parametrisation, a, b)) as onSubarc;
         choose source : ℝ such that
             source ∈ Real.unitInterval
               ∧ Plane.subarc(parametrisation, a, b)(source) = y
@@ -210,9 +222,9 @@ theorem Plane.subarc_image (parametrisation : ℝ → Plane.Point) (a b : ℝ)
       };
   Set.image(parametrisation, Real.segment(a, b))
       ⊆ Plane.arc(Plane.subarc(parametrisation, a, b))
-      by (y : Plane.Point)
-         (onRestriction :
-              y ∈ Set.image(parametrisation, Real.segment(a, b))) ↦ {
+      by {
+        take y : Plane.Point;
+        suppose y ∈ Set.image(parametrisation, Real.segment(a, b)) as onRestriction;
         choose middle : ℝ such that
             middle ∈ Real.segment(a, b) ∧ parametrisation(middle) = y
             from onRestriction;
@@ -406,9 +418,10 @@ theorem Plane.IsArc.image_OpenIn (parametrisation : ℝ → Plane.Point)
     ∀ (other : Plane.Point). other ∈ Plane.arc(parametrisation) →
         Plane.distance(value, other) < valueRadius →
           other ∈ Set.image(parametrisation, piece)
-        by (other : Plane.Point)
-           (onArc : other ∈ Plane.arc(parametrisation))
-           (near : Plane.distance(value, other) < valueRadius) ↦ {
+        by {
+          take other : Plane.Point;
+          suppose other ∈ Plane.arc(parametrisation) as onArc;
+          suppose Plane.distance(value, other) < valueRadius;
           choose otherSource : ℝ such that
               otherSource ∈ Real.unitInterval
                 ∧ parametrisation(otherSource) = other
@@ -491,10 +504,11 @@ theorem Plane.IsArc.basic_piece_inside_ball (parametrisation : ℝ → Plane.Poi
       parametrisation,
       MetricSpace.Ball(source, parameterRadius) ∩ Real.unitInterval)
         ⊆ Plane.Ball(value, radius)
-      by (other : Plane.Point)
-         (inImage : other ∈ Set.image(
-              parametrisation,
-              MetricSpace.Ball(source, parameterRadius) ∩ Real.unitInterval)) ↦ {
+      by {
+        take other : Plane.Point;
+        suppose other ∈ Set.image(parametrisation,
+                            MetricSpace.Ball(source, parameterRadius) ∩ Real.unitInterval)
+            as inImage;
         choose otherSource : ℝ such that
             otherSource ∈ MetricSpace.Ball(source, parameterRadius)
                             ∩ Real.unitInterval
@@ -578,9 +592,10 @@ theorem Plane.between_ContinuousOn (a b : Plane.Point)
         distance(x, y) < Plane.parameterGap(tolerance, a, b) →
           distance(Plane.between(a, b, x), Plane.between(a, b, y))
               < tolerance
-        by (y : ℝ) (inside : y ∈ Real.unitInterval)
-           (near : distance(x, y)
-                       < Plane.parameterGap(tolerance, a, b)) ↦ {
+        by {
+          take y : ℝ;
+          suppose y ∈ Real.unitInterval as inside;
+          suppose distance(x, y) < Plane.parameterGap(tolerance, a, b);
           abs(y - x)
              = abs(x - y) by Real.absolute_value_subtract_swap
              = distance(x, y)
