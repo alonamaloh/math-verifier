@@ -79,3 +79,75 @@ list is `prepend(head, tail)` on `head`-equality.
 reachable without being named. Worth measuring the blast radius first — the
 library has many list inductions, so this should *remove* citations broadly
 rather than only serve Layer 6.
+
+---
+
+## L2 — an equation case refines the GOAL but not the hypotheses
+
+**Symptom.** In `Plane.segment_meet` the argument splits on whether the first
+segment is degenerate:
+
+```math
+theorem Plane.segment_meet (a b c d : Plane.Point)
+        (meets : Set.IsNonempty(Plane.Point,
+            Plane.segment(a, b) ∩ Plane.segment(c, d)))
+        : ∃ (p q : Plane.Point).
+              Plane.segment(a, b) ∩ Plane.segment(c, d) = Plane.segment(p, q) :=
+  done by cases {
+    case a = b as endsEqual: …
+```
+
+Inside that arm the reported goal is
+
+```
+∃ p q. Set.intersection (Plane.segment b b) (Plane.segment c d) = Plane.segment p q
+```
+
+— `a` has been rewritten to `b` — while `meets` is still reported as
+`Set.IsNonempty (Set.intersection (Plane.segment a b) (Plane.segment c d))`.
+So the arm opens with two spellings of the same set, and every step that
+feeds the hypothesis into a lemma about the goal has to bridge them by hand.
+
+**Why it bites.** The refinement direction is not the one a reader picks. The
+arm was written to reason about the *degenerate* segment, which reads
+`segment(a, a)`; the elaborator produced `segment(b, b)`. A theorem
+*parameter* is not refined at all, so the mismatch is not merely cosmetic —
+it is between a rewritten goal and an unrewritten premise.
+
+**What the natural form should be.** Either both refine or neither does. A
+`case a = b` arm that rewrote the hypothesis too would let the arm be written
+in one spelling throughout.
+
+**What the library does about it.** Takes the degenerate case out as its own
+theorem, `Plane.segment_meet_at_point`, stated in a single point name, so the
+arm only has to transport `meets` once and then cite it:
+
+```math
+case a = b: {
+    Plane.segment(a, b) = Plane.segment(b, b);
+    Set.IsNonempty(Plane.Point, Plane.segment(b, b) ∩ Plane.segment(c, d))
+        by substituting (Plane.segment(a, b) = Plane.segment(b, b));
+    Plane.segment(b, b) ∩ Plane.segment(c, d) = Plane.segment(b, b)
+        by Plane.segment_meet_at_point;
+    witness b with witness b
+  }
+```
+
+That is a good factoring on its own terms, so the cost here was small. It
+would not be, in a proof whose degenerate case is not separable.
+
+---
+
+## Not frictions — two error messages that did their job
+
+Recorded because they were the two places the build stopped, and in both the
+message named the fix outright:
+
+- ``field``: *"carrier `Real` uses the partial reciprocal
+  `Real.reciprocal(b, proof)`, which carries its own nonzero proof — call
+  `field` with no arguments (the proof rides on each `/`)"*. Written as
+  `by field(gapNonzero)`, fixed to `by field`.
+- A chain step that changed **two** subterms at once
+  (`nearest` and `farthest` in one `Plane.between(…)`) with only one equation
+  cited. Diff-inference wants one change per step; splitting it in two was the
+  fix.

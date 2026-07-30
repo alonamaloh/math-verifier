@@ -644,9 +644,31 @@ and `Metric/finite_union.math` underneath. Area guide:
 unbounded needs the exterior of a large disk to be connected, which is a
 genuine plane fact and not a consequence of anything above.
 
-**Next**, in dependency order: the segment trichotomy (two segments meet in
-nothing, a point, or a segment — Layer 0 geometry, independent of everything
-here), then the overlay, then H6. "The realisation of a cycle is a Jordan
+### Also done 2026-07-29: how two segments meet
+
+**`Plane.segment_meet`** (`Plane/segment_meet.math`, 245 lines) — two segments
+meet in nothing, or in a segment. The blueprint's "empty set, one point, or
+one closed interval" folds to a dichotomy, since a point *is* a segment with
+equal endpoints, and that is the form the overlay wants.
+
+It needs **no parallel/non-parallel split and no determinant**. A segment is
+compact and convex, so the meet is; the distance from the left endpoint
+attains a minimum and a maximum on it, and along a nondegenerate segment that
+distance **orders the parameters**
+(`Plane.parameter_LessOrEqual_of_distance`), so those two extreme points are
+the endpoints. `Plane.between_nested` re-reads the middle parameter as a walk
+between them.
+
+Landed underneath: `MetricSpace.IsCompact.intersection`,
+`Plane.IsConvex.intersection`, `Plane.between_degenerate` /
+`Plane.segment_degenerate`, `Plane.distance_from_left`, and
+**`Plane.RealContinuousOn.distance_from`** — the distance from a fixed point
+is continuous, every tolerance its own nearness. That is
+`Plane.attains_maximum`'s first customer since it was proved.
+
+**Next**, in dependency order: the overlay (`lem:polygonal-overlay`) — split
+the polygonal edges into segments, subdivide at every meet, represent each
+duplicated subsegment once — then H6. "The realisation of a cycle is a Jordan
 curve" wants the edge arcs of a cycle concatenated in order.
 
 **Definitions.** `Plane.Graph.IsDrawing` (**settled** — see above, not a
@@ -742,10 +764,11 @@ Flagging these rather than deciding them, per the always-apply rule.
 
 ## Frictions found so far
 
-`FRICTION_PLANE_LAYER6.md` — the running log from Layer 6. One entry so far
-(L1: *destructuring* list membership is plumbing the auto-prover doesn't do —
-building one is already by-less), plus the note that nested module
-directories work with no build change.
+`FRICTION_PLANE_LAYER6.md` — the running log from Layer 6. Two entries (L1:
+*destructuring* list membership is plumbing the auto-prover doesn't do —
+building one is already by-less; L2: an equation case refines the goal but not
+the hypotheses, so the arm opens with two spellings of one set), plus the note
+that nested module directories work with no build change.
 
 `FRICTION_PLANE_LAYER0.md` — the running log from Layer 0, in
 `QUIRK.md`'s format. Section I is inequalities and is the priority: every

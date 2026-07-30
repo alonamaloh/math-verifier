@@ -83,9 +83,10 @@ subgraph, with the same family of arcs: `Graph.Joins` reads only the ambient
 - **The outer face.** That exactly one face is unbounded needs the exterior
   of a large disk to be connected — a genuine plane fact that nothing here
   supplies.
-- **The overlay** (`lem:polygonal-overlay`). Its foundation is
-  the segment trichotomy (two segments meet in nothing, a point, or a
-  segment), which is Layer 0 geometry and independent of everything above.
+- **The overlay** (`lem:polygonal-overlay`). Its foundation — two segments
+  meet in nothing or in a segment — is now `Plane.segment_meet`; what remains
+  is splitting the polygonal edges into segments, subdividing at every meet,
+  and representing each duplicated subsegment once.
 - **H6, polygonal redrawing** — every finite plane graph is isomorphic to
   one with polygonal edges.
 - **The realisation of a cycle is a Jordan curve.** Needs the edge arcs of a

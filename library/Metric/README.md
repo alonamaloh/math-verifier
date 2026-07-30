@@ -76,7 +76,17 @@ about the subspace.)
 - `MetricSpace.compact_separation` — disjoint compacta are a positive
   distance apart
 - `MetricSpace.IsCompact.bounded` and `.Closure_subset` — the two halves of
-  Heine–Borel that hold in any metric space
+  Heine–Borel that hold in any metric space — and
+  `MetricSpace.IsCompact.intersection`, where the subsequence comes from one
+  set and its limit lands in the other because a compactum is closed
+- **`MetricSpace.complement_IsOpen`** — the complement of a closed set
+  (`Closure(region) ⊆ region`) is open. The one place the negation of "every
+  ball meets the set" is taken classically, and it is taken here once
+- **`MetricSpace.complement_unionOver_IsOpen`** — a finite union of closed
+  sets has an open complement ([finite_union.math](finite_union.math)). The
+  induction over the list names no radius: De Morgan turns each step into
+  `MetricSpace.OpenIn.intersection`. With `MetricSpace.Closure.empty_subset` and
+  `.singleton_subset` as the two base cases a union is built from
 - `MetricSpace.ContinuousOn.compose`, `.restrict`, `.paste`, `.of_agreeing`
 - `Real.unitInterval_IsCompact`
 

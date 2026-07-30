@@ -11,6 +11,11 @@ needed.
 - `List.append`, `List.map`, `List.length`, `List.filter`, and `List.remove`
 - `List.sumOver(values, list)` — the sum of a ℕ-valued function over a
   list's members, in [sum.math](sum.math)
+- `List.unionOver(pieces, list)` — the union of a family of sets over a
+  list's members, in [set_union.math](set_union.math). The finite union with
+  its finiteness carried by a list; written as a recursion so that each
+  induction step is a two-set statement, with `List.unionOver_member` /
+  `.member_invert` recovering the comprehension reading
 - `List.range_down` for `1,…,n`, `List.range_up` for `0,…,n-1`, and
   `List.range_down_offset`
 - Pairwise distinctness `List.Distinct`

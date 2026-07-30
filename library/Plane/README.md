@@ -109,7 +109,9 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
   **`determinant_perpendicular`** — `det(v, v⊥) = ⟨v, v⟩`, the identity
   the strip lemma runs on
 - Convexity: `between_zero`, `between_one`, `between_difference`,
-  `left_in_segment`, `right_in_segment`,
+  `left_in_segment`, `right_in_segment`, `Plane.IsConvex.intersection`,
+  `Plane.between_degenerate` / `Plane.segment_degenerate` (a segment with
+  equal endpoints is the one point),
   **`Plane.Vector.norm_affine_combination`** (a weighted average is no
   longer than the longer summand — the estimate every convexity argument
   runs on), and **`Plane.Ball_IsConvex`**
@@ -146,6 +148,18 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
   closed halves (with `Plane.ContinuousOn.of_agreeing`, since the glued map only
   *agrees* with a composition on each); injectivity splits four ways, and
   the seam case is where the meet-only-there hypothesis is used
+- **`Plane.segment_meet`** — two segments meet in nothing, or in a segment
+  ([segment_meet.math](segment_meet.math)). The blueprint's "empty set, one
+  point, or one closed interval", folded to a dichotomy because a point *is*
+  a degenerate segment. No parallel/non-parallel split and no determinant:
+  the meet is compact (`MetricSpace.IsCompact.intersection`) and convex, so
+  the distance from the left endpoint attains a minimum and a maximum there,
+  and `Plane.parameter_LessOrEqual_of_distance` — along a nondegenerate
+  segment that distance **orders the parameters** — makes those two extreme
+  points the endpoints. Supporting:
+  `Plane.RealContinuousOn.distance_from` (the distance from a fixed point is
+  continuous, every tolerance its own nearness — `Plane.attains_maximum`'s
+  first customer) and `Plane.distance_from_left`
 - **`Plane.IsArc.image_OpenIn`** — a parametrisation is an open map onto its
   arc (this is what the inverse's continuity is *for*), and
   `Plane.IsArc.basic_piece_inside_ball` puts one such image inside every
