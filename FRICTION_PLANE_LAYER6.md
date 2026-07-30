@@ -161,3 +161,45 @@ message named the fix outright:
   (`nearest` and `farthest` in one `Plane.between(…)`) with only one equation
   cited. Diff-inference wants one change per step; splitting it in two was the
   fix.
+
+---
+
+## L3 — `suppose x ∉ S for contradiction` is not recognised as a reductio
+
+**Symptom.** `∉` is ordinary notation for `Not(x ∈ S)` — the lexer maps it to
+`TokenKind::NotElementOf` and `Test/negated_relation_operators_test.math`
+checks that `x ∉ s` and `Not(x ∈ s)` are interchangeable as *types*. But the
+terminal reductio form does not see through it. In
+`Plane.Component_boundary_in_closed`:
+
+```math
+        : x ∈ closedSet := {
+  …
+  suppose x ∉ closedSet for contradiction {   -- REJECTED
+    …
+  };
+  done
+```
+
+fails with `claim 'Set.member Plane.Point x closedSet'` at the closing `done`
+— i.e. the `suppose … for contradiction` did not register as discharging the
+goal, so the goal was still open. Writing the same thing as
+
+```math
+  suppose ¬(x ∈ closedSet) for contradiction {   -- ACCEPTED
+```
+
+works. Found while sweeping `¬(a ∈ b)` → `a ∉ b` at the owner's request; that
+one site is left in the `¬(…)` spelling because of this.
+
+**Why it matters beyond the one site.** The sweep is now the house style, so
+every future reductio whose goal is a membership hits this, and the error
+message points at the closing `done` rather than at the `suppose` — nothing in
+it suggests the negation spelling is the problem.
+
+**Suggested fix.** Wherever the reductio matches the supposed proposition
+against `Not(<goal>)`, normalise the negated-relation notations first (`∉`,
+`≠`, `≰`, `∤`) — they are the same term, so this is a matcher gap rather than
+a semantic one. Worth checking `≠` in the same position while there: a goal
+`a = b` with `suppose a ≠ b for contradiction` is the identical shape and
+probably fails identically.
