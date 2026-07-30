@@ -1,0 +1,229 @@
+-- Plane/Graph/segments.math
+--
+-- Polygonal plane graphs: the ones whose edges are straight segments.
+-- Layer 6 of PLAN_JORDAN_SCHOENFLIES.md, and the shape the overlay
+-- (`lem:polygonal-overlay`) has to produce.
+--
+-- THE EDGE NAME IS THE PAIR OF ENDPOINTS, and `ends` is the identity. The
+-- general representation goes out of its way to allow parallel edges —
+-- two names with the same ends — because a Jordan curve cut at two points
+-- is a two-vertex cycle. Straight segments cannot do that: a segment IS
+-- determined by its endpoints, so naming one by anything else would be
+-- naming a distinction that does not exist. The payoff is that the
+-- blueprint's "represent every duplicate geometric subsegment only once"
+-- becomes deduplication of a list of NAMES, with no geometry in it.
+--
+-- The one wrinkle the identity ambient leaves: `(a, b)` and `(b, a)` are
+-- two names for one segment. A graph holding both is refused — they are
+-- distinct edges with equal interiors — so a construction owes an edge list
+-- that picks one orientation of each segment. That obligation is real, and
+-- honest: it is the deduplication clause, stated where it can be checked.
+--
+-- What this file buys is that for segments the ARC obligations are free.
+-- A plane drawing asks for four things; two of them — that each edge is a
+-- simple arc, and that it runs between the two points its name says — hold
+-- of `Plane.between` for any pair of distinct points, and well-formedness
+-- already supplies the distinctness. So being a polygonal plane graph is
+-- well-formedness plus the two disjointness conditions, and those are the
+-- only things a construction has to discharge.
+
+module Plane.Graph.segments
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Equality.basics
+import axioms
+import Set.basics
+import Set.algebra
+import Lists.list
+import Real.interface
+import Real.order
+import Metric.space
+import Metric.interval
+import Plane.point
+import Plane.segment
+import Plane.curve
+import Plane.subarc
+import Graph.basics
+import Plane.Graph.basics
+
+-- ----------------------------------------------------------------------
+-- The ambient.
+
+definition Plane.Segment : Type(0) := Pair(Plane.Point, Plane.Point)
+
+definition Plane.segmentEnds (piece : Plane.Segment)
+        : Pair(Plane.Point, Plane.Point) := piece
+
+definition Plane.PolygonalGraph : Type(0) :=
+  Graph(Plane.Point, Plane.Segment, Plane.segmentEnds)
+
+-- The drawing: each name is traversed by the walk between its own two
+-- components. Written through `Product.first` / `Product.second` rather
+-- than a `let`-destructure, so that it reduces at an arbitrary edge and
+-- not only at one already in constructor form.
+definition Plane.segmentDrawing (piece : Plane.Segment) : ℝ → Plane.Point :=
+  Plane.between(Product.first(piece), Product.second(piece))
+
+definition Plane.openSegment (a b : Plane.Point) : Set(Plane.Point) :=
+  Plane.segment(a, b)
+      ∖ Set.singleton(Plane.Point, a)
+      ∖ Set.singleton(Plane.Point, b)
+
+-- ----------------------------------------------------------------------
+-- What a segment edge draws.
+
+theorem Plane.segmentDrawing_make (a b : Plane.Point)
+        : Plane.segmentDrawing(Product.make(a, b)) = Plane.between(a, b) :=
+  reflexivity(ℝ → Plane.Point, Plane.between(a, b))
+
+theorem Plane.arc_segmentDrawing (piece : Plane.Segment)
+        : Plane.arc(Plane.segmentDrawing(piece))
+              = Plane.segment(Product.first(piece), Product.second(piece)) :=
+  done by Plane.arc_between
+
+theorem Plane.segmentDrawing_arcStart (piece : Plane.Segment)
+        : Plane.arcStart(Plane.segmentDrawing(piece)) = Product.first(piece) :=
+  done by Plane.between_arcStart
+
+theorem Plane.segmentDrawing_arcFinish (piece : Plane.Segment)
+        : Plane.arcFinish(Plane.segmentDrawing(piece)) = Product.second(piece) :=
+  done by Plane.between_arcFinish
+
+theorem Plane.openSegment_subset (a b : Plane.Point)
+        : Plane.openSegment(a, b) ⊆ Plane.segment(a, b) := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.openSegment(a, b);
+  done
+}
+
+-- The interior of a segment edge is the segment without its two ends —
+-- which is what makes the disjointness conditions checkable by
+-- `Plane.segment_meet`, since that speaks about segments.
+theorem Plane.openArc_segmentDrawing (piece : Plane.Segment)
+        (distinct : Product.first(piece) ≠ Product.second(piece))
+        : Plane.openArc(Plane.segmentDrawing(piece))
+              = Plane.openSegment(Product.first(piece), Product.second(piece)) := {
+  Plane.IsArc(Plane.segmentDrawing(piece)) by Plane.IsArc.between;
+  Plane.openArc(Plane.segmentDrawing(piece))
+     = Plane.arc(Plane.segmentDrawing(piece))
+           ∖ Set.singleton(Plane.Point, Plane.arcStart(Plane.segmentDrawing(piece)))
+           ∖ Set.singleton(Plane.Point, Plane.arcFinish(Plane.segmentDrawing(piece)))
+           by Plane.IsArc.openArc_is_arc_without_endpoints
+     = Plane.segment(Product.first(piece), Product.second(piece))
+           ∖ Set.singleton(Plane.Point, Product.first(piece))
+           ∖ Set.singleton(Plane.Point, Product.second(piece));
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The two ends of a segment edge, read off the graph.
+--
+-- With `ends` the identity, `Graph.Joins.at_components` says exactly that
+-- an edge joins its own two components — so the incidence side of the
+-- drawing condition needs nothing beyond well-formedness.
+
+theorem Plane.segmentEdge_joins (graph : Plane.PolygonalGraph)
+        (piece : Plane.Segment)
+        : Graph.Joins(graph, piece, Product.first(piece), Product.second(piece)) := {
+  Graph.Joins(graph, piece,
+      Product.first(Plane.segmentEnds(piece)),
+      Product.second(Plane.segmentEnds(piece)))
+      by Graph.Joins.at_components;
+  done
+}
+
+theorem Plane.segmentEdge_ends_distinct (graph : Plane.PolygonalGraph)
+        (wellFormed : Graph.IsWellFormed(graph))
+        (piece : Plane.Segment) (isEdge : piece ∈ Graph.edges(graph))
+        : Product.first(piece) ≠ Product.second(piece) := {
+  Graph.Joins(graph, piece, Product.first(piece), Product.second(piece))
+      by Plane.segmentEdge_joins;
+  done by Graph.IsWellFormed.no_loop
+}
+
+-- ----------------------------------------------------------------------
+-- The criterion.
+--
+-- Being a polygonal plane graph is well-formedness plus the two
+-- disjointness conditions, stated about open SEGMENTS. Nothing here asks
+-- the caller for an arc.
+
+theorem Plane.Graph.polygonal_IsDrawing (graph : Plane.PolygonalGraph)
+        (wellFormed : Graph.IsWellFormed(graph))
+        (verticesOffEdges : ∀ (piece : Plane.Segment). ∀ (vertex : Plane.Point).
+            piece ∈ Graph.edges(graph) → vertex ∈ Graph.vertices(graph) →
+            ¬(vertex ∈ Plane.openSegment(
+                  Product.first(piece), Product.second(piece))))
+        (piecesMeetAtEnds : ∀ (piece other : Plane.Segment). ∀ (x : Plane.Point).
+            piece ∈ Graph.edges(graph) → other ∈ Graph.edges(graph) →
+            piece ≠ other →
+            x ∈ Plane.openSegment(Product.first(piece), Product.second(piece)) →
+            ¬(x ∈ Plane.openSegment(
+                  Product.first(other), Product.second(other))))
+        : Plane.Graph.IsDrawing(graph, Plane.segmentDrawing) := {
+  -- Each edge is a simple arc between the two points its name says.
+  ∀ (piece : Plane.Segment). piece ∈ Graph.edges(graph) →
+      Plane.IsArc(Plane.segmentDrawing(piece))
+      ∧ Graph.Joins(graph, piece,
+            Plane.arcStart(Plane.segmentDrawing(piece)),
+            Plane.arcFinish(Plane.segmentDrawing(piece)))
+      by { take piece : Plane.Segment;
+           suppose piece ∈ Graph.edges(graph);
+           Product.first(piece) ≠ Product.second(piece);
+           Plane.IsArc(Plane.segmentDrawing(piece)) by Plane.IsArc.between;
+           Plane.arcStart(Plane.segmentDrawing(piece)) = Product.first(piece);
+           Plane.arcFinish(Plane.segmentDrawing(piece)) = Product.second(piece);
+           Graph.Joins(graph, piece, Product.first(piece), Product.second(piece));
+           done };
+
+  -- The two disjointness conditions, transported from open segments to
+  -- open arcs by `Plane.openArc_segmentDrawing`.
+  ∀ (piece : Plane.Segment). ∀ (vertex : Plane.Point).
+      piece ∈ Graph.edges(graph) → vertex ∈ Graph.vertices(graph) →
+      ¬(vertex ∈ Plane.openArc(Plane.segmentDrawing(piece)))
+      by { take piece : Plane.Segment;
+           take vertex : Plane.Point;
+           suppose piece ∈ Graph.edges(graph);
+           suppose vertex ∈ Graph.vertices(graph);
+           Product.first(piece) ≠ Product.second(piece);
+           Plane.openArc(Plane.segmentDrawing(piece))
+               = Plane.openSegment(Product.first(piece), Product.second(piece))
+               by Plane.openArc_segmentDrawing;
+           suppose vertex ∈ Plane.openArc(Plane.segmentDrawing(piece));
+           vertex ∈ Plane.openSegment(
+               Product.first(piece), Product.second(piece))
+               by Set.member_of_equal;
+           done };
+
+  ∀ (piece other : Plane.Segment). ∀ (x : Plane.Point).
+      piece ∈ Graph.edges(graph) → other ∈ Graph.edges(graph) →
+      piece ≠ other →
+      x ∈ Plane.openArc(Plane.segmentDrawing(piece)) →
+      ¬(x ∈ Plane.openArc(Plane.segmentDrawing(other)))
+      by { take piece : Plane.Segment;
+           take other : Plane.Segment;
+           take x : Plane.Point;
+           suppose piece ∈ Graph.edges(graph);
+           suppose other ∈ Graph.edges(graph);
+           suppose piece ≠ other;
+           suppose x ∈ Plane.openArc(Plane.segmentDrawing(piece));
+           Product.first(piece) ≠ Product.second(piece);
+           Product.first(other) ≠ Product.second(other);
+           Plane.openArc(Plane.segmentDrawing(piece))
+               = Plane.openSegment(Product.first(piece), Product.second(piece))
+               by Plane.openArc_segmentDrawing;
+           x ∈ Plane.openSegment(Product.first(piece), Product.second(piece))
+               by Set.member_of_equal;
+           ¬(x ∈ Plane.openSegment(
+                 Product.first(other), Product.second(other)));
+           suppose x ∈ Plane.openArc(Plane.segmentDrawing(other));
+           Plane.openArc(Plane.segmentDrawing(other))
+               = Plane.openSegment(Product.first(other), Product.second(other))
+               by Plane.openArc_segmentDrawing;
+           x ∈ Plane.openSegment(Product.first(other), Product.second(other))
+               by Set.member_of_equal;
+           done };
+  done
+}
