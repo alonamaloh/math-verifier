@@ -867,10 +867,10 @@ subdividing at all crossings and identifying duplicated subsegments
 in nothing, a point, or an interval (**done**, `Plane.segment_meet`); a plane
 graph realises an abstract finite graph (true by construction).
 
-Still open in this layer: the same statement for a finite union of polygonal
-GRAPHS rather than a bare list of segments — the graphs' edge lists have to be
-concatenated first, which is bookkeeping over `Plane.polygonal_overlay` and no
-new geometry.
+The graph form is done too — `Plane.polygonal_overlay_of_graphs`, over
+`Plane.graphEdges` and `Plane.edgeSet_is_piecesCover`. It covers the graphs'
+EDGE sets: an isolated vertex of one of them is not covered and could not be,
+since the overlay's vertices are the ends of its edges.
 
 > **Headliner H6 — `Plane.Graph.polygonal_redrawing`
 > (blueprint `lem:polygonal-redrawing`):** every finite plane graph is

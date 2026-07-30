@@ -163,6 +163,14 @@ not every pair: a meet is `segment(u, v)` and `segment(v, u)` alike, and that
 a nondegenerate segment's ends are determined by its point set is a theorem
 this development neither has nor needs.
 
+`Plane.polygonal_overlay_of_graphs` is the same result for finitely many
+polygonal **graphs**, which is how the blueprint states it: concatenate the
+edge lists (`Plane.graphEdges`), take nondegeneracy from well-formedness, and
+cite the segment form. It covers the graphs' **edge** sets —
+`Plane.edgeSet_is_piecesCover` says a graph covers what its edges cover — and
+not their isolated vertices, which the overlay cannot keep, since its vertices
+are the ends of its edges.
+
 **Deduplication is up to equality, not up to reversal**, because of
 `Plane.orientSegment` ([orient.math](orient.math)): it puts the
 lexicographically smaller end first (`Plane.Point.Precedes`, in
