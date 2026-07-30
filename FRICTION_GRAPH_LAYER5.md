@@ -532,3 +532,27 @@ limit. `Graph.IsTwoConnected.replace_edge_by_path` had respelled
 One trap when applying it in bulk: a search-and-replace of the long term will
 also rewrite the right-hand side of the `let` that introduces it, producing
 `let trimmed := trimmed;` and an `unknown identifier` at the first use.
+
+## Note on the review that produced G11/G12
+
+Two of its specific claims did **not** hold up, both worth recording because
+they are the shape of mistake an outside reader makes here:
+
+- *"`IsTree.has_leaf` re-derives positive degree over ~35 lines, which is what
+  `Graph.IsConnected.degree_positive` proves."* It does not. `has_leaf` gets
+  `1 ≤ degree(longestSource)` in three lines from the longest path's own first
+  edge (`incidentEdges_member` then `length_positive_of_member`). The ~35 lines
+  are the longest-path CONSTRUCTION — two distinct vertices, a path between
+  them, its nonemptiness, a longest one — which `degree_positive` does not
+  supply, and which itself costs 32 lines going the other way round (through
+  connectedness, to another vertex). Citing it would replace three lines with
+  one and add a dependency.
+- *"the same eight lines, four times"* for the second-vertex block. Three
+  times. The fourth site, `IsTree.delete_leaf`, wants only a SURVIVOR of the
+  deletion, not a vertex distinct from a named one, so `Graph.other_vertex`
+  is not what it needs.
+
+Everything else the review asserted — the `⊆` count, the 77 inline
+take-blocks, the term-occurrence counts, and all four `Natural` lemma names it
+proposed — checked out exactly.
+
