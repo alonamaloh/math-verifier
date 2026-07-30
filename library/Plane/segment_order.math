@@ -1,0 +1,478 @@
+-- Plane/segment_order.math
+--
+-- The points of a segment, ordered by their distance from one endpoint.
+--
+-- Everything the polygonal overlay has to say about several collinear
+-- segments — which piece lies inside which, where a piece may end, when two
+-- pieces have to coincide — is one-dimensional: it happens along a single
+-- straight segment. This file supplies the coordinate that makes it
+-- ordinary arithmetic. Along a nondegenerate `Plane.segment(a, b)` the
+-- distance from `a` determines the point, and it reads betweenness off as a
+-- pair of inequalities, so a claim about four collinear points becomes a
+-- claim about four reals.
+--
+-- No new geometry is needed for that. `Plane.distance_from_left` already
+-- says the distance from `a` IS the walk parameter, scaled by the
+-- segment's length, and `Plane.between_nested` re-reads a walk between two
+-- points of a walk as a walk with the averaged parameter. What is added
+-- here is the translation, stated once so that the arithmetic does not have
+-- to be redone at every use.
+--
+-- The two results the overlay is after come last, and they are what makes
+-- cutting at every meet enough:
+--
+--   * a piece that meets an overlap and keeps the overlap's ends out of its
+--     interior lies inside the overlap;
+--   * two pieces whose interiors meet, each keeping the other's ends out of
+--     its interior, have the SAME ends.
+--
+-- The second is the separation the blueprint's deduplication clause is for:
+-- overlapping collinear pieces cannot be pulled apart by cutting, and after
+-- enough cuts they coincide instead.
+
+module Plane.segment_order
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import axioms
+import Set.basics
+import Real.interface
+import Real.order
+import Real.order_multiplication
+import Real.division
+import Real.linearity
+import Plane.point
+import Plane.norm
+import Plane.segment
+
+-- ----------------------------------------------------------------------
+-- The coordinate.
+
+-- Two points of a nondegenerate segment at the same distance from the left
+-- endpoint are the same point: that distance is the walk parameter scaled
+-- by the segment's length, and a nonzero length cancels.
+theorem Plane.equal_of_distance_from_left (a b : Plane.Point) (distinct : a ≠ b)
+        (x y : Plane.Point)
+        (xOn : x ∈ Plane.segment(a, b)) (yOn : y ∈ Plane.segment(a, b))
+        (sameDistance : Plane.distance(a, x) = Plane.distance(a, y))
+        : x = y := {
+  Plane.distance(a, b) ≠ 0
+      by { suppose Plane.distance(a, b) = 0;
+           a = b by Plane.equal_of_distance_zero;
+           done };
+  choose firstParameter such that
+      (0 ≤ firstParameter ∧ firstParameter ≤ 1)
+          ∧ x = Plane.between(a, b, firstParameter) from xOn;
+  choose secondParameter such that
+      (0 ≤ secondParameter ∧ secondParameter ≤ 1)
+          ∧ y = Plane.between(a, b, secondParameter) from yOn;
+  firstParameter ≥ 0;
+  secondParameter ≥ 0;
+  x = Plane.between(a, b, firstParameter) as atFirstParameter;
+  y = Plane.between(a, b, secondParameter) as atSecondParameter;
+  Plane.distance(a, b) * firstParameter
+     = firstParameter * Plane.distance(a, b)
+     = Plane.distance(a, Plane.between(a, b, firstParameter))
+           by Plane.distance_from_left
+     = Plane.distance(a, x) by atFirstParameter
+     = Plane.distance(a, y) by sameDistance
+     = Plane.distance(a, Plane.between(a, b, secondParameter)) by atSecondParameter
+     = secondParameter * Plane.distance(a, b) by Plane.distance_from_left
+     = Plane.distance(a, b) * secondParameter;
+  firstParameter = secondParameter by Real.equal_of_multiply_left;
+  x = Plane.between(a, b, firstParameter)
+    = Plane.between(a, b, secondParameter)
+          by substituting (firstParameter = secondParameter)
+    = y by atSecondParameter;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- Betweenness as a pair of inequalities.
+
+-- A point between two points of the segment is between them in distance
+-- from `a` as well — measured from `a`, the nearer end comes first.
+theorem Plane.distance_between_of_member_segment (a b : Plane.Point) (distinct : a ≠ b)
+        (nearEnd farEnd : Plane.Point)
+        (nearOn : nearEnd ∈ Plane.segment(a, b)) (farOn : farEnd ∈ Plane.segment(a, b))
+        (oriented : Plane.distance(a, nearEnd) ≤ Plane.distance(a, farEnd))
+        (x : Plane.Point) (inside : x ∈ Plane.segment(nearEnd, farEnd))
+        : Plane.distance(a, nearEnd) ≤ Plane.distance(a, x)
+          ∧ Plane.distance(a, x) ≤ Plane.distance(a, farEnd) := {
+  Plane.distance(a, b) ≥ 0;
+  Real.IsNonneg(Plane.distance(a, b));
+  choose nearParameter such that
+      (0 ≤ nearParameter ∧ nearParameter ≤ 1)
+          ∧ nearEnd = Plane.between(a, b, nearParameter) from nearOn;
+  choose farParameter such that
+      (0 ≤ farParameter ∧ farParameter ≤ 1)
+          ∧ farEnd = Plane.between(a, b, farParameter) from farOn;
+  nearParameter ≥ 0;
+  farParameter ≥ 0;
+  nearEnd = Plane.between(a, b, nearParameter) as nearAtParameter;
+  farEnd = Plane.between(a, b, farParameter) as farAtParameter;
+
+  -- The nearer end has the smaller parameter.
+  Plane.distance(a, Plane.between(a, b, nearParameter))
+      ≤ Plane.distance(a, Plane.between(a, b, farParameter))
+      by { Plane.distance(a, Plane.between(a, b, nearParameter))
+              = Plane.distance(a, nearEnd) by nearAtParameter
+              ≤ Plane.distance(a, farEnd) by oriented
+              = Plane.distance(a, Plane.between(a, b, farParameter)) by farAtParameter;
+           done };
+  nearParameter ≤ farParameter by Plane.parameter_LessOrEqual_of_distance;
+  farParameter - nearParameter ≥ 0;
+
+  choose walkParameter such that
+      (0 ≤ walkParameter ∧ walkParameter ≤ 1)
+          ∧ x = Plane.between(nearEnd, farEnd, walkParameter) from inside;
+  walkParameter ≥ 0;
+  walkParameter ≤ 1;
+  1 - walkParameter ≥ 0;
+  x = Plane.between(nearEnd, farEnd, walkParameter)
+    = Plane.between(Plane.between(a, b, nearParameter), farEnd, walkParameter)
+          by nearAtParameter
+    = Plane.between(Plane.between(a, b, nearParameter),
+          Plane.between(a, b, farParameter), walkParameter) by farAtParameter
+    = Plane.between(a, b,
+          (1 - walkParameter) * nearParameter + walkParameter * farParameter)
+          by Plane.between_nested as xAtParameter;
+
+  -- The averaged parameter lies between the two it averages.
+  nearParameter ≤ (1 - walkParameter) * nearParameter + walkParameter * farParameter
+      by { walkParameter * (farParameter - nearParameter) ≥ 0;
+           done by ordered_field };
+  (1 - walkParameter) * nearParameter + walkParameter * farParameter ≤ farParameter
+      by { (1 - walkParameter) * (farParameter - nearParameter) ≥ 0;
+           done by ordered_field };
+  (1 - walkParameter) * nearParameter + walkParameter * farParameter ≥ 0;
+
+  Plane.distance(a, nearEnd)
+     = Plane.distance(a, Plane.between(a, b, nearParameter)) by nearAtParameter
+     = nearParameter * Plane.distance(a, b) by Plane.distance_from_left
+     ≤ ((1 - walkParameter) * nearParameter + walkParameter * farParameter)
+           * Plane.distance(a, b) by Real.LessOrEqual.multiply_by_nonneg_right
+     = Plane.distance(a, Plane.between(a, b,
+           (1 - walkParameter) * nearParameter + walkParameter * farParameter))
+           by Plane.distance_from_left
+     = Plane.distance(a, x) by xAtParameter;
+  Plane.distance(a, x)
+     = Plane.distance(a, Plane.between(a, b,
+           (1 - walkParameter) * nearParameter + walkParameter * farParameter))
+           by xAtParameter
+     = ((1 - walkParameter) * nearParameter + walkParameter * farParameter)
+           * Plane.distance(a, b) by Plane.distance_from_left
+     ≤ farParameter * Plane.distance(a, b) by Real.LessOrEqual.multiply_by_nonneg_right
+     = Plane.distance(a, Plane.between(a, b, farParameter)) by Plane.distance_from_left
+     = Plane.distance(a, farEnd) by farAtParameter;
+  done
+}
+
+-- The converse. A point of the segment whose distance from `a` lies between
+-- the two ends' distances lies between the ends; the fraction of the way it
+-- stands is its distance rescaled, which is where the division comes from.
+theorem Plane.member_segment_of_distance_between (a b : Plane.Point) (distinct : a ≠ b)
+        (nearEnd farEnd : Plane.Point)
+        (nearOn : nearEnd ∈ Plane.segment(a, b)) (farOn : farEnd ∈ Plane.segment(a, b))
+        (x : Plane.Point) (xOn : x ∈ Plane.segment(a, b))
+        (afterNear : Plane.distance(a, nearEnd) ≤ Plane.distance(a, x))
+        (beforeFar : Plane.distance(a, x) ≤ Plane.distance(a, farEnd))
+        : x ∈ Plane.segment(nearEnd, farEnd) := {
+  choose nearParameter such that
+      (0 ≤ nearParameter ∧ nearParameter ≤ 1)
+          ∧ nearEnd = Plane.between(a, b, nearParameter) from nearOn;
+  choose farParameter such that
+      (0 ≤ farParameter ∧ farParameter ≤ 1)
+          ∧ farEnd = Plane.between(a, b, farParameter) from farOn;
+  choose pointParameter such that
+      (0 ≤ pointParameter ∧ pointParameter ≤ 1)
+          ∧ x = Plane.between(a, b, pointParameter) from xOn;
+  nearParameter ≥ 0;
+  farParameter ≥ 0;
+  pointParameter ≥ 0;
+  nearEnd = Plane.between(a, b, nearParameter) as nearAtParameter;
+  farEnd = Plane.between(a, b, farParameter) as farAtParameter;
+  x = Plane.between(a, b, pointParameter) as xAtParameter;
+
+  Plane.distance(a, Plane.between(a, b, nearParameter))
+      ≤ Plane.distance(a, Plane.between(a, b, pointParameter))
+      by { Plane.distance(a, Plane.between(a, b, nearParameter))
+              = Plane.distance(a, nearEnd) by nearAtParameter
+              ≤ Plane.distance(a, x) by afterNear
+              = Plane.distance(a, Plane.between(a, b, pointParameter)) by xAtParameter;
+           done };
+  nearParameter ≤ pointParameter by Plane.parameter_LessOrEqual_of_distance;
+  Plane.distance(a, Plane.between(a, b, pointParameter))
+      ≤ Plane.distance(a, Plane.between(a, b, farParameter))
+      by { Plane.distance(a, Plane.between(a, b, pointParameter))
+              = Plane.distance(a, x) by xAtParameter
+              ≤ Plane.distance(a, farEnd) by beforeFar
+              = Plane.distance(a, Plane.between(a, b, farParameter)) by farAtParameter;
+           done };
+  pointParameter ≤ farParameter by Plane.parameter_LessOrEqual_of_distance;
+
+  done by cases {
+    case nearParameter = farParameter as endsAgree: {
+        -- Nothing to divide by: the point sits at the common end.
+        pointParameter = nearParameter by Real.LessOrEqual.antisymmetric;
+        x = Plane.between(a, b, pointParameter)
+          = Plane.between(a, b, nearParameter)
+                by substituting (pointParameter = nearParameter)
+          = nearEnd by nearAtParameter;
+        nearEnd ∈ Plane.segment(nearEnd, farEnd) by Plane.left_in_segment;
+        done by substituting (x = nearEnd)
+      }
+    otherwise as endsDistinct: {
+        nearParameter < farParameter;
+        farParameter - nearParameter > 0;
+        farParameter - nearParameter ≠ 0;
+        pointParameter - nearParameter ≥ 0;
+        pointParameter - nearParameter ≤ farParameter - nearParameter;
+        (pointParameter - nearParameter) / (farParameter - nearParameter) ≥ 0
+            by Real.divide_nonneg;
+        (pointParameter - nearParameter) / (farParameter - nearParameter)
+            ≤ (farParameter - nearParameter) / (farParameter - nearParameter)
+            by Real.LessOrEqual.divide_by_positive;
+        (farParameter - nearParameter) / (farParameter - nearParameter) = 1
+            by Real.divide_self;
+        (pointParameter - nearParameter) / (farParameter - nearParameter) ≤ 1;
+        (1 - (pointParameter - nearParameter) / (farParameter - nearParameter))
+                * nearParameter
+            + (pointParameter - nearParameter) / (farParameter - nearParameter)
+                * farParameter
+            = pointParameter by field as rescaledWeights;
+        x = Plane.between(a, b, pointParameter)
+          = Plane.between(a, b,
+                (1 - (pointParameter - nearParameter) / (farParameter - nearParameter))
+                        * nearParameter
+                    + (pointParameter - nearParameter) / (farParameter - nearParameter)
+                        * farParameter) by rescaledWeights
+          = Plane.between(Plane.between(a, b, nearParameter),
+                Plane.between(a, b, farParameter),
+                (pointParameter - nearParameter) / (farParameter - nearParameter))
+                by Plane.between_nested
+          = Plane.between(nearEnd, Plane.between(a, b, farParameter),
+                (pointParameter - nearParameter) / (farParameter - nearParameter))
+                by nearAtParameter
+          = Plane.between(nearEnd, farEnd,
+                (pointParameter - nearParameter) / (farParameter - nearParameter))
+                by farAtParameter;
+        done by { witness (pointParameter - nearParameter) / (farParameter - nearParameter) }
+      }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- The same translation for interiors.
+
+theorem Plane.distance_strictly_between_of_member_openSegment
+        (a b : Plane.Point) (distinct : a ≠ b)
+        (nearEnd farEnd : Plane.Point)
+        (nearOn : nearEnd ∈ Plane.segment(a, b)) (farOn : farEnd ∈ Plane.segment(a, b))
+        (oriented : Plane.distance(a, nearEnd) ≤ Plane.distance(a, farEnd))
+        (x : Plane.Point) (inside : x ∈ Plane.openSegment(nearEnd, farEnd))
+        : Plane.distance(a, nearEnd) < Plane.distance(a, x)
+          ∧ Plane.distance(a, x) < Plane.distance(a, farEnd) := {
+  x ∈ Plane.segment(nearEnd, farEnd);
+  x ≠ nearEnd;
+  x ≠ farEnd;
+  Plane.distance(a, nearEnd) ≤ Plane.distance(a, x)
+      ∧ Plane.distance(a, x) ≤ Plane.distance(a, farEnd)
+      by Plane.distance_between_of_member_segment;
+  Plane.distance(a, nearEnd) ≤ Plane.distance(a, x);
+  Plane.distance(a, x) ≤ Plane.distance(a, farEnd);
+  Plane.IsConvex(Plane.segment(a, b)) by Plane.segment_IsConvex;
+  Plane.segment(nearEnd, farEnd) ⊆ Plane.segment(a, b)
+      by Plane.IsConvex.segment_inside;
+  x ∈ Plane.segment(a, b);
+  Plane.distance(a, nearEnd) ≠ Plane.distance(a, x)
+      by { suppose Plane.distance(a, nearEnd) = Plane.distance(a, x);
+           x = nearEnd by Plane.equal_of_distance_from_left;
+           done };
+  Plane.distance(a, x) ≠ Plane.distance(a, farEnd)
+      by { suppose Plane.distance(a, x) = Plane.distance(a, farEnd);
+           x = farEnd by Plane.equal_of_distance_from_left;
+           done };
+  Plane.distance(a, nearEnd) < Plane.distance(a, x);
+  Plane.distance(a, x) < Plane.distance(a, farEnd);
+  done
+}
+
+theorem Plane.member_openSegment_of_distance_strictly_between
+        (a b : Plane.Point) (distinct : a ≠ b)
+        (nearEnd farEnd : Plane.Point)
+        (nearOn : nearEnd ∈ Plane.segment(a, b)) (farOn : farEnd ∈ Plane.segment(a, b))
+        (x : Plane.Point) (xOn : x ∈ Plane.segment(a, b))
+        (afterNear : Plane.distance(a, nearEnd) < Plane.distance(a, x))
+        (beforeFar : Plane.distance(a, x) < Plane.distance(a, farEnd))
+        : x ∈ Plane.openSegment(nearEnd, farEnd) := {
+  Plane.distance(a, nearEnd) ≤ Plane.distance(a, x);
+  Plane.distance(a, x) ≤ Plane.distance(a, farEnd);
+  x ∈ Plane.segment(nearEnd, farEnd) by Plane.member_segment_of_distance_between;
+  x ≠ nearEnd
+      by { suppose x = nearEnd as atNear;
+           Plane.distance(a, nearEnd)
+              < Plane.distance(a, x)
+              = Plane.distance(a, nearEnd) by atNear;
+           done };
+  x ≠ farEnd
+      by { suppose x = farEnd as atFar;
+           Plane.distance(a, farEnd)
+              = Plane.distance(a, x) by atFar
+              < Plane.distance(a, farEnd);
+           done };
+  done by Plane.member_openSegment
+}
+
+-- ----------------------------------------------------------------------
+-- Where a point that is not interior to a piece must sit.
+--
+-- These two carry the whole one-dimensional argument. A point of the
+-- ambient segment kept out of a piece's interior has to be outside on one
+-- side or the other, and knowing which side it is not settles it.
+
+theorem Plane.distance_LessOrEqual_left_of_not_interior
+        (a b : Plane.Point) (distinct : a ≠ b)
+        (nearEnd farEnd : Plane.Point)
+        (nearOn : nearEnd ∈ Plane.segment(a, b)) (farOn : farEnd ∈ Plane.segment(a, b))
+        (y : Plane.Point) (yOn : y ∈ Plane.segment(a, b))
+        (outside : y ∉ Plane.openSegment(nearEnd, farEnd))
+        (beforeFar : Plane.distance(a, y) < Plane.distance(a, farEnd))
+        : Plane.distance(a, y) ≤ Plane.distance(a, nearEnd) := {
+  suppose ¬(Plane.distance(a, y) ≤ Plane.distance(a, nearEnd)) for contradiction;
+  Plane.distance(a, nearEnd) < Plane.distance(a, y)
+      by Real.LessThan_of_not_LessOrEqual;
+  y ∈ Plane.openSegment(nearEnd, farEnd)
+      by Plane.member_openSegment_of_distance_strictly_between;
+  done
+}
+
+theorem Plane.distance_right_LessOrEqual_of_not_interior
+        (a b : Plane.Point) (distinct : a ≠ b)
+        (nearEnd farEnd : Plane.Point)
+        (nearOn : nearEnd ∈ Plane.segment(a, b)) (farOn : farEnd ∈ Plane.segment(a, b))
+        (y : Plane.Point) (yOn : y ∈ Plane.segment(a, b))
+        (outside : y ∉ Plane.openSegment(nearEnd, farEnd))
+        (afterNear : Plane.distance(a, nearEnd) < Plane.distance(a, y))
+        : Plane.distance(a, farEnd) ≤ Plane.distance(a, y) := {
+  suppose ¬(Plane.distance(a, farEnd) ≤ Plane.distance(a, y)) for contradiction;
+  Plane.distance(a, y) < Plane.distance(a, farEnd)
+      by Real.LessThan_of_not_LessOrEqual;
+  y ∈ Plane.openSegment(nearEnd, farEnd)
+      by Plane.member_openSegment_of_distance_strictly_between;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- What the overlay is after.
+
+-- A piece that meets an overlap and keeps the overlap's two ends out of its
+-- interior lies inside the overlap. Collinearity is not optional here: a
+-- piece crossing the overlap transversally would meet it and avoid its ends
+-- without lying inside it, so every point named is a point of one ambient
+-- segment.
+theorem Plane.segment_inside_of_ends_outside (a b : Plane.Point) (distinct : a ≠ b)
+        (pieceNear pieceFar : Plane.Point)
+        (pieceNearOn : pieceNear ∈ Plane.segment(a, b))
+        (pieceFarOn : pieceFar ∈ Plane.segment(a, b))
+        (pieceOriented : Plane.distance(a, pieceNear) ≤ Plane.distance(a, pieceFar))
+        (overlapNear overlapFar : Plane.Point)
+        (overlapNearOn : overlapNear ∈ Plane.segment(a, b))
+        (overlapFarOn : overlapFar ∈ Plane.segment(a, b))
+        (overlapOriented : Plane.distance(a, overlapNear) ≤ Plane.distance(a, overlapFar))
+        (x : Plane.Point)
+        (onPiece : x ∈ Plane.openSegment(pieceNear, pieceFar))
+        (inOverlap : x ∈ Plane.openSegment(overlapNear, overlapFar))
+        (nearOutside : overlapNear ∉ Plane.openSegment(pieceNear, pieceFar))
+        (farOutside : overlapFar ∉ Plane.openSegment(pieceNear, pieceFar))
+        : Plane.segment(pieceNear, pieceFar) ⊆ Plane.segment(overlapNear, overlapFar) := {
+  Plane.distance(a, pieceNear) < Plane.distance(a, x)
+      ∧ Plane.distance(a, x) < Plane.distance(a, pieceFar)
+      by Plane.distance_strictly_between_of_member_openSegment;
+  Plane.distance(a, pieceNear) < Plane.distance(a, x);
+  Plane.distance(a, x) < Plane.distance(a, pieceFar);
+  Plane.distance(a, overlapNear) < Plane.distance(a, x)
+      ∧ Plane.distance(a, x) < Plane.distance(a, overlapFar)
+      by Plane.distance_strictly_between_of_member_openSegment;
+  Plane.distance(a, overlapNear) < Plane.distance(a, x);
+  Plane.distance(a, x) < Plane.distance(a, overlapFar);
+
+  -- The overlap starts at or before the piece and ends at or after it.
+  Plane.distance(a, overlapNear) < Plane.distance(a, pieceFar);
+  Plane.distance(a, overlapNear) ≤ Plane.distance(a, pieceNear)
+      by Plane.distance_LessOrEqual_left_of_not_interior(farEnd := pieceFar);
+  Plane.distance(a, pieceNear) < Plane.distance(a, overlapFar);
+  Plane.distance(a, pieceFar) ≤ Plane.distance(a, overlapFar)
+      by Plane.distance_right_LessOrEqual_of_not_interior(nearEnd := pieceNear);
+
+  Plane.IsConvex(Plane.segment(a, b)) by Plane.segment_IsConvex;
+  Plane.segment(pieceNear, pieceFar) ⊆ Plane.segment(a, b)
+      by Plane.IsConvex.segment_inside;
+  take y : Plane.Point;
+  suppose y ∈ Plane.segment(pieceNear, pieceFar);
+  y ∈ Plane.segment(a, b);
+  Plane.distance(a, pieceNear) ≤ Plane.distance(a, y)
+      ∧ Plane.distance(a, y) ≤ Plane.distance(a, pieceFar)
+      by Plane.distance_between_of_member_segment;
+  Plane.distance(a, pieceNear) ≤ Plane.distance(a, y);
+  Plane.distance(a, y) ≤ Plane.distance(a, pieceFar);
+  Plane.distance(a, overlapNear) ≤ Plane.distance(a, y);
+  Plane.distance(a, y) ≤ Plane.distance(a, overlapFar);
+  done by Plane.member_segment_of_distance_between
+}
+
+-- Two pieces of one ambient segment whose interiors meet, each keeping the
+-- other's ends out of its interior, have the same ends. This is the
+-- separation the overlay runs on: once every piece's ends are cut points,
+-- and so interior to nothing, two pieces that share an interior point
+-- cannot merely overlap — they coincide.
+theorem Plane.same_ends_of_meeting_interiors (a b : Plane.Point) (distinct : a ≠ b)
+        (firstNear firstFar : Plane.Point)
+        (firstNearOn : firstNear ∈ Plane.segment(a, b))
+        (firstFarOn : firstFar ∈ Plane.segment(a, b))
+        (firstOriented : Plane.distance(a, firstNear) ≤ Plane.distance(a, firstFar))
+        (secondNear secondFar : Plane.Point)
+        (secondNearOn : secondNear ∈ Plane.segment(a, b))
+        (secondFarOn : secondFar ∈ Plane.segment(a, b))
+        (secondOriented : Plane.distance(a, secondNear) ≤ Plane.distance(a, secondFar))
+        (x : Plane.Point)
+        (onFirst : x ∈ Plane.openSegment(firstNear, firstFar))
+        (onSecond : x ∈ Plane.openSegment(secondNear, secondFar))
+        (secondNearOutside : secondNear ∉ Plane.openSegment(firstNear, firstFar))
+        (secondFarOutside : secondFar ∉ Plane.openSegment(firstNear, firstFar))
+        (firstNearOutside : firstNear ∉ Plane.openSegment(secondNear, secondFar))
+        (firstFarOutside : firstFar ∉ Plane.openSegment(secondNear, secondFar))
+        : firstNear = secondNear ∧ firstFar = secondFar := {
+  Plane.distance(a, firstNear) < Plane.distance(a, x)
+      ∧ Plane.distance(a, x) < Plane.distance(a, firstFar)
+      by Plane.distance_strictly_between_of_member_openSegment;
+  Plane.distance(a, firstNear) < Plane.distance(a, x);
+  Plane.distance(a, x) < Plane.distance(a, firstFar);
+  Plane.distance(a, secondNear) < Plane.distance(a, x)
+      ∧ Plane.distance(a, x) < Plane.distance(a, secondFar)
+      by Plane.distance_strictly_between_of_member_openSegment;
+  Plane.distance(a, secondNear) < Plane.distance(a, x);
+  Plane.distance(a, x) < Plane.distance(a, secondFar);
+
+  -- Each piece's near end lies before the other's, so they agree.
+  Plane.distance(a, secondNear) < Plane.distance(a, firstFar);
+  Plane.distance(a, secondNear) ≤ Plane.distance(a, firstNear)
+      by Plane.distance_LessOrEqual_left_of_not_interior(farEnd := firstFar);
+  Plane.distance(a, firstNear) < Plane.distance(a, secondFar);
+  Plane.distance(a, firstNear) ≤ Plane.distance(a, secondNear)
+      by Plane.distance_LessOrEqual_left_of_not_interior(farEnd := secondFar);
+  Plane.distance(a, firstNear) = Plane.distance(a, secondNear)
+      by Real.LessOrEqual.antisymmetric;
+  firstNear = secondNear by Plane.equal_of_distance_from_left;
+
+  -- And the same on the far side.
+  Plane.distance(a, firstFar) ≤ Plane.distance(a, secondFar)
+      by Plane.distance_right_LessOrEqual_of_not_interior(nearEnd := firstNear);
+  Plane.distance(a, secondFar) ≤ Plane.distance(a, firstFar)
+      by Plane.distance_right_LessOrEqual_of_not_interior(nearEnd := secondNear);
+  Plane.distance(a, firstFar) = Plane.distance(a, secondFar)
+      by Real.LessOrEqual.antisymmetric;
+  firstFar = secondFar by Plane.equal_of_distance_from_left;
+  done
+}
