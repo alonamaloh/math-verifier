@@ -1129,3 +1129,133 @@ theorem Plane.polygonal_overlay (pieces : List(Plane.Segment))
       = Plane.piecesCover(pieces) by Plane.overlayGraph_pointSet;
   witness Plane.overlayGraph(pieces, points)
 }
+
+-- ----------------------------------------------------------------------
+-- Overlaying several polygonal graphs.
+--
+-- The blueprint asks for the overlay of finitely many polygonal plane graphs,
+-- not of a bare list of segments. There is no new geometry in the difference:
+-- concatenate the edge lists and cite `Plane.polygonal_overlay`. What has to be
+-- said carefully is what the result covers — the graphs' EDGE sets. An isolated
+-- vertex of one of the graphs is not covered, and could not be: the overlay's
+-- vertices are the ends of its edges.
+
+-- A polygonal graph covers what its edges cover.
+theorem Plane.edgeSet_is_piecesCover (graph : Plane.PolygonalGraph)
+        : Plane.Graph.edgeSet(graph, Plane.segmentDrawing)
+          = Plane.piecesCover(Graph.edges(graph)) := {
+  ∀ (edge : Plane.Segment). edge ∈ Graph.edges(graph) →
+      Plane.arc(Plane.segmentDrawing(edge))
+          = Plane.segment(Product.first(edge), Product.second(edge))
+      by { take edge : Plane.Segment;
+           suppose edge ∈ Graph.edges(graph);
+           done by Plane.arc_segmentDrawing };
+  done by List.unionOver_pointwise
+}
+
+definition Plane.graphEdges : List(Plane.PolygonalGraph) → List(Plane.Segment)
+  | List.empty               => List.empty(Plane.Segment)
+  | List.prepend(head, tail) =>
+      List.append(Graph.edges(head), Plane.graphEdges(tail))
+
+theorem Plane.graphEdges_member_invert (graphs : List(Plane.PolygonalGraph))
+        (edge : Plane.Segment) (isEdge : edge ∈ Plane.graphEdges(graphs))
+        : ∃ (graph : Plane.PolygonalGraph). graph ∈ graphs
+              ∧ edge ∈ Graph.edges(graph) :=
+  by induction on graphs with IH {
+    case graphs = List.empty:
+        done by List.no_member_empty
+    case graphs = List.prepend(head, tail) for some head, tail: {
+        edge ∈ List.append(Graph.edges(head), Plane.graphEdges(tail));
+        edge ∈ Graph.edges(head) ∨ edge ∈ Plane.graphEdges(tail)
+            by List.member_append_invert;
+        head ∈ List.prepend(Plane.PolygonalGraph, head, tail);
+        done by cases {
+          case edge ∈ Graph.edges(head):
+              witness head
+          case edge ∈ Plane.graphEdges(tail): {
+              choose graph such that graph ∈ tail ∧ edge ∈ Graph.edges(graph) from IH;
+              graph ∈ tail;
+              graph ∈ List.prepend(Plane.PolygonalGraph, head, tail);
+              edge ∈ Graph.edges(graph);
+              witness graph
+            }
+        }
+      }
+  }
+
+-- What the concatenated edge lists cover is what the graphs cover.
+theorem Plane.graphEdges_cover (graphs : List(Plane.PolygonalGraph))
+        : Plane.piecesCover(Plane.graphEdges(graphs))
+          = List.unionOver(
+                (graph : Plane.PolygonalGraph) ↦
+                    Plane.Graph.edgeSet(graph, Plane.segmentDrawing),
+                graphs) :=
+  by induction on graphs with IH {
+    case graphs = List.empty:
+        done
+    case graphs = List.prepend(head, tail) for some head, tail: {
+        Plane.Graph.edgeSet(head, Plane.segmentDrawing)
+            = Plane.piecesCover(Graph.edges(head))
+            by Plane.edgeSet_is_piecesCover as headCovers;
+        Plane.piecesCover(Plane.graphEdges(List.prepend(Plane.PolygonalGraph, head, tail)))
+           = Plane.piecesCover(List.append(Graph.edges(head), Plane.graphEdges(tail)))
+           = Plane.piecesCover(Graph.edges(head))
+                 ∪ Plane.piecesCover(Plane.graphEdges(tail))
+                 by List.unionOver_append
+           = Plane.Graph.edgeSet(head, Plane.segmentDrawing)
+                 ∪ Plane.piecesCover(Plane.graphEdges(tail)) by headCovers
+           = Plane.Graph.edgeSet(head, Plane.segmentDrawing)
+                 ∪ List.unionOver(
+                       (graph : Plane.PolygonalGraph) ↦
+                           Plane.Graph.edgeSet(graph, Plane.segmentDrawing),
+                       tail) by IH;
+        done
+      }
+  }
+
+theorem Plane.polygonal_overlay_of_graphs (graphs : List(Plane.PolygonalGraph))
+        (allWellFormed : ∀ (graph : Plane.PolygonalGraph). graph ∈ graphs →
+            Graph.IsWellFormed(graph))
+        : ∃ (overlay : Plane.PolygonalGraph).
+              Plane.Graph.IsDrawing(overlay, Plane.segmentDrawing)
+              ∧ Plane.Graph.pointSet(overlay, Plane.segmentDrawing)
+                  = List.unionOver(
+                        (graph : Plane.PolygonalGraph) ↦
+                            Plane.Graph.edgeSet(graph, Plane.segmentDrawing),
+                        graphs) := {
+  -- Every edge of every graph is nondegenerate, by well-formedness.
+  ∀ (piece : Plane.Segment). piece ∈ Plane.graphEdges(graphs) →
+      Product.first(piece) ≠ Product.second(piece)
+      by { take piece : Plane.Segment;
+           suppose piece ∈ Plane.graphEdges(graphs);
+           choose graph such that graph ∈ graphs ∧ piece ∈ Graph.edges(graph)
+               from Plane.graphEdges_member_invert;
+           graph ∈ graphs;
+           piece ∈ Graph.edges(graph);
+           Graph.IsWellFormed(graph) by allWellFormed;
+           done by Plane.segmentEdge_ends_distinct };
+  -- The same construction the segment form uses, so that its two results can
+  -- be cited as themselves rather than projected out of an existential.
+  choose points such that Plane.EndsAreCut(Plane.graphEdges(graphs), points)
+      ∧ Plane.MeetsAreCut(Plane.graphEdges(graphs), points)
+      from Plane.exists_cut_points;
+  Plane.EndsAreCut(Plane.graphEdges(graphs), points);
+  Plane.MeetsAreCut(Plane.graphEdges(graphs), points);
+  Plane.Graph.IsDrawing(Plane.overlayGraph(Plane.graphEdges(graphs), points),
+      Plane.segmentDrawing) by Plane.overlayGraph_IsDrawing;
+  Plane.piecesCover(Plane.graphEdges(graphs))
+      = List.unionOver(
+            (graph : Plane.PolygonalGraph) ↦
+                Plane.Graph.edgeSet(graph, Plane.segmentDrawing),
+            graphs)
+      by Plane.graphEdges_cover as edgesCoverGraphs;
+  Plane.Graph.pointSet(Plane.overlayGraph(Plane.graphEdges(graphs), points),
+      Plane.segmentDrawing)
+     = Plane.piecesCover(Plane.graphEdges(graphs)) by Plane.overlayGraph_pointSet
+     = List.unionOver(
+           (graph : Plane.PolygonalGraph) ↦
+               Plane.Graph.edgeSet(graph, Plane.segmentDrawing),
+           graphs) by edgesCoverGraphs;
+  witness Plane.overlayGraph(Plane.graphEdges(graphs), points)
+}
