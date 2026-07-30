@@ -57,10 +57,10 @@ definition Plane.Graph.IsDrawing (graph : Graph(Plane.Point, E, ends))
               Plane.arcStart(drawing(edge)), Plane.arcFinish(drawing(edge))))
   ∧ (∀ (edge : E). ∀ (vertex : Plane.Point).
         edge ∈ Graph.edges(graph) → vertex ∈ Graph.vertices(graph) →
-        ¬(vertex ∈ Plane.openArc(drawing(edge))))
+        vertex ∉ Plane.openArc(drawing(edge)))
   ∧ (∀ (edge other : E). ∀ (x : Plane.Point).
         edge ∈ Graph.edges(graph) → other ∈ Graph.edges(graph) → edge ≠ other →
-        x ∈ Plane.openArc(drawing(edge)) → ¬(x ∈ Plane.openArc(drawing(other))))
+        x ∈ Plane.openArc(drawing(edge)) → x ∉ Plane.openArc(drawing(other)))
 
 theorem Plane.Graph.IsDrawing.IsWellFormed (graph : Graph(Plane.Point, E, ends))
         (drawing : E → (ℝ → Plane.Point))
@@ -108,10 +108,10 @@ theorem Plane.Graph.IsDrawing.vertex_off_interior (graph : Graph(Plane.Point, E,
         (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
         (edge : E) (isEdge : edge ∈ Graph.edges(graph))
         (vertex : Plane.Point) (isVertex : vertex ∈ Graph.vertices(graph))
-        : ¬(vertex ∈ Plane.openArc(drawing(edge))) := {
+        : vertex ∉ Plane.openArc(drawing(edge)) := {
   ∀ (e : E). ∀ (v : Plane.Point).
       e ∈ Graph.edges(graph) → v ∈ Graph.vertices(graph) →
-      ¬(v ∈ Plane.openArc(drawing(e)));
+      v ∉ Plane.openArc(drawing(e));
   done
 }
 
@@ -122,10 +122,10 @@ theorem Plane.Graph.IsDrawing.interiors_disjoint (graph : Graph(Plane.Point, E, 
         (isEdge : edge ∈ Graph.edges(graph)) (otherIsEdge : other ∈ Graph.edges(graph))
         (distinct : edge ≠ other)
         (x : Plane.Point) (inInterior : x ∈ Plane.openArc(drawing(edge)))
-        : ¬(x ∈ Plane.openArc(drawing(other))) := {
+        : x ∉ Plane.openArc(drawing(other)) := {
   ∀ (e f : E). ∀ (y : Plane.Point).
       e ∈ Graph.edges(graph) → f ∈ Graph.edges(graph) → e ≠ f →
-      y ∈ Plane.openArc(drawing(e)) → ¬(y ∈ Plane.openArc(drawing(f)));
+      y ∈ Plane.openArc(drawing(e)) → y ∉ Plane.openArc(drawing(f));
   done
 }
 
@@ -204,7 +204,7 @@ theorem Plane.Graph.IsDrawing.subgraph (whole part : Graph(Plane.Point, E, ends)
 
   ∀ (edge : E). ∀ (vertex : Plane.Point).
       edge ∈ Graph.edges(part) → vertex ∈ Graph.vertices(part) →
-      ¬(vertex ∈ Plane.openArc(drawing(edge)))
+      vertex ∉ Plane.openArc(drawing(edge))
       by { take edge : E;
            take vertex : Plane.Point;
            suppose edge ∈ Graph.edges(part);
@@ -215,7 +215,7 @@ theorem Plane.Graph.IsDrawing.subgraph (whole part : Graph(Plane.Point, E, ends)
 
   ∀ (edge other : E). ∀ (x : Plane.Point).
       edge ∈ Graph.edges(part) → other ∈ Graph.edges(part) → edge ≠ other →
-      x ∈ Plane.openArc(drawing(edge)) → ¬(x ∈ Plane.openArc(drawing(other)))
+      x ∈ Plane.openArc(drawing(edge)) → x ∉ Plane.openArc(drawing(other))
       by { take edge : E;
            take other : E;
            take x : Plane.Point;
@@ -309,17 +309,17 @@ theorem Plane.Graph.IsDrawing.arcs_meet_at_vertex (graph : Graph(Plane.Point, E,
   done by cases {
     case Graph.Incident(graph, edge, x): {
         x ∈ Graph.vertices(graph);
-        ¬(x ∈ Plane.openArc(drawing(other)))
+        x ∉ Plane.openArc(drawing(other))
             by Plane.Graph.IsDrawing.vertex_off_interior;
         Graph.Incident(graph, other, x);
         done
       }
     case x ∈ Plane.openArc(drawing(edge)): {
-        ¬(x ∈ Plane.openArc(drawing(other)))
+        x ∉ Plane.openArc(drawing(other))
             by Plane.Graph.IsDrawing.interiors_disjoint;
         Graph.Incident(graph, other, x);
         x ∈ Graph.vertices(graph);
-        ¬(x ∈ Plane.openArc(drawing(edge)))
+        x ∉ Plane.openArc(drawing(edge))
             by Plane.Graph.IsDrawing.vertex_off_interior;
         done
       }
@@ -333,7 +333,7 @@ theorem Plane.Graph.IsDrawing.unique_edge_at (graph : Graph(Plane.Point, E, ends
         (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
         (edge other : E)
         (isEdge : edge ∈ Graph.edges(graph)) (otherIsEdge : other ∈ Graph.edges(graph))
-        (x : Plane.Point) (notVertex : ¬(x ∈ Graph.vertices(graph)))
+        (x : Plane.Point) (notVertex : x ∉ Graph.vertices(graph))
         (onEdge : x ∈ Plane.arc(drawing(edge)))
         (onOther : x ∈ Plane.arc(drawing(other)))
         : edge = other := {
