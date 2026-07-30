@@ -23,6 +23,23 @@ comparable with the edges of another. `V`, `E` and `ends` are file-level
 the graph argument. That is also why the incidence predicates take the
 graph although they only read `ends`.
 
+## Two habits this layer relies on
+
+**Inclusion is `⊆`, on lists as on sets.** `List.Includes` (`Lists/list.math`)
+is `∀ element. element ∈ small → element ∈ large`, with `⊆` overloaded on
+lists the way `∈` already is. `Graph.IsSubgraph` is two of them. It is
+transparent, so a `⊆` fact in context discharges an individual membership
+with no citation — write the inclusion, not the ∀-implication, and never an
+inline `by { take …; suppose …; done }` for one.
+
+**Name the graph under construction with `let`.** Citations unify through a
+`let`-bound graph, so
+`let subdivided : Graph(V, E, ends) := Graph.union(trimmed, pathGraph);`
+lets the rest of a proof say `subdivided`. `Graph.IsTwoConnected.
+replace_edge_by_path` had respelled its four-level term 33 times before this;
+the binding is what makes such a proof readable, and the name carries the
+mathematics the nesting hides.
+
 ## Main definitions
 
 - `Graph(V, E, ends)`, `Graph.vertices`, `Graph.edges`, `Graph.order`,

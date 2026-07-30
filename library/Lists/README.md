@@ -18,6 +18,11 @@ needed.
   `.member_invert` recovering the comprehension reading
 - `List.range_down` for `1,…,n`, `List.range_up` for `0,…,n-1`, and
   `List.range_down_offset`
+- Inclusion `List.Includes`, spelled `⊆` — every member of the smaller list
+  is a member of the larger, saying nothing about order or multiplicity. The
+  same operator `Set` uses, since `∈` is already overloaded that way.
+  Transparent, so a `⊆` fact in context discharges an individual membership
+  with no citation
 - Pairwise distinctness `List.Distinct`
 - Reordering relation `List.Permutation`
 - Cartesian list product `List.cartesianProduct`

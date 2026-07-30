@@ -479,3 +479,56 @@ enforce the ascription (a citation that resolves at a type other than the
 `such that` existential must be an error, not a silent substitution), and
 solve the predicate metavariable from the ASCRIPTION before the premise
 discharge gets to guess it from `witnessAtN`.
+
+---
+
+## G11 — the layer had no vocabulary for "is contained in" (FIXED)
+
+**Found by an external review, 2026-07-29**, and it is the root cause of most
+of what made the hard files hard. `library/Graph/` contained **zero**
+occurrences of `⊆`. Every inclusion was spelled
+`∀ (x : T). x ∈ A → x ∈ B` and discharged with an inline
+`by { take …; suppose …; done }` — 77 such blocks in the layer, the extreme
+case being reflexivity written out in full:
+
+```math
+∀ (edge : E). edge ∈ Graph.edges(graph) → edge ∈ Graph.edges(graph)
+    by { take edge : E; suppose edge ∈ Graph.edges(graph); done };
+```
+
+**Root cause: a library gap, not a proof defect.** `Set` has `Set.subset`
+with `⊆`, `.reflexive` and `.transitive`, and `Plane/` uses it idiomatically.
+`Lists/` had membership and nothing above it — no inclusion *relation* — so
+for edge and vertex lists there was nothing to reach for.
+
+**Fixed** by `List.Includes` in `Lists/list.math`, with `⊆` overloaded on
+lists (`∈` was already overloaded that way, so this is the established
+pattern), plus `.reflexive`, `.transitive`, `.prepend` and `.prepend_both`.
+`Graph.IsSubgraph` is now two inclusions.
+
+Worth knowing for the next such change: `List.Includes` is **transparent**, so
+every consumer that projected an `IsSubgraph` leg as a ∀-fact — and every bare
+`edge ∈ Graph.edges(whole);` step discharged from one — kept working with no
+edit at all. The definition change and the consumer sweep were separable.
+
+## G12 — `let` DOES abbreviate a graph term (measured, not a friction)
+
+The same review flagged as unknown whether `by <Lemma>` citations unify
+through a `let`-bound graph, and noted that if they do not, *that* is the
+friction, since `docs/style.md` recommends the form. **They do.** Probed
+directly:
+
+```math
+let combined : Graph(V, E, ends) := Graph.union(first, second);
+Graph.IsSubgraph(first, combined) by Graph.union.IsSubgraph_left;
+```
+
+verifies, including when the theorem's own conclusion spells the term out —
+ζ-reduction makes the two defeq. So the layer's total absence of `let` as an
+abbreviation (three uses, all record destructures) was habit, not a language
+limit. `Graph.IsTwoConnected.replace_edge_by_path` had respelled
+`Graph.union(Graph.deleteEdge(graph, edge), pathGraph)` 33 times.
+
+One trap when applying it in bulk: a search-and-replace of the long term will
+also rewrite the right-hand side of the `let` that introduces it, producing
+`let trimmed := trimmed;` and an `unknown identifier` at the first use.
