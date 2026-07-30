@@ -14,10 +14,57 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
         Frame frame(*this,
             "claim by substitution at line "
             + std::to_string(line));
+        // ── Phase accounting (MATH_TIME_SUBST=1) ──────────────────────────
+        // LOCAL, not members: this function reaches itself through
+        // autoProveClaim, and member accumulators would have an inner call
+        // wipe the outer one's tally — the bug that made the first attempt at
+        // this report zero attempts for a 9.8 s claim. Reported from a scope
+        // guard so every return path is covered.
+        long long prepareMicros = 0, occurrenceMicros = 0, typecheckMicros = 0;
+        long long defeqMicros = 0, proveMicros = 0, attempts = 0;
+        long long proveFailedMicros = 0, proveCalls = 0;
+        struct PhaseTimer {
+            long long& sink_; bool on_; long long t0_ = 0;
+            PhaseTimer(bool on, long long& sink) : sink_(sink), on_(on) {
+                if (on_) t0_ = monotonicNanos();
+            }
+            ~PhaseTimer() {
+                if (on_) sink_ += (monotonicNanos() - t0_) / 1000;
+            }
+        };
+        static const bool substTimingOn = [] {
+            const char* f = std::getenv("MATH_TIME_SUBST");
+            return f && f[0] != '\0' && f[0] != '0';
+        }();
+        struct PhaseReport {
+            bool on_; int line_; long long t0_; const std::string& module_;
+            long long &prep_, &occ_, &tc_, &defeq_, &prove_, &attempts_;
+            long long &failed_, &calls_;
+            ~PhaseReport() {
+                if (!on_) return;
+                long long total = (monotonicNanos() - t0_) / 1000;
+                if (total < 200000) return;   // only the expensive ones
+                std::cerr << "[subst] " << module_ << ":" << line_
+                          << " total " << total / 1000
+                          << " | prepare " << prep_ / 1000
+                          << " | occurrence " << occ_ / 1000
+                          << " | typecheck " << tc_ / 1000
+                          << " | defeq " << defeq_ / 1000
+                          << " | prove " << prove_ / 1000
+                          << " (of which FAILED " << failed_ / 1000
+                          << ", calls " << calls_ << ")"
+                          << " (ms) | attempts " << attempts_ << "\n";
+            }
+        } phaseReport{substTimingOn, line, monotonicNanos(), moduleName_,
+                      prepareMicros, occurrenceMicros, typecheckMicros,
+                      defeqMicros, proveMicros, attempts,
+                      proveFailedMicros, proveCalls};
         // Build the candidate-equality list. Default: every equality
         // in scope (the existing bridge's pool). Narrowed: a single
         // equality the user supplied as `by substituting <eq>`.
         std::vector<ContextEquality> candidates;
+        std::unique_ptr<PhaseTimer> prepareTimer(
+            new PhaseTimer(substTimingOn, prepareMicros));
         if (claim.byHint) {
             // Narrowed form. Elaborate <eq>; extract its components
             // as a single ContextEquality.
@@ -158,6 +205,7 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
                 goalForms.push_back(goalZetaDeepWhnf);
             }
         }
+        prepareTimer.reset();
         // For each candidate, both directions, try the bridge.
         // Track per-attempt outcomes so we can produce a useful
         // diagnostic when nothing closes — the user wants to know
@@ -178,8 +226,18 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
         // the full prover search closing it. PASS 1 is the original behaviour
         // (prover allowed), with the original direction order preserved, so
         // proofs that legitimately need the search are unaffected.
-        for (int pass = 0; pass < 2; ++pass) {
+        // PASS 1 (new) is the CHEAP-PROVER pass. Measured: on every expensive
+        // `by substituting` site in the library, ~100% of the cost is the
+        // auto-prover FAILING on a rewrite candidate that does not work —
+        // `Plane.IsEndOf.orientSegment` spends 188.98 s of 188.98 s in failed
+        // prover calls, while the rewrite that succeeds costs about a
+        // millisecond. Trying every candidate under a low effort cap before
+        // letting any of them have the full budget finds that cheap winner
+        // first. Completeness is unaffected: pass 2 is the old pass 1,
+        // unchanged, so anything that needed the full search still gets it.
+        for (int pass = 0; pass < 3; ++pass) {
           bool fastPathOnly = (pass == 0);
+          bool cheapProver = (pass == 1);
           for (const ContextEquality& eq : candidates) {
             for (int direction = 0; direction < 2; ++direction) {
                 ExpressionPointer fromSide =
@@ -225,6 +283,9 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
                 // — the widening only rescues endpoints that match NOWHERE
                 // structurally (a numeral hidden behind an opaque coercion).
                 const StructuralNodeMatcher* activeBridge = nullptr;
+                ++attempts;
+                {
+                PhaseTimer occurrenceTimer(substTimingOn, occurrenceMicros);
                 for (int bridgePass = 0; bridgePass < 2; ++bridgePass) {
                     const StructuralNodeMatcher* bridge =
                         (bridgePass == 0) ? nullptr : numeralBridgePtr;
@@ -248,6 +309,7 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
                         }
                     }
                     if (occurrences > 0) break;
+                }
                 }
                 SubstAttempt attempt;
                 attempt.direction = (direction == 0)
@@ -335,12 +397,17 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
                     // bad (form, direction) is skipped cleanly instead of handed
                     // to the prover, which would build a proof term that only the
                     // FINAL kernel check rejects (an opaque-boundary leak).
-                    try {
-                        inferTypeInLocalContext(localBinders, rewrittenGoal);
-                    } catch (const ElaborateError&) {
-                        return nullptr;
-                    } catch (const TypeError&) {
-                        return nullptr;
+                    {
+                        PhaseTimer typecheckTimer(
+                            substTimingOn, typecheckMicros);
+                        try {
+                            inferTypeInLocalContext(
+                                localBinders, rewrittenGoal);
+                        } catch (const ElaborateError&) {
+                            return nullptr;
+                        } catch (const TypeError&) {
+                            return nullptr;
+                        }
                     }
                     // Fast path: the rewrite alone settled the goal. A
                     // directly-supplied equality usually rewrites one side
@@ -380,6 +447,7 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
                             // positive can't slip through — at worst the probe
                             // is wasted and we take the slow path anyway.
                             int N = static_cast<int>(localBinders.size());
+                            PhaseTimer defeqTimer(substTimingOn, defeqMicros);
                             try {
                                 sidesEqual = isDefinitionallyEqual(
                                     environment_,
@@ -406,15 +474,40 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
                     // reflexive, so do NOT pay the prover here — let a different
                     // rewrite/direction (or the later prover pass) handle it.
                     if (fastPathOnly) return nullptr;
+                    ++proveCalls;
+                    long long proveStart =
+                        substTimingOn ? monotonicNanos() : 0;
                     try {
                         AutoProveCallerLabelGuard callerLabel(
                             *this, "`by substituting` re-proof");
+                        PhaseTimer proveTimer(substTimingOn, proveMicros);
+                        std::unique_ptr<RedundancyBudgetGuard> cheapGuard;
+                        if (cheapProver) {
+                            cheapGuard.reset(new RedundancyBudgetGuard(*this));
+                        }
                         ExpressionPointer proofRewritten = autoProveClaim(
                             rewrittenGoal, localBinders, line, budget);
                         return buildTransport(abstractedBody, proofRewritten);
                     } catch (const ElaborateError&) {
+                        if (substTimingOn) {
+                            proveFailedMicros +=
+                                (monotonicNanos() - proveStart) / 1000;
+                        }
+                        return nullptr;
+                    } catch (const AutoProverBudgetError&) {
+                        // Only reachable in the cheap pass, whose whole point
+                        // is to give up early; the full-budget pass follows.
+                        if (substTimingOn) {
+                            proveFailedMicros +=
+                                (monotonicNanos() - proveStart) / 1000;
+                        }
+                        if (!cheapProver) throw;
                         return nullptr;
                     } catch (const TypeError&) {
+                        if (substTimingOn) {
+                            proveFailedMicros +=
+                                (monotonicNanos() - proveStart) / 1000;
+                        }
                         return nullptr;
                     }
                 };

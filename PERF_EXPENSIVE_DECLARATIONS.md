@@ -186,6 +186,53 @@ Patterns worth naming, since they recur down the list:
   library; worth revisiting when the `by`-citation discharge path is
   understood.
 
+## FIXED 2026-07-30: the cheap-prover pass in `by substituting`
+
+**The `by substituting` family is solved.** Measured with `MATH_TIME_SUBST=1`,
+which times the phases of `elaborateClaimBySubstitution` using LOCAL
+accumulators (the function reaches itself through `autoProveClaim`, so member
+accumulators had an inner call wipe the outer one's tally):
+
+```
+BEFORE  [subst] Plane.Graph.orient:202 total 189461 | prepare 0 | occurrence 0
+                | typecheck 2 | defeq 0 | prove 188981 (FAILED 188980, calls 5)
+AFTER   [subst] Plane.Graph.orient:202 total   1407 | prepare 0 | occurrence 0
+                | typecheck 52 | defeq 0 | prove 855 (FAILED 855, calls 5)
+```
+
+The substitution machinery is **entirely innocent** — occurrence search,
+type-checks, defeq probes and candidate preparation are all ~0 ms. Essentially
+100% of the cost was the auto-prover FAILING on rewrite candidates that do not
+work, while the candidate that succeeds costs about a millisecond.
+
+The fix is one new pass. The loop was `pass 0` = fast path only (no prover),
+`pass 1` = prover at full budget. It is now:
+
+- **pass 0** — fast path only (reflexivity/defeq), unchanged;
+- **pass 1** — every candidate under a LOW effort cap (`RedundancyBudgetGuard`);
+- **pass 2** — the old pass 1, at full budget, unchanged.
+
+Completeness is unaffected: anything that needed the full search still reaches
+pass 2. What changes is that a cheap winner is found before an expensive loser
+can burn the whole budget. An `AutoProverBudgetError` in the cheap pass is
+caught and treated as a miss (it is rethrown in the full pass, where it still
+means what it always did).
+
+Measured results:
+
+| site | before | after | factor |
+| --- | --- | --- | --- |
+| `Plane.IsEndOf.orientSegment:202` | 189 461 ms | 1 407 ms | **135×** |
+| `Matrix.characteristic_entry_leading:388` | 9 532 ms | 411 ms | 23× |
+| `Matrix.characteristic_entry_constant:415` | 7 704 ms | 441 ms | 17× |
+| `Plane/Graph/orient.math` (whole file) | ~191 s | 3.1 s | 62× |
+
+Library-wide, both runs under `make -j 16` so they are comparable to each
+other: **total claim self-time 1087 s → 910 s (−16%)**, and the **top 10
+claims 499 s → 297 s (−40%)**. Zero errors, `tests` and `docs-check` green.
+
+`by substituting` no longer appears anywhere in the top 10.
+
 ## Optimisation attempts so far — both failed, measured
 
 Recorded so the next attempt does not repeat them.
