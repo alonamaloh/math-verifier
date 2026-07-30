@@ -734,15 +734,65 @@ That regress is the same one that forced the named-pair form of
 So all four properties of `Plane.subdivide` are in the kernel:
 `ends_distinct`, `inside`, `avoids`, `covers`.
 
-**Remaining: the assembly.** State the overlay EXISTENTIALLY ("can be made
-into a finite plane graph by subdivision", as the blueprint has it) and prove
-it by induction over the segments, so the cut points never have to be
-produced. That is where `Plane.segment_meet` is finally used — to choose the
-cut points for one new segment against the pieces already placed — and where
-the two remaining obligations live: pairwise-disjoint interiors (NOT a
-property of `subdivide`; see the correction above) and the deduplication that
-picks one orientation of each segment. Then H6. "The realisation of a cycle is
-a Jordan curve" wants the edge arcs of a cycle concatenated in order.
+### Remaining: the assembly — design worked out, not yet written
+
+Target shape:
+
+```math
+theorem Plane.polygonal_overlay (pieces : List(Plane.Segment))
+        (allDistinct : ∀ piece ∈ pieces. first(piece) ≠ second(piece))
+        : ∃ (graph : Plane.PolygonalGraph).
+            Plane.Graph.IsDrawing(graph, Plane.segmentDrawing)
+            ∧ Plane.Graph.pointSet(graph, Plane.segmentDrawing)
+                = Plane.piecesCover(pieces)
+```
+
+`Plane.Graph.polygonal_IsDrawing` reduces the first conjunct to well-formedness
+plus the two disjointness conditions, and `Plane.subdivide_covers` gives the
+second. So the whole job is the disjointness, and the crux is:
+
+> **Separation.** If the cut points include, for every pair of distinct source
+> pieces, both endpoints of their meet, then two pieces of the subdivision that
+> share an INTERIOR point have equal interiors.
+
+Equal — not disjoint. Overlapping collinear segments cannot be separated by
+cutting at all: after the cuts they *coincide*, which is exactly the case the
+blueprint's "represent every duplicate geometric subsegment only once" is for.
+So separation feeds deduplication rather than replacing it.
+
+**The case analysis** (this is the part worth not re-deriving). Let `P`, `Q` be
+pieces of `subdivide(pieces, points)` sharing an interior point `x`. By
+`subdivide_inside` each has its interior inside a source piece's, say
+`p` and `q`, so `x ∈ interior(p) ∩ interior(q)`.
+
+- **`p = q`.** `P` and `Q` are sub-pieces of one segment sharing an interior
+  point. NEEDS A NEW LEMMA: the pieces `subdivide` makes of a single segment
+  have pairwise-disjoint interiors unless equal — i.e. splitting partitions.
+  Provable by the same induction, but it is not any of the four properties.
+- **`p ≠ q`.** `segment_meet` makes `p ∩ q` a segment `[u, v]`, and `u`, `v`
+  are cut points, so `subdivide_avoids` keeps them out of every interior. Then
+  `interior(P)` meets `(u, v)` and avoids `u` and `v`. NEEDS A SECOND NEW
+  LEMMA: an interval that meets `(u, v)` and avoids both endpoints lies inside
+  `[u, v]`. With that, `interior(P)` and `interior(Q)` are both inside the
+  overlap, and the overlap is where the two coincide.
+
+**Then producing the cut points.** `Logic.the` (definite description) and
+`Logic.countable_choice` are both available, so collecting the meet endpoints
+into a list is possible — but note `segment_meet`'s `∃ p q` does NOT determine
+the pair uniquely (`(p, q)` and `(q, p)` both work), so `Logic.the` needs a
+canonical choice or a uniqueness-carrying restatement first. The alternative,
+and probably the better one: keep the cut-point list EXISTENTIAL throughout —
+state separation as "there exists a `points` for which …" and build it by the
+induction over `pieces`, so no choice operator is needed at all. That is the
+same move that made `subdivide` need no sort.
+
+**Then deduplication:** an edge list holding one orientation of each geometric
+segment. `List.Includes` and the distinctness machinery are in place; what is
+missing is the "same segment up to swapping" relation and a filter that
+respects it.
+
+Then H6. "The realisation of a cycle is a Jordan curve" wants the edge arcs of
+a cycle concatenated in order.
 
 **Definitions.** `Plane.Graph.IsDrawing` (**settled** — see above, not a
 `Plane.Graph` type); `Plane.Graph.face` as a component of the complement

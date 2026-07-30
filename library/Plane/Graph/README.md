@@ -107,12 +107,15 @@ an endpoint is a no-op).
 
 ## Not built yet
 
-- **The overlay proper.** With the two designs above settled, what remains is
-  three properties of `Plane.subdivide` — the pieces cover what they came
-  from, their interiors are pairwise disjoint, and no cut point is interior
-  to any of them — and then the assembly, stated **existentially** ("can be
-  made into a plane graph by subdivision") and proved by induction over the
-  segments, so the cut points never have to be produced.
+- **The overlay's assembly.** All four properties of `Plane.subdivide` are
+  proved — `ends_distinct`, `inside` (interiors only shrink, so a cut is
+  permanent), `avoids` (no cut point stays interior), `covers` (the pieces
+  occupy exactly what they came from). What remains is the SEPARATION step:
+  with enough cut points, two pieces sharing an interior point have EQUAL
+  interiors — equal, not disjoint, because overlapping collinear segments
+  coincide after cutting and are what deduplication is for. The case analysis
+  and the two sub-lemmas it needs are written out in
+  `PLAN_JORDAN_SCHOENFLIES.md`.
 - **The outer face.** That exactly one face is unbounded needs the exterior
   of a large disk to be connected — a genuine plane fact that nothing here
   supplies.
