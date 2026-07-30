@@ -118,3 +118,396 @@ theorem Plane.subdivide_prepend (pieces : List(Plane.Segment))
         : Plane.subdivide(pieces, List.prepend(Plane.Point, point, rest))
           = Plane.subdivide(Plane.splitAllAt(point, pieces), rest) :=
   done
+
+-- ----------------------------------------------------------------------
+-- What one cut does.
+--
+-- Two facts, and everything below is these two lifted through the two
+-- recursions: a cut only SHRINKS interiors, and after cutting at a point
+-- that point is interior to nothing.
+
+theorem Plane.splitSegmentAt_ends_distinct (cut : Plane.Point)
+        (piece : Plane.Segment)
+        (distinct : Product.first(piece) ≠ Product.second(piece))
+        (part : Plane.Segment) (isPart : part ∈ Plane.splitSegmentAt(cut, piece))
+        : Product.first(part) ≠ Product.second(part) :=
+  done by cases {
+    case cut ∈ Plane.openSegment(
+             Product.first(piece), Product.second(piece)) as interior: {
+        Plane.splitSegmentAt(cut, piece)
+            = List.prepend(Plane.Segment,
+                  Product.make(Product.first(piece), cut),
+                  List.prepend(Plane.Segment,
+                      Product.make(cut, Product.second(piece)),
+                      List.empty(Plane.Segment)))
+            by Plane.splitSegmentAt_interior;
+        part ∈ List.prepend(Plane.Segment,
+                   Product.make(Product.first(piece), cut),
+                   List.prepend(Plane.Segment,
+                       Product.make(cut, Product.second(piece)),
+                       List.empty(Plane.Segment)));
+        part = Product.make(Product.first(piece), cut)
+            ∨ part = Product.make(cut, Product.second(piece))
+            by List.member_pair_invert;
+        cut ≠ Product.first(piece);
+        cut ≠ Product.second(piece);
+        Product.first(piece) ≠ cut;
+        done by cases {
+          case part = Product.make(Product.first(piece), cut):
+              done
+          case part = Product.make(cut, Product.second(piece)):
+              done
+        }
+      }
+    otherwise as outside: {
+        Plane.splitSegmentAt(cut, piece)
+            = List.prepend(Plane.Segment, piece, List.empty(Plane.Segment))
+            by Plane.splitSegmentAt_elsewhere;
+        part ∈ List.prepend(Plane.Segment, piece, List.empty(Plane.Segment));
+        part = piece by List.member_singleton_invert;
+        done
+      }
+  }
+
+theorem Plane.splitSegmentAt_inside (cut : Plane.Point) (piece : Plane.Segment)
+        (distinct : Product.first(piece) ≠ Product.second(piece))
+        (part : Plane.Segment) (isPart : part ∈ Plane.splitSegmentAt(cut, piece))
+        : Plane.openSegment(Product.first(part), Product.second(part))
+              ⊆ Plane.openSegment(
+                    Product.first(piece), Product.second(piece)) :=
+  done by cases {
+    case cut ∈ Plane.openSegment(
+             Product.first(piece), Product.second(piece)) as interior: {
+        Plane.splitSegmentAt(cut, piece)
+            = List.prepend(Plane.Segment,
+                  Product.make(Product.first(piece), cut),
+                  List.prepend(Plane.Segment,
+                      Product.make(cut, Product.second(piece)),
+                      List.empty(Plane.Segment)))
+            by Plane.splitSegmentAt_interior;
+        part ∈ List.prepend(Plane.Segment,
+                   Product.make(Product.first(piece), cut),
+                   List.prepend(Plane.Segment,
+                       Product.make(cut, Product.second(piece)),
+                       List.empty(Plane.Segment)));
+        part = Product.make(Product.first(piece), cut)
+            ∨ part = Product.make(cut, Product.second(piece))
+            by List.member_pair_invert;
+        Plane.openSegment(Product.first(piece), cut)
+            ⊆ Plane.openSegment(Product.first(piece), Product.second(piece))
+            by Plane.openSegment_left_inside;
+        Plane.openSegment(cut, Product.second(piece))
+            ⊆ Plane.openSegment(Product.first(piece), Product.second(piece))
+            by Plane.openSegment_right_inside;
+        done by cases {
+          case part = Product.make(Product.first(piece), cut):
+              done
+          case part = Product.make(cut, Product.second(piece)):
+              done
+        }
+      }
+    otherwise as outside: {
+        Plane.splitSegmentAt(cut, piece)
+            = List.prepend(Plane.Segment, piece, List.empty(Plane.Segment))
+            by Plane.splitSegmentAt_elsewhere;
+        part ∈ List.prepend(Plane.Segment, piece, List.empty(Plane.Segment));
+        part = piece by List.member_singleton_invert;
+        Plane.openSegment(Product.first(piece), Product.second(piece))
+            ⊆ Plane.openSegment(Product.first(piece), Product.second(piece))
+            by Set.subset.reflexive;
+        done
+      }
+  }
+
+-- After a cut, the point cut at is an ENDPOINT of every piece it touched,
+-- and an interior excludes its endpoints.
+theorem Plane.splitSegmentAt_avoids (cut : Plane.Point) (piece : Plane.Segment)
+        (part : Plane.Segment) (isPart : part ∈ Plane.splitSegmentAt(cut, piece))
+        : ¬(cut ∈ Plane.openSegment(
+                Product.first(part), Product.second(part))) :=
+  done by cases {
+    case cut ∈ Plane.openSegment(
+             Product.first(piece), Product.second(piece)) as interior: {
+        Plane.splitSegmentAt(cut, piece)
+            = List.prepend(Plane.Segment,
+                  Product.make(Product.first(piece), cut),
+                  List.prepend(Plane.Segment,
+                      Product.make(cut, Product.second(piece)),
+                      List.empty(Plane.Segment)))
+            by Plane.splitSegmentAt_interior;
+        part ∈ List.prepend(Plane.Segment,
+                   Product.make(Product.first(piece), cut),
+                   List.prepend(Plane.Segment,
+                       Product.make(cut, Product.second(piece)),
+                       List.empty(Plane.Segment)));
+        part = Product.make(Product.first(piece), cut)
+            ∨ part = Product.make(cut, Product.second(piece))
+            by List.member_pair_invert;
+        ¬(cut ∈ Plane.openSegment(Product.first(piece), cut))
+            by { suppose cut ∈ Plane.openSegment(Product.first(piece), cut);
+                 cut ≠ cut;
+                 done };
+        ¬(cut ∈ Plane.openSegment(cut, Product.second(piece)))
+            by { suppose cut ∈ Plane.openSegment(cut, Product.second(piece));
+                 cut ≠ cut;
+                 done };
+        done by cases {
+          case part = Product.make(Product.first(piece), cut):
+              done
+          case part = Product.make(cut, Product.second(piece)):
+              done
+        }
+      }
+    otherwise as outside: {
+        Plane.splitSegmentAt(cut, piece)
+            = List.prepend(Plane.Segment, piece, List.empty(Plane.Segment))
+            by Plane.splitSegmentAt_elsewhere;
+        part ∈ List.prepend(Plane.Segment, piece, List.empty(Plane.Segment));
+        part = piece by List.member_singleton_invert;
+        done
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- The same three facts across a whole list of pieces.
+--
+-- Each is an induction on the piece list, splitting the `append` that
+-- `splitAllAt` produces.
+
+theorem Plane.splitAllAt_ends_distinct (cut : Plane.Point)
+        (pieces : List(Plane.Segment))
+        (allDistinct : ∀ (piece : Plane.Segment). piece ∈ pieces →
+            Product.first(piece) ≠ Product.second(piece))
+        (part : Plane.Segment) (isPart : part ∈ Plane.splitAllAt(cut, pieces))
+        : Product.first(part) ≠ Product.second(part) :=
+  by induction on pieces with IH {
+    case pieces = List.empty:
+        done
+    case pieces = List.prepend(head, tail) for some head, tail: {
+        head ∈ List.prepend(Plane.Segment, head, tail);
+        Product.first(head) ≠ Product.second(head) by allDistinct;
+        ∀ (piece : Plane.Segment). piece ∈ tail →
+            Product.first(piece) ≠ Product.second(piece)
+            by { take piece : Plane.Segment;
+                 suppose piece ∈ tail;
+                 piece ∈ List.prepend(Plane.Segment, head, tail);
+                 done by allDistinct };
+        part ∈ List.append(Plane.splitSegmentAt(cut, head),
+                           Plane.splitAllAt(cut, tail));
+        part ∈ Plane.splitSegmentAt(cut, head)
+            ∨ part ∈ Plane.splitAllAt(cut, tail)
+            by List.member_append_invert;
+        done by cases {
+          case part ∈ Plane.splitSegmentAt(cut, head):
+              done by Plane.splitSegmentAt_ends_distinct
+          case part ∈ Plane.splitAllAt(cut, tail):
+              done by IH
+        }
+      }
+  }
+
+theorem Plane.splitAllAt_inside (cut : Plane.Point)
+        (pieces : List(Plane.Segment))
+        (allDistinct : ∀ (piece : Plane.Segment). piece ∈ pieces →
+            Product.first(piece) ≠ Product.second(piece))
+        (part : Plane.Segment) (isPart : part ∈ Plane.splitAllAt(cut, pieces))
+        : ∃ (piece : Plane.Segment). piece ∈ pieces
+            ∧ Plane.openSegment(Product.first(part), Product.second(part))
+                ⊆ Plane.openSegment(
+                      Product.first(piece), Product.second(piece)) :=
+  by induction on pieces with IH {
+    case pieces = List.empty:
+        done
+    case pieces = List.prepend(head, tail) for some head, tail: {
+        head ∈ List.prepend(Plane.Segment, head, tail);
+        Product.first(head) ≠ Product.second(head) by allDistinct;
+        ∀ (piece : Plane.Segment). piece ∈ tail →
+            Product.first(piece) ≠ Product.second(piece)
+            by { take piece : Plane.Segment;
+                 suppose piece ∈ tail;
+                 piece ∈ List.prepend(Plane.Segment, head, tail);
+                 done by allDistinct };
+        part ∈ List.append(Plane.splitSegmentAt(cut, head),
+                           Plane.splitAllAt(cut, tail));
+        part ∈ Plane.splitSegmentAt(cut, head)
+            ∨ part ∈ Plane.splitAllAt(cut, tail)
+            by List.member_append_invert;
+        done by cases {
+          case part ∈ Plane.splitSegmentAt(cut, head): {
+              Plane.openSegment(Product.first(part), Product.second(part))
+                  ⊆ Plane.openSegment(
+                        Product.first(head), Product.second(head))
+                  by Plane.splitSegmentAt_inside;
+              witness head
+            }
+          case part ∈ Plane.splitAllAt(cut, tail): {
+              choose piece such that piece ∈ tail
+                  ∧ Plane.openSegment(Product.first(part), Product.second(part))
+                      ⊆ Plane.openSegment(
+                            Product.first(piece), Product.second(piece))
+                  from IH;
+              piece ∈ tail;
+              piece ∈ List.prepend(Plane.Segment, head, tail);
+              Plane.openSegment(Product.first(part), Product.second(part))
+                  ⊆ Plane.openSegment(
+                        Product.first(piece), Product.second(piece));
+              witness piece
+            }
+        }
+      }
+  }
+
+theorem Plane.splitAllAt_avoids (cut : Plane.Point)
+        (pieces : List(Plane.Segment))
+        (part : Plane.Segment) (isPart : part ∈ Plane.splitAllAt(cut, pieces))
+        : ¬(cut ∈ Plane.openSegment(
+                Product.first(part), Product.second(part))) :=
+  by induction on pieces with IH {
+    case pieces = List.empty:
+        done
+    case pieces = List.prepend(head, tail) for some head, tail: {
+        part ∈ List.append(Plane.splitSegmentAt(cut, head),
+                           Plane.splitAllAt(cut, tail));
+        part ∈ Plane.splitSegmentAt(cut, head)
+            ∨ part ∈ Plane.splitAllAt(cut, tail)
+            by List.member_append_invert;
+        done by cases {
+          case part ∈ Plane.splitSegmentAt(cut, head):
+              done by Plane.splitSegmentAt_avoids
+          case part ∈ Plane.splitAllAt(cut, tail):
+              done by IH
+        }
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- The three properties of a full subdivision.
+--
+-- Each is an induction on the POINT list with the pieces generalised, so
+-- the hypothesis applies at the once-cut list rather than at the original.
+
+theorem Plane.subdivide_ends_distinct (points : List(Plane.Point))
+        (pieces : List(Plane.Segment))
+        (allDistinct : ∀ (piece : Plane.Segment). piece ∈ pieces →
+            Product.first(piece) ≠ Product.second(piece))
+        (part : Plane.Segment) (isPart : part ∈ Plane.subdivide(pieces, points))
+        : Product.first(part) ≠ Product.second(part) :=
+  by induction on points with IH generalizing pieces {
+    case points = List.empty: {
+        part ∈ pieces;
+        done by allDistinct
+      }
+    case points = List.prepend(head, tail) for some head, tail: {
+        ∀ (piece : Plane.Segment). piece ∈ Plane.splitAllAt(head, pieces) →
+            Product.first(piece) ≠ Product.second(piece)
+            by { take piece : Plane.Segment;
+                 suppose piece ∈ Plane.splitAllAt(head, pieces);
+                 done by Plane.splitAllAt_ends_distinct };
+        part ∈ Plane.subdivide(Plane.splitAllAt(head, pieces), tail);
+        done by IH
+      }
+  }
+
+-- Every piece of a subdivision has its interior inside the interior of a
+-- piece it came from. This is what makes a cut permanent: nothing later
+-- can put a removed point back into an interior.
+theorem Plane.subdivide_inside (points : List(Plane.Point))
+        (pieces : List(Plane.Segment))
+        (allDistinct : ∀ (piece : Plane.Segment). piece ∈ pieces →
+            Product.first(piece) ≠ Product.second(piece))
+        (part : Plane.Segment) (isPart : part ∈ Plane.subdivide(pieces, points))
+        : ∃ (piece : Plane.Segment). piece ∈ pieces
+            ∧ Plane.openSegment(Product.first(part), Product.second(part))
+                ⊆ Plane.openSegment(
+                      Product.first(piece), Product.second(piece)) :=
+  by induction on points with IH generalizing pieces {
+    case points = List.empty: {
+        part ∈ pieces;
+        Plane.openSegment(Product.first(part), Product.second(part))
+            ⊆ Plane.openSegment(Product.first(part), Product.second(part))
+            by Set.subset.reflexive;
+        witness part
+      }
+    case points = List.prepend(head, tail) for some head, tail: {
+        ∀ (piece : Plane.Segment). piece ∈ Plane.splitAllAt(head, pieces) →
+            Product.first(piece) ≠ Product.second(piece)
+            by { take piece : Plane.Segment;
+                 suppose piece ∈ Plane.splitAllAt(head, pieces);
+                 done by Plane.splitAllAt_ends_distinct };
+        part ∈ Plane.subdivide(Plane.splitAllAt(head, pieces), tail);
+        choose middle such that middle ∈ Plane.splitAllAt(head, pieces)
+            ∧ Plane.openSegment(Product.first(part), Product.second(part))
+                ⊆ Plane.openSegment(
+                      Product.first(middle), Product.second(middle))
+            from IH;
+        middle ∈ Plane.splitAllAt(head, pieces);
+        Plane.openSegment(Product.first(part), Product.second(part))
+            ⊆ Plane.openSegment(
+                  Product.first(middle), Product.second(middle));
+        choose piece such that piece ∈ pieces
+            ∧ Plane.openSegment(
+                  Product.first(middle), Product.second(middle))
+                ⊆ Plane.openSegment(
+                      Product.first(piece), Product.second(piece))
+            from Plane.splitAllAt_inside;
+        piece ∈ pieces;
+        Plane.openSegment(Product.first(middle), Product.second(middle))
+            ⊆ Plane.openSegment(
+                  Product.first(piece), Product.second(piece));
+        Plane.openSegment(Product.first(part), Product.second(part))
+            ⊆ Plane.openSegment(Product.first(piece), Product.second(piece))
+            by Set.subset.transitive;
+        witness piece
+      }
+  }
+
+-- And the point of the whole construction: after subdividing, no cut point
+-- is interior to any piece.
+theorem Plane.subdivide_avoids (points : List(Plane.Point))
+        (pieces : List(Plane.Segment))
+        (allDistinct : ∀ (piece : Plane.Segment). piece ∈ pieces →
+            Product.first(piece) ≠ Product.second(piece))
+        (point : Plane.Point) (isCut : point ∈ points)
+        (part : Plane.Segment) (isPart : part ∈ Plane.subdivide(pieces, points))
+        : ¬(point ∈ Plane.openSegment(
+                Product.first(part), Product.second(part))) :=
+  by induction on points with IH generalizing pieces {
+    case points = List.empty:
+        done
+    case points = List.prepend(head, tail) for some head, tail: {
+        ∀ (piece : Plane.Segment). piece ∈ Plane.splitAllAt(head, pieces) →
+            Product.first(piece) ≠ Product.second(piece)
+            by { take piece : Plane.Segment;
+                 suppose piece ∈ Plane.splitAllAt(head, pieces);
+                 done by Plane.splitAllAt_ends_distinct };
+        part ∈ Plane.subdivide(Plane.splitAllAt(head, pieces), tail);
+        point = head ∨ point ∈ tail by List.member_prepend_invert;
+        done by cases {
+          case point = head: {
+              -- `head` left every interior when it was cut at, and a later
+              -- cut only shrinks interiors.
+              choose middle such that middle ∈ Plane.splitAllAt(head, pieces)
+                  ∧ Plane.openSegment(Product.first(part), Product.second(part))
+                      ⊆ Plane.openSegment(
+                            Product.first(middle), Product.second(middle))
+                  from Plane.subdivide_inside;
+              middle ∈ Plane.splitAllAt(head, pieces);
+              Plane.openSegment(Product.first(part), Product.second(part))
+                  ⊆ Plane.openSegment(
+                        Product.first(middle), Product.second(middle))
+                  as partInMiddle;
+              ¬(head ∈ Plane.openSegment(
+                    Product.first(middle), Product.second(middle)))
+                  by Plane.splitAllAt_avoids;
+              suppose head ∈ Plane.openSegment(
+                  Product.first(part), Product.second(part));
+              head ∈ Plane.openSegment(
+                  Product.first(middle), Product.second(middle))
+                  by partInMiddle;
+              done
+            }
+          case point ∈ tail:
+              done by IH
+        }
+      }
+  }

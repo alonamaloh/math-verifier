@@ -523,3 +523,155 @@ theorem Plane.parameter_LessOrEqual_of_distance (a b : Plane.Point)
      = Plane.distance(a, b) * t;
   done by Real.LessOrEqual.multiply_cancel_left_positive
 }
+
+-- ----------------------------------------------------------------------
+-- The interior of a segment, and how a cut at an interior point behaves.
+--
+-- Cutting a segment at a point strictly inside it is the move the polygonal
+-- overlay is built from, so what it does to the interiors is Layer 0 work:
+-- each half's interior lies inside the whole's. The ordering along the
+-- segment never has to be mentioned — `Plane.distance_from_left` turns it
+-- into a comparison of distances from the left endpoint.
+
+definition Plane.openSegment (a b : Plane.Point) : Set(Plane.Point) :=
+  Plane.segment(a, b)
+      ∖ Set.singleton(Plane.Point, a)
+      ∖ Set.singleton(Plane.Point, b)
+
+theorem Plane.openSegment_subset (a b : Plane.Point)
+        : Plane.openSegment(a, b) ⊆ Plane.segment(a, b) := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.openSegment(a, b);
+  done
+}
+
+theorem Plane.member_openSegment (a b x : Plane.Point)
+        (onSegment : x ∈ Plane.segment(a, b))
+        (notLeft : x ≠ a) (notRight : x ≠ b)
+        : x ∈ Plane.openSegment(a, b) :=
+  done
+
+theorem Plane.openSegment_symmetric (a b : Plane.Point)
+        : Plane.openSegment(a, b) = Plane.openSegment(b, a) := {
+  Plane.segment(a, b) = Plane.segment(b, a) by Plane.segment_symmetric;
+  Plane.openSegment(a, b) ⊆ Plane.openSegment(b, a)
+      by (x : Plane.Point) (inOpen : x ∈ Plane.openSegment(a, b)) ↦ {
+        x ∈ Plane.segment(a, b);
+        x ∈ Plane.segment(b, a) by Set.member_of_equal;
+        x ≠ a;
+        x ≠ b;
+        done
+      };
+  Plane.openSegment(b, a) ⊆ Plane.openSegment(a, b)
+      by (x : Plane.Point) (inOpen : x ∈ Plane.openSegment(b, a)) ↦ {
+        x ∈ Plane.segment(b, a);
+        Plane.segment(b, a) = Plane.segment(a, b) by Plane.segment_symmetric;
+        x ∈ Plane.segment(a, b) by Set.member_of_equal;
+        x ≠ a;
+        x ≠ b;
+        done
+      };
+  done by Set.equal_of_same_members
+}
+
+-- No point of a segment is further from the left endpoint than the right
+-- endpoint is.
+theorem Plane.segment_distance_bound (a b x : Plane.Point)
+        (onSegment : x ∈ Plane.segment(a, b))
+        : Plane.distance(a, x) ≤ Plane.distance(a, b) := {
+  choose parameter such that
+      (0 ≤ parameter ∧ parameter ≤ 1) ∧ x = Plane.between(a, b, parameter)
+      from onSegment;
+  parameter ≥ 0;
+  parameter ≤ 1;
+  x = Plane.between(a, b, parameter) as atParameter;
+  Plane.distance(a, b) ≥ 0;
+  Real.IsNonneg(Plane.distance(a, b));
+  Plane.distance(a, x)
+     = Plane.distance(a, Plane.between(a, b, parameter)) by atParameter
+     = parameter * Plane.distance(a, b) by Plane.distance_from_left
+     ≤ 1 * Plane.distance(a, b)
+     = Plane.distance(a, b);
+  done
+}
+
+-- And a point strictly inside is strictly nearer.
+theorem Plane.openSegment_nearer (a b : Plane.Point) (distinct : a ≠ b)
+        (x : Plane.Point) (inOpen : x ∈ Plane.openSegment(a, b))
+        : Plane.distance(a, x) < Plane.distance(a, b) := {
+  x ∈ Plane.segment(a, b);
+  x ≠ b;
+  choose parameter such that
+      (0 ≤ parameter ∧ parameter ≤ 1) ∧ x = Plane.between(a, b, parameter)
+      from (x ∈ Plane.segment(a, b));
+  parameter ≥ 0;
+  parameter ≤ 1;
+  x = Plane.between(a, b, parameter) as atParameter;
+  -- The parameter misses 1, because only `b` sits there.
+  parameter ≠ 1
+      by { suppose parameter = 1 as atFinish;
+           Plane.between(a, b, parameter) = Plane.between(a, b, 1)
+               by substituting atFinish;
+           x = Plane.between(a, b, 1)
+             = b;
+           done };
+  parameter < 1;
+  Plane.distance(a, b) ≥ 0;
+  Plane.distance(a, b) ≠ 0
+      by { suppose Plane.distance(a, b) = 0 as vanishes;
+           a = b by Plane.equal_of_distance_zero;
+           done };
+  Plane.distance(a, b) > 0;
+  parameter * Plane.distance(a, b) < 1 * Plane.distance(a, b);
+  Plane.distance(a, x)
+     = Plane.distance(a, Plane.between(a, b, parameter)) by atParameter
+     = parameter * Plane.distance(a, b) by Plane.distance_from_left
+     < 1 * Plane.distance(a, b)
+     = Plane.distance(a, b);
+  done
+}
+
+-- Cutting at an interior point: the near half's interior lies inside the
+-- whole segment's. The far half follows by reversing both segments.
+theorem Plane.openSegment_left_inside (a b cut : Plane.Point) (distinct : a ≠ b)
+        (interior : cut ∈ Plane.openSegment(a, b))
+        : Plane.openSegment(a, cut) ⊆ Plane.openSegment(a, b) := {
+  cut ∈ Plane.segment(a, b);
+  Plane.distance(a, cut) < Plane.distance(a, b) by Plane.openSegment_nearer;
+  Plane.IsConvex(Plane.segment(a, b)) by Plane.segment_IsConvex;
+  a ∈ Plane.segment(a, b);
+  Plane.segment(a, cut) ⊆ Plane.segment(a, b) by Plane.IsConvex.segment_inside;
+  take x : Plane.Point;
+  suppose x ∈ Plane.openSegment(a, cut);
+  x ∈ Plane.segment(a, cut);
+  x ≠ a;
+  x ∈ Plane.segment(a, b);
+  -- `b` is too far away to be on the near half.
+  x ≠ b
+      by { suppose x = b as isFarEnd;
+           Plane.segment(a, cut) ⊆ Plane.segment(a, b);
+           b ∈ Plane.segment(a, cut) by substituting isFarEnd;
+           Plane.distance(a, b) ≤ Plane.distance(a, cut)
+               by Plane.segment_distance_bound;
+           Plane.distance(a, b) < Plane.distance(a, b);
+           done };
+  done by Plane.member_openSegment
+}
+
+theorem Plane.openSegment_right_inside (a b cut : Plane.Point) (distinct : a ≠ b)
+        (interior : cut ∈ Plane.openSegment(a, b))
+        : Plane.openSegment(cut, b) ⊆ Plane.openSegment(a, b) := {
+  b ≠ a;
+  Plane.openSegment(a, b) = Plane.openSegment(b, a) by Plane.openSegment_symmetric;
+  cut ∈ Plane.openSegment(b, a) by Set.member_of_equal;
+  Plane.openSegment(b, cut) ⊆ Plane.openSegment(b, a)
+      by Plane.openSegment_left_inside;
+  take x : Plane.Point;
+  suppose x ∈ Plane.openSegment(cut, b);
+  Plane.openSegment(cut, b) = Plane.openSegment(b, cut)
+      by Plane.openSegment_symmetric;
+  x ∈ Plane.openSegment(b, cut) by Set.member_of_equal;
+  x ∈ Plane.openSegment(b, a);
+  Plane.openSegment(b, a) = Plane.openSegment(a, b) by Plane.openSegment_symmetric;
+  done by Set.member_of_equal
+}

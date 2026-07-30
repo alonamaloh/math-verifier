@@ -218,3 +218,36 @@ automatic theorem List.no_member_empty (A : Type(0)) (element : A)
     List.is_nonempty(A, List.empty(A));
     done
   }
+
+-- A member of a one-element list is that element.
+theorem List.member_singleton_invert (A : Type(0)) (element only : A)
+        (mem : element ∈ List.prepend(A, only, List.empty(A)))
+        : element = only := {
+  element = only ∨ element ∈ List.empty(A) by List.member_prepend_invert;
+  done by cases {
+    case element = only: done
+    case element ∈ List.empty(A): done
+  }
+}
+
+-- A member of a two-element list is one of the two. The shape every
+-- "split this in two" produces, so it is worth naming rather than
+-- inverting the prepend twice at each site.
+theorem List.member_pair_invert (A : Type(0)) (element first second : A)
+        (mem : element ∈ List.prepend(A, first,
+                   List.prepend(A, second, List.empty(A))))
+        : element = first ∨ element = second := {
+  element = first ∨ element ∈ List.prepend(A, second, List.empty(A))
+      by List.member_prepend_invert;
+  done by cases {
+    case element = first: done
+    case element ∈ List.prepend(A, second, List.empty(A)): {
+        element = second ∨ element ∈ List.empty(A)
+            by List.member_prepend_invert;
+        done by cases {
+          case element = second: done
+          case element ∈ List.empty(A): done
+        }
+      }
+  }
+}
