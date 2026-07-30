@@ -42,6 +42,9 @@ import Set.basics
 import Set.algebra
 import Lists.list
 import Lists.append
+import Lists.map
+import Lists.deduplicate
+import Lists.set_union
 import Real.interface
 import Real.order
 import Plane.point
@@ -49,8 +52,12 @@ import Plane.norm
 import Plane.segment
 import Plane.segment_order
 import Plane.segment_meet
+import Graph.basics
+import Plane.Graph.basics
+import Plane.Graph.pointset
 import Plane.Graph.segments
 import Plane.Graph.subdivide
+import Plane.Graph.orient
 
 -- ----------------------------------------------------------------------
 -- What the cut points have to cover.
@@ -588,3 +595,340 @@ theorem Plane.exists_cut_points (pieces : List(Plane.Segment))
         witness grown
       }
   }
+
+-- ----------------------------------------------------------------------
+-- The graph.
+--
+-- Its edges are the pieces of the subdivision, oriented canonically and then
+-- deduplicated — orienting is what makes two names for one segment into one
+-- name, so the deduplication is the plain list one and carries no geometry.
+-- Its vertices are the ends of those edges, deduplicated the same way.
+
+definition Plane.endsList : List(Plane.Segment) → List(Plane.Point)
+  | List.empty               => List.empty(Plane.Point)
+  | List.prepend(head, tail) =>
+      List.prepend(Plane.Point, Product.first(head),
+          List.prepend(Plane.Point, Product.second(head), Plane.endsList(tail)))
+
+theorem Plane.member_endsList (pieces : List(Plane.Segment)) (piece : Plane.Segment)
+        (isPiece : piece ∈ pieces)
+        (point : Plane.Point) (isEnd : Plane.IsEndOf(point, piece))
+        : point ∈ Plane.endsList(pieces) :=
+  by induction on pieces with IH {
+    case pieces = List.empty:
+        done by List.no_member_empty
+    case pieces = List.prepend(head, tail) for some head, tail: {
+        piece = head ∨ piece ∈ tail by List.member_prepend_invert;
+        done by cases {
+          case piece = head as pieceIsHead: {
+              Plane.IsEndOf(point, head) by substituting pieceIsHead;
+              point = Product.first(head) ∨ point = Product.second(head);
+              done by cases {
+                case point = Product.first(head) as atFirstEnd:
+                    done by substituting atFirstEnd
+                case point = Product.second(head) as atSecondEnd: {
+                    Product.second(head)
+                        ∈ List.prepend(Plane.Point, Product.second(head),
+                              Plane.endsList(tail));
+                    Product.second(head) ∈ Plane.endsList(List.prepend(Plane.Segment, head, tail));
+                    done by substituting atSecondEnd
+                  }
+              }
+            }
+          case piece ∈ tail: {
+              point ∈ Plane.endsList(tail) by IH;
+              point ∈ List.prepend(Plane.Point, Product.second(head),
+                          Plane.endsList(tail));
+              done
+            }
+        }
+      }
+  }
+
+theorem Plane.endsList_member_invert (pieces : List(Plane.Segment)) (point : Plane.Point)
+        (isMember : point ∈ Plane.endsList(pieces))
+        : ∃ (piece : Plane.Segment). piece ∈ pieces ∧ Plane.IsEndOf(point, piece) :=
+  by induction on pieces with IH {
+    case pieces = List.empty:
+        done by List.no_member_empty
+    case pieces = List.prepend(head, tail) for some head, tail: {
+        point ∈ List.prepend(Plane.Point, Product.first(head),
+                    List.prepend(Plane.Point, Product.second(head),
+                        Plane.endsList(tail)));
+        point = Product.first(head)
+            ∨ point ∈ List.prepend(Plane.Point, Product.second(head),
+                          Plane.endsList(tail))
+            by List.member_prepend_invert;
+        head ∈ List.prepend(Plane.Segment, head, tail);
+        done by cases {
+          case point = Product.first(head) as atFirstEnd: {
+              Plane.IsEndOf(point, head) by Or.introduceLeft;
+              witness head
+            }
+          case point ∈ List.prepend(Plane.Point, Product.second(head),
+                   Plane.endsList(tail)): {
+              point = Product.second(head) ∨ point ∈ Plane.endsList(tail)
+                  by List.member_prepend_invert;
+              done by cases {
+                case point = Product.second(head) as atSecondEnd: {
+                    Plane.IsEndOf(point, head) by Or.introduceRight;
+                    witness head
+                  }
+                case point ∈ Plane.endsList(tail): {
+                    choose piece such that piece ∈ tail ∧ Plane.IsEndOf(point, piece)
+                        from IH;
+                    piece ∈ tail;
+                    piece ∈ List.prepend(Plane.Segment, head, tail);
+                    Plane.IsEndOf(point, piece);
+                    witness piece
+                  }
+              }
+            }
+        }
+      }
+  }
+
+definition Plane.overlayPieces (pieces : List(Plane.Segment))
+        (points : List(Plane.Point)) : List(Plane.Segment) :=
+  List.deduplicate(List.map(Plane.orientSegment, Plane.subdivide(pieces, points)))
+
+theorem Plane.overlayPieces_member_invert (pieces : List(Plane.Segment))
+        (points : List(Plane.Point)) (edge : Plane.Segment)
+        (isEdge : edge ∈ Plane.overlayPieces(pieces, points))
+        : ∃ (part : Plane.Segment). part ∈ Plane.subdivide(pieces, points)
+              ∧ Plane.orientSegment(part) = edge := {
+  edge ∈ List.map(Plane.orientSegment, Plane.subdivide(pieces, points))
+      by List.deduplicate_subset;
+  done by List.map_member_invert
+}
+
+theorem Plane.overlayPieces_ends_distinct (pieces : List(Plane.Segment))
+        (points : List(Plane.Point))
+        (allDistinct : ∀ (piece : Plane.Segment). piece ∈ pieces →
+            Product.first(piece) ≠ Product.second(piece))
+        (edge : Plane.Segment) (isEdge : edge ∈ Plane.overlayPieces(pieces, points))
+        : Product.first(edge) ≠ Product.second(edge) := {
+  choose part such that part ∈ Plane.subdivide(pieces, points)
+      ∧ Plane.orientSegment(part) = edge from Plane.overlayPieces_member_invert;
+  part ∈ Plane.subdivide(pieces, points);
+  Plane.orientSegment(part) = edge as isOriented;
+  Product.first(part) ≠ Product.second(part) by Plane.subdivide_ends_distinct;
+  Product.first(Plane.orientSegment(part)) ≠ Product.second(Plane.orientSegment(part))
+      by Plane.orientSegment_ends_distinct;
+  done by substituting isOriented
+}
+
+-- An end of an overlay piece is an end of the piece of the subdivision it came
+-- from, hence a cut point.
+theorem Plane.overlayPieces_end_is_cut (pieces : List(Plane.Segment))
+        (points : List(Plane.Point)) (endsCut : Plane.EndsAreCut(pieces, points))
+        (edge : Plane.Segment) (isEdge : edge ∈ Plane.overlayPieces(pieces, points))
+        (point : Plane.Point) (isEnd : Plane.IsEndOf(point, edge))
+        : point ∈ points := {
+  choose part such that part ∈ Plane.subdivide(pieces, points)
+      ∧ Plane.orientSegment(part) = edge from Plane.overlayPieces_member_invert;
+  part ∈ Plane.subdivide(pieces, points);
+  Plane.orientSegment(part) = edge as isOriented;
+  Plane.IsEndOf(point, Plane.orientSegment(part)) by substituting isOriented;
+  Plane.IsEndOf(point, part) by Plane.IsEndOf.of_orientSegment;
+  done by Plane.subdivide_ends_are_cuts
+}
+
+-- And a cut point is interior to no overlay piece: orienting does not move the
+-- interior, and a cut point is interior to no piece of the subdivision.
+theorem Plane.overlayPieces_avoids_cuts (pieces : List(Plane.Segment))
+        (points : List(Plane.Point))
+        (allDistinct : ∀ (piece : Plane.Segment). piece ∈ pieces →
+            Product.first(piece) ≠ Product.second(piece))
+        (edge : Plane.Segment) (isEdge : edge ∈ Plane.overlayPieces(pieces, points))
+        (point : Plane.Point) (isCut : point ∈ points)
+        : point ∉ Plane.openSegment(Product.first(edge), Product.second(edge)) := {
+  choose part such that part ∈ Plane.subdivide(pieces, points)
+      ∧ Plane.orientSegment(part) = edge from Plane.overlayPieces_member_invert;
+  part ∈ Plane.subdivide(pieces, points);
+  Plane.orientSegment(part) = edge as isOriented;
+  point ∉ Plane.openSegment(Product.first(part), Product.second(part))
+      by Plane.subdivide_avoids;
+  Plane.SameSegment(Plane.orientSegment(part), part) by Plane.SameSegment.orientSegment;
+  Plane.openSegment(Product.first(Plane.orientSegment(part)),
+                    Product.second(Plane.orientSegment(part)))
+      = Plane.openSegment(Product.first(part), Product.second(part))
+      by Plane.SameSegment.openSegment as sameInterior;
+  point ∉ Plane.openSegment(Product.first(Plane.orientSegment(part)),
+                            Product.second(Plane.orientSegment(part)))
+      by substituting sameInterior;
+  done by substituting isOriented
+}
+
+-- Distinct overlay pieces have disjoint interiors. This is where separation is
+-- spent: pieces sharing an interior point are the same segment, so after
+-- orienting they are the same NAME, and the deduplicated list holds it once.
+theorem Plane.overlayPieces_disjoint_interiors (pieces : List(Plane.Segment))
+        (points : List(Plane.Point))
+        (allDistinct : ∀ (piece : Plane.Segment). piece ∈ pieces →
+            Product.first(piece) ≠ Product.second(piece))
+        (endsCut : Plane.EndsAreCut(pieces, points))
+        (meetsCut : Plane.MeetsAreCut(pieces, points))
+        (edge other : Plane.Segment)
+        (isEdge : edge ∈ Plane.overlayPieces(pieces, points))
+        (isOther : other ∈ Plane.overlayPieces(pieces, points))
+        (different : edge ≠ other)
+        (x : Plane.Point)
+        (onEdge : x ∈ Plane.openSegment(Product.first(edge), Product.second(edge)))
+        : x ∉ Plane.openSegment(Product.first(other), Product.second(other)) := {
+  choose part such that part ∈ Plane.subdivide(pieces, points)
+      ∧ Plane.orientSegment(part) = edge from Plane.overlayPieces_member_invert;
+  part ∈ Plane.subdivide(pieces, points);
+  Plane.orientSegment(part) = edge as isOriented;
+  Plane.SameSegment(Plane.orientSegment(part), part) by Plane.SameSegment.orientSegment;
+  Plane.openSegment(Product.first(Plane.orientSegment(part)),
+                    Product.second(Plane.orientSegment(part)))
+      = Plane.openSegment(Product.first(part), Product.second(part))
+      by Plane.SameSegment.openSegment as edgeInterior;
+  x ∈ Plane.openSegment(Product.first(Plane.orientSegment(part)),
+                        Product.second(Plane.orientSegment(part)))
+      by substituting isOriented;
+  x ∈ Plane.openSegment(Product.first(part), Product.second(part))
+      by substituting edgeInterior;
+
+  choose otherPart such that otherPart ∈ Plane.subdivide(pieces, points)
+      ∧ Plane.orientSegment(otherPart) = other from Plane.overlayPieces_member_invert;
+  otherPart ∈ Plane.subdivide(pieces, points);
+  Plane.orientSegment(otherPart) = other as otherIsOriented;
+  Plane.SameSegment(Plane.orientSegment(otherPart), otherPart)
+      by Plane.SameSegment.orientSegment;
+  Plane.openSegment(Product.first(Plane.orientSegment(otherPart)),
+                    Product.second(Plane.orientSegment(otherPart)))
+      = Plane.openSegment(Product.first(otherPart), Product.second(otherPart))
+      by Plane.SameSegment.openSegment as otherInterior;
+
+  suppose x ∈ Plane.openSegment(Product.first(other), Product.second(other));
+  x ∈ Plane.openSegment(Product.first(Plane.orientSegment(otherPart)),
+                        Product.second(Plane.orientSegment(otherPart)))
+      by substituting otherIsOriented;
+  x ∈ Plane.openSegment(Product.first(otherPart), Product.second(otherPart))
+      by substituting otherInterior;
+  Plane.SameSegment(part, otherPart) by Plane.subdivide_separated;
+  Plane.orientSegment(part) = Plane.orientSegment(otherPart)
+      by Plane.orientSegment_of_SameSegment;
+  edge = Plane.orientSegment(part)
+       = Plane.orientSegment(otherPart)
+       = other by otherIsOriented;
+  done
+}
+
+definition Plane.overlayGraph (pieces : List(Plane.Segment))
+        (points : List(Plane.Point)) : Plane.PolygonalGraph :=
+  Graph.make(List.deduplicate(Plane.endsList(Plane.overlayPieces(pieces, points))),
+             Plane.overlayPieces(pieces, points))
+
+theorem Plane.overlayGraph_edges (pieces : List(Plane.Segment))
+        (points : List(Plane.Point))
+        : Graph.edges(Plane.overlayGraph(pieces, points))
+          = Plane.overlayPieces(pieces, points) :=
+  done
+
+theorem Plane.overlayGraph_vertices (pieces : List(Plane.Segment))
+        (points : List(Plane.Point))
+        : Graph.vertices(Plane.overlayGraph(pieces, points))
+          = List.deduplicate(Plane.endsList(Plane.overlayPieces(pieces, points))) :=
+  done
+
+theorem Plane.overlayGraph_end_is_vertex (pieces : List(Plane.Segment))
+        (points : List(Plane.Point))
+        (edge : Plane.Segment) (isEdge : edge ∈ Plane.overlayPieces(pieces, points))
+        (point : Plane.Point) (isEnd : Plane.IsEndOf(point, edge))
+        : point ∈ Graph.vertices(Plane.overlayGraph(pieces, points)) := {
+  point ∈ Plane.endsList(Plane.overlayPieces(pieces, points))
+      by Plane.member_endsList;
+  Plane.endsList(Plane.overlayPieces(pieces, points))
+      ⊆ List.deduplicate(Plane.endsList(Plane.overlayPieces(pieces, points)))
+      by List.subset_deduplicate;
+  done
+}
+
+-- A vertex of the overlay is an end of one of its edges — the vertex list was
+-- built out of nothing else.
+theorem Plane.overlayGraph_vertex_is_end (pieces : List(Plane.Segment))
+        (points : List(Plane.Point)) (vertex : Plane.Point)
+        (isVertex : vertex ∈ Graph.vertices(Plane.overlayGraph(pieces, points)))
+        : ∃ (edge : Plane.Segment). edge ∈ Plane.overlayPieces(pieces, points)
+              ∧ Plane.IsEndOf(vertex, edge) := {
+  vertex ∈ List.deduplicate(Plane.endsList(Plane.overlayPieces(pieces, points)));
+  List.deduplicate(Plane.endsList(Plane.overlayPieces(pieces, points)))
+      ⊆ Plane.endsList(Plane.overlayPieces(pieces, points))
+      by List.deduplicate_subset;
+  vertex ∈ Plane.endsList(Plane.overlayPieces(pieces, points));
+  done by Plane.endsList_member_invert
+}
+
+theorem Plane.overlayGraph_IsWellFormed (pieces : List(Plane.Segment))
+        (points : List(Plane.Point))
+        (allDistinct : ∀ (piece : Plane.Segment). piece ∈ pieces →
+            Product.first(piece) ≠ Product.second(piece))
+        : Graph.IsWellFormed(Plane.overlayGraph(pieces, points)) := {
+  Graph.vertices(Plane.overlayGraph(pieces, points))
+      = List.deduplicate(Plane.endsList(Plane.overlayPieces(pieces, points)))
+      by Plane.overlayGraph_vertices as verticesAre;
+  List.Distinct(Plane.Point,
+      List.deduplicate(Plane.endsList(Plane.overlayPieces(pieces, points))))
+      by List.deduplicate_distinct;
+  List.Distinct(Plane.Point, Graph.vertices(Plane.overlayGraph(pieces, points)))
+      by substituting verticesAre;
+  Graph.edges(Plane.overlayGraph(pieces, points))
+      = Plane.overlayPieces(pieces, points) by Plane.overlayGraph_edges as edgesAre;
+  List.Distinct(Plane.Segment,
+      List.deduplicate(List.map(Plane.orientSegment, Plane.subdivide(pieces, points))))
+      by List.deduplicate_distinct;
+  List.Distinct(Plane.Segment, Plane.overlayPieces(pieces, points));
+  List.Distinct(Plane.Segment, Graph.edges(Plane.overlayGraph(pieces, points)))
+      by substituting edgesAre;
+  ∀ (edge : Plane.Segment). ∀ (u v : Plane.Point).
+      edge ∈ Graph.edges(Plane.overlayGraph(pieces, points))
+      → Graph.Joins(Plane.overlayGraph(pieces, points), edge, u, v)
+      → u ∈ Graph.vertices(Plane.overlayGraph(pieces, points)) ∧ u ≠ v
+      by { take edge : Plane.Segment;
+           take u : Plane.Point;
+           take v : Plane.Point;
+           suppose edge ∈ Graph.edges(Plane.overlayGraph(pieces, points));
+           suppose Graph.Joins(Plane.overlayGraph(pieces, points), edge, u, v);
+           edge ∈ Plane.overlayPieces(pieces, points);
+           Product.first(edge) ≠ Product.second(edge)
+               by Plane.overlayPieces_ends_distinct;
+           -- With `ends` the identity, the pair a reading names IS the edge.
+           edge = Product.make(u, v) ∨ edge = Product.make(v, u);
+           done by cases {
+             case edge = Product.make(u, v) as forwardReading: {
+                 Product.first(edge) = u by substituting forwardReading;
+                 Product.second(edge) = v
+                     by substituting forwardReading as secondIsV;
+                 u ≠ v
+                     by { suppose u = v as readingsCoincide;
+                          Product.first(edge)
+                             = u
+                             = v by readingsCoincide
+                             = Product.second(edge) by secondIsV;
+                          done };
+                 Plane.IsEndOf(u, edge) by Or.introduceLeft;
+                 u ∈ Graph.vertices(Plane.overlayGraph(pieces, points))
+                     by Plane.overlayGraph_end_is_vertex;
+                 done
+               }
+             case edge = Product.make(v, u) as reverseReading: {
+                 Product.first(edge) = v by substituting reverseReading;
+                 Product.second(edge) = u by substituting reverseReading;
+                 u ≠ v
+                     by { suppose u = v as readingsCoincide;
+                          Product.first(edge)
+                             = v
+                             = u by readingsCoincide
+                             = Product.second(edge);
+                          done };
+                 Plane.IsEndOf(u, edge) by Or.introduceRight;
+                 u ∈ Graph.vertices(Plane.overlayGraph(pieces, points))
+                     by Plane.overlayGraph_end_is_vertex;
+                 done
+               }
+           } };
+  done
+}

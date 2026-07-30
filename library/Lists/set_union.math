@@ -21,6 +21,7 @@ import Set.basics
 import Set.algebra
 import Lists.list
 import Lists.append
+import Lists.map
 
 definition List.unionOver {A T : Type(0)} (pieces : A → Set(T))
         : List(A) → Set(T)
@@ -155,3 +156,46 @@ theorem List.unionOver_same_members (A T : Type(0)) (pieces : A → Set(T))
            done by List.unionOver_subset };
   done by Set.equal_of_same_members
 }
+
+-- Pointwise-equal families have equal unions — the shape needed when a
+-- construction changes the pieces without changing what each one covers.
+theorem List.unionOver_pointwise (A T : Type(0)) (pieces other : A → Set(T))
+        (list : List(A))
+        (agree : ∀ (item : A). item ∈ list → pieces(item) = other(item))
+        : List.unionOver(pieces, list) = List.unionOver(other, list) :=
+  by induction on list with IH {
+    case list = List.empty:
+        done
+    case list = List.prepend(head, tail) for some head, tail: {
+        head ∈ List.prepend(A, head, tail);
+        pieces(head) = other(head) by agree;
+        ∀ (item : A). item ∈ tail → pieces(item) = other(item)
+            by { take item : A;
+                 suppose item ∈ tail;
+                 item ∈ List.prepend(A, head, tail);
+                 done by agree };
+        List.unionOver(pieces, List.prepend(A, head, tail))
+           = pieces(head) ∪ List.unionOver(pieces, tail)
+           = other(head) ∪ List.unionOver(pieces, tail)
+                 by (pieces(head) = other(head))
+           = other(head) ∪ List.unionOver(other, tail) by IH
+           = List.unionOver(other, List.prepend(A, head, tail));
+        done
+      }
+  }
+
+-- A union over a mapped list is the union of the composite over the original.
+theorem List.unionOver_map (A B T : Type(0)) (f : A → B) (pieces : B → Set(T))
+        (list : List(A))
+        : List.unionOver(pieces, List.map(f, list))
+          = List.unionOver((item : A) ↦ pieces(f(item)), list) :=
+  by induction on list with IH {
+    case list = List.empty:
+        done
+    case list = List.prepend(head, tail) for some head, tail:
+        List.unionOver(pieces, List.map(f, List.prepend(A, head, tail)))
+           = List.unionOver(pieces, List.prepend(B, f(head), List.map(f, tail)))
+           = pieces(f(head)) ∪ List.unionOver(pieces, List.map(f, tail))
+           = pieces(f(head)) ∪ List.unionOver((item : A) ↦ pieces(f(item)), tail) by IH
+           = List.unionOver((item : A) ↦ pieces(f(item)), List.prepend(A, head, tail))
+  }
