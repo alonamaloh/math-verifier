@@ -319,28 +319,22 @@ theorem Graph.pathGraphOf.IsPathGraph (graph : Graph(V, E, ends))
         (path : Graph.IsPath(graph, source, edgeList, target))
         : Graph.IsPathGraph(Graph.pathGraphOf(graph, source, edgeList),
                             source, target) := {
-  edgeList ⊆ Graph.edges(Graph.pathGraphOf(graph, source, edgeList))
-      by List.Includes.reflexive;
-  Graph.IsPath(Graph.pathGraphOf(graph, source, edgeList), source, edgeList, target)
-      by Graph.IsPath.transfer;
+  let pathPart : Graph(V, E, ends) := Graph.pathGraphOf(graph, source, edgeList);
+  edgeList ⊆ Graph.edges(pathPart) by List.Includes.reflexive;
+  Graph.IsPath(pathPart, source, edgeList, target) by Graph.IsPath.transfer;
 
-  ∀ (vertex : V).
-      vertex ∈ Graph.vertices(Graph.pathGraphOf(graph, source, edgeList))
-      → vertex ∈ Graph.walkVertices(Graph.pathGraphOf(graph, source, edgeList),
-                                    source, edgeList)
+  ∀ (vertex : V). vertex ∈ Graph.vertices(pathPart)
+      → vertex ∈ Graph.walkVertices(pathPart, source, edgeList)
       by { take vertex : V;
-           suppose vertex ∈ Graph.vertices(Graph.pathGraphOf(graph, source, edgeList));
+           suppose vertex ∈ Graph.vertices(pathPart);
            vertex ∈ Graph.walkVertexList(graph, source, edgeList);
            done by Graph.walkVertexList.visits };
 
   Graph.IsWalk(graph, source, edgeList, target) by Graph.IsPath.walk;
-  ∀ (vertex : V).
-      vertex ∈ Graph.walkVertices(Graph.pathGraphOf(graph, source, edgeList),
-                                  source, edgeList)
-      → vertex ∈ Graph.vertices(Graph.pathGraphOf(graph, source, edgeList))
+  ∀ (vertex : V). vertex ∈ Graph.walkVertices(pathPart, source, edgeList)
+      → vertex ∈ Graph.vertices(pathPart)
       by { take vertex : V;
-           suppose vertex ∈ Graph.walkVertices(
-               Graph.pathGraphOf(graph, source, edgeList), source, edgeList);
+           suppose vertex ∈ Graph.walkVertices(pathPart, source, edgeList);
            vertex ∈ Graph.walkVertices(graph, source, edgeList);
            done by Graph.walkVertexList.complete };
   done
@@ -351,30 +345,29 @@ theorem Graph.pathGraphOf.IsWellFormed (graph : Graph(V, E, ends))
         (source target : V) (edgeList : List(E))
         (path : Graph.IsPath(graph, source, edgeList, target))
         : Graph.IsWellFormed(Graph.pathGraphOf(graph, source, edgeList)) := {
+  let pathPart : Graph(V, E, ends) := Graph.pathGraphOf(graph, source, edgeList);
   List.Distinct(V, Graph.walkVertexList(graph, source, edgeList))
       by Graph.IsPath.vertexList_distinct;
   List.Distinct(E, edgeList) by Graph.IsPath.distinct_edges;
   Graph.IsWalk(graph, source, edgeList, target) by Graph.IsPath.walk;
   ∀ (edge : E). ∀ (u v : V).
-      edge ∈ Graph.edges(Graph.pathGraphOf(graph, source, edgeList))
-      → Graph.Joins(Graph.pathGraphOf(graph, source, edgeList), edge, u, v)
-      → u ∈ Graph.vertices(Graph.pathGraphOf(graph, source, edgeList)) ∧ u ≠ v
+      edge ∈ Graph.edges(pathPart) → Graph.Joins(pathPart, edge, u, v)
+      → u ∈ Graph.vertices(pathPart) ∧ u ≠ v
       by { take edge : E;
            take u : V;
            take v : V;
-           suppose edge ∈ Graph.edges(Graph.pathGraphOf(graph, source, edgeList));
-           suppose Graph.Joins(Graph.pathGraphOf(graph, source, edgeList), edge, u, v);
+           suppose edge ∈ Graph.edges(pathPart);
+           suppose Graph.Joins(pathPart, edge, u, v);
            edge ∈ edgeList;
            Graph.Joins(graph, edge, u, v);
            edge ∈ Graph.edges(graph) by Graph.IsWalk.edge_is_edge;
            u ≠ v by Graph.IsWellFormed.no_loop;
            Graph.Incident(graph, edge, u) by Graph.Joins.incident_source;
-           u ∈ Graph.coveredVertices(graph, edgeList)
-               by Graph.coveredVertices.of_edge;
+           u ∈ Graph.coveredVertices(graph, edgeList) by Graph.coveredVertices.of_edge;
            u ∈ Graph.walkVertices(graph, source, edgeList);
            u ∈ Graph.walkVertexList(graph, source, edgeList)
                by Graph.walkVertexList.complete;
-           u ∈ Graph.vertices(Graph.pathGraphOf(graph, source, edgeList));
+           u ∈ Graph.vertices(pathPart);
            done };
   done
 }
@@ -386,20 +379,18 @@ theorem Graph.pathGraphOf.IsSubgraph (graph : Graph(V, E, ends))
         (path : Graph.IsPath(graph, source, edgeList, target))
         (sourceIsVertex : source ∈ Graph.vertices(graph))
         : Graph.IsSubgraph(Graph.pathGraphOf(graph, source, edgeList), graph) := {
+  let pathPart : Graph(V, E, ends) := Graph.pathGraphOf(graph, source, edgeList);
   Graph.IsWalk(graph, source, edgeList, target) by Graph.IsPath.walk;
-  ∀ (vertex : V).
-      vertex ∈ Graph.vertices(Graph.pathGraphOf(graph, source, edgeList))
-      → vertex ∈ Graph.vertices(graph)
+  Graph.vertices(pathPart) ⊆ Graph.vertices(graph)
       by { take vertex : V;
-           suppose vertex ∈ Graph.vertices(Graph.pathGraphOf(graph, source, edgeList));
+           suppose vertex ∈ Graph.vertices(pathPart);
            vertex ∈ Graph.walkVertexList(graph, source, edgeList);
            vertex ∈ Graph.walkVertices(graph, source, edgeList)
                by Graph.walkVertexList.visits;
            done by Graph.IsWalk.visits_vertices };
-  ∀ (edge : E). edge ∈ Graph.edges(Graph.pathGraphOf(graph, source, edgeList))
-      → edge ∈ Graph.edges(graph)
+  Graph.edges(pathPart) ⊆ Graph.edges(graph)
       by { take edge : E;
-           suppose edge ∈ Graph.edges(Graph.pathGraphOf(graph, source, edgeList));
+           suppose edge ∈ Graph.edges(pathPart);
            edge ∈ edgeList;
            done by Graph.IsWalk.edge_is_edge };
   done

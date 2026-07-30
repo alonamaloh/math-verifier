@@ -210,33 +210,25 @@ theorem Graph.Joins.unique (graph : Graph(V, E, ends)) (edge : E) (u v w : V)
         (joinsToW : Graph.Joins(graph, edge, u, w))
         (endsDistinct : u ≠ v)
         : v = w := {
-  (u = Product.first(ends(edge)) ∧ v = Product.second(ends(edge)))
-      ∨ (u = Product.second(ends(edge)) ∧ v = Product.first(ends(edge)))
-      by Graph.Joins.canonical as readingV;
-  (u = Product.first(ends(edge)) ∧ w = Product.second(ends(edge)))
-      ∨ (u = Product.second(ends(edge)) ∧ w = Product.first(ends(edge)))
-      by Graph.Joins.canonical as readingW;
+  let firstEnd : V := Product.first(ends(edge));
+  let secondEnd : V := Product.second(ends(edge));
+  (u = firstEnd ∧ v = secondEnd) ∨ (u = secondEnd ∧ v = firstEnd)
+      by Graph.Joins.canonical;
+  (u = firstEnd ∧ w = secondEnd) ∨ (u = secondEnd ∧ w = firstEnd)
+      by Graph.Joins.canonical;
   -- `u` picks one component; whichever it is, `v` and `w` are both the
   -- other. The mixed cases make the two components equal, which collapses
   -- `v` onto `u`.
   done by cases {
-    case u = Product.first(ends(edge)) ∧ v = Product.second(ends(edge)):
+    case u = firstEnd ∧ v = secondEnd:
         done by cases {
-          case u = Product.first(ends(edge)) ∧ w = Product.second(ends(edge)):
-              v = Product.second(ends(edge)) = w
-          case u = Product.second(ends(edge)) ∧ w = Product.first(ends(edge)): {
-              v = Product.second(ends(edge)) = u;
-              done
-            }
+          case u = firstEnd ∧ w = secondEnd:   v = secondEnd = w
+          case u = secondEnd ∧ w = firstEnd: { v = secondEnd = u; done }
         }
-    case u = Product.second(ends(edge)) ∧ v = Product.first(ends(edge)):
+    case u = secondEnd ∧ v = firstEnd:
         done by cases {
-          case u = Product.first(ends(edge)) ∧ w = Product.second(ends(edge)): {
-              v = Product.first(ends(edge)) = u;
-              done
-            }
-          case u = Product.second(ends(edge)) ∧ w = Product.first(ends(edge)):
-              v = Product.first(ends(edge)) = w
+          case u = firstEnd ∧ w = secondEnd: { v = firstEnd = u; done }
+          case u = secondEnd ∧ w = firstEnd:   v = firstEnd = w
         }
   }
 }
@@ -247,29 +239,25 @@ theorem Graph.Incident.is_end (graph : Graph(V, E, ends)) (edge : E) (u v vertex
         (joins : Graph.Joins(graph, edge, u, v))
         (incident : Graph.Incident(graph, edge, vertex))
         : vertex = u ∨ vertex = v := {
+  let firstEnd : V := Product.first(ends(edge));
+  let secondEnd : V := Product.second(ends(edge));
   choose farEnd such that Graph.Joins(graph, edge, vertex, farEnd) from incident;
   -- Both readings name the same two components, so `vertex` is one of them
   -- and `u`, `v` are those same two.
-  (vertex = Product.first(ends(edge)) ∧ farEnd = Product.second(ends(edge)))
-      ∨ (vertex = Product.second(ends(edge)) ∧ farEnd = Product.first(ends(edge)))
+  (vertex = firstEnd ∧ farEnd = secondEnd) ∨ (vertex = secondEnd ∧ farEnd = firstEnd)
       by Graph.Joins.canonical;
-  (u = Product.first(ends(edge)) ∧ v = Product.second(ends(edge)))
-      ∨ (u = Product.second(ends(edge)) ∧ v = Product.first(ends(edge)))
-      by Graph.Joins.canonical as readingOfEdge;
+  (u = firstEnd ∧ v = secondEnd) ∨ (u = secondEnd ∧ v = firstEnd)
+      by Graph.Joins.canonical;
   done by cases {
-    case vertex = Product.first(ends(edge)) ∧ farEnd = Product.second(ends(edge)):
+    case vertex = firstEnd ∧ farEnd = secondEnd:
         done by cases {
-          case u = Product.first(ends(edge)) ∧ v = Product.second(ends(edge)):
-              vertex = Product.first(ends(edge)) = u
-          case u = Product.second(ends(edge)) ∧ v = Product.first(ends(edge)):
-              vertex = Product.first(ends(edge)) = v
+          case u = firstEnd ∧ v = secondEnd:  vertex = firstEnd = u
+          case u = secondEnd ∧ v = firstEnd:  vertex = firstEnd = v
         }
-    case vertex = Product.second(ends(edge)) ∧ farEnd = Product.first(ends(edge)):
+    case vertex = secondEnd ∧ farEnd = firstEnd:
         done by cases {
-          case u = Product.first(ends(edge)) ∧ v = Product.second(ends(edge)):
-              vertex = Product.second(ends(edge)) = v
-          case u = Product.second(ends(edge)) ∧ v = Product.first(ends(edge)):
-              vertex = Product.second(ends(edge)) = u
+          case u = firstEnd ∧ v = secondEnd:  vertex = secondEnd = v
+          case u = secondEnd ∧ v = firstEnd:  vertex = secondEnd = u
         }
   }
 }
