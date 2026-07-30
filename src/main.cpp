@@ -5340,6 +5340,17 @@ int verifyWithCache(const std::string& sourcePath,
                   << ": elaborate error: "
                   << error.what() << "\n";
         return 1;
+    } catch (const AutoProverBudgetError& error) {
+        // Positioned like an ElaborateError: a budget trip that never
+        // reached the by-less dispatch used to print `FILE:1:1:`, anchoring
+        // the one error whose fix is "add `by` HERE" at the module header.
+        printGoalAtReport();
+        std::cerr << sourcePath << ":"
+                  << (error.line > 0 ? error.line : 1) << ":"
+                  << (error.column > 0 ? error.column : 1)
+                  << ": elaborate error: "
+                  << error.what() << "\n";
+        return 1;
     } catch (const TypeError& error) {
         printGoalAtReport();
         std::cerr << sourcePath << ":1:1: type error: "

@@ -592,21 +592,26 @@ private:
         if (inSpeculativeContextScan_) {
             throw ElaborateError(message, 0, 0);
         }
-        // Pick up the most recent (innermost) frame that has a known
-        // source position; that's the best anchor for an editor to
-        // highlight.
         int line = 0;
         int column = 0;
+        innermostKnownPosition(line, column);
+        throw ElaborateError(
+            formatErrorWithContext(message), line, column);
+    }
+
+    // The most recent (innermost) frame that has a known source position —
+    // the best anchor for an editor to highlight. Shared with the
+    // auto-prover's budget error, which is not an ElaborateError but needs
+    // the same anchor: without one the driver printed `FILE:1:1:`.
+    void innermostKnownPosition(int& line, int& column) const {
         for (auto iter = contextFrames_.rbegin();
              iter != contextFrames_.rend(); ++iter) {
             if (iter->line != 0) {
                 line = iter->line;
                 column = iter->column;
-                break;
+                return;
             }
         }
-        throw ElaborateError(
-            formatErrorWithContext(message), line, column);
     }
 
     // Wraps a kernel TypeError with the elaborator's context stack and
@@ -6781,7 +6786,14 @@ private:
     void autoProveSpend(long long /*units*/ = 1) {
         if (!autoProveBudgetActive_) return;
         if (autoProveBudgetTripped_) {
-            throw AutoProverBudgetError("auto-prover effort budget exceeded");
+            {
+                int budgetLine = 0;
+                int budgetColumn = 0;
+                innermostKnownPosition(budgetLine, budgetColumn);
+                throw AutoProverBudgetError(
+                    "auto-prover effort budget exceeded",
+                    budgetLine, budgetColumn);
+            }
         }
         uint64_t now = kernelStepsSoFar();
         // Counter is reset (to a smaller value) at kernel public-entry
@@ -6790,7 +6802,14 @@ private:
             ? now - autoProveStepSnapshot_ : now;
         if (consumed >= static_cast<uint64_t>(autoProveBudgetLimit_)) {
             autoProveBudgetTripped_ = true;
-            throw AutoProverBudgetError("auto-prover effort budget exceeded");
+            {
+                int budgetLine = 0;
+                int budgetColumn = 0;
+                innermostKnownPosition(budgetLine, budgetColumn);
+                throw AutoProverBudgetError(
+                    "auto-prover effort budget exceeded",
+                    budgetLine, budgetColumn);
+            }
         }
     }
     // Set by tryContextFactMatch (only when profiling is on) to the

@@ -30,8 +30,18 @@ struct ElaborateError : std::runtime_error {
 // message, never be silently turned into "this tactic missed". It is
 // caught at exactly one place — the by-less proof-step dispatch — and
 // re-issued as a positioned ElaborateError with the surrounding context.
+//
+// It carries its own position for the paths where that re-issue does NOT
+// happen: a budget trip raised outside the by-less dispatch reaches the
+// driver as itself, and a driver that had no position to print emitted
+// `FILE:1:1:`, pointing at the module header instead of the claim. Same
+// fields and same meaning as `ElaborateError`'s — 0 is "unknown".
 struct AutoProverBudgetError : std::runtime_error {
+    int line = 0;
+    int column = 0;
     using std::runtime_error::runtime_error;
+    AutoProverBudgetError(const std::string& message, int line_, int column_)
+        : std::runtime_error(message), line(line_), column(column_) {}
 };
 
 // Elaborates a single surface expression to a kernel expression in the

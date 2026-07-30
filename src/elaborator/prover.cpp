@@ -3850,12 +3850,20 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
             if (attempt) return attempt;
         }
 
-        // contextEqualityBridge: opt-out via MATH_DISABLE_CTX_EQ_BRIDGE=1.
-        // The profiler showed it wins only 16 of 217 outermost claim
-        // sites across the library while costing ~20 s total. Disabled
-        // by default to measure the saving; opt back in when you want
-        // it. Sites that need it surface as "no in-scope hypothesis
-        // matches structurally…" claim errors.
+        // contextEqualityBridge: ON by default, opt out with
+        // MATH_DISABLE_CTX_EQ_BRIDGE=1.
+        //
+        // The comment here used to claim it was "disabled by default to
+        // measure the saving" while the predicate enabled it. MEASURED: the
+        // code was right and the comment wrong — defaulting it off fails 11+
+        // library files (Lists, Natural, Logic, Polynomial) on "no in-scope
+        // hypothesis matches structurally", so the library depends on this
+        // rung and it cannot simply be turned off.
+        //
+        // It is nonetheless the layer's dominant cost when it LOSES: on
+        // `Plane.subdivide_separated` it is 11 invocations, zero wins, and
+        // 21.2 s of the theorem's 25.1 s of prover time (41 s → 14 s with it
+        // off). Sites that pay that are the ones to give an explicit `by`.
         static const bool ctxEqBridgeDisabled = [] {
             const char* f = std::getenv("MATH_DISABLE_CTX_EQ_BRIDGE");
             return f && f[0] != '\0' && f[0] != '0';
@@ -3950,6 +3958,9 @@ void Elaborator::throwAutoProveBudgetExceeded(
         // Throw the dedicated budget exception (NOT an ElaborateError) so
         // the rich message likewise survives the speculative catches and
         // reaches the proof-step dispatch / driver intact.
+        int budgetLine = 0;
+        int budgetColumn = 0;
+        innermostKnownPosition(budgetLine, budgetColumn);
         throw AutoProverBudgetError(
             "claim `" + goal
             + "`: the auto-prover gave up after exhausting its effort "
@@ -3960,7 +3971,8 @@ void Elaborator::throwAutoProveBudgetExceeded(
             "definitional equality instead of the prover searching for "
             "it. (Raise or disable the bound with MATH_AUTOPROVE_BUDGET "
             "if you believe the step really should auto-close.)"
-            + hints);
+            + hints,
+            budgetLine, budgetColumn);
     }
 
 ExpressionPointer Elaborator::autoProveClaimProfiling(
