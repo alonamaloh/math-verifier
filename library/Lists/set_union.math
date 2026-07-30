@@ -124,3 +124,34 @@ theorem List.unionOver_append (A T : Type(0)) (pieces : A → Set(T))
            = (pieces(head) ∪ List.unionOver(pieces, tail))
                  ∪ List.unionOver(pieces, second) by Set.union_associative
   }
+
+-- ── Only the members matter ────────────────────────────────────────────
+
+-- Two lists with the same members have the same union. Deduplicating a list,
+-- or reordering it, therefore leaves the union alone — which is what a
+-- construction needs when it has to hand a finite union a tidier list than
+-- the one it started with.
+theorem List.unionOver_same_members (A T : Type(0)) (pieces : A → Set(T))
+        (first second : List(A))
+        (firstInSecond : first ⊆ second) (secondInFirst : second ⊆ first)
+        : List.unionOver(pieces, first) = List.unionOver(pieces, second) := {
+  List.unionOver(pieces, first) ⊆ List.unionOver(pieces, second)
+      by { ∀ (item : A). item ∈ first → pieces(item) ⊆ List.unionOver(pieces, second)
+               by { take item : A;
+                    suppose item ∈ first;
+                    item ∈ second by firstInSecond;
+                    take x : T;
+                    suppose x ∈ pieces(item);
+                    done by List.unionOver_member };
+           done by List.unionOver_subset };
+  List.unionOver(pieces, second) ⊆ List.unionOver(pieces, first)
+      by { ∀ (item : A). item ∈ second → pieces(item) ⊆ List.unionOver(pieces, first)
+               by { take item : A;
+                    suppose item ∈ second;
+                    item ∈ first by secondInFirst;
+                    take x : T;
+                    suppose x ∈ pieces(item);
+                    done by List.unionOver_member };
+           done by List.unionOver_subset };
+  done by Set.equal_of_same_members
+}

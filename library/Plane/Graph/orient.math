@@ -1,0 +1,223 @@
+-- Plane/Graph/orient.math
+--
+-- A canonical orientation for a segment: the lexicographically smaller end
+-- first.
+--
+-- `(a, b)` and `(b, a)` are two names for one segment and a graph may hold
+-- only one of them, so a construction has to choose. Choosing by an ORDER
+-- rather than case by case is what makes the choice canonical: two names for
+-- one segment orient to the same name, so "represent each duplicated
+-- subsegment once" stops being deduplication up to reversal and becomes
+-- deduplication up to equality, which a list can do without knowing any
+-- geometry.
+
+module Plane.Graph.orient
+
+import Logic.basics
+import Logic.product
+import Equality.basics
+import axioms
+import Natural.classical_decidable
+import Real.interface
+import Real.order
+import Plane.point
+import Plane.point_order
+import Plane.segment
+import Plane.Graph.segments
+import Plane.Graph.subdivide
+
+definition Plane.orientSegment (piece : Plane.Segment) : Plane.Segment :=
+  if Plane.Point.Precedes(Product.first(piece), Product.second(piece))
+  then piece
+  else Plane.reverseSegment(piece)
+
+theorem Plane.orientSegment_ordered (piece : Plane.Segment)
+        (ordered : Plane.Point.Precedes(Product.first(piece), Product.second(piece)))
+        : Plane.orientSegment(piece) = piece :=
+  done by Logic.if_positive
+
+theorem Plane.orientSegment_reversed (piece : Plane.Segment)
+        (unordered : ¬(Plane.Point.Precedes(Product.first(piece), Product.second(piece))))
+        : Plane.orientSegment(piece) = Plane.reverseSegment(piece) :=
+  done by Logic.if_negative
+
+-- ----------------------------------------------------------------------
+-- Reversal.
+
+theorem Plane.reverseSegment_involutive (piece : Plane.Segment)
+        : Plane.reverseSegment(Plane.reverseSegment(piece)) = piece := {
+  Plane.reverseSegment(Plane.reverseSegment(piece))
+     = Product.make(Product.first(piece), Product.second(piece))
+     = piece by Product.eta;
+  done
+}
+
+theorem Plane.IsEndOf.reverseSegment (point : Plane.Point) (piece : Plane.Segment)
+        (isEnd : Plane.IsEndOf(point, piece))
+        : Plane.IsEndOf(point, Plane.reverseSegment(piece)) :=
+  done by cases {
+    case point = Product.first(piece): {
+        Plane.IsEndOf(point, Plane.reverseSegment(piece)) by Or.introduceRight;
+        done
+      }
+    case point = Product.second(piece): {
+        Plane.IsEndOf(point, Plane.reverseSegment(piece)) by Or.introduceLeft;
+        done
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- Orienting names the same segment.
+
+theorem Plane.SameSegment.orientSegment (piece : Plane.Segment)
+        : Plane.SameSegment(Plane.orientSegment(piece), piece) :=
+  done by cases {
+    case Plane.Point.Precedes(Product.first(piece), Product.second(piece)): {
+        Plane.orientSegment(piece) = piece by Plane.orientSegment_ordered;
+        done by Or.introduceLeft
+      }
+    otherwise: {
+        Plane.orientSegment(piece) = Plane.reverseSegment(piece)
+            by Plane.orientSegment_reversed;
+        done by Or.introduceRight
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- And it forgets which name it was given.
+
+theorem Plane.orientSegment_reverse (piece : Plane.Segment)
+        : Plane.orientSegment(Plane.reverseSegment(piece))
+          = Plane.orientSegment(piece) :=
+  done by cases {
+    case Plane.Point.Precedes(Product.first(piece), Product.second(piece))
+             as ordered: {
+        Plane.orientSegment(piece) = piece by Plane.orientSegment_ordered;
+        done by cases {
+          case Plane.Point.Precedes(Product.second(piece), Product.first(piece))
+                   as alsoReversed: {
+              -- Each end precedes the other, so they are the same point and
+              -- the pair is its own reversal.
+              Product.first(piece) = Product.second(piece)
+                  by Plane.Point.Precedes.antisymmetric;
+              Plane.reverseSegment(piece)
+                 = Product.make(Product.second(piece), Product.first(piece))
+                 = Product.make(Product.first(piece), Product.first(piece))
+                       by substituting (Product.first(piece) = Product.second(piece))
+                 = Product.make(Product.first(piece), Product.second(piece))
+                       by substituting (Product.first(piece) = Product.second(piece))
+                 = piece by Product.eta;
+              done by substituting (Plane.reverseSegment(piece) = piece)
+            }
+          otherwise: {
+              Plane.orientSegment(Plane.reverseSegment(piece))
+                  = Plane.reverseSegment(Plane.reverseSegment(piece))
+                  by Plane.orientSegment_reversed;
+              Plane.reverseSegment(Plane.reverseSegment(piece)) = piece
+                  by Plane.reverseSegment_involutive;
+              Plane.orientSegment(Plane.reverseSegment(piece))
+                 = Plane.reverseSegment(Plane.reverseSegment(piece))
+                 = piece by Plane.reverseSegment_involutive
+                 = Plane.orientSegment(piece);
+              done
+            }
+        }
+      }
+    otherwise as unordered: {
+        Plane.orientSegment(piece) = Plane.reverseSegment(piece)
+            by Plane.orientSegment_reversed;
+        -- The failed test plus totality: the reversal is the ordered one.
+        Plane.Point.Precedes(Product.first(piece), Product.second(piece))
+            ∨ Plane.Point.Precedes(Product.second(piece), Product.first(piece))
+            by Plane.Point.Precedes.total;
+        Plane.Point.Precedes(Product.second(piece), Product.first(piece));
+        Plane.Point.Precedes(Product.first(Plane.reverseSegment(piece)),
+                             Product.second(Plane.reverseSegment(piece)));
+        Plane.orientSegment(Plane.reverseSegment(piece)) = Plane.reverseSegment(piece)
+            by Plane.orientSegment_ordered;
+        Plane.orientSegment(Plane.reverseSegment(piece))
+           = Plane.reverseSegment(piece)
+           = Plane.orientSegment(piece);
+        done
+      }
+  }
+
+-- The key fact: two names for one segment orient to the same name.
+theorem Plane.orientSegment_of_SameSegment (piece other : Plane.Segment)
+        (same : Plane.SameSegment(piece, other))
+        : Plane.orientSegment(piece) = Plane.orientSegment(other) :=
+  done by cases {
+    case piece = other as isSame:
+        done by substituting isSame
+    case piece = Plane.reverseSegment(other) as isReversed: {
+        Plane.orientSegment(Plane.reverseSegment(other)) = Plane.orientSegment(other)
+            by Plane.orientSegment_reverse;
+        done by substituting isReversed
+      }
+  }
+
+theorem Plane.orientSegment_idempotent (piece : Plane.Segment)
+        : Plane.orientSegment(Plane.orientSegment(piece)) = Plane.orientSegment(piece) := {
+  Plane.SameSegment(Plane.orientSegment(piece), piece) by Plane.SameSegment.orientSegment;
+  done by Plane.orientSegment_of_SameSegment
+}
+
+-- ----------------------------------------------------------------------
+-- What a construction still has after orienting.
+
+theorem Plane.orientSegment_ends_distinct (piece : Plane.Segment)
+        (distinct : Product.first(piece) ≠ Product.second(piece))
+        : Product.first(Plane.orientSegment(piece))
+              ≠ Product.second(Plane.orientSegment(piece)) :=
+  done by cases {
+    case Plane.Point.Precedes(Product.first(piece), Product.second(piece)): {
+        Plane.orientSegment(piece) = piece by Plane.orientSegment_ordered;
+        done by substituting (Plane.orientSegment(piece) = piece)
+      }
+    otherwise: {
+        Plane.orientSegment(piece) = Plane.reverseSegment(piece)
+            by Plane.orientSegment_reversed;
+        Product.second(piece) ≠ Product.first(piece)
+            by Equality.not_equal_symmetric;
+        Product.first(Plane.reverseSegment(piece))
+            ≠ Product.second(Plane.reverseSegment(piece));
+        done by substituting (Plane.orientSegment(piece) = Plane.reverseSegment(piece))
+      }
+  }
+
+theorem Plane.IsEndOf.orientSegment (point : Plane.Point) (piece : Plane.Segment)
+        (isEnd : Plane.IsEndOf(point, piece))
+        : Plane.IsEndOf(point, Plane.orientSegment(piece)) :=
+  done by cases {
+    case Plane.Point.Precedes(Product.first(piece), Product.second(piece)): {
+        Plane.orientSegment(piece) = piece by Plane.orientSegment_ordered;
+        done by substituting (Plane.orientSegment(piece) = piece)
+      }
+    otherwise: {
+        Plane.orientSegment(piece) = Plane.reverseSegment(piece)
+            by Plane.orientSegment_reversed;
+        Plane.IsEndOf(point, Plane.reverseSegment(piece))
+            by Plane.IsEndOf.reverseSegment;
+        done by substituting (Plane.orientSegment(piece) = Plane.reverseSegment(piece))
+      }
+  }
+
+theorem Plane.IsEndOf.of_orientSegment (point : Plane.Point) (piece : Plane.Segment)
+        (isEnd : Plane.IsEndOf(point, Plane.orientSegment(piece)))
+        : Plane.IsEndOf(point, piece) :=
+  done by cases {
+    case Plane.Point.Precedes(Product.first(piece), Product.second(piece)): {
+        Plane.orientSegment(piece) = piece by Plane.orientSegment_ordered;
+        done by substituting (Plane.orientSegment(piece) = piece)
+      }
+    otherwise: {
+        Plane.orientSegment(piece) = Plane.reverseSegment(piece)
+            by Plane.orientSegment_reversed as isReversed;
+        Plane.IsEndOf(point, Plane.reverseSegment(piece)) by substituting isReversed;
+        Plane.IsEndOf(point, Plane.reverseSegment(Plane.reverseSegment(piece)))
+            by Plane.IsEndOf.reverseSegment;
+        Plane.reverseSegment(Plane.reverseSegment(piece)) = piece
+            by Plane.reverseSegment_involutive;
+        done by substituting (Plane.reverseSegment(Plane.reverseSegment(piece)) = piece)
+      }
+  }

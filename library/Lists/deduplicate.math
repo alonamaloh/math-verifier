@@ -1,0 +1,134 @@
+-- Lists/deduplicate.math
+--
+-- `List.deduplicate(list)` — the list with its repetitions removed.
+--
+-- What a construction wants when it has collected a list that may repeat
+-- itself and owes something a list without repetitions: a graph's vertex list
+-- and its edge list are both required to be `List.Distinct`, and a list of
+-- vertices gathered by walking over edges is not. The members are unchanged,
+-- so nothing that reads only the members — a finite union over the list, a
+-- membership test — can tell the two lists apart.
+
+module Lists.deduplicate
+
+import Logic.basics
+import Equality.basics
+import axioms
+import Natural.classical_decidable
+import Lists.list
+import Lists.distinct
+
+definition List.deduplicate {A : Type(0)} : List(A) → List(A)
+  | List.empty               => List.empty(A)
+  | List.prepend(head, tail) =>
+      if head ∈ List.deduplicate(tail)
+      then List.deduplicate(tail)
+      else List.prepend(A, head, List.deduplicate(tail))
+
+-- The two characterizing equations: a head already kept is dropped, a fresh
+-- one is kept.
+theorem List.deduplicate_prepend_repeat (A : Type(0)) (head : A) (tail : List(A))
+        (alreadyKept : head ∈ List.deduplicate(tail))
+        : List.deduplicate(List.prepend(A, head, tail)) = List.deduplicate(tail) :=
+  done by Logic.if_positive
+
+theorem List.deduplicate_prepend_fresh (A : Type(0)) (head : A) (tail : List(A))
+        (notKept : head ∉ List.deduplicate(tail))
+        : List.deduplicate(List.prepend(A, head, tail))
+          = List.prepend(A, head, List.deduplicate(tail)) :=
+  done by Logic.if_negative
+
+-- ----------------------------------------------------------------------
+-- The same members.
+
+theorem List.deduplicate_subset (A : Type(0)) (list : List(A))
+        : List.deduplicate(list) ⊆ list :=
+  by induction on list with IH {
+    case list = List.empty:
+        done by List.Includes.reflexive
+    case list = List.prepend(head, tail) for some head, tail:
+        done by cases {
+          case head ∈ List.deduplicate(tail): {
+              List.deduplicate(List.prepend(A, head, tail)) = List.deduplicate(tail)
+                  by List.deduplicate_prepend_repeat as dropsHead;
+              List.deduplicate(tail) ⊆ tail by IH;
+              tail ⊆ List.prepend(A, head, tail) by List.Includes.prepend;
+              List.deduplicate(tail) ⊆ List.prepend(A, head, tail)
+                  by List.Includes.transitive;
+              done by substituting dropsHead
+            }
+          otherwise: {
+              List.deduplicate(List.prepend(A, head, tail))
+                  = List.prepend(A, head, List.deduplicate(tail))
+                  by List.deduplicate_prepend_fresh as keepsHead;
+              List.deduplicate(tail) ⊆ tail by IH;
+              List.prepend(A, head, List.deduplicate(tail))
+                  ⊆ List.prepend(A, head, tail) by List.Includes.prepend_both;
+              done by substituting keepsHead
+            }
+        }
+  }
+
+theorem List.subset_deduplicate (A : Type(0)) (list : List(A))
+        : list ⊆ List.deduplicate(list) :=
+  by induction on list with IH {
+    case list = List.empty:
+        done by List.Includes.reflexive
+    case list = List.prepend(head, tail) for some head, tail:
+        done by cases {
+          case head ∈ List.deduplicate(tail) as alreadyKept: {
+              List.deduplicate(List.prepend(A, head, tail)) = List.deduplicate(tail)
+                  by List.deduplicate_prepend_repeat as dropsHead;
+              -- The head was dropped, but a copy of it is already kept.
+              List.prepend(A, head, tail) ⊆ List.deduplicate(tail)
+                  by { take element : A;
+                       suppose element ∈ List.prepend(A, head, tail);
+                       element = head ∨ element ∈ tail by List.member_prepend_invert;
+                       done by cases {
+                         case element = head as isHead:
+                             done by substituting isHead
+                         case element ∈ tail:
+                             done by IH
+                       } };
+              done by substituting dropsHead
+            }
+          otherwise: {
+              List.deduplicate(List.prepend(A, head, tail))
+                  = List.prepend(A, head, List.deduplicate(tail))
+                  by List.deduplicate_prepend_fresh as keepsHead;
+              tail ⊆ List.deduplicate(tail) by IH;
+              List.prepend(A, head, tail)
+                  ⊆ List.prepend(A, head, List.deduplicate(tail))
+                  by List.Includes.prepend_both;
+              done by substituting keepsHead
+            }
+        }
+  }
+
+-- ----------------------------------------------------------------------
+-- And no repetitions.
+
+theorem List.deduplicate_distinct (A : Type(0)) (list : List(A))
+        : List.Distinct(A, List.deduplicate(list)) :=
+  by induction on list with IH {
+    case list = List.empty:
+        done by List.Distinct.empty
+    case list = List.prepend(head, tail) for some head, tail:
+        done by cases {
+          case head ∈ List.deduplicate(tail): {
+              List.deduplicate(List.prepend(A, head, tail)) = List.deduplicate(tail)
+                  by List.deduplicate_prepend_repeat as dropsHead;
+              List.Distinct(A, List.deduplicate(tail)) by IH;
+              done by substituting dropsHead
+            }
+          otherwise as notKept: {
+              List.deduplicate(List.prepend(A, head, tail))
+                  = List.prepend(A, head, List.deduplicate(tail))
+                  by List.deduplicate_prepend_fresh as keepsHead;
+              List.Distinct(A, List.deduplicate(tail)) by IH;
+              List.Distinct(A, List.prepend(A, head, List.deduplicate(tail)))
+                  by List.Distinct.prepend;
+              done by substituting keepsHead
+            }
+        }
+  }

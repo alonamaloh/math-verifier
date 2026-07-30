@@ -1,0 +1,108 @@
+-- Plane/point_order.math
+--
+-- A total order on the points of the plane, lexicographic in the coordinates.
+--
+-- It is here for one purpose: to pick one of two points canonically, so that a
+-- segment can be given a canonical orientation and two names for one segment
+-- become the same name. Nothing geometric rests on it — which order it is does
+-- not matter, and only two facts about it are ever used, that it compares any
+-- two points and that it cannot rank two distinct points the same way round.
+
+module Plane.point_order
+
+import Logic.basics
+import Equality.basics
+import axioms
+import Real.interface
+import Real.order
+import Real.linearity
+import Plane.point
+
+definition Plane.Point.Precedes (p q : Plane.Point) : Proposition :=
+  Plane.Point.first(p) < Plane.Point.first(q)
+  ∨ (Plane.Point.first(p) = Plane.Point.first(q)
+         ∧ Plane.Point.second(p) ≤ Plane.Point.second(q))
+
+theorem Plane.Point.Precedes.total (p q : Plane.Point)
+        : Plane.Point.Precedes(p, q) ∨ Plane.Point.Precedes(q, p) :=
+  done by cases {
+    case Plane.Point.first(p) < Plane.Point.first(q): {
+        Plane.Point.Precedes(p, q) by Or.introduceLeft;
+        done by Or.introduceLeft
+      }
+    otherwise: {
+        Plane.Point.first(q) ≤ Plane.Point.first(p)
+            by Real.LessOrEqual_of_not_LessThan;
+        done by cases {
+          case Plane.Point.first(q) < Plane.Point.first(p): {
+              Plane.Point.Precedes(q, p) by Or.introduceLeft;
+              done by Or.introduceRight
+            }
+          otherwise: {
+              -- Neither coordinate is below the other, so the first
+              -- coordinates agree and the second ones decide.
+              Plane.Point.first(p) ≤ Plane.Point.first(q)
+                  by Real.LessOrEqual_of_not_LessThan;
+              Plane.Point.first(p) = Plane.Point.first(q)
+                  by Real.LessOrEqual.antisymmetric;
+              Plane.Point.first(q) = Plane.Point.first(p);
+              done by cases {
+                case Plane.Point.second(p) ≤ Plane.Point.second(q): {
+                    Plane.Point.first(p) = Plane.Point.first(q)
+                        ∧ Plane.Point.second(p) ≤ Plane.Point.second(q);
+                    Plane.Point.Precedes(p, q) by Or.introduceRight;
+                    done by Or.introduceLeft
+                  }
+                otherwise: {
+                    Plane.Point.second(q) ≤ Plane.Point.second(p)
+                        by Real.not_LessOrEqual_implies;
+                    Plane.Point.first(q) = Plane.Point.first(p)
+                        ∧ Plane.Point.second(q) ≤ Plane.Point.second(p);
+                    Plane.Point.Precedes(q, p) by Or.introduceRight;
+                    done by Or.introduceRight
+                  }
+              }
+            }
+        }
+      }
+  }
+
+theorem Plane.Point.Precedes.antisymmetric (p q : Plane.Point)
+        (forward : Plane.Point.Precedes(p, q))
+        (backward : Plane.Point.Precedes(q, p))
+        : p = q :=
+  done by cases {
+    case Plane.Point.first(p) < Plane.Point.first(q):
+        done by cases {
+          case Plane.Point.first(q) < Plane.Point.first(p):
+              done
+          case Plane.Point.first(q) = Plane.Point.first(p)
+                   ∧ Plane.Point.second(q) ≤ Plane.Point.second(p): {
+              Plane.Point.first(q) = Plane.Point.first(p);
+              Plane.Point.first(p)
+                 < Plane.Point.first(q)
+                 = Plane.Point.first(p);
+              done
+            }
+        }
+    case Plane.Point.first(p) = Plane.Point.first(q)
+             ∧ Plane.Point.second(p) ≤ Plane.Point.second(q):
+        done by cases {
+          case Plane.Point.first(q) < Plane.Point.first(p): {
+              Plane.Point.first(p) = Plane.Point.first(q);
+              Plane.Point.first(q)
+                 < Plane.Point.first(p)
+                 = Plane.Point.first(q);
+              done
+            }
+          case Plane.Point.first(q) = Plane.Point.first(p)
+                   ∧ Plane.Point.second(q) ≤ Plane.Point.second(p): {
+              Plane.Point.first(p) = Plane.Point.first(q);
+              Plane.Point.second(p) ≤ Plane.Point.second(q);
+              Plane.Point.second(q) ≤ Plane.Point.second(p);
+              Plane.Point.second(p) = Plane.Point.second(q)
+                  by Real.LessOrEqual.antisymmetric;
+              done by Plane.Point.equal_of_coordinates
+            }
+        }
+  }
