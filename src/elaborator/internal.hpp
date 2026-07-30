@@ -6878,6 +6878,103 @@ private:
     // fired, leaving the author to guess the hint. The proposition is always
     // citable, because `by (<fact>)` is a first-class surface form.
     std::string lastWinningProposition_;
+    // ── Per-claim cost diagnostics (MATH_TIME_CLAIMS=1) ────────────────
+    //
+    // The always-on expensive-step warning only fires for a by-LESS claim
+    // that succeeds, so it cannot see the two costs that dominate a slow
+    // declaration: premise discharge for a citation the author already
+    // wrote, and a search that fails and falls back. This mode times EVERY
+    // structured claim and reports, per declaration, where the seconds went.
+    struct ClaimCostRow {
+        int line = 0;
+        int depth = 0;
+        long long inclusiveMicros = 0;
+        long long selfMicros = 0;
+        uint64_t kernelSteps = 0;
+        std::string hint;        // `by <name>` / `by cases` / "(by-less)"
+        std::string closedBy;    // winning tactic (+ fact, when nameable)
+        std::string wastedBy;    // dominant losing tactic
+        long long wastedMicros = 0;
+    };
+    std::vector<ClaimCostRow> claimCostRows_;
+    int claimCostDepth_ = 0;
+    long long claimChildMicros_ = 0;
+    bool claimCostEnabled_ = [] {
+        const char* f = std::getenv("MATH_TIME_CLAIMS");
+        return f && f[0] != '\0' && f[0] != '0';
+    }();
+
+    // Label for a claim's hint, as the author wrote it.
+    static std::string claimHintLabel(const SurfaceStructuredClaim& claim) {
+        if (claim.byCases) return "by cases";
+        if (claim.byInduction) return "by induction";
+        if (claim.bySubstitution) {
+            return claim.byHint ? "by substituting <eq>" : "by substitution";
+        }
+        if (!claim.byHint) return "(by-less)";
+        if (auto* identifier =
+                std::get_if<SurfaceIdentifier>(&claim.byHint->node)) {
+            return "by " + identifier->qualifiedName;
+        }
+        return "by <proof>";
+    }
+
+    // Times one structured claim and records a row. Self time subtracts the
+    // nested claims' inclusive time, so a 90-line proof reports which of its
+    // own steps is expensive rather than blaming the outermost one.
+    struct ClaimCostScope {
+        Elaborator& self_;
+        bool active_;
+        int line_;
+        long long start_;
+        uint64_t steps0_;
+        long long savedChildMicros_;
+        std::string hint_;
+        void setHint(std::string hint) { hint_ = std::move(hint); }
+        ClaimCostScope(Elaborator& self, int line)
+            : self_(self), active_(self.claimCostEnabled_), line_(line) {
+            if (!active_) return;
+            start_ = monotonicNanos();
+            steps0_ = kernelStepsSoFar();
+            savedChildMicros_ = self_.claimChildMicros_;
+            self_.claimChildMicros_ = 0;
+            ++self_.claimCostDepth_;
+            // Cleared per claim so the row reports this claim's own verdict
+            // rather than whatever a previous one left behind.
+            self_.lastWinningTactic_.clear();
+            self_.lastWinningDetail_.clear();
+            self_.lastWinningProposition_.clear();
+            self_.dominantLosingTactic_.clear();
+            self_.dominantLosingMicros_ = 0;
+        }
+        // Records on the way out, including when the claim threw: a
+        // speculative path that costs seconds and then fails is exactly the
+        // cost this mode exists to find.
+        ~ClaimCostScope() {
+            if (!active_) return;
+            long long inclusive = (monotonicNanos() - start_) / 1000;
+            --self_.claimCostDepth_;
+            ClaimCostRow row;
+            row.line = line_;
+            row.hint = hint_;
+            row.depth = self_.claimCostDepth_;
+            row.inclusiveMicros = inclusive;
+            row.selfMicros = inclusive - self_.claimChildMicros_;
+            row.kernelSteps = kernelStepsSoFar() - steps0_;
+            row.closedBy = self_.lastWinningTactic_;
+            if (!row.closedBy.empty() && !self_.lastWinningDetail_.empty()) {
+                row.closedBy += " (" + self_.lastWinningDetail_ + ")";
+            }
+            row.wastedBy = self_.dominantLosingTactic_;
+            row.wastedMicros = self_.dominantLosingMicros_;
+            self_.claimChildMicros_ = savedChildMicros_ + inclusive;
+            self_.claimCostRows_.push_back(std::move(row));
+        }
+    };
+
+    // Dump and clear the rows collected for one declaration.
+    void reportClaimCosts(const std::string& declarationLabel);
+
     // The costliest tactic in the current armed frame that closed nothing,
     // and what it cost. Reset per outermost claim alongside the winner.
     std::string dominantLosingTactic_;

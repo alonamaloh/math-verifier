@@ -6,7 +6,9 @@
 
 #include "elaborator/internal.hpp"
 
+#include <algorithm>
 #include <cstring>
+#include <iomanip>
 
 void Elaborator::emitAutoProverProfile() {
         if (autoProveRows_.empty()) return;
@@ -245,18 +247,19 @@ void Elaborator::runModule(const SurfaceModule& module) {
             }
         }
         for (const auto& statement : module.statements) {
-            if (timeDeclarations) {
+            if (timeDeclarations || claimCostEnabled_) {
                 long long t0 = monotonicNanos();
                 elaborateTopStatement(statement);
                 long long t1 = monotonicNanos();
                 long long elapsedMs = (t1 - t0) / 1000000;
+                std::string label = topStatementLabel(statement);
                 // Emit only non-trivial timings to keep noise low.
-                if (elapsedMs >= 50) {
-                    std::string label = topStatementLabel(statement);
+                if (timeDeclarations && elapsedMs >= 50) {
                     std::cerr << "[time] " << moduleName_
                               << " " << label
                               << ": " << elapsedMs << " ms\n";
                 }
+                if (claimCostEnabled_) reportClaimCosts(label);
             } else {
                 elaborateTopStatement(statement);
             }
@@ -560,3 +563,49 @@ void Elaborator::runNumeralTableSelfCheck() {
         }
     }
 
+// MATH_TIME_CLAIMS=1: per-declaration report of where a proof's seconds went.
+// Sorted by SELF time, so the line that pays is named rather than the block
+// that contains it. Prints nothing for a declaration that was cheap.
+void Elaborator::reportClaimCosts(const std::string& declarationLabel) {
+        if (claimCostRows_.empty()) return;
+        std::vector<ClaimCostRow> rows = std::move(claimCostRows_);
+        claimCostRows_.clear();
+        long long totalMicros = 0;
+        for (const ClaimCostRow& row : rows) {
+            if (row.depth == 0) totalMicros += row.inclusiveMicros;
+        }
+        // A declaration under ~200 ms is not what this mode is for.
+        if (totalMicros < 200000) return;
+        std::sort(rows.begin(), rows.end(),
+                  [](const ClaimCostRow& a, const ClaimCostRow& b) {
+                      return a.selfMicros > b.selfMicros;
+                  });
+        std::cerr << "[claim-cost] " << moduleName_ << " "
+                  << declarationLabel << ": " << (totalMicros / 1000)
+                  << " ms over " << rows.size() << " claim(s)\n";
+        std::cerr << "[claim-cost]   "
+                  << "self_ms  incl_ms   steps  line  hint / closed by"
+                  << " / wasted by\n";
+        size_t shown = 0;
+        for (const ClaimCostRow& row : rows) {
+            if (shown++ >= 12) break;
+            if (row.selfMicros < 1000) break;
+            std::cerr << "[claim-cost]   "
+                      << std::setw(7) << (row.selfMicros / 1000) << "  "
+                      << std::setw(7) << (row.inclusiveMicros / 1000) << "  "
+                      << std::setw(6) << row.kernelSteps << "  "
+                      << std::setw(4) << row.line << "  "
+                      << row.hint;
+            if (!row.closedBy.empty()) {
+                std::cerr << " | closed: " << row.closedBy;
+            } else {
+                std::cerr << " | closed: (no prover win — hint checked"
+                             " directly, or the claim failed)";
+            }
+            if (!row.wastedBy.empty() && row.wastedMicros >= 1000) {
+                std::cerr << " | wasted: " << row.wastedBy << " "
+                          << (row.wastedMicros / 1000) << " ms";
+            }
+            std::cerr << "\n";
+        }
+    }

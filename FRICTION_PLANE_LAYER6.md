@@ -432,8 +432,14 @@ what it cost, and fires on wall clock too (`MATH_AUTOPROVE_WARN_MS`, default
 1500). Library-wide that went from ~35 to 47 expensive-step warnings, all
 carrying a millisecond figure.
 
-**Still open**, and this is the part that matters here: it does not time
-premise discharge for an explicit citation, so a claim whose `by` was cheap to
-write and expensive to check stays invisible. Full measurement, the two wrong
-hypotheses it killed, and the directions worth trying:
+**Closed 2026-07-30 by `MATH_TIME_CLAIMS=1`**, which times every structured
+claim — hinted, by-less, failed, speculative — and reports per declaration
+sorted by self time. It localised all three immediately: each is ONE claim.
+`Plane.IsEndOf.orientSegment` is 188 s in a single `by substituting` whose
+REWRITE is the cost (its rewritten goal is closed by `localFactExactMatch`,
+the cheapest rung there is); `Plane.subdivide_separated` is 39 s in the
+disjunction goal this log already records as L4, closed not by the author's
+cited lemma but by `contextEqualityBridge` reaching for
+`Plane.segmentDrawing_arcFinish` — a lemma about drawings, in a claim about
+endpoints. Full ledger, the wrong hypotheses it killed, and what to try next:
 `PERF_EXPENSIVE_DECLARATIONS.md`.

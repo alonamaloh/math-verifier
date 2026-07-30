@@ -68,6 +68,35 @@ Worth recording because each looked obviously right.
    each searching a 30-fact context for its premises. **"Add a `by`" is not
    the fix for these.**
 
+## Where the time actually is — one claim each
+
+`MATH_TIME_CLAIMS=1` answers this directly. Every one of these declarations is
+**one or two claims**, not a diffuse cost:
+
+| declaration | line | self | hint as written | what closed it |
+| --- | --- | --- | --- | --- |
+| `Plane.IsEndOf.orientSegment` | orient:202 | **188 s** | `by substituting <eq>` | `localFactExactMatch` |
+| `Plane.subdivide_common_segment` | overlay:251 | 46 s | `by <proof>` | *nothing — the claim failed* |
+| `Plane.subdivide_common_segment` | overlay:248 | 46 s | `by <proof>` | `localFactExactMatch` |
+| `Plane.subdivide_separated` | overlay:323 | 39 s | `by <proof>` | `contextEqualityBridge`, via `Plane.segmentDrawing_arcFinish` |
+
+Three separate things to notice, none of which the old instrumentation could
+have told us:
+
+- **orient:202 is `by substituting isReversed` closed by `localFactExactMatch`.**
+  The rewritten goal is proved by a fact stated on the line above — the
+  cheapest rung there is. So the 188 s is spent inside the SUBSTITUTION, not
+  in proving anything. Naming the equation (already done) does not help,
+  because the equation was never the search; the rewrite is.
+- **overlay:323 is closed by `Plane.segmentDrawing_arcFinish`** — a lemma about
+  DRAWINGS, in a claim about segment endpoints. The author's cited lemma
+  (`Plane.same_ends_of_meeting_interiors`) is not what proves the step. This
+  is friction L4's site: the goal is `(A ∧ B) ∨ (C ∧ D)` and the prover works
+  through the false side first.
+- **overlay:251 cost 46 s and closed nothing** — a speculative path that
+  failed after 3.0M kernel steps and fell back. Any instrumentation keyed on
+  success is blind to it by construction.
+
 ## What the instrumentation does and does not see
 
 The expensive-step warning gained two things (2026-07-30):
@@ -83,12 +112,30 @@ The expensive-step warning gained two things (2026-07-30):
   probes in the elaborator and barely moves the step counter.
 
 That took the library from ~35 to 47 expensive-step warnings, all now
-carrying a millisecond figure — and it still **does not surface any of the
-four declarations above**, because the warning fires only on a by-less claim
-that SUCCEEDS (`if (proof)`), and their cost is neither. Closing that gap is
-the next instrumentation step: time premise discharge for an explicit
-citation, and report a claim whose `by` was cheap to state but expensive to
-check.
+carrying a millisecond figure — and it still does not surface the four
+declarations above, because it fires only on a by-less claim that SUCCEEDS
+(`if (proof)`), and their cost is neither.
+
+**`MATH_TIME_CLAIMS=1` closes that gap** and is the tool to reach for first.
+It times EVERY structured claim — hinted, by-less, failed, speculative — and
+reports per declaration, sorted by SELF time (inclusive minus nested claims,
+so the line that pays is named rather than the block containing it):
+
+```
+[claim-cost] Plane.Graph.overlay Plane.subdivide_separated: 40130 ms over 31 claim(s)
+[claim-cost]   self_ms  incl_ms   steps  line  hint / closed by / wasted by
+[claim-cost]     39199    39199 3376345   323  by <proof> | closed: contextEqualityBridge
+                                                (library lemma Plane.segmentDrawing_arcFinish)
+                                                | wasted: contextEqualityBridge 5287 ms
+```
+
+Rows are recorded from the scope's DESTRUCTOR, so a claim that throws is
+reported too. Declarations under 200 ms print nothing. Off by default and
+costing one branch per claim when off.
+
+Known imprecision: `closed by` is the last prover win anywhere in the claim's
+subtree, so for a hinted claim it may name a premise's winner rather than the
+claim's own. The self-time column is the reliable number.
 
 ## Directions worth trying
 
@@ -104,4 +151,10 @@ check.
   Needs care: it wins 16 of 217 outermost claim sites library-wide.
 - **`Plane.IsEndOf.orientSegment` specifically** — 191 s for a statement that
   says "orienting a segment keeps its ends" deserves a different proof, not a
-  faster prover.
+  faster prover. Now localised to one `by substituting` whose rewrite, not
+  whose proof, is the cost: worth trying a boundary lemma that states the
+  transported form directly, so no rewrite is searched for at all.
+- **Profile `elaborateClaimBySubstitution`.** orient:202 shows a *narrowed*
+  `by substituting <eq>` costing 188 s and 610k kernel steps to move one
+  equation through one predicate. That is disproportionate on its face and is
+  the single biggest number in the ledger.

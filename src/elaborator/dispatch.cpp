@@ -2541,6 +2541,8 @@ ExpressionPointer Elaborator::elaborateExpression(
         }
         if (auto* claim =
                 std::get_if<SurfaceStructuredClaim>(&expression.node)) {
+            ClaimCostScope claimCost(*this, expression.line);
+            claimCost.setHint(claimHintLabel(*claim));
             return elaborateStructuredClaim(
                 *claim, localBinders, expectedType,
                 expression.line, expression.column);
