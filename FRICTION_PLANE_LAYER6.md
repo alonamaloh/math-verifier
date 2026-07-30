@@ -164,7 +164,7 @@ message named the fix outright:
 
 ---
 
-## L3 — `suppose x ∉ S for contradiction` is not recognised as a reductio
+## L3 — `suppose x ∉ S for contradiction` is not recognised as a reductio — **FIXED 2026-07-30**
 
 **Symptom.** `∉` is ordinary notation for `Not(x ∈ S)` — the lexer maps it to
 `TokenKind::NotElementOf` and `Test/negated_relation_operators_test.math`
@@ -197,9 +197,35 @@ every future reductio whose goal is a membership hits this, and the error
 message points at the closing `done` rather than at the `suppose` — nothing in
 it suggests the negation spelling is the problem.
 
-**Suggested fix.** Wherever the reductio matches the supposed proposition
-against `Not(<goal>)`, normalise the negated-relation notations first (`∉`,
-`≠`, `≰`, `∤`) — they are the same term, so this is a matcher gap rather than
-a semantic one. Worth checking `≠` in the same position while there: a goal
-`a = b` with `suppose a ≠ b for contradiction` is the identical shape and
-probably fails identically.
+**Root cause, and the fix.** Re-tested before working around it, and the
+symptom is narrower than recorded above: only the **forward** (braced) form
+was affected. The terminal form accepts `∉` and always did — the entry's
+repro is the forward form, and its diagnosis ("did not register as
+discharging the goal") was wrong. What the forward form does depends on
+whether the assumption is a negation: for `P = Not(X)` it eliminates the
+double negation and establishes `X`, otherwise it establishes `Not(P)`. That
+test (`parser.cpp`, `BlockWrapper::SupposeForContradictionForward`) knew the
+`¬` prefix, a `Not(…)` application, and `≠` — and nothing else, so `x ∉ S`
+established `Not(Not(x ∈ S))` and the goal stayed open.
+
+Fixed by giving the negated relations one shared list,
+`positiveRelationSymbol` in `syntax/surface.hpp`, used both by the
+desugaring that turns `a ∉ b` into `Not(a ∈ b)` (`dispatch.cpp`, which had
+the list inline) and by the reductio's negation test. Adding a negated
+operator now cannot teach the desugaring about it and leave the reductio
+behind — which is exactly how `≠` came to be handled and `∉` did not.
+
+Pinned by six theorems in `Test/negated_relation_operators_test.math`, one
+per operator plus the terminal form. Measured, while there: with the fix
+reverted, the `≰` case fails outright, and the `∉` case still *verifies* —
+the auto-prover's own reductio rung reproves the goal — but with the
+"vestigial detour" warning, because the fact the block established was the
+double negation and nothing consumed it. So the operator-specific pinning
+lives in the `≰`/`∤`/`⊈` cases, and the real-world `∉` guard is
+`Plane.Component_boundary_in_closed`, now written in the `∉` spelling.
+
+Beyond this layer: `Metric/{sequence,real,compactness,separation,connected,
+interval}.math` have six reductios spelled `¬(…)` that the negated operators
+can now carry. Left alone — `Metric/` is not in `scripts/clean_manifest.txt`,
+and style sweeps are manifest-scoped. `¬(∃ …)` sites stay as they are, and
+`<` has no negated operator to move to.

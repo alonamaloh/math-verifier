@@ -8,6 +8,7 @@
 module Test.negated_relation_operators_test
 
 import Logic.basics
+import Logic.excluded_middle
 import Equality.basics
 import Natural.basics
 import Natural.peano
@@ -22,3 +23,57 @@ theorem notin_is_not_member
         (A : Type(0)) (x : A) (s : Set(A)) (h : Not(x ∈ s)) : x ∉ s := h
 theorem nsubset_is_not_subset
         (A : Type(0)) (s t : Set(A)) (h : Not(s ⊆ t)) : s ⊈ t := h
+
+-- The reductio forms read the notation the same way. A `suppose` that
+-- assumes a negated relation is assuming a negation, so the double negation
+-- is eliminated and what is established is the POSITIVE relation — in the
+-- terminal form the goal, in the forward form a fact for the rest of the
+-- block. Each theorem below is unprovable without that: the goal follows
+-- only from the reductio, so a form that established `Not(Not(…))` instead
+-- would leave the goal open.
+
+theorem reductio_terminal_notin
+        (A : Type(0)) (x : A) (s t : Set(A))
+        (fromOutside : x ∉ s → x ∈ t) (notInside : x ∉ t)
+        : x ∈ s := {
+  suppose x ∉ s for contradiction;
+  x ∈ t by fromOutside;
+  done
+}
+
+theorem reductio_forward_notin
+        (A : Type(0)) (x : A) (s t : Set(A))
+        (fromOutside : x ∉ s → x ∈ t) (notInside : x ∉ t)
+        : x ∈ s := {
+  suppose x ∉ s for contradiction { x ∈ t by fromOutside; done };
+  done
+}
+
+theorem reductio_forward_ne (a b c : Natural)
+        (fromDistinct : a ≠ b → c ≤ a) (notBelow : c ≰ a)
+        : a = b := {
+  suppose a ≠ b for contradiction { c ≤ a by fromDistinct; done };
+  done
+}
+
+theorem reductio_forward_nle (a b c : Natural)
+        (fromNotBelow : a ≰ b → c = a) (distinct : c ≠ a)
+        : a ≤ b := {
+  suppose a ≰ b for contradiction { c = a by fromNotBelow; done };
+  done
+}
+
+theorem reductio_forward_ndvd (a b c : Natural)
+        (fromNotDivides : a ∤ b → c = a) (distinct : c ≠ a)
+        : a ∣ b := {
+  suppose a ∤ b for contradiction { c = a by fromNotDivides; done };
+  done
+}
+
+theorem reductio_forward_nsubset
+        (A : Type(0)) (s t u : Set(A))
+        (fromNotSubset : s ⊈ t → u ⊆ s) (notInside : u ⊈ s)
+        : s ⊆ t := {
+  suppose s ⊈ t for contradiction { u ⊆ s by fromNotSubset; done };
+  done
+}

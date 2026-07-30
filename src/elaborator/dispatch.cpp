@@ -2122,12 +2122,7 @@ ExpressionPointer Elaborator::elaborateExpression(
             // build the surface call to the positive relation and
             // recursively elaborate inside a `Not`.
             const std::string& sym = binary->opSymbol;
-            const char* positive = nullptr;
-            if (sym == "≠") positive = "=";
-            else if (sym == "≰") positive = "≤";
-            else if (sym == "∤") positive = "∣";
-            else if (sym == "∉") positive = "∈";
-            else if (sym == "⊈") positive = "⊆";
+            const char* positive = positiveRelationSymbol(sym);
             if (positive) {
                 if (environment_.lookup("Not") == nullptr) {
                     throw ElaborateError(

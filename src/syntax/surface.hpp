@@ -186,6 +186,20 @@ struct SurfaceUnaryOperation {
     SurfaceExpressionPointer operand;
 };
 
+// The negated relations. Each is notation for `Not(<positive>)` and is
+// desugared to exactly that (dispatch.cpp), so a `suppose` that assumes one
+// is assuming a negation — which the reductio forms have to know, to
+// eliminate the double negation. Shared so that adding a negated operator
+// cannot teach the desugaring about it and leave the reductio behind.
+inline const char* positiveRelationSymbol(const std::string& opSymbol) {
+    if (opSymbol == "≠") return "=";
+    if (opSymbol == "≰") return "≤";
+    if (opSymbol == "∤") return "∣";
+    if (opSymbol == "∉") return "∈";
+    if (opSymbol == "⊈") return "⊆";
+    return nullptr;
+}
+
 // Ellipsis fold notation (A8 step 4): `t₁ op t₂ op ... op g` — the
 // blackboard spelling of a fold. The parser collects the prefix terms
 // (one or more, all under the SAME operator) and the general term; the
