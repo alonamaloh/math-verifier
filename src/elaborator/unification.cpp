@@ -281,6 +281,80 @@ void Elaborator::unifyConstructorParameters(
             if (auto* headFreeVariable =
                     std::get_if<FreeVariable>(&patternHead->node)) {
                 if (metavariableNames.count(headFreeVariable->name)) {
+                    // Higher-order pattern solve: pattern `?F a₁ … aₖ` against
+                    // target `g b₁ … bₖ` of the SAME arity, where each aᵢ is
+                    // either (i) structurally equal to bᵢ — an already-aligned
+                    // rigid argument — or (ii) one of OUR metavariables, which
+                    // we then solve as `?aᵢ := bᵢ`. Under that condition the
+                    // spines line up position-for-position, so the equation
+                    // determines `?F := g` (and the hole args). This is the
+                    // reading a mathematician takes for granted: `?s m` against
+                    // `s m`, with `m` a local, plainly means `?s := s`; and the
+                    // product-Cauchy conclusion `abs((?s ?m)·(?t ?m) − …)` against
+                    // `abs((s m)·(t m) − …)` solves `?s := s, ?t := t, ?m := m`.
+                    //
+                    // The (i)-or-(ii) gate is what keeps it sound. A RIGID aᵢ
+                    // that DIFFERS from bᵢ (or a different arity) means the
+                    // spines do NOT align — e.g. an instance/relation metavar
+                    // `?R rep1 rep2` against `Equality(N, x, y)` — and a blind
+                    // head-solve there would corrupt `?R` into a partial
+                    // application. Rejecting those leaves such metavariables for
+                    // the proper instance/bundle inference path. Any binding
+                    // made here is, as always, re-checked by the kernel's final
+                    // typecheck of the assembled term.
+                    if (!assignment.count(headFreeVariable->name)) {
+                        std::vector<ExpressionPointer> patternArgs;
+                        ExpressionPointer patternCursor = pattern;
+                        while (auto* app = std::get_if<Application>(
+                                   &patternCursor->node)) {
+                            patternArgs.push_back(app->argument);
+                            patternCursor = app->function;
+                        }
+                        std::vector<ExpressionPointer> targetArgs;
+                        ExpressionPointer targetCursor = target;
+                        while (auto* app = std::get_if<Application>(
+                                   &targetCursor->node)) {
+                            targetArgs.push_back(app->argument);
+                            targetCursor = app->function;
+                        }
+                        bool spinesAlign =
+                            !patternArgs.empty()
+                            && patternArgs.size() == targetArgs.size();
+                        for (size_t k = 0; spinesAlign
+                                 && k < patternArgs.size(); ++k) {
+                            if (structurallyEqual(patternArgs[k],
+                                                   targetArgs[k])) {
+                                continue;
+                            }
+                            auto* argFreeVariable = std::get_if<FreeVariable>(
+                                &patternArgs[k]->node);
+                            if (argFreeVariable
+                                && metavariableNames.count(
+                                       argFreeVariable->name)) {
+                                continue;
+                            }
+                            spinesAlign = false;
+                        }
+                        if (spinesAlign) {
+                            unifyConstructorParameters(
+                                patternCursor, targetCursor,
+                                metavariableNames, assignment,
+                                binderDepth, binderTypeStack);
+                            for (size_t k = 0; k < patternArgs.size(); ++k) {
+                                unifyConstructorParameters(
+                                    patternArgs[k], targetArgs[k],
+                                    metavariableNames, assignment,
+                                    binderDepth, binderTypeStack);
+                            }
+                        }
+                    }
+                    // ORDER MATTERS. The first-order alignment above gets
+                    // first refusal: where the spines line up it solves
+                    // `?F := g` directly, while the Miller rule below hands
+                    // back the eta-expansion `λ x. g x` — definitionally
+                    // equal, but the structural matching downstream of this
+                    // walker cannot see through it, and siblings that used
+                    // to be pinned off `?F`'s shape are left unsolved.
                     // Miller-pattern higher-order unification: if the
                     // pattern is `metavar(Bound(k))` with k < binderDepth
                     // (referring to a binder we descended into), and
@@ -370,73 +444,6 @@ void Elaborator::unifyConstructorParameters(
                                             solution;
                                     }
                                 }
-                            }
-                        }
-                    }
-                    // Higher-order pattern solve: pattern `?F a₁ … aₖ` against
-                    // target `g b₁ … bₖ` of the SAME arity, where each aᵢ is
-                    // either (i) structurally equal to bᵢ — an already-aligned
-                    // rigid argument — or (ii) one of OUR metavariables, which
-                    // we then solve as `?aᵢ := bᵢ`. Under that condition the
-                    // spines line up position-for-position, so the equation
-                    // determines `?F := g` (and the hole args). This is the
-                    // reading a mathematician takes for granted: `?s m` against
-                    // `s m`, with `m` a local, plainly means `?s := s`; and the
-                    // product-Cauchy conclusion `abs((?s ?m)·(?t ?m) − …)` against
-                    // `abs((s m)·(t m) − …)` solves `?s := s, ?t := t, ?m := m`.
-                    //
-                    // The (i)-or-(ii) gate is what keeps it sound. A RIGID aᵢ
-                    // that DIFFERS from bᵢ (or a different arity) means the
-                    // spines do NOT align — e.g. an instance/relation metavar
-                    // `?R rep1 rep2` against `Equality(N, x, y)` — and a blind
-                    // head-solve there would corrupt `?R` into a partial
-                    // application. Rejecting those leaves such metavariables for
-                    // the proper instance/bundle inference path. Any binding
-                    // made here is, as always, re-checked by the kernel's final
-                    // typecheck of the assembled term.
-                    if (!assignment.count(headFreeVariable->name)) {
-                        std::vector<ExpressionPointer> patternArgs;
-                        ExpressionPointer patternCursor = pattern;
-                        while (auto* app = std::get_if<Application>(
-                                   &patternCursor->node)) {
-                            patternArgs.push_back(app->argument);
-                            patternCursor = app->function;
-                        }
-                        std::vector<ExpressionPointer> targetArgs;
-                        ExpressionPointer targetCursor = target;
-                        while (auto* app = std::get_if<Application>(
-                                   &targetCursor->node)) {
-                            targetArgs.push_back(app->argument);
-                            targetCursor = app->function;
-                        }
-                        bool spinesAlign =
-                            !patternArgs.empty()
-                            && patternArgs.size() == targetArgs.size();
-                        for (size_t k = 0; spinesAlign
-                                 && k < patternArgs.size(); ++k) {
-                            if (structurallyEqual(patternArgs[k],
-                                                   targetArgs[k])) {
-                                continue;
-                            }
-                            auto* argFreeVariable = std::get_if<FreeVariable>(
-                                &patternArgs[k]->node);
-                            if (argFreeVariable
-                                && metavariableNames.count(
-                                       argFreeVariable->name)) {
-                                continue;
-                            }
-                            spinesAlign = false;
-                        }
-                        if (spinesAlign) {
-                            unifyConstructorParameters(
-                                patternCursor, targetCursor,
-                                metavariableNames, assignment,
-                                binderDepth, binderTypeStack);
-                            for (size_t k = 0; k < patternArgs.size(); ++k) {
-                                unifyConstructorParameters(
-                                    patternArgs[k], targetArgs[k],
-                                    metavariableNames, assignment,
-                                    binderDepth, binderTypeStack);
                             }
                         }
                     }
@@ -606,14 +613,22 @@ void Elaborator::unifyConstructorParameters(
             // with a matching head has no arguments to recurse into.)
             if (auto* targetApplication =
                     std::get_if<Application>(&target->node)) {
+                // Carry the binder stack down. Dropping it here silently
+                // disabled the Miller-pattern solve for every metavariable
+                // below an application — which is all of them, since
+                // `Exists T (λ x. …)` IS an application: a lemma stated over
+                // a predicate could never have its predicate solved from the
+                // goal, and the premise discharge guessed it instead.
                 unifyConstructorParameters(
                     patternApplication->function,
                     targetApplication->function,
-                    metavariableNames, assignment, binderDepth);
+                    metavariableNames, assignment, binderDepth,
+                    binderTypeStack);
                 unifyConstructorParameters(
                     patternApplication->argument,
                     targetApplication->argument,
-                    metavariableNames, assignment, binderDepth);
+                    metavariableNames, assignment, binderDepth,
+                    binderTypeStack);
             }
             return;
         }

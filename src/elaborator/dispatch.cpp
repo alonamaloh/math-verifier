@@ -1854,6 +1854,52 @@ ExpressionPointer Elaborator::elaborateExpression(
                     // fall back to the no-coercion path.
                 }
             }
+            // An ascription is a CLAIM about the type, so check it. The
+            // ascribed type is passed above as the expected type, but that
+            // is only a hint: a bidirectional elaborator that cannot use it
+            // still produces a term, and that term used to be returned
+            // unexamined. `choose … such that P from <lemma>` shapes its
+            // citation with exactly such an ascription, so an unchecked one
+            // let the citation resolve at a different proposition — binding
+            // the witness to a condition the proof never stated, silently.
+            {
+                ExpressionPointer innerType;
+                bool readable = true;
+                try {
+                    innerType = inferTypeInLocalContext(localBinders, inner);
+                } catch (const TypeError&) {
+                    readable = false;
+                } catch (const ElaborateError&) {
+                    readable = false;
+                }
+                if (readable) {
+                    bool matches = false;
+                    try {
+                        matches = isDefinitionallyEqual(
+                            environment_,
+                            buildContextFromLocalBinders(localBinders),
+                            innerType,
+                            openOverLocalBinders(ascribedType, localBinders,
+                                                 localBinders.size()));
+                    } catch (const TypeError&) {
+                        // Can't judge — keep the pre-check behaviour.
+                        matches = true;
+                    }
+                    if (!matches) {
+                        throwElaborate(
+                            "this ascription does not hold — the expression "
+                            "has a different type\n  ascribed: "
+                            + prettyPrintInLocalScope(ascribedType,
+                                                      localBinders)
+                            + "\n  actual:   "
+                            + prettyPrintInLocalScope(
+                                  closeOverLocalBinders(
+                                      innerType, localBinders,
+                                      localBinders.size()),
+                                  localBinders));
+                    }
+                }
+            }
             return inner;
         }
         if (auto* typeExpression =

@@ -2291,8 +2291,17 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
         // as possible up front.
         std::map<std::string, ExpressionPointer> assignment;
         if (expectedType) {
+            // Carry a binder stack so the unifier's Miller-pattern rule can
+            // fire: a lemma stated over a PREDICATE (`?P(minimum) ∧ ∀ k.
+            // ?P(k) → …`) has to solve `?P` by abstracting the goal's body
+            // over the bound witness, and that rule is gated on knowing the
+            // binder types. Without it `?P` survived Step 2 and the premise
+            // discharge guessed it from a sibling hypothesis — binding a
+            // proposition the caller never asked for.
+            std::vector<ExpressionPointer> backwardBinderStack;
             unifyConstructorParameters(resultTypePattern, expectedType,
-                                          metavariableNames, assignment);
+                                          metavariableNames, assignment,
+                                          0, &backwardBinderStack);
             // If anything's still unassigned, try with both sides WHNF'd.
             bool anyUnassigned = false;
             for (const auto& name : metavariableNames) {
@@ -2305,9 +2314,11 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                     weakHeadNormalForm(environment_, resultTypePattern);
                 ExpressionPointer expectedTypeNormalised =
                     weakHeadNormalForm(environment_, expectedType);
+                backwardBinderStack.clear();
                 unifyConstructorParameters(resultPatternNormalised,
                                               expectedTypeNormalised,
-                                              metavariableNames, assignment);
+                                              metavariableNames, assignment,
+                                              0, &backwardBinderStack);
             }
             // β-normalisation retry: δ-unfolding a definition that takes a
             // PREDICATE (`Natural.Eventually(P) := ∃ N. ∀ m. N ≤ m → P(m)`)
@@ -2601,6 +2612,18 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                     unresolved.push_back(i);
                 } else {
                     ExpressionPointer inferred = iterator->second;
+                    // A solution may itself mention holes solved later or
+                    // elsewhere — the Miller-pattern rule builds
+                    // `λ (x : <the pattern's domain>). …`, and that domain
+                    // is often another hole. Resolve to a fixpoint before
+                    // the value is used, or the internal name travels into
+                    // the final term and the kernel reports it unbound.
+                    for (int pass = 0; pass < 4; ++pass) {
+                        ExpressionPointer next =
+                            substituteFreeVariables(inferred, assignment);
+                        if (structurallyEqual(next, inferred)) break;
+                        inferred = next;
+                    }
                     // Backward unification can recover a carrier-valued
                     // argument from the goal before that value has passed
                     // through ordinary argument elaboration.  In particular,

@@ -1,0 +1,22 @@
+-- Citing a lemma whose higher-order EXPLICIT argument is a PREDICATE.
+-- The goal determines it — `∃ (n : ℕ). n = n` against the conclusion
+-- `∃ (n : ℕ). ?predicate(n)` solves `?predicate := λ n. n = n` by the
+-- unifier's Miller-pattern rule. This was an ErrorTest until that rule
+-- was reachable: it is gated on the binder types, which the walker used
+-- to drop the moment it descended through an application — and
+-- `Exists T (λ x. …)` IS an application, so it could never fire.
+module Test.higher_order_predicate_cite
+
+import Natural.basics
+import Natural.peano
+import Logic.basics
+import Logic.exists
+
+theorem Test.witness_holds (predicate : Natural → Proposition)
+        (proof : predicate(0))
+        : ∃ (n : Natural). predicate(n) :=
+  ⟨0, proof⟩
+
+theorem Test.cite_it : ∃ (n : Natural). n = n := {
+  ∃ (n : Natural). n = n by Test.witness_holds
+}
