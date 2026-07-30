@@ -33,6 +33,7 @@ import Set.algebra
 import Natural.classical_decidable
 import Lists.list
 import Lists.append
+import Lists.set_union
 import Real.interface
 import Plane.point
 import Plane.segment
@@ -504,5 +505,124 @@ theorem Plane.subdivide_avoids (points : List(Plane.Point))
           case point ∈ tail:
               done by IH
         }
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- The cover.
+--
+-- Cutting loses nothing: the pieces occupy exactly what they came from. This
+-- is the fourth property, and the one that makes the overlay's point set
+-- equal to the union of the graphs it was built from.
+
+definition Plane.piecesCover (pieces : List(Plane.Segment)) : Set(Plane.Point) :=
+  List.unionOver(
+      (piece : Plane.Segment) ↦
+          Plane.segment(Product.first(piece), Product.second(piece)),
+      pieces)
+
+theorem Plane.splitSegmentAt_covers (cut : Plane.Point) (piece : Plane.Segment)
+        (distinct : Product.first(piece) ≠ Product.second(piece))
+        : Plane.piecesCover(Plane.splitSegmentAt(cut, piece))
+          = Plane.segment(Product.first(piece), Product.second(piece)) :=
+  done by cases {
+    case cut ∈ Plane.openSegment(
+             Product.first(piece), Product.second(piece)) as interior: {
+        Plane.splitSegmentAt(cut, piece)
+            = List.prepend(Plane.Segment,
+                  Product.make(Product.first(piece), cut),
+                  List.prepend(Plane.Segment,
+                      Product.make(cut, Product.second(piece)),
+                      List.empty(Plane.Segment)))
+            by Plane.splitSegmentAt_interior;
+        Plane.segment(Product.first(piece), cut)
+            ∪ Plane.segment(cut, Product.second(piece))
+            = Plane.segment(Product.first(piece), Product.second(piece))
+            by Plane.segment_split;
+        Plane.piecesCover(Plane.splitSegmentAt(cut, piece))
+           = Plane.segment(Product.first(piece), cut)
+                 ∪ (Plane.segment(cut, Product.second(piece))
+                        ∪ Set.empty(Plane.Point))
+           = Plane.segment(Product.first(piece), cut)
+                 ∪ Plane.segment(cut, Product.second(piece))
+                 by Set.union_empty
+           = Plane.segment(Product.first(piece), Product.second(piece))
+                 by Plane.segment_split;
+        done
+      }
+    otherwise: {
+        Plane.splitSegmentAt(cut, piece)
+            = List.prepend(Plane.Segment, piece, List.empty(Plane.Segment))
+            by Plane.splitSegmentAt_elsewhere;
+        Plane.piecesCover(Plane.splitSegmentAt(cut, piece))
+           = Plane.segment(Product.first(piece), Product.second(piece))
+                 ∪ Set.empty(Plane.Point)
+           = Plane.segment(Product.first(piece), Product.second(piece))
+                 by Set.union_empty;
+        done
+      }
+  }
+
+theorem Plane.splitAllAt_covers (cut : Plane.Point) (pieces : List(Plane.Segment))
+        (allDistinct : ∀ (piece : Plane.Segment). piece ∈ pieces →
+            Product.first(piece) ≠ Product.second(piece))
+        : Plane.piecesCover(Plane.splitAllAt(cut, pieces))
+          = Plane.piecesCover(pieces) :=
+  by induction on pieces with IH {
+    case pieces = List.empty:
+        done
+    case pieces = List.prepend(head, tail) for some head, tail: {
+        head ∈ List.prepend(Plane.Segment, head, tail);
+        Product.first(head) ≠ Product.second(head) by allDistinct;
+        ∀ (piece : Plane.Segment). piece ∈ tail →
+            Product.first(piece) ≠ Product.second(piece)
+            by { take piece : Plane.Segment;
+                 suppose piece ∈ tail;
+                 piece ∈ List.prepend(Plane.Segment, head, tail);
+                 done by allDistinct };
+        Plane.piecesCover(Plane.splitSegmentAt(cut, head))
+            = Plane.segment(Product.first(head), Product.second(head))
+            by Plane.splitSegmentAt_covers;
+        Plane.piecesCover(Plane.splitAllAt(cut, tail)) = Plane.piecesCover(tail) by IH;
+        Plane.piecesCover(Plane.splitAllAt(cut, List.prepend(Plane.Segment, head, tail)))
+           = Plane.piecesCover(List.append(Plane.splitSegmentAt(cut, head),
+                                           Plane.splitAllAt(cut, tail)))
+           = Plane.piecesCover(Plane.splitSegmentAt(cut, head))
+                 ∪ Plane.piecesCover(Plane.splitAllAt(cut, tail))
+                 by List.unionOver_append
+           = Plane.segment(Product.first(head), Product.second(head))
+                 ∪ Plane.piecesCover(Plane.splitAllAt(cut, tail))
+                 by Plane.splitSegmentAt_covers
+           = Plane.segment(Product.first(head), Product.second(head))
+                 ∪ Plane.piecesCover(tail) by IH
+           = Plane.piecesCover(List.prepend(Plane.Segment, head, tail));
+        done
+      }
+  }
+
+theorem Plane.subdivide_covers (points : List(Plane.Point))
+        (pieces : List(Plane.Segment))
+        (allDistinct : ∀ (piece : Plane.Segment). piece ∈ pieces →
+            Product.first(piece) ≠ Product.second(piece))
+        : Plane.piecesCover(Plane.subdivide(pieces, points))
+          = Plane.piecesCover(pieces) :=
+  by induction on points with IH generalizing pieces {
+    case points = List.empty:
+        done
+    case points = List.prepend(head, tail) for some head, tail: {
+        ∀ (piece : Plane.Segment). piece ∈ Plane.splitAllAt(head, pieces) →
+            Product.first(piece) ≠ Product.second(piece)
+            by { take piece : Plane.Segment;
+                 suppose piece ∈ Plane.splitAllAt(head, pieces);
+                 done by Plane.splitAllAt_ends_distinct };
+        Plane.piecesCover(Plane.splitAllAt(head, pieces)) = Plane.piecesCover(pieces)
+            by Plane.splitAllAt_covers;
+        Plane.piecesCover(Plane.subdivide(Plane.splitAllAt(head, pieces), tail))
+            = Plane.piecesCover(Plane.splitAllAt(head, pieces)) by IH;
+        Plane.piecesCover(Plane.subdivide(pieces, List.prepend(Plane.Point, head, tail)))
+           = Plane.piecesCover(Plane.subdivide(Plane.splitAllAt(head, pieces), tail))
+           = Plane.piecesCover(Plane.splitAllAt(head, pieces)) by IH
+           = Plane.piecesCover(pieces) by Plane.splitAllAt_covers;
+        done
       }
   }

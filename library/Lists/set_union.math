@@ -20,6 +20,7 @@ import Equality.basics
 import Set.basics
 import Set.algebra
 import Lists.list
+import Lists.append
 
 definition List.unionOver {A T : Type(0)} (pieces : A → Set(T))
         : List(A) → Set(T)
@@ -101,3 +102,25 @@ theorem List.unionOver_subset (A T : Type(0)) (pieces : A → Set(T))
   x ∈ pieces(item);
   done
 }
+
+-- A union over a concatenation splits where the list does — the shape every
+-- induction over `List.append` needs.
+theorem List.unionOver_append (A T : Type(0)) (pieces : A → Set(T))
+        (first second : List(A))
+        : List.unionOver(pieces, List.append(first, second))
+          = List.unionOver(pieces, first) ∪ List.unionOver(pieces, second) :=
+  by induction on first with IH {
+    case first = List.empty:
+        List.unionOver(pieces, List.append(List.empty(A), second))
+           = List.unionOver(pieces, second)
+           = Set.empty(T) ∪ List.unionOver(pieces, second)
+                 by Set.union_empty(subset := List.unionOver(pieces, second))
+    case first = List.prepend(head, tail) for some head, tail:
+        List.unionOver(pieces, List.append(List.prepend(A, head, tail), second))
+           = List.unionOver(pieces, List.prepend(A, head, List.append(tail, second)))
+           = pieces(head) ∪ List.unionOver(pieces, List.append(tail, second))
+           = pieces(head) ∪ (List.unionOver(pieces, tail)
+                                 ∪ List.unionOver(pieces, second)) by IH
+           = (pieces(head) ∪ List.unionOver(pieces, tail))
+                 ∪ List.unionOver(pieces, second) by Set.union_associative
+  }

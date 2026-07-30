@@ -214,6 +214,69 @@ theorem Set.union_commutative {T : Type(0)} (left right : Set(T))
   done by Set.equal_of_same_members
 }
 
+-- Where the brackets fall in a union does not matter: membership in either is
+-- membership in one of the three.
+theorem Set.union_associative {T : Type(0)} (left middle right : Set(T))
+        : left ∪ (middle ∪ right) = (left ∪ middle) ∪ right := {
+  left ∪ (middle ∪ right) ⊆ (left ∪ middle) ∪ right
+      by { take subject : T;
+           suppose subject ∈ left ∪ (middle ∪ right);
+           subject ∈ left ∨ subject ∈ middle ∪ right;
+           done by cases {
+             case subject ∈ left: {
+                 subject ∈ left ∪ middle by Set.subset_union_left;
+                 done
+               }
+             case subject ∈ middle ∪ right: {
+                 subject ∈ middle ∨ subject ∈ right;
+                 done by cases {
+                   case subject ∈ middle: {
+                       subject ∈ left ∪ middle by Set.subset_union_right;
+                       done
+                     }
+                   case subject ∈ right: done
+                 }
+               }
+           } };
+  (left ∪ middle) ∪ right ⊆ left ∪ (middle ∪ right)
+      by { take subject : T;
+           suppose subject ∈ (left ∪ middle) ∪ right;
+           subject ∈ left ∪ middle ∨ subject ∈ right;
+           done by cases {
+             case subject ∈ left ∪ middle: {
+                 subject ∈ left ∨ subject ∈ middle;
+                 done by cases {
+                   case subject ∈ left: done
+                   case subject ∈ middle: {
+                       subject ∈ middle ∪ right by Set.subset_union_left;
+                       done
+                     }
+                 }
+               }
+             case subject ∈ right: {
+                 subject ∈ middle ∪ right by Set.subset_union_right;
+                 done
+               }
+           } };
+  done by Set.equal_of_same_members
+}
+
+-- Adjoining nothing changes nothing. The unit law a finite union hits at the
+-- end of its list.
+theorem Set.union_empty {T : Type(0)} (subset : Set(T))
+        : subset ∪ Set.empty(T) = subset := {
+  subset ∪ Set.empty(T) ⊆ subset
+      by { take subject : T;
+           suppose subject ∈ subset ∪ Set.empty(T);
+           subject ∈ subset ∨ subject ∈ Set.empty(T);
+           done by cases {
+             case subject ∈ subset: done
+             case subject ∈ Set.empty(T): done
+           } };
+  subset ⊆ subset ∪ Set.empty(T) by Set.subset_union_left;
+  done by Set.equal_of_same_members
+}
+
 -- De Morgan: to miss a union is to miss both sides. This is what turns a
 -- statement about a finite union being closed into one about an
 -- intersection of open complements.
