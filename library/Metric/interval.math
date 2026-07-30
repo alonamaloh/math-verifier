@@ -535,3 +535,55 @@ theorem Real.member_segment_of_bounds (a b x : ℝ) (ordered : a ≤ b)
         done by { witness (x - a) / (b - a) }
       }
   }
+
+-- ----------------------------------------------------------------------
+-- The segment read backwards, and the unit interval as a segment.
+--
+-- A subinterval does not remember which end it was named from: walking the
+-- complementary fraction from the other end reaches the same point. That is
+-- what lets an arc be run in reverse, whose domain is `Real.segment(1, 0)`.
+
+theorem Real.segment_subset_swap (a b : ℝ)
+        : Real.segment(a, b) ⊆ Real.segment(b, a) := {
+  take x : ℝ;
+  suppose x ∈ Real.segment(a, b) as onSegment;
+  choose t such that (0 ≤ t ∧ t ≤ 1) ∧ x = Real.between(a, b, t) from onSegment;
+  0 ≤ t;
+  t ≤ 1;
+  (0 : ℝ) ≤ 1 - t;
+  1 - t ≤ 1;
+  x = Real.between(a, b, t)
+    = a + t * (b - a)
+    = b + (1 - t) * (a - b) by ring
+    = Real.between(b, a, 1 - t);
+  done by { witness 1 - t }
+}
+
+theorem Real.segment_symmetric (a b : ℝ)
+        : Real.segment(a, b) = Real.segment(b, a) := {
+  Real.segment(a, b) ⊆ Real.segment(b, a) by Real.segment_subset_swap;
+  Real.segment(b, a) ⊆ Real.segment(a, b) by Real.segment_subset_swap;
+  done by Set.equal_of_same_members
+}
+
+theorem Real.segment_zero_one : Real.segment(0, 1) = Real.unitInterval := {
+  (0 : ℝ) ≤ 1;
+  Real.segment(0, 1) ⊆ Real.unitInterval
+      by { take x : ℝ;
+           suppose x ∈ Real.segment(0, 1);
+           x ≥ 0 by Real.segment_atLeast;
+           x ≤ 1 by Real.segment_atMost;
+           done by Real.member_unitInterval };
+  Real.unitInterval ⊆ Real.segment(0, 1)
+      by { take x : ℝ;
+           suppose x ∈ Real.unitInterval;
+           x ≥ 0 by Real.unitInterval_nonneg;
+           x ≤ 1 by Real.unitInterval_atMostOne;
+           done by Real.member_segment_of_bounds };
+  done by Set.equal_of_same_members
+}
+
+theorem Real.segment_one_zero : Real.segment(1, 0) = Real.unitInterval :=
+  Real.segment(1, 0)
+     = Real.segment(0, 1) by Real.segment_symmetric
+     = Real.unitInterval by Real.segment_zero_one

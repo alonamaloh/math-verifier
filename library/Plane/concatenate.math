@@ -615,6 +615,227 @@ theorem Plane.IsArc.concatenate
 }
 
 -- ----------------------------------------------------------------------
+-- Closing the loop.
+--
+-- Two arcs that share BOTH of their ends — the second runs back from where
+-- the first arrived to where it set out — glue to a loop rather than to an
+-- arc. Everything above carries over except the seam analysis: a common
+-- value now has two ways to be legitimate, at the middle where the arcs are
+-- glued and at the ends where the loop closes, and the second of those is
+-- exactly the repetition `Plane.IsLoop` allows itself at the finish.
+--
+-- The two extra pinning lemmas are the start-and-finish counterparts of the
+-- midpoint pair above: an arc is at its start only at parameter 0, so the
+-- glued map is there only at 0, and at its finish only at 1.
+
+theorem Plane.lowerHalf_at_start_is_zero
+        (firstArc : ℝ → Plane.Point)
+        (firstInjective
+            : MetricSpace.InjectiveOn(firstArc, Real.unitInterval))
+        (t : ℝ) (inLower : t ∈ Plane.lowerHalf)
+        (atStart : firstArc(2 * t) = Plane.arcStart(firstArc))
+        : t = 0 := {
+  2 * t ∈ Real.unitInterval by Plane.lowerHalf_lands;
+  (0 : ℝ) ∈ Real.unitInterval by Real.zero_in_unitInterval;
+  firstArc(2 * t) = firstArc(0) by atStart;
+  2 * t = 0 by firstInjective as reachesZero;
+  (2 : ℝ) ≠ 0;
+  2 * t = 2 * 0 by linear_combination(reachesZero);
+  done by Real.equal_of_multiply_left
+}
+
+theorem Plane.upperHalf_at_finish_is_one
+        (secondArc : ℝ → Plane.Point)
+        (secondInjective
+            : MetricSpace.InjectiveOn(secondArc, Real.unitInterval))
+        (t : ℝ) (inUpper : t ∈ Plane.upperHalf)
+        (atFinish : secondArc(2 * t - 1) = Plane.arcFinish(secondArc))
+        : t = 1 := {
+  2 * t - 1 ∈ Real.unitInterval by Plane.upperHalf_lands;
+  (1 : ℝ) ∈ Real.unitInterval by Real.one_in_unitInterval;
+  secondArc(2 * t - 1) = secondArc(1) by atFinish;
+  2 * t - 1 = 1 by secondInjective as reachesOne;
+  (2 : ℝ) ≠ 0;
+  2 * t = 2 * 1 by linear_combination(reachesOne);
+  done by Real.equal_of_multiply_left
+}
+
+-- Across the seam, when the two arcs also share their outer ends. The
+-- common value is one of the two shared points. At the middle the argument
+-- is the one above; at the outer ends the first arc is at its start, so the
+-- lower parameter is 0, and the second is at its finish, so the upper
+-- parameter is 1 — which the hypothesis has excluded.
+theorem Plane.concatenate_across_seam_of_loop
+        (firstArc secondArc : ℝ → Plane.Point)
+        (firstInjective
+            : MetricSpace.InjectiveOn(firstArc, Real.unitInterval))
+        (secondInjective
+            : MetricSpace.InjectiveOn(secondArc, Real.unitInterval))
+        (sharedMiddle
+            : Plane.arcFinish(firstArc) = Plane.arcStart(secondArc))
+        (closesUp
+            : Plane.arcFinish(secondArc) = Plane.arcStart(firstArc))
+        (meetOnlyAtEnds
+            : ∀ (z : Plane.Point). z ∈ Plane.arc(firstArc) →
+                z ∈ Plane.arc(secondArc) →
+                  z = Plane.arcStart(firstArc) ∨ z = Plane.arcFinish(firstArc))
+        (low high : ℝ)
+        (lowInLower : low ∈ Plane.lowerHalf)
+        (highInUpper : high ∈ Plane.upperHalf)
+        (highBeforeFinish : high ≠ 1)
+        (sameValue
+            : Plane.concatenate(firstArc, secondArc)(low)
+                  = Plane.concatenate(firstArc, secondArc)(high))
+        : low = high := {
+  low ∈ Real.unitInterval;
+  high ∈ Real.unitInterval;
+  2 * low ∈ Real.unitInterval by Plane.lowerHalf_lands;
+  2 * high - 1 ∈ Real.unitInterval by Plane.upperHalf_lands;
+  Plane.concatenate(firstArc, secondArc)(low) = firstArc(2 * low)
+      by Plane.concatenate_on_lowerHalf as valueAtLow;
+  Plane.concatenate(firstArc, secondArc)(high) = secondArc(2 * high - 1)
+      by Plane.concatenate_value_on_upperHalf as valueAtHigh;
+
+  let shared : Plane.Point := firstArc(2 * low);
+  shared ∈ Plane.arc(firstArc) by Plane.member_arc(t := 2 * low);
+  shared
+     = Plane.concatenate(firstArc, secondArc)(low) by valueAtLow
+     = Plane.concatenate(firstArc, secondArc)(high) by sameValue
+     = secondArc(2 * high - 1) by valueAtHigh
+     as sharedOnSecond;
+  secondArc(2 * high - 1) = shared by sharedOnSecond;
+  shared ∈ Plane.arc(secondArc) by Plane.member_arc;
+  shared = Plane.arcStart(firstArc) ∨ shared = Plane.arcFinish(firstArc)
+      by meetOnlyAtEnds;
+  done by cases {
+    case shared = Plane.arcStart(firstArc): {
+        secondArc(2 * high - 1) = Plane.arcStart(firstArc)
+            by substituting sharedOnSecond;
+        secondArc(2 * high - 1) = Plane.arcFinish(secondArc) by closesUp;
+        high = 1 by Plane.upperHalf_at_finish_is_one;
+        done
+      }
+    case shared = Plane.arcFinish(firstArc): {
+        firstArc(2 * low) = Plane.arcFinish(firstArc);
+        low = 1 / 2 by Plane.lowerHalf_at_finish_is_midpoint;
+        secondArc(2 * high - 1) = Plane.arcFinish(firstArc)
+            by substituting sharedOnSecond;
+        secondArc(2 * high - 1) = Plane.arcStart(secondArc) by sharedMiddle;
+        high = 1 / 2 by Plane.upperHalf_at_start_is_midpoint;
+        low = 1 / 2
+            = high;
+        done
+      }
+  }
+}
+
+-- Two arcs glued along both of their ends make a loop.
+theorem Plane.IsLoop.concatenate
+        (firstArc secondArc : ℝ → Plane.Point)
+        (firstIsArc : Plane.IsArc(firstArc))
+        (secondIsArc : Plane.IsArc(secondArc))
+        (sharedMiddle
+            : Plane.arcFinish(firstArc) = Plane.arcStart(secondArc))
+        (closesUp
+            : Plane.arcFinish(secondArc) = Plane.arcStart(firstArc))
+        (meetOnlyAtEnds
+            : ∀ (z : Plane.Point). z ∈ Plane.arc(firstArc) →
+                z ∈ Plane.arc(secondArc) →
+                  z = Plane.arcStart(firstArc) ∨ z = Plane.arcFinish(firstArc))
+        : Plane.IsLoop(Plane.concatenate(firstArc, secondArc)) := {
+  MetricSpace.ContinuousOn(firstArc, Real.unitInterval);
+  MetricSpace.InjectiveOn(firstArc, Real.unitInterval) as firstInjective;
+  MetricSpace.ContinuousOn(secondArc, Real.unitInterval);
+  MetricSpace.InjectiveOn(secondArc, Real.unitInterval) as secondInjective;
+  MetricSpace.ContinuousOn(
+      Plane.concatenate(firstArc, secondArc), Real.unitInterval)
+      by Plane.concatenate_ContinuousOn;
+
+  Plane.concatenate(firstArc, secondArc)(0)
+     = Plane.arcStart(firstArc) by Plane.concatenate_start
+     = Plane.arcFinish(secondArc) by closesUp
+     = Plane.concatenate(firstArc, secondArc)(1) by Plane.concatenate_finish;
+
+  MetricSpace.InjectiveOn(
+      Plane.concatenate(firstArc, secondArc),
+      Real.unitInterval ∖ Set.singleton(ℝ, 1))
+      by {
+        take x : ℝ;
+        suppose x ∈ Real.unitInterval ∖ Set.singleton(ℝ, 1);
+        take y : ℝ;
+        suppose y ∈ Real.unitInterval ∖ Set.singleton(ℝ, 1);
+        suppose Plane.concatenate(firstArc, secondArc)(x)
+                    = Plane.concatenate(firstArc, secondArc)(y) as sameValue;
+        x ∈ Real.unitInterval;
+        y ∈ Real.unitInterval;
+        x ∉ Set.singleton(ℝ, 1);
+        y ∉ Set.singleton(ℝ, 1);
+        x ≠ 1;
+        y ≠ 1;
+        (2 : ℝ) ≠ 0;
+        done by cases {
+          case x ≤ 1 / 2: {
+              x ∈ Plane.lowerHalf;
+              2 * x ∈ Real.unitInterval by Plane.lowerHalf_lands;
+              Plane.concatenate(firstArc, secondArc)(x) = firstArc(2 * x)
+                  by Logic.if_positive;
+              done by cases {
+                case y ≤ 1 / 2: {
+                    y ∈ Plane.lowerHalf;
+                    2 * y ∈ Real.unitInterval by Plane.lowerHalf_lands;
+                    Plane.concatenate(firstArc, secondArc)(y) = firstArc(2 * y)
+                        by Logic.if_positive as valueAtY;
+                    firstArc(2 * x)
+                       = Plane.concatenate(firstArc, secondArc)(x)
+                       = Plane.concatenate(firstArc, secondArc)(y) by sameValue
+                       = firstArc(2 * y) by valueAtY;
+                    2 * x = 2 * y by firstInjective;
+                    done by Real.equal_of_multiply_left
+                  }
+                otherwise: {
+                    y ≥ 1 / 2 by Real.not_LessOrEqual_implies;
+                    y ∈ Plane.upperHalf;
+                    done by Plane.concatenate_across_seam_of_loop
+                  }
+              }
+            }
+          otherwise: {
+              x ≥ 1 / 2 by Real.not_LessOrEqual_implies;
+              x ∈ Plane.upperHalf;
+              2 * x - 1 ∈ Real.unitInterval by Plane.upperHalf_lands;
+              Plane.concatenate(firstArc, secondArc)(x)
+                  = secondArc(2 * x - 1) by Logic.if_negative;
+              done by cases {
+                case y ≤ 1 / 2: {
+                    y ∈ Plane.lowerHalf;
+                    Plane.concatenate(firstArc, secondArc)(y)
+                        = Plane.concatenate(firstArc, secondArc)(x) by sameValue;
+                    y = x by Plane.concatenate_across_seam_of_loop;
+                    done
+                  }
+                otherwise: {
+                    y ≥ 1 / 2 by Real.not_LessOrEqual_implies;
+                    y ∈ Plane.upperHalf;
+                    2 * y - 1 ∈ Real.unitInterval by Plane.upperHalf_lands;
+                    Plane.concatenate(firstArc, secondArc)(y)
+                        = secondArc(2 * y - 1)
+                        by Logic.if_negative as valueAtY;
+                    secondArc(2 * x - 1)
+                       = Plane.concatenate(firstArc, secondArc)(x)
+                       = Plane.concatenate(firstArc, secondArc)(y) by sameValue
+                       = secondArc(2 * y - 1) by valueAtY;
+                    2 * x - 1 = 2 * y - 1 by secondInjective as sameRetimed;
+                    2 * x = 2 * y by linear_combination(sameRetimed);
+                    done by Real.equal_of_multiply_left
+                  }
+              }
+            }
+        }
+      };
+  done
+}
+
+-- ----------------------------------------------------------------------
 -- What the concatenation covers.
 --
 -- Each half retimes ONTO the whole interval — half a parameter is the one
@@ -743,4 +964,154 @@ theorem Plane.arc_concatenate
         }
       };
   done by Set.equal_of_same_members
+}
+
+-- ----------------------------------------------------------------------
+-- The set-level reading: pieces, not parametrisations.
+--
+-- This is the form the rest of the development speaks. A piece is an arc
+-- between two named points; two such pieces meeting only where they are
+-- joined make one longer piece, and two meeting at both of their ends make
+-- a Jordan curve. The parametrisations are chosen inside the proofs and are
+-- never seen again.
+
+-- An arc between two points is an arc between them the other way round:
+-- run its parameter from 1 back to 0.
+theorem Plane.IsArcBetween.reverse (piece : Set(Plane.Point)) (p q : Plane.Point)
+        (isArcBetween : Plane.IsArcBetween(piece, p, q))
+        : Plane.IsArcBetween(piece, q, p) := {
+  choose parametrisation such that
+      Plane.IsArc(parametrisation)
+      ∧ (Plane.arc(parametrisation) = piece
+             ∧ (Plane.arcStart(parametrisation) = p
+                    ∧ Plane.arcFinish(parametrisation) = q))
+      from isArcBetween;
+  Plane.IsArc(parametrisation);
+  Plane.arc(parametrisation) = piece as covers;
+  Plane.arcStart(parametrisation) = p;
+  Plane.arcFinish(parametrisation) = q;
+  (0 : ℝ) ∈ Real.unitInterval by Real.zero_in_unitInterval;
+  (1 : ℝ) ∈ Real.unitInterval by Real.one_in_unitInterval;
+  (1 : ℝ) ≠ 0;
+
+  Plane.IsArc(Plane.subarc(parametrisation, 1, 0)) by Plane.IsArc.subarc;
+  Plane.arc(Plane.subarc(parametrisation, 1, 0))
+     = Set.image(parametrisation, Real.segment(1, 0)) by Plane.subarc_image
+     = Set.image(parametrisation, Real.unitInterval) by Real.segment_one_zero
+     = piece by covers;
+  Plane.arcStart(Plane.subarc(parametrisation, 1, 0)) = q by Plane.subarc_start;
+  Plane.arcFinish(Plane.subarc(parametrisation, 1, 0)) = p by Plane.subarc_finish;
+  done by { witness Plane.subarc(parametrisation, 1, 0) }
+}
+
+-- Two pieces meeting only at the point where they are joined make one.
+theorem Plane.IsArcBetween.concatenate
+        (first second : Set(Plane.Point)) (a b c : Plane.Point)
+        (firstBetween : Plane.IsArcBetween(first, a, b))
+        (secondBetween : Plane.IsArcBetween(second, b, c))
+        (meetOnlyAtJoin
+            : ∀ (z : Plane.Point). z ∈ first → z ∈ second → z = b)
+        : Plane.IsArcBetween(first ∪ second, a, c) := {
+  choose firstArc such that
+      Plane.IsArc(firstArc)
+      ∧ (Plane.arc(firstArc) = first
+             ∧ (Plane.arcStart(firstArc) = a ∧ Plane.arcFinish(firstArc) = b))
+      from firstBetween;
+  Plane.IsArc(firstArc);
+  Plane.arc(firstArc) = first as firstCovers;
+  Plane.arcStart(firstArc) = a;
+  Plane.arcFinish(firstArc) = b as firstEndsAtJoin;
+
+  choose secondArc such that
+      Plane.IsArc(secondArc)
+      ∧ (Plane.arc(secondArc) = second
+             ∧ (Plane.arcStart(secondArc) = b ∧ Plane.arcFinish(secondArc) = c))
+      from secondBetween;
+  Plane.IsArc(secondArc);
+  Plane.arc(secondArc) = second as secondCovers;
+  Plane.arcStart(secondArc) = b;
+  Plane.arcFinish(secondArc) = c;
+
+  Plane.arcFinish(firstArc) = Plane.arcStart(secondArc);
+  ∀ (z : Plane.Point). z ∈ Plane.arc(firstArc) → z ∈ Plane.arc(secondArc) →
+      z = Plane.arcFinish(firstArc)
+      by { take z : Plane.Point;
+           suppose z ∈ Plane.arc(firstArc);
+           suppose z ∈ Plane.arc(secondArc);
+           z ∈ first by substituting firstCovers;
+           z ∈ second by substituting secondCovers;
+           z = b by meetOnlyAtJoin
+             = Plane.arcFinish(firstArc) by firstEndsAtJoin;
+           done };
+
+  Plane.IsArc(Plane.concatenate(firstArc, secondArc)) by Plane.IsArc.concatenate;
+  Plane.arc(Plane.concatenate(firstArc, secondArc))
+     = Plane.arc(firstArc) ∪ Plane.arc(secondArc) by Plane.arc_concatenate
+     = first ∪ Plane.arc(secondArc) by firstCovers
+     = first ∪ second by secondCovers;
+  Plane.arcStart(Plane.concatenate(firstArc, secondArc)) = a
+      by Plane.concatenate_start;
+  Plane.arcFinish(Plane.concatenate(firstArc, secondArc)) = c
+      by Plane.concatenate_finish;
+  done by { witness Plane.concatenate(firstArc, secondArc) }
+}
+
+-- And two pieces meeting at both of their ends make a Jordan curve. This is
+-- the converse of `Plane.IsJordanCurve.two_arcs`, and the form every
+-- construction of a curve in this development takes: a cycle of a plane
+-- graph arrives as a path and one more edge back to where it started.
+theorem Plane.IsJordanCurve.of_two_arcs
+        (first second : Set(Plane.Point)) (a b : Plane.Point)
+        (firstBetween : Plane.IsArcBetween(first, a, b))
+        (secondBetween : Plane.IsArcBetween(second, b, a))
+        (meetOnlyAtEnds
+            : ∀ (z : Plane.Point). z ∈ first → z ∈ second → z = a ∨ z = b)
+        : Plane.IsJordanCurve(first ∪ second) := {
+  choose firstArc such that
+      Plane.IsArc(firstArc)
+      ∧ (Plane.arc(firstArc) = first
+             ∧ (Plane.arcStart(firstArc) = a ∧ Plane.arcFinish(firstArc) = b))
+      from firstBetween;
+  Plane.IsArc(firstArc);
+  Plane.arc(firstArc) = first as firstCovers;
+  Plane.arcStart(firstArc) = a as firstStartsAtA;
+  Plane.arcFinish(firstArc) = b as firstEndsAtB;
+
+  choose secondArc such that
+      Plane.IsArc(secondArc)
+      ∧ (Plane.arc(secondArc) = second
+             ∧ (Plane.arcStart(secondArc) = b ∧ Plane.arcFinish(secondArc) = a))
+      from secondBetween;
+  Plane.IsArc(secondArc);
+  Plane.arc(secondArc) = second as secondCovers;
+  Plane.arcStart(secondArc) = b;
+  Plane.arcFinish(secondArc) = a;
+
+  Plane.arcFinish(firstArc) = Plane.arcStart(secondArc);
+  Plane.arcFinish(secondArc) = Plane.arcStart(firstArc);
+  ∀ (z : Plane.Point). z ∈ Plane.arc(firstArc) → z ∈ Plane.arc(secondArc) →
+      z = Plane.arcStart(firstArc) ∨ z = Plane.arcFinish(firstArc)
+      by { take z : Plane.Point;
+           suppose z ∈ Plane.arc(firstArc);
+           suppose z ∈ Plane.arc(secondArc);
+           z ∈ first by substituting firstCovers;
+           z ∈ second by substituting secondCovers;
+           z = a ∨ z = b by meetOnlyAtEnds;
+           done by cases {
+             case z = a: {
+                 z = Plane.arcStart(firstArc) by firstStartsAtA;
+                 done
+               }
+             case z = b: {
+                 z = Plane.arcFinish(firstArc) by firstEndsAtB;
+                 done
+               }
+           } };
+
+  Plane.IsLoop(Plane.concatenate(firstArc, secondArc)) by Plane.IsLoop.concatenate;
+  Set.image(Plane.concatenate(firstArc, secondArc), Real.unitInterval)
+     = Plane.arc(firstArc) ∪ Plane.arc(secondArc) by Plane.arc_concatenate
+     = first ∪ Plane.arc(secondArc) by firstCovers
+     = first ∪ second by secondCovers;
+  done by { witness Plane.concatenate(firstArc, secondArc) }
 }

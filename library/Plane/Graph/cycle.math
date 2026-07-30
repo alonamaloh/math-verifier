@@ -1,0 +1,272 @@
+-- Plane/Graph/cycle.math
+--
+-- The realisation of a cycle is a Jordan curve. Layer 6 of
+-- PLAN_JORDAN_SCHOENFLIES.md.
+--
+-- A cycle of a plane graph arrives as Layer 5 presents it: an edge, and a
+-- path between that edge's two ends which does not use it. Its realisation
+-- is the set of points the arcs of those edges occupy, and the claim is
+-- that this set is a Jordan curve.
+--
+-- The whole argument is set-level. `Plane.IsArcBetween` — a piece with two
+-- named endpoints — is what a path is drawn by, and the two gluing theorems
+-- of `Plane/concatenate.math` do the work: pieces meeting only where they
+-- are joined make one piece, and two pieces meeting at both of their ends
+-- make a Jordan curve. No parametrisation of a walk is ever constructed:
+-- the arcs are chosen inside the induction and the concatenation of them is
+-- chosen by the gluing theorem, exactly as `Plane.exists_cut_points`
+-- produces the overlay's cut points without naming them.
+--
+-- The geometry enters once, and it is the layer's workhorse: two distinct
+-- edges meet only at a vertex incident with both. Everything else is the
+-- path's own freshness clause — the vertex a step departs from is not one
+-- the rest of the path visits — which is exactly what rules out the first
+-- edge's arc touching the rest anywhere but at the waypoint.
+
+module Plane.Graph.cycle
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Equality.basics
+import axioms
+import Set.basics
+import Set.algebra
+import Lists.list
+import Lists.set_union
+import Real.interface
+import Real.order
+import Metric.space
+import Metric.interval
+import Plane.point
+import Plane.curve
+import Plane.subarc
+import Plane.concatenate
+import Graph.basics
+import Graph.walk
+import Graph.path
+import Graph.cycle
+import Plane.Graph.basics
+import Plane.Graph.pointset
+
+convention E : Type(0)
+convention ends : E → Pair(Plane.Point, Plane.Point)
+
+-- ----------------------------------------------------------------------
+-- One edge.
+
+-- The drawing gives an arc between the edge's two ends, whichever way round
+-- the caller names them: the arc runs between them by the drawing
+-- condition, and an arc between two points is an arc between them the other
+-- way round.
+theorem Plane.Graph.IsDrawing.edge_IsArcBetween (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
+        (edge : E) (isEdge : edge ∈ Graph.edges(graph))
+        (u v : Plane.Point) (joins : Graph.Joins(graph, edge, u, v))
+        : Plane.IsArcBetween(Plane.arc(drawing(edge)), u, v) := {
+  Graph.IsWellFormed(graph) by Plane.Graph.IsDrawing.IsWellFormed;
+  u ≠ v by Graph.IsWellFormed.no_loop;
+  Plane.IsArc(drawing(edge)) by Plane.Graph.IsDrawing.IsArc;
+  Graph.Joins(graph, edge,
+      Plane.arcStart(drawing(edge)), Plane.arcFinish(drawing(edge)))
+      by Plane.Graph.IsDrawing.joins_ends;
+  Plane.IsArcBetween(Plane.arc(drawing(edge)),
+      Plane.arcStart(drawing(edge)), Plane.arcFinish(drawing(edge)))
+      by { witness drawing(edge) };
+  (Plane.arcStart(drawing(edge)) = u ∧ Plane.arcFinish(drawing(edge)) = v)
+      ∨ (Plane.arcStart(drawing(edge)) = v ∧ Plane.arcFinish(drawing(edge)) = u)
+      by Graph.Joins.ends_agree;
+  done by cases {
+    case Plane.arcStart(drawing(edge)) = u ∧ Plane.arcFinish(drawing(edge)) = v: {
+        Plane.arcStart(drawing(edge)) = u as startsAtSource;
+        Plane.arcFinish(drawing(edge)) = v as finishesAtTarget;
+        Plane.IsArcBetween(Plane.arc(drawing(edge)),
+            u, Plane.arcFinish(drawing(edge))) by substituting startsAtSource;
+        done by substituting finishesAtTarget
+      }
+    case Plane.arcStart(drawing(edge)) = v ∧ Plane.arcFinish(drawing(edge)) = u: {
+        Plane.arcStart(drawing(edge)) = v as startsAtTarget;
+        Plane.arcFinish(drawing(edge)) = u as finishesAtSource;
+        Plane.IsArcBetween(Plane.arc(drawing(edge)),
+            v, Plane.arcFinish(drawing(edge))) by substituting startsAtTarget;
+        Plane.IsArcBetween(Plane.arc(drawing(edge)), v, u)
+            by substituting finishesAtSource;
+        done by Plane.IsArcBetween.reverse
+      }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- A path.
+
+-- The first edge's arc meets the rest of the path only at the waypoint.
+-- Two cases, and neither of them is geometric beyond the workhorse: if the
+-- rest takes the same edge again, the source is one of its ends, and if it
+-- takes a different one, a common point is a vertex of both — so it is the
+-- source or the waypoint. Either way a point that is the source would put
+-- the source among the vertices the rest visits, which is what the path's
+-- freshness clause forbids.
+theorem Plane.Graph.IsDrawing.first_edge_meets_rest (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
+        (edge : E) (isEdge : edge ∈ Graph.edges(graph))
+        (source waypoint : Plane.Point)
+        (joins : Graph.Joins(graph, edge, source, waypoint))
+        (rest : List(E)) (restAreEdges : rest ⊆ Graph.edges(graph))
+        (fresh : source ∉ Graph.walkVertices(graph, waypoint, rest))
+        (z : Plane.Point)
+        (onEdge : z ∈ Plane.arc(drawing(edge)))
+        (onRest : z ∈ Plane.Graph.edgesCover(drawing, rest))
+        : z = waypoint := {
+  Graph.IsWellFormed(graph) by Plane.Graph.IsDrawing.IsWellFormed;
+  choose other such that other ∈ rest ∧ z ∈ Plane.arc(drawing(other))
+      from List.unionOver_member_invert;
+  other ∈ rest;
+  z ∈ Plane.arc(drawing(other));
+  other ∈ Graph.edges(graph) by restAreEdges;
+
+  -- Taking the same edge again would put the source among the vertices the
+  -- rest visits.
+  edge ≠ other
+      by { suppose edge = other as takenAgain;
+           edge ∈ rest by substituting takenAgain;
+           Graph.Incident(graph, edge, source) by Graph.Joins.incident_source;
+           source ∈ Graph.coveredVertices(graph, rest)
+               by Graph.coveredVertices.of_edge;
+           source ∈ Graph.walkVertices(graph, waypoint, rest)
+               by Graph.walkVertices.of_covered;
+           done };
+
+  Graph.Incident(graph, edge, z) ∧ Graph.Incident(graph, other, z)
+      by Plane.Graph.IsDrawing.arcs_meet_at_vertex;
+  Graph.Incident(graph, edge, z);
+  Graph.Incident(graph, other, z);
+  z = source ∨ z = waypoint by Graph.Incident.is_end;
+  done by cases {
+    case z = source as atSource: {
+        Graph.Incident(graph, other, source) by substituting atSource;
+        source ∈ Graph.coveredVertices(graph, rest) by Graph.coveredVertices.of_edge;
+        source ∈ Graph.walkVertices(graph, waypoint, rest)
+            by Graph.walkVertices.of_covered;
+        done
+      }
+    case z = waypoint: done
+  }
+}
+
+-- A path that goes anywhere at all is drawn by an arc between its two ends,
+-- covering exactly the arcs of the edges it takes.
+theorem Plane.Graph.IsDrawing.path_IsArcBetween (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
+        (source target : Plane.Point) (edgeList : List(E))
+        (path : Graph.IsPath(graph, source, edgeList, target))
+        (moves : edgeList ≠ List.empty(E))
+        : Plane.IsArcBetween(Plane.Graph.edgesCover(drawing, edgeList), source, target) :=
+  by induction on path with IH {
+    case Graph.IsPathOver.arrived(endpoint):
+        done
+    case Graph.IsPathOver.step(
+        stepSource, waypoint, stepTarget, edge, rest, isEdge, joins, restPath, fresh): {
+        Plane.IsArcBetween(Plane.arc(drawing(edge)), stepSource, waypoint)
+            by Plane.Graph.IsDrawing.edge_IsArcBetween;
+        Graph.IsPath(graph, waypoint, rest, stepTarget);
+        rest ⊆ Graph.edges(graph) by Graph.IsPath.edge_is_edge;
+        done by cases {
+          case rest = List.empty(E): {
+              -- The path is the single edge, and the rest contributes nothing.
+              Graph.IsWalk(graph, waypoint, rest, stepTarget) by Graph.IsPath.walk;
+              waypoint = stepTarget by Graph.IsWalk.empty_endpoints as arrives;
+              Plane.Graph.edgesCover(drawing, List.prepend(E, edge, List.empty(E)))
+                 = Plane.arc(drawing(edge))
+                       ∪ Plane.Graph.edgesCover(drawing, List.empty(E))
+                 = Plane.arc(drawing(edge)) ∪ Set.empty(Plane.Point)
+                 = Plane.arc(drawing(edge)) by Set.union_empty
+                 as coversTheEdge;
+              Plane.IsArcBetween(Plane.arc(drawing(edge)), stepSource, stepTarget)
+                  by substituting arrives;
+              done by substituting coversTheEdge
+            }
+          otherwise: {
+              Plane.IsArcBetween(
+                  Plane.Graph.edgesCover(drawing, rest), waypoint, stepTarget) by IH;
+              ∀ (z : Plane.Point). z ∈ Plane.arc(drawing(edge)) →
+                  z ∈ Plane.Graph.edgesCover(drawing, rest) → z = waypoint
+                  by { take z : Plane.Point;
+                       suppose z ∈ Plane.arc(drawing(edge));
+                       suppose z ∈ Plane.Graph.edgesCover(drawing, rest);
+                       done by Plane.Graph.IsDrawing.first_edge_meets_rest };
+              done by Plane.IsArcBetween.concatenate(b := waypoint)
+            }
+        }
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- A cycle.
+
+-- The blueprint's "the realisation of a cycle is a Jordan curve". The
+-- detour is drawn by an arc from one end of the edge to the other, the edge
+-- is drawn by an arc back, and the two meet only at those two ends —
+-- because a common point lies on the edge and on some edge of the detour,
+-- which the detour does not contain, so it is a vertex incident with the
+-- edge.
+theorem Plane.Graph.cycle_IsJordanCurve (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
+        (edge : E) (u v : Plane.Point) (detour : List(E))
+        (isCycle : Graph.IsCycleThrough(graph, edge, u, v, detour))
+        : Plane.IsJordanCurve(
+              Plane.Graph.edgesCover(drawing, List.prepend(E, edge, detour))) := {
+  edge ∈ Graph.edges(graph);
+  Graph.Joins(graph, edge, u, v);
+  Graph.IsPath(graph, u, detour, v);
+  edge ∉ detour;
+  Graph.IsWellFormed(graph) by Plane.Graph.IsDrawing.IsWellFormed;
+  u ≠ v by Graph.IsWellFormed.no_loop;
+
+  -- A detour with no edges would return to where it set out, but the edge
+  -- has two distinct ends.
+  detour ≠ List.empty(E)
+      by { suppose detour = List.empty(E);
+           Graph.IsWalk(graph, u, detour, v) by Graph.IsPath.walk;
+           u = v by Graph.IsWalk.empty_endpoints;
+           done };
+
+  Plane.IsArcBetween(Plane.Graph.edgesCover(drawing, detour), u, v)
+      by Plane.Graph.IsDrawing.path_IsArcBetween;
+  Graph.Joins(graph, edge, v, u) by Graph.Joins.symmetric;
+  Plane.IsArcBetween(Plane.arc(drawing(edge)), v, u)
+      by Plane.Graph.IsDrawing.edge_IsArcBetween;
+
+  detour ⊆ Graph.edges(graph) by Graph.IsPath.edge_is_edge as detourAreEdges;
+  ∀ (z : Plane.Point). z ∈ Plane.Graph.edgesCover(drawing, detour) →
+      z ∈ Plane.arc(drawing(edge)) → z = u ∨ z = v
+      by { take z : Plane.Point;
+           suppose z ∈ Plane.Graph.edgesCover(drawing, detour) as onDetour;
+           suppose z ∈ Plane.arc(drawing(edge));
+           choose other such that other ∈ detour ∧ z ∈ Plane.arc(drawing(other))
+               from List.unionOver_member_invert;
+           other ∈ detour;
+           z ∈ Plane.arc(drawing(other));
+           other ∈ Graph.edges(graph) by detourAreEdges;
+           edge ≠ other
+               by { suppose edge = other as takenAgain;
+                    edge ∈ detour by substituting takenAgain;
+                    done };
+           Graph.Incident(graph, edge, z) ∧ Graph.Incident(graph, other, z)
+               by Plane.Graph.IsDrawing.arcs_meet_at_vertex;
+           Graph.Incident(graph, edge, z);
+           done by Graph.Incident.is_end };
+
+  Plane.IsJordanCurve(
+      Plane.Graph.edgesCover(drawing, detour) ∪ Plane.arc(drawing(edge)))
+      by Plane.IsJordanCurve.of_two_arcs(b := v);
+  Plane.Graph.edgesCover(drawing, List.prepend(E, edge, detour))
+     = Plane.arc(drawing(edge)) ∪ Plane.Graph.edgesCover(drawing, detour)
+     = Plane.Graph.edgesCover(drawing, detour) ∪ Plane.arc(drawing(edge))
+           by Set.union_commutative
+     as coversBoth;
+  done by substituting coversBoth
+}
