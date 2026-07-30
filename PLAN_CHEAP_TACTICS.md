@@ -154,33 +154,52 @@ unfolded on both sides), `Natural/binomial.math` (a by-less `≤` step hiding
 `Natural.le_successor` and a transitivity). All three now name what they use,
 which is what the style guide asks for anyway.
 
-### Deep search as an error-message generator — designed, NOT built
+### Deep search as an error-message generator — BUILT 2026-07-30
 
-The idea (owner's): cap the bridge at 1 for the normal path, and keep the
-uncapped search **only on the failure path**. When a claim fails under the cap,
-retry uncapped; if that closes it, the step is doing several rewrites at once,
-and the message can name one of them and tell the author to break it down.
-The economics are ideal — the expensive search runs only when we are already
-failing, so the happy path pays nothing.
+Working. When the equality bridge is capped and a declaration fails, the
+elaborator re-elaborates it **once, uncapped, on the failure path only**; if
+that succeeds, the step was doing several rewrites at once, and the message
+names the equations the deeper search used:
 
-I built it and **it did not fire**; the code is removed rather than left dead.
-Two placement lessons, both worth knowing before the next attempt:
+```
+library/Algebra/aggregation.math:195:1: elaborate error: calc step 1 at line 195
+  …
+  NOTE: this DOES elaborate when the equality bridge is allowed to chain more
+  rewrites than the current cap permits, so a step here is doing several
+  rewrites at once and the proof would say more if they were named.
+  The deeper search rewrote with:
+    - library lemma Natural.add_associative
+    - library lemma Algebra.indexedAggregate_add_one
+  State each rewritten form as its own claim, or cite the equation directly
+  with `by substituting <eq>`.
+```
 
-1. **Not in the prover's armed frame.** That frame is entered only for the
-   OUTERMOST claim, so a failure thrown from inside a `by cases` arm never
-   reaches its catch. The first version hooked there and saw nothing.
-2. **Not keyed on a flag reset per armed frame.** The second version set a
-   "the cap bit here" flag in the bridge and tested it at the claim's catch,
-   but the flag is cleared when a later claim arms its own budget, so it was
-   false by the time the failing claim reported.
+That is the whole point of the ladder: each of the ~34 remaining cap-1 breaks
+now *explains itself*, instead of having to be reverse-engineered.
 
-What the next attempt should do instead: have the BRIDGE itself record, per
-claim, that it declined a rewrite for want of prove budget — in something with
-the same lifetime as the claim, not the armed frame — and have
-`elaborateStructuredClaim` consult that on its failure path. Verify against a
-site known to fail *because of* the cap, not merely a site that fails while the
-cap is set: at cap 1 many files fail for reasons unrelated to the bridge, and I
-mistook one of those for a non-firing feature twice.
+**Design notes, all of them earned by getting it wrong first.**
+
+- **Hook at the TOP STATEMENT, not the claim.** A step can fail on several
+  paths — a structured claim, a **calc step**, a coercion — and only the top
+  statement sees all of them. The fixture that finally exercised this
+  (`Algebra/aggregation.math`) fails in a *calc step*, so a claim-level hook
+  came up empty. The message is appended to the original error, which already
+  carries the precise line, so coarse hooking costs no precision.
+- **The "cap bit here" counter needs the STATEMENT's lifetime.** Two earlier
+  attempts keyed it to the prover's armed frame, which is entered only for the
+  outermost claim and is therefore already stale when a nested arm reports.
+- **Gate the retry on the counter, not on failure alone.** Speculative probes
+  fail constantly; retrying each uncapped would be catastrophic. `inDeepRetry_`
+  additionally stops the retry re-entering itself.
+- **Inert by default.** With the cap unlimited (the default),
+  `bridgeDeclines_` never increments, so the retry never runs and the happy
+  path pays nothing.
+- **Build the fixture before the feature.** A site that fails *while* the cap
+  is set is not the same as one that fails *because of* it — at cap 1 many
+  files fail for unrelated reasons. I mistook one of those for a non-firing
+  feature twice. The fixture procedure that works: run the full library at
+  cap 1 with `make -k`, then re-verify candidates STANDALONE both capped and
+  uncapped, and keep only those that pass uncapped and fail capped.
 
 ## Recommended order
 

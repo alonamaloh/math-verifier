@@ -247,6 +247,13 @@ void Elaborator::runModule(const SurfaceModule& module) {
             }
         }
         for (const auto& statement : module.statements) {
+            // Diagnose a failure the capped equality bridge may have caused.
+            // Hooked HERE rather than at the claim, because a step can fail on
+            // several paths — a structured claim, a calc step, a coercion —
+            // and only the top statement sees all of them. The message is
+            // appended to the original error, which already carries the
+            // precise line.
+            bridgeDeclines_ = 0;
             if (timeDeclarations || claimCostEnabled_) {
                 long long t0 = monotonicNanos();
                 elaborateTopStatement(statement);
@@ -261,7 +268,17 @@ void Elaborator::runModule(const SurfaceModule& module) {
                 }
                 if (claimCostEnabled_) reportClaimCosts(label);
             } else {
-                elaborateTopStatement(statement);
+                try {
+                    elaborateTopStatement(statement);
+                } catch (const ElaborateError& failure) {
+                    if (bridgeDeclines_ == 0) throw;
+                    std::string route =
+                        describeDeepEqualityRoute(statement);
+                    if (route.empty()) throw;
+                    throw ElaborateError(
+                        std::string(failure.what()) + route,
+                        failure.line, failure.column);
+                }
             }
         }
         if (enableKernelCache) kernelCacheEnabled = previousKernelCache;
@@ -608,4 +625,52 @@ void Elaborator::reportClaimCosts(const std::string& declarationLabel) {
             }
             std::cerr << "\n";
         }
+    }
+
+// Re-elaborate a failed top statement with the equality bridge uncapped, purely
+// to describe the deeper route. Never called except on a failure path, so the
+// happy path pays nothing.
+std::string Elaborator::describeDeepEqualityRoute(
+        const SurfaceTopStatement& statement) {
+        if (inDeepRetry_) return "";
+        struct Restore {
+            Elaborator& e;
+            int savedOverride;
+            ~Restore() {
+                e.inDeepRetry_ = false;
+                e.bridgeProveCapOverride_ = savedOverride;
+                e.deepRoute_.clear();
+            }
+        } restore{*this, bridgeProveCapOverride_};
+        inDeepRetry_ = true;
+        bridgeProveCapOverride_ = 1000000;   // uncapped, for this retry only
+        deepRoute_.clear();
+        try {
+            elaborateTopStatement(statement);
+        } catch (...) {
+            return "";   // fails either way: the cap is not the story
+        }
+        std::string message =
+            "\n  NOTE: this DOES elaborate when the equality bridge is allowed "
+            "to chain more rewrites than the current cap permits, so a step "
+            "here is doing several rewrites at once and the proof would say "
+            "more if they were named.";
+        if (!deepRoute_.empty()) {
+            message += "\n  The deeper search rewrote with:";
+            std::vector<std::string> shown;
+            for (const std::string& step : deepRoute_) {
+                bool seen = false;
+                for (const std::string& already : shown) {
+                    if (already == step) seen = true;
+                }
+                if (seen) continue;
+                shown.push_back(step);
+                message += "\n    - " + step;
+                if (shown.size() >= 6) break;
+            }
+        }
+        message +=
+            "\n  State each rewritten form as its own claim, or cite the "
+            "equation directly with `by substituting <eq>`.";
+        return message;
     }

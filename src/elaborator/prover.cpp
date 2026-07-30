@@ -1923,7 +1923,9 @@ ExpressionPointer Elaborator::tryContextEqualityBridge(
         // a low effort cap first finds that winner before a loser can spend
         // the full budget. Completeness is unaffected: pass 2 is the old
         // pass 1, unchanged.
-        int recursiveProvesLeft = contextEqualityBridgeProveCap();
+        int recursiveProvesLeft = bridgeProveCapOverride_ > 0
+            ? bridgeProveCapOverride_
+            : contextEqualityBridgeProveCap();
         for (int pass = 0; pass < 2; ++pass) {
           bool fastOnly = (pass == 0);
           for (const ContextEquality& eq : equalities) {
@@ -2019,7 +2021,12 @@ ExpressionPointer Elaborator::tryContextEqualityBridge(
                     // Pass 0 does the cheap close ONLY — let a later equation
                     // (or pass 1) handle anything that needs the real search.
                     if (fastOnly) continue;
-                    if (recursiveProvesLeft <= 0) continue;
+                    if (recursiveProvesLeft <= 0) {
+                        // Record the refusal so the claim's failure path knows
+                        // a deeper search was available to try.
+                        ++bridgeDeclines_;
+                        continue;
+                    }
                     --recursiveProvesLeft;
                     try {
                         proofRewritten = autoProveClaim(
@@ -2028,6 +2035,9 @@ ExpressionPointer Elaborator::tryContextEqualityBridge(
                     } catch (const ElaborateError&) { continue; }
                       catch (const TypeError&) { continue; }
 
+                }
+                if (inDeepRetry_ && !eq.source.empty()) {
+                    deepRoute_.push_back(eq.source);
                 }
                 ExpressionPointer motive = makeLambda(
                     "_rewriteHole",

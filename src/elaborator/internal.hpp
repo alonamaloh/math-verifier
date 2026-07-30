@@ -1770,6 +1770,9 @@ private:
     //   outer slots that are bound by unification. Slots not bound
     //   by unification must be findable in local hypotheses by
     //   structural-type match.
+    // On a failed declaration, diagnose a capped-bridge route (see above).
+    std::string describeDeepEqualityRoute(const SurfaceTopStatement& statement);
+
     ExpressionPointer elaborateStructuredClaim(
         const SurfaceStructuredClaim& claim,
         const std::vector<LocalBinder>& localBinders,
@@ -7081,6 +7084,27 @@ private:
     // re-proof that would exceed the threshold trips the budget and yields
     // no proof, so the hint is (correctly) left in place. A zero threshold
     // leaves the budget untouched (cost gate disabled).
+    // ── Deep-route diagnosis ──────────────────────────────────────────
+    //
+    // When `contextEqualityBridge` is capped, a claim that fails under the cap
+    // may well close if the bridge is allowed to chain more rewrites. Retrying
+    // UNCAPPED on the failure path turns that into the most useful message the
+    // elaborator can give — "this step is doing several rewrites at once; here
+    // are the equations it needed" — and costs nothing on the happy path,
+    // because it runs only once we are already going to fail.
+    //
+    // Lifetime matters and is why two earlier attempts saw nothing. The count
+    // below is saved and restored around EACH claim (like `claimChildMicros_`),
+    // not reset per armed prover frame: the armed frame is entered only for the
+    // outermost claim, so a flag scoped to it is already stale by the time a
+    // `by cases` arm reports its own failure.
+    int bridgeDeclines_ = 0;      // rewrites the cap refused, this claim
+    bool inDeepRetry_ = false;    // keeps the retry from re-entering itself
+    std::vector<std::string> deepRoute_;  // equations the uncapped run used
+    // >0 forces the bridge's per-claim prove cap, overriding the env knob.
+    // Used to lift the cap for the duration of a retry.
+    int bridgeProveCapOverride_ = 0;
+
     // A self-contained low-effort window for a SPECULATIVE prover call.
     //
     // `RedundancyBudgetGuard` only lowers the ceiling, and the budget is
