@@ -136,6 +136,52 @@ instead of 190-second successes.
 This is a language-policy change, not a tactic change, and it would touch every
 file. Not a next step; the thing A–C are incrementally walking toward.
 
+## The ladder, and the deep-search-as-error-message idea
+
+**Status 2026-07-30: cap 6 is GREEN.** Walking the cap down and treating each
+break as a proof to improve works, and the fixes are improvements:
+
+| prove cap | files failing | state |
+| --- | --- | --- |
+| 6 | 3 → **0** | done — three proofs written out |
+| 3 | 16 | next |
+| 1 | 35 | the goal; worth 14.9 s → 6.4 s on the profiled file |
+
+The three fixed: `Natural/distance.math` (`le_add_distance` was hiding
+`distance_succ_succ` plus an associativity shuffle behind a bare `done by`),
+`Natural/cancellation.math` (a by-less chain step hiding successor-multiply
+unfolded on both sides), `Natural/binomial.math` (a by-less `≤` step hiding
+`Natural.le_successor` and a transitivity). All three now name what they use,
+which is what the style guide asks for anyway.
+
+### Deep search as an error-message generator — designed, NOT built
+
+The idea (owner's): cap the bridge at 1 for the normal path, and keep the
+uncapped search **only on the failure path**. When a claim fails under the cap,
+retry uncapped; if that closes it, the step is doing several rewrites at once,
+and the message can name one of them and tell the author to break it down.
+The economics are ideal — the expensive search runs only when we are already
+failing, so the happy path pays nothing.
+
+I built it and **it did not fire**; the code is removed rather than left dead.
+Two placement lessons, both worth knowing before the next attempt:
+
+1. **Not in the prover's armed frame.** That frame is entered only for the
+   OUTERMOST claim, so a failure thrown from inside a `by cases` arm never
+   reaches its catch. The first version hooked there and saw nothing.
+2. **Not keyed on a flag reset per armed frame.** The second version set a
+   "the cap bit here" flag in the bridge and tested it at the claim's catch,
+   but the flag is cleared when a later claim arms its own budget, so it was
+   false by the time the failing claim reported.
+
+What the next attempt should do instead: have the BRIDGE itself record, per
+claim, that it declined a rewrite for want of prove budget — in something with
+the same lifetime as the claim, not the armed frame — and have
+`elaborateStructuredClaim` consult that on its failure path. Verify against a
+site known to fail *because of* the cap, not merely a site that fails while the
+cap is set: at cap 1 many files fail for reasons unrelated to the bridge, and I
+mistook one of those for a non-firing feature twice.
+
 ## Recommended order
 
 1. **A**, because it is additive, cannot regress anything, and lets us convert

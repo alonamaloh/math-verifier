@@ -79,9 +79,19 @@ theorem Natural.multiply_cancel_right (a : ℕ)
               successor(predA) = 0 as successorEqualsZero;
               absurd(successorEqualsZero)
             }
-          case b = successor(predB) for some predB: {
+          case b = successor(predB) for some predB as bIsSuccessor: {
+              -- Unfold the successor multiplication on both sides of the
+              -- hypothesis: `successor(x) * c` is `c + x * c`.
+              successor(predA) * c = c + predA * c
+                  by Natural.successor_multiply as leftUnfolds;
+              successor(predB) * c = c + predB * c
+                  by Natural.successor_multiply as rightUnfolds;
+              successor(predA) * c = successor(predB) * c
+                  by substituting bIsSuccessor;
               c + predA * c
-                      = c + predB * c;
+                 = successor(predA) * c by leftUnfolds
+                 = successor(predB) * c
+                 = c + predB * c by rightUnfolds;
               predA * c = predB * c as reduced;
               predA = predB
                 by IH(predB, c, positivity, reduced);
