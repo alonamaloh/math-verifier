@@ -932,3 +932,200 @@ theorem Plane.overlayGraph_IsWellFormed (pieces : List(Plane.Segment))
            } };
   done
 }
+
+theorem Plane.overlayGraph_IsDrawing (pieces : List(Plane.Segment))
+        (points : List(Plane.Point))
+        (allDistinct : ∀ (piece : Plane.Segment). piece ∈ pieces →
+            Product.first(piece) ≠ Product.second(piece))
+        (endsCut : Plane.EndsAreCut(pieces, points))
+        (meetsCut : Plane.MeetsAreCut(pieces, points))
+        : Plane.Graph.IsDrawing(Plane.overlayGraph(pieces, points),
+              Plane.segmentDrawing) := {
+  Graph.IsWellFormed(Plane.overlayGraph(pieces, points))
+      by Plane.overlayGraph_IsWellFormed;
+  Graph.edges(Plane.overlayGraph(pieces, points)) = Plane.overlayPieces(pieces, points)
+      by Plane.overlayGraph_edges as edgesAre;
+
+  -- No vertex is interior to an edge: a vertex is an end of some edge, hence a
+  -- cut point, and a cut point is interior to nothing.
+  ∀ (piece : Plane.Segment). ∀ (vertex : Plane.Point).
+      piece ∈ Graph.edges(Plane.overlayGraph(pieces, points)) →
+      vertex ∈ Graph.vertices(Plane.overlayGraph(pieces, points)) →
+      vertex ∉ Plane.openSegment(Product.first(piece), Product.second(piece))
+      by { take piece : Plane.Segment;
+           take vertex : Plane.Point;
+           suppose piece ∈ Graph.edges(Plane.overlayGraph(pieces, points));
+           suppose vertex ∈ Graph.vertices(Plane.overlayGraph(pieces, points));
+           piece ∈ Plane.overlayPieces(pieces, points) by substituting edgesAre;
+           choose edge such that edge ∈ Plane.overlayPieces(pieces, points)
+               ∧ Plane.IsEndOf(vertex, edge) from Plane.overlayGraph_vertex_is_end;
+           edge ∈ Plane.overlayPieces(pieces, points);
+           Plane.IsEndOf(vertex, edge);
+           vertex ∈ points by Plane.overlayPieces_end_is_cut;
+           done by Plane.overlayPieces_avoids_cuts };
+
+  -- And distinct edges have disjoint interiors, which is separation.
+  ∀ (piece other : Plane.Segment). ∀ (x : Plane.Point).
+      piece ∈ Graph.edges(Plane.overlayGraph(pieces, points)) →
+      other ∈ Graph.edges(Plane.overlayGraph(pieces, points)) →
+      piece ≠ other →
+      x ∈ Plane.openSegment(Product.first(piece), Product.second(piece)) →
+      x ∉ Plane.openSegment(Product.first(other), Product.second(other))
+      by { take piece : Plane.Segment;
+           take other : Plane.Segment;
+           take x : Plane.Point;
+           suppose piece ∈ Graph.edges(Plane.overlayGraph(pieces, points));
+           suppose other ∈ Graph.edges(Plane.overlayGraph(pieces, points));
+           suppose piece ≠ other;
+           suppose x ∈ Plane.openSegment(Product.first(piece), Product.second(piece));
+           piece ∈ Plane.overlayPieces(pieces, points) by substituting edgesAre;
+           other ∈ Plane.overlayPieces(pieces, points) by substituting edgesAre;
+           done by Plane.overlayPieces_disjoint_interiors };
+  done by Plane.Graph.polygonal_IsDrawing
+}
+
+-- ----------------------------------------------------------------------
+-- And it occupies exactly what it was built from.
+
+theorem Plane.overlayGraph_pointSet (pieces : List(Plane.Segment))
+        (points : List(Plane.Point))
+        (allDistinct : ∀ (piece : Plane.Segment). piece ∈ pieces →
+            Product.first(piece) ≠ Product.second(piece))
+        : Plane.Graph.pointSet(Plane.overlayGraph(pieces, points), Plane.segmentDrawing)
+          = Plane.piecesCover(pieces) := {
+  -- An edge's arc is its segment, so the edge set is what the edges cover.
+  ∀ (edge : Plane.Segment). edge ∈ Plane.overlayPieces(pieces, points) →
+      Plane.arc(Plane.segmentDrawing(edge))
+          = Plane.segment(Product.first(edge), Product.second(edge))
+      by { take edge : Plane.Segment;
+           suppose edge ∈ Plane.overlayPieces(pieces, points);
+           done by Plane.arc_segmentDrawing };
+  List.unionOver((edge : Plane.Segment) ↦ Plane.arc(Plane.segmentDrawing(edge)),
+      Plane.overlayPieces(pieces, points))
+      = Plane.piecesCover(Plane.overlayPieces(pieces, points))
+      by List.unionOver_pointwise as edgeSetIsCover;
+
+  -- Deduplicating keeps the members, so it keeps the cover.
+  List.deduplicate(List.map(Plane.orientSegment, Plane.subdivide(pieces, points)))
+      ⊆ List.map(Plane.orientSegment, Plane.subdivide(pieces, points))
+      by List.deduplicate_subset;
+  List.map(Plane.orientSegment, Plane.subdivide(pieces, points))
+      ⊆ List.deduplicate(List.map(Plane.orientSegment, Plane.subdivide(pieces, points)))
+      by List.subset_deduplicate;
+  Plane.piecesCover(Plane.overlayPieces(pieces, points))
+      = Plane.piecesCover(List.map(Plane.orientSegment, Plane.subdivide(pieces, points)))
+      by List.unionOver_same_members as deduplicationKeepsCover;
+
+  -- And orienting keeps each piece's segment.
+  Plane.piecesCover(List.map(Plane.orientSegment, Plane.subdivide(pieces, points)))
+      = List.unionOver((part : Plane.Segment) ↦
+            Plane.segment(Product.first(Plane.orientSegment(part)),
+                          Product.second(Plane.orientSegment(part))),
+        Plane.subdivide(pieces, points))
+      by List.unionOver_map as coverThroughOrienting;
+  ∀ (part : Plane.Segment). part ∈ Plane.subdivide(pieces, points) →
+      Plane.segment(Product.first(Plane.orientSegment(part)),
+                    Product.second(Plane.orientSegment(part)))
+          = Plane.segment(Product.first(part), Product.second(part))
+      by { take part : Plane.Segment;
+           suppose part ∈ Plane.subdivide(pieces, points);
+           Plane.SameSegment(Plane.orientSegment(part), part)
+               by Plane.SameSegment.orientSegment;
+           done by Plane.SameSegment.segment };
+  List.unionOver((part : Plane.Segment) ↦
+        Plane.segment(Product.first(Plane.orientSegment(part)),
+                      Product.second(Plane.orientSegment(part))),
+      Plane.subdivide(pieces, points))
+      = Plane.piecesCover(Plane.subdivide(pieces, points))
+      by List.unionOver_pointwise as orientingKeepsCover;
+  Plane.piecesCover(Plane.subdivide(pieces, points)) = Plane.piecesCover(pieces)
+      by Plane.subdivide_covers as subdivisionKeepsCover;
+
+  Plane.Graph.edgeSet(Plane.overlayGraph(pieces, points), Plane.segmentDrawing)
+     = List.unionOver((edge : Plane.Segment) ↦ Plane.arc(Plane.segmentDrawing(edge)),
+           Plane.overlayPieces(pieces, points))
+     = Plane.piecesCover(Plane.overlayPieces(pieces, points)) by edgeSetIsCover
+     = Plane.piecesCover(List.map(Plane.orientSegment, Plane.subdivide(pieces, points)))
+           by deduplicationKeepsCover
+     = List.unionOver((part : Plane.Segment) ↦
+           Plane.segment(Product.first(Plane.orientSegment(part)),
+                         Product.second(Plane.orientSegment(part))),
+         Plane.subdivide(pieces, points)) by coverThroughOrienting
+     = Plane.piecesCover(Plane.subdivide(pieces, points)) by orientingKeepsCover
+     = Plane.piecesCover(pieces) by subdivisionKeepsCover as edgeSetIsPiecesCover;
+
+  -- Every vertex lies on an edge, so the vertex set adds nothing.
+  Plane.Graph.vertexSet(Plane.overlayGraph(pieces, points))
+      ⊆ Plane.Graph.edgeSet(Plane.overlayGraph(pieces, points), Plane.segmentDrawing)
+      by { take y : Plane.Point;
+           suppose y ∈ Plane.Graph.vertexSet(Plane.overlayGraph(pieces, points));
+           y ∈ Graph.vertices(Plane.overlayGraph(pieces, points))
+               by Plane.Graph.vertexSet_member_invert;
+           choose edge such that edge ∈ Plane.overlayPieces(pieces, points)
+               ∧ Plane.IsEndOf(y, edge) from Plane.overlayGraph_vertex_is_end;
+           edge ∈ Plane.overlayPieces(pieces, points);
+           Plane.IsEndOf(y, edge);
+           edge ∈ Graph.edges(Plane.overlayGraph(pieces, points));
+           Plane.arc(Plane.segmentDrawing(edge))
+               = Plane.segment(Product.first(edge), Product.second(edge))
+               by Plane.arc_segmentDrawing as arcIsSegment;
+           y ∈ Plane.segment(Product.first(edge), Product.second(edge))
+               by { done by cases {
+                      case y = Product.first(edge) as atFirstEnd: {
+                          Product.first(edge)
+                              ∈ Plane.segment(Product.first(edge), Product.second(edge))
+                              by Plane.left_in_segment;
+                          done by substituting atFirstEnd
+                        }
+                      case y = Product.second(edge) as atSecondEnd: {
+                          Product.second(edge)
+                              ∈ Plane.segment(Product.first(edge), Product.second(edge))
+                              by Plane.right_in_segment;
+                          done by substituting atSecondEnd
+                        }
+                    } };
+           y ∈ Plane.arc(Plane.segmentDrawing(edge)) by substituting arcIsSegment;
+           done by Plane.Graph.edgeSet_member };
+  Plane.Graph.edgeSet(Plane.overlayGraph(pieces, points), Plane.segmentDrawing)
+      ⊆ Plane.Graph.edgeSet(Plane.overlayGraph(pieces, points), Plane.segmentDrawing)
+      by Set.subset.reflexive;
+  Plane.Graph.pointSet(Plane.overlayGraph(pieces, points), Plane.segmentDrawing)
+      ⊆ Plane.Graph.edgeSet(Plane.overlayGraph(pieces, points), Plane.segmentDrawing)
+      by Set.union_subset;
+  Plane.Graph.edgeSet(Plane.overlayGraph(pieces, points), Plane.segmentDrawing)
+      ⊆ Plane.Graph.pointSet(Plane.overlayGraph(pieces, points), Plane.segmentDrawing)
+      by { take y : Plane.Point;
+           suppose y ∈ Plane.Graph.edgeSet(Plane.overlayGraph(pieces, points),
+               Plane.segmentDrawing);
+           done };
+  Plane.Graph.pointSet(Plane.overlayGraph(pieces, points), Plane.segmentDrawing)
+     = Plane.Graph.edgeSet(Plane.overlayGraph(pieces, points), Plane.segmentDrawing)
+           by Set.equal_of_same_members
+     = Plane.piecesCover(pieces) by edgeSetIsPiecesCover;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The overlay (`lem:polygonal-overlay`).
+--
+-- Finitely many segments, no one of them degenerate, can be made into a
+-- polygonal plane graph occupying exactly the same points: subdivide at the
+-- ends and the meets, orient, and name each segment once.
+
+theorem Plane.polygonal_overlay (pieces : List(Plane.Segment))
+        (allDistinct : ∀ (piece : Plane.Segment). piece ∈ pieces →
+            Product.first(piece) ≠ Product.second(piece))
+        : ∃ (graph : Plane.PolygonalGraph).
+              Plane.Graph.IsDrawing(graph, Plane.segmentDrawing)
+              ∧ Plane.Graph.pointSet(graph, Plane.segmentDrawing)
+                  = Plane.piecesCover(pieces) := {
+  choose points such that Plane.EndsAreCut(pieces, points)
+      ∧ Plane.MeetsAreCut(pieces, points) from Plane.exists_cut_points;
+  Plane.EndsAreCut(pieces, points);
+  Plane.MeetsAreCut(pieces, points);
+  Plane.Graph.IsDrawing(Plane.overlayGraph(pieces, points), Plane.segmentDrawing)
+      by Plane.overlayGraph_IsDrawing;
+  Plane.Graph.pointSet(Plane.overlayGraph(pieces, points), Plane.segmentDrawing)
+      = Plane.piecesCover(pieces) by Plane.overlayGraph_pointSet;
+  witness Plane.overlayGraph(pieces, points)
+}
