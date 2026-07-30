@@ -222,17 +222,26 @@ public:
 
     template <typename F>
     ExpressionPointer runTactic(const std::string& name, F&& fn) {
-        if (!tacticTimingEnabled_) {
-            ExpressionPointer result = fn();
-            if (result) lastWinningTactic_ = name;
-            return result;
-        }
-        ++tacticStats_[name].invocations;
+        // Timed unconditionally now, so the slow-step warning can name the
+        // tactic that BURNED the time as well as the one that closed the
+        // goal. Two clock_gettime calls per tactic invocation (~20 ns each)
+        // against tactics that cost microseconds to seconds; the map
+        // accounting stays behind MATH_TIME_TACTICS.
+        const bool detailed = tacticTimingEnabled_;
+        if (detailed) ++tacticStats_[name].invocations;
         long long t0 = monotonicNanos();
         ExpressionPointer result = fn();
-        long long t1 = monotonicNanos();
-        tacticStats_[name].totalMicros += (t1 - t0) / 1000;
-        if (result) { ++tacticStats_[name].successes; lastWinningTactic_ = name; }
+        long long elapsedMicros = (monotonicNanos() - t0) / 1000;
+        if (detailed) tacticStats_[name].totalMicros += elapsedMicros;
+        if (result) {
+            if (detailed) ++tacticStats_[name].successes;
+            lastWinningTactic_ = name;
+        } else if (elapsedMicros > dominantLosingMicros_) {
+            // Losers only: a tactic that closed nothing yet dominated the
+            // frame is exactly what an author needs told.
+            dominantLosingMicros_ = elapsedMicros;
+            dominantLosingTactic_ = name;
+        }
         return result;
     }
 
@@ -266,12 +275,44 @@ public:
     // contextEqualityBridge win, the chained facts for a transitivityBridge
     // win. Falls back to the strategy name; empty when nothing nameable
     // (e.g. ring/diff with no single cite).
+    // Record the winning fact's proposition for the expensive-step warning.
+    // Only the LAST win is kept, and only the outermost armed frame reads it,
+    // so this is one pretty-print per closed by-less claim.
+    void recordWinningProposition(
+            ExpressionPointer type,
+            const std::vector<LocalBinder>& localBinders) {
+        try {
+            lastWinningProposition_ =
+                prettyPrintInLocalScope(type, localBinders);
+        } catch (...) { lastWinningProposition_.clear(); }
+    }
+
+    void recordWinningEquation(
+            ExpressionPointer lhs, ExpressionPointer rhs,
+            const std::vector<LocalBinder>& localBinders) {
+        try {
+            lastWinningProposition_ =
+                prettyPrintInLocalScope(lhs, localBinders) + " = "
+                + prettyPrintInLocalScope(rhs, localBinders);
+        } catch (...) { lastWinningProposition_.clear(); }
+    }
+
     std::string expensiveStepWinnerHint() const {
         if (lastWinningTactic_ == "contextFactMatch"
             && !lastWinningDetail_.empty()) {
             std::string name =
                 citableNameFromFactSource(lastWinningDetail_);
             if (!name.empty()) return " (try `by " + name + "`)";
+            // Unnamed winner — an anonymous stated claim, or a conjunction
+            // leg. There is no name to cite, so report the PROPOSITION that
+            // did the work; the author can name that claim and cite it, or
+            // restate it with `by (<fact>)`. Printed in the diagnostics'
+            // usual spelling, which is not always paste-ready, so this says
+            // "used" rather than promising a citation.
+            if (!lastWinningProposition_.empty()) {
+                return " (used the fact `" + lastWinningProposition_
+                    + "` — name that claim and cite it)";
+            }
             return "";
         }
         if (lastWinningTactic_ == "contextEqualityBridge"
@@ -281,6 +322,11 @@ public:
             if (!name.empty()) {
                 return " (rewrote with `" + name
                     + "` — try `by substituting " + name + "`)";
+            }
+            if (!lastWinningProposition_.empty()) {
+                return " (rewrote with `" + lastWinningProposition_
+                    + "` — name that equation and cite it with"
+                      " `by substituting`)";
             }
             return " (via the contextEqualityBridge strategy)";
         }
@@ -6825,6 +6871,17 @@ private:
     // wins (a `library <name>` or `local binder <name>`).
     std::string lastWinningTactic_;
     std::string lastWinningDetail_;
+    // The winning fact's PROPOSITION, pretty-printed, for the
+    // expensive-step warning. `citableNameFromFactSource` yields nothing for
+    // an anonymous claim or a conjunction leg (`… (∧-left)`) — which is what
+    // wins most such steps — and the warning then said only which strategy
+    // fired, leaving the author to guess the hint. The proposition is always
+    // citable, because `by (<fact>)` is a first-class surface form.
+    std::string lastWinningProposition_;
+    // The costliest tactic in the current armed frame that closed nothing,
+    // and what it cost. Reset per outermost claim alongside the winner.
+    std::string dominantLosingTactic_;
+    long long dominantLosingMicros_ = 0;
     // True while tryContextFactMatch is speculatively scanning candidate
     // facts/lemmas. The citation premise-discharge's defeq fallback (a') in
     // completeCitationFromBindings is gated off during such a scan: it is an

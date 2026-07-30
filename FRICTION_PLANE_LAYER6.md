@@ -407,3 +407,33 @@ reported in a later context dump as
 inequality into the definition that happened to match it. Harmless, and the
 proof is unaffected, but a hypothesis list that renames the author's own
 claims is hard to read.
+
+## L9 — the expensive-step warning cannot see the layer's expensive declarations
+
+**Symptom.** `Plane.IsEndOf.orientSegment` (191 s), `Plane.subdivide_common_segment`
+(94 s) and `Plane.subdivide_separated` (40 s) are ~5.5 of the ~6 minutes
+`Plane/Graph/` costs, and **none of them emits any warning**. Everything else
+in the area is under 1.5 s.
+
+Two independent reasons, both now understood:
+
+- the warning's threshold was in **kernel steps**, and their cost is
+  elaborator wall clock — defeq probes in `contextEqualityBridge`, which
+  barely move the step counter;
+- the warning fires only on a by-less claim that **succeeds** (`if (proof)`),
+  and only ~0.7 s of `subdivide_separated`'s 40 s is in by-less claims. The
+  rest is premise discharge for citations already written by hand.
+
+**Partly fixed 2026-07-30.** The warning now names the winning fact's
+PROPOSITION when the winner has no citable name (an anonymous claim or a
+conjunction leg — `citableNameFromFactSource` returns empty for those, so the
+message used to name only the strategy), names the dominant LOSING tactic and
+what it cost, and fires on wall clock too (`MATH_AUTOPROVE_WARN_MS`, default
+1500). Library-wide that went from ~35 to 47 expensive-step warnings, all
+carrying a millisecond figure.
+
+**Still open**, and this is the part that matters here: it does not time
+premise discharge for an explicit citation, so a claim whose `by` was cheap to
+write and expensive to check stays invisible. Full measurement, the two wrong
+hypotheses it killed, and the directions worth trying:
+`PERF_EXPENSIVE_DECLARATIONS.md`.

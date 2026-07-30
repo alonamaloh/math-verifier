@@ -10,6 +10,22 @@
 #include <iostream>
 
 namespace {
+// Wall-clock warn threshold for a successful by-less auto-prove, in
+// milliseconds. Separate trigger from the kernel-step one: a hidden SEARCH
+// costs elaborator time (defeq probes) and almost no kernel steps, so the
+// step counter never sees it. Overridable via MATH_AUTOPROVE_WARN_MS
+// (0 disables). Default 1500 ms — above any ordinary claim, well below the
+// declarations this was written to surface.
+static long long autoProveWarnMillisValue() {
+    static const long long value = [] {
+        if (const char* w = std::getenv("MATH_AUTOPROVE_WARN_MS")) {
+            try { return std::stoll(w); } catch (...) { return 1500LL; }
+        }
+        return 1500LL;
+    }();
+    return value;
+}
+
 // Warn threshold for an expensive-but-successful by-less auto-prove, in
 // kernel reduction steps. Overridable via MATH_AUTOPROVE_WARN (0
 // disables). Default picked from the library's step distribution: well
@@ -1689,6 +1705,7 @@ ExpressionPointer Elaborator::tryContextFactMatch(
                     lastContextFactCandidateCount_ = triedCount;
                 }
                 lastWinningDetail_ = fact.source;
+                recordWinningProposition(fact.type, localBinders);
                 fingerprintCensus.rejectedMicrosInWins +=
                     rejectedMicrosThisScan;
                 // The goal was closed by a fact bound further back than the
@@ -2036,6 +2053,7 @@ ExpressionPointer Elaborator::tryContextEqualityBridge(
                 } catch (const TypeError&) { continue; }
                   catch (const ElaborateError&) { continue; }
                 lastWinningDetail_ = eq.source;
+                recordWinningEquation(eq.lhs, eq.rhs, localBinders);
                 return call;
             }
           }
@@ -3198,6 +3216,10 @@ ExpressionPointer Elaborator::autoProveClaim(
             ExpressionPointer proof;
             lastWinningTactic_.clear();
             lastWinningDetail_.clear();
+            lastWinningProposition_.clear();
+            dominantLosingTactic_.clear();
+            dominantLosingMicros_ = 0;
+            long long wallStartNanos = monotonicNanos();
             try {
                 proof = autoProveClaimTactics(
                     goalClosed, localBinders, line, transportBudget);
@@ -3215,14 +3237,37 @@ ExpressionPointer Elaborator::autoProveClaim(
             if (proof) {
                 uint64_t spent = kernelStepsSoFar() - autoProveStepSnapshot_;
                 long long warnAt = autoProveWarnThresholdValue();
-                if (warnAt > 0 && spent > (uint64_t)warnAt) {
+                long long elapsedMillis =
+                    (monotonicNanos() - wallStartNanos) / 1000000;
+                long long warnMillis = autoProveWarnMillisValue();
+                // Two independent triggers. Kernel steps catch a hidden
+                // COMPUTATION; wall-clock catches a hidden SEARCH, whose cost
+                // is defeq probes in the elaborator and barely touches the
+                // kernel counter at all. The layer's three slowest
+                // declarations tripped neither before this — 40 s to 190 s
+                // each, silently, because their cost was spread over a dozen
+                // claims that were individually step-cheap.
+                bool stepsTripped = warnAt > 0 && spent > (uint64_t)warnAt;
+                bool millisTripped =
+                    warnMillis > 0 && elapsedMillis > warnMillis;
+                if (stepsTripped || millisTripped) {
                     std::string winnerHint = expensiveStepWinnerHint();
+                    std::string wasteHint;
+                    if (!dominantLosingTactic_.empty()
+                        && dominantLosingMicros_ >= 1000) {
+                        wasteHint = "; `" + dominantLosingTactic_
+                            + "` closed nothing here and spent "
+                            + std::to_string(dominantLosingMicros_ / 1000)
+                            + " ms of that";
+                    }
                     if (autoProveCallerLabel_.empty()) {
                         std::cerr << "warning: " << moduleName_ << ":"
                             << line
                             << ": expensive by-less proof step ("
-                            << spent << " kernel-steps) — the auto-prover "
+                            << spent << " kernel-steps, "
+                            << elapsedMillis << " ms) — the auto-prover "
                             "closed it by search" << winnerHint
+                            << wasteHint
                             << "; add an explicit `by <reason>` so the "
                             "kernel checks it directly "
                             "(much faster, and the intent is recorded)\n";
