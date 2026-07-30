@@ -35,11 +35,18 @@ about the subspace.)
 ## Main definitions
 
 - The bundle `MetricSpace`, `IsMetric`, `MetricSpace.carrier`,
-  `MetricSpace.distance` — [space.math](space.math)
-- `MetricSpace.OpenIn`, `IsOpen`, `Ball`, `Closure` — [topology.math](topology.math).
-  `MetricSpace.IsOpen.ball_inside` and `MetricSpace.Closure.meets_every_ball`
-  (with their `of_…` converses) are the absolute readings, free of the
-  `Set.universe` membership the relative definitions carry
+  `MetricSpace.distance`, and `MetricSpace.Ball` —
+  [space.math](space.math)
+- `MetricSpace.OpenIn`, `IsOpen`, `ClosedIn`, and the relative
+  `InteriorIn` / `ClosureIn` / `BoundaryIn` —
+  [topology.math](topology.math). `MetricSpace.IsOpen.ball_inside` (with its
+  `of_…` converse) is the absolute reading, free of the `Set.universe`
+  membership the relative definitions carry. `MetricSpace.OpenIn.cut_by_open`
+  is the textbook characterisation — some open set cuts the region along the
+  trace — with `MetricSpace.OpenIn.cut_out_of_region` as its
+  `subset ⊆ region` reading, and `MetricSpace.OpenIn_of_cut` /
+  `MetricSpace.OpenIn.of_cut_by_open` the direction that *builds* a
+  relatively open set
 - `MetricSpace.ContinuousWithinAt`, `ContinuousAt`, `ContinuousOn` —
   [continuity.math](continuity.math). Continuity **within a region** at a point
   is the primitive; `ContinuousAt(f, x)` is the whole-space case.
@@ -56,17 +63,24 @@ about the subspace.)
   in-scope `NearWithin` fact **at the same region**. Its body is not handed the
   region membership; state `MetricSpace.NearWithin.in_region` when the argument
   splits on where in the region the point lies
-- `MetricSpace.SequenceConverges`, `IsBounded`, `SubsequenceConverges` —
+- `MetricSpace.SequenceConverges`, `IsBounded` (of a set),
+  `SequenceIsBounded`, `SubsequenceConverges` —
   [sequence.math](sequence.math)
-- `MetricSpace.IsCompact` — [compactness.math](compactness.math). Its image
-  theorem is stated over the ordinary `Set.image`, which involves no metric
+- `MetricSpace.IsCompact` and `MetricSpace.Closure` —
+  [compactness.math](compactness.math). `MetricSpace.Closure.meets_every_ball`
+  and its converse are the absolute reading; the image theorem is stated over
+  the ordinary `Set.image`, which involves no metric
 - `MetricSpace.IsConnected`, `preimageIn` — [connected.math](connected.math)
 - `MetricSpace.UniformlyContinuousOn` — [uniform.math](uniform.math)
 - `MetricSpace.InjectiveOn`, `HasContinuousInverseOn`, `IsHomeomorphismOn` —
   [homeomorphism.math](homeomorphism.math)
 - ℝ as a metric space (`Real.distance`, `Real.metricSpace`) —
-  [real.math](real.math); the unit interval and its compactness —
-  [interval.math](interval.math)
+  [real.math](real.math)
+- The real unit interval — [interval.math](interval.math): `Real.unitInterval`
+  and `Real.segment`, the affine parametrisation `Real.between(a, b, t)`, and
+  `Real.IsConvex`. This is the parameter domain every arc and curve of
+  `Plane/` runs on, so it is also where the interval's compactness,
+  convexity and connectedness are proved
 
 ## Main theorems
 
@@ -74,7 +88,11 @@ about the subspace.)
   compact, and `MetricSpace.IsConnected.image` for connectedness
 - `MetricSpace.uniformly_continuous_on_compact` — Heine–Cantor
 - `MetricSpace.compact_separation` — disjoint compacta are a positive
-  distance apart
+  distance apart ([separation.math](separation.math)). The argument is the
+  closing-pairs one: `MetricSpace.close_pair_at_every_scale` denies the gap,
+  `MetricSpace.closing_pairs_share_a_limit` and
+  `MetricSpace.equal_limits_of_closing` put the two sequences at one point.
+  `MetricSpace.distance_shift_bound` is the estimate they run on
 - `MetricSpace.IsCompact.bounded` and `.Closure_subset` — the two halves of
   Heine–Borel that hold in any metric space — and
   `MetricSpace.IsCompact.intersection`, where the subsequence comes from one
@@ -88,7 +106,14 @@ about the subspace.)
   `MetricSpace.OpenIn.intersection`. With `MetricSpace.Closure.empty_subset` and
   `.singleton_subset` as the two base cases a union is built from
 - `MetricSpace.ContinuousOn.compose`, `.restrict`, `.paste`, `.of_agreeing`
-- `Real.unitInterval_IsCompact`
+- `MetricSpace.IsHomeomorphismOn.of_continuous_injective_on_compact` — a
+  continuous injection on a compactum is a homeomorphism onto its image,
+  out of `MetricSpace.inverse_continuous_on_compact`
+- `Real.unitInterval_IsCompact` and `Real.unitInterval_IsConnected`, the
+  second out of `Real.IsConvex.connected`; `Real.between_injective` and
+  `Real.between_distance` are what make a nondegenerate `Real.segment` usable
+  as the domain of an arc, and `Real.member_segment_of_bounds` is its ordered
+  reading
 
 ## Reading it at ℝ
 

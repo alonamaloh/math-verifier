@@ -17,15 +17,47 @@ types should agree with it.
 make -j 16 plane      # this area and exactly its transitive imports
 ```
 
-Not `make library`: that verifies the Algebra/ fifteen-theorem material,
-which dominates the wall clock. The `plane` target covers the 156-module
-import cone — including 19 of the 546 Algebra files, the bundled-structure
-basics that `Real`'s field and ring instances need — and nothing else.
+The target covers this area's 206-module import cone — including 19 of the
+106 Algebra files, the bundled-structure basics that `Real`'s field and ring
+instances need — and nothing else, so it stays a narrow inner loop while
+`make -j 16 library` is what you run before committing.
 
-About two seconds warm; about eighteen after a kernel or elaborator
-change, which invalidates every module's proofs. The target asks for the
-cone's proofs, not just its interfaces, so that second case is actually
+Seconds warm; a re-verification of the whole cone after a kernel or
+elaborator change, which invalidates every module's proofs. The target asks
+for the cone's proofs, not just its interfaces, so that second case really is
 re-verified rather than silently skipped (`scripts/module_cone.py`).
+
+`Plane/Graph/` is part of this cone; `library/Graph/`, which has no geometry
+in it, has its own narrower `make -j 16 graph`.
+
+## The plane is a metric space, and its topology is the generic one
+
+`Plane.metricSpace` ([metric.math](metric.math)) registers `Plane.Point` with
+its Euclidean distance as the canonical `MetricSpace`. Everything topological
+here is then a **name** for the generic notion of
+[`Metric/`](../Metric/README.md), not a second copy of it:
+`Plane.OpenIn`, `Plane.IsCompact`, `Plane.Closure`, `Plane.IsConnected`,
+`Plane.ContinuousOn`, `Plane.compact_separation` and their relatives all
+unfold to the `MetricSpace.…` definition and are proved `done by` the generic
+theorem. The names are kept because the Jordan–Schönflies development speaks
+them; the mathematics lives in `Metric/`, where it is written once and also
+serves the real line.
+
+So: a general topological fact belongs in `Metric/`, and only the plane's own
+geometry — coordinates, the norm, convexity, orientation — belongs here. What
+this area adds on top of the generic topology is Bolzano–Weierstrass in two
+coordinates, convexity, and the curve theory.
+
+That inherited topology is **relative to a region** throughout — `OpenIn`
+speaks about the trace `subset ∩ region` and does not require
+`subset ⊆ region`; see `Metric/README.md` for the contract and the cut
+characterisation `Plane.OpenIn.cut_by_open`. The reason it had to be relative
+from the start is the plane's, though: an open subarc of a Jordan curve has
+empty interior in the plane — the only plane-open subset of a curve is empty —
+so "the relatively open subarcs form a basis" cannot even be *stated*
+absolutely. Connectedness gets applied to arcs and curves as subspaces for the
+same reason, and retrofitting relativisation after Layers 1–3 were built would
+have cost more than paying for it once.
 
 ## Main definitions
 
@@ -41,8 +73,9 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
   `Plane.Vector.Counterclockwise` — [direction.math](direction.math)
 - `Plane.Vector.norm`, `Plane.Vector.supNorm`, `Plane.distance`, and
   `Plane.supDistance` — [norm.math](norm.math)
-- `Plane.between`, `Plane.segment`, `Plane.IsConvex`, `Plane.Ball`, and
-  `Plane.supBall` — [segment.math](segment.math)
+- `Plane.between`, `Plane.segment`, `Plane.openSegment`, `Plane.IsConvex`,
+  `Plane.Ball`, and `Plane.supBall` — [segment.math](segment.math)
+- `Plane.is_metric`, `Plane.metricSpace` — [metric.math](metric.math)
 - `Plane.OpenIn`, `Plane.IsOpen`, `Plane.ClosedIn`, `Plane.InteriorIn`,
   `Plane.ClosureIn`, `Plane.BoundaryIn`, `Plane.ContinuousAt`,
   `Plane.ContinuousOn` — [topology.math](topology.math). **Relative to a
@@ -53,8 +86,9 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
   [compact.math](compact.math)
 - `Plane.IsCompact` (**sequential**), `Plane.Closure` —
   [compactness.math](compactness.math)
-- `Plane.RealContinuousOn`, `Plane.image`, `Plane.UniformlyContinuousOn` —
-  [extremum.math](extremum.math)
+- `Plane.RealContinuousAt`, `Plane.RealContinuousOn`, `Plane.image`,
+  `Plane.UniformlyContinuousOn` — [extremum.math](extremum.math), the
+  real-valued functions an extremum argument runs on
 - `Plane.IsConnected` (**the clopen criterion, as the definition**),
   `Plane.preimageIn`, `Plane.reachedParameters`, `Plane.parameterGap` —
   [connected.math](connected.math)
@@ -72,6 +106,17 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
   [subarc.math](subarc.math)
 - `Plane.lowerHalf`, `Plane.upperHalf`, `Plane.concatenate` —
   [concatenate.math](concatenate.math)
+- `Plane.IsArcBetween` — an arc *between two named points*, the form the
+  two-arcs theorem states — [twoarcs.math](twoarcs.math)
+- `Plane.polyline`, `Plane.chainFrom`, and `Plane.IsPolygonal` —
+  [polyline.math](polyline.math). A polygonal arc is built **from its vertex
+  list** rather than existentially recovered from a union of segments:
+  `Plane.polyline(start, vertices)` is the parametrisation,
+  `Plane.chainFrom(start, vertices)` the set of points it covers, and
+  `Plane.IsPolygonal` the blueprint's set-level predicate. The
+  parametrisation is deliberately not constant speed — each remaining tail
+  gets half of what is left of the interval — because only the image and the
+  order along it are ever used
 
 ## Main theorems
 
@@ -122,7 +167,11 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
   **`Plane.compact_of_closed_bounded`** and `Plane.IsCompact.bounded`
   (Heine–Borel as an equivalence), `Plane.IsCompact.image`,
   `Plane.attains_maximum` / `attains_minimum`,
-  `Plane.uniformly_continuous_on_compact`, `Plane.compact_separation`
+  `Plane.uniformly_continuous_on_compact`, and `Plane.compact_separation`
+  ([separation.math](separation.math)) — disjoint compacta are a positive
+  distance apart. `Plane.segment_IsCompact`, and `Plane.circle_IsCompact` /
+  `Plane.squareBoundary_IsCompact` for the model curves, which are compact
+  because they are bounded level sets
 - `Plane.IsConnected.image`, `.union` (through a common point), `.swallows`,
   `.lands_in_side`, `.adjoin_limits`; **`Plane.IsConvex.connected`** (the
   layer's one analytic proof — a walk with a supremum), hence
@@ -130,11 +179,13 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
 - `Plane.Component_IsConnected`, `Plane.Component_IsOpen`,
   `Plane.Component.equal_of_meeting` (components partition),
   **`Plane.Component.recognize`**, `Plane.Component_boundary_in_closed`
+- `Plane.Component_IsRegion` and `Plane.Ball_IsRegion` — the two sources of a
+  `Plane.IsRegion`, which is what a consumer of connectedness holds
 - **`Plane.polygonal_connected`** — any two points of an open connected set
-  are joined by a chain of segments inside it — and
+  are joined by a chain of segments inside it (`Plane.IsRegion.polygonal_connected`
+  is the same statement for a region) — and
   `Plane.Component_is_reachable_set`, which identifies the components of an
   open set with the walk classes
-- `Plane.segment_IsCompact`, `Plane.squareBoundary_IsCompact`
 - **`Plane.IsHomeomorphismOn.of_continuous_injective_on_compact`** (H4's
   engine) and `Plane.IsJordanParametrisation.IsHomeomorphismOn` — a
   continuous injection on the circle is a homeomorphism onto its image
@@ -166,11 +217,39 @@ re-verified rather than silently skipped (`scripts/module_cone.py`).
   neighbourhood: together, the images of relatively open subsegments are a
   basis of the arc's topology
 
+### Cutting a segment, and cutting a curve
+
+- The open segment is the vocabulary a plane graph's edges are stated in:
+  `Plane.openSegment_symmetric`, `Plane.openSegment_nearer` (a point strictly
+  inside is strictly nearer the left end), and hence
+  **`Plane.openSegment_left_inside`** / **`Plane.openSegment_right_inside`** —
+  cutting at an interior point leaves both halves' interiors inside the
+  original, so a cut is permanent
+- **`Plane.segment_split`** — the converse half: the two pieces cover the
+  whole segment, so cutting loses nothing. With `Plane.between_nested`,
+  `Plane.between_nested_from_start` and `Plane.between_nested_to_finish` as
+  the parameter arithmetic underneath
+- **`Plane.IsJordanCurve.two_arcs`** — two distinct points of a Jordan curve
+  cut it into two arcs between them, which cover the curve and meet in
+  exactly those two points ([twoarcs.math](twoarcs.math)). Carried entirely by
+  the loop's parameters: `Plane.IsLoop.parameter_before_finish` pulls the two
+  points back to parameters short of the finish,
+  `Plane.IsLoop.two_arcs_at_parameters` is the statement there, and the pieces
+  are the middle interval and the two end pieces glued where the loop closes
+  up (`Plane.IsLoop.middle_IsArcBetween`, `.outside_IsArcBetween`). The
+  meeting is `Plane.IsLoop.pieces_meet_at_ends`, and the injectivity it needs
+  splits into `Plane.IsLoop.injective_on_front` / `_middle` / `_back`
+- **`Plane.arc_polyline`** — what a polyline covers is the chain of its
+  vertices, hence `Plane.IsPolygonal.of_polyline`; `Plane.polyline_arcStart`
+  names where it begins. Both are proved with the start **generalised**, since
+  the recursion moves it
+
 ## Connectedness is the clopen criterion
 
-`Plane.IsConnected(region)` says: a subset of the region that is relatively
-open, whose complement in the region is relatively open, and which is
-nonempty, **is the region**. Not the absence of a separation.
+`Plane.IsConnected(region)` — the generic `MetricSpace.IsConnected` — says: a
+subset of the region that is relatively open, whose complement in the region
+is relatively open, and which is nonempty, **is the region**. Not the absence
+of a separation.
 
 Every consumer of connectedness in the blueprint is discharging exactly
 those three obligations and concluding the fourth, so taking the criterion
@@ -183,12 +262,11 @@ An arc is a continuous injective map on `Real.unitInterval`; a Jordan curve
 is a **set** carried onto by a **loop** on the same interval — continuous,
 returning to its start, injective until it does — which is the blueprint's
 definition. The parameter domain is a subset of **ℝ**, and the topology it
-carries is the generic one of `Metric/`, so everything above applies
-unchanged: a
-parametrisation is an ordinary `Plane.Point → Plane.Point` map, its
-continuity is `ContinuousOn`, its image is `Set.image`, its compactness is
-`IsCompact`. Parametrising by `[0,1] ⊆ ℝ` would need a second relative
-topology for real-domain maps, and a circle would need a quotient.
+carries is the generic one of `Metric/`, so everything above applies unchanged:
+a parametrisation is an ordinary `ℝ → Plane.Point` map, its continuity is
+`ContinuousOn`, its image is `Set.image`, its compactness is `IsCompact`.
+Making the interval a type of its own would need a second relative topology for
+maps out of it, and taking the circle as the domain would need a quotient.
 
 Two consequences worth knowing before extending this area:
 
@@ -206,9 +284,7 @@ Two consequences worth knowing before extending this area:
   the radial projection (`x ↦ x/‖x‖`, `x ↦ x/‖x‖∞`).
 - A curve's parameter **is** a real number: the domain is
   `Real.unitInterval`, so a reparametrisation composes on ℝ with nothing to
-  extract and no inverse to construct. (Before the interval migration the
-  domain was a segment *in the plane* and the parameter had to be read off
-  a point as its first coordinate; that bridging vocabulary is gone.)
+  extract and no inverse to construct.
 
 The inverse of a homeomorphism is never named:
 `Plane.HasContinuousInverseOn(f, region)` says points whose images are
@@ -229,29 +305,6 @@ through the root itself, and `Real.LessOrEqual_of_square_LessOrEqual`
 turns a comparison of squares back into a comparison of values. The sup
 norm sits alongside for the axis-parallel squares the polygonal work is
 built on.
-
-## Relative topology
-
-`Plane.OpenIn(subset, region)` is the ε-ball condition with the ball cut
-down to the region: only `y ∈ region` within the radius is constrained.
-Drop that clause and you have ordinary openness, which is why
-`Plane.IsOpen(U)` is literally `OpenIn(U, Set.universe)` rather than a
-second definition.
-
-This is not decoration. An open subarc of a Jordan curve has empty
-interior in the plane — the only plane-open subset of a curve is empty —
-so "the relatively open subarcs form a basis" cannot even be *stated*
-absolutely. Connectedness will be applied to arcs as subspaces for the
-same reason.
-
-`OpenIn` deliberately does **not** require `subset ⊆ region`: demanding it
-would put a proof obligation at every use. What it does insist on is that it
-speak about the **trace** `subset ∩ region` and nothing else.
-`Plane.OpenIn.cut_by_open` supplies the textbook characterization — some open
-set cuts the region along that trace — with `Plane.OpenIn.cut_out_of_region`
-as the `subset ⊆ region` reading (`subset = cuttingSet ∩ region`), and
-`Plane.OpenIn_of_cut` / `Plane.OpenIn.of_cut_by_open` are the converse, the
-direction consumers use to *build* relatively open sets.
 
 ## Orientation instead of angles
 
@@ -308,6 +361,5 @@ should not have to reconstruct.
 The two coordinate chains in every law are identical up to
 `first`/`second`. A `componentwise` tactic — prove the goal for both
 coordinates and close by `equal_of_coordinates` — would collapse each
-proof to its one interesting line. Roughly two thirds of this file is
-that duplication, and the ratio will be worse in the norm and
-determinant laws to come.
+proof to its one interesting line. Roughly two thirds of `vector.math` is
+that duplication, and the norm and determinant laws are no better.

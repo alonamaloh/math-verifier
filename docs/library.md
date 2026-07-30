@@ -90,8 +90,19 @@ laws:
   over the whole line — not a second definition.
 - **`Plane/`** (start with [`Plane/README.md`](../library/Plane/README.md))
   — the Euclidean plane as a metric space, with curves parametrised by
-  `Real.unitInterval`: arcs, loops, Jordan curves, polygonal reachability,
-  components, and the model curves (circle, square boundary).
+  `Real.unitInterval`: arcs, loops, Jordan curves, two points cutting a curve
+  into two arcs, polygonal arcs and polygonal reachability, components, and the
+  model curves (circle, square boundary).
+- **`Graph/`** (start with [`Graph/README.md`](../library/Graph/README.md))
+  — abstract finite multigraphs over an ambient `(V, E, ends)`, with **edges as
+  names**: walks, paths, connectedness, cycles and bridges, vertex and edge
+  deletion, 2-connectivity and the ear decomposition, trees, and the handshake
+  lemma. No geometry, so all of it applies to a plane graph unprojected.
+- **`Plane/Graph/`** (start with
+  [`Plane/Graph/README.md`](../library/Plane/Graph/README.md)) — plane graphs:
+  an abstract graph *plus* a drawing by arcs, kept **unbundled**. The point set,
+  the faces, and polygonal plane graphs whose edge names are their endpoint
+  pairs.
 
 ## Other
 
