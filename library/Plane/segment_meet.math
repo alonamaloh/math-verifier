@@ -1,0 +1,245 @@
+-- Plane/segment_meet.math
+--
+-- How two segments meet: in nothing, or in a segment.
+--
+-- The blueprint says "the empty set, one point, or one closed interval"
+-- (`lem:polygonal-overlay`), and a single point IS a segment with equal
+-- endpoints, so the statement folds to a dichotomy. That is the form the
+-- overlay wants: it subdivides at the endpoints of whatever the meet turns
+-- out to be, and a degenerate meet contributes one subdivision point.
+--
+-- The proof needs no case analysis on whether the segments are parallel and
+-- no determinant. A segment is compact and convex, so the meet is compact
+-- and convex; the distance from `a` attains a minimum and a maximum on it,
+-- and those two extreme points are the endpoints. What makes them the
+-- endpoints is `Plane.parameter_LessOrEqual_of_distance` — along a
+-- nondegenerate segment the distance from the left endpoint ORDERS the
+-- parameters — so an extremum of the distance is an extremum of the
+-- parameter, and `Plane.between_nested` re-reads the middle parameter as a
+-- walk between the two extremes.
+
+module Plane.segment_meet
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Set.algebra
+import Real.interface
+import Real.order
+import Real.order_field
+import Real.division
+import Metric.space
+import Metric.compactness
+import Plane.vector
+import Plane.point
+import Plane.norm
+import Plane.metric
+import Plane.segment
+import Plane.compactness
+import Plane.connected
+import Plane.extremum
+import Plane.model
+
+-- The degenerate case, taken out on its own so that the equation-shaped
+-- split in the theorem below never has to reconcile two spellings of the
+-- same segment: a `case a = b` arm refines the goal to `segment(b, b)` but
+-- leaves the hypothesis at `segment(a, b)`.
+theorem Plane.segment_meet_at_point (a c d : Plane.Point)
+        (meets : Set.IsNonempty(Plane.Point,
+            Plane.segment(a, a) ∩ Plane.segment(c, d)))
+        : Plane.segment(a, a) ∩ Plane.segment(c, d) = Plane.segment(a, a) := {
+  ∀ (x : Plane.Point). x ∈ Plane.segment(a, a) → x = a
+      by { take x : Plane.Point;
+           suppose x ∈ Plane.segment(a, a) as onSegment;
+           choose t such that (0 ≤ t ∧ t ≤ 1) ∧ x = Plane.between(a, a, t)
+               from onSegment;
+           x = Plane.between(a, a, t)
+             = a by Plane.between_degenerate;
+           done }
+      as onlyPoint;
+  choose start such that
+      start ∈ Plane.segment(a, a) ∩ Plane.segment(c, d) from meets;
+  start ∈ Plane.segment(a, a);
+  start ∈ Plane.segment(c, d);
+  start = a by onlyPoint;
+  a ∈ Plane.segment(c, d);
+
+  Plane.segment(a, a) ∩ Plane.segment(c, d) ⊆ Plane.segment(a, a)
+      by Set.intersection_subset_left;
+  Plane.segment(a, a) ⊆ Plane.segment(a, a) ∩ Plane.segment(c, d)
+      by { take x : Plane.Point;
+           suppose x ∈ Plane.segment(a, a);
+           x = a by onlyPoint;
+           x ∈ Plane.segment(c, d) by substituting (x = a);
+           done };
+  done by Set.equal_of_same_members
+}
+
+theorem Plane.segment_meet (a b c d : Plane.Point)
+        (meets : Set.IsNonempty(Plane.Point,
+            Plane.segment(a, b) ∩ Plane.segment(c, d)))
+        : ∃ (p q : Plane.Point).
+              Plane.segment(a, b) ∩ Plane.segment(c, d) = Plane.segment(p, q) :=
+  done by cases {
+    case a = b as endsEqual: {
+        Plane.segment(a, b) = Plane.segment(b, b) by substituting endsEqual;
+        Set.IsNonempty(Plane.Point, Plane.segment(b, b) ∩ Plane.segment(c, d))
+            by substituting (Plane.segment(a, b) = Plane.segment(b, b));
+        Plane.segment(b, b) ∩ Plane.segment(c, d) = Plane.segment(b, b)
+            by Plane.segment_meet_at_point;
+        witness b with witness b
+      }
+    otherwise as endsDistinct: {
+        Plane.IsCompact(Plane.segment(a, b)) by Plane.segment_IsCompact;
+        Plane.IsCompact(Plane.segment(c, d)) by Plane.segment_IsCompact;
+        Plane.IsCompact(Plane.segment(a, b) ∩ Plane.segment(c, d))
+            by MetricSpace.IsCompact.intersection;
+        Plane.IsConvex(Plane.segment(a, b)) by Plane.segment_IsConvex;
+        Plane.IsConvex(Plane.segment(c, d)) by Plane.segment_IsConvex;
+        Plane.IsConvex(Plane.segment(a, b) ∩ Plane.segment(c, d))
+            by Plane.IsConvex.intersection;
+        Plane.RealContinuousOn((x : Plane.Point) ↦ Plane.distance(a, x),
+            Plane.segment(a, b) ∩ Plane.segment(c, d))
+            by Plane.RealContinuousOn.distance_from;
+
+        -- The two extreme points of the meet, measured from `a`.
+        choose nearest such that
+            nearest ∈ Plane.segment(a, b) ∩ Plane.segment(c, d)
+            ∧ ∀ (x : Plane.Point).
+                  x ∈ Plane.segment(a, b) ∩ Plane.segment(c, d) →
+                  Plane.distance(a, nearest) ≤ Plane.distance(a, x)
+            from Plane.attains_minimum(
+                f := (x : Plane.Point) ↦ Plane.distance(a, x));
+        choose farthest such that
+            farthest ∈ Plane.segment(a, b) ∩ Plane.segment(c, d)
+            ∧ ∀ (x : Plane.Point).
+                  x ∈ Plane.segment(a, b) ∩ Plane.segment(c, d) →
+                  Plane.distance(a, x) ≤ Plane.distance(a, farthest)
+            from Plane.attains_maximum(
+                f := (x : Plane.Point) ↦ Plane.distance(a, x));
+
+        nearest ∈ Plane.segment(a, b) ∩ Plane.segment(c, d);
+        farthest ∈ Plane.segment(a, b) ∩ Plane.segment(c, d);
+        ∀ (x : Plane.Point). x ∈ Plane.segment(a, b) ∩ Plane.segment(c, d) →
+            Plane.distance(a, nearest) ≤ Plane.distance(a, x) as nearestIsClosest;
+        ∀ (x : Plane.Point). x ∈ Plane.segment(a, b) ∩ Plane.segment(c, d) →
+            Plane.distance(a, x) ≤ Plane.distance(a, farthest) as farthestIsFurthest;
+
+        nearest ∈ Plane.segment(a, b) as nearestOnFirst;
+        farthest ∈ Plane.segment(a, b) as farthestOnFirst;
+        choose nearParameter such that
+            (0 ≤ nearParameter ∧ nearParameter ≤ 1)
+            ∧ nearest = Plane.between(a, b, nearParameter) from nearestOnFirst;
+        choose farParameter such that
+            (0 ≤ farParameter ∧ farParameter ≤ 1)
+            ∧ farthest = Plane.between(a, b, farParameter) from farthestOnFirst;
+        0 ≤ nearParameter;
+        nearest = Plane.between(a, b, nearParameter) as nearestAtParameter;
+        0 ≤ farParameter;
+        farthest = Plane.between(a, b, farParameter) as farthestAtParameter;
+
+        -- Convexity gives one inclusion outright.
+        Plane.segment(nearest, farthest)
+            ⊆ Plane.segment(a, b) ∩ Plane.segment(c, d)
+            by Plane.IsConvex.segment_inside;
+
+        Plane.segment(a, b) ∩ Plane.segment(c, d)
+            ⊆ Plane.segment(nearest, farthest)
+            by { take x : Plane.Point;
+                 suppose x ∈ Plane.segment(a, b) ∩ Plane.segment(c, d);
+                 x ∈ Plane.segment(a, b) as pointOnFirst;
+                 choose xParameter such that
+                     (0 ≤ xParameter ∧ xParameter ≤ 1)
+                     ∧ x = Plane.between(a, b, xParameter) from pointOnFirst;
+                 0 ≤ xParameter;
+                 x = Plane.between(a, b, xParameter) as pointAtParameter;
+
+                 -- The extremes of the distance are the extremes of the
+                 -- parameter, because `a` is the left endpoint.
+                 Plane.distance(a, Plane.between(a, b, nearParameter))
+                    = Plane.distance(a, nearest) by nearestAtParameter
+                    ≤ Plane.distance(a, x) by nearestIsClosest
+                    = Plane.distance(a, Plane.between(a, b, xParameter))
+                          by pointAtParameter;
+                 nearParameter ≤ xParameter
+                     by Plane.parameter_LessOrEqual_of_distance;
+                 Plane.distance(a, Plane.between(a, b, xParameter))
+                    = Plane.distance(a, x) by pointAtParameter
+                    ≤ Plane.distance(a, farthest) by farthestIsFurthest
+                    = Plane.distance(a, Plane.between(a, b, farParameter))
+                          by farthestAtParameter;
+                 xParameter ≤ farParameter
+                     by Plane.parameter_LessOrEqual_of_distance;
+
+                 done by cases {
+                   case nearParameter = farParameter as extremesAgree: {
+                       -- The meet is a single point, and `x` is it.
+                       xParameter ≤ nearParameter;
+                       xParameter = nearParameter by Real.LessOrEqual.antisymmetric;
+                       x = Plane.between(a, b, xParameter)
+                         = Plane.between(a, b, nearParameter)
+                         = nearest by nearestAtParameter;
+                       nearest ∈ Plane.segment(nearest, farthest)
+                           by Plane.left_in_segment;
+                       done
+                     }
+                   otherwise: {
+                       nearParameter < farParameter;
+                       farParameter - nearParameter > 0;
+                       farParameter - nearParameter ≠ 0;
+                       0 ≤ xParameter - nearParameter;
+                       xParameter - nearParameter ≤ farParameter - nearParameter;
+
+                       0 ≤ (xParameter - nearParameter)
+                               / (farParameter - nearParameter);
+                       (xParameter - nearParameter)
+                               / (farParameter - nearParameter)
+                           ≤ (farParameter - nearParameter)
+                               / (farParameter - nearParameter);
+                       (farParameter - nearParameter)
+                               / (farParameter - nearParameter) = 1
+                           by Real.divide_self;
+                       (xParameter - nearParameter)
+                               / (farParameter - nearParameter) ≤ 1;
+
+                       (1 - (xParameter - nearParameter)
+                                / (farParameter - nearParameter)) * nearParameter
+                           + (xParameter - nearParameter)
+                                / (farParameter - nearParameter) * farParameter
+                           = xParameter by field as weightsRecoverPoint;
+
+                       Plane.between(nearest, farthest,
+                           (xParameter - nearParameter)
+                               / (farParameter - nearParameter))
+                          = Plane.between(Plane.between(a, b, nearParameter),
+                                farthest,
+                                (xParameter - nearParameter)
+                                    / (farParameter - nearParameter))
+                                by nearestAtParameter
+                          = Plane.between(Plane.between(a, b, nearParameter),
+                                Plane.between(a, b, farParameter),
+                                (xParameter - nearParameter)
+                                    / (farParameter - nearParameter))
+                                by farthestAtParameter
+                          = Plane.between(a, b,
+                                (1 - (xParameter - nearParameter)
+                                         / (farParameter - nearParameter))
+                                        * nearParameter
+                                    + (xParameter - nearParameter)
+                                         / (farParameter - nearParameter)
+                                        * farParameter)
+                                by Plane.between_nested
+                          = Plane.between(a, b, xParameter) by weightsRecoverPoint
+                          = x by pointAtParameter;
+                       done by { witness (xParameter - nearParameter)
+                                     / (farParameter - nearParameter) }
+                     }
+                 }
+               };
+        Plane.segment(a, b) ∩ Plane.segment(c, d) = Plane.segment(nearest, farthest)
+            by Set.equal_of_same_members;
+        witness nearest with witness farthest
+      }
+  }

@@ -195,6 +195,41 @@ theorem Plane.right_in_segment (a b : Plane.Point)
     done
   }
 
+-- A walk that goes nowhere stays put, so a segment with equal endpoints is
+-- the one point. This is the degenerate case every "nothing, a point, or an
+-- interval" statement folds into "empty, or a segment".
+theorem Plane.between_degenerate (a : Plane.Point) (t : ℝ)
+        : Plane.between(a, a, t) = a := {
+  Plane.Point.first(Plane.between(a, a, t))
+     = Plane.Point.first(a) + t * (Plane.Point.first(a) - Plane.Point.first(a))
+           by Plane.Point.first_between
+     = Plane.Point.first(a);
+  Plane.Point.second(Plane.between(a, a, t))
+     = Plane.Point.second(a) + t * (Plane.Point.second(a) - Plane.Point.second(a))
+           by Plane.Point.second_between
+     = Plane.Point.second(a);
+  done by Plane.Point.equal_of_coordinates
+}
+
+theorem Plane.segment_degenerate (a : Plane.Point)
+        : Plane.segment(a, a) = Set.singleton(Plane.Point, a) := {
+  Plane.segment(a, a) ⊆ Set.singleton(Plane.Point, a)
+      by (x : Plane.Point) (onSegment : x ∈ Plane.segment(a, a)) ↦ {
+        choose t such that (0 ≤ t ∧ t ≤ 1) ∧ x = Plane.between(a, a, t)
+            from onSegment;
+        x = Plane.between(a, a, t)
+          = a by Plane.between_degenerate;
+        done
+      };
+  Set.singleton(Plane.Point, a) ⊆ Plane.segment(a, a)
+      by (x : Plane.Point) (isCenter : x ∈ Set.singleton(Plane.Point, a)) ↦ {
+        x = a;
+        a ∈ Plane.segment(a, a) by Plane.left_in_segment;
+        done
+      };
+  done by Set.equal_of_same_members
+}
+
 -- A segment has no preferred end.
 theorem Plane.segment_subset_reverse (a b : Plane.Point)
         : Plane.segment(a, b) ⊆ Plane.segment(b, a) := {
@@ -350,6 +385,27 @@ theorem Plane.segment_IsConvex (a b : Plane.Point)
 
 -- Convexity, read as a statement about segments rather than about the
 -- walk: a convex set holds the whole segment between two of its points.
+-- Two convex sets meet in a convex set: a walk between two common points
+-- stays in each of them.
+theorem Plane.IsConvex.intersection (left right : Set(Plane.Point))
+        (leftConvex : Plane.IsConvex(left)) (rightConvex : Plane.IsConvex(right))
+        : Plane.IsConvex(left ∩ right) := {
+  take x : Plane.Point;
+  suppose x ∈ left ∩ right;
+  take y : Plane.Point;
+  suppose y ∈ left ∩ right;
+  take t : ℝ;
+  suppose 0 ≤ t;
+  suppose t ≤ 1;
+  x ∈ left;
+  y ∈ left;
+  Plane.between(x, y, t) ∈ left by leftConvex;
+  x ∈ right;
+  y ∈ right;
+  Plane.between(x, y, t) ∈ right by rightConvex;
+  done
+}
+
 theorem Plane.IsConvex.segment_inside (region : Set(Plane.Point))
         (convex : Plane.IsConvex(region))
         (a b : Plane.Point) (aInside : a ∈ region) (bInside : b ∈ region)
@@ -430,4 +486,40 @@ theorem Plane.between_distance (a b : Plane.Point) (s t : ℝ)
      = abs(t - s) * Plane.Vector.norm(b - a) by Plane.Vector.norm_scale
      = abs(t - s) * Plane.distance(a, b);
   done
+}
+
+-- Measured from the left endpoint, the distance along a walk IS the
+-- parameter, scaled. So on a nondegenerate segment the distance from the
+-- left endpoint ORDERS the parameters — which is what lets an extremum of
+-- that distance stand in for an extremum of the parameter.
+theorem Plane.distance_from_left (a b : Plane.Point) (t : ℝ) (tNonneg : t ≥ 0)
+        : Plane.distance(a, Plane.between(a, b, t)) = t * Plane.distance(a, b) := {
+  abs(t - 0) = abs(t)
+             = t by Real.absolute_value_when_nonneg   as absOfParameter;
+  Plane.distance(a, Plane.between(a, b, t))
+     = Plane.distance(Plane.between(a, b, 0), Plane.between(a, b, t))
+           by Plane.between_zero
+     = abs(t - 0) * Plane.distance(a, b) by Plane.between_distance
+     = t * Plane.distance(a, b) by absOfParameter;
+  done
+}
+
+theorem Plane.parameter_LessOrEqual_of_distance (a b : Plane.Point)
+        (distinct : a ≠ b) (s t : ℝ) (sNonneg : s ≥ 0) (tNonneg : t ≥ 0)
+        (closer : Plane.distance(a, Plane.between(a, b, s))
+                      ≤ Plane.distance(a, Plane.between(a, b, t)))
+        : s ≤ t := {
+  Plane.distance(a, b) ≥ 0;
+  Plane.distance(a, b) ≠ 0
+      by { suppose Plane.distance(a, b) = 0 as vanishes;
+           a = b by Plane.equal_of_distance_zero;
+           done };
+  Plane.distance(a, b) > 0;
+  Plane.distance(a, b) * s
+     = s * Plane.distance(a, b)
+     = Plane.distance(a, Plane.between(a, b, s)) by Plane.distance_from_left
+     ≤ Plane.distance(a, Plane.between(a, b, t))
+     = t * Plane.distance(a, b) by Plane.distance_from_left
+     = Plane.distance(a, b) * t;
+  done by Real.LessOrEqual.multiply_cancel_left_positive
 }

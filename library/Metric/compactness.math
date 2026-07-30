@@ -202,6 +202,35 @@ theorem MetricSpace.IsCompact.Closure_subset (m : MetricSpace)
 }
 
 -- ----------------------------------------------------------------------
+-- Two compact sets meet in a compact set. The subsequence comes from the
+-- left one, and its limit lands in the right one because a compact set
+-- contains the limits of its own sequences.
+
+theorem MetricSpace.IsCompact.intersection (m : MetricSpace) (left right : Set(m))
+        (leftCompact : MetricSpace.IsCompact(left))
+        (rightCompact : MetricSpace.IsCompact(right))
+        : MetricSpace.IsCompact(left ∩ right) := {
+  take s : ℕ → m;
+  suppose ∀ (k : ℕ). s(k) ∈ left ∩ right as inBoth;
+  ∀ (k : ℕ). s(k) ∈ left
+      by { take k : ℕ; s(k) ∈ left ∩ right by inBoth; done };
+  choose index : ℕ → ℕ, limit : m such that
+      limit ∈ left ∧ MetricSpace.SubsequenceConverges(s, index, limit)
+      from leftCompact;
+  limit ∈ left;
+  MetricSpace.SubsequenceConverges(s, index, limit);
+  MetricSpace.SequenceConverges((k : ℕ) ↦ s(index(k)), limit)
+      by MetricSpace.SubsequenceConverges.converges;
+  ∀ (k : ℕ). s(index(k)) ∈ right
+      by { take k : ℕ; s(index(k)) ∈ left ∩ right by inBoth; done };
+  limit ∈ MetricSpace.Closure(right) by MetricSpace.limit_in_Closure;
+  MetricSpace.Closure(right) ⊆ right by MetricSpace.IsCompact.Closure_subset;
+  limit ∈ right;
+  limit ∈ left ∩ right;
+  witness index with witness limit
+}
+
+-- ----------------------------------------------------------------------
 -- A compact set is bounded. If its distances from a point were unbounded,
 -- some point of it would escape every one of them, and countable choice
 -- assembles those escapes into a sequence. Compactness thins it to a

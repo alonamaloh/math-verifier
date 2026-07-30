@@ -97,6 +97,34 @@ theorem Plane.RealContinuousOn.negate
   }
 }
 
+-- The distance from a fixed point is continuous, and every tolerance is its
+-- own nearness: moving the far endpoint moves the distance by no more than
+-- the move itself. This is the extremum theorem's first customer — an
+-- extremum of `distance(a, ·)` along a segment is an extremum of the
+-- parameter.
+theorem Plane.RealContinuousOn.distance_from (center : Plane.Point)
+        (region : Set(Plane.Point))
+        : Plane.RealContinuousOn(
+              (x : Plane.Point) ↦ Plane.distance(center, x), region) := {
+  take x : Plane.Point;
+  suppose x ∈ region;
+  take tolerance : ℝ;
+  suppose tolerance > 0;
+  witness tolerance with {
+    tolerance > 0;
+    ∀ (y : Plane.Point). y ∈ region → Plane.distance(x, y) < tolerance
+        → abs(Plane.distance(center, y) - Plane.distance(center, x)) < tolerance
+        by (y : Plane.Point) (inRegionY : y ∈ region)
+           (near : Plane.distance(x, y) < tolerance) ↦ {
+             abs(Plane.distance(center, y) - Plane.distance(center, x))
+                ≤ Plane.distance(x, y) by Plane.distance_shift_bound
+                < tolerance;
+             done
+           };
+    done
+  }
+}
+
 -- Continuity is sequential: a sequence in the region converging to a
 -- point of it has its values converging to the value there.
 theorem Plane.RealContinuousAt.along_sequence
