@@ -666,10 +666,45 @@ Landed underneath: `MetricSpace.IsCompact.intersection`,
 is continuous, every tolerance its own nearness. That is
 `Plane.attains_maximum`'s first customer since it was proved.
 
-**Next**, in dependency order: the overlay (`lem:polygonal-overlay`) — split
-the polygonal edges into segments, subdivide at every meet, represent each
-duplicated subsegment once — then H6. "The realisation of a cycle is a Jordan
-curve" wants the edge arcs of a cycle concatenated in order.
+### The overlay — STARTED 2026-07-29, two designs settled
+
+`Plane/Graph/{segments,subdivide}.math`.
+
+**A polygonal edge IS its pair of endpoints.** `Plane.Segment :=
+Pair(Point, Point)` with `ends` the identity. A straight segment is
+determined by its endpoints, so naming one by anything else names a
+distinction that does not exist — and the blueprint's "represent every
+duplicate geometric subsegment only once" becomes deduplication of a list of
+NAMES, with no geometry in it. The general representation allows parallel
+edges only because a Jordan curve cut at two points is a two-vertex cycle,
+which segments cannot be. Wrinkle, recorded at the definition: `(a, b)` and
+`(b, a)` name one segment, and a graph holding both is refused, so a
+construction owes an edge list that picks one orientation of each.
+
+`Plane.Graph.polygonal_IsDrawing` is what a construction discharges: for
+segments the two ARC obligations are free (`Plane.between` is a simple arc
+between any two distinct points, and well-formedness supplies the
+distinctness), so being a polygonal plane graph is well-formedness plus the
+two disjointness conditions — stated about `Plane.openSegment`, the form
+`Plane.segment_meet` can check.
+
+**The subdivision is structural in the POINT list, not the segment.**
+`Plane.subdivide(pieces, points)` cuts every current piece at one point, then
+recurses with the rest of the points. Read literally the blueprint wants the
+cut points as DATA, which needs a choice operator (the meets are existential)
+and then a sort (to order them along each segment). Neither is required:
+order does not matter, because cutting at a point that has already become an
+endpoint is a no-op. The pieces are threaded through the RETURN TYPE, like
+`Plane.chainFunction`, since a fixed parameter that varies never fires its
+recursion equation.
+
+**Remaining, in order:** three properties of `Plane.subdivide` — the pieces
+cover what they came from, their interiors are pairwise disjoint, and no cut
+point is interior to any of them — then the assembly, stated EXISTENTIALLY
+("can be made into a finite plane graph by subdivision", as the blueprint has
+it) and proved by induction over the segments, so the cut points never have
+to be produced. Then H6. "The realisation of a cycle is a Jordan curve" wants
+the edge arcs of a cycle concatenated in order.
 
 **Definitions.** `Plane.Graph.IsDrawing` (**settled** — see above, not a
 `Plane.Graph` type); `Plane.Graph.face` as a component of the complement

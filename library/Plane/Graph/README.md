@@ -78,15 +78,44 @@ subgraph, with the same family of arcs: `Graph.Joins` reads only the ambient
   (`face_IsRegion`), and the faces partition the exterior
   (`face.equal_of_meeting`, `face.equal_of_member`).
 
+## Polygonal plane graphs, and the overlay
+
+**The edge name is the pair of endpoints** (`Plane.Segment`), and `ends` is
+the identity — [segments.math](segments.math). A straight segment is
+determined by its endpoints, so naming one by anything else would name a
+distinction that does not exist; the general representation allows parallel
+edges only because a Jordan curve cut at two points is a two-vertex cycle,
+which segments cannot be. The payoff is that "represent every duplicate
+geometric subsegment only once" becomes deduplication of a list of **names**.
+The wrinkle: `(a, b)` and `(b, a)` name one segment, and a graph holding both
+is refused, so a construction owes an edge list that picks one orientation.
+
+**`Plane.Graph.polygonal_IsDrawing`** is what a construction discharges. For
+segments the two arc obligations are free — `Plane.between` is a simple arc
+between any two distinct points, and well-formedness supplies the
+distinctness — so being a polygonal plane graph is well-formedness plus the
+two disjointness conditions, stated about `Plane.openSegment`, which is the
+form `Plane.segment_meet` can check.
+
+**`Plane.subdivide(pieces, points)`** cuts a list of segments at a list of
+points — [subdivide.math](subdivide.math). Structural in the **point** list:
+cut every current piece at one point, recurse with the rest. This is what
+avoids both a choice operator (the meets are existential, so naming them as
+data would need one) and a sort (no ordering of the cut points along a
+segment is ever required, because cutting at a point that has already become
+an endpoint is a no-op).
+
 ## Not built yet
 
+- **The overlay proper.** With the two designs above settled, what remains is
+  three properties of `Plane.subdivide` — the pieces cover what they came
+  from, their interiors are pairwise disjoint, and no cut point is interior
+  to any of them — and then the assembly, stated **existentially** ("can be
+  made into a plane graph by subdivision") and proved by induction over the
+  segments, so the cut points never have to be produced.
 - **The outer face.** That exactly one face is unbounded needs the exterior
   of a large disk to be connected — a genuine plane fact that nothing here
   supplies.
-- **The overlay** (`lem:polygonal-overlay`). Its foundation — two segments
-  meet in nothing or in a segment — is now `Plane.segment_meet`; what remains
-  is splitting the polygonal edges into segments, subdividing at every meet,
-  and representing each duplicated subsegment once.
 - **H6, polygonal redrawing** — every finite plane graph is isomorphic to
   one with polygonal edges.
 - **The realisation of a cycle is a Jordan curve.** Needs the edge arcs of a

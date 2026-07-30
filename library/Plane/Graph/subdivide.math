@@ -1,0 +1,120 @@
+-- Plane/Graph/subdivide.math
+--
+-- Cutting a list of segments at a list of points. Layer 6 of
+-- PLAN_JORDAN_SCHOENFLIES.md; the construction `lem:polygonal-overlay`
+-- runs on.
+--
+-- The blueprint says "subdivide at all old endpoints, isolated
+-- intersections, and endpoints of overlapping intervals". Read literally
+-- that asks for the cut points to be produced as DATA, which would mean
+-- naming the meets — `Plane.segment_meet` is an existential, so naming them
+-- needs a choice operator — and then ordering them along each segment,
+-- which would mean sorting. Neither is needed.
+--
+-- Instead the recursion is structural in the POINT list: cut every current
+-- piece at one point, then recurse with the rest of the points. A point
+-- interior to a piece splits it in two; a point anywhere else leaves it
+-- alone. Order does not matter, because cutting at a point that has already
+-- become an endpoint is a no-op — which is also why no sort is required, and
+-- why the same point appearing twice in the list costs nothing.
+--
+-- The overlay itself is then stated EXISTENTIALLY ("can be made into a plane
+-- graph by subdivision", as the blueprint has it) and proved by induction
+-- over the segments, so nothing ever has to compute the cut points either.
+
+module Plane.Graph.subdivide
+
+import Logic.basics
+import Logic.product
+import Equality.basics
+import axioms
+import Set.basics
+import Set.algebra
+import Natural.classical_decidable
+import Lists.list
+import Lists.append
+import Real.interface
+import Plane.point
+import Plane.segment
+import Plane.Graph.segments
+
+-- ----------------------------------------------------------------------
+-- One piece, one point.
+
+definition Plane.splitSegmentAt (point : Plane.Point) (piece : Plane.Segment)
+        : List(Plane.Segment) :=
+  if point ∈ Plane.openSegment(Product.first(piece), Product.second(piece))
+  then List.prepend(Plane.Segment, Product.make(Product.first(piece), point),
+         List.prepend(Plane.Segment, Product.make(point, Product.second(piece)),
+           List.empty(Plane.Segment)))
+  else List.prepend(Plane.Segment, piece, List.empty(Plane.Segment))
+
+theorem Plane.splitSegmentAt_interior (point : Plane.Point) (piece : Plane.Segment)
+        (interior : point ∈ Plane.openSegment(
+            Product.first(piece), Product.second(piece)))
+        : Plane.splitSegmentAt(point, piece)
+          = List.prepend(Plane.Segment,
+                Product.make(Product.first(piece), point),
+                List.prepend(Plane.Segment,
+                    Product.make(point, Product.second(piece)),
+                    List.empty(Plane.Segment))) :=
+  done by Logic.if_positive
+
+theorem Plane.splitSegmentAt_elsewhere (point : Plane.Point) (piece : Plane.Segment)
+        (outside : ¬(point ∈ Plane.openSegment(
+            Product.first(piece), Product.second(piece))))
+        : Plane.splitSegmentAt(point, piece)
+          = List.prepend(Plane.Segment, piece, List.empty(Plane.Segment)) :=
+  done by Logic.if_negative
+
+-- ----------------------------------------------------------------------
+-- Every piece, one point.
+
+definition Plane.splitAllAt (point : Plane.Point)
+        : List(Plane.Segment) → List(Plane.Segment)
+  | List.empty               => List.empty(Plane.Segment)
+  | List.prepend(head, tail) =>
+      List.append(Plane.splitSegmentAt(point, head),
+                  Plane.splitAllAt(point, tail))
+
+theorem Plane.splitAllAt_empty (point : Plane.Point)
+        : Plane.splitAllAt(point, List.empty(Plane.Segment))
+          = List.empty(Plane.Segment) :=
+  done
+
+theorem Plane.splitAllAt_prepend (point : Plane.Point)
+        (head : Plane.Segment) (tail : List(Plane.Segment))
+        : Plane.splitAllAt(point, List.prepend(Plane.Segment, head, tail))
+          = List.append(Plane.splitSegmentAt(point, head),
+                        Plane.splitAllAt(point, tail)) :=
+  done
+
+-- ----------------------------------------------------------------------
+-- Every piece, every point.
+--
+-- The pieces are threaded through the RETURN TYPE rather than as a
+-- parameter the recursive call changes: a fixed parameter that varies
+-- elaborates, but its recursion equation never fires, so `subdivide` would
+-- not reduce. `Plane.chainFunction` is built the same way and for the same
+-- reason.
+
+definition Plane.cutFunction
+        : List(Plane.Point) → (List(Plane.Segment) → List(Plane.Segment))
+  | List.empty               => (pieces : List(Plane.Segment)) ↦ pieces
+  | List.prepend(head, tail) =>
+      (pieces : List(Plane.Segment)) ↦
+          Plane.cutFunction(tail)(Plane.splitAllAt(head, pieces))
+
+definition Plane.subdivide (pieces : List(Plane.Segment))
+        (points : List(Plane.Point)) : List(Plane.Segment) :=
+  Plane.cutFunction(points)(pieces)
+
+theorem Plane.subdivide_empty (pieces : List(Plane.Segment))
+        : Plane.subdivide(pieces, List.empty(Plane.Point)) = pieces :=
+  done
+
+theorem Plane.subdivide_prepend (pieces : List(Plane.Segment))
+        (point : Plane.Point) (rest : List(Plane.Point))
+        : Plane.subdivide(pieces, List.prepend(Plane.Point, point, rest))
+          = Plane.subdivide(Plane.splitAllAt(point, pieces), rest) :=
+  done
