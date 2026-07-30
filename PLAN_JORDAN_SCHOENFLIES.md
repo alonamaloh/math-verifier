@@ -721,13 +721,28 @@ property of `subdivide`. `subdivide([(a,b), (a,b)], [])` has two pieces with
 equal interiors. Disjointness comes from cutting at *the right* points and
 then deduplicating, so it belongs to the assembly, not to the cutting.
 
-**Remaining:** the COVER property — `segment(a, cut) ∪ segment(cut, b) =
-segment(a, b)` at an interior cut, lifted the same way, so the point set is
-preserved. Then the assembly, stated EXISTENTIALLY ("can be made into a
-finite plane graph by subdivision", as the blueprint has it) and proved by
-induction over the segments, so the cut points never have to be produced.
-Then H6. "The realisation of a cycle is a Jordan curve" wants the edge arcs
-of a cycle concatenated in order.
+**The COVER is done too 2026-07-30**: `Plane.piecesCover` names what a list of
+segments occupies and `Plane.subdivide_covers` says a subdivision does not
+change it, over `Plane.segment_split` (cutting at an interior point loses
+nothing). The two nested-walk identities it runs on —
+`between_nested_from_start` / `_to_finish` — are proved in COORDINATES, not
+derived from `between_nested`: reaching the nested form would mean rewriting
+`a` into `between(a, b, 0)`, a replacement containing the term being replaced.
+That regress is the same one that forced the named-pair form of
+`Graph.otherEnd.incident`, and it is worth recognising on sight.
+
+So all four properties of `Plane.subdivide` are in the kernel:
+`ends_distinct`, `inside`, `avoids`, `covers`.
+
+**Remaining: the assembly.** State the overlay EXISTENTIALLY ("can be made
+into a finite plane graph by subdivision", as the blueprint has it) and prove
+it by induction over the segments, so the cut points never have to be
+produced. That is where `Plane.segment_meet` is finally used — to choose the
+cut points for one new segment against the pieces already placed — and where
+the two remaining obligations live: pairwise-disjoint interiors (NOT a
+property of `subdivide`; see the correction above) and the deduplication that
+picks one orientation of each segment. Then H6. "The realisation of a cycle is
+a Jordan curve" wants the edge arcs of a cycle concatenated in order.
 
 **Definitions.** `Plane.Graph.IsDrawing` (**settled** — see above, not a
 `Plane.Graph` type); `Plane.Graph.face` as a component of the complement
