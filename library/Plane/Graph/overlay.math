@@ -1,0 +1,331 @@
+-- Plane/Graph/overlay.math
+--
+-- The polygonal overlay (`lem:polygonal-overlay` of PLAN_JORDAN_SCHOENFLIES.md):
+-- finitely many segments become a polygonal plane graph once they are
+-- subdivided at their meets and each duplicated subsegment is named once.
+--
+-- What has to be proved is the DISJOINTNESS the drawing condition asks for,
+-- and the shape of that argument is the file's whole content:
+--
+--   * SEPARATION. Cut at every end of every source piece and at both ends of
+--     every meet, and two pieces of the subdivision that share an interior
+--     point are the same segment — equal, not disjoint. Overlapping collinear
+--     pieces cannot be pulled apart by cutting; after enough cuts they
+--     coincide, which is what the blueprint's deduplication clause is for.
+--
+--   * The argument is ONE-DIMENSIONAL, and `Plane/segment_order.math` is what
+--     makes it so. Two pieces sharing an interior point lie in a common
+--     segment: if they came from the same source piece, that piece; if from
+--     different ones, the sources overlap in a nondegenerate segment (the
+--     shared point is interior to the overlap, because the overlap's ends are
+--     cut points and so lie in no interior) and both pieces lie inside that
+--     overlap. Along that one segment, the pieces' ends are cut points too,
+--     so neither piece has an end inside the other — and two intervals whose
+--     interiors meet while neither's ends are inside the other are the same
+--     interval.
+--
+-- Nothing here produces the cut points: they are a hypothesis, stated as what
+-- a construction can actually supply — for each pair of source pieces that
+-- meet, SOME pair of ends of the meet is cut. `Plane.segment_meet` says the
+-- meet is a segment, so such a pair exists; the construction below picks one
+-- per pair, and no choice operator is needed because the point list is built
+-- existentially.
+
+module Plane.Graph.overlay
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Equality.basics
+import axioms
+import Set.basics
+import Set.algebra
+import Lists.list
+import Lists.append
+import Real.interface
+import Real.order
+import Plane.point
+import Plane.norm
+import Plane.segment
+import Plane.segment_order
+import Plane.segment_meet
+import Plane.Graph.segments
+import Plane.Graph.subdivide
+
+-- ----------------------------------------------------------------------
+-- Collinearity: two pieces that share an interior point lie in one segment.
+
+theorem Plane.subdivide_common_segment (points : List(Plane.Point))
+        (pieces : List(Plane.Segment))
+        (allDistinct : ∀ (piece : Plane.Segment). piece ∈ pieces →
+            Product.first(piece) ≠ Product.second(piece))
+        (meetsCut : ∀ (piece source : Plane.Segment). piece ∈ pieces → source ∈ pieces →
+            piece ≠ source →
+            Set.IsNonempty(Plane.Point,
+                Plane.segment(Product.first(piece), Product.second(piece))
+                    ∩ Plane.segment(Product.first(source), Product.second(source))) →
+            ∃ (u v : Plane.Point).
+                Plane.segment(Product.first(piece), Product.second(piece))
+                    ∩ Plane.segment(Product.first(source), Product.second(source))
+                    = Plane.segment(u, v)
+                ∧ u ∈ points ∧ v ∈ points)
+        (part other : Plane.Segment)
+        (isPart : part ∈ Plane.subdivide(pieces, points))
+        (isOther : other ∈ Plane.subdivide(pieces, points))
+        (x : Plane.Point)
+        (onPart : x ∈ Plane.openSegment(Product.first(part), Product.second(part)))
+        (onOther : x ∈ Plane.openSegment(Product.first(other), Product.second(other)))
+        : ∃ (ambient : Plane.Segment).
+              Product.first(ambient) ≠ Product.second(ambient)
+              ∧ Plane.segment(Product.first(part), Product.second(part))
+                  ⊆ Plane.segment(Product.first(ambient), Product.second(ambient))
+              ∧ Plane.segment(Product.first(other), Product.second(other))
+                  ⊆ Plane.segment(Product.first(ambient), Product.second(ambient)) := {
+  choose sourcePart such that sourcePart ∈ pieces
+      ∧ Plane.segment(Product.first(part), Product.second(part))
+          ⊆ Plane.segment(Product.first(sourcePart), Product.second(sourcePart))
+      ∧ Plane.openSegment(Product.first(part), Product.second(part))
+          ⊆ Plane.openSegment(Product.first(sourcePart), Product.second(sourcePart))
+      from Plane.subdivide_inside;
+  sourcePart ∈ pieces;
+  Plane.segment(Product.first(part), Product.second(part))
+      ⊆ Plane.segment(Product.first(sourcePart), Product.second(sourcePart))
+      as partInsideSource;
+  Plane.openSegment(Product.first(part), Product.second(part))
+      ⊆ Plane.openSegment(Product.first(sourcePart), Product.second(sourcePart));
+  Product.first(sourcePart) ≠ Product.second(sourcePart) by allDistinct;
+
+  choose sourceOther such that sourceOther ∈ pieces
+      ∧ Plane.segment(Product.first(other), Product.second(other))
+          ⊆ Plane.segment(Product.first(sourceOther), Product.second(sourceOther))
+      ∧ Plane.openSegment(Product.first(other), Product.second(other))
+          ⊆ Plane.openSegment(Product.first(sourceOther), Product.second(sourceOther))
+      from Plane.subdivide_inside;
+  sourceOther ∈ pieces;
+  Plane.segment(Product.first(other), Product.second(other))
+      ⊆ Plane.segment(Product.first(sourceOther), Product.second(sourceOther))
+      as otherInsideSource;
+  Plane.openSegment(Product.first(other), Product.second(other))
+      ⊆ Plane.openSegment(Product.first(sourceOther), Product.second(sourceOther));
+  Product.first(sourceOther) ≠ Product.second(sourceOther) by allDistinct;
+
+  done by cases {
+    case sourcePart = sourceOther as sourcesAgree: {
+        Plane.segment(Product.first(other), Product.second(other))
+            ⊆ Plane.segment(Product.first(sourcePart), Product.second(sourcePart))
+            by substituting sourcesAgree;
+        witness sourcePart
+      }
+    otherwise as sourcesDiffer: {
+        -- The sources meet at `x`, so their meet is a segment with both ends
+        -- cut — and `x` is interior to it, since a cut point is interior to
+        -- no piece of the subdivision.
+        x ∈ Plane.segment(Product.first(sourcePart), Product.second(sourcePart));
+        x ∈ Plane.segment(Product.first(sourceOther), Product.second(sourceOther));
+        x ∈ Plane.segment(Product.first(sourcePart), Product.second(sourcePart))
+                ∩ Plane.segment(Product.first(sourceOther), Product.second(sourceOther));
+        Set.IsNonempty(Plane.Point,
+            Plane.segment(Product.first(sourcePart), Product.second(sourcePart))
+                ∩ Plane.segment(Product.first(sourceOther), Product.second(sourceOther)))
+            by { witness x };
+        choose meetNear, meetFar such that
+            Plane.segment(Product.first(sourcePart), Product.second(sourcePart))
+                    ∩ Plane.segment(Product.first(sourceOther), Product.second(sourceOther))
+                = Plane.segment(meetNear, meetFar)
+            ∧ meetNear ∈ points ∧ meetFar ∈ points
+            from meetsCut;
+        Plane.segment(Product.first(sourcePart), Product.second(sourcePart))
+                ∩ Plane.segment(Product.first(sourceOther), Product.second(sourceOther))
+            = Plane.segment(meetNear, meetFar) as meetIsSegment;
+        meetNear ∈ points;
+        meetFar ∈ points;
+
+        meetNear ∉ Plane.openSegment(Product.first(part), Product.second(part))
+            by Plane.subdivide_avoids;
+        meetFar ∉ Plane.openSegment(Product.first(part), Product.second(part))
+            by Plane.subdivide_avoids;
+        meetNear ∉ Plane.openSegment(Product.first(other), Product.second(other))
+            by Plane.subdivide_avoids;
+        meetFar ∉ Plane.openSegment(Product.first(other), Product.second(other))
+            by Plane.subdivide_avoids;
+
+        x ∈ Plane.segment(meetNear, meetFar) by substituting meetIsSegment;
+        x ≠ meetNear
+            by { suppose x = meetNear as sharedIsNear;
+                 meetNear ∈ Plane.openSegment(Product.first(part), Product.second(part))
+                     by substituting sharedIsNear;
+                 done };
+        x ≠ meetFar
+            by { suppose x = meetFar as sharedIsFar;
+                 meetFar ∈ Plane.openSegment(Product.first(part), Product.second(part))
+                     by substituting sharedIsFar;
+                 done };
+        x ∈ Plane.openSegment(meetNear, meetFar) by Plane.member_openSegment;
+        meetNear ≠ meetFar
+            by { suppose meetNear = meetFar as meetIsDegenerate;
+                 Plane.segment(meetNear, meetFar) = Plane.segment(meetFar, meetFar)
+                     by substituting meetIsDegenerate;
+                 Plane.segment(meetFar, meetFar) = Set.singleton(Plane.Point, meetFar)
+                     by Plane.segment_degenerate;
+                 x ∈ Set.singleton(Plane.Point, meetFar);
+                 x = meetFar;
+                 done };
+
+        -- Both ends of the meet lie on both sources.
+        Plane.segment(Product.first(sourcePart), Product.second(sourcePart))
+                ∩ Plane.segment(Product.first(sourceOther), Product.second(sourceOther))
+            ⊆ Plane.segment(Product.first(sourcePart), Product.second(sourcePart))
+            by Set.intersection_subset_left;
+        Plane.segment(meetNear, meetFar)
+            ⊆ Plane.segment(Product.first(sourcePart), Product.second(sourcePart))
+            by substituting meetIsSegment;
+        Plane.segment(Product.first(sourcePart), Product.second(sourcePart))
+                ∩ Plane.segment(Product.first(sourceOther), Product.second(sourceOther))
+            ⊆ Plane.segment(Product.first(sourceOther), Product.second(sourceOther))
+            by Set.intersection_subset_right;
+        Plane.segment(meetNear, meetFar)
+            ⊆ Plane.segment(Product.first(sourceOther), Product.second(sourceOther))
+            by substituting meetIsSegment;
+        meetNear ∈ Plane.segment(meetNear, meetFar) by Plane.left_in_segment;
+        meetFar ∈ Plane.segment(meetNear, meetFar) by Plane.right_in_segment;
+        meetNear ∈ Plane.segment(Product.first(sourcePart), Product.second(sourcePart));
+        meetFar ∈ Plane.segment(Product.first(sourcePart), Product.second(sourcePart));
+        meetNear ∈ Plane.segment(Product.first(sourceOther), Product.second(sourceOther));
+        meetFar ∈ Plane.segment(Product.first(sourceOther), Product.second(sourceOther));
+
+        -- And each piece's ends lie on its own source, which is the ambient
+        -- segment the one-dimensional lemma runs along.
+        Product.first(part) ∈ Plane.segment(Product.first(part), Product.second(part))
+            by Plane.left_in_segment;
+        Product.second(part) ∈ Plane.segment(Product.first(part), Product.second(part))
+            by Plane.right_in_segment;
+        Product.first(part)
+            ∈ Plane.segment(Product.first(sourcePart), Product.second(sourcePart))
+            by partInsideSource;
+        Product.second(part)
+            ∈ Plane.segment(Product.first(sourcePart), Product.second(sourcePart))
+            by partInsideSource;
+        Product.first(other) ∈ Plane.segment(Product.first(other), Product.second(other))
+            by Plane.left_in_segment;
+        Product.second(other) ∈ Plane.segment(Product.first(other), Product.second(other))
+            by Plane.right_in_segment;
+        Product.first(other)
+            ∈ Plane.segment(Product.first(sourceOther), Product.second(sourceOther))
+            by otherInsideSource;
+        Product.second(other)
+            ∈ Plane.segment(Product.first(sourceOther), Product.second(sourceOther))
+            by otherInsideSource;
+
+        Plane.segment(Product.first(part), Product.second(part))
+            ⊆ Plane.segment(meetNear, meetFar)
+            by Plane.segment_inside_of_ends_outside(a := Product.first(sourcePart));
+        Plane.segment(Product.first(other), Product.second(other))
+            ⊆ Plane.segment(meetNear, meetFar)
+            by Plane.segment_inside_of_ends_outside(a := Product.first(sourceOther));
+        witness Product.make(meetNear, meetFar)
+      }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- Separation: pieces that share an interior point are the same segment.
+
+theorem Plane.subdivide_separated (points : List(Plane.Point))
+        (pieces : List(Plane.Segment))
+        (allDistinct : ∀ (piece : Plane.Segment). piece ∈ pieces →
+            Product.first(piece) ≠ Product.second(piece))
+        (endsCut : ∀ (piece : Plane.Segment). piece ∈ pieces →
+            ∀ (point : Plane.Point). Plane.IsEndOf(point, piece) → point ∈ points)
+        (meetsCut : ∀ (piece source : Plane.Segment). piece ∈ pieces → source ∈ pieces →
+            piece ≠ source →
+            Set.IsNonempty(Plane.Point,
+                Plane.segment(Product.first(piece), Product.second(piece))
+                    ∩ Plane.segment(Product.first(source), Product.second(source))) →
+            ∃ (u v : Plane.Point).
+                Plane.segment(Product.first(piece), Product.second(piece))
+                    ∩ Plane.segment(Product.first(source), Product.second(source))
+                    = Plane.segment(u, v)
+                ∧ u ∈ points ∧ v ∈ points)
+        (part other : Plane.Segment)
+        (isPart : part ∈ Plane.subdivide(pieces, points))
+        (isOther : other ∈ Plane.subdivide(pieces, points))
+        (x : Plane.Point)
+        (onPart : x ∈ Plane.openSegment(Product.first(part), Product.second(part)))
+        (onOther : x ∈ Plane.openSegment(Product.first(other), Product.second(other)))
+        : Plane.SameSegment(part, other) := {
+  -- Every end of every piece is a cut point, hence interior to nothing.
+  Plane.IsEndOf(Product.first(part), part);
+  Plane.IsEndOf(Product.second(part), part);
+  Plane.IsEndOf(Product.first(other), other);
+  Plane.IsEndOf(Product.second(other), other);
+  Product.first(part) ∈ points by Plane.subdivide_ends_are_cuts;
+  Product.second(part) ∈ points by Plane.subdivide_ends_are_cuts;
+  Product.first(other) ∈ points by Plane.subdivide_ends_are_cuts;
+  Product.second(other) ∈ points by Plane.subdivide_ends_are_cuts;
+  Product.first(part) ∉ Plane.openSegment(Product.first(other), Product.second(other))
+      by Plane.subdivide_avoids;
+  Product.second(part) ∉ Plane.openSegment(Product.first(other), Product.second(other))
+      by Plane.subdivide_avoids;
+  Product.first(other) ∉ Plane.openSegment(Product.first(part), Product.second(part))
+      by Plane.subdivide_avoids;
+  Product.second(other) ∉ Plane.openSegment(Product.first(part), Product.second(part))
+      by Plane.subdivide_avoids;
+
+  -- One segment holds both pieces.
+  choose ambient such that Product.first(ambient) ≠ Product.second(ambient)
+      ∧ Plane.segment(Product.first(part), Product.second(part))
+          ⊆ Plane.segment(Product.first(ambient), Product.second(ambient))
+      ∧ Plane.segment(Product.first(other), Product.second(other))
+          ⊆ Plane.segment(Product.first(ambient), Product.second(ambient))
+      from Plane.subdivide_common_segment;
+  Product.first(ambient) ≠ Product.second(ambient);
+  Plane.segment(Product.first(part), Product.second(part))
+      ⊆ Plane.segment(Product.first(ambient), Product.second(ambient)) as partInAmbient;
+  Plane.segment(Product.first(other), Product.second(other))
+      ⊆ Plane.segment(Product.first(ambient), Product.second(ambient)) as otherInAmbient;
+  Product.first(part) ∈ Plane.segment(Product.first(part), Product.second(part))
+      by Plane.left_in_segment;
+  Product.second(part) ∈ Plane.segment(Product.first(part), Product.second(part))
+      by Plane.right_in_segment;
+  Product.first(other) ∈ Plane.segment(Product.first(other), Product.second(other))
+      by Plane.left_in_segment;
+  Product.second(other) ∈ Plane.segment(Product.first(other), Product.second(other))
+      by Plane.right_in_segment;
+  Product.first(part) ∈ Plane.segment(Product.first(ambient), Product.second(ambient))
+      by partInAmbient;
+  Product.second(part) ∈ Plane.segment(Product.first(ambient), Product.second(ambient))
+      by partInAmbient;
+  Product.first(other) ∈ Plane.segment(Product.first(ambient), Product.second(ambient))
+      by otherInAmbient;
+  Product.second(other) ∈ Plane.segment(Product.first(ambient), Product.second(ambient))
+      by otherInAmbient;
+
+  -- Along it, neither piece has an end inside the other, so they agree.
+  (Product.first(part) = Product.first(other)
+       ∧ Product.second(part) = Product.second(other))
+  ∨ (Product.first(part) = Product.second(other)
+       ∧ Product.second(part) = Product.first(other))
+      by Plane.same_ends_of_meeting_interiors(a := Product.first(ambient));
+  done by cases {
+    case Product.first(part) = Product.first(other)
+             ∧ Product.second(part) = Product.second(other): {
+        part = Product.make(Product.first(part), Product.second(part)) by Product.eta
+             = Product.make(Product.first(other), Product.second(part))
+                   by substituting (Product.first(part) = Product.first(other))
+             = Product.make(Product.first(other), Product.second(other))
+                   by substituting (Product.second(part) = Product.second(other))
+             = other by Product.eta;
+        done by Or.introduceLeft
+      }
+    case Product.first(part) = Product.second(other)
+             ∧ Product.second(part) = Product.first(other): {
+        part = Product.make(Product.first(part), Product.second(part)) by Product.eta
+             = Product.make(Product.second(other), Product.second(part))
+                   by substituting (Product.first(part) = Product.second(other))
+             = Product.make(Product.second(other), Product.first(other))
+                   by substituting (Product.second(part) = Product.first(other))
+             = Plane.reverseSegment(other);
+        done by Or.introduceRight
+      }
+  }
+}
