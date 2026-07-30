@@ -80,13 +80,63 @@ theorem Graph.Joins.symmetric (graph : Graph(V, E, ends)) (edge : E) (u v : V)
     case ends(edge) = Product.make(v, u): done
   }
 
+-- Either end of a joining is an end of the edge.
+theorem Graph.Joins.incident_source (graph : Graph(V, E, ends)) (edge : E) (u v : V)
+        (joins : Graph.Joins(graph, edge, u, v))
+        : Graph.Incident(graph, edge, u) :=
+  witness v with joins
+
+theorem Graph.Joins.incident_target (graph : Graph(V, E, ends)) (edge : E) (u v : V)
+        (joins : Graph.Joins(graph, edge, u, v))
+        : Graph.Incident(graph, edge, v) := {
+  Graph.Joins(graph, edge, v, u) by Graph.Joins.symmetric;
+  done by Graph.Joins.incident_source
+}
+
+-- An edge joins the two components of its own ends pair. Together with
+-- `Graph.Joins.canonical` below this is the whole interface to the pair:
+-- one fact says the components ARE ends, the other says an arbitrary
+-- reading names those same two, and no proof past this section reads a
+-- `Product` again.
+theorem Graph.Joins.at_components (graph : Graph(V, E, ends)) (edge : E)
+        : Graph.Joins(graph, edge,
+              Product.first(ends(edge)), Product.second(ends(edge))) := {
+  ends(edge) = Product.make(Product.first(ends(edge)), Product.second(ends(edge)))
+      by Product.eta;
+  done
+}
+
 -- Every edge joins a pair of vertices: the two its ends assignment names.
 theorem Graph.edge_has_ends (graph : Graph(V, E, ends)) (edge : E)
         : ∃ (u v : V). Graph.Joins(graph, edge, u, v) := {
-  ends(edge) = Product.make(Product.first(ends(edge)), Product.second(ends(edge)))
-      by Product.eta;
+  Graph.Joins(graph, edge, Product.first(ends(edge)), Product.second(ends(edge)))
+      by Graph.Joins.at_components;
   witness Product.first(ends(edge)) with witness Product.second(ends(edge))
 }
+
+-- Any reading of an edge names the two components of its ends pair, in one
+-- order or the other. This is what turns every question about an edge's
+-- ends into equations between VERTICES.
+theorem Graph.Joins.canonical (graph : Graph(V, E, ends)) (edge : E) (u v : V)
+        (joins : Graph.Joins(graph, edge, u, v))
+        : (u = Product.first(ends(edge)) ∧ v = Product.second(ends(edge)))
+          ∨ (u = Product.second(ends(edge)) ∧ v = Product.first(ends(edge))) :=
+  done by cases {
+    case ends(edge) = Product.make(u, v) as endsEquation: {
+        u = Product.first(Product.make(u, v))
+          = Product.first(ends(edge)) by endsEquation;
+        v = Product.second(Product.make(u, v))
+          = Product.second(ends(edge)) by endsEquation;
+        done
+      }
+    case ends(edge) = Product.make(v, u) as endsEquation: {
+        u = Product.second(Product.make(v, u))
+          = Product.second(ends(edge)) by endsEquation;
+        v = Product.first(Product.make(v, u))
+          = Product.first(ends(edge)) by endsEquation;
+        done
+      }
+  }
 
 -- The end of `edge` away from `vertex`. Takes the graph for the same
 -- reason `Graph.Joins` does — it reads only `ends`, and the graph is what
@@ -115,49 +165,41 @@ theorem Graph.otherEnd.of_joins (graph : Graph(V, E, ends)) (edge : E) (u v : V)
   }
 
 -- Whichever end `otherEnd` picks, it is an end.
-theorem Graph.otherEnd.incident (graph : Graph(V, E, ends)) (edge : E) (vertex : V)
+--
+-- Stated first over a NAMED pair, because `otherEnd` destructures
+-- `ends(edge)` and that destructure only reduces once the pair is in
+-- constructor form. With `u` and `v` as binders the eta equation can be
+-- substituted in; against `Product.first(ends(edge))` it could not, since
+-- the components mention the very term being rewritten.
+theorem Graph.otherEnd.incident_of_ends (graph : Graph(V, E, ends)) (edge : E)
+        (vertex u v : V) (endsEquation : ends(edge) = Product.make(u, v))
         : Graph.Incident(graph, edge, Graph.otherEnd(graph, edge, vertex)) := {
-  ∃ (x y : V). Graph.Joins(graph, edge, x, y) by Graph.edge_has_ends;
-  choose u, v such that Graph.Joins(graph, edge, u, v);
-  Graph.Joins(graph, edge, v, u) by Graph.Joins.symmetric;
+  Graph.Joins(graph, edge, u, v);
+  Graph.Incident(graph, edge, u) by Graph.Joins.incident_source;
+  Graph.Incident(graph, edge, v) by Graph.Joins.incident_target;
+  Graph.otherEnd(graph, edge, vertex) = (if u = vertex then v else u : V)
+      by substituting endsEquation as picksAnEnd;
   done by cases {
-    case ends(edge) = Product.make(u, v) as endsEquation: {
-        done by cases {
-          case u = vertex as picksSecond: {
-              Graph.otherEnd(graph, edge, vertex)
-                 = (if u = vertex then v else u : V)  by substituting endsEquation
-                 = v                                  by Logic.if_positive;
-              Graph.Incident(graph, edge, v) by witness u;
-              done
-            }
-          otherwise: {
-              Graph.otherEnd(graph, edge, vertex)
-                 = (if u = vertex then v else u : V)  by substituting endsEquation
-                 = u                                  by Logic.if_negative;
-              Graph.Incident(graph, edge, u) by witness v;
-              done
-            }
-        }
+    case u = vertex: {
+        Graph.otherEnd(graph, edge, vertex)
+           = (if u = vertex then v else u : V) by picksAnEnd
+           = v                                 by Logic.if_positive;
+        done
       }
-    case ends(edge) = Product.make(v, u) as endsEquation: {
-        done by cases {
-          case v = vertex as picksSecond: {
-              Graph.otherEnd(graph, edge, vertex)
-                 = (if v = vertex then u else v : V)  by substituting endsEquation
-                 = u                                  by Logic.if_positive;
-              Graph.Incident(graph, edge, u) by witness v;
-              done
-            }
-          otherwise: {
-              Graph.otherEnd(graph, edge, vertex)
-                 = (if v = vertex then u else v : V)  by substituting endsEquation
-                 = v                                  by Logic.if_negative;
-              Graph.Incident(graph, edge, v) by witness u;
-              done
-            }
-        }
+    otherwise: {
+        Graph.otherEnd(graph, edge, vertex)
+           = (if u = vertex then v else u : V) by picksAnEnd
+           = u                                 by Logic.if_negative;
+        done
       }
   }
+}
+
+theorem Graph.otherEnd.incident (graph : Graph(V, E, ends)) (edge : E) (vertex : V)
+        : Graph.Incident(graph, edge, Graph.otherEnd(graph, edge, vertex)) := {
+  ends(edge) = Product.make(Product.first(ends(edge)), Product.second(ends(edge)))
+      by Product.eta;
+  done by Graph.otherEnd.incident_of_ends
 }
 
 -- An edge with two distinct ends has no third one: knowing where it
@@ -167,50 +209,36 @@ theorem Graph.Joins.unique (graph : Graph(V, E, ends)) (edge : E) (u v w : V)
         (joinsToV : Graph.Joins(graph, edge, u, v))
         (joinsToW : Graph.Joins(graph, edge, u, w))
         (endsDistinct : ¬(u = v))
-        : v = w :=
+        : v = w := {
+  (u = Product.first(ends(edge)) ∧ v = Product.second(ends(edge)))
+      ∨ (u = Product.second(ends(edge)) ∧ v = Product.first(ends(edge)))
+      by Graph.Joins.canonical as readingV;
+  (u = Product.first(ends(edge)) ∧ w = Product.second(ends(edge)))
+      ∨ (u = Product.second(ends(edge)) ∧ w = Product.first(ends(edge)))
+      by Graph.Joins.canonical as readingW;
+  -- `u` picks one component; whichever it is, `v` and `w` are both the
+  -- other. The mixed cases make the two components equal, which collapses
+  -- `v` onto `u`.
   done by cases {
-    case ends(edge) = Product.make(u, v):
+    case u = Product.first(ends(edge)) ∧ v = Product.second(ends(edge)):
         done by cases {
-          case ends(edge) = Product.make(u, w):
-              v  = Product.second(Product.make(u, v))
-                 = Product.second(ends(edge))
-                 = Product.second(Product.make(u, w))
-                 = w
-          case ends(edge) = Product.make(w, u): {
-              u  = Product.second(Product.make(w, u))
-                 = Product.second(ends(edge))
-                 = Product.second(Product.make(u, v))
-                 = v;
+          case u = Product.first(ends(edge)) ∧ w = Product.second(ends(edge)):
+              v = Product.second(ends(edge)) = w
+          case u = Product.second(ends(edge)) ∧ w = Product.first(ends(edge)): {
+              v = Product.second(ends(edge)) = u;
               done
             }
         }
-    case ends(edge) = Product.make(v, u):
+    case u = Product.second(ends(edge)) ∧ v = Product.first(ends(edge)):
         done by cases {
-          case ends(edge) = Product.make(u, w): {
-              u  = Product.first(Product.make(u, w))
-                 = Product.first(ends(edge))
-                 = Product.first(Product.make(v, u))
-                 = v;
+          case u = Product.first(ends(edge)) ∧ w = Product.second(ends(edge)): {
+              v = Product.first(ends(edge)) = u;
               done
             }
-          case ends(edge) = Product.make(w, u):
-              v  = Product.first(Product.make(v, u))
-                 = Product.first(ends(edge))
-                 = Product.first(Product.make(w, u))
-                 = w
+          case u = Product.second(ends(edge)) ∧ w = Product.first(ends(edge)):
+              v = Product.first(ends(edge)) = w
         }
   }
-
-theorem Graph.Joins.incident_source (graph : Graph(V, E, ends)) (edge : E) (u v : V)
-        (joins : Graph.Joins(graph, edge, u, v))
-        : Graph.Incident(graph, edge, u) :=
-  witness v with joins
-
-theorem Graph.Joins.incident_target (graph : Graph(V, E, ends)) (edge : E) (u v : V)
-        (joins : Graph.Joins(graph, edge, u, v))
-        : Graph.Incident(graph, edge, v) := {
-  Graph.Joins(graph, edge, v, u) by Graph.Joins.symmetric;
-  done by Graph.Joins.incident_source
 }
 
 -- An edge has no ends beyond the two: a vertex incident to it is one of
@@ -220,32 +248,28 @@ theorem Graph.Incident.is_end (graph : Graph(V, E, ends)) (edge : E) (u v vertex
         (incident : Graph.Incident(graph, edge, vertex))
         : vertex = u ∨ vertex = v := {
   choose farEnd such that Graph.Joins(graph, edge, vertex, farEnd) from incident;
+  -- Both readings name the same two components, so `vertex` is one of them
+  -- and `u`, `v` are those same two.
+  (vertex = Product.first(ends(edge)) ∧ farEnd = Product.second(ends(edge)))
+      ∨ (vertex = Product.second(ends(edge)) ∧ farEnd = Product.first(ends(edge)))
+      by Graph.Joins.canonical;
+  (u = Product.first(ends(edge)) ∧ v = Product.second(ends(edge)))
+      ∨ (u = Product.second(ends(edge)) ∧ v = Product.first(ends(edge)))
+      by Graph.Joins.canonical as readingOfEdge;
   done by cases {
-    case ends(edge) = Product.make(u, v):
+    case vertex = Product.first(ends(edge)) ∧ farEnd = Product.second(ends(edge)):
         done by cases {
-          case ends(edge) = Product.make(vertex, farEnd):
-              vertex = Product.first(Product.make(vertex, farEnd))
-                     = Product.first(ends(edge))
-                     = Product.first(Product.make(u, v))
-                     = u
-          case ends(edge) = Product.make(farEnd, vertex):
-              vertex = Product.second(Product.make(farEnd, vertex))
-                     = Product.second(ends(edge))
-                     = Product.second(Product.make(u, v))
-                     = v
+          case u = Product.first(ends(edge)) ∧ v = Product.second(ends(edge)):
+              vertex = Product.first(ends(edge)) = u
+          case u = Product.second(ends(edge)) ∧ v = Product.first(ends(edge)):
+              vertex = Product.first(ends(edge)) = v
         }
-    case ends(edge) = Product.make(v, u):
+    case vertex = Product.second(ends(edge)) ∧ farEnd = Product.first(ends(edge)):
         done by cases {
-          case ends(edge) = Product.make(vertex, farEnd):
-              vertex = Product.first(Product.make(vertex, farEnd))
-                     = Product.first(ends(edge))
-                     = Product.first(Product.make(v, u))
-                     = v
-          case ends(edge) = Product.make(farEnd, vertex):
-              vertex = Product.second(Product.make(farEnd, vertex))
-                     = Product.second(ends(edge))
-                     = Product.second(Product.make(v, u))
-                     = u
+          case u = Product.first(ends(edge)) ∧ v = Product.second(ends(edge)):
+              vertex = Product.second(ends(edge)) = v
+          case u = Product.second(ends(edge)) ∧ v = Product.first(ends(edge)):
+              vertex = Product.second(ends(edge)) = u
         }
   }
 }
@@ -264,7 +288,7 @@ theorem Graph.Joins.ends_agree (graph : Graph(V, E, ends)) (edge : E) (u v x y :
         Graph.Joins(graph, edge, u, y) by substituting (x = u);
         y = v by Graph.Joins.unique;
         x = u ∧ y = v;
-        done by Or.introduceLeft
+        done
       }
     case x = v: {
         Graph.Joins(graph, edge, v, u) by Graph.Joins.symmetric;
@@ -272,7 +296,7 @@ theorem Graph.Joins.ends_agree (graph : Graph(V, E, ends)) (edge : E) (u v x y :
         ¬(v = u) by Equality.not_equal_symmetric;
         y = u by Graph.Joins.unique;
         x = v ∧ y = u;
-        done by Or.introduceRight
+        done
       }
   }
 }
@@ -398,15 +422,13 @@ theorem Graph.incidentEdges_incident (graph : Graph(V, E, ends)) (vertex : V) (e
 -- Subgraphs.
 
 definition Graph.IsSubgraph (part whole : Graph(V, E, ends)) : Proposition :=
-  (∀ (vertex : V). vertex ∈ Graph.vertices(part) → vertex ∈ Graph.vertices(whole))
-  ∧ (∀ (edge : E). edge ∈ Graph.edges(part) → edge ∈ Graph.edges(whole))
+  Graph.vertices(part) ⊆ Graph.vertices(whole)
+  ∧ Graph.edges(part) ⊆ Graph.edges(whole)
 
 theorem Graph.IsSubgraph.reflexive (graph : Graph(V, E, ends))
         : Graph.IsSubgraph(graph, graph) := {
-  ∀ (vertex : V). vertex ∈ Graph.vertices(graph) → vertex ∈ Graph.vertices(graph)
-      by { take vertex : V; suppose vertex ∈ Graph.vertices(graph); done };
-  ∀ (edge : E). edge ∈ Graph.edges(graph) → edge ∈ Graph.edges(graph)
-      by { take edge : E; suppose edge ∈ Graph.edges(graph); done };
+  Graph.vertices(graph) ⊆ Graph.vertices(graph) by List.Includes.reflexive;
+  Graph.edges(graph) ⊆ Graph.edges(graph) by List.Includes.reflexive;
   done
 }
 
@@ -414,22 +436,8 @@ theorem Graph.IsSubgraph.transitive (small middle large : Graph(V, E, ends))
         (smallInMiddle : Graph.IsSubgraph(small, middle))
         (middleInLarge : Graph.IsSubgraph(middle, large))
         : Graph.IsSubgraph(small, large) := {
-  ∀ (vertex : V). vertex ∈ Graph.vertices(small) → vertex ∈ Graph.vertices(middle)
-      as smallVertices;
-  ∀ (vertex : V). vertex ∈ Graph.vertices(middle) → vertex ∈ Graph.vertices(large)
-      as middleVertices;
-  ∀ (edge : E). edge ∈ Graph.edges(small) → edge ∈ Graph.edges(middle) as smallEdges;
-  ∀ (edge : E). edge ∈ Graph.edges(middle) → edge ∈ Graph.edges(large) as middleEdges;
-  ∀ (vertex : V). vertex ∈ Graph.vertices(small) → vertex ∈ Graph.vertices(large)
-      by { take vertex : V;
-           suppose vertex ∈ Graph.vertices(small);
-           vertex ∈ Graph.vertices(middle) by smallVertices;
-           done by middleVertices };
-  ∀ (edge : E). edge ∈ Graph.edges(small) → edge ∈ Graph.edges(large)
-      by { take edge : E;
-           suppose edge ∈ Graph.edges(small);
-           edge ∈ Graph.edges(middle) by smallEdges;
-           done by middleEdges };
+  Graph.vertices(small) ⊆ Graph.vertices(large) by List.Includes.transitive;
+  Graph.edges(small) ⊆ Graph.edges(large) by List.Includes.transitive;
   done
 }
 

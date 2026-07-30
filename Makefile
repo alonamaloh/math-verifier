@@ -171,7 +171,7 @@ LIBRARY_MATHV_IFACE_FILES := $(LIBRARY_MATHV_FILES:.mathv=.mathv.iface)
 TEST_MATHV_IFACE_FILES := $(TEST_MATHV_FILES:.mathv=.mathv.iface)
 PROJECT_MATHV_IFACE_FILES := $(PROJECT_MATHV_FILES:.mathv=.mathv.iface)
 
-.PHONY: library library-clean plane tests error-tests checker-tests \
+.PHONY: library library-clean plane graph tests error-tests checker-tests \
         premise-block-warning-check partial-choose-condition-check \
         clean-check clean-status projects projects-clean project-tests all
 
@@ -224,6 +224,18 @@ PLANE_CONE_MATHV := $(shell python3 scripts/module_cone.py \
 
 plane: $(PLANE_MATHV_FILES) $(PLANE_MATHV_FILES:.mathv=.mathv.iface) \
        $(PLANE_CONE_MATHV)
+
+# The same narrow loop for the abstract graph layer. `library/Graph/` sits on
+# `Lists/` and `Natural/` only — no geometry — so this cone is a fraction of
+# Plane's, and it is the right target while working in Graph/. It does NOT
+# cover `library/Plane/Graph/`, which is plane graphs and belongs to `plane`.
+GRAPH_MATH_FILES := $(filter library/Graph/%,$(LIBRARY_MATH_FILES))
+GRAPH_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(GRAPH_MATH_FILES))
+GRAPH_CONE_MATHV := $(shell python3 scripts/module_cone.py \
+    $(BUILD_DIR)/library-depends.mk $(BUILD_DIR)/library/Graph 2>/dev/null)
+
+graph: $(GRAPH_MATHV_FILES) $(GRAPH_MATHV_FILES:.mathv=.mathv.iface) \
+       $(GRAPH_CONE_MATHV)
 
 tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES) checker-tests \
 	carrier-normal-form-check matrix-ergonomics-statement-check \

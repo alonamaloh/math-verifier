@@ -138,6 +138,65 @@ automatic theorem List.member_of_prepend_not_head (A : Type(0)) (element head : 
   done
 }
 
+-- ----------------------------------------------------------------------
+-- Inclusion: every member of the smaller list is a member of the larger.
+--
+-- It says nothing about order or multiplicity, which is exactly right for
+-- the statements that want it — "these edges are among those", the subgraph
+-- order, a filter landing back in its source. Spelled `⊆`, the same
+-- operator `Set` uses, because it is the same relation read on a different
+-- container; `∈` is already overloaded that way.
+--
+-- Transparent, so a `⊆` fact in context discharges an individual membership
+-- with no citation and the ∀-form and the `⊆` form are interchangeable.
+
+definition List.Includes {A : Type(0)} (small large : List(A)) : Proposition :=
+  ∀ (element : A). element ∈ small → element ∈ large
+operator (⊆) on (List, List) := List.Includes
+
+theorem List.Includes.reflexive (A : Type(0)) (list : List(A))
+        : list ⊆ list := {
+  take element : A;
+  suppose element ∈ list;
+  done
+}
+
+theorem List.Includes.transitive (A : Type(0)) (small middle large : List(A))
+        (smallInMiddle : small ⊆ middle) (middleInLarge : middle ⊆ large)
+        : small ⊆ large := {
+  take element : A;
+  suppose element ∈ small;
+  element ∈ middle by smallInMiddle;
+  done by middleInLarge
+}
+
+-- Dropping the head only loses members.
+theorem List.Includes.prepend (A : Type(0)) (head : A) (tail : List(A))
+        : tail ⊆ List.prepend(A, head, tail) := {
+  take element : A;
+  suppose element ∈ tail;
+  done by List.member.there
+}
+
+-- Growing both sides by the same head preserves inclusion.
+theorem List.Includes.prepend_both (A : Type(0)) (head : A) (small large : List(A))
+        (included : small ⊆ large)
+        : List.prepend(A, head, small) ⊆ List.prepend(A, head, large) := {
+  take element : A;
+  suppose element ∈ List.prepend(A, head, small);
+  element = head ∨ element ∈ small by List.member_prepend_invert;
+  done by cases {
+    case element = head: {
+        element ∈ List.prepend(A, head, large) by List.member.here;
+        done
+      }
+    case element ∈ small: {
+        element ∈ large by included;
+        done by List.member.there
+      }
+  }
+}
+
 -- Discriminator: True on `prepend`, False on `empty`. Refutes membership
 -- in the empty list — any member proof lifts to `is_nonempty`, but
 -- `is_nonempty(empty)` is False.

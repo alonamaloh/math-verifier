@@ -199,18 +199,11 @@ theorem Graph.IsTree.has_leaf (graph : Graph(V, E, ends))
   -- Two distinct vertices, the second taken from what the first leaves.
   ∃ (vertex : V). vertex ∈ Graph.vertices(graph);
   choose firstVertex such that firstVertex ∈ Graph.vertices(graph);
-  length(Graph.vertices(graph))
-      = 1 + length(Graph.vertices(graph) ∖ firstVertex)
-      by List.length_remove_member;
-  (1 : ℕ) + 1
-     ≤ Graph.order(graph)
-     = length(Graph.vertices(graph))
-     = 1 + length(Graph.vertices(graph) ∖ firstVertex);
-  1 ≤ length(Graph.vertices(graph) ∖ firstVertex) by Natural.add_left_le_cancel;
-  choose secondVertex such that secondVertex ∈ Graph.vertices(graph) ∖ firstVertex
-      from List.member_of_positive_length;
-  ¬(secondVertex = firstVertex) by List.remove_member_ne;
-  secondVertex ∈ Graph.vertices(graph) by List.remove_member_subset;
+  choose secondVertex such that
+      secondVertex ∈ Graph.vertices(graph) ∧ ¬(secondVertex = firstVertex)
+      from Graph.other_vertex;
+  secondVertex ∈ Graph.vertices(graph);
+  ¬(secondVertex = firstVertex);
 
   -- So some path between them takes at least one edge.
   Graph.Reaches(graph, firstVertex, secondVertex) by Graph.IsConnected.reaches;
@@ -541,39 +534,11 @@ theorem Graph.IsTree.edge_count_below (bound : ℕ)
                               by List.length_remove_member
                           = Graph.order(graph);
                        done };
-              Graph.size(graph) = 0
-                  by { Graph.size(graph) = 0 ∨ ∃ (k : ℕ). Graph.size(graph) = 1 + k
-                           by Natural.zero_or_one_plus;
-                       done by cases {
-                         case Graph.size(graph) = 0: done
-                         case ∃ (k : ℕ). Graph.size(graph) = 1 + k as positive: {
-                             choose gap such that Graph.size(graph) = 1 + gap
-                                 from positive;
-                             (1 : ℕ)
-                                ≤ 1 + gap
-                                = Graph.size(graph);
-                             done
-                           }
-                       } } as noEdges;
-              Graph.order(graph) < 2 ∨ Graph.order(graph) = 2
-                  ∨ 2 < Graph.order(graph) by Natural.lt_trichotomy;
-              Graph.order(graph) ≤ 1
-                  by done by cases {
-                    case Graph.order(graph) < 2: {
-                        Graph.order(graph)
-                           < 2
-                           = 1 + 1;
-                        done by Natural.le_of_lt_add_one
-                      }
-                    case Graph.order(graph) = 2: {
-                        (2 : ℕ) ≤ Graph.order(graph);
-                        done
-                      }
-                    case 2 < Graph.order(graph): {
-                        (2 : ℕ) ≤ Graph.order(graph) by Natural.LessThan.weaken;
-                        done
-                      }
-                  };
+              Graph.size(graph) < 1 by Natural.lt_of_not_le;
+              Graph.size(graph) ≤ 0 by Natural.le_of_lt_one_plus;
+              Graph.size(graph) = 0 as noEdges;
+              Graph.order(graph) < 2 by Natural.lt_of_not_le;
+              Graph.order(graph) ≤ 1 by Natural.le_of_lt_one_plus;
               Graph.order(graph) = 1 by Natural.le_antisymmetric;
               1 + Graph.size(graph)
                  = 1 + 0                             by substituting noEdges
@@ -603,18 +568,10 @@ theorem Graph.IsConnected.degree_positive (graph : Graph(V, E, ends))
         (atLeastTwo : 2 ≤ Graph.order(graph))
         (vertex : V) (isVertex : vertex ∈ Graph.vertices(graph))
         : 1 ≤ Graph.degree(graph, vertex) := {
-  List.Distinct(V, Graph.vertices(graph)) by Graph.IsWellFormed.vertices_distinct;
-  length(Graph.vertices(graph)) = 1 + length(Graph.vertices(graph) ∖ vertex)
-      by List.length_remove_member;
-  (1 : ℕ) + 1
-     ≤ Graph.order(graph)
-     = length(Graph.vertices(graph))
-     = 1 + length(Graph.vertices(graph) ∖ vertex);
-  1 ≤ length(Graph.vertices(graph) ∖ vertex) by Natural.add_left_le_cancel;
-  choose other such that other ∈ Graph.vertices(graph) ∖ vertex
-      from List.member_of_positive_length;
-  ¬(other = vertex) by List.remove_member_ne;
-  other ∈ Graph.vertices(graph) by List.remove_member_subset;
+  choose other such that other ∈ Graph.vertices(graph) ∧ ¬(other = vertex)
+      from Graph.other_vertex;
+  other ∈ Graph.vertices(graph);
+  ¬(other = vertex);
   Graph.Reaches(graph, vertex, other) by Graph.IsConnected.reaches;
   choose route such that Graph.IsPath(graph, vertex, route, other)
       from Graph.Reaches.path;

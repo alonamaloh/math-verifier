@@ -317,3 +317,31 @@ theorem Graph.Reaches.not_to_deleted (graph : Graph(V, E, ends)) (vertex source 
       }
   }
 }
+
+-- ----------------------------------------------------------------------
+-- A second vertex.
+--
+-- A named vertex of a graph on two or more leaves one over. Removing it
+-- shortens the vertex list by one, and what is left is not empty; the
+-- three-vertex companion is `Graph.third_vertex`.
+
+theorem Graph.other_vertex (graph : Graph(V, E, ends))
+        (wellFormed : Graph.IsWellFormed(graph))
+        (atLeastTwo : 2 ≤ Graph.order(graph))
+        (vertex : V) (isVertex : vertex ∈ Graph.vertices(graph))
+        : ∃ (other : V). other ∈ Graph.vertices(graph) ∧ ¬(other = vertex) := {
+  List.Distinct(V, Graph.vertices(graph)) by Graph.IsWellFormed.vertices_distinct;
+  length(Graph.vertices(graph))
+      = 1 + length(Graph.vertices(graph) ∖ vertex)
+      by List.length_remove_member;
+  (1 : ℕ) + 1
+     ≤ Graph.order(graph)
+     = length(Graph.vertices(graph))
+     = 1 + length(Graph.vertices(graph) ∖ vertex);
+  1 ≤ length(Graph.vertices(graph) ∖ vertex) by Natural.add_left_le_cancel;
+  choose other such that other ∈ Graph.vertices(graph) ∖ vertex
+      from List.member_of_positive_length;
+  ¬(other = vertex) by List.remove_member_ne;
+  other ∈ Graph.vertices(graph) by List.remove_member_subset;
+  witness other
+}
