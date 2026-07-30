@@ -228,33 +228,22 @@ theorem Graph.IsTwoConnected.grows_by_ear (graph part : Graph(V, E, ends))
       ∧ ¬(newEdge ∈ Graph.edges(part));
   nearEnd ∈ Graph.vertices(graph) by partVertices;
 
-  -- The path, presented as a graph, is the ear.
-  Graph.IsPathGraph(Graph.pathGraphOf(graph, nearEnd, earEdges), nearEnd, farEnd)
-      by Graph.pathGraphOf.IsPathGraph;
-  Graph.IsWellFormed(Graph.pathGraphOf(graph, nearEnd, earEdges))
-      by Graph.pathGraphOf.IsWellFormed;
-  Graph.IsSubgraph(Graph.pathGraphOf(graph, nearEnd, earEdges), graph)
-      by Graph.pathGraphOf.IsSubgraph;
-  Graph.IsTwoConnected(
-      Graph.union(part, Graph.pathGraphOf(graph, nearEnd, earEdges)))
-      by Graph.IsTwoConnected.ear;
-  Graph.IsWellFormed(
-      Graph.union(part, Graph.pathGraphOf(graph, nearEnd, earEdges)))
-      by Graph.union.IsWellFormed;
-  Graph.IsSubgraph(part,
-      Graph.union(part, Graph.pathGraphOf(graph, nearEnd, earEdges)))
-      by Graph.union.IsSubgraph_left;
-  Graph.IsSubgraph(
-      Graph.union(part, Graph.pathGraphOf(graph, nearEnd, earEdges)), graph)
-      by Graph.union.IsSubgraph_into;
+  -- The path, presented as a graph, is the ear; the subgraph with the ear
+  -- attached is what the theorem produces.
+  let ear : Graph(V, E, ends) := Graph.pathGraphOf(graph, nearEnd, earEdges);
+  let bigger : Graph(V, E, ends) := Graph.union(part, ear);
+  Graph.IsPathGraph(ear, nearEnd, farEnd) by Graph.pathGraphOf.IsPathGraph;
+  Graph.IsWellFormed(ear) by Graph.pathGraphOf.IsWellFormed;
+  Graph.IsSubgraph(ear, graph) by Graph.pathGraphOf.IsSubgraph;
+  Graph.IsTwoConnected(bigger) by Graph.IsTwoConnected.ear;
+  Graph.IsWellFormed(bigger) by Graph.union.IsWellFormed;
+  Graph.IsSubgraph(part, bigger) by Graph.union.IsSubgraph_left;
+  Graph.IsSubgraph(bigger, graph) by Graph.union.IsSubgraph_into;
 
   -- And it brings an edge the subgraph did not have.
-  newEdge ∈ Graph.edges(Graph.pathGraphOf(graph, nearEnd, earEdges));
-  newEdge ∈ Graph.edges(
-      Graph.union(part, Graph.pathGraphOf(graph, nearEnd, earEdges)))
-      by Graph.union.edge_right;
-  ∃ (edge : E). edge ∈ Graph.edges(
-          Graph.union(part, Graph.pathGraphOf(graph, nearEnd, earEdges)))
-      ∧ ¬(edge ∈ Graph.edges(part)) by witness newEdge;
-  witness Graph.union(part, Graph.pathGraphOf(graph, nearEnd, earEdges))
+  newEdge ∈ Graph.edges(ear);
+  newEdge ∈ Graph.edges(bigger) by Graph.union.edge_right;
+  ∃ (edge : E). edge ∈ Graph.edges(bigger) ∧ ¬(edge ∈ Graph.edges(part))
+      by witness newEdge;
+  witness bigger
 }
