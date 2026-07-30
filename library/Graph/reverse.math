@@ -73,7 +73,7 @@ theorem Graph.walkVertices.after_append (graph : Graph(V, E, ends))
                     }
                   }
                 case vertex ∈ Graph.coveredVertices(graph, List.empty(E)): {
-                    ¬(vertex ∈ Graph.coveredVertices(graph, List.empty(E)))
+                    vertex ∉ Graph.coveredVertices(graph, List.empty(E))
                         by Graph.coveredVertices.no_edges;
                     done
                   }
@@ -91,7 +91,7 @@ theorem Graph.IsPath.extend_at_target (graph : Graph(V, E, ends))
         (path : Graph.IsPath(graph, source, edgeList, middle))
         (isEdge : edge ∈ Graph.edges(graph))
         (joins : Graph.Joins(graph, edge, middle, target))
-        (fresh : ¬(target ∈ Graph.walkVertices(graph, source, edgeList)))
+        (fresh : target ∉ Graph.walkVertices(graph, source, edgeList))
         : Graph.IsPath(graph, source,
                        List.append(edgeList, List.prepend(E, edge, List.empty(E))),
                        target) :=
@@ -106,7 +106,7 @@ theorem Graph.IsPath.extend_at_target (graph : Graph(V, E, ends))
                      by substituting (target = endpoint);
                  done };
         Graph.IsPath(graph, target, List.empty(E), target) by Graph.IsPath.empty;
-        ¬(endpoint ∈ Graph.walkVertices(graph, target, List.empty(E)))
+        endpoint ∉ Graph.walkVertices(graph, target, List.empty(E))
             by { suppose endpoint ∈ Graph.walkVertices(graph, target, List.empty(E));
                  done by cases {
                    case endpoint = target: {
@@ -114,7 +114,7 @@ theorem Graph.IsPath.extend_at_target (graph : Graph(V, E, ends))
                        done
                      }
                    case endpoint ∈ Graph.coveredVertices(graph, List.empty(E)): {
-                       ¬(endpoint ∈ Graph.coveredVertices(graph, List.empty(E)))
+                       endpoint ∉ Graph.coveredVertices(graph, List.empty(E))
                            by Graph.coveredVertices.no_edges;
                        done
                      }
@@ -129,7 +129,7 @@ theorem Graph.IsPath.extend_at_target (graph : Graph(V, E, ends))
         stepSource, waypoint, stepMiddle, stepEdge, rest, isStepEdge, stepJoins,
         restPath, stepFresh): {
         -- The far end is fresh for the rest of the path too.
-        ¬(target ∈ Graph.walkVertices(graph, waypoint, rest))
+        target ∉ Graph.walkVertices(graph, waypoint, rest)
             by { suppose target ∈ Graph.walkVertices(graph, waypoint, rest);
                  target ∈ Graph.walkVertices(graph, stepSource,
                               List.prepend(E, stepEdge, rest))
@@ -151,8 +151,8 @@ theorem Graph.IsPath.extend_at_target (graph : Graph(V, E, ends))
                               List.prepend(E, stepEdge, rest))
                      by substituting (stepSource = target);
                  done };
-        ¬(stepSource ∈ Graph.walkVertices(graph, waypoint,
-              List.append(rest, List.prepend(E, edge, List.empty(E)))))
+        stepSource ∉ Graph.walkVertices(graph, waypoint,
+                         List.append(rest, List.prepend(E, edge, List.empty(E))))
             by { suppose stepSource ∈ Graph.walkVertices(graph, waypoint,
                      List.append(rest, List.prepend(E, edge, List.empty(E))));
                  stepSource ∈ Graph.walkVertices(graph, waypoint, rest)
@@ -203,7 +203,7 @@ theorem Graph.IsPath.reverse (graph : Graph(V, E, ends)) (source target : V)
         Graph.Joins(graph, edge, waypoint, stepSource) by Graph.Joins.symmetric;
         -- The old source is fresh for the reversed rest, because it was
         -- fresh for the rest.
-        ¬(stepSource ∈ Graph.walkVertices(graph, stepTarget, reversedRest))
+        stepSource ∉ Graph.walkVertices(graph, stepTarget, reversedRest)
             by { suppose stepSource ∈ Graph.walkVertices(graph, stepTarget, reversedRest);
                  stepSource ∈ Graph.walkVertices(graph, waypoint, rest)
                      by Set.member_of_equal;
@@ -301,14 +301,14 @@ theorem Graph.IsPath.reaches_target_avoiding_source (graph : Graph(V, E, ends))
       edgeList = List.append(prefixEdges, suffixEdges)
       ∧ Graph.IsPath(graph, source, prefixEdges, vertex)
       ∧ Graph.IsPath(graph, vertex, suffixEdges, target)
-      ∧ (vertex = source ∨ ¬(source ∈ Graph.walkVertices(graph, vertex, suffixEdges)))
+      ∧ (vertex = source ∨ source ∉ Graph.walkVertices(graph, vertex, suffixEdges))
       from Graph.IsPath.split;
   Graph.IsPath(graph, vertex, suffixEdges, target);
-  vertex = source ∨ ¬(source ∈ Graph.walkVertices(graph, vertex, suffixEdges));
-  ¬(source ∈ Graph.walkVertices(graph, vertex, suffixEdges))
+  vertex = source ∨ source ∉ Graph.walkVertices(graph, vertex, suffixEdges);
+  source ∉ Graph.walkVertices(graph, vertex, suffixEdges)
       by cases {
         case vertex = source: done
-        case ¬(source ∈ Graph.walkVertices(graph, vertex, suffixEdges)): done
+        case source ∉ Graph.walkVertices(graph, vertex, suffixEdges): done
       };
   Graph.IsWalk(graph, vertex, suffixEdges, target) by Graph.IsPath.walk;
   Graph.IsWalk(Graph.deleteVertex(graph, source), vertex, suffixEdges, target)

@@ -156,14 +156,14 @@ theorem Graph.IsWalk.after_vertex_deletion (graph : Graph(V, E, ends)) (vertex :
 theorem Graph.IsWalk.avoiding_vertex (graph : Graph(V, E, ends)) (vertex : V)
         (source target : V) (edgeList : List(E))
         (walk : Graph.IsWalk(graph, source, edgeList, target))
-        (avoided : ¬(vertex ∈ Graph.walkVertices(graph, source, edgeList)))
+        (avoided : vertex ∉ Graph.walkVertices(graph, source, edgeList))
         : Graph.IsWalk(Graph.deleteVertex(graph, vertex), source, edgeList, target) :=
   by induction on walk with IH {
     case Graph.IsWalkOver.arrived(endpoint): done by Graph.IsWalk.empty
     case Graph.IsWalkOver.step(
         stepSource, waypoint, stepTarget, edge, rest, isEdge, joins, restWalk): {
         -- Everything the remainder visits, the whole walk visits.
-        ¬(vertex ∈ Graph.walkVertices(graph, waypoint, rest))
+        vertex ∉ Graph.walkVertices(graph, waypoint, rest)
             by { suppose vertex ∈ Graph.walkVertices(graph, waypoint, rest);
                  vertex ∈ Graph.walkVertices(graph, stepSource, List.prepend(E, edge, rest))
                      by Graph.walkVertices.before_step;
@@ -198,7 +198,7 @@ theorem Graph.IsWalk.in_vertex_deletion_misses (graph : Graph(V, E, ends)) (vert
         (walk : Graph.IsWalk(Graph.deleteVertex(graph, vertex), source, edgeList, target))
         (edge : E)
         (incident : Graph.Incident(graph, edge, vertex))
-        : ¬(edge ∈ edgeList) := {
+        : edge ∉ edgeList := {
   edgeList ⊆ Graph.edges(Graph.deleteVertex(graph, vertex))
       by Graph.IsWalk.edge_is_edge as walkEdgesSurvive;
   suppose edge ∈ edgeList;
@@ -248,7 +248,7 @@ theorem Graph.deleteVertex.monotone (part whole : Graph(V, E, ends))
 theorem Graph.IsConnected.after_outside_deletion (graph : Graph(V, E, ends))
         (wellFormed : Graph.IsWellFormed(graph))
         (connected : Graph.IsConnected(graph)) (outsider : V)
-        (notVertex : ¬(outsider ∈ Graph.vertices(graph)))
+        (notVertex : outsider ∉ Graph.vertices(graph))
         : Graph.IsConnected(Graph.deleteVertex(graph, outsider)) := {
   choose someVertex such that someVertex ∈ Graph.vertices(graph)
       from Graph.IsConnected.has_vertex;
@@ -268,7 +268,7 @@ theorem Graph.IsConnected.after_outside_deletion (graph : Graph(V, E, ends))
            ∀ (visited : V). visited ∈ Graph.walkVertices(graph, someVertex, edgeList)
                → visited ∈ Graph.vertices(graph)
                by Graph.IsWalk.visits_vertices as walkStaysInGraph;
-           ¬(outsider ∈ Graph.walkVertices(graph, someVertex, edgeList))
+           outsider ∉ Graph.walkVertices(graph, someVertex, edgeList)
                by { suppose outsider ∈ Graph.walkVertices(graph, someVertex, edgeList);
                     outsider ∈ Graph.vertices(graph) by walkStaysInGraph;
                     done };

@@ -40,7 +40,7 @@ definition Graph.IsCycleThrough (graph : Graph(V, E, ends)) (edge : E) (u v : V)
   edge ∈ Graph.edges(graph)
   ∧ Graph.Joins(graph, edge, u, v)
   ∧ Graph.IsPath(graph, u, detour, v)
-  ∧ ¬(edge ∈ detour)
+  ∧ edge ∉ detour
 
 definition Graph.LiesOnCycle (graph : Graph(V, E, ends)) (edge : E) : Proposition :=
   ∃ (u v : V). ∃ (detour : List(E)).
@@ -64,7 +64,7 @@ theorem Graph.LiesOnCycle.deletion_reaches (graph : Graph(V, E, ends))
       from onCycle;
   Graph.Joins(graph, edge, cycleSource, cycleTarget);
   Graph.IsPath(graph, cycleSource, detour, cycleTarget);
-  ¬(edge ∈ detour);
+  edge ∉ detour;
   Graph.IsWalk(graph, cycleSource, detour, cycleTarget) by Graph.IsPath.walk;
   Graph.IsWalk(Graph.deleteEdge(graph, edge), cycleSource, detour, cycleTarget)
       by Graph.IsWalk.avoiding_edge;
@@ -104,7 +104,7 @@ theorem Graph.LiesOnCycle.of_deletion_reaches (graph : Graph(V, E, ends))
   ∀ (e : E). e ∈ detour → e ∈ Graph.edges(Graph.deleteEdge(graph, edge))
       by Graph.IsPath.edge_is_edge as detourEdgesSurvive;
   -- The deleted name is not among them, so the detour avoids it.
-  ¬(edge ∈ detour)
+  edge ∉ detour
       by { suppose edge ∈ detour;
            edge ∈ Graph.edges(Graph.deleteEdge(graph, edge)) by detourEdgesSurvive;
            edge ≠ edge by Graph.deleteEdge.drops;
@@ -153,18 +153,18 @@ theorem Graph.IsPath.chord_on_cycle (graph : Graph(V, E, ends))
         (edge : E) (far : V)
         (isEdge : edge ∈ Graph.edges(graph))
         (joins : Graph.Joins(graph, edge, source, far))
-        (offPath : ¬(edge ∈ edgeList))
+        (offPath : edge ∉ edgeList)
         (visited : far ∈ Graph.walkVertices(graph, source, edgeList))
         : Graph.LiesOnCycle(graph, edge) := {
   choose prefixEdges, suffixEdges such that
       edgeList = List.append(prefixEdges, suffixEdges)
       ∧ Graph.IsPath(graph, source, prefixEdges, far)
       ∧ Graph.IsPath(graph, far, suffixEdges, target)
-      ∧ (far = source ∨ ¬(source ∈ Graph.walkVertices(graph, far, suffixEdges)))
+      ∧ (far = source ∨ source ∉ Graph.walkVertices(graph, far, suffixEdges))
       from Graph.IsPath.split;
   edgeList = List.append(prefixEdges, suffixEdges) as edgesSplit;
   Graph.IsPath(graph, source, prefixEdges, far);
-  ¬(edge ∈ prefixEdges)
+  edge ∉ prefixEdges
       by { suppose edge ∈ prefixEdges;
            edge ∈ List.append(prefixEdges, suffixEdges) by List.member_append_left;
            edge ∈ edgeList by substituting edgesSplit;

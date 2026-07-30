@@ -53,7 +53,7 @@ theorem Graph.IsTwoConnected.replace_edge_by_path
         (isPath : Graph.IsPathGraph(pathGraph, u, v))
         (interiorIsNew : ∀ (candidate : V). candidate ∈ Graph.vertices(pathGraph)
             → candidate ≠ u → candidate ≠ v
-            → ¬(candidate ∈ Graph.vertices(graph)))
+            → candidate ∉ Graph.vertices(graph))
         : Graph.IsTwoConnected(
               Graph.union(Graph.deleteEdge(graph, edge), pathGraph)) := {
   -- The graph with the edge replaced by the path: `trimmed` is the graph
@@ -89,11 +89,11 @@ theorem Graph.IsTwoConnected.replace_edge_by_path
 
   -- An edge of the old graph meets only old vertices.
   ∀ (candidate : E). ∀ (outsider : V). candidate ∈ Graph.edges(graph)
-      → ¬(outsider ∈ Graph.vertices(graph)) → ¬Graph.Incident(graph, candidate, outsider)
+      → outsider ∉ Graph.vertices(graph) → ¬Graph.Incident(graph, candidate, outsider)
       by { take candidate : E;
            take outsider : V;
            suppose candidate ∈ Graph.edges(graph);
-           suppose ¬(outsider ∈ Graph.vertices(graph));
+           suppose outsider ∉ Graph.vertices(graph);
            suppose Graph.Incident(graph, candidate, outsider);
            choose otherEnd such that Graph.Joins(graph, candidate, outsider, otherEnd);
            outsider ∈ Graph.vertices(graph) by Graph.IsWellFormed.end_is_vertex;
@@ -175,7 +175,7 @@ theorem Graph.IsTwoConnected.replace_edge_by_path
                  case deleted ∈ Graph.vertices(graph):
                      done by Graph.IsTwoConnected.survives_deletion
                  otherwise: {
-                     ¬(deleted ∈ Graph.vertices(graph));
+                     deleted ∉ Graph.vertices(graph);
                      done by Graph.IsConnected.after_outside_deletion                   }
                };
            Graph.IsSubgraph(Graph.deleteVertex(pathGraph, deleted),
@@ -234,9 +234,9 @@ theorem Graph.IsTwoConnected.replace_edge_by_path
                      done by cases {
                        case deleted ∈ Graph.vertices(graph): {
                            -- The path is untouched, and it joins the ends.
-                           ¬(deleted ∈ Graph.vertices(pathGraph))
+                           deleted ∉ Graph.vertices(pathGraph)
                                by { suppose deleted ∈ Graph.vertices(pathGraph);
-                                    ¬(deleted ∈ Graph.vertices(graph)) by interiorIsNew;
+                                    deleted ∉ Graph.vertices(graph) by interiorIsNew;
                                     done };
                            Graph.IsConnected(Graph.deleteVertex(pathGraph, deleted))
                                by Graph.IsConnected.after_outside_deletion(
@@ -265,7 +265,7 @@ theorem Graph.IsTwoConnected.replace_edge_by_path
                        otherwise: {
                            -- The deleted vertex is not in the old graph, so the
                            -- old graph's own route around the edge survives.
-                           ¬(deleted ∈ Graph.vertices(graph));
+                           deleted ∉ Graph.vertices(graph);
                            choose aroundEdge such that Graph.IsWalk(trimmed, u, aroundEdge, v);
                            aroundEdge ⊆ Graph.edges(pruned)
                                by { take candidate : E;

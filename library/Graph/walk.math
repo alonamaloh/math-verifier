@@ -81,11 +81,11 @@ definition Graph.walkVertices (graph : Graph(V, E, ends)) (source : V) (edgeList
   (vertex : V) ↦ vertex = source ∨ vertex ∈ Graph.coveredVertices(graph, edgeList)
 
 theorem Graph.coveredVertices.no_edges (graph : Graph(V, E, ends)) (vertex : V)
-        : ¬(vertex ∈ Graph.coveredVertices(graph, List.empty(E))) := {
+        : vertex ∉ Graph.coveredVertices(graph, List.empty(E)) := {
   suppose vertex ∈ Graph.coveredVertices(graph, List.empty(E));
   choose usedEdge such that usedEdge ∈ List.empty(E) ∧ Graph.Incident(graph, usedEdge, vertex);
   usedEdge ∈ List.empty(E);
-  ¬(usedEdge ∈ List.empty(E)) by List.no_member_empty;
+  usedEdge ∉ List.empty(E) by List.no_member_empty;
   done
 }
 
@@ -518,7 +518,7 @@ theorem Graph.walkVertexList.visits (graph : Graph(V, E, ends)) (edgeList : List
         done by cases {
           case vertex = source: done
           case vertex ∈ List.empty(V): {
-              ¬(vertex ∈ List.empty(V)) by List.no_member_empty;
+              vertex ∉ List.empty(V) by List.no_member_empty;
               done
             }
         }
@@ -586,7 +586,7 @@ theorem Graph.walkVertexList.complete (graph : Graph(V, E, ends))
               done
             }
           case vertex ∈ Graph.coveredVertices(graph, List.empty(E)): {
-              ¬(vertex ∈ Graph.coveredVertices(graph, List.empty(E)))
+              vertex ∉ Graph.coveredVertices(graph, List.empty(E))
                   by Graph.coveredVertices.no_edges;
               done
             }
@@ -633,9 +633,9 @@ theorem Graph.IsWalk.crossing (graph : Graph(V, E, ends)) (region : List(V))
         (source target : V) (edgeList : List(E))
         (walk : Graph.IsWalk(graph, source, edgeList, target))
         (sourceInside : source ∈ region)
-        (targetOutside : ¬(target ∈ region))
+        (targetOutside : target ∉ region)
         : ∃ (edge : E). ∃ (u w : V). edge ∈ edgeList
-            ∧ Graph.Joins(graph, edge, u, w) ∧ u ∈ region ∧ ¬(w ∈ region) :=
+            ∧ Graph.Joins(graph, edge, u, w) ∧ u ∈ region ∧ w ∉ region :=
   by induction on walk with IH {
     case Graph.IsWalkOver.arrived(endpoint): done
     case Graph.IsWalkOver.step(
@@ -643,15 +643,15 @@ theorem Graph.IsWalk.crossing (graph : Graph(V, E, ends)) (region : List(V))
         done by cases {
           case waypoint ∈ region: {
               ∃ (crosser : E). ∃ (u w : V). crosser ∈ rest
-                  ∧ Graph.Joins(graph, crosser, u, w) ∧ u ∈ region ∧ ¬(w ∈ region)
+                  ∧ Graph.Joins(graph, crosser, u, w) ∧ u ∈ region ∧ w ∉ region
                   by IH;
               choose crosser, insideEnd, outsideEnd such that
                   crosser ∈ rest ∧ Graph.Joins(graph, crosser, insideEnd, outsideEnd)
-                  ∧ insideEnd ∈ region ∧ ¬(outsideEnd ∈ region);
+                  ∧ insideEnd ∈ region ∧ outsideEnd ∉ region;
               crosser ∈ rest;
               Graph.Joins(graph, crosser, insideEnd, outsideEnd);
               insideEnd ∈ region;
-              ¬(outsideEnd ∈ region);
+              outsideEnd ∉ region;
               crosser ∈ List.prepend(E, edge, rest);
               witness crosser with witness insideEnd with witness outsideEnd
             }
