@@ -26,6 +26,8 @@ import Real.maximum
 import Real.absolute_value
 import Real.absolute_value_order
 import Real.order_multiplication
+import Real.order_field
+import Real.division
 import Plane.vector
 import Plane.point
 import Plane.bilinear
@@ -674,4 +676,189 @@ theorem Plane.openSegment_right_inside (a b cut : Plane.Point) (distinct : a ≠
   x ∈ Plane.openSegment(b, a);
   Plane.openSegment(b, a) = Plane.openSegment(a, b) by Plane.openSegment_symmetric;
   done by Set.member_of_equal
+}
+
+-- Walking part of the way to an interior point of a walk, and part of the
+-- way onward from it. Both are `between_nested` with one endpoint pinned,
+-- but they are proved in coordinates rather than derived from it: reaching
+-- the nested form would mean rewriting `a` into `between(a, b, 0)`, a
+-- replacement that contains the very term being replaced.
+
+theorem Plane.between_nested_from_start (a b : Plane.Point) (u t : ℝ)
+        : Plane.between(a, Plane.between(a, b, u), t) = Plane.between(a, b, t * u) := {
+  Plane.Point.first(Plane.between(a, b, u))
+      = Plane.Point.first(a) + u * (Plane.Point.first(b) - Plane.Point.first(a))
+      by Plane.Point.first_between as firstAtCut;
+  Plane.Point.second(Plane.between(a, b, u))
+      = Plane.Point.second(a) + u * (Plane.Point.second(b) - Plane.Point.second(a))
+      by Plane.Point.second_between as secondAtCut;
+  Plane.Point.first(Plane.between(a, Plane.between(a, b, u), t))
+     = Plane.Point.first(a)
+           + t * (Plane.Point.first(Plane.between(a, b, u)) - Plane.Point.first(a))
+           by Plane.Point.first_between
+     = Plane.Point.first(a)
+           + t * ((Plane.Point.first(a)
+                     + u * (Plane.Point.first(b) - Plane.Point.first(a)))
+                    - Plane.Point.first(a))
+           by substituting firstAtCut
+     = Plane.Point.first(a) + t * u * (Plane.Point.first(b) - Plane.Point.first(a)) by ring
+     = Plane.Point.first(Plane.between(a, b, t * u)) by Plane.Point.first_between;
+  Plane.Point.second(Plane.between(a, Plane.between(a, b, u), t))
+     = Plane.Point.second(a)
+           + t * (Plane.Point.second(Plane.between(a, b, u)) - Plane.Point.second(a))
+           by Plane.Point.second_between
+     = Plane.Point.second(a)
+           + t * ((Plane.Point.second(a)
+                     + u * (Plane.Point.second(b) - Plane.Point.second(a)))
+                    - Plane.Point.second(a))
+           by substituting secondAtCut
+     = Plane.Point.second(a) + t * u * (Plane.Point.second(b) - Plane.Point.second(a)) by ring
+     = Plane.Point.second(Plane.between(a, b, t * u)) by Plane.Point.second_between;
+  done by Plane.Point.equal_of_coordinates
+}
+
+theorem Plane.between_nested_to_finish (a b : Plane.Point) (u t : ℝ)
+        : Plane.between(Plane.between(a, b, u), b, t)
+              = Plane.between(a, b, u + t * (1 - u)) := {
+  Plane.Point.first(Plane.between(a, b, u))
+      = Plane.Point.first(a) + u * (Plane.Point.first(b) - Plane.Point.first(a))
+      by Plane.Point.first_between as firstAtCut;
+  Plane.Point.second(Plane.between(a, b, u))
+      = Plane.Point.second(a) + u * (Plane.Point.second(b) - Plane.Point.second(a))
+      by Plane.Point.second_between as secondAtCut;
+  Plane.Point.first(Plane.between(Plane.between(a, b, u), b, t))
+     = Plane.Point.first(Plane.between(a, b, u))
+           + t * (Plane.Point.first(b) - Plane.Point.first(Plane.between(a, b, u)))
+           by Plane.Point.first_between
+     = (Plane.Point.first(a) + u * (Plane.Point.first(b) - Plane.Point.first(a)))
+           + t * (Plane.Point.first(b)
+                    - (Plane.Point.first(a)
+                         + u * (Plane.Point.first(b) - Plane.Point.first(a))))
+           by substituting firstAtCut
+     = Plane.Point.first(a)
+           + (u + t * (1 - u)) * (Plane.Point.first(b) - Plane.Point.first(a)) by ring
+     = Plane.Point.first(Plane.between(a, b, u + t * (1 - u)))
+           by Plane.Point.first_between;
+  Plane.Point.second(Plane.between(Plane.between(a, b, u), b, t))
+     = Plane.Point.second(Plane.between(a, b, u))
+           + t * (Plane.Point.second(b) - Plane.Point.second(Plane.between(a, b, u)))
+           by Plane.Point.second_between
+     = (Plane.Point.second(a) + u * (Plane.Point.second(b) - Plane.Point.second(a)))
+           + t * (Plane.Point.second(b)
+                    - (Plane.Point.second(a)
+                         + u * (Plane.Point.second(b) - Plane.Point.second(a))))
+           by substituting secondAtCut
+     = Plane.Point.second(a)
+           + (u + t * (1 - u)) * (Plane.Point.second(b) - Plane.Point.second(a)) by ring
+     = Plane.Point.second(Plane.between(a, b, u + t * (1 - u)))
+           by Plane.Point.second_between;
+  done by Plane.Point.equal_of_coordinates
+}
+
+-- Cutting at an interior point loses nothing: the two halves cover the whole
+-- segment. This is the fact that makes a subdivision preserve the point set,
+-- and it is the converse half of `openSegment_left_inside` / `_right_inside`.
+--
+-- A point of the whole is on the near half or the far one according to
+-- whether its parameter is below the cut's; the fraction along that half is
+-- the parameter rescaled, which is where the two divisions come from.
+theorem Plane.segment_split (a b cut : Plane.Point) (distinct : a ≠ b)
+        (interior : cut ∈ Plane.openSegment(a, b))
+        : Plane.segment(a, cut) ∪ Plane.segment(cut, b) = Plane.segment(a, b) := {
+  cut ∈ Plane.segment(a, b) as cutOnWhole;
+  cut ≠ a;
+  cut ≠ b;
+  a ∈ Plane.segment(a, b) by Plane.left_in_segment;
+  b ∈ Plane.segment(a, b) by Plane.right_in_segment;
+  Plane.IsConvex(Plane.segment(a, b)) by Plane.segment_IsConvex;
+  Plane.segment(a, cut) ⊆ Plane.segment(a, b) by Plane.IsConvex.segment_inside;
+  Plane.segment(cut, b) ⊆ Plane.segment(a, b) by Plane.IsConvex.segment_inside;
+  Plane.segment(a, cut) ∪ Plane.segment(cut, b) ⊆ Plane.segment(a, b)
+      by Set.union_subset;
+
+  -- The cut's parameter is strictly inside, so both halves are nondegenerate.
+  choose cutParameter such that
+      (0 ≤ cutParameter ∧ cutParameter ≤ 1) ∧ cut = Plane.between(a, b, cutParameter)
+      from cutOnWhole;
+  0 ≤ cutParameter;
+  cutParameter ≤ 1;
+  cut = Plane.between(a, b, cutParameter) as cutAtParameter;
+  cutParameter ≠ 0
+      by { suppose cutParameter = 0 as atStart;
+           cut = Plane.between(a, b, cutParameter)
+               = Plane.between(a, b, 0) by substituting atStart
+               = a by Plane.between_zero;
+           done };
+  cutParameter ≠ 1
+      by { suppose cutParameter = 1 as atFinish;
+           cut = Plane.between(a, b, cutParameter)
+               = Plane.between(a, b, 1) by substituting atFinish
+               = b by Plane.between_one;
+           done };
+  cutParameter > 0;
+  cutParameter < 1;
+  1 - cutParameter > 0;
+  1 - cutParameter ≠ 0 as farGapNonzero;
+
+  Plane.segment(a, b) ⊆ Plane.segment(a, cut) ∪ Plane.segment(cut, b)
+      by { take x : Plane.Point;
+           suppose x ∈ Plane.segment(a, b) as onWhole;
+           choose parameter such that
+               (0 ≤ parameter ∧ parameter ≤ 1) ∧ x = Plane.between(a, b, parameter)
+               from onWhole;
+           0 ≤ parameter;
+           parameter ≤ 1;
+           x = Plane.between(a, b, parameter) as atParameter;
+           done by cases {
+             case parameter ≤ cutParameter: {
+                 -- On the near half, at the fraction `parameter / cutParameter`.
+                 0 ≤ parameter / cutParameter by Real.divide_nonneg;
+                 parameter / cutParameter ≤ cutParameter / cutParameter
+                     by Real.LessOrEqual.divide_by_positive;
+                 cutParameter / cutParameter = 1 by Real.divide_self;
+                 parameter / cutParameter ≤ 1;
+                 parameter / cutParameter * cutParameter = parameter
+                     by field as nearWeights;
+                 Plane.between(a, cut, parameter / cutParameter)
+                    = Plane.between(a, Plane.between(a, b, cutParameter),
+                          parameter / cutParameter) by cutAtParameter
+                    = Plane.between(a, b, parameter / cutParameter * cutParameter)
+                          by Plane.between_nested_from_start
+                    = Plane.between(a, b, parameter) by nearWeights
+                    = x by atParameter;
+                 x ∈ Plane.segment(a, cut) by { witness parameter / cutParameter };
+                 done
+               }
+             otherwise: {
+                 -- On the far half, at `(parameter - cutParameter) / (1 - cutParameter)`.
+                 cutParameter ≤ parameter by Real.not_LessOrEqual_implies;
+                 0 ≤ parameter - cutParameter;
+                 parameter - cutParameter ≤ 1 - cutParameter;
+                 0 ≤ (parameter - cutParameter) / (1 - cutParameter)
+                     by Real.divide_nonneg;
+                 (parameter - cutParameter) / (1 - cutParameter)
+                     ≤ (1 - cutParameter) / (1 - cutParameter)
+                     by Real.LessOrEqual.divide_by_positive;
+                 (1 - cutParameter) / (1 - cutParameter) = 1 by Real.divide_self;
+                 (parameter - cutParameter) / (1 - cutParameter) ≤ 1;
+                 cutParameter
+                     + (parameter - cutParameter) / (1 - cutParameter) * (1 - cutParameter)
+                     = parameter by field as farWeights;
+                 Plane.between(cut, b, (parameter - cutParameter) / (1 - cutParameter))
+                    = Plane.between(Plane.between(a, b, cutParameter), b,
+                          (parameter - cutParameter) / (1 - cutParameter))
+                          by cutAtParameter
+                    = Plane.between(a, b,
+                          cutParameter
+                              + (parameter - cutParameter) / (1 - cutParameter)
+                                  * (1 - cutParameter))
+                          by Plane.between_nested_to_finish
+                    = Plane.between(a, b, parameter) by farWeights
+                    = x by atParameter;
+                 x ∈ Plane.segment(cut, b)
+                     by { witness (parameter - cutParameter) / (1 - cutParameter) };
+                 done
+               }
+           } };
+  done by Set.equal_of_same_members
 }
