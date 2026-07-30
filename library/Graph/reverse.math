@@ -20,6 +20,7 @@ import Logic.exists
 import Logic.product
 import Equality.basics
 import Set.basics
+import Set.algebra
 import Lists.list
 import Lists.append
 import Graph.basics
@@ -180,49 +181,39 @@ theorem Graph.IsPath.reverse (graph : Graph(V, E, ends)) (source target : V)
         (edgeList : List(E))
         (path : Graph.IsPath(graph, source, edgeList, target))
         : ∃ (reversed : List(E)). Graph.IsPath(graph, target, reversed, source)
-            ∧ (∀ (vertex : V). vertex ∈ Graph.walkVertices(graph, target, reversed)
-                 → vertex ∈ Graph.walkVertices(graph, source, edgeList))
-            ∧ (∀ (vertex : V). vertex ∈ Graph.walkVertices(graph, source, edgeList)
-                 → vertex ∈ Graph.walkVertices(graph, target, reversed)) :=
+            ∧ Graph.walkVertices(graph, target, reversed)
+                = Graph.walkVertices(graph, source, edgeList) :=
   by induction on path with IH {
     case Graph.IsPathOver.arrived(endpoint): {
         Graph.IsPath(graph, endpoint, List.empty(E), endpoint) by Graph.IsPath.empty;
-        ∀ (vertex : V). vertex ∈ Graph.walkVertices(graph, endpoint, List.empty(E))
-            → vertex ∈ Graph.walkVertices(graph, endpoint, List.empty(E))
-            by { take vertex : V;
-                 suppose vertex ∈ Graph.walkVertices(graph, endpoint, List.empty(E));
-                 done };
         witness List.empty(E)
       }
     case Graph.IsPathOver.step(
         stepSource, waypoint, stepTarget, edge, rest, isEdge, joins, restPath, fresh): {
         choose reversedRest such that
             Graph.IsPath(graph, stepTarget, reversedRest, waypoint)
-            ∧ (∀ (vertex : V).
-                 vertex ∈ Graph.walkVertices(graph, stepTarget, reversedRest)
-                 → vertex ∈ Graph.walkVertices(graph, waypoint, rest))
-            ∧ (∀ (vertex : V). vertex ∈ Graph.walkVertices(graph, waypoint, rest)
-                 → vertex ∈ Graph.walkVertices(graph, stepTarget, reversedRest))
+            ∧ Graph.walkVertices(graph, stepTarget, reversedRest)
+                = Graph.walkVertices(graph, waypoint, rest)
             from IH;
         Graph.IsPath(graph, stepTarget, reversedRest, waypoint);
-        ∀ (vertex : V). vertex ∈ Graph.walkVertices(graph, stepTarget, reversedRest)
-            → vertex ∈ Graph.walkVertices(graph, waypoint, rest) as reversedInside;
-        ∀ (vertex : V). vertex ∈ Graph.walkVertices(graph, waypoint, rest)
-            → vertex ∈ Graph.walkVertices(graph, stepTarget, reversedRest)
-            as forwardInside;
+        Graph.walkVertices(graph, stepTarget, reversedRest)
+            = Graph.walkVertices(graph, waypoint, rest) as sameVertices;
+        Graph.walkVertices(graph, waypoint, rest)
+            = Graph.walkVertices(graph, stepTarget, reversedRest) as sameVerticesBack;
         Graph.Joins(graph, edge, waypoint, stepSource) by Graph.Joins.symmetric;
         -- The old source is fresh for the reversed rest, because it was
         -- fresh for the rest.
         ¬(stepSource ∈ Graph.walkVertices(graph, stepTarget, reversedRest))
             by { suppose stepSource ∈ Graph.walkVertices(graph, stepTarget, reversedRest);
                  stepSource ∈ Graph.walkVertices(graph, waypoint, rest)
-                     by reversedInside;
+                     by Set.member_of_equal;
                  done };
         Graph.IsPath(graph, stepTarget,
                      List.append(reversedRest, List.prepend(E, edge, List.empty(E))),
                      stepSource)
             by Graph.IsPath.extend_at_target(middle := waypoint);
-        waypoint ∈ Graph.walkVertices(graph, stepTarget, reversedRest) by forwardInside;
+        waypoint ∈ Graph.walkVertices(graph, stepTarget, reversedRest)
+            by Set.member_of_equal;
         -- The vertices match: the longer reversal adds exactly the old
         -- source, which is what the step added at the front.
         ∀ (vertex : V).
@@ -239,7 +230,7 @@ theorem Graph.IsPath.reverse (graph : Graph(V, E, ends)) (source target : V)
                  done by cases {
                    case vertex ∈ Graph.walkVertices(graph, stepTarget, reversedRest): {
                        vertex ∈ Graph.walkVertices(graph, waypoint, rest)
-                           by reversedInside;
+                           by Set.member_of_equal;
                        done by Graph.walkVertices.before_step
                      }
                    case vertex = stepSource: {
@@ -275,7 +266,7 @@ theorem Graph.IsPath.reverse (graph : Graph(V, E, ends)) (source target : V)
                      }
                    case vertex ∈ Graph.walkVertices(graph, waypoint, rest): {
                        vertex ∈ Graph.walkVertices(graph, stepTarget, reversedRest)
-                           by forwardInside;
+                           by Set.member_of_equal;
                        ∀ (candidate : E). candidate ∈ reversedRest
                            → candidate ∈ List.append(reversedRest,
                                  List.prepend(E, edge, List.empty(E)))
@@ -285,6 +276,10 @@ theorem Graph.IsPath.reverse (graph : Graph(V, E, ends)) (source target : V)
                        done by Graph.walkVertices.monotone
                      }
                  } };
+        Graph.walkVertices(graph, stepTarget,
+            List.append(reversedRest, List.prepend(E, edge, List.empty(E))))
+            = Graph.walkVertices(graph, stepSource, List.prepend(E, edge, rest))
+            by Set.equal_of_same_members;
         witness List.append(reversedRest, List.prepend(E, edge, List.empty(E)))
       }
   }
@@ -329,14 +324,12 @@ theorem Graph.IsPath.reaches_source_avoiding_target (graph : Graph(V, E, ends))
         : Graph.Reaches(Graph.deleteVertex(graph, target), vertex, source) := {
   choose reversed such that
       Graph.IsPath(graph, target, reversed, source)
-      ∧ (∀ (candidate : V). candidate ∈ Graph.walkVertices(graph, target, reversed)
-           → candidate ∈ Graph.walkVertices(graph, source, edgeList))
-      ∧ (∀ (candidate : V). candidate ∈ Graph.walkVertices(graph, source, edgeList)
-           → candidate ∈ Graph.walkVertices(graph, target, reversed))
+      ∧ Graph.walkVertices(graph, target, reversed)
+          = Graph.walkVertices(graph, source, edgeList)
       from Graph.IsPath.reverse;
   Graph.IsPath(graph, target, reversed, source);
-  ∀ (candidate : V). candidate ∈ Graph.walkVertices(graph, source, edgeList)
-      → candidate ∈ Graph.walkVertices(graph, target, reversed) as forwardVisits;
-  vertex ∈ Graph.walkVertices(graph, target, reversed) by forwardVisits(vertex);
+  Graph.walkVertices(graph, source, edgeList)
+      = Graph.walkVertices(graph, target, reversed);
+  vertex ∈ Graph.walkVertices(graph, target, reversed) by Set.member_of_equal;
   done by Graph.IsPath.reaches_target_avoiding_source(edgeList := reversed)
 }
