@@ -136,6 +136,16 @@ case a = b: {
 That is a good factoring on its own terms, so the cost here was small. It
 would not be, in a proof whose degenerate case is not separable.
 
+**Second occurrence, 2026-07-29** (`Plane.subdivide_avoids`, the
+`case point = head` arm). Here the refinement went the useful way: the goal
+became `¬(head ∈ …)` while the hypothesis stayed at `point`, and the arm was
+simply written in terms of `head`, dropping a `by substituting` and a dead
+label. So the asymmetry is not always a cost — but it is always a surprise,
+and the error it produces when you write the arm the other way round
+("this case's result has the wrong type for the function's declared return
+type") does not mention the refinement at all. That message is the friction
+as much as the behaviour is.
+
 ---
 
 ## Not frictions — two error messages that did their job

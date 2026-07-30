@@ -698,13 +698,36 @@ endpoint is a no-op. The pieces are threaded through the RETURN TYPE, like
 `Plane.chainFunction`, since a fixed parameter that varies never fires its
 recursion equation.
 
-**Remaining, in order:** three properties of `Plane.subdivide` — the pieces
-cover what they came from, their interiors are pairwise disjoint, and no cut
-point is interior to any of them — then the assembly, stated EXISTENTIALLY
-("can be made into a finite plane graph by subdivision", as the blueprint has
-it) and proved by induction over the segments, so the cut points never have
-to be produced. Then H6. "The realisation of a cycle is a Jordan curve" wants
-the edge arcs of a cycle concatenated in order.
+**Done 2026-07-29**, three facts about one cut, each lifted across the piece
+list and then across the point list — `splitSegmentAt_*` → `splitAllAt_*` →
+`subdivide_*`:
+
+- `subdivide_ends_distinct` — no piece degenerates, so the invariant the
+  drawing condition needs survives every cut;
+- `subdivide_inside` — every piece's interior lies inside the interior of a
+  piece it came from. This is what makes a cut PERMANENT: nothing later can
+  put a removed point back into an interior;
+- `subdivide_avoids` — after subdividing, no cut point is interior to any
+  piece.
+
+Underneath, in Layer 0 where it belongs: `Plane.openSegment` with
+`openSegment_left_inside` / `_right_inside` (cutting at an interior point
+puts each half's interior inside the whole's). The ordering along the segment
+is never mentioned — `Plane.distance_from_left` turns it into a comparison of
+distances from the left endpoint.
+
+**Correction to the earlier plan here:** pairwise-disjoint interiors is NOT a
+property of `subdivide`. `subdivide([(a,b), (a,b)], [])` has two pieces with
+equal interiors. Disjointness comes from cutting at *the right* points and
+then deduplicating, so it belongs to the assembly, not to the cutting.
+
+**Remaining:** the COVER property — `segment(a, cut) ∪ segment(cut, b) =
+segment(a, b)` at an interior cut, lifted the same way, so the point set is
+preserved. Then the assembly, stated EXISTENTIALLY ("can be made into a
+finite plane graph by subdivision", as the blueprint has it) and proved by
+induction over the segments, so the cut points never have to be produced.
+Then H6. "The realisation of a cycle is a Jordan curve" wants the edge arcs
+of a cycle concatenated in order.
 
 **Definitions.** `Plane.Graph.IsDrawing` (**settled** — see above, not a
 `Plane.Graph` type); `Plane.Graph.face` as a component of the complement
