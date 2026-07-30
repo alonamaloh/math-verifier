@@ -1,0 +1,272 @@
+-- Plane/Graph/pointset.math
+--
+-- What a plane graph occupies, and what is left over.
+--
+-- `Plane.Graph.pointSet` is the union of the vertices and the edge arcs —
+-- the set the blueprint means by "the graph" when it speaks of the
+-- complement. It is a finite union: over the graph's own vertex list and
+-- its own edge list, through `List.unionOver`, so the closedness of the
+-- whole reduces to a point being closed and an arc being compact.
+--
+-- The FACES are then the components of the complement, and they come with
+-- the component API of Layer 3 for free: open (the complement is open),
+-- connected, and pairwise equal-or-disjoint.
+--
+-- Not built: the OUTER face. That exactly one face is unbounded needs the
+-- exterior of a large disk to be connected, which is a genuine plane fact
+-- and not a consequence of anything here.
+
+module Plane.Graph.pointset
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Equality.basics
+import axioms
+import Set.basics
+import Set.algebra
+import Lists.list
+import Lists.set_union
+import Real.interface
+import Real.order
+import Metric.space
+import Metric.topology
+import Metric.compactness
+import Metric.finite_union
+import Metric.interval
+import Plane.point
+import Plane.metric
+import Plane.topology
+import Plane.compactness
+import Plane.connected
+import Plane.component
+import Plane.curve
+import Plane.subarc
+import Graph.basics
+import Plane.Graph.basics
+
+convention E : Type(0)
+convention ends : E → Pair(Plane.Point, Plane.Point)
+
+-- ----------------------------------------------------------------------
+-- The three sets.
+
+definition Plane.Graph.vertexSet (graph : Graph(Plane.Point, E, ends))
+        : Set(Plane.Point) :=
+  List.unionOver(
+      (vertex : Plane.Point) ↦ Set.singleton(Plane.Point, vertex),
+      Graph.vertices(graph))
+
+definition Plane.Graph.edgeSet (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point)) : Set(Plane.Point) :=
+  List.unionOver((edge : E) ↦ Plane.arc(drawing(edge)), Graph.edges(graph))
+
+definition Plane.Graph.pointSet (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point)) : Set(Plane.Point) :=
+  Plane.Graph.vertexSet(graph) ∪ Plane.Graph.edgeSet(graph, drawing)
+
+-- ----------------------------------------------------------------------
+-- Membership, both ways.
+
+theorem Plane.Graph.vertexSet_member (graph : Graph(Plane.Point, E, ends))
+        (vertex : Plane.Point) (isVertex : vertex ∈ Graph.vertices(graph))
+        : vertex ∈ Plane.Graph.vertexSet(graph) := {
+  vertex ∈ Set.singleton(Plane.Point, vertex) by Set.singleton_member;
+  done by List.unionOver_member
+}
+
+theorem Plane.Graph.vertexSet_member_invert (graph : Graph(Plane.Point, E, ends))
+        (x : Plane.Point) (inVertexSet : x ∈ Plane.Graph.vertexSet(graph))
+        : x ∈ Graph.vertices(graph) := {
+  choose vertex such that
+      vertex ∈ Graph.vertices(graph) ∧ x ∈ Set.singleton(Plane.Point, vertex)
+      from List.unionOver_member_invert;
+  vertex ∈ Graph.vertices(graph);
+  x ∈ Set.singleton(Plane.Point, vertex);
+  x = vertex;
+  done by substituting (x = vertex)
+}
+
+theorem Plane.Graph.edgeSet_member (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (edge : E) (isEdge : edge ∈ Graph.edges(graph))
+        (x : Plane.Point) (onArc : x ∈ Plane.arc(drawing(edge)))
+        : x ∈ Plane.Graph.edgeSet(graph, drawing) :=
+  done by List.unionOver_member
+
+theorem Plane.Graph.edgeSet_member_invert (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (x : Plane.Point) (inEdgeSet : x ∈ Plane.Graph.edgeSet(graph, drawing))
+        : ∃ (edge : E). edge ∈ Graph.edges(graph) ∧ x ∈ Plane.arc(drawing(edge)) :=
+  done by List.unionOver_member_invert
+
+theorem Plane.Graph.pointSet_member_vertex (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (vertex : Plane.Point) (isVertex : vertex ∈ Graph.vertices(graph))
+        : vertex ∈ Plane.Graph.pointSet(graph, drawing) := {
+  vertex ∈ Plane.Graph.vertexSet(graph) by Plane.Graph.vertexSet_member;
+  done
+}
+
+theorem Plane.Graph.pointSet_member_arc (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (edge : E) (isEdge : edge ∈ Graph.edges(graph))
+        (x : Plane.Point) (onArc : x ∈ Plane.arc(drawing(edge)))
+        : x ∈ Plane.Graph.pointSet(graph, drawing) := {
+  x ∈ Plane.Graph.edgeSet(graph, drawing) by Plane.Graph.edgeSet_member;
+  done
+}
+
+-- A point of the drawing is a vertex or lies on an edge arc. This is the
+-- form every "the point is off the graph" argument uses, contrapositively.
+theorem Plane.Graph.pointSet_member_invert (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (x : Plane.Point) (inPointSet : x ∈ Plane.Graph.pointSet(graph, drawing))
+        : x ∈ Graph.vertices(graph)
+          ∨ (∃ (edge : E). edge ∈ Graph.edges(graph) ∧ x ∈ Plane.arc(drawing(edge))) :=
+  done by cases {
+    case x ∈ Plane.Graph.vertexSet(graph): {
+        x ∈ Graph.vertices(graph) by Plane.Graph.vertexSet_member_invert;
+        done
+      }
+    case x ∈ Plane.Graph.edgeSet(graph, drawing): {
+        ∃ (edge : E). edge ∈ Graph.edges(graph) ∧ x ∈ Plane.arc(drawing(edge))
+            by Plane.Graph.edgeSet_member_invert;
+        done
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- The drawing is closed, so its complement is open.
+
+theorem Plane.Graph.complement_vertexSet_IsOpen (graph : Graph(Plane.Point, E, ends))
+        : Plane.IsOpen(Set.complement(Plane.Graph.vertexSet(graph))) := {
+  ∀ (vertex : Plane.Point). vertex ∈ Graph.vertices(graph) →
+      Plane.Closure(Set.singleton(Plane.Point, vertex))
+          ⊆ Set.singleton(Plane.Point, vertex)
+      by { take vertex : Plane.Point;
+           suppose vertex ∈ Graph.vertices(graph);
+           done by MetricSpace.Closure.singleton_subset };
+  done by MetricSpace.complement_unionOver_IsOpen
+}
+
+theorem Plane.Graph.complement_edgeSet_IsOpen (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
+        : Plane.IsOpen(Set.complement(Plane.Graph.edgeSet(graph, drawing))) := {
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      Plane.Closure(Plane.arc(drawing(edge))) ⊆ Plane.arc(drawing(edge))
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           Plane.IsArc(drawing(edge)) by Plane.Graph.IsDrawing.IsArc;
+           Plane.IsCompact(Plane.arc(drawing(edge))) by Plane.IsArc.IsCompact;
+           done by Plane.IsCompact.Closure_subset };
+  done by MetricSpace.complement_unionOver_IsOpen
+}
+
+theorem Plane.Graph.complement_pointSet_IsOpen (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
+        : Plane.IsOpen(Set.complement(Plane.Graph.pointSet(graph, drawing))) := {
+  Plane.IsOpen(Set.complement(Plane.Graph.vertexSet(graph)))
+      by Plane.Graph.complement_vertexSet_IsOpen;
+  Plane.IsOpen(Set.complement(Plane.Graph.edgeSet(graph, drawing)))
+      by Plane.Graph.complement_edgeSet_IsOpen;
+  Plane.IsOpen(
+      Set.complement(Plane.Graph.vertexSet(graph))
+          ∩ Set.complement(Plane.Graph.edgeSet(graph, drawing)))
+      by Plane.OpenIn.intersection;
+  Set.complement(
+      Plane.Graph.vertexSet(graph) ∪ Plane.Graph.edgeSet(graph, drawing))
+      = Set.complement(Plane.Graph.vertexSet(graph))
+            ∩ Set.complement(Plane.Graph.edgeSet(graph, drawing))
+      by Set.complement_union;
+  done by substituting (
+      Set.complement(
+          Plane.Graph.vertexSet(graph) ∪ Plane.Graph.edgeSet(graph, drawing))
+          = Set.complement(Plane.Graph.vertexSet(graph))
+                ∩ Set.complement(Plane.Graph.edgeSet(graph, drawing)))
+}
+
+-- ----------------------------------------------------------------------
+-- Faces.
+--
+-- `Plane.Graph.face(graph, drawing, base)` is the face through a point off
+-- the drawing: the component of the complement containing it. Named by a
+-- point rather than indexed, exactly as `Plane.Component` is, so no face
+-- ever has to be produced before it is spoken about.
+
+definition Plane.Graph.exterior (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point)) : Set(Plane.Point) :=
+  Set.complement(Plane.Graph.pointSet(graph, drawing))
+
+definition Plane.Graph.face (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point)) (base : Plane.Point)
+        : Set(Plane.Point) :=
+  Plane.Component(Plane.Graph.exterior(graph, drawing), base)
+
+theorem Plane.Graph.member_exterior (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point)) (x : Plane.Point)
+        (offDrawing : ¬(x ∈ Plane.Graph.pointSet(graph, drawing)))
+        : x ∈ Plane.Graph.exterior(graph, drawing) :=
+  done
+
+theorem Plane.Graph.exterior_IsOpen (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
+        : Plane.IsOpen(Plane.Graph.exterior(graph, drawing)) :=
+  done by Plane.Graph.complement_pointSet_IsOpen
+
+-- A face misses the drawing, holds the point that names it, and is a
+-- region: nonempty, open, connected.
+
+theorem Plane.Graph.face_subset_exterior (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point)) (base : Plane.Point)
+        : Plane.Graph.face(graph, drawing, base)
+              ⊆ Plane.Graph.exterior(graph, drawing) :=
+  done by Plane.Component_subset
+
+theorem Plane.Graph.base_in_face (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point)) (base : Plane.Point)
+        (offDrawing : ¬(base ∈ Plane.Graph.pointSet(graph, drawing)))
+        : base ∈ Plane.Graph.face(graph, drawing, base) := {
+  base ∈ Plane.Graph.exterior(graph, drawing) by Plane.Graph.member_exterior;
+  done by Plane.base_in_Component
+}
+
+theorem Plane.Graph.face_IsRegion (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
+        (base : Plane.Point)
+        (offDrawing : ¬(base ∈ Plane.Graph.pointSet(graph, drawing)))
+        : Plane.IsRegion(Plane.Graph.face(graph, drawing, base)) := {
+  Plane.IsOpen(Plane.Graph.exterior(graph, drawing))
+      by Plane.Graph.exterior_IsOpen;
+  base ∈ Plane.Graph.exterior(graph, drawing) by Plane.Graph.member_exterior;
+  done by Plane.Component_IsRegion
+}
+
+-- The faces partition the complement: two that meet at all are the same
+-- face.
+theorem Plane.Graph.face.equal_of_meeting (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (first second : Plane.Point)
+        (firstOffDrawing : ¬(first ∈ Plane.Graph.pointSet(graph, drawing)))
+        (secondOffDrawing : ¬(second ∈ Plane.Graph.pointSet(graph, drawing)))
+        (meets : Set.IsNonempty(Plane.Point,
+            Plane.Graph.face(graph, drawing, first)
+                ∩ Plane.Graph.face(graph, drawing, second)))
+        : Plane.Graph.face(graph, drawing, first)
+              = Plane.Graph.face(graph, drawing, second) := {
+  first ∈ Plane.Graph.exterior(graph, drawing) by Plane.Graph.member_exterior;
+  second ∈ Plane.Graph.exterior(graph, drawing) by Plane.Graph.member_exterior;
+  done by Plane.Component.equal_of_meeting
+}
+
+-- A face is named by any of its own points.
+theorem Plane.Graph.face.equal_of_member (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point)) (base x : Plane.Point)
+        (inFace : x ∈ Plane.Graph.face(graph, drawing, base))
+        : Plane.Graph.face(graph, drawing, base)
+              = Plane.Graph.face(graph, drawing, x) :=
+  done by Plane.Component.equal_of_member
