@@ -734,7 +734,67 @@ That regress is the same one that forced the named-pair form of
 So all four properties of `Plane.subdivide` are in the kernel:
 `ends_distinct`, `inside`, `avoids`, `covers`.
 
-### Remaining: the assembly — design worked out, not yet written
+### Done 2026-07-30: the assembly — `Plane.polygonal_overlay`
+
+`lem:polygonal-overlay` is in the kernel, in the shape the design below
+predicted:
+
+```math
+theorem Plane.polygonal_overlay (pieces : List(Plane.Segment))
+        (allDistinct : ∀ piece ∈ pieces. first(piece) ≠ second(piece))
+        : ∃ (graph : Plane.PolygonalGraph).
+            Plane.Graph.IsDrawing(graph, Plane.segmentDrawing)
+            ∧ Plane.Graph.pointSet(graph, Plane.segmentDrawing)
+                = Plane.piecesCover(pieces)
+```
+
+The parts, in dependency order:
+
+- **`Plane/segment_order.math`** — the distance from one end as a coordinate
+  along a segment, which is what makes every collinear argument
+  one-dimensional. `equal_of_distance_from_left` (the coordinate determines
+  the point), betweenness ⇄ inequalities in it, and then the two results the
+  overlay needs: `segment_inside_of_ends_outside` and
+  `same_ends_of_meeting_interiors`. **Correction to the design below:** the
+  first is FALSE as the plan stated it — a piece crossing the overlap
+  transversally meets `(u, v)` and avoids both ends without lying inside
+  `[u, v]` — so both are stated inside one ambient segment, which is exactly
+  what the `p ≠ q` case supplies.
+- **Two additions to `Plane.subdivide`**: `subdivide_inside` now carries the
+  CLOSED inclusion beside the open one, in one existential (separation reads a
+  piece's ends off its source segment and its interior off the source's
+  interior, and needs both at the same source); and `subdivide_ends`, a fifth
+  property — an end of a piece that is not a cut point was an end all along —
+  whose corollary `subdivide_ends_are_cuts` is what a construction that also
+  cuts at the source ends gets. **Second correction:** the `p ≠ q` case does
+  NOT close with "both are inside the overlap, and the overlap is where the
+  two coincide" — two different subpieces can both sit inside a long overlap.
+  What closes it is the endpoint criterion, which is why the fifth property
+  was needed.
+- **`Plane.subdivide_separated`** — the separation theorem, over
+  `subdivide_common_segment` (collinearity: a common source, or the sources'
+  overlap, which is nondegenerate because the shared point is interior to it).
+- **`Plane.exists_cut_points`** — the point list, existentially, by induction
+  over the pieces: each step adds the head's two ends and its meets with the
+  rest (`exists_meet_points`). No sort, no choice operator. `MeetsAreCut` asks
+  for SOME pair of ends of each meet, not every pair — demanding every
+  representation would need "a nondegenerate segment's ends are determined by
+  its point set", which this development does not have.
+- **Deduplication up to equality**, via `Plane.orientSegment`
+  (`Plane/Graph/orient.math`) over a lexicographic order on points
+  (`Plane/point_order.math`): two names for one segment orient to the same
+  name, so `List.deduplicate` (new, in `Lists/deduplicate.math`) is all the
+  blueprint's "represent each duplicated subsegment once" needs.
+- **`Plane.overlayGraph`** and its four steps — well-formedness, the two
+  disjointness conditions through `polygonal_IsDrawing`, and the point-set
+  equality (an edge's arc is its segment; deduplicating keeps the members;
+  orienting keeps each piece's segment; `subdivide_covers`).
+
+What the design below got right and is kept for the record: the case analysis,
+the decision to keep the cut-point list existential rather than reaching for
+`Logic.the`, and that separation concludes EQUAL rather than disjoint.
+
+### The design as written before building it
 
 Target shape:
 
@@ -789,20 +849,28 @@ same move that made `subdivide` need no sort.
 **Then deduplication:** an edge list holding one orientation of each geometric
 segment. `List.Includes` and the distinctness machinery are in place; what is
 missing is the "same segment up to swapping" relation and a filter that
-respects it.
+respects it. *(Built as `Plane.SameSegment` plus `Plane.orientSegment`: pick
+the orientation by an ORDER on points and the relation collapses to equality,
+so the filter is plain `List.deduplicate` with no geometry in it.)*
 
 Then H6. "The realisation of a cycle is a Jordan curve" wants the edge arcs of
 a cycle concatenated in order.
 
 **Definitions.** `Plane.Graph.IsDrawing` (**settled** — see above, not a
 `Plane.Graph` type); `Plane.Graph.face` as a component of the complement
-(**done**); `Plane.Graph.outerFace`; `Plane.Graph.overlay` — the
-subdivision of a finite union of polygonal graphs at all intersections.
+(**done**); `Plane.Graph.outerFace`; the overlay itself — `Plane.overlayGraph`,
+the subdivision oriented and deduplicated (**done**).
 
-**Main results.** The overlay of finitely many finite polygonal plane
-graphs is a plane graph after subdividing at all crossings and identifying
-duplicated subsegments (`lem:polygonal-overlay`); segments meet in nothing,
-a point, or an interval; a plane graph realises an abstract finite graph.
+**Main results.** The overlay of finitely many segments is a plane graph after
+subdividing at all crossings and identifying duplicated subsegments
+(`lem:polygonal-overlay` — **done**, `Plane.polygonal_overlay`); segments meet
+in nothing, a point, or an interval (**done**, `Plane.segment_meet`); a plane
+graph realises an abstract finite graph (true by construction).
+
+Still open in this layer: the same statement for a finite union of polygonal
+GRAPHS rather than a bare list of segments — the graphs' edge lists have to be
+concatenated first, which is bookkeeping over `Plane.polygonal_overlay` and no
+new geometry.
 
 > **Headliner H6 — `Plane.Graph.polygonal_redrawing`
 > (blueprint `lem:polygonal-redrawing`):** every finite plane graph is

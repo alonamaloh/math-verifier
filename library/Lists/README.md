@@ -24,6 +24,12 @@ needed.
   Transparent, so a `⊆` fact in context discharges an individual membership
   with no citation
 - Pairwise distinctness `List.Distinct`
+- `List.deduplicate(list)` — the list with its repetitions removed, in
+  [deduplicate.math](deduplicate.math): same members
+  (`List.deduplicate_subset` and `List.subset_deduplicate`) and
+  `List.deduplicate_distinct` afterwards. What a construction owes a
+  consumer that requires distinctness — a graph's vertex and edge lists —
+  when what it gathered may repeat itself
 - Reordering relation `List.Permutation`
 - Cartesian list product `List.cartesianProduct`
 
@@ -42,6 +48,12 @@ needed.
   repetitions is no longer than any list holding all of its elements
 - Sums: `List.sumOver_append`, `List.sumOver_add`,
   `List.sumOver_congruence` and `List.sumOver_constant`
+- Finite unions: `List.unionOver_append` splits a union where the list
+  concatenates, `List.unionOver_same_members` says only the members matter
+  (so deduplicating or reordering leaves a union alone),
+  `List.unionOver_pointwise` replaces the family by a pointwise-equal one, and
+  `List.unionOver_map` turns a union over a mapped list into one of the
+  composite over the original
 - Counting members: `List.sumOver_indicator` — summing one per member
   that satisfies a condition counts them — and `List.filter_length_two`
 

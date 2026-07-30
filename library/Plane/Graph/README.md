@@ -122,14 +122,68 @@ is a no-op).
 recursion equations `Plane.subdivide_empty` / `Plane.subdivide_prepend` are
 how a proof steps through a cut list.
 
+Five properties of a subdivision, each proved of one cut and then lifted
+across the piece list and the point list:
+
+| property | what it says |
+| --- | --- |
+| `Plane.subdivide_ends_distinct` | no piece degenerates |
+| `Plane.subdivide_inside` | a piece lies inside a source piece — segment in segment AND interior in interior, at the **same** source, which is what the separation argument needs |
+| `Plane.subdivide_avoids` | no cut point stays interior to any piece |
+| `Plane.subdivide_covers` | the pieces occupy exactly what they came from |
+| `Plane.subdivide_ends` | an end of a piece that is not a cut point was an end all along; so `Plane.subdivide_ends_are_cuts`, once the source ends are cut too |
+
+## Separation, and the overlay itself
+
+`Plane.polygonal_overlay` ([overlay.math](overlay.math)) is
+`lem:polygonal-overlay`: finitely many nondegenerate segments become a
+polygonal plane graph occupying exactly the points they cover. The graph is
+`Plane.overlayGraph` — the subdivision, oriented and deduplicated, with the
+ends of those edges as vertices — and the cut points are never computed:
+`Plane.exists_cut_points` produces them existentially, by the same induction
+that proves they exist.
+
+The theorem it turns on is **separation**:
+
+- **`Plane.subdivide_separated`** — cut at every end of every source piece
+  (`Plane.EndsAreCut`) and at both ends of every meet (`Plane.MeetsAreCut`),
+  and two pieces of the subdivision that share an interior point are the
+  **same** segment. Equal, not disjoint: overlapping collinear pieces cannot
+  be pulled apart by cutting, and that is exactly what the deduplication
+  clause is for.
+
+Its first step, `Plane.subdivide_common_segment`, is collinearity — two such
+pieces lie in one segment (their common source, or the sources' overlap, which
+is nondegenerate because the shared point is interior to it). The rest is
+one-dimensional and lives in
+[`Plane/segment_order.math`](../segment_order.math).
+
+`Plane.MeetsAreCut` asks for **some** pair of ends of each meet to be cut,
+not every pair: a meet is `segment(u, v)` and `segment(v, u)` alike, and that
+a nondegenerate segment's ends are determined by its point set is a theorem
+this development neither has nor needs.
+
+**Deduplication is up to equality, not up to reversal**, because of
+`Plane.orientSegment` ([orient.math](orient.math)): it puts the
+lexicographically smaller end first (`Plane.Point.Precedes`, in
+[`Plane/point_order.math`](../point_order.math)), and
+`Plane.orientSegment_of_SameSegment` says two names for one segment orient to
+the same name. So `List.deduplicate` — plain list deduplication, carrying no
+geometry — is all the "represent each duplicated subsegment once" clause
+needs. `Plane.SameSegment` (in [segments.math](segments.math)) is the relation
+being quotiented, and `Plane.SameSegment.segment` / `.openSegment` say both
+names draw the same points.
+
 ## Where to look
 
 | module | what is in it |
 | --- | --- |
 | [basics.math](basics.math) | `Plane.Graph.IsDrawing`, its five readers, and the meet-at-a-vertex theorems |
 | [pointset.math](pointset.math) | `vertexSet` / `edgeSet` / `pointSet`, the open exterior, and the faces |
-| [segments.math](segments.math) | `Plane.Segment`, `Plane.PolygonalGraph`, `Plane.segmentDrawing`, and the polygonal criterion |
-| [subdivide.math](subdivide.math) | `Plane.subdivide` and its four properties |
+| [segments.math](segments.math) | `Plane.Segment`, `Plane.PolygonalGraph`, `Plane.segmentDrawing`, `Plane.SameSegment`, and the polygonal criterion |
+| [subdivide.math](subdivide.math) | `Plane.subdivide`, `Plane.IsEndOf`, and the five properties |
+| [orient.math](orient.math) | `Plane.orientSegment` — one canonical name per segment |
+| [overlay.math](overlay.math) | separation, the cut points, `Plane.overlayGraph`, and `Plane.polygonal_overlay` |
 
 Each module opens with `convention E` and `convention ends`, as
 [`library/Graph/`](../../Graph/README.md) does, so a statement names the graph
@@ -137,16 +191,6 @@ and the drawing and nothing else.
 
 ## Not built yet
 
-- **The overlay's assembly.** All four properties of `Plane.subdivide` are
-  proved — `Plane.subdivide_ends_distinct`, `Plane.subdivide_inside`
-  (interiors only shrink, so a cut is permanent), `Plane.subdivide_avoids` (no
-  cut point stays interior), `Plane.subdivide_covers` (the pieces occupy
-  exactly what they came from). What remains is the SEPARATION step:
-  with enough cut points, two pieces sharing an interior point have EQUAL
-  interiors — equal, not disjoint, because overlapping collinear segments
-  coincide after cutting and are what deduplication is for. The case analysis
-  and the two sub-lemmas it needs are written out in
-  `PLAN_JORDAN_SCHOENFLIES.md`.
 - **The outer face.** That exactly one face is unbounded needs the exterior
   of a large disk to be connected — a genuine plane fact that nothing here
   supplies.

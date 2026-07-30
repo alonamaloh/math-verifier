@@ -229,3 +229,100 @@ interval}.math` have six reductios spelled `¬(…)` that the negated operators
 can now carry. Left alone — `Metric/` is not in `scripts/clean_manifest.txt`,
 and style sweeps are manifest-scoped. `¬(∃ …)` sites stay as they are, and
 `<` has no negated operator to move to.
+
+---
+
+## L4 — a disjunction goal makes the prover try the false side first
+
+**Symptom.** Two shapes, both from the overlay, both cured the same way.
+
+```math
+-- (a) `Plane.splitSegmentAt_ends`, goal `point = cut ∨ Plane.IsEndOf(point, piece)`
+--     with `Plane.IsEndOf(point, piece)` in context:
+warning: expensive by-less proof step (80456 kernel-steps) — the auto-prover
+closed it by search (via the disjunctionIntro strategy)
+
+-- (b) `Plane.same_ends_of_meeting_interiors`, goal
+--     `(A ∧ B) ∨ (C ∧ D)` between point equations, with `A` and `B` in context:
+elaborate error: the auto-prover gave up after exhausting its effort budget
+```
+
+**Why it bites.** The style guide's rule is to state the true disjunct and
+close bare — "the auto-prover's disjunction-introduction picks whichever
+disjunct is in context". It does, but it tries the disjuncts in order, and
+*failing* on the other one is what costs: in (a) 80k kernel-steps twice, in
+(b) the whole budget in a context of twenty hypotheses about points. The
+recommended form is the slow one, and nothing in the warning says which
+disjunct was expensive.
+
+**What the library does about it.** Two different answers, and the difference
+is worth keeping:
+
+- In (a) the disjunction was avoidable. `splitSegmentAt_ends` was restated in
+  the negative — "an end of a half that is not the cut point was an end it
+  inherited", `(notCut : point ≠ cut)` as a hypothesis and `Plane.IsEndOf` as
+  the bare conclusion. That removed the disjunction from the goal, removed
+  two case splits from the proof, and reads better than what it replaced. Its
+  two consumers (`splitAllAt_ends`, `subdivide_ends`) then needed no case
+  analysis at all.
+- In (b) the disjunction IS the statement (two names for one segment, in one
+  order or the other). There the fix is to name the injection —
+  `done by Or.introduceLeft` — which the warning asks for and which reads as
+  "this is the left case", at the cost of a mechanism name the style guide
+  would rather not see.
+
+**Suggested fix.** Try the disjuncts cheaply before committing: a disjunct
+whose head is a constructor-shaped equation between distinct variables cannot
+be closed from context by the equality battery, and a syntactic pre-check
+would skip it in the cases above. Failing that, the warning should say which
+side the search spent its budget on, so that the author can name the other.
+
+## L5 — the matcher does not reduce a projection of a definition
+
+**Symptom.** `Graph.vertices(Plane.overlayGraph(pieces, points))` is
+definitionally `List.deduplicate(…)` — `overlayGraph` is a plain definition
+whose body is `Graph.make(…)`, and `Graph.vertices` is the first projection —
+but
+
+```math
+List.Distinct(Plane.Point, Graph.vertices(Plane.overlayGraph(pieces, points)))
+    by List.deduplicate_distinct;
+```
+
+fails with *"the conclusion shape fits, but an argument could not be inferred
+from the goal"*: matching `List.deduplicate(?list)` against
+`Graph.vertices(overlayGraph(…))` needs one δ-step and one ι-step, and the
+matcher does neither.
+
+**What the library does about it.** States the fact at the reduced spelling
+and transports it by the characterizing equation, which the definition
+publishes anyway (`Plane.overlayGraph_vertices`):
+
+```math
+Graph.vertices(Plane.overlayGraph(pieces, points))
+    = List.deduplicate(Plane.endsList(Plane.overlayPieces(pieces, points)))
+    by Plane.overlayGraph_vertices as verticesAre;
+List.Distinct(Plane.Point,
+    List.deduplicate(Plane.endsList(Plane.overlayPieces(pieces, points))))
+    by List.deduplicate_distinct;
+List.Distinct(Plane.Point, Graph.vertices(Plane.overlayGraph(pieces, points)))
+    by substituting verticesAre;
+```
+
+Three lines where one should do. Publishing the characterizing equations is
+good practice regardless, so the cost is small — but the same shape will
+recur at every graph a construction builds, and whnf-ing the goal's arguments
+before matching would remove it.
+
+## L6 — `let` in a proof abbreviates, but membership does not see through it twice
+
+**Symptom.** With `let grown : List(Plane.Point) := List.prepend(P, u,
+List.prepend(P, v, tail));`, the claim `u ∈ grown` closes by itself, and
+`v ∈ grown` does not — the second needs the membership one level down, and
+that is one ζ-step further than the prover takes. Stating the intermediate
+(`v ∈ List.prepend(P, v, tail);` then `v ∈ grown;`) fixes it.
+
+Recorded rather than worked around: the `let` is house style (it names the
+object under construction, and the alternative is a three-line term repeated
+at every membership claim), and one extra line per claim is a small price.
+Related to L1 — building a membership is free only at the head.

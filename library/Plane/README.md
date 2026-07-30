@@ -75,6 +75,8 @@ have cost more than paying for it once.
   `Plane.supDistance` — [norm.math](norm.math)
 - `Plane.between`, `Plane.segment`, `Plane.openSegment`, `Plane.IsConvex`,
   `Plane.Ball`, and `Plane.supBall` — [segment.math](segment.math)
+- `Plane.Point.Precedes` — the points ordered lexicographically, used only to
+  pick one of two canonically — [point_order.math](point_order.math)
 - `Plane.is_metric`, `Plane.metricSpace` — [metric.math](metric.math)
 - `Plane.OpenIn`, `Plane.IsOpen`, `Plane.ClosedIn`, `Plane.InteriorIn`,
   `Plane.ClosureIn`, `Plane.BoundaryIn`, `Plane.ContinuousAt`,
@@ -243,6 +245,35 @@ have cost more than paying for it once.
   vertices, hence `Plane.IsPolygonal.of_polyline`; `Plane.polyline_arcStart`
   names where it begins. Both are proved with the start **generalised**, since
   the recursion moves it
+
+### Along one segment: the distance from an end as a coordinate
+
+[segment_order.math](segment_order.math) makes collinear arguments
+one-dimensional. Along a nondegenerate `Plane.segment(a, b)`, the distance
+from `a` **determines** the point (`Plane.equal_of_distance_from_left`) and
+reads betweenness off as a pair of inequalities
+(`Plane.distance_between_of_member_segment` and its converse
+`Plane.member_segment_of_distance_between`, plus the strict pair for
+interiors), so a claim about four collinear points becomes a claim about four
+reals. No new geometry: this is `Plane.distance_from_left` and
+`Plane.between_nested` turned into a translation.
+
+The two results it exists for, both stated inside one ambient segment —
+collinearity is not optional, since a piece crossing an overlap transversally
+would satisfy the hypotheses without the conclusion:
+
+- **`Plane.segment_inside_of_ends_outside`** — a piece that meets an overlap
+  and keeps the overlap's ends out of its interior lies inside the overlap;
+- **`Plane.same_ends_of_meeting_interiors`** — two pieces whose interiors meet,
+  each keeping the other's ends out of its interior, are the same pair of
+  points (in one order or the other).
+
+Both are stated with no orientation asked of the caller; the `_oriented` forms
+they wrap are near-end-first, which is what the arithmetic wants. The whole
+one-dimensional argument is carried by
+`Plane.distance_LessOrEqual_left_of_not_interior` and its mirror: a point of
+the ambient segment kept out of `[s, t]` and lying before `t` lies at or
+before `s`.
 
 ## Connectedness is the clopen criterion
 
