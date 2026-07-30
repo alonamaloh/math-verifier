@@ -117,9 +117,8 @@ theorem Plane.HalfPlane_IsConvex (coordinate : Plane.Point → ℝ)
      as mixture;
   Real.IsNonneg(1 - t);
   Real.IsNonneg(t);
-  bound * (1 - t) ≤ coordinate(a) * (1 - t)
-      by Real.LessOrEqual.multiply_by_nonneg_right;
-  bound * t ≤ coordinate(b) * t by Real.LessOrEqual.multiply_by_nonneg_right;
+  bound * (1 - t) ≤ coordinate(a) * (1 - t);
+  bound * t ≤ coordinate(b) * t;
 
   -- One of the two weights is positive, and that is where the strictness
   -- comes from. At `t = 0` the walk has not left `a`.
@@ -136,8 +135,7 @@ theorem Plane.HalfPlane_IsConvex (coordinate : Plane.Point → ℝ)
         otherwise: {
             (0 : ℝ) ≠ t;
             t > 0;
-            bound * t < coordinate(b) * t
-                by Real.LessThan.multiply_by_positive_right;
+            bound * t < coordinate(b) * t;
             bound
                = bound * (1 - t) + bound * t by ring
                < coordinate(a) * (1 - t) + coordinate(b) * t by ordered_field
@@ -173,6 +171,46 @@ definition Plane.farLeft (radius : ℝ) : Set(Plane.Point) :=
 
 definition Plane.farBelow (radius : ℝ) : Set(Plane.Point) :=
   Plane.HalfPlane((x : Plane.Point) ↦ -Plane.Point.second(x), radius)
+
+-- The same shape about an arbitrary centre, which is what a vertex of a plane
+-- graph wants around it. Axis-parallel, so its boundary is made of segments —
+-- the reason the redrawing puts squares rather than disks around vertices.
+definition Plane.squareAbout (center : Plane.Point) (radius : ℝ)
+        : Set(Plane.Point) :=
+  (x : Plane.Point) ↦
+    abs(Plane.Point.first(x) - Plane.Point.first(center)) ≤ radius
+      ∧ abs(Plane.Point.second(x) - Plane.Point.second(center)) ≤ radius
+
+theorem Plane.squareAbout_monotone (center : Plane.Point) (small large : ℝ)
+        (ordered : small ≤ large)
+        : Plane.squareAbout(center, small) ⊆ Plane.squareAbout(center, large) := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.squareAbout(center, small);
+  abs(Plane.Point.first(x) - Plane.Point.first(center)) ≤ small
+                                                       ≤ large;
+  abs(Plane.Point.second(x) - Plane.Point.second(center)) ≤ small
+                                                         ≤ large;
+  done
+}
+
+-- A square of radius `r` reaches no further than `2r`: the Euclidean norm is
+-- at most twice the sup norm. That is what turns a separation gap into a
+-- radius, and the factor is why every radius below is a quarter of a gap.
+theorem Plane.squareAbout_distance_bound (center : Plane.Point) (radius : ℝ)
+        (x : Plane.Point) (inSquare : x ∈ Plane.squareAbout(center, radius))
+        : Plane.distance(center, x) ≤ 2 * radius := {
+  abs(Plane.Point.first(x) - Plane.Point.first(center)) ≤ radius;
+  abs(Plane.Point.second(x) - Plane.Point.second(center)) ≤ radius;
+  abs(Plane.Vector.first(x - center)) ≤ radius;
+  abs(Plane.Vector.second(x - center)) ≤ radius;
+  Plane.Vector.supNorm(x - center) ≤ radius by Real.maximum_LessOrEqual;
+  Plane.distance(center, x)
+     = Plane.Vector.norm(x - center)
+     ≤ 2 * Plane.Vector.supNorm(x - center)
+           by Plane.Vector.norm_LessOrEqual_two_supNorm
+     ≤ 2 * radius;
+  done
+}
 
 -- Listed so that consecutive sides share a corner, which is what the
 -- connectedness proof walks along.
@@ -273,7 +311,7 @@ theorem Plane.square_of_not_beyondSquare (radius : ℝ) (x : Plane.Point)
            x ∈ Plane.beyondSquare(radius) by Plane.farLeft_beyondSquare;
            done };
   -Plane.Point.first(x) ≤ radius by Real.LessOrEqual_of_not_LessThan;
-  -radius ≤ Plane.Point.first(x) by ordered_field;
+  -radius ≤ Plane.Point.first(x);
   abs(Plane.Point.first(x)) ≤ radius by Real.absolute_value_LessOrEqual_of_bounds;
 
   ¬(radius < Plane.Point.second(x))
@@ -288,7 +326,7 @@ theorem Plane.square_of_not_beyondSquare (radius : ℝ) (x : Plane.Point)
            x ∈ Plane.beyondSquare(radius) by Plane.farBelow_beyondSquare;
            done };
   -Plane.Point.second(x) ≤ radius by Real.LessOrEqual_of_not_LessThan;
-  -radius ≤ Plane.Point.second(x) by ordered_field;
+  -radius ≤ Plane.Point.second(x);
   abs(Plane.Point.second(x)) ≤ radius by Real.absolute_value_LessOrEqual_of_bounds;
   done
 }
@@ -347,7 +385,7 @@ theorem Plane.beyondSquare_IsConnected (radius : ℝ)
   let upperLeft : Plane.Point := Plane.Point.make(-(radius + 1), radius + 1);
   let lowerLeft : Plane.Point := Plane.Point.make(-(radius + 1), -(radius + 1));
   radius < radius + 1;
-  radius < -(-(radius + 1)) by ordered_field;
+  radius < -(-(radius + 1));
   upperRight ∈ Plane.farRight(radius);
   upperRight ∈ Plane.farAbove(radius);
   upperLeft ∈ Plane.farAbove(radius);

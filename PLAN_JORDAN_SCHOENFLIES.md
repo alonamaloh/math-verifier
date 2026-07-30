@@ -942,6 +942,83 @@ The disk version is what would have needed the traversal Layer 4 withholds.
   swallows all of it. No face is produced as data — a face is named by a
   point of it, as `Plane.Graph.face` has always been.
 
+### H6 — the design, before building it
+
+**Settled: the abstract graph does not change.** The blueprint's "isomorphic
+plane drawing" is the same finite graph drawn differently, and since the
+vertices of a plane graph ARE plane points and the redrawing leaves them where
+they are, the isomorphism is the identity. So H6 needs no `Graph.IsIsomorphism`
+and none should be built for it:
+
+```math
+theorem Plane.Graph.polygonal_redrawing (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
+        : ∃ (redrawing : E → (ℝ → Plane.Point)).
+            Plane.Graph.IsDrawing(graph, redrawing)
+              ∧ ∀ (edge : E). edge ∈ Graph.edges(graph) →
+                    Plane.IsPolygonal(Plane.arc(redrawing(edge)))
+```
+
+The bricks, in dependency order. B1–B4 are ordinary; **B5 and B6 are the
+substance**, and they are where the estimate lives.
+
+- **B1 — one positive bound for a finite list of positive bounds.** Every
+  "choose ε small enough for all of them" step is this, and the proof has
+  three. By induction on the list over `Real.minimum`, stated for a predicate
+  that is monotone downward in the bound; NOT as a `min`-fold definition,
+  since no consumer wants the value. Reusable well beyond H6.
+- **B2 — the vertex squares.** `Plane.squareAbout(center, radius)` — the
+  closed axis-parallel square — and, for each vertex, a radius whose square
+  meets no other vertex and no arc of a non-incident edge. One
+  `Plane.compact_separation` per other vertex and per non-incident arc, then
+  B1. Squares rather than disks because B5 needs the boundary to be made of
+  segments; convexity, which the radial segments of the last step want, both
+  shapes have.
+- **B3 — the last point of an arc inside a closed set.** The parameters that
+  land in `D_v` form a closed bounded nonempty subset of `[0, 1]`; its
+  supremum is attained, and past it the arc has left for good. This is
+  `Real.supremum` plus closedness of the preimage — the same shape as
+  `Plane.reached_supremum_inside`, which is the model to copy.
+- **B4 — the cores.** `K_e` is the subarc between `c_{v,e}` and `c_{w,e}`,
+  and the facts wanted of it are: compact, meets the two endpoint squares only
+  at its ends, meets no other vertex square, and distinct cores are disjoint.
+  All four are `Plane.subarc` plus B2 plus `arcs_meet_at_vertex`.
+- **B5 — the plane minus the open vertex squares is locally polygonally
+  connected.** Every point of `M` has a relative neighbourhood that is
+  polygonally connected, and there are exactly three shapes: a disk (away from
+  every square), a half-disk (against one side), a three-quarter disk (at a
+  corner). This is the case analysis the blueprint compresses into one
+  sentence, and it is genuinely new plane geometry — nothing in Layers 0–3
+  supplies it.
+- **B6 — polygonal connectivity one level up.** Layer 3 proved
+  `Plane.polygonal_connected` for a REGION of the plane and deliberately
+  skipped the general "locally path-connected carrier" formulation, on the
+  grounds that no consumer wanted the abstract version. **H6 is that
+  consumer.** The clopen argument is unchanged; what changes is that the
+  basic open piece is B5's three shapes instead of a ball, so `Plane.polygonal`
+  wants restating over a carrier with a polygonally-connected basis. Expect to
+  reuse `Plane.reachableFrom`, `_OpenIn`, `_ClosedIn` verbatim and to replace
+  only `Plane.segment_inside_of_open`.
+- **B7 — the ε-choices.** The cores are pairwise disjoint compacts with
+  disjoint finite endpoint sets on the square boundaries, so B1 over
+  `Plane.compact_separation` gives one `ε` making every
+  `O_e = {x ∈ M : dist(x, K_e) < ε}` pairwise disjoint and confining each
+  boundary contact to a small arc about the designated endpoint. `U_e` is the
+  component of `O_e` through `K_e`, relatively open by B5 + Layer 3's
+  "components of relatively open subsets of a locally path-connected set are
+  relatively open".
+- **B8 — the assembly.** Join `c_{v,e}` to `c_{w,e}` inside `U_e` by B6, then
+  join `v` to each `c_{v,e}` by the radial segment in the convex square `D_v`.
+  Distinct radials in one square meet only at `v`; radials meet replacement
+  cores only at the designated boundary points. Then discharge
+  `Plane.Graph.IsDrawing` for the new family, with `Plane.IsPolygonal` from
+  `Plane.IsPolygonal.of_polyline`.
+
+**Size, honestly: 2.5–5k lines**, with B5 and B6 the bulk — comparable to
+Layer 3's own headliner, which is what B6 re-proves. This is a multi-session
+build, and the pieces above are separable enough to land one at a time.
+
 > **Headliner H6 — `Plane.Graph.polygonal_redrawing`
 > (blueprint `lem:polygonal-redrawing`):** every finite plane graph is
 > isomorphic to one with polygonal edges.
