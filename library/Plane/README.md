@@ -106,10 +106,14 @@ have cost more than paying for it once.
   [curve.math](curve.math)
 - `Plane.subarc`, `Real.openUnitInterval`, `Plane.openArc` —
   [subarc.math](subarc.math)
+- `Plane.IsArcBetween` — an arc *between two named points*, the set-level
+  reading of an arc and the form most of the development speaks —
+  [curve.math](curve.math)
 - `Plane.lowerHalf`, `Plane.upperHalf`, `Plane.concatenate` —
   [concatenate.math](concatenate.math)
-- `Plane.IsArcBetween` — an arc *between two named points*, the form the
-  two-arcs theorem states — [twoarcs.math](twoarcs.math)
+- `Plane.IsAffineCoordinate`, `Plane.HalfPlane`, `Plane.square`,
+  `Plane.farRight` / `.farAbove` / `.farLeft` / `.farBelow`,
+  `Plane.beyondSquare` — [exterior.math](exterior.math)
 - `Plane.polyline`, `Plane.chainFrom`, and `Plane.IsPolygonal` —
   [polyline.math](polyline.math). A polygonal arc is built **from its vertex
   list** rather than existentially recovered from a union of segments:
@@ -245,6 +249,26 @@ have cost more than paying for it once.
   vertices, hence `Plane.IsPolygonal.of_polyline`; `Plane.polyline_arcStart`
   names where it begins. Both are proved with the start **generalised**, since
   the recursion moves it
+- **`Plane.IsArcBetween.concatenate`** and **`Plane.IsJordanCurve.of_two_arcs`**
+  — the set-level gluing theorems, and the form every construction of a curve
+  uses: two pieces meeting only where they are joined make one piece, and two
+  meeting at both of their ends make a Jordan curve (the converse of
+  `Plane.IsJordanCurve.two_arcs`). Their engine is `Plane.IsLoop.concatenate`,
+  whose seam analysis has two legitimate meeting points instead of one — the
+  middle, and the parameter where the loop is allowed to repeat itself.
+  `Plane.IsArcBetween.reverse` runs a piece the other way round, as
+  `Plane.subarc(_, 1, 0)`
+- **`Plane.beyondSquare_IsConnected`** — the plane outside a square is all one
+  piece ([exterior.math](exterior.math)). A SQUARE, not a disk: its outside is
+  exactly a union of four half-planes, each convex and hence connected, with
+  consecutive ones sharing a corner. The exterior of a *disk* is not a union
+  of half-planes, and cutting it into pieces that are would need the polar
+  decomposition this development withholds. `Plane.HalfPlane` is stated for an
+  arbitrary affine coordinate, so one convexity proof serves all four sides.
+  Alongside it, `Plane.square` as the shape a bounded set is caught inside
+  (`Plane.IsBounded.inside_square`, `Plane.unionOver_inside_square`), with
+  radii kept nonnegative so two squares merge by **adding** them — no maximum,
+  and no case split on which is larger
 
 ### Along one segment: the distance from an end as a coordinate
 

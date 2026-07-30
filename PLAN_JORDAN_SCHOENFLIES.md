@@ -640,9 +640,7 @@ and `Metric/finite_union.math` underneath. Area guide:
   indexed, so no face has to be produced before it is spoken about; a region,
   and the faces partition the exterior.
 
-**Deferred, deliberately.** The **outer face**: that exactly one face is
-unbounded needs the exterior of a large disk to be connected, which is a
-genuine plane fact and not a consequence of anything above.
+**The outer face was deferred here and is now DONE — see below.**
 
 ### Also done 2026-07-29: how two segments meet
 
@@ -865,12 +863,84 @@ the subdivision oriented and deduplicated (**done**).
 subdividing at all crossings and identifying duplicated subsegments
 (`lem:polygonal-overlay` — **done**, `Plane.polygonal_overlay`); segments meet
 in nothing, a point, or an interval (**done**, `Plane.segment_meet`); a plane
-graph realises an abstract finite graph (true by construction).
+graph realises an abstract finite graph (true by construction); the
+realisation of a cycle is a Jordan curve (**done**,
+`Plane.Graph.cycle_IsJordanCurve`); exactly one face is unbounded (**done**,
+`Plane.Graph.exists_outer_face` + `.outer_face_unique`).
 
 The graph form is done too — `Plane.polygonal_overlay_of_graphs`, over
 `Plane.graphEdges` and `Plane.edgeSet_is_piecesCover`. It covers the graphs'
 EDGE sets: an isolated vertex of one of them is not covered and could not be,
 since the overlay's vertices are the ends of its edges.
+
+### Done 2026-07-30: the realisation of a cycle is a Jordan curve
+
+`Plane.Graph.cycle_IsJordanCurve` (`Plane/Graph/cycle.math`). A cycle arrives
+as Layer 5 presents it — an edge, and a path between its two ends avoiding it
+— and the arcs of those edges cover a Jordan curve.
+
+**Settled: the argument is SET-LEVEL, and no parametrisation of a walk is
+built.** The plan's earlier note ("needs the edge arcs of a cycle concatenated
+in order") suggested a `walkArc` definition folding `Plane.concatenate` along
+the edge list. That is the wrong shape twice over: the empty-list base case is
+a CONSTANT map, which is not an arc, so the fold cannot be shown injective at
+the last step; and threading a parametrisation through the induction buys
+nothing, since every consumer wants the point set. Instead the existence of
+the arc is what the induction carries, in `Plane.IsArcBetween` — the same
+move that made `Plane.exists_cut_points` need no choice operator.
+
+What that needs, in `Plane/concatenate.math`:
+
+- **`Plane.IsLoop.concatenate`** — two arcs glued along BOTH of their ends
+  make a loop. Its seam analysis has two legitimate meeting points instead of
+  one: the middle, and the parameter where the loop is allowed to repeat
+  itself. That needed the start/finish counterparts of the midpoint pinning
+  lemmas (`Plane.lowerHalf_at_start_is_zero`,
+  `Plane.upperHalf_at_finish_is_one`).
+- **`Plane.IsArcBetween.concatenate`** and
+  **`Plane.IsJordanCurve.of_two_arcs`** — the set-level readings, and the
+  converse of `Plane.IsJordanCurve.two_arcs`. `Plane.IsArcBetween.reverse`
+  runs a piece the other way round, as `Plane.subarc(_, 1, 0)`, over the new
+  `Real.segment_one_zero`.
+- `Plane.IsArcBetween` moved from `Plane/twoarcs.math` to `Plane/curve.math`:
+  it is a basic notion about arcs and most of the layer speaks it.
+
+And in Layer 6: `Plane.Graph.edgesCover` (what a LIST of edges occupies —
+`edgeSet` is that at the graph's own list),
+`Plane.Graph.IsDrawing.edge_IsArcBetween`, and
+`Plane.Graph.IsDrawing.path_IsArcBetween`. The geometry enters exactly once,
+in `first_edge_meets_rest`: a common point of the first edge's arc and the
+rest is a vertex incident with both, and the path's own freshness clause
+forbids it being the source. Taking the same edge again is refused by the same
+clause, so `Graph.IsPath.distinct_edges` is not needed.
+
+### Done 2026-07-30: the outer face
+
+`Plane.Graph.exists_outer_face` and `Plane.Graph.outer_face_unique`
+(`Plane/Graph/outerface.math`) — exactly one face is unbounded.
+
+**Correction to the deferral above:** the plane fact needed is not "the
+exterior of a large DISK is connected". It is the exterior of a **square**,
+and that one is elementary: `|x₁| > r ∨ |x₂| > r` is exactly a union of four
+half-planes, each convex and hence connected, with consecutive ones sharing a
+corner. `Plane/exterior.math` does it in ~500 lines with no polar
+decomposition, no Cauchy–Schwarz and no arbitrary unions of connected sets.
+The disk version is what would have needed the traversal Layer 4 withholds.
+
+- `Plane.HalfPlane(coordinate, bound)` is stated for an arbitrary AFFINE
+  coordinate, so one convexity proof serves all four sides — the negated
+  coordinate is affine too, and "left of `-r`" is "beyond `r`" for `-x₁`.
+- `Plane.square(radius)` is the shape a bounded set is caught inside, with
+  radii kept **nonnegative** so two squares merge by ADDING them. No maximum,
+  no case split on which is larger, and the finite-union step
+  (`Plane.unionOver_inside_square`) is then a one-liner.
+- `Plane.Graph.pointSet_inside_square` carries the drawing: finitely many
+  points and finitely many compact arcs, through
+  `Plane.IsBounded.inside_square`.
+- Uniqueness is `Plane.unbounded_escapes_square`: an unbounded face reaches
+  past the square, so it is named by a point of the outside and therefore
+  swallows all of it. No face is produced as data — a face is named by a
+  point of it, as `Plane.Graph.face` has always been.
 
 > **Headliner H6 — `Plane.Graph.polygonal_redrawing`
 > (blueprint `lem:polygonal-redrawing`):** every finite plane graph is
@@ -955,11 +1025,16 @@ Flagging these rather than deciding them, per the always-apply rule.
 
 ## Frictions found so far
 
-`FRICTION_PLANE_LAYER6.md` — the running log from Layer 6. Two entries (L1:
-*destructuring* list membership is plumbing the auto-prover doesn't do —
-building one is already by-less; L2: an equation case refines the goal but not
-the hypotheses, so the arm opens with two spellings of one set), plus the note
-that nested module directories work with no build change.
+`FRICTION_PLANE_LAYER6.md` — the running log from Layer 6. L1 (*destructuring*
+list membership is plumbing the auto-prover doesn't do — building one is
+already by-less), L2 (an equation case refines the goal but not the
+hypotheses), L3 (`∉` in a forward reductio — **FIXED**), L4 (a disjunction goal
+makes the prover try the false side first), L5 (the matcher does not reduce a
+projection of a definition), L6 (`let` and membership one level down), L7 (a
+`⊆`-on-lists citation needs its premise hoisted, and the error blames the
+lemma's name instead), L8 (disjunction-introduction does not walk a nested
+union), plus the note that nested module directories work with no build
+change.
 
 `FRICTION_PLANE_LAYER0.md` — the running log from Layer 0, in
 `QUIRK.md`'s format. Section I is inequalities and is the priority: every

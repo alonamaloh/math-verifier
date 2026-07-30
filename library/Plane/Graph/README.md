@@ -69,6 +69,9 @@ subgraph, with the same family of arcs: `Graph.Joins` reads only the ambient
   `List.unionOver` over the graph's **own** vertex and edge lists, which is
   how finiteness is carried (`Lists/set_union.math`).
   `Plane.Graph.pointSet_subset` carries it down a subgraph.
+  `Plane.Graph.edgesCover(drawing, edgeList)` is the same union over an
+  arbitrary edge list — a walk, a path and a cycle each arrive as one — and
+  `edgeSet` is that at the graph's own list.
 - `Plane.Graph.exterior` — the complement, open by
   `Plane.Graph.complement_pointSet_IsOpen`. That reduces, through
   `MetricSpace.complement_unionOver_IsOpen`, to a point being closed and an
@@ -192,17 +195,61 @@ names draw the same points.
 | [subdivide.math](subdivide.math) | `Plane.subdivide`, `Plane.IsEndOf`, and the five properties |
 | [orient.math](orient.math) | `Plane.orientSegment` — one canonical name per segment |
 | [overlay.math](overlay.math) | separation, the cut points, `Plane.overlayGraph`, and `Plane.polygonal_overlay` |
+| [cycle.math](cycle.math) | the realisation of a cycle is a Jordan curve |
+| [outerface.math](outerface.math) | the drawing fits in a square, and exactly one face is unbounded |
 
 Each module opens with `convention E` and `convention ends`, as
 [`library/Graph/`](../../Graph/README.md) does, so a statement names the graph
 and the drawing and nothing else.
 
+## The realisation of a cycle
+
+**`Plane.Graph.cycle_IsJordanCurve`** ([cycle.math](cycle.math)) — the arcs of
+a cycle's edges cover a Jordan curve. A cycle arrives as Layer 5 presents it:
+an edge, and a path between that edge's two ends which does not use it.
+
+The argument is **set-level throughout**; no parametrisation of a walk is ever
+constructed. `Plane.IsArcBetween` is what a path is drawn by, and the two
+gluing theorems of [`Plane/concatenate.math`](../concatenate.math) do the
+work — `Plane.IsArcBetween.concatenate` and `Plane.IsJordanCurve.of_two_arcs`.
+The arcs are chosen inside the induction and their concatenation is chosen by
+the gluing theorem, exactly as `Plane.exists_cut_points` produces the
+overlay's cut points without naming them.
+
+- `Plane.Graph.IsDrawing.edge_IsArcBetween` — an edge is drawn by an arc
+  between its two ends, whichever way round the caller names them
+  (`Plane.IsArcBetween.reverse` supplies the other orientation).
+- `Plane.Graph.IsDrawing.path_IsArcBetween` — a path that goes anywhere at
+  all is drawn by an arc between its ends, covering exactly
+  `Plane.Graph.edgesCover` of its edges. The induction is on the path
+  derivation, with the singleton case split off inside the step.
+- `Plane.Graph.IsDrawing.first_edge_meets_rest` is where the geometry enters,
+  and it enters once: the first edge's arc meets the rest of the path only at
+  the waypoint, because a common point is a vertex incident with both edges
+  (`arcs_meet_at_vertex`) and the path's freshness clause forbids it being the
+  source. Taking the same edge again is refused by the same clause.
+
+## The outer face
+
+**Exactly one face is unbounded** ([outerface.math](outerface.math)), which
+Layer 6 had deferred. The plane fact it waits on is in
+[`Plane/exterior.math`](../exterior.math): the plane outside a **square** is
+connected, because that outside is exactly a union of four half-planes, each
+convex and hence connected, with consecutive ones sharing a corner. A disk
+would need the polar decomposition this development withholds.
+
+- `Plane.Graph.pointSet_inside_square` — the drawing is caught inside some
+  square: finitely many points and finitely many compact arcs, merged by
+  **adding** radii (`Plane.unionOver_inside_square`).
+- `Plane.Graph.beyondSquare_inside_face` — everything beyond that square lies
+  in one face, since it is a connected part of the exterior.
+- `Plane.Graph.exists_outer_face` and `Plane.Graph.outer_face_unique`. No face
+  is ever produced as data: a face is named by a point of it, as
+  `Plane.Graph.face` has always been. Uniqueness is
+  `Plane.unbounded_escapes_square` — an unbounded face reaches past the
+  square, so it is named by a point of the outside and swallows all of it.
+
 ## Not built yet
 
-- **The outer face.** That exactly one face is unbounded needs the exterior
-  of a large disk to be connected — a genuine plane fact that nothing here
-  supplies.
 - **H6, polygonal redrawing** — every finite plane graph is isomorphic to
   one with polygonal edges.
-- **The realisation of a cycle is a Jordan curve.** Needs the edge arcs of a
-  cycle concatenated in order.

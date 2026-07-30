@@ -326,3 +326,84 @@ Recorded rather than worked around: the `let` is house style (it names the
 object under construction, and the alternative is a three-line term repeated
 at every membership claim), and one extra line per claim is a small price.
 Related to L1 — building a membership is free only at the head.
+
+## L7 — a `⊆`-on-lists citation needs its premise hoisted, and the error blames the wrong thing
+
+**Symptom.** In `Plane.Graph.IsDrawing.path_IsArcBetween`, inside the step
+case of an induction on a path derivation, with
+`restPath : Graph.IsPath(graph, waypoint, rest, stepTarget)` among the case
+binders:
+
+```math
+rest ⊆ Graph.edges(graph) by Graph.IsPath.edge_is_edge;   -- REJECTED
+```
+
+```
+its conclusion is about `List.memberOf` but the goal is about `List.Includes`
+  — this lemma does not target this goal (check the lemma name)
+```
+
+The lemma's conclusion *is* `List.Includes(edgeList, Graph.edges(graph))`,
+which is what the goal is; the message is printed after the matcher has
+δ-unfolded `List.Includes` on one side only and compared heads. Adding the
+premise as its own line fixes it:
+
+```math
+Graph.IsPath(graph, waypoint, rest, stepTarget);
+rest ⊆ Graph.edges(graph) by Graph.IsPath.edge_is_edge;   -- ACCEPTED
+```
+
+**Why it bites.** Hoisting the premise is the documented recipe
+(`docs/style.md`, "hoist the premises, then cite bare"), so the *fix* is
+house style and the cost is one line. The friction is the diagnosis: it says
+the lemma is the wrong lemma and tells the author to check its name, when the
+lemma is right and the missing thing is a premise the matcher could not
+discharge. Nothing in the message mentions premises. Compare the message the
+same matcher prints elsewhere — *"the conclusion shape fits, but an argument
+could not be inferred from the goal or a premise discharged from context"* —
+which is the accurate one; the `List.Includes` case takes a different branch
+and prints the misleading one.
+
+**Suggested fix.** Compare heads only after unfolding both sides, or not at
+all when the lemma's conclusion is a transparent definition; and reserve
+"check the lemma name" for a genuine head mismatch.
+
+## L8 — disjunction-introduction does not walk a nested union
+
+**Symptom.** With
+
+```math
+definition Plane.beyondSquare (radius : ℝ) : Set(Plane.Point) :=
+  ((Plane.farRight(radius) ∪ Plane.farAbove(radius)) ∪ Plane.farLeft(radius))
+      ∪ Plane.farBelow(radius)
+```
+
+and `x ∈ Plane.farRight(radius)` in context, the claim
+`x ∈ Plane.beyondSquare(radius)` is not closed: the prover reports "no
+in-scope hypothesis matches structurally" and offers `Set` lemmas about
+complements and intersections. Spelling the two intermediate unions closes
+it:
+
+```math
+x ∈ Plane.farRight(radius) ∪ Plane.farAbove(radius);
+x ∈ (Plane.farRight(radius) ∪ Plane.farAbove(radius)) ∪ Plane.farLeft(radius);
+done
+```
+
+**What the library does about it.** Four one-line theorems,
+`Plane.farRight_beyondSquare` and its three siblings, so the walk is paid for
+once. That is worth having anyway — the side names are what the argument
+speaks — so the cost was small, but the shape recurs at every union of more
+than two sets.
+
+Same family as L4: the disjunction machinery is a single rung, and it neither
+recurses nor reports which disjunct it tried.
+
+**Not a friction, but worth recording.** A bare stated inequality can come
+back wearing a local definition's clothes. `radius < -(-reach)`, stated in
+`Plane.beyondSquare_IsUnbounded` to feed a `Plane.farLeft` membership, is
+reported in a later context dump as
+`Plane.HalfPlane Real.negate radius (-reach)` — the elaborator folded the
+inequality into the definition that happened to match it. Harmless, and the
+proof is unaffected, but a hypothesis list that renames the author's own
+claims is hard to read.
