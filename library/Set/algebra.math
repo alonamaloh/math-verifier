@@ -214,6 +214,39 @@ theorem Set.union_commutative {T : Type(0)} (left right : Set(T))
   done by Set.equal_of_same_members
 }
 
+-- De Morgan: to miss a union is to miss both sides. This is what turns a
+-- statement about a finite union being closed into one about an
+-- intersection of open complements.
+theorem Set.complement_union {T : Type(0)} (left right : Set(T))
+        : Set.complement(left ∪ right)
+              = Set.complement(left) ∩ Set.complement(right) := {
+  Set.complement(left ∪ right) ⊆ Set.complement(left) ∩ Set.complement(right)
+      by (subject : T) (outside : subject ∈ Set.complement(left ∪ right)) ↦ {
+        ¬(subject ∈ left ∪ right);
+        subject ∈ Set.complement(left)
+            by { suppose subject ∈ left as inLeft;
+                 subject ∈ left ∨ subject ∈ right;
+                 done };
+        subject ∈ Set.complement(right)
+            by { suppose subject ∈ right as inRight;
+                 subject ∈ left ∨ subject ∈ right;
+                 done };
+        done
+      };
+  Set.complement(left) ∩ Set.complement(right) ⊆ Set.complement(left ∪ right)
+      by (subject : T) (outsideBoth : subject ∈ Set.complement(left) ∩ Set.complement(right)) ↦ {
+        ¬(subject ∈ left);
+        ¬(subject ∈ right);
+        suppose subject ∈ left ∪ right as inEither;
+        subject ∈ left ∨ subject ∈ right;
+        done by cases {
+          case subject ∈ left: done
+          case subject ∈ right: done
+        }
+      };
+  done by Set.equal_of_same_members
+}
+
 theorem Set.intersection_commutative {T : Type(0)} (left right : Set(T))
         : left ∩ right = right ∩ left := {
   left ∩ right ⊆ right ∩ left

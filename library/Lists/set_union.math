@@ -1,0 +1,103 @@
+-- Lists/set_union.math
+--
+-- `List.unionOver(pieces, list)` — the union of a family of sets over the
+-- members of a list. The finite union, with the finiteness carried by a
+-- list rather than by an indexing predicate, which is what the plane
+-- development wants: the point set of a plane graph is the union of its
+-- edge arcs over the graph's own edge list.
+--
+-- Written as a recursion rather than as the comprehension
+-- `∃ item ∈ list. x ∈ pieces(item)`, because every theorem about a finite
+-- union is proved by induction on the list and the recursion is what makes
+-- each step a two-set statement. The comprehension reading is recovered by
+-- `List.unionOver_member` / `.member_invert`.
+
+module Lists.set_union
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Set.algebra
+import Lists.list
+
+definition List.unionOver {A T : Type(0)} (pieces : A → Set(T))
+        : List(A) → Set(T)
+  | List.empty               => Set.empty(T)
+  | List.prepend(head, tail) => pieces(head) ∪ List.unionOver(pieces, tail)
+
+-- ── The two characterizing equations ──────────────────────────────────
+
+theorem List.unionOver_empty (A T : Type(0)) (pieces : A → Set(T))
+        : List.unionOver(pieces, List.empty(A)) = Set.empty(T) :=
+  done
+
+theorem List.unionOver_prepend (A T : Type(0)) (pieces : A → Set(T))
+        (head : A) (tail : List(A))
+        : List.unionOver(pieces, List.prepend(A, head, tail))
+          = pieces(head) ∪ List.unionOver(pieces, tail) :=
+  done
+
+-- ── The comprehension reading ─────────────────────────────────────────
+
+-- A member of one piece is a member of the union.
+theorem List.unionOver_member (A T : Type(0)) (pieces : A → Set(T))
+        (list : List(A)) (item : A) (isMember : item ∈ list)
+        (x : T) (inPiece : x ∈ pieces(item))
+        : x ∈ List.unionOver(pieces, list) :=
+  by induction on list with IH {
+    case list = List.empty:
+        done by List.no_member_empty
+    case list = List.prepend(head, tail) for some head, tail:
+        done by cases {
+          case item = head: {
+              x ∈ pieces(head) by substituting (item = head);
+              done
+            }
+          otherwise: {
+              item ∈ tail by List.member_of_prepend_not_head;
+              x ∈ List.unionOver(pieces, tail) by IH;
+              done
+            }
+        }
+  }
+
+-- And conversely: a member of the union came from one of the pieces.
+theorem List.unionOver_member_invert (A T : Type(0)) (pieces : A → Set(T))
+        (list : List(A)) (x : T) (inUnion : x ∈ List.unionOver(pieces, list))
+        : ∃ (item : A). item ∈ list ∧ x ∈ pieces(item) :=
+  by induction on list with IH {
+    case list = List.empty:
+        done
+    case list = List.prepend(head, tail) for some head, tail:
+        done by cases {
+          case x ∈ pieces(head): {
+              head ∈ List.prepend(A, head, tail);
+              witness head
+            }
+          case x ∈ List.unionOver(pieces, tail): {
+              choose item such that item ∈ tail ∧ x ∈ pieces(item) from IH;
+              item ∈ tail;
+              item ∈ List.prepend(A, head, tail);
+              x ∈ pieces(item);
+              witness item
+            }
+        }
+  }
+
+-- ── Monotonicity ──────────────────────────────────────────────────────
+
+-- Enlarging the pieces enlarges the union.
+theorem List.unionOver_subset (A T : Type(0)) (pieces : A → Set(T))
+        (list : List(A)) (larger : Set(T))
+        (piecesInside : ∀ (item : A). item ∈ list → pieces(item) ⊆ larger)
+        : List.unionOver(pieces, list) ⊆ larger := {
+  take x : T;
+  suppose x ∈ List.unionOver(pieces, list);
+  choose item such that item ∈ list ∧ x ∈ pieces(item)
+      from List.unionOver_member_invert;
+  item ∈ list;
+  pieces(item) ⊆ larger by piecesInside;
+  x ∈ pieces(item);
+  done
+}

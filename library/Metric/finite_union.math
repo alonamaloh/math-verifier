@@ -1,0 +1,155 @@
+-- Metric/finite_union.math
+--
+-- Complements of closed sets, and the finite union.
+--
+-- "Closed" is spelled `Closure(region) ⊆ region` throughout `Metric/` —
+-- the sequential form. What consumers want from it is that the complement
+-- is OPEN, and that is the one place where the negation of "every ball
+-- meets the set" has to be taken classically. It is taken once, here.
+--
+-- The finite union is indexed by a LIST (`List.unionOver`), because that
+-- is how the plane development carries finiteness: the point set of a
+-- plane graph is a union over the graph's own vertex and edge lists. The
+-- induction never has to name a radius — each step is
+-- `OpenIn.intersection` after De Morgan.
+
+module Metric.finite_union
+
+import Logic.basics
+import Logic.exists
+import Logic.excluded_middle
+import Equality.basics
+import axioms
+import Set.basics
+import Set.algebra
+import Lists.list
+import Lists.set_union
+import Real.interface
+import Real.order
+import Metric.space
+import Metric.topology
+import Metric.compactness
+
+-- ----------------------------------------------------------------------
+-- The complement of a closed set is open.
+
+theorem MetricSpace.complement_IsOpen (m : MetricSpace) (region : Set(m))
+        (closed : MetricSpace.Closure(region) ⊆ region)
+        : MetricSpace.IsOpen(Set.complement(region)) := {
+  ∀ (x : m). x ∈ Set.complement(region) →
+      ∃ (radius : ℝ). radius > 0 ∧
+        ∀ (y : m). distance(x, y) < radius → y ∈ Set.complement(region)
+      by { take x : m;
+           suppose x ∈ Set.complement(region);
+           ¬(x ∈ region);
+           -- Were every ball to meet the region, `x` would be in its
+           -- closure, hence in the region itself.
+           ¬(∀ (scale : ℝ). scale > 0 →
+                 ∃ (y : m). y ∈ region ∧ distance(x, y) < scale)
+               by { suppose ∀ (scale : ℝ). scale > 0 →
+                        ∃ (y : m). y ∈ region ∧ distance(x, y) < scale
+                        as everyBallMeets;
+                    x ∈ MetricSpace.Closure(region)
+                        by MetricSpace.Closure.of_meets_every_ball;
+                    x ∈ region by closed;
+                    done };
+           choose radius : ℝ such that
+               ¬(radius > 0 →
+                   ∃ (y : m). y ∈ region ∧ distance(x, y) < radius)
+               from Logic.not_forall_implies_exists_not;
+           radius > 0
+               ∧ ¬(∃ (y : m). y ∈ region ∧ distance(x, y) < radius)
+               by Logic.not_implies_implies_and_not;
+           radius > 0;
+           ¬(∃ (y : m). y ∈ region ∧ distance(x, y) < radius);
+           ∀ (y : m). distance(x, y) < radius → y ∈ Set.complement(region)
+               by { take y : m;
+                    suppose distance(x, y) < radius;
+                    suppose y ∈ region as inRegion;
+                    ∃ (z : m). z ∈ region ∧ distance(x, z) < radius
+                        by { witness y };
+                    done };
+           witness radius };
+  done by MetricSpace.IsOpen.of_ball_inside
+}
+
+-- ----------------------------------------------------------------------
+-- The two sets a finite union is built from.
+
+theorem MetricSpace.Closure.empty_subset (m : MetricSpace)
+        : MetricSpace.Closure(Set.empty(m)) ⊆ Set.empty(m) := {
+  take x : m;
+  suppose x ∈ MetricSpace.Closure(Set.empty(m));
+  (1 : ℝ) > 0;
+  choose y such that y ∈ Set.empty(m) ∧ distance(x, y) < 1
+      from MetricSpace.Closure.meets_every_ball;
+  y ∈ Set.empty(m);
+  done
+}
+
+-- A single point is closed: if `x` were a different point, the ball of
+-- radius `distance(x, point)` about `x` would have to contain `point`.
+theorem MetricSpace.Closure.singleton_subset (m : MetricSpace) (point : m)
+        : MetricSpace.Closure(Set.singleton(m, point))
+              ⊆ Set.singleton(m, point) := {
+  take x : m;
+  suppose x ∈ MetricSpace.Closure(Set.singleton(m, point));
+  suppose x ≠ point for contradiction {
+    distance(x, point) ≥ 0 by MetricSpace.distance_nonneg;
+    distance(x, point) ≠ 0
+        by { suppose distance(x, point) = 0 as vanishes;
+             x = point by MetricSpace.equal_of_distance_zero;
+             done };
+    distance(x, point) > 0;
+    choose y such that
+        y ∈ Set.singleton(m, point) ∧ distance(x, y) < distance(x, point)
+        from MetricSpace.Closure.meets_every_ball;
+    y = point;
+    distance(x, y) < distance(x, point);
+    distance(x, point) < distance(x, point) by substituting (y = point);
+    done
+  };
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- A finite union of closed sets is closed, in the form consumers want it:
+-- its complement is open.
+
+theorem MetricSpace.complement_unionOver_IsOpen (A : Type(0)) (m : MetricSpace)
+        (pieces : A → Set(m)) (list : List(A))
+        (piecesClosed : ∀ (item : A). item ∈ list →
+            MetricSpace.Closure(pieces(item)) ⊆ pieces(item))
+        : MetricSpace.IsOpen(Set.complement(List.unionOver(pieces, list))) :=
+  by induction on list with IH {
+    case list = List.empty: {
+        MetricSpace.Closure(Set.empty(m)) ⊆ Set.empty(m)
+            by MetricSpace.Closure.empty_subset;
+        done by MetricSpace.complement_IsOpen
+      }
+    case list = List.prepend(head, tail) for some head, tail: {
+        head ∈ List.prepend(A, head, tail) by List.member.here;
+        MetricSpace.Closure(pieces(head)) ⊆ pieces(head) by piecesClosed;
+        MetricSpace.IsOpen(Set.complement(pieces(head)))
+            by MetricSpace.complement_IsOpen;
+        ∀ (item : A). item ∈ tail →
+            MetricSpace.Closure(pieces(item)) ⊆ pieces(item)
+            by { take item : A;
+                 suppose item ∈ tail;
+                 item ∈ List.prepend(A, head, tail) by List.member.there;
+                 done by piecesClosed };
+        MetricSpace.IsOpen(Set.complement(List.unionOver(pieces, tail))) by IH;
+        MetricSpace.IsOpen(
+            Set.complement(pieces(head))
+                ∩ Set.complement(List.unionOver(pieces, tail)))
+            by MetricSpace.OpenIn.intersection;
+        Set.complement(pieces(head) ∪ List.unionOver(pieces, tail))
+            = Set.complement(pieces(head))
+                  ∩ Set.complement(List.unionOver(pieces, tail))
+            by Set.complement_union;
+        done by substituting (
+            Set.complement(pieces(head) ∪ List.unionOver(pieces, tail))
+                = Set.complement(pieces(head))
+                      ∩ Set.complement(List.unionOver(pieces, tail)))
+      }
+  }
