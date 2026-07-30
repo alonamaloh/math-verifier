@@ -127,6 +127,9 @@ theorem Plane.IsLoop.pieces_meet_at_ends (loop : ℝ → Plane.Point) (isLoop : 
               ∩ (Set.image(loop, Real.segment(0, s))
                      ∪ Set.image(loop, Real.segment(t, 1)))
               = Set.singleton(Plane.Point, loop(s)) ∪ Set.singleton(Plane.Point, loop(t)) := {
+  -- The two points the curve is cut at, which is all the pieces may share.
+  let firstCut : Set(Plane.Point) := Set.singleton(Plane.Point, loop(s));
+  let secondCut : Set(Plane.Point) := Set.singleton(Plane.Point, loop(t));
   Real.IsConvex(Real.unitInterval) by Real.unitInterval_IsConvex;
   (0 : ℝ) ∈ Real.unitInterval by Real.zero_in_unitInterval;
   (1 : ℝ) ∈ Real.unitInterval by Real.one_in_unitInterval;
@@ -144,7 +147,7 @@ theorem Plane.IsLoop.pieces_meet_at_ends (loop : ℝ → Plane.Point) (isLoop : 
   Set.image(loop, Real.segment(s, t))
       ∩ (Set.image(loop, Real.segment(0, s))
              ∪ Set.image(loop, Real.segment(t, 1)))
-      ⊆ Set.singleton(Plane.Point, loop(s)) ∪ Set.singleton(Plane.Point, loop(t))
+      ⊆ firstCut ∪ secondCut
       by {
         take z : Plane.Point;
         suppose z ∈ Set.image(loop, Real.segment(s, t))
@@ -178,7 +181,7 @@ theorem Plane.IsLoop.pieces_meet_at_ends (loop : ℝ → Plane.Point) (isLoop : 
               middle = s by Real.LessOrEqual.antisymmetric;
               loop(s) = z by substituting (middle = s);
               z = loop(s);
-              z ∈ Set.singleton(Plane.Point, loop(s));
+              z ∈ firstCut;
               done
             }
           case z ∈ Set.image(loop, Real.segment(t, 1)) as onBack: {
@@ -205,7 +208,7 @@ theorem Plane.IsLoop.pieces_meet_at_ends (loop : ℝ → Plane.Point) (isLoop : 
                     middle = s;
                     loop(s) = z by substituting (middle = s);
                     z = loop(s);
-                    z ∈ Set.singleton(Plane.Point, loop(s));
+                    z ∈ firstCut;
                     done
                   }
                 otherwise as beforeFinish: {
@@ -215,7 +218,7 @@ theorem Plane.IsLoop.pieces_meet_at_ends (loop : ℝ → Plane.Point) (isLoop : 
                     middle = t by Real.LessOrEqual.antisymmetric;
                     loop(t) = z by substituting (middle = t);
                     z = loop(t);
-                    z ∈ Set.singleton(Plane.Point, loop(t));
+                    z ∈ secondCut;
                     done
                   }
               }
@@ -231,16 +234,16 @@ theorem Plane.IsLoop.pieces_meet_at_ends (loop : ℝ → Plane.Point) (isLoop : 
   loop(t) ∈ Set.image(loop, Real.segment(s, t)) by { witness t };
   loop(s) ∈ Set.image(loop, Real.segment(0, s)) by { witness s };
   loop(t) ∈ Set.image(loop, Real.segment(t, 1)) by { witness t };
-  Set.singleton(Plane.Point, loop(s)) ∪ Set.singleton(Plane.Point, loop(t))
+  firstCut ∪ secondCut
       ⊆ Set.image(loop, Real.segment(s, t))
             ∩ (Set.image(loop, Real.segment(0, s))
                    ∪ Set.image(loop, Real.segment(t, 1)))
       by {
         take z : Plane.Point;
-        suppose z ∈ Set.singleton(Plane.Point, loop(s))
-                      ∪ Set.singleton(Plane.Point, loop(t));
+        suppose z ∈ firstCut
+                      ∪ secondCut;
         done by cases {
-          case z ∈ Set.singleton(Plane.Point, loop(s)) as atStart: {
+          case z ∈ firstCut as atStart: {
               z = loop(s);
               z ∈ Set.image(loop, Real.segment(s, t))
                   by substituting (z = loop(s));
@@ -250,7 +253,7 @@ theorem Plane.IsLoop.pieces_meet_at_ends (loop : ℝ → Plane.Point) (isLoop : 
                   ∪ Set.image(loop, Real.segment(t, 1));
               done
             }
-          case z ∈ Set.singleton(Plane.Point, loop(t)) as atEnd: {
+          case z ∈ secondCut as atEnd: {
               z = loop(t);
               z ∈ Set.image(loop, Real.segment(s, t))
                   by substituting (z = loop(t));
