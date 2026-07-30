@@ -26,6 +26,16 @@ static long long autoProveWarnMillisValue() {
     return value;
 }
 
+static int contextEqualityBridgeProveCap() {
+    static const int value = [] {
+        if (const char* w = std::getenv("MATH_CTX_EQ_BRIDGE_PROVES")) {
+            try { return std::stoi(w); } catch (...) { return 0; }
+        }
+        return 0;
+    }();
+    return value == 0 ? 1000000 : value;
+}
+
 // Warn threshold for an expensive-but-successful by-less auto-prove, in
 // kernel reduction steps. Overridable via MATH_AUTOPROVE_WARN (0
 // disables). Default picked from the library's step distribution: well
@@ -1913,6 +1923,7 @@ ExpressionPointer Elaborator::tryContextEqualityBridge(
         // a low effort cap first finds that winner before a loser can spend
         // the full budget. Completeness is unaffected: pass 2 is the old
         // pass 1, unchanged.
+        int recursiveProvesLeft = contextEqualityBridgeProveCap();
         for (int pass = 0; pass < 2; ++pass) {
           bool fastOnly = (pass == 0);
           for (const ContextEquality& eq : equalities) {
@@ -2008,6 +2019,8 @@ ExpressionPointer Elaborator::tryContextEqualityBridge(
                     // Pass 0 does the cheap close ONLY — let a later equation
                     // (or pass 1) handle anything that needs the real search.
                     if (fastOnly) continue;
+                    if (recursiveProvesLeft <= 0) continue;
+                    --recursiveProvesLeft;
                     try {
                         proofRewritten = autoProveClaim(
                             rewrittenGoal, localBinders,

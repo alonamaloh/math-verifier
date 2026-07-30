@@ -281,14 +281,43 @@ Measured on `Metric/connected.math`, where the bridge is 74 invocations,
   then fail): caps of 1 / 2 / 3 break **4 / 6 / 6** library files, and a cap of
   6 keeps them green while giving **no speedup at all** (14.68 s).
 
-Four discriminators, all budgets — kernel steps, passes, prove counts — and
-all fail identically. That is the finding:
+**CORRECTION — the prove-cap numbers above were an artefact.** Env vars are not
+part of the `.mathv` cache key, and the runs used `make` without `-k`, so a
+failure blocked its dependents, which were then attempted for the first time in
+the NEXT run. The counts were a function of the build state, not of the cap.
+Re-measured with a full `touch` and `make -k`, the counts are monotonic, as
+they must be, and far larger:
 
-> The searches that must be allowed and the searches that waste time are **not
-> separated by how much they cost.** A bound cheap enough to cut the waste
-> removes wins; a bound loose enough to keep the wins cuts nothing.
+| prove cap | distinct files failing |
+| --- | --- |
+| 1 | **35** |
+| 3 | 16 |
+| 6 | 3 |
 
-Tuning is therefore ruled out for this rung. The design options that remain —
+Cap 1 is worth 14.9 s → 6.4 s on `Metric/connected.math` (2.3×). Cap 6 is
+nearly green but buys nothing.
+
+**And the three sites that survive to cap 6 are proofs that should be rewritten
+anyway.** `Natural/distance.math:161` was
+
+```math
+k ≤ m + Natural.distance(k, m) by IH(m);
+done by Natural.successor_less_or_equal_successor
+```
+
+— which silently asks the prover to find `distance(1+k, 1+m) = distance(k, m)`
+and an associativity shuffle. Written out, naming
+`Natural.distance_succ_succ` and the successor step, the proof says what it
+does, still verifies uncapped, and **passes at cap 1**.
+
+So the earlier conclusion was too pessimistic. A bound cheap enough to cut the
+waste does remove wins — but the wins it removes are mostly steps that are
+UNDER-SPECIFIED, and writing them out is an improvement by the project's own
+standard, not a workaround. The tradeoff is real (cap 1 needs ~35 files
+revisited) but it is a sweep with a payoff at each site, not a wall.
+
+What remains true: no cap value is simultaneously green and valuable *without*
+that sweep. The design options that remain —
 a restricted `by … using [lemmas]`, a directed non-searching rewrite, and
 congruence closure — are in `PLAN_CHEAP_TACTICS.md`.
 
