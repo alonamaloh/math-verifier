@@ -18,6 +18,8 @@ for Zhuk's theorem on the left centre of a subdirect relation.
   `Universal.Term.substitute`.
 - `Universal.generated` — the least subuniverse containing a set, and
   `Universal.Signature.HasNoConstants`, in [generated.math](generated.math).
+- `Universal.termValues` — the values of terms whose variables range over a set,
+  in [generation.math](generation.math).
 
 ## Main theorems
 
@@ -31,6 +33,9 @@ for Zhuk's theorem on the left centre of a subdirect relation.
   and `.empty` — the characterising facts. Because a set is a predicate,
   "least subuniverse containing `base`" is directly definable as quantification
   over the subuniverses that contain it, so no closure construction is needed.
+- `Universal.generated_eq_termValues` — the generated subuniverse is exactly the
+  term values. The variable type is the generating set itself, so no enumeration
+  of the generators appears anywhere.
 
 ## Two representation choices
 
