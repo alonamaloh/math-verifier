@@ -1,0 +1,115 @@
+-- Universal/signature.math
+--
+-- Signatures and algebras: the vocabulary of universal algebra, on which the
+-- development of Zhuk's centres rests.
+--
+-- A signature assigns to each arity a type of operation symbols. Indexing BY
+-- arity, rather than carrying an arity function on one symbol type, makes the
+-- arity definitional wherever a symbol is used: an operation's argument tuple
+-- has type `NaturalsBelow(arity) → carrier`, with no dependency on the symbol.
+-- That is what lets `Universal.Term` be declared directly, with its arguments a
+-- function into the term type, rather than through a list-plus-length encoding.
+--
+-- An algebra bundles its carrier with the interpretation, mirroring
+-- `Algebra/group_bundle.math`: one value threads where a carrier and an
+-- interpretation would otherwise be passed separately at every call. As there,
+-- the dependent projection is written with a destructuring `let ⟨…⟩ := a in …`,
+-- since its result type mentions `Universal.Algebra.carrier(a)`.
+--
+-- Subuniverses are subsets, not bundled algebras. This follows the blueprint,
+-- which defines absorption relative to a pair of subuniverses with the ambient
+-- algebra suppressed, and so never needs a subalgebra-as-an-algebra
+-- construction.
+
+module Universal.signature
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Logic.functions
+import Set.basics
+import Set.algebra
+import Set.subtype
+import Set.finite
+
+-- A family of operation-symbol types, indexed by arity.
+definition Universal.Signature : Type(1) :=
+  ℕ → Type(0)
+
+-- A carrier together with an interpretation of every operation symbol.
+inductive Universal.Algebra (signature : Universal.Signature) : Type(1) where
+  | Universal.Algebra.make
+      : (carrier : Type(0))
+        → (interpret :
+             (arity : ℕ)
+             → signature(arity)
+             → (NaturalsBelow(arity) → carrier)
+             → carrier)
+        → Universal.Algebra(signature)
+
+definition Universal.Algebra.carrier {signature : Universal.Signature}
+        : Universal.Algebra(signature) → Type(0)
+  | Universal.Algebra.make(carrier, interpret) => carrier
+
+-- The algebra is implicit: it is recovered from the argument tuple's type, so a
+-- call site reads `Universal.Algebra.interpret(arity, symbol, arguments)`.
+definition Universal.Algebra.interpret {signature : Universal.Signature}
+        {a : Universal.Algebra(signature)}
+        : (arity : ℕ)
+          → signature(arity)
+          → (NaturalsBelow(arity) → Universal.Algebra.carrier(a))
+          → Universal.Algebra.carrier(a) :=
+  let ⟨carrier, interpret⟩ := a in
+    interpret
+
+-- Every operation fixes the constant tuples.
+definition Universal.Algebra.IsIdempotent {signature : Universal.Signature}
+        (a : Universal.Algebra(signature)) : Proposition :=
+  ∀ (arity : ℕ). ∀ (symbol : signature(arity)).
+    ∀ (element : Universal.Algebra.carrier(a)).
+      Universal.Algebra.interpret(arity, symbol,
+                                   (index : NaturalsBelow(arity)) ↦ element)
+        = element
+
+-- A subset closed under every operation.
+definition Universal.IsSubuniverse {signature : Universal.Signature}
+        (a : Universal.Algebra(signature))
+        (subset : Set(Universal.Algebra.carrier(a))) : Proposition :=
+  ∀ (arity : ℕ). ∀ (symbol : signature(arity)).
+    ∀ (arguments : NaturalsBelow(arity) → Universal.Algebra.carrier(a)).
+      (∀ (index : NaturalsBelow(arity)). arguments(index) ∈ subset)
+      → Universal.Algebra.interpret(arity, symbol, arguments) ∈ subset
+
+-- The whole carrier is a subuniverse.
+theorem Universal.IsSubuniverse.universe {signature : Universal.Signature}
+        (a : Universal.Algebra(signature))
+        : Universal.IsSubuniverse(a, Set.universe(Universal.Algebra.carrier(a))) := {
+  take arity : ℕ;
+  take symbol : signature(arity);
+  take arguments : NaturalsBelow(arity) → Universal.Algebra.carrier(a);
+  suppose ∀ (index : NaturalsBelow(arity)).
+      arguments(index) ∈ Set.universe(Universal.Algebra.carrier(a));
+  done
+}
+
+-- In an idempotent algebra every singleton is a subuniverse: the arguments are
+-- all that one element, so the operation returns it.
+theorem Universal.IsSubuniverse.singleton {signature : Universal.Signature}
+        (a : Universal.Algebra(signature))
+        (idempotent : Universal.Algebra.IsIdempotent(a))
+        (element : Universal.Algebra.carrier(a))
+        : Universal.IsSubuniverse(a,
+            Set.singleton(Universal.Algebra.carrier(a), element)) := {
+  take arity : ℕ;
+  take symbol : signature(arity);
+  take arguments : NaturalsBelow(arity) → Universal.Algebra.carrier(a);
+  suppose ∀ (index : NaturalsBelow(arity)).
+      arguments(index) ∈ Set.singleton(Universal.Algebra.carrier(a), element);
+  arguments = ((index : NaturalsBelow(arity)) ↦ element)
+      by Function.extensionality;
+  Universal.Algebra.interpret(arity, symbol, arguments)
+     = Universal.Algebra.interpret(arity, symbol,
+         ((index : NaturalsBelow(arity)) ↦ element))
+     = element;
+  done
+}

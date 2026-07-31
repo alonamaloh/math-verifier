@@ -2277,3 +2277,28 @@ all three free and the file warning-clean. So the workaround is real but it
 constrains how a bundled proposition may be written, which is exactly the
 kind of "equal spellings treated differently" this project tries to remove.
 Worth fixing at the source: let the projection descend more than one level.
+
+**OPEN — a parse error reports its position in prose, not in the
+`file:line:column:` prefix.** A misplaced `by` inside an induction block
+produced:
+
+```
+library/Universal/term.math:1:1: parse error: expected '}' ending 'by induction' block at line 87, column 9 (got 'by')
+```
+
+The prefix says `1:1`, so an editor jumping to the error lands on the
+module's first line, and the real position has to be read out of the
+message text. Every other diagnostic in the system carries the true
+position in the prefix, which is why this one stands out. It should read:
+
+```
+library/Universal/term.math:87:9: parse error: expected '}' ending 'by induction' block (got 'by')
+```
+
+The position is already in hand — it is being formatted into the message
+instead of into the prefix. The three sites are `src/main.cpp:5136`,
+`:6490` and the `deps` reporter at `:6141`, all of which hardcode `:1:1:`;
+`ParseError` (`src/syntax/parser.hpp:9`) would need to carry line and
+column so the callers can use them.
+
+Cheap, and it pays back on every parse error thereafter.
