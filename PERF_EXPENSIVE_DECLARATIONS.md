@@ -379,6 +379,47 @@ which phase of `elaborateClaimBySubstitution` holds the 9.8 s** before
 optimising anything. Both failed attempts below came from acting ahead of
 that measurement.
 
+## Where things stand (2026-07-30, end of the cap-3 sweep)
+
+All three runs under `make -j 16`, so they compare with each other:
+
+| | claims | total self | top 10 |
+| --- | --- | --- | --- |
+| session start | 2537 | **1087.0 s** | 499.1 s |
+| after the `by substituting` cheap-prover pass | 2757 | 909.6 s | 296.9 s |
+| after the cap-3 proof sweep | 2536 | **815.2 s** | 295.9 s |
+
+Total is down **25%**, the top 10 down **41%**.
+
+Note what the second step buys: the sweep wrote twelve proofs out explicitly and
+that alone took the **uncapped** build from 910 s to 815 s. The cap was never
+enabled by default — the proofs simply give the elaborator less to search for.
+Readability and speed were the same work.
+
+`by substituting` no longer appears anywhere in the top 12; that family is
+closed.
+
+Current slowest claims:
+
+| ms | declaration | line | hint | closed by |
+| --- | --- | --- | --- | --- |
+| 48 453 | `Plane.Graph.overlay subdivide_common_segment` | 248 | `by <proof>` | `localFactExactMatch` |
+| 47 327 | `Plane.Graph.overlay subdivide_common_segment` | 251 | `by <proof>` | *nothing* |
+| 40 249 | `Plane.Graph.overlay subdivide_separated` | 323 | `by <proof>` | `contextEqualityBridge` |
+| 35 063 | `Algebra.schur_complement quadraticForm_schurComplement` | 575 | `by Matrix.quadraticForm_bordered` | *nothing* |
+| 28 418 | `Algebra.basis_pruning size_one_finite_dimensional` | 808 | `by pointNonzero` | `contextFactDiffBridge` |
+| 26 643 | `Natural.floor_divide monus_succ_implies_gt` | 370 | `by cases` | `monotonicityRecursion` |
+| 23 311 | `Plane.concatenate IsLoop.concatenate` | 798 | `by …across_seam_of_loop` | *nothing* |
+| 23 293 | `Algebra.rank_nullity appended_images_independent` | 1836 | `by <proof>` | *nothing* |
+
+Two things to notice. **Four of the top eight are Layer-6 / Layer-4 proofs
+written in this session** (`subdivide_common_segment` ×2, `subdivide_separated`,
+`IsLoop.concatenate`) — the overlay work is the most expensive thing in the
+library and is the obvious next target. And **"closed by nothing" is now the
+dominant pattern**: the hint was checked directly, or the claim failed and fell
+back. Neither is a rewrite chain, so the deep-route tool has nothing to say
+about them — a different diagnosis is needed for that class.
+
 ## Directions worth trying
 
 - **Shrink the context.** These proofs state ~30 facts before using any of
