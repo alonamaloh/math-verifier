@@ -43,11 +43,10 @@ convention signature : Universal.Signature
 definition Universal.IsBlockEssential
         (a : Universal.Algebra(signature)) (size blocks : ℕ)
         (block : NaturalsBelow(size) → NaturalsBelow(blocks))
-        (subset : Set(Universal.carrier(a)))
-        (relation : Set(Universal.carrier(a ^ NaturalsBelow(size))))
-        : Proposition := (∀ (freeBlock : NaturalsBelow(blocks)). ∃ (tuple : Universal.carrier(a ^ NaturalsBelow(size))). tuple ∈ relation
-       ∧ ∀ (i : NaturalsBelow(size)). ¬(block(i) = freeBlock) → tuple(i) ∈ subset) ∧ ¬(∃ (tuple : Universal.carrier(
-          a ^ NaturalsBelow(size))). tuple ∈ relation ∧ ∀ (i : NaturalsBelow(size)). tuple(i) ∈ subset)
+        (subset : Set(a))
+        (relation : Set(a ^ NaturalsBelow(size)))
+        : Proposition := (∀ (freeBlock : NaturalsBelow(blocks)). ∃ (tuple : a ^ NaturalsBelow(size)). tuple ∈ relation
+       ∧ ∀ (i : NaturalsBelow(size)). block(i) ≠ freeBlock → tuple(i) ∈ subset) ∧ ¬(∃ (tuple : a ^ NaturalsBelow(size)). tuple ∈ relation ∧ ∀ (i : NaturalsBelow(size)). tuple(i) ∈ subset)
 
 -- Every block is populated — and it need not be assumed. If no coordinate had
 -- block `j`, the (B1) witness freed at `j` would lie inside `subset` at every
@@ -55,28 +54,28 @@ definition Universal.IsBlockEssential
 theorem Universal.IsBlockEssential.blocks_populated
         (a : Universal.Algebra(signature)) (size blocks : ℕ)
         (block : NaturalsBelow(size) → NaturalsBelow(blocks))
-        (subset : Set(Universal.carrier(a)))
-        (relation : Set(Universal.carrier(a ^ NaturalsBelow(size))))
+        (subset : Set(a))
+        (relation : Set(a ^ NaturalsBelow(size)))
         (blockEssential : Universal.IsBlockEssential(a, size, blocks, block, subset, relation))
         (j : NaturalsBelow(blocks))
         : ∃ (i : NaturalsBelow(size)). block(i) = j := {
-  ∀ (freeBlock : NaturalsBelow(blocks)). ∃ (tuple : Universal.carrier(a ^ NaturalsBelow(size))). tuple ∈ relation
-        ∧ ∀ (i : NaturalsBelow(size)). ¬(block(i) = freeBlock) → tuple(i) ∈ subset
+  ∀ (freeBlock : NaturalsBelow(blocks)). ∃ (tuple : a ^ NaturalsBelow(size)). tuple ∈ relation
+        ∧ ∀ (i : NaturalsBelow(size)). block(i) ≠ freeBlock → tuple(i) ∈ subset
       as blocksFreed;
   suppose ¬(∃ (i : NaturalsBelow(size)). block(i) = j) for contradiction;
-  choose tuple such that tuple ∈ relation ∧ ∀ (i : NaturalsBelow(size)). ¬(block(i) = j) → tuple(i) ∈ subset
+  choose tuple such that tuple ∈ relation ∧ ∀ (i : NaturalsBelow(size)). block(i) ≠ j → tuple(i) ∈ subset
       from blocksFreed(j);
   tuple ∈ relation;
-  ∀ (i : NaturalsBelow(size)). ¬(block(i) = j) → tuple(i) ∈ subset as insideOffBlock;
+  ∀ (i : NaturalsBelow(size)). block(i) ≠ j → tuple(i) ∈ subset as insideOffBlock;
   ∀ (i : NaturalsBelow(size)). tuple(i) ∈ subset
       by { take i : NaturalsBelow(size);
-           ¬(block(i) = j)
+           block(i) ≠ j
                by { suppose block(i) = j as isBlockJ;
                     ∃ (candidate : NaturalsBelow(size)). block(candidate) = j
                         by { witness i };
                     done };
            done by insideOffBlock };
-  ∃ (candidate : Universal.carrier(a ^ NaturalsBelow(size))). candidate ∈ relation ∧ ∀ (i : NaturalsBelow(size)). candidate(i) ∈ subset
+  ∃ (candidate : a ^ NaturalsBelow(size)). candidate ∈ relation ∧ ∀ (i : NaturalsBelow(size)). candidate(i) ∈ subset
       by { witness tuple };
   done
 }
@@ -93,37 +92,37 @@ theorem Universal.HasEssential.of_block_bijection
         (pick : NaturalsBelow(blocks) → NaturalsBelow(size))
         (blockOfPick : ∀ (j : NaturalsBelow(blocks)). block(pick(j)) = j)
         (pickOfBlock : ∀ (i : NaturalsBelow(size)). pick(block(i)) = i)
-        (subset : Set(Universal.carrier(a)))
-        (relation : Set(Universal.carrier(a ^ NaturalsBelow(size))))
+        (subset : Set(a))
+        (relation : Set(a ^ NaturalsBelow(size)))
         (closed : Universal.IsSubuniverse(a ^ NaturalsBelow(size), relation))
         (blockEssential : Universal.IsBlockEssential(a, size, blocks, block, subset, relation))
         : Universal.HasEssential(a, subset, blocks) := {
-  ∀ (freeBlock : NaturalsBelow(blocks)). ∃ (tuple : Universal.carrier(a ^ NaturalsBelow(size))). tuple ∈ relation
-        ∧ ∀ (i : NaturalsBelow(size)). ¬(block(i) = freeBlock) → tuple(i) ∈ subset
+  ∀ (freeBlock : NaturalsBelow(blocks)). ∃ (tuple : a ^ NaturalsBelow(size)). tuple ∈ relation
+        ∧ ∀ (i : NaturalsBelow(size)). block(i) ≠ freeBlock → tuple(i) ∈ subset
       as blocksPopulated;
-  ¬(∃ (tuple : Universal.carrier(a ^ NaturalsBelow(size))). tuple ∈ relation ∧ ∀ (i : NaturalsBelow(size)). tuple(i) ∈ subset);
+  ¬(∃ (tuple : a ^ NaturalsBelow(size)). tuple ∈ relation ∧ ∀ (i : NaturalsBelow(size)). tuple(i) ∈ subset);
   -- The relation read through the chosen representatives.
   Universal.IsSubuniverse(a ^ NaturalsBelow(blocks), Universal.project(a, NaturalsBelow(size), NaturalsBelow(blocks), pick, relation))
       by Universal.IsSubuniverse.project;
   -- Every coordinate is free somewhere: the witness for block `j` restricts to
   -- one free exactly at `j`, because `block(pick(j')) = j'`.
-  ∀ (freeSlot : NaturalsBelow(blocks)). ∃ (small : Universal.carrier(a ^ NaturalsBelow(blocks))).
+  ∀ (freeSlot : NaturalsBelow(blocks)). ∃ (small : a ^ NaturalsBelow(blocks)).
         small ∈ Universal.project(a, NaturalsBelow(size), NaturalsBelow(blocks), pick, relation) ∧ ∀ (other : NaturalsBelow(blocks)).
-            ¬(other = freeSlot) → small(other) ∈ subset
+            other ≠ freeSlot → small(other) ∈ subset
       by { take freeSlot : NaturalsBelow(blocks);
-           choose tuple such that tuple ∈ relation ∧ ∀ (i : NaturalsBelow(size)). ¬(block(i) = freeSlot) → tuple(i) ∈ subset
+           choose tuple such that tuple ∈ relation ∧ ∀ (i : NaturalsBelow(size)). block(i) ≠ freeSlot → tuple(i) ∈ subset
                from blocksPopulated(freeSlot);
            tuple ∈ relation;
-           ∀ (i : NaturalsBelow(size)). ¬(block(i) = freeSlot) → tuple(i) ∈ subset as tupleOutside;
+           ∀ (i : NaturalsBelow(size)). block(i) ≠ freeSlot → tuple(i) ∈ subset as tupleOutside;
            Universal.restrict(a, NaturalsBelow(size), NaturalsBelow(blocks), pick, tuple)
              ∈ Universal.project(a, NaturalsBelow(size), NaturalsBelow(blocks), pick, relation)
                by { witness tuple };
-           ∀ (other : NaturalsBelow(blocks)). ¬(other = freeSlot) → Universal.restrict(a, NaturalsBelow(size),
+           ∀ (other : NaturalsBelow(blocks)). other ≠ freeSlot → Universal.restrict(a, NaturalsBelow(size),
                    NaturalsBelow(blocks), pick, tuple)(other) ∈ subset
                by { take other : NaturalsBelow(blocks);
-                    suppose ¬(other = freeSlot) as otherDiffers;
+                    suppose other ≠ freeSlot as otherDiffers;
                     block(pick(other)) = other by blockOfPick as representative;
-                    ¬(block(pick(other)) = freeSlot)
+                    block(pick(other)) ≠ freeSlot
                         by { suppose block(pick(other)) = freeSlot as isFree;
                              other
                                 = block(pick(other)) by representative
@@ -134,9 +133,9 @@ theorem Universal.HasEssential.of_block_bijection
            witness Universal.restrict(a, NaturalsBelow(size), NaturalsBelow(blocks), pick, tuple) };
   -- And nothing lies inside everywhere: a lift would too, since every
   -- coordinate is the representative of its own block.
-  ¬(∃ (small : Universal.carrier(a ^ NaturalsBelow(blocks))). small ∈ Universal.project(a, NaturalsBelow(size), NaturalsBelow(blocks),
+  ¬(∃ (small : a ^ NaturalsBelow(blocks)). small ∈ Universal.project(a, NaturalsBelow(size), NaturalsBelow(blocks),
       pick, relation) ∧ ∀ (slot : NaturalsBelow(blocks)). small(slot) ∈ subset)
-      by { suppose ∃ (small : Universal.carrier(a ^ NaturalsBelow(blocks))). small ∈ Universal.project(a, NaturalsBelow(size),
+      by { suppose ∃ (small : a ^ NaturalsBelow(blocks)). small ∈ Universal.project(a, NaturalsBelow(size),
                                NaturalsBelow(blocks), pick, relation) ∧ ∀ (slot : NaturalsBelow(blocks)). small(slot) ∈ subset
                    as someSmallInside;
            choose small such that small ∈ Universal.project(a, NaturalsBelow(size), NaturalsBelow(blocks), pick, relation)
@@ -158,7 +157,7 @@ theorem Universal.HasEssential.of_block_bijection
                     big(pick(block(i))) ∈ subset;
                     pick(block(i)) = i by pickOfBlock as isSelf;
                     done by substituting isSelf };
-           ∃ (tuple : Universal.carrier(a ^ NaturalsBelow(size))). tuple ∈ relation ∧ ∀ (i : NaturalsBelow(size)). tuple(i) ∈ subset
+           ∃ (tuple : a ^ NaturalsBelow(size)). tuple ∈ relation ∧ ∀ (i : NaturalsBelow(size)). tuple(i) ∈ subset
                by { witness big };
            done };
   Universal.IsEssential(a, NaturalsBelow(blocks), ((slot : NaturalsBelow(blocks)) ↦ subset),
@@ -196,71 +195,71 @@ theorem NaturalsBelow.inverse_of_injective_surjective (size blocks : ℕ)
 theorem Universal.IsBlockEssential.deleteElement
         (a : Universal.Algebra(signature)) (current blocks count : ℕ)
         (block : NaturalsBelow(current) → NaturalsBelow(blocks))
-        (subset : Set(Universal.carrier(a)))
-        (relation : Set(Universal.carrier(a ^ NaturalsBelow(current))))
+        (subset : Set(a))
+        (relation : Set(a ^ NaturalsBelow(current)))
         (blockEssential : Universal.IsBlockEssential(a, current, blocks, block, subset, relation))
         (u : NaturalsBelow(current))
-        (dagger : ∃ (tuple : Universal.carrier(a ^ NaturalsBelow(current))). tuple ∈ relation ∧ ∀ (i : NaturalsBelow(current)).
-                  (¬(block(i) = block(u)) ∨ i = u) → tuple(i) ∈ subset)
+        (dagger : ∃ (tuple : a ^ NaturalsBelow(current)). tuple ∈ relation ∧ ∀ (i : NaturalsBelow(current)).
+                  (block(i) ≠ block(u) ∨ i = u) → tuple(i) ∈ subset)
         (place : NaturalsBelow(count) → NaturalsBelow(current))
-        (indexes : NaturalsBelow.IndexesSubset(current, ((i : NaturalsBelow(current)) ↦ ¬(i = u)), count, place))
+        (indexes : NaturalsBelow.IndexesSubset(current, ((i : NaturalsBelow(current)) ↦ i ≠ u), count, place))
         : Universal.IsBlockEssential(a, count, blocks, ((i : NaturalsBelow(count)) ↦ block(place(i))), subset,
             Universal.project(a, NaturalsBelow(current), NaturalsBelow(count), place,
               relation ∩ Universal.coordinateIn(a, NaturalsBelow(current), u,
                 subset))) := {
-  ∀ (freeBlock : NaturalsBelow(blocks)). ∃ (tuple : Universal.carrier(a ^ NaturalsBelow(current))). tuple ∈ relation
-        ∧ ∀ (i : NaturalsBelow(current)). ¬(block(i) = freeBlock) → tuple(i) ∈ subset
+  ∀ (freeBlock : NaturalsBelow(blocks)). ∃ (tuple : a ^ NaturalsBelow(current)). tuple ∈ relation
+        ∧ ∀ (i : NaturalsBelow(current)). block(i) ≠ freeBlock → tuple(i) ∈ subset
       as blocksPopulated;
-  ∀ (x : NaturalsBelow(current)). ¬(x = u) → ∃ (i : NaturalsBelow(count)). place(i) = x as placeCovers;
+  ∀ (x : NaturalsBelow(current)). x ≠ u → ∃ (i : NaturalsBelow(count)). place(i) = x as placeCovers;
   -- (B1). Two sources of a witness, according to whether the freed block is
   -- the one holding `u`.
-  ∀ (freeBlock : NaturalsBelow(blocks)). ∃ (small : Universal.carrier(a ^ NaturalsBelow(count))).
+  ∀ (freeBlock : NaturalsBelow(blocks)). ∃ (small : a ^ NaturalsBelow(count)).
         small ∈ Universal.project(a, NaturalsBelow(current), NaturalsBelow(count), place,
       relation ∩ Universal.coordinateIn(a, NaturalsBelow(current), u, subset)) ∧ ∀ (i : NaturalsBelow(count)).
-            ¬(block(place(i)) = freeBlock) → small(i) ∈ subset
+            block(place(i)) ≠ freeBlock → small(i) ∈ subset
       by { take freeBlock : NaturalsBelow(blocks);
            -- Whichever source, the witness lies in the relation and is inside
            -- at `u` and at every coordinate outside the freed block.
-           ∃ (tuple : Universal.carrier(a ^ NaturalsBelow(current))). tuple ∈ relation ∧ tuple(u) ∈ subset ∧ ∀ (i : NaturalsBelow(current)).
-                   ¬(block(i) = freeBlock) → tuple(i) ∈ subset
+           ∃ (tuple : a ^ NaturalsBelow(current)). tuple ∈ relation ∧ tuple(u) ∈ subset ∧ ∀ (i : NaturalsBelow(current)).
+                   block(i) ≠ freeBlock → tuple(i) ∈ subset
                by cases {
                  case block(u) = freeBlock as uIsFreed: {
-                     choose tuple such that tuple ∈ relation ∧ ∀ (i : NaturalsBelow(current)). (¬(block(i) = block(u)) ∨ i = u)
+                     choose tuple such that tuple ∈ relation ∧ ∀ (i : NaturalsBelow(current)). (block(i) ≠ block(u) ∨ i = u)
                              → tuple(i) ∈ subset
                          from dagger;
                      tuple ∈ relation;
-                     ∀ (i : NaturalsBelow(current)). (¬(block(i) = block(u)) ∨ i = u) → tuple(i) ∈ subset
+                     ∀ (i : NaturalsBelow(current)). (block(i) ≠ block(u) ∨ i = u) → tuple(i) ∈ subset
                          as tupleInside;
                      u = u;
-                     ¬(block(u) = block(u)) ∨ u = u;
+                     block(u) ≠ block(u) ∨ u = u;
                      tuple(u) ∈ subset by tupleInside;
-                     ∀ (i : NaturalsBelow(current)). ¬(block(i) = freeBlock) → tuple(i) ∈ subset
+                     ∀ (i : NaturalsBelow(current)). block(i) ≠ freeBlock → tuple(i) ∈ subset
                          by { take i : NaturalsBelow(current);
-                              suppose ¬(block(i) = freeBlock) as outside;
-                              ¬(block(i) = block(u))
+                              suppose block(i) ≠ freeBlock as outside;
+                              block(i) ≠ block(u)
                                   by { suppose block(i) = block(u) as sameBlock;
                                        block(i) = block(u) = freeBlock by uIsFreed;
                                        done };
-                              ¬(block(i) = block(u)) ∨ i = u;
+                              block(i) ≠ block(u) ∨ i = u;
                               done by tupleInside };
                      witness tuple
                    }
                  otherwise as uIsNotFreed: {
-                     choose tuple such that tuple ∈ relation ∧ ∀ (i : NaturalsBelow(current)). ¬(block(i) = freeBlock) → tuple(i) ∈ subset
+                     choose tuple such that tuple ∈ relation ∧ ∀ (i : NaturalsBelow(current)). block(i) ≠ freeBlock → tuple(i) ∈ subset
                          from blocksPopulated(freeBlock);
                      tuple ∈ relation;
-                     ∀ (i : NaturalsBelow(current)). ¬(block(i) = freeBlock) → tuple(i) ∈ subset
+                     ∀ (i : NaturalsBelow(current)). block(i) ≠ freeBlock → tuple(i) ∈ subset
                          as tupleOutside;
                      tuple(u) ∈ subset by tupleOutside;
                      witness tuple
                    }
                } as someWitness;
            choose tuple such that tuple ∈ relation ∧ tuple(u) ∈ subset ∧ ∀ (i : NaturalsBelow(current)).
-                   ¬(block(i) = freeBlock) → tuple(i) ∈ subset
+                   block(i) ≠ freeBlock → tuple(i) ∈ subset
                from someWitness;
            tuple ∈ relation;
            tuple(u) ∈ subset;
-           ∀ (i : NaturalsBelow(current)). ¬(block(i) = freeBlock) → tuple(i) ∈ subset as tupleOutside;
+           ∀ (i : NaturalsBelow(current)). block(i) ≠ freeBlock → tuple(i) ∈ subset as tupleOutside;
            tuple ∈ Universal.coordinateIn(a, NaturalsBelow(current), u, subset);
            tuple ∈ relation
              ∩ Universal.coordinateIn(a, NaturalsBelow(current), u, subset);
@@ -268,19 +267,18 @@ theorem Universal.IsBlockEssential.deleteElement
              ∈ Universal.project(a, NaturalsBelow(current), NaturalsBelow(count), place,
                  relation ∩ Universal.coordinateIn(a, NaturalsBelow(current), u, subset))
                by { witness tuple };
-           ∀ (i : NaturalsBelow(count)). ¬(block(place(i)) = freeBlock) → Universal.restrict(a, NaturalsBelow(current),
+           ∀ (i : NaturalsBelow(count)). block(place(i)) ≠ freeBlock → Universal.restrict(a, NaturalsBelow(current),
                    NaturalsBelow(count), place, tuple)(i) ∈ subset
                by { take i : NaturalsBelow(count);
-                    suppose ¬(block(place(i)) = freeBlock);
+                    suppose block(place(i)) ≠ freeBlock;
                     tuple(place(i)) ∈ subset by tupleOutside;
                     done };
            witness Universal.restrict(a, NaturalsBelow(current), NaturalsBelow(count), place, tuple) };
   -- (B2). A lift is inside at `u` by the intersection and everywhere else
   -- because `place` covers everything but `u`.
-  ¬(∃ (small : Universal.carrier(a ^ NaturalsBelow(count))). small ∈ Universal.project(a, NaturalsBelow(current), NaturalsBelow(count),
-      place, relation ∩ Universal.coordinateIn(a, NaturalsBelow(current), u, subset))
-      ∧ ∀ (i : NaturalsBelow(count)). small(i) ∈ subset)
-      by { suppose ∃ (small : Universal.carrier(a ^ NaturalsBelow(count))). small ∈ Universal.project(a, NaturalsBelow(current),
+  ¬(∃ (small : a ^ NaturalsBelow(count)). small ∈ Universal.project(a, NaturalsBelow(current), NaturalsBelow(count),
+      place, relation ∩ Universal.coordinateIn(a, NaturalsBelow(current), u, subset)) ∧ ∀ (i : NaturalsBelow(count)). small(i) ∈ subset)
+      by { suppose ∃ (small : a ^ NaturalsBelow(count)). small ∈ Universal.project(a, NaturalsBelow(current),
                                NaturalsBelow(count), place, relation
                                  ∩ Universal.coordinateIn(a, NaturalsBelow(current), u, subset))
                      ∧ ∀ (i : NaturalsBelow(count)). small(i) ∈ subset
@@ -317,7 +315,7 @@ theorem Universal.IsBlockEssential.deleteElement
                           done by substituting (place(slot) = i)
                         }
                     } };
-           ∃ (tuple : Universal.carrier(a ^ NaturalsBelow(current))). tuple ∈ relation ∧ ∀ (i : NaturalsBelow(current)). tuple(i) ∈ subset
+           ∃ (tuple : a ^ NaturalsBelow(current)). tuple ∈ relation ∧ ∀ (i : NaturalsBelow(current)). tuple(i) ∈ subset
                by { witness big };
            done };
   done
@@ -333,45 +331,45 @@ theorem Universal.IsBlockEssential.deleteElement
 theorem Universal.IsBlockEssential.collapseBlock
         (a : Universal.Algebra(signature)) (current blocks count : ℕ)
         (block : NaturalsBelow(current) → NaturalsBelow(blocks))
-        (subset : Set(Universal.carrier(a)))
-        (relation : Set(Universal.carrier(a ^ NaturalsBelow(current))))
+        (subset : Set(a))
+        (relation : Set(a ^ NaturalsBelow(current)))
         (blockEssential : Universal.IsBlockEssential(a, current, blocks, block, subset, relation))
         (u : NaturalsBelow(current))
-        (daggerFails : ¬(∃ (tuple : Universal.carrier(a ^ NaturalsBelow(current))). tuple ∈ relation ∧ ∀ (i : NaturalsBelow(current)).
+        (daggerFails : ¬(∃ (tuple : a ^ NaturalsBelow(current)). tuple ∈ relation ∧ ∀ (i : NaturalsBelow(current)).
                   (¬(block(i) = block(u)) ∨ i = u) → tuple(i) ∈ subset))
         (place : NaturalsBelow(count) → NaturalsBelow(current))
-        (indexes : NaturalsBelow.IndexesSubset(current, ((i : NaturalsBelow(current)) ↦ ¬(block(i) = block(u)) ∨ i = u), count, place))
+        (indexes : NaturalsBelow.IndexesSubset(current, ((i : NaturalsBelow(current)) ↦ block(i) ≠ block(u) ∨ i = u), count, place))
         : Universal.IsBlockEssential(a, count, blocks, ((i : NaturalsBelow(count)) ↦ block(place(i))), subset,
             Universal.project(a, NaturalsBelow(current), NaturalsBelow(count),
               place, relation)) := {
-  ∀ (freeBlock : NaturalsBelow(blocks)). ∃ (tuple : Universal.carrier(a ^ NaturalsBelow(current))). tuple ∈ relation
-        ∧ ∀ (i : NaturalsBelow(current)). ¬(block(i) = freeBlock) → tuple(i) ∈ subset
+  ∀ (freeBlock : NaturalsBelow(blocks)). ∃ (tuple : a ^ NaturalsBelow(current)). tuple ∈ relation
+        ∧ ∀ (i : NaturalsBelow(current)). block(i) ≠ freeBlock → tuple(i) ∈ subset
       as blocksPopulated;
-  ∀ (x : NaturalsBelow(current)). (¬(block(x) = block(u)) ∨ x = u) → ∃ (i : NaturalsBelow(count)). place(i) = x as placeCovers;
+  ∀ (x : NaturalsBelow(current)). (block(x) ≠ block(u) ∨ x = u) → ∃ (i : NaturalsBelow(count)). place(i) = x as placeCovers;
   -- (B1) transfers uniformly: the new block function is the old one composed
   -- with the indexing, so the old witness restricts to a new one.
-  ∀ (freeBlock : NaturalsBelow(blocks)). ∃ (small : Universal.carrier(a ^ NaturalsBelow(count))).
+  ∀ (freeBlock : NaturalsBelow(blocks)). ∃ (small : a ^ NaturalsBelow(count)).
         small ∈ Universal.project(a, NaturalsBelow(current), NaturalsBelow(count), place, relation) ∧ ∀ (i : NaturalsBelow(count)).
-            ¬(block(place(i)) = freeBlock) → small(i) ∈ subset
+            block(place(i)) ≠ freeBlock → small(i) ∈ subset
       by { take freeBlock : NaturalsBelow(blocks);
-           choose tuple such that tuple ∈ relation ∧ ∀ (i : NaturalsBelow(current)). ¬(block(i) = freeBlock) → tuple(i) ∈ subset
+           choose tuple such that tuple ∈ relation ∧ ∀ (i : NaturalsBelow(current)). block(i) ≠ freeBlock → tuple(i) ∈ subset
                from blocksPopulated(freeBlock);
            tuple ∈ relation;
-           ∀ (i : NaturalsBelow(current)). ¬(block(i) = freeBlock) → tuple(i) ∈ subset as tupleOutside;
+           ∀ (i : NaturalsBelow(current)). block(i) ≠ freeBlock → tuple(i) ∈ subset as tupleOutside;
            Universal.restrict(a, NaturalsBelow(current), NaturalsBelow(count), place, tuple)
              ∈ Universal.project(a, NaturalsBelow(current), NaturalsBelow(count), place, relation)
                by { witness tuple };
-           ∀ (i : NaturalsBelow(count)). ¬(block(place(i)) = freeBlock) → Universal.restrict(a, NaturalsBelow(current),
+           ∀ (i : NaturalsBelow(count)). block(place(i)) ≠ freeBlock → Universal.restrict(a, NaturalsBelow(current),
                    NaturalsBelow(count), place, tuple)(i) ∈ subset
                by { take i : NaturalsBelow(count);
-                    suppose ¬(block(place(i)) = freeBlock);
+                    suppose block(place(i)) ≠ freeBlock;
                     tuple(place(i)) ∈ subset by tupleOutside;
                     done };
            witness Universal.restrict(a, NaturalsBelow(current), NaturalsBelow(count), place, tuple) };
   -- (B2) is the failure of (†): a lift is inside exactly on `chosen`.
-  ¬(∃ (small : Universal.carrier(a ^ NaturalsBelow(count))). small ∈ Universal.project(a, NaturalsBelow(current), NaturalsBelow(count),
+  ¬(∃ (small : a ^ NaturalsBelow(count)). small ∈ Universal.project(a, NaturalsBelow(current), NaturalsBelow(count),
       place, relation) ∧ ∀ (i : NaturalsBelow(count)). small(i) ∈ subset)
-      by { suppose ∃ (small : Universal.carrier(a ^ NaturalsBelow(count))). small ∈ Universal.project(a, NaturalsBelow(current),
+      by { suppose ∃ (small : a ^ NaturalsBelow(count)). small ∈ Universal.project(a, NaturalsBelow(current),
                                NaturalsBelow(count), place, relation) ∧ ∀ (i : NaturalsBelow(count)). small(i) ∈ subset
                    as someSmallInside;
            choose small such that small ∈ Universal.project(a, NaturalsBelow(current), NaturalsBelow(count), place, relation)
@@ -383,9 +381,9 @@ theorem Universal.IsBlockEssential.collapseBlock
                from (small ∈ Universal.project(a, NaturalsBelow(current), NaturalsBelow(count), place, relation));
            big ∈ relation;
            Universal.restrict(a, NaturalsBelow(current), NaturalsBelow(count), place, big) = small as restrictsToSmall;
-           ∀ (i : NaturalsBelow(current)). (¬(block(i) = block(u)) ∨ i = u) → big(i) ∈ subset
+           ∀ (i : NaturalsBelow(current)). (block(i) ≠ block(u) ∨ i = u) → big(i) ∈ subset
                by { take i : NaturalsBelow(current);
-                    suppose ¬(block(i) = block(u)) ∨ i = u as inChosen;
+                    suppose block(i) ≠ block(u) ∨ i = u as inChosen;
                     choose slot such that place(slot) = i from placeCovers;
                     small(slot) ∈ subset by smallInside;
                     big(place(slot))
@@ -393,8 +391,8 @@ theorem Universal.IsBlockEssential.collapseBlock
                        = small(slot) by substituting restrictsToSmall;
                     big(place(slot)) ∈ subset;
                     done by substituting (place(slot) = i) };
-           ∃ (tuple : Universal.carrier(a ^ NaturalsBelow(current))). tuple ∈ relation ∧ ∀ (i : NaturalsBelow(current)).
-                   (¬(block(i) = block(u)) ∨ i = u) → tuple(i) ∈ subset
+           ∃ (tuple : a ^ NaturalsBelow(current)). tuple ∈ relation ∧ ∀ (i : NaturalsBelow(current)).
+                   (block(i) ≠ block(u) ∨ i = u) → tuple(i) ∈ subset
                by { witness big };
            done };
   done
@@ -410,43 +408,42 @@ theorem Universal.IsBlockEssential.collapseBlock
 
 theorem Universal.HasEssential.of_block_essential
         (a : Universal.Algebra(signature))
-        (subset : Set(Universal.carrier(a)))
+        (subset : Set(a))
         (subsetClosed : Universal.IsSubuniverse(a, subset))
         (blocks : ℕ)
-        : ∀ (size : ℕ). ∀ (block : NaturalsBelow(size) → NaturalsBelow(blocks)). ∀ (relation : Set(Universal.carrier(
-                a ^ NaturalsBelow(size)))). Universal.IsSubuniverse(a ^ NaturalsBelow(size), relation) → (∀ (j : NaturalsBelow(blocks)).
+        : ∀ (size : ℕ). ∀ (block : NaturalsBelow(size) → NaturalsBelow(blocks)). ∀ (relation : Set(a ^ NaturalsBelow(size))). Universal.IsSubuniverse(a ^ NaturalsBelow(size), relation) → (∀ (j : NaturalsBelow(blocks)).
             ∃ (i : NaturalsBelow(size)). block(i) = j) → Universal.IsBlockEssential(a, size, blocks, block, subset, relation)
               → Universal.HasEssential(a, subset, blocks) := {
   take size : ℕ;
   by strong induction on size with current, IH {
     take block : NaturalsBelow(current) → NaturalsBelow(blocks);
-    take relation : Set(Universal.carrier(a ^ NaturalsBelow(current)));
+    take relation : Set(a ^ NaturalsBelow(current));
     suppose Universal.IsSubuniverse(a ^ NaturalsBelow(current), relation) as closed;
     suppose ∀ (j : NaturalsBelow(blocks)). ∃ (i : NaturalsBelow(current)). block(i) = j as surjective;
     suppose Universal.IsBlockEssential(a, current, blocks, block, subset, relation) as blockEssential;
     done by cases {
       case ∃ (u : NaturalsBelow(current)). ∃ (v : NaturalsBelow(current)).
-             block(u) = block(v) ∧ ¬(u = v) as someCollision: {
-          choose u such that ∃ (v : NaturalsBelow(current)). block(u) = block(v) ∧ ¬(u = v)
+             block(u) = block(v) ∧ u ≠ v as someCollision: {
+          choose u such that ∃ (v : NaturalsBelow(current)). block(u) = block(v) ∧ u ≠ v
               from someCollision;
-          choose v such that block(u) = block(v) ∧ ¬(u = v);
+          choose v such that block(u) = block(v) ∧ u ≠ v;
           block(u) = block(v) as sameBlock;
-          ¬(u = v);
+          u ≠ v;
           done by cases {
-            case ∃ (tuple : Universal.carrier(a ^ NaturalsBelow(current))). tuple ∈ relation ∧ ∀ (i : NaturalsBelow(current)).
-                (¬(block(i) = block(u)) ∨ i = u) → tuple(i) ∈ subset
+            case ∃ (tuple : a ^ NaturalsBelow(current)). tuple ∈ relation ∧ ∀ (i : NaturalsBelow(current)).
+                (block(i) ≠ block(u) ∨ i = u) → tuple(i) ∈ subset
                  as dagger: {
                 -- Delete `u`; its block keeps `v`, so no block empties.
                 choose count such that ∃ (place : NaturalsBelow(count) → NaturalsBelow(current)). NaturalsBelow.IndexesSubset(current,
-                        ((i : NaturalsBelow(current)) ↦ ¬(i = u)), count, place)
-                    from NaturalsBelow.index_subset(current, ((i : NaturalsBelow(current)) ↦ ¬(i = u)));
-                choose place such that NaturalsBelow.IndexesSubset(current, ((i : NaturalsBelow(current)) ↦ ¬(i = u)), count, place);
+                        ((i : NaturalsBelow(current)) ↦ i ≠ u), count, place)
+                    from NaturalsBelow.index_subset(current, ((i : NaturalsBelow(current)) ↦ i ≠ u));
+                choose place such that NaturalsBelow.IndexesSubset(current, ((i : NaturalsBelow(current)) ↦ i ≠ u), count, place);
                 ∀ (x : NaturalsBelow(current)). ¬(¬(x = u)) → count < current as indexingStrict;
-                ∀ (x : NaturalsBelow(current)). ¬(x = u) → ∃ (i : NaturalsBelow(count)). place(i) = x
+                ∀ (x : NaturalsBelow(current)). x ≠ u → ∃ (i : NaturalsBelow(count)). place(i) = x
                     as placeCovers;
                 -- `u` itself is left out, so the index set really did shrink.
                 ¬(¬(u = u))
-                    by { suppose ¬(u = u) as uOmitted;
+                    by { suppose u ≠ u as uOmitted;
                          u = u;
                          done };
                 count < current by indexingStrict as measureDrops;
@@ -464,7 +461,7 @@ theorem Universal.HasEssential.of_block_essential
                          choose w such that block(w) = j from surjective(j);
                          done by cases {
                            case w = u as isU: {
-                               ¬(v = u)
+                               v ≠ u
                                    by { suppose v = u as flipped;
                                         u = v;
                                         done };
@@ -493,18 +490,18 @@ theorem Universal.HasEssential.of_block_essential
             otherwise as daggerFails: {
                 -- Collapse `u`'s block to `u` alone; `v` is dropped.
                 choose count such that ∃ (place : NaturalsBelow(count) → NaturalsBelow(current)). NaturalsBelow.IndexesSubset(current,
-                        ((i : NaturalsBelow(current)) ↦ ¬(block(i) = block(u)) ∨ i = u), count, place)
-                    from NaturalsBelow.index_subset(current, ((i : NaturalsBelow(current)) ↦ ¬(block(i) = block(u)) ∨ i = u));
+                        ((i : NaturalsBelow(current)) ↦ block(i) ≠ block(u) ∨ i = u), count, place)
+                    from NaturalsBelow.index_subset(current, ((i : NaturalsBelow(current)) ↦ block(i) ≠ block(u) ∨ i = u));
                 choose place such that NaturalsBelow.IndexesSubset(current, ((i : NaturalsBelow(current)) ↦
-                        ¬(block(i) = block(u)) ∨ i = u), count, place);
+                        block(i) ≠ block(u) ∨ i = u), count, place);
                 ∀ (x : NaturalsBelow(current)). ¬(¬(block(x) = block(u)) ∨ x = u) → count < current as indexingStrict;
-                ∀ (x : NaturalsBelow(current)). (¬(block(x) = block(u)) ∨ x = u) → ∃ (i : NaturalsBelow(count)). place(i) = x
+                ∀ (x : NaturalsBelow(current)). (block(x) ≠ block(u) ∨ x = u) → ∃ (i : NaturalsBelow(count)). place(i) = x
                     as placeCovers;
                 -- `v` is left out: it shares `u`'s block and is not `u`.
                 ¬(¬(block(v) = block(u)) ∨ v = u)
-                    by { suppose ¬(block(v) = block(u)) ∨ v = u as vKept;
+                    by { suppose block(v) ≠ block(u) ∨ v = u as vKept;
                          done by cases {
-                           case ¬(block(v) = block(u)) as differs: {
+                           case block(v) ≠ block(u) as differs: {
                                block(v) = block(u) by sameBlock;
                                done
                              }
@@ -524,7 +521,7 @@ theorem Universal.HasEssential.of_block_essential
                          done by cases {
                            case block(u) = j as isBlockOfU: {
                                u = u;
-                               ¬(block(u) = block(u)) ∨ u = u;
+                               block(u) ≠ block(u) ∨ u = u;
                                choose i such that place(i) = u from placeCovers;
                                block(place(i))
                                   = block(u) by (place(i) = u)
@@ -533,11 +530,11 @@ theorem Universal.HasEssential.of_block_essential
                              }
                            otherwise as isOtherBlock: {
                                choose w such that block(w) = j from surjective(j);
-                               ¬(block(w) = block(u))
+                               block(w) ≠ block(u)
                                    by { suppose block(w) = block(u) as shares;
                                         block(u) = block(w) = j;
                                         done };
-                               ¬(block(w) = block(u)) ∨ w = u;
+                               block(w) ≠ block(u) ∨ w = u;
                                choose i such that place(i) = w from placeCovers;
                                block(place(i))
                                   = block(w) by (place(i) = w)
@@ -558,9 +555,9 @@ theorem Universal.HasEssential.of_block_essential
               by { take i : NaturalsBelow(current);
                    take j : NaturalsBelow(current);
                    suppose block(i) = block(j) as sameBlock;
-                   suppose ¬(i = j) for contradiction;
-                   ∃ (x : NaturalsBelow(current)). ∃ (y : NaturalsBelow(current)). block(x) = block(y) ∧ ¬(x = y)
-                       by { ∃ (y : NaturalsBelow(current)). block(i) = block(y) ∧ ¬(i = y)
+                   suppose i ≠ j for contradiction;
+                   ∃ (x : NaturalsBelow(current)). ∃ (y : NaturalsBelow(current)). block(x) = block(y) ∧ x ≠ y
+                       by { ∃ (y : NaturalsBelow(current)). block(i) = block(y) ∧ i ≠ y
                                 by { witness j };
                             witness i };
                    done } as injective;

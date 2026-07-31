@@ -2327,8 +2327,12 @@ void Elaborator::elaborateDefinition(const SurfaceDefinitionDeclaration& origDec
                         }
                     }
                 }
-                returnType =
-                    elaborateExpression(*declaration.type, localBinders);
+                // A declaration's return type is a type position too, so a
+                // bundle value standing for its carrier is coerced here as
+                // well as in the binders.
+                returnType = coerceBundleValueToCarrier(
+                    elaborateExpression(*declaration.type, localBinders),
+                    localBinders);
             } catch (const TypeError& kernelError) {
                 rethrowKernelError(kernelError);
             }
@@ -2443,8 +2447,9 @@ void Elaborator::elaborateTheoremStatementOnly(
                     }
                 }
             }
-            fullType =
-                elaborateExpression(*declaration.type, localBinders);
+            fullType = coerceBundleValueToCarrier(
+                elaborateExpression(*declaration.type, localBinders),
+                localBinders);
         } catch (const TypeError& kernelError) {
             rethrowKernelError(kernelError);
         }

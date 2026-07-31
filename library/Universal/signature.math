@@ -14,7 +14,7 @@
 -- `Algebra/group_bundle.math`: one value threads where a carrier and an
 -- interpretation would otherwise be passed separately at every call. As there,
 -- the dependent projection is written with a destructuring `let ⟨…⟩ := a in …`,
--- since its result type mentions `Universal.carrier(a)`.
+-- since its result type mentions `a`.
 --
 -- Subuniverses are subsets, not bundled algebras. This follows the blueprint,
 -- which defines absorption relative to a pair of subuniverses with the ambient
@@ -57,28 +57,27 @@ definition Universal.carrier (a : Universal.Algebra(signature)) : Type(0) := Uni
 -- `A` again, read as the subset of itself — the `outer` argument of almost
 -- every absorption statement.
 definition Universal.universe (a : Universal.Algebra(signature))
-        : Set(Universal.carrier(a)) := Set.universe(Universal.carrier(a))
+        : Set(a) := Set.universe(a)
 
 -- The algebra is implicit: it is recovered from the argument tuple's type, so a
 -- call site reads `Universal.Algebra.interpret(arity, symbol, arguments)`.
 definition Universal.Algebra.interpret
         {a : Universal.Algebra(signature)}
-        : (arity : ℕ) → signature(arity) → (NaturalsBelow(arity) → Universal.carrier(a)) → Universal.carrier(a) :=
-  let ⟨carrier, interpret⟩ := a in
+        : (arity : ℕ) → signature(arity) → (NaturalsBelow(arity) → a) → a := let ⟨carrier, interpret⟩ := a in
     interpret
 
 -- Every operation fixes the constant tuples.
 definition Universal.Algebra.IsIdempotent
         (a : Universal.Algebra(signature)) : Proposition := ∀ (arity : ℕ). ∀ (symbol : signature(arity)).
-    ∀ (element : Universal.carrier(a)). Universal.Algebra.interpret(arity, symbol,
+    ∀ (element : a). Universal.Algebra.interpret(arity, symbol,
                                    (index : NaturalsBelow(arity)) ↦ element)
         = element
 
 -- A subset closed under every operation.
 definition Universal.IsSubuniverse
         (a : Universal.Algebra(signature))
-        (subset : Set(Universal.carrier(a))) : Proposition := ∀ (arity : ℕ). ∀ (symbol : signature(arity)).
-    ∀ (arguments : NaturalsBelow(arity) → Universal.carrier(a)). (∀ (index : NaturalsBelow(arity)). arguments(index) ∈ subset)
+        (subset : Set(a)) : Proposition := ∀ (arity : ℕ). ∀ (symbol : signature(arity)).
+    ∀ (arguments : NaturalsBelow(arity) → a). (∀ (index : NaturalsBelow(arity)). arguments(index) ∈ subset)
       → Universal.Algebra.interpret(arity, symbol, arguments) ∈ subset
 
 -- The whole carrier is a subuniverse.
@@ -87,7 +86,7 @@ theorem Universal.IsSubuniverse.universe
         : Universal.IsSubuniverse(a, Universal.universe(a)) := {
   take arity : ℕ;
   take symbol : signature(arity);
-  take arguments : NaturalsBelow(arity) → Universal.carrier(a);
+  take arguments : NaturalsBelow(arity) → a;
   suppose ∀ (index : NaturalsBelow(arity)). arguments(index) ∈ Universal.universe(a);
   done
 }
@@ -97,13 +96,13 @@ theorem Universal.IsSubuniverse.universe
 theorem Universal.IsSubuniverse.singleton
         (a : Universal.Algebra(signature))
         (idempotent : Universal.Algebra.IsIdempotent(a))
-        (element : Universal.carrier(a))
+        (element : a)
         : Universal.IsSubuniverse(a,
-            Set.singleton(Universal.carrier(a), element)) := {
+            Set.singleton(a, element)) := {
   take arity : ℕ;
   take symbol : signature(arity);
-  take arguments : NaturalsBelow(arity) → Universal.carrier(a);
-  suppose ∀ (index : NaturalsBelow(arity)). arguments(index) ∈ Set.singleton(Universal.carrier(a), element);
+  take arguments : NaturalsBelow(arity) → a;
+  suppose ∀ (index : NaturalsBelow(arity)). arguments(index) ∈ Set.singleton(a, element);
   arguments = ((index : NaturalsBelow(arity)) ↦ element) by Function.extensionality;
   Universal.Algebra.interpret(arity, symbol, arguments)
      = Universal.Algebra.interpret(arity, symbol, ((index : NaturalsBelow(arity)) ↦ element))

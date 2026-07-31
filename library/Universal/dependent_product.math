@@ -38,8 +38,8 @@ convention signature : Universal.Signature
 definition Universal.Algebra.dependentProduct
         (index : Type(0)) (family : index → Universal.Algebra(signature))
         : Universal.Algebra(signature) := Universal.Algebra.make(signature,
-    (coordinate : index) → Universal.carrier(family(coordinate)), ((arity : ℕ) ↦ (symbol : signature(arity)) ↦
-      (arguments : NaturalsBelow(arity) → ((coordinate : index) → Universal.carrier(family(coordinate)))) ↦
+    (coordinate : index) → family(coordinate), ((arity : ℕ) ↦ (symbol : signature(arity)) ↦
+      (arguments : NaturalsBelow(arity) → ((coordinate : index) → family(coordinate))) ↦
         (coordinate : index) ↦ Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ arguments(slot)(coordinate)))))
 
 -- Terms are evaluated coordinatewise. As with the power, this is the whole
@@ -47,7 +47,7 @@ definition Universal.Algebra.dependentProduct
 theorem Universal.Term.evaluate_dependentProduct
         {variables : Type(0)}
         (index : Type(0)) (family : index → Universal.Algebra(signature))
-        (valuation : variables → Universal.carrier(Universal.Algebra.dependentProduct(index, family)))
+        (valuation : variables → Universal.Algebra.dependentProduct(index, family))
         (subject : Universal.Term(signature, variables))
         (coordinate : index)
         : Universal.Term.evaluate(Universal.Algebra.dependentProduct(index, family), valuation, subject)(coordinate)
@@ -92,20 +92,19 @@ theorem Universal.Algebra.power_eq_dependentProduct
 -- subuniverses `C, B_1, …, B_n, C'`.
 definition Universal.dependentBox
         (index : Type(0)) (family : index → Universal.Algebra(signature))
-        (parts : (coordinate : index) → Set(Universal.carrier(family(coordinate))))
-        : Set(Universal.carrier(Universal.Algebra.dependentProduct(index, family))) :=
-  (tuple : Universal.carrier(Universal.Algebra.dependentProduct(index, family))) ↦
-    ∀ (coordinate : index). tuple(coordinate) ∈ parts(coordinate)
+        (parts : (coordinate : index) → Set(family(coordinate)))
+        : Set(Universal.Algebra.dependentProduct(index, family)) :=
+  (tuple : Universal.Algebra.dependentProduct(index, family)) ↦ ∀ (coordinate : index). tuple(coordinate) ∈ parts(coordinate)
 
 theorem Universal.IsSubuniverse.dependentBox
         (index : Type(0)) (family : index → Universal.Algebra(signature))
-        (parts : (coordinate : index) → Set(Universal.carrier(family(coordinate))))
+        (parts : (coordinate : index) → Set(family(coordinate)))
         (partsClosed : ∀ (coordinate : index). Universal.IsSubuniverse(family(coordinate), parts(coordinate)))
         : Universal.IsSubuniverse(Universal.Algebra.dependentProduct(index, family),
             Universal.dependentBox(index, family, parts)) := {
   take arity : ℕ;
   take symbol : signature(arity);
-  take arguments : NaturalsBelow(arity) → Universal.carrier(Universal.Algebra.dependentProduct(index, family));
+  take arguments : NaturalsBelow(arity) → Universal.Algebra.dependentProduct(index, family);
   suppose ∀ (slot : NaturalsBelow(arity)). arguments(slot) ∈ Universal.dependentBox(index, family, parts) as allInside;
   take coordinate : index;
   Universal.IsSubuniverse(family(coordinate), parts(coordinate)) by partsClosed;

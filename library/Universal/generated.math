@@ -35,33 +35,32 @@ definition Universal.Signature.HasNoConstants (signature : Universal.Signature)
 theorem Universal.IsSubuniverse.empty
         (a : Universal.Algebra(signature))
         (noConstants : Universal.Signature.HasNoConstants(signature))
-        : Universal.IsSubuniverse(a, Set.empty(Universal.carrier(a))) := {
+        : Universal.IsSubuniverse(a, Set.empty(a)) := {
   take arity : ℕ;
   take symbol : signature(arity);
-  take arguments : NaturalsBelow(arity) → Universal.carrier(a);
-  suppose ∀ (index : NaturalsBelow(arity)). arguments(index) ∈ Set.empty(Universal.carrier(a)) as allInside;
+  take arguments : NaturalsBelow(arity) → a;
+  suppose ∀ (index : NaturalsBelow(arity)). arguments(index) ∈ Set.empty(a) as allInside;
   1 ≤ arity by noConstants;
   0 < arity as positive;
   arguments(NaturalsBelow.make(0, positive))
-      ∈ Set.empty(Universal.carrier(a)) by allInside;
+      ∈ Set.empty(a) by allInside;
   done
 }
 
 -- The least subuniverse containing `base`.
 definition Universal.generated
         (a : Universal.Algebra(signature))
-        (base : Set(Universal.carrier(a)))
-        : Set(Universal.carrier(a)) :=
-  (subject : Universal.carrier(a)) ↦ ∀ (subset : Set(Universal.carrier(a))).
-      Universal.IsSubuniverse(a, subset) → base ⊆ subset → subject ∈ subset
+        (base : Set(a))
+        : Set(a) :=
+  (subject : a) ↦ ∀ (subset : Set(a)). Universal.IsSubuniverse(a, subset) → base ⊆ subset → subject ∈ subset
 
 theorem Universal.generated.contains_base
         (a : Universal.Algebra(signature))
-        (base : Set(Universal.carrier(a)))
+        (base : Set(a))
         : base ⊆ Universal.generated(a, base) := {
-  take subject : Universal.carrier(a);
+  take subject : a;
   suppose subject ∈ base;
-  take subset : Set(Universal.carrier(a));
+  take subset : Set(a);
   suppose Universal.IsSubuniverse(a, subset);
   suppose base ⊆ subset;
   done
@@ -69,25 +68,25 @@ theorem Universal.generated.contains_base
 
 theorem Universal.generated.least
         (a : Universal.Algebra(signature))
-        (base : Set(Universal.carrier(a)))
-        (subset : Set(Universal.carrier(a)))
+        (base : Set(a))
+        (subset : Set(a))
         (closed : Universal.IsSubuniverse(a, subset))
         (baseInside : base ⊆ subset)
         : Universal.generated(a, base) ⊆ subset := {
-  take subject : Universal.carrier(a);
+  take subject : a;
   suppose subject ∈ Universal.generated(a, base);
   done
 }
 
 theorem Universal.generated.is_subuniverse
         (a : Universal.Algebra(signature))
-        (base : Set(Universal.carrier(a)))
+        (base : Set(a))
         : Universal.IsSubuniverse(a, Universal.generated(a, base)) := {
   take arity : ℕ;
   take symbol : signature(arity);
-  take arguments : NaturalsBelow(arity) → Universal.carrier(a);
+  take arguments : NaturalsBelow(arity) → a;
   suppose ∀ (index : NaturalsBelow(arity)). arguments(index) ∈ Universal.generated(a, base) as allGenerated;
-  take subset : Set(Universal.carrier(a));
+  take subset : Set(a);
   suppose Universal.IsSubuniverse(a, subset);
   suppose base ⊆ subset;
   ∀ (index : NaturalsBelow(arity)). arguments(index) ∈ subset by allGenerated;
@@ -97,7 +96,7 @@ theorem Universal.generated.is_subuniverse
 -- Generation is monotone, and adds nothing to a set already closed.
 theorem Universal.generated.monotone
         (a : Universal.Algebra(signature))
-        (smaller larger : Set(Universal.carrier(a)))
+        (smaller larger : Set(a))
         (inside : smaller ⊆ larger)
         : Universal.generated(a, smaller) ⊆ Universal.generated(a, larger) := {
   Universal.IsSubuniverse(a, Universal.generated(a, larger));
@@ -110,13 +109,13 @@ theorem Universal.generated.monotone
 theorem Universal.generated.empty
         (a : Universal.Algebra(signature))
         (noConstants : Universal.Signature.HasNoConstants(signature))
-        : Universal.generated(a, Set.empty(Universal.carrier(a)))
-          = Set.empty(Universal.carrier(a)) := {
-  Universal.IsSubuniverse(a, Set.empty(Universal.carrier(a)));
-  Set.empty(Universal.carrier(a)) ⊆ Set.empty(Universal.carrier(a)) by Set.subset.reflexive;
-  Universal.generated(a, Set.empty(Universal.carrier(a)))
-      ⊆ Set.empty(Universal.carrier(a));
-  Set.empty(Universal.carrier(a))
-      ⊆ Universal.generated(a, Set.empty(Universal.carrier(a)));
+        : Universal.generated(a, Set.empty(a))
+          = Set.empty(a) := {
+  Universal.IsSubuniverse(a, Set.empty(a));
+  Set.empty(a) ⊆ Set.empty(a) by Set.subset.reflexive;
+  Universal.generated(a, Set.empty(a))
+      ⊆ Set.empty(a);
+  Set.empty(a)
+      ⊆ Universal.generated(a, Set.empty(a));
   done by Set.equal_of_same_members
 }

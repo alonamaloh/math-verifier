@@ -30,9 +30,8 @@ convention signature : Universal.Signature
 -- operations applied at each coordinate.
 definition Universal.Algebra.power
         (a : Universal.Algebra(signature)) (index : Type(0))
-        : Universal.Algebra(signature) := Universal.Algebra.make(signature, index → Universal.carrier(a),
-    ((arity : ℕ) ↦ (symbol : signature(arity)) ↦
-      (arguments : NaturalsBelow(arity) → (index → Universal.carrier(a))) ↦
+        : Universal.Algebra(signature) := Universal.Algebra.make(signature, index → a, ((arity : ℕ) ↦ (symbol : signature(arity)) ↦
+      (arguments : NaturalsBelow(arity) → (index → a)) ↦
         (coordinate : index) ↦ Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ arguments(slot)(coordinate)))))
 operator (^) on (Universal.Algebra, _) := Universal.Algebra.power
 
@@ -42,7 +41,7 @@ operator (^) on (Universal.Algebra, _) := Universal.Algebra.power
 theorem Universal.Term.evaluate_power
         {variables : Type(0)}
         (a : Universal.Algebra(signature)) (index : Type(0))
-        (valuation : variables → Universal.carrier(a ^ index))
+        (valuation : variables → a ^ index)
         (subject : Universal.Term(signature, variables))
         (coordinate : index)
         : Universal.Term.evaluate(a ^ index, valuation, subject)(coordinate)
@@ -76,9 +75,8 @@ theorem Universal.Term.evaluate_power
 -- The binary product `a × b`.
 definition Universal.Algebra.product
         (a b : Universal.Algebra(signature)) : Universal.Algebra(signature) := Universal.Algebra.make(signature,
-    Product(Universal.carrier(a), Universal.carrier(b)), ((arity : ℕ) ↦ (symbol : signature(arity)) ↦
-      (arguments : NaturalsBelow(arity) → Product(Universal.carrier(a), Universal.carrier(b))) ↦
-        Product.make(Universal.carrier(a), Universal.carrier(b), Universal.Algebra.interpret(arity, symbol,
+    Product(a, b), ((arity : ℕ) ↦ (symbol : signature(arity)) ↦
+      (arguments : NaturalsBelow(arity) → Product(a, b)) ↦ Product.make(a, b, Universal.Algebra.interpret(arity, symbol,
             ((slot : NaturalsBelow(arity)) ↦ Product.first(arguments(slot)))), Universal.Algebra.interpret(arity, symbol,
             ((slot : NaturalsBelow(arity)) ↦ Product.second(arguments(slot)))))))
 operator (×) on (Universal.Algebra, Universal.Algebra) := Universal.Algebra.product
@@ -89,7 +87,7 @@ operator (×) on (Universal.Algebra, Universal.Algebra) := Universal.Algebra.pro
 theorem Universal.Term.first_evaluate_product
         {variables : Type(0)}
         (a b : Universal.Algebra(signature))
-        (valuation : variables → Universal.carrier(a × b))
+        (valuation : variables → a × b)
         (subject : Universal.Term(signature, variables))
         : Product.first(Universal.Term.evaluate(a × b, valuation, subject))
           = Universal.Term.evaluate(a,
@@ -119,7 +117,7 @@ theorem Universal.Term.first_evaluate_product
 theorem Universal.Term.second_evaluate_product
         {variables : Type(0)}
         (a b : Universal.Algebra(signature))
-        (valuation : variables → Universal.carrier(a × b))
+        (valuation : variables → a × b)
         (subject : Universal.Term(signature, variables))
         : Product.second(Universal.Term.evaluate(a × b, valuation, subject))
           = Universal.Term.evaluate(b,

@@ -46,10 +46,10 @@ convention signature : Universal.Signature
 -- Free at every coordinate, but nowhere entirely inside.
 definition Universal.IsEssential
         (a : Universal.Algebra(signature)) (index : Type(0))
-        (parts : index → Set(Universal.carrier(a)))
-        (relation : Set(Universal.carrier(a ^ index)))
-        : Proposition := (∀ (free : index). ∃ (tuple : Universal.carrier(a ^ index)). tuple ∈ relation
-       ∧ ∀ (other : index). ¬(other = free) → tuple(other) ∈ parts(other)) ∧ ¬(∃ (tuple : Universal.carrier(a ^ index)). tuple ∈ relation
+        (parts : index → Set(a))
+        (relation : Set(a ^ index))
+        : Proposition := (∀ (free : index). ∃ (tuple : a ^ index). tuple ∈ relation
+       ∧ ∀ (other : index). other ≠ free → tuple(other) ∈ parts(other)) ∧ ¬(∃ (tuple : a ^ index). tuple ∈ relation
         ∧ ∀ (coordinate : index). tuple(coordinate) ∈ parts(coordinate))
 
 -- ── Essentiality forces the parts nonempty ────────────────────────────
@@ -60,18 +60,17 @@ definition Universal.IsEssential
 -- "there is one different from this one", and that is what the proof uses.
 theorem Universal.IsEssential.parts_nonempty
         (a : Universal.Algebra(signature)) (index : Type(0))
-        (parts : index → Set(Universal.carrier(a)))
-        (relation : Set(Universal.carrier(a ^ index)))
+        (parts : index → Set(a))
+        (relation : Set(a ^ index))
         (essential : Universal.IsEssential(a, index, parts, relation))
-        (coordinate other : index) (distinct : ¬(other = coordinate))
-        : Set.IsNonempty(Universal.carrier(a), parts(coordinate)) := {
-  ∀ (free : index). ∃ (tuple : Universal.carrier(a ^ index)). tuple ∈ relation
-        ∧ ∀ (place : index). ¬(place = free) → tuple(place) ∈ parts(place)
+        (coordinate other : index) (distinct : other ≠ coordinate)
+        : Set.IsNonempty(a, parts(coordinate)) := {
+  ∀ (free : index). ∃ (tuple : a ^ index). tuple ∈ relation ∧ ∀ (place : index). place ≠ free → tuple(place) ∈ parts(place)
       as freeAtEach;
-  choose tuple such that tuple ∈ relation ∧ ∀ (place : index). ¬(place = other) → tuple(place) ∈ parts(place)
+  choose tuple such that tuple ∈ relation ∧ ∀ (place : index). place ≠ other → tuple(place) ∈ parts(place)
       from freeAtEach(other);
-  ∀ (place : index). ¬(place = other) → tuple(place) ∈ parts(place);
-  ¬(coordinate = other);
+  ∀ (place : index). place ≠ other → tuple(place) ∈ parts(place);
+  coordinate ≠ other;
   tuple(coordinate) ∈ parts(coordinate);
   witness tuple(coordinate)
 }
@@ -88,26 +87,26 @@ theorem Universal.IsEssential.parts_nonempty
 -- coordinate; `NaturalsBelow.choice` is the choice principle available.
 theorem Universal.no_essential_of_witnesses
         (a : Universal.Algebra(signature)) (arity : ℕ)
-        (subset : Set(Universal.carrier(a)))
+        (subset : Set(a))
         (subject : Universal.Term(signature, NaturalsBelow(arity)))
         (witnesses : Universal.Witnesses(a, subset, Universal.universe(a), subject))
-        (relation : Set(Universal.carrier(a ^ NaturalsBelow(arity))))
+        (relation : Set(a ^ NaturalsBelow(arity)))
         (closed : Universal.IsSubuniverse(a ^ NaturalsBelow(arity), relation))
         (essential : Universal.IsEssential(a, NaturalsBelow(arity), ((slot : NaturalsBelow(arity)) ↦ subset), relation))
         : False := {
-  ∀ (free : NaturalsBelow(arity)). ∃ (tuple : Universal.carrier(a ^ NaturalsBelow(arity))). tuple ∈ relation
-        ∧ ∀ (other : NaturalsBelow(arity)). ¬(other = free) → tuple(other) ∈ subset
+  ∀ (free : NaturalsBelow(arity)). ∃ (tuple : a ^ NaturalsBelow(arity)). tuple ∈ relation
+        ∧ ∀ (other : NaturalsBelow(arity)). other ≠ free → tuple(other) ∈ subset
       as freeAtEach;
   choose chosen such that ∀ (free : NaturalsBelow(arity)). chosen(free) ∈ relation ∧ ∀ (other : NaturalsBelow(arity)).
-            ¬(other = free) → chosen(free)(other) ∈ subset
-      from NaturalsBelow.choice(Universal.carrier(a ^ NaturalsBelow(arity)), arity, ((free : NaturalsBelow(arity)) ↦
-          (candidate : Universal.carrier(a ^ NaturalsBelow(arity))) ↦ candidate ∈ relation ∧ ∀ (other : NaturalsBelow(arity)).
-                ¬(other = free) → candidate(other) ∈ subset), freeAtEach);
+            other ≠ free → chosen(free)(other) ∈ subset
+      from NaturalsBelow.choice(a ^ NaturalsBelow(arity), arity, ((free : NaturalsBelow(arity)) ↦
+          (candidate : a ^ NaturalsBelow(arity)) ↦ candidate ∈ relation ∧ ∀ (other : NaturalsBelow(arity)).
+                other ≠ free → candidate(other) ∈ subset), freeAtEach);
   -- The value of the witnessing term at the tuple of witnesses, computed in the
   -- power. Preservation keeps it in the relation.
   ∀ (free : NaturalsBelow(arity)). chosen(free) ∈ relation
       by { take free : NaturalsBelow(arity);
-           chosen(free) ∈ relation ∧ ∀ (other : NaturalsBelow(arity)). ¬(other = free) → chosen(free)(other) ∈ subset;
+           chosen(free) ∈ relation ∧ ∀ (other : NaturalsBelow(arity)). other ≠ free → chosen(free)(other) ∈ subset;
            done };
   Universal.Term.evaluate(a ^ NaturalsBelow(arity), chosen, subject) ∈ relation by Universal.Term.evaluate_mem;
   -- And at every coordinate its arguments meet the witnessing condition, with
@@ -116,13 +115,13 @@ theorem Universal.no_essential_of_witnesses
       by { take coordinate : NaturalsBelow(arity);
            ((slot : NaturalsBelow(arity)) ↦ chosen(slot)(coordinate))(coordinate)
                ∈ Universal.universe(a);
-           ∀ (slot : NaturalsBelow(arity)). ¬(slot = coordinate) → ((place : NaturalsBelow(arity)) ↦ chosen(place)(coordinate))(slot)
+           ∀ (slot : NaturalsBelow(arity)). slot ≠ coordinate → ((place : NaturalsBelow(arity)) ↦ chosen(place)(coordinate))(slot)
                  ∈ subset
                by { take slot : NaturalsBelow(arity);
-                    suppose ¬(slot = coordinate) as slotDiffers;
-                    chosen(slot) ∈ relation ∧ ∀ (other : NaturalsBelow(arity)). ¬(other = slot) → chosen(slot)(other) ∈ subset;
-                    ∀ (other : NaturalsBelow(arity)). ¬(other = slot) → chosen(slot)(other) ∈ subset;
-                    ¬(coordinate = slot)
+                    suppose slot ≠ coordinate as slotDiffers;
+                    chosen(slot) ∈ relation ∧ ∀ (other : NaturalsBelow(arity)). other ≠ slot → chosen(slot)(other) ∈ subset;
+                    ∀ (other : NaturalsBelow(arity)). other ≠ slot → chosen(slot)(other) ∈ subset;
+                    coordinate ≠ slot
                         by { suppose coordinate = slot as sameSlot;
                              slot = coordinate;
                              done };
@@ -135,8 +134,7 @@ theorem Universal.no_essential_of_witnesses
            done by substituting coordinatewise };
   -- Which is a member of the relation lying inside the box: the second clause
   -- of essentiality says there is none.
-  ∃ (tuple : Universal.carrier(a ^ NaturalsBelow(arity))). tuple ∈ relation
-      ∧ ∀ (coordinate : NaturalsBelow(arity)). tuple(coordinate) ∈ subset
+  ∃ (tuple : a ^ NaturalsBelow(arity)). tuple ∈ relation ∧ ∀ (coordinate : NaturalsBelow(arity)). tuple(coordinate) ∈ subset
       by { witness Universal.Term.evaluate(a ^ NaturalsBelow(arity), chosen, subject) };
   done
 }
@@ -148,19 +146,19 @@ theorem Universal.no_essential_of_witnesses
 -- naming the one constrained coordinate is the same condition and shorter.
 definition Universal.firstCoordinateIn
         (a : Universal.Algebra(signature)) (bound : ℕ)
-        (subset : Set(Universal.carrier(a)))
-        : Set(Universal.carrier(a ^ NaturalsBelow(1 + bound))) :=
-  (tuple : Universal.carrier(a ^ NaturalsBelow(1 + bound))) ↦ tuple(NaturalsBelow.first) ∈ subset
+        (subset : Set(a))
+        : Set(a ^ NaturalsBelow(1 + bound)) :=
+  (tuple : a ^ NaturalsBelow(1 + bound)) ↦ tuple(NaturalsBelow.first) ∈ subset
 
 theorem Universal.IsSubuniverse.firstCoordinateIn
         (a : Universal.Algebra(signature)) (bound : ℕ)
-        (subset : Set(Universal.carrier(a)))
+        (subset : Set(a))
         (closed : Universal.IsSubuniverse(a, subset))
         : Universal.IsSubuniverse(a ^ NaturalsBelow(1 + bound),
             Universal.firstCoordinateIn(a, bound, subset)) := {
   take arity : ℕ;
   take symbol : signature(arity);
-  take arguments : NaturalsBelow(arity) → Universal.carrier(a ^ NaturalsBelow(1 + bound));
+  take arguments : NaturalsBelow(arity) → a ^ NaturalsBelow(1 + bound);
   suppose ∀ (slot : NaturalsBelow(arity)). arguments(slot) ∈ Universal.firstCoordinateIn(a, bound, subset) as allInside;
   ∀ (slot : NaturalsBelow(arity)). arguments(slot)(NaturalsBelow.first) ∈ subset by allInside;
   Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ arguments(slot)(NaturalsBelow.first)))
@@ -174,16 +172,16 @@ theorem Universal.IsSubuniverse.firstCoordinateIn
 -- `NaturalsBelow.shiftUp` makes cheap.
 definition Universal.deleteFirst
         (a : Universal.Algebra(signature)) (bound : ℕ)
-        (subset : Set(Universal.carrier(a)))
-        (relation : Set(Universal.carrier(a ^ NaturalsBelow(1 + bound))))
-        : Set(Universal.carrier(a ^ NaturalsBelow(bound))) := Universal.project(a, NaturalsBelow(1 + bound), NaturalsBelow(bound),
+        (subset : Set(a))
+        (relation : Set(a ^ NaturalsBelow(1 + bound)))
+        : Set(a ^ NaturalsBelow(bound)) := Universal.project(a, NaturalsBelow(1 + bound), NaturalsBelow(bound),
     NaturalsBelow.shiftUp, relation ∩ Universal.firstCoordinateIn(a, bound, subset))
 
 theorem Universal.IsSubuniverse.deleteFirst
         (a : Universal.Algebra(signature)) (bound : ℕ)
-        (subset : Set(Universal.carrier(a)))
+        (subset : Set(a))
         (subsetClosed : Universal.IsSubuniverse(a, subset))
-        (relation : Set(Universal.carrier(a ^ NaturalsBelow(1 + bound))))
+        (relation : Set(a ^ NaturalsBelow(1 + bound)))
         (closed : Universal.IsSubuniverse(a ^ NaturalsBelow(1 + bound), relation))
         : Universal.IsSubuniverse(a ^ NaturalsBelow(bound),
             Universal.deleteFirst(a, bound, subset, relation)) := {
@@ -204,32 +202,32 @@ theorem Universal.IsSubuniverse.deleteFirst
 -- every other coordinate because every index is `first` or a shift.
 theorem Universal.IsEssential.deleteFirst
         (a : Universal.Algebra(signature)) (bound : ℕ)
-        (parts : NaturalsBelow(1 + bound) → Set(Universal.carrier(a)))
-        (relation : Set(Universal.carrier(a ^ NaturalsBelow(1 + bound))))
+        (parts : NaturalsBelow(1 + bound) → Set(a))
+        (relation : Set(a ^ NaturalsBelow(1 + bound)))
         (essential : Universal.IsEssential(a, NaturalsBelow(1 + bound), parts, relation))
         : Universal.IsEssential(a, NaturalsBelow(bound), ((slot : NaturalsBelow(bound)) ↦ parts(NaturalsBelow.shiftUp(slot))),
             Universal.deleteFirst(a, bound, parts(NaturalsBelow.first),
               relation)) := {
-  ∀ (free : NaturalsBelow(1 + bound)). ∃ (tuple : Universal.carrier(a ^ NaturalsBelow(1 + bound))). tuple ∈ relation
-        ∧ ∀ (other : NaturalsBelow(1 + bound)). ¬(other = free) → tuple(other) ∈ parts(other)
+  ∀ (free : NaturalsBelow(1 + bound)). ∃ (tuple : a ^ NaturalsBelow(1 + bound)). tuple ∈ relation
+        ∧ ∀ (other : NaturalsBelow(1 + bound)). other ≠ free → tuple(other) ∈ parts(other)
       as freeAtEach;
   -- (E1)
-  ∀ (free : NaturalsBelow(bound)). ∃ (small : Universal.carrier(a ^ NaturalsBelow(bound))).
+  ∀ (free : NaturalsBelow(bound)). ∃ (small : a ^ NaturalsBelow(bound)).
         small ∈ Universal.deleteFirst(a, bound, parts(NaturalsBelow.first), relation) ∧ ∀ (other : NaturalsBelow(bound)).
-            ¬(other = free) → small(other) ∈ parts(NaturalsBelow.shiftUp(other))
+            other ≠ free → small(other) ∈ parts(NaturalsBelow.shiftUp(other))
       by { take free : NaturalsBelow(bound);
-           choose tuple such that tuple ∈ relation ∧ ∀ (other : NaturalsBelow(1 + bound)). ¬(other = NaturalsBelow.shiftUp(free))
+           choose tuple such that tuple ∈ relation ∧ ∀ (other : NaturalsBelow(1 + bound)). other ≠ NaturalsBelow.shiftUp(free)
                    → tuple(other) ∈ parts(other)
                from freeAtEach(NaturalsBelow.shiftUp(free));
            tuple ∈ relation;
-           ∀ (other : NaturalsBelow(1 + bound)). ¬(other = NaturalsBelow.shiftUp(free)) → tuple(other) ∈ parts(other)
+           ∀ (other : NaturalsBelow(1 + bound)). other ≠ NaturalsBelow.shiftUp(free) → tuple(other) ∈ parts(other)
                as insideElsewhere;
            -- The first coordinate is not the freed one, so it is already inside.
            ¬((NaturalsBelow.first : NaturalsBelow(1 + bound))
                = NaturalsBelow.shiftUp(free))
                by { suppose (NaturalsBelow.first : NaturalsBelow(1 + bound))
                         = NaturalsBelow.shiftUp(free) as firstIsShift;
-                    ¬(NaturalsBelow.value(NaturalsBelow.shiftUp(free)) = 0) by NaturalsBelow.shiftUp_nonzero;
+                    NaturalsBelow.value(NaturalsBelow.shiftUp(free)) ≠ 0 by NaturalsBelow.shiftUp_nonzero;
                     NaturalsBelow.value(NaturalsBelow.shiftUp(free))
                        = NaturalsBelow.value((NaturalsBelow.first : NaturalsBelow(1 + bound)))
                              by substituting firstIsShift
@@ -242,12 +240,12 @@ theorem Universal.IsEssential.deleteFirst
            Universal.restrict(a, NaturalsBelow(1 + bound), NaturalsBelow(bound), NaturalsBelow.shiftUp, tuple)
              ∈ Universal.deleteFirst(a, bound, parts(NaturalsBelow.first), relation)
                by { witness tuple };
-           ∀ (other : NaturalsBelow(bound)). ¬(other = free) → Universal.restrict(a, NaturalsBelow(1 + bound),
+           ∀ (other : NaturalsBelow(bound)). other ≠ free → Universal.restrict(a, NaturalsBelow(1 + bound),
                    NaturalsBelow(bound), NaturalsBelow.shiftUp, tuple)(other)
                  ∈ parts(NaturalsBelow.shiftUp(other))
                by { take other : NaturalsBelow(bound);
-                    suppose ¬(other = free) as otherDiffers;
-                    ¬(NaturalsBelow.shiftUp(other) = NaturalsBelow.shiftUp(free))
+                    suppose other ≠ free as otherDiffers;
+                    NaturalsBelow.shiftUp(other) ≠ NaturalsBelow.shiftUp(free)
                         by { suppose NaturalsBelow.shiftUp(other)
                                  = NaturalsBelow.shiftUp(free) as shiftsAgree;
                              other = free by NaturalsBelow.shiftUp_injective;
@@ -258,9 +256,9 @@ theorem Universal.IsEssential.deleteFirst
                     done };
            witness Universal.restrict(a, NaturalsBelow(1 + bound), NaturalsBelow(bound), NaturalsBelow.shiftUp, tuple) };
   -- (E2)
-  ¬(∃ (small : Universal.carrier(a ^ NaturalsBelow(bound))). small ∈ Universal.deleteFirst(a, bound, parts(NaturalsBelow.first), relation)
+  ¬(∃ (small : a ^ NaturalsBelow(bound)). small ∈ Universal.deleteFirst(a, bound, parts(NaturalsBelow.first), relation)
       ∧ ∀ (coordinate : NaturalsBelow(bound)). small(coordinate) ∈ parts(NaturalsBelow.shiftUp(coordinate)))
-      by { suppose ∃ (small : Universal.carrier(a ^ NaturalsBelow(bound))). small ∈ Universal.deleteFirst(a, bound,
+      by { suppose ∃ (small : a ^ NaturalsBelow(bound)). small ∈ Universal.deleteFirst(a, bound,
                        parts(NaturalsBelow.first), relation) ∧ ∀ (coordinate : NaturalsBelow(bound)). small(coordinate)
                            ∈ parts(NaturalsBelow.shiftUp(coordinate))
                    as someSmallInside;
@@ -301,7 +299,7 @@ theorem Universal.IsEssential.deleteFirst
                             = NaturalsBelow.shiftUp(lower))
                         }
                     } };
-           ∃ (tuple : Universal.carrier(a ^ NaturalsBelow(1 + bound))). tuple ∈ relation ∧ ∀ (coordinate : NaturalsBelow(1 + bound)).
+           ∃ (tuple : a ^ NaturalsBelow(1 + bound)). tuple ∈ relation ∧ ∀ (coordinate : NaturalsBelow(1 + bound)).
                    tuple(coordinate) ∈ parts(coordinate)
                by { witness big };
            done };
@@ -319,14 +317,14 @@ theorem Universal.IsEssential.deleteFirst
 
 definition Universal.HasEssential
         (a : Universal.Algebra(signature))
-        (subset : Set(Universal.carrier(a))) (arity : ℕ) : Proposition := ∃ (relation : Set(Universal.carrier(a ^ NaturalsBelow(arity)))).
+        (subset : Set(a)) (arity : ℕ) : Proposition := ∃ (relation : Set(a ^ NaturalsBelow(arity))).
     Universal.IsSubuniverse(a ^ NaturalsBelow(arity), relation) ∧ Universal.IsEssential(a, NaturalsBelow(arity),
         ((slot : NaturalsBelow(arity)) ↦ subset), relation)
 
 -- One coordinate down.
 theorem Universal.HasEssential.one_less
         (a : Universal.Algebra(signature))
-        (subset : Set(Universal.carrier(a)))
+        (subset : Set(a))
         (subsetClosed : Universal.IsSubuniverse(a, subset))
         (bound : ℕ)
         (has : Universal.HasEssential(a, subset, 1 + bound))
@@ -347,7 +345,7 @@ theorem Universal.HasEssential.one_less
 -- Any number of coordinates down. Blueprint Proposition 3.5's final sentence.
 theorem Universal.HasEssential.descend
         (a : Universal.Algebra(signature))
-        (subset : Set(Universal.carrier(a)))
+        (subset : Set(a))
         (subsetClosed : Universal.IsSubuniverse(a, subset)) (gap : ℕ)
         : ∀ (lower : ℕ). Universal.HasEssential(a, subset, gap + lower) → Universal.HasEssential(a, subset, lower) :=
   by induction on gap with IH {
@@ -372,7 +370,7 @@ theorem Universal.HasEssential.descend
 -- would descend to one of arity exactly `arity`, which Proposition 3.6 forbids.
 theorem Universal.HasEssential.bounded_of_witnesses
         (a : Universal.Algebra(signature))
-        (subset : Set(Universal.carrier(a)))
+        (subset : Set(a))
         (subsetClosed : Universal.IsSubuniverse(a, subset))
         (arity : ℕ)
         (subject : Universal.Term(signature, NaturalsBelow(arity)))
@@ -410,20 +408,20 @@ theorem Universal.HasEssential.bounded_of_witnesses
 
 theorem Universal.Witnesses.of_inside_on_critical
         (a : Universal.Algebra(signature))
-        (subset : Set(Universal.carrier(a)))
+        (subset : Set(a))
         (subsetClosed : Universal.IsSubuniverse(a, subset))
         (arity : ℕ)
         (subject : Universal.Term(signature, NaturalsBelow(arity)))
         (insideOnCritical :
-            ∀ (valuation : NaturalsBelow(arity) → Universal.carrier(a)). (∃ (free : NaturalsBelow(arity)). ¬(valuation(free) ∈ subset)
-                 ∧ ∀ (other : NaturalsBelow(arity)). ¬(other = free) → valuation(other) ∈ subset)
+            ∀ (valuation : NaturalsBelow(arity) → a). (∃ (free : NaturalsBelow(arity)). valuation(free) ∉ subset
+                 ∧ ∀ (other : NaturalsBelow(arity)). other ≠ free → valuation(other) ∈ subset)
               → Universal.Term.evaluate(a, valuation, subject) ∈ subset)
         : Universal.Witnesses(a, subset,
             Universal.universe(a), subject) := {
   take free : NaturalsBelow(arity);
-  take valuation : NaturalsBelow(arity) → Universal.carrier(a);
+  take valuation : NaturalsBelow(arity) → a;
   suppose valuation(free) ∈ Universal.universe(a);
-  suppose ∀ (other : NaturalsBelow(arity)). ¬(other = free) → valuation(other) ∈ subset as othersInside;
+  suppose ∀ (other : NaturalsBelow(arity)). other ≠ free → valuation(other) ∈ subset as othersInside;
   done by cases {
     case valuation(free) ∈ subset as freeInside: {
         -- Wholly inside: preservation.
@@ -437,8 +435,8 @@ theorem Universal.Witnesses.of_inside_on_critical
       }
     otherwise as freeOutside: {
         -- Critical, with the one outside coordinate at `free`.
-        ∃ (slot : NaturalsBelow(arity)). ¬(valuation(slot) ∈ subset) ∧ ∀ (other : NaturalsBelow(arity)).
-                ¬(other = slot) → valuation(other) ∈ subset
+        ∃ (slot : NaturalsBelow(arity)). valuation(slot) ∉ subset ∧ ∀ (other : NaturalsBelow(arity)).
+                other ≠ slot → valuation(other) ∈ subset
             by { witness free };
         done by insideOnCritical
       }
@@ -457,32 +455,31 @@ theorem Universal.IsEssential.reindex
         (forward : sub → index) (backward : index → sub)
         (afterBackward : ∀ (coordinate : index). forward(backward(coordinate)) = coordinate)
         (afterForward : ∀ (slot : sub). backward(forward(slot)) = slot)
-        (parts : index → Set(Universal.carrier(a)))
-        (relation : Set(Universal.carrier(a ^ index)))
+        (parts : index → Set(a))
+        (relation : Set(a ^ index))
         (essential : Universal.IsEssential(a, index, parts, relation))
         : Universal.IsEssential(a, sub, ((slot : sub) ↦ parts(forward(slot))),
             Universal.project(a, index, sub, forward, relation)) := {
-  ∀ (free : index). ∃ (tuple : Universal.carrier(a ^ index)). tuple ∈ relation
-        ∧ ∀ (other : index). ¬(other = free) → tuple(other) ∈ parts(other)
+  ∀ (free : index). ∃ (tuple : a ^ index). tuple ∈ relation ∧ ∀ (other : index). other ≠ free → tuple(other) ∈ parts(other)
       as freeAtEach;
   -- (E1). The witness freed at `forward(free)`, restricted.
-  ∀ (free : sub). ∃ (small : Universal.carrier(a ^ sub)). small ∈ Universal.project(a, index, sub, forward, relation) ∧ ∀ (other : sub).
-            ¬(other = free) → small(other) ∈ parts(forward(other))
+  ∀ (free : sub). ∃ (small : a ^ sub). small ∈ Universal.project(a, index, sub, forward, relation) ∧ ∀ (other : sub).
+            other ≠ free → small(other) ∈ parts(forward(other))
       by { take free : sub;
-           choose tuple such that tuple ∈ relation ∧ ∀ (other : index). ¬(other = forward(free)) → tuple(other) ∈ parts(other)
+           choose tuple such that tuple ∈ relation ∧ ∀ (other : index). other ≠ forward(free) → tuple(other) ∈ parts(other)
                from freeAtEach(forward(free));
            tuple ∈ relation;
-           ∀ (other : index). ¬(other = forward(free)) → tuple(other) ∈ parts(other)
+           ∀ (other : index). other ≠ forward(free) → tuple(other) ∈ parts(other)
                as insideElsewhere;
            Universal.restrict(a, index, sub, forward, tuple)
              ∈ Universal.project(a, index, sub, forward, relation)
                by { witness tuple };
-           ∀ (other : sub). ¬(other = free) → Universal.restrict(a, index, sub, forward, tuple)(other)
+           ∀ (other : sub). other ≠ free → Universal.restrict(a, index, sub, forward, tuple)(other)
                  ∈ parts(forward(other))
                by { take other : sub;
-                    suppose ¬(other = free) as otherDiffers;
+                    suppose other ≠ free as otherDiffers;
                     -- `forward` is injective: `backward` undoes it.
-                    ¬(forward(other) = forward(free))
+                    forward(other) ≠ forward(free)
                         by { suppose forward(other) = forward(free)
                                  as imagesAgree;
                              other
@@ -496,9 +493,8 @@ theorem Universal.IsEssential.reindex
            witness Universal.restrict(a, index, sub, forward, tuple) };
   -- (E2). A lift is inside at every index, because every index is the image of
   -- its own preimage.
-  ¬(∃ (small : Universal.carrier(a ^ sub)). small ∈ Universal.project(a, index, sub, forward, relation)
-      ∧ ∀ (slot : sub). small(slot) ∈ parts(forward(slot)))
-      by { suppose ∃ (small : Universal.carrier(a ^ sub)). small ∈ Universal.project(a, index, sub, forward, relation)
+  ¬(∃ (small : a ^ sub). small ∈ Universal.project(a, index, sub, forward, relation) ∧ ∀ (slot : sub). small(slot) ∈ parts(forward(slot)))
+      by { suppose ∃ (small : a ^ sub). small ∈ Universal.project(a, index, sub, forward, relation)
                      ∧ ∀ (slot : sub). small(slot) ∈ parts(forward(slot))
                    as someSmallInside;
            choose small such that small ∈ Universal.project(a, index, sub, forward, relation)
@@ -521,7 +517,7 @@ theorem Universal.IsEssential.reindex
                         ∈ parts(forward(backward(coordinate)));
                     forward(backward(coordinate)) = coordinate by afterBackward;
                     done };
-           ∃ (tuple : Universal.carrier(a ^ index)). tuple ∈ relation ∧ ∀ (coordinate : index). tuple(coordinate) ∈ parts(coordinate)
+           ∃ (tuple : a ^ index). tuple ∈ relation ∧ ∀ (coordinate : index). tuple(coordinate) ∈ parts(coordinate)
                by { witness big };
            done };
   done

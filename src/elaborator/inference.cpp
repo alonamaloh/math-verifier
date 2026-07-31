@@ -3535,8 +3535,26 @@ ExpressionPointer Elaborator::coerceBundleValueToCarrier(
         if (structureName == "<unknown>") return term;
         std::string projectionName = structureName + ".carrier";
         if (environment_.lookup(projectionName) == nullptr) return term;
-        return makeApplication(makeConstant(projectionName),
-                               std::move(term));
+        // The projection may carry leading implicits — `Universal.Algebra`
+        // is parametrised by its signature, so `Universal.Algebra.carrier`
+        // is `{signature} → Algebra(signature) → Type(0)`. Solve them from
+        // the term's type, exactly as the value-level coercion chain does.
+        // The type must be CLOSED over the local binders first: implicits
+        // read off an opened type carry free variables of the opened
+        // context, which the kernel rejects as unbound.
+        std::vector<ExpressionPointer> implicits;
+        if (!inferLeadingImplicitsFromSourceType(
+                projectionName,
+                closeOverLocalBinders(termType, localBinders, binderCount),
+                implicits)) {
+            return term;
+        }
+        ExpressionPointer applied = makeConstant(projectionName);
+        for (auto& implicitArgument : implicits) {
+            applied = makeApplication(std::move(applied),
+                                       std::move(implicitArgument));
+        }
+        return makeApplication(std::move(applied), std::move(term));
     }
 
 ExpressionPointer Elaborator::elaboratePiType(
