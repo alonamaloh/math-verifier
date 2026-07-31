@@ -231,9 +231,22 @@ same route, and each step carries how the goal it produced was closed. The same
 site went from 1 reported rewrite to 3, and transcribing the missing one fixed
 it.
 
-Route lengths now seen across the 11 remaining cap-3 breaks: 1, 1, 1, 1, 2, 2,
-5, 5, 5, 8, **11**. The 11-rewrite site is the clearest possible statement of
-why the tool was needed — no author was going to reconstruct that by hand.
+**Third iteration: the long routes were partly inflation.** Reported lengths
+were 1,1,1,1,2,2,5,5,5,8,**11** — but the 11 was an artefact. The retry
+re-elaborates the WHOLE declaration, so the collected steps were every rewrite
+anywhere in it: that "route" spanned two unrelated `case` arms of the same
+theorem. Each step now records the line of the claim it was performed for, and
+the report keeps only the steps matching the failing line. The 11 became **2**,
+and the honest distribution is 1,1,1,1,2,2,2,5,5,5,8.
+
+That site (`Natural.binomial`, a calc step) was then fixed by transcription:
+its two-step route named the two anonymous claims it leaned on, and giving them
+names plus two explicit calc steps closed it, capped and uncapped.
+
+Anonymous facts are now reported usefully too. A route step through an unnamed
+claim used to print its internal binder (`local binder _claim_anon_120_9`),
+which is neither citable nor meaningful; it now reads *"the (unnamed) claim at
+line 120 — give it a name and cite it"*, which is exactly the fix.
 
 Naming matters as much as recording. Every equation is printed as the author
 would type it: `citableNameFromFactSource` for context/library facts, and for a

@@ -1771,7 +1771,8 @@ private:
     //   by unification must be findable in local hypotheses by
     //   structural-type match.
     // On a failed declaration, diagnose a capped-bridge route (see above).
-    std::string describeDeepEqualityRoute(const SurfaceTopStatement& statement);
+    std::string describeDeepEqualityRoute(
+        const SurfaceTopStatement& statement, int failingLine);
 
     ExpressionPointer elaborateStructuredClaim(
         const SurfaceStructuredClaim& claim,
@@ -7111,6 +7112,11 @@ private:
         // innermost step that is the base justification the author needs —
         // whether the form stands bare or wants a citation of its own.
         std::string closedBy;
+        // The claim this rewrite was performed for. The retry re-elaborates
+        // the WHOLE declaration, so without this the collected steps are a
+        // log of every rewrite anywhere in it — including other `case` arms —
+        // rather than the route to the step that actually failed.
+        int line = 0;
     };
     std::vector<DeepRouteStep> deepRoute_;
     // >0 forces the bridge's per-claim prove cap, overriding the env knob.

@@ -392,6 +392,7 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
                     DeepRouteStep step;
                     step.equation = eq.source;
                     step.closedBy = closedBy;
+                    step.line = line;
                     try {
                         step.statement = prettyPrintInLocalScope(
                             rewrittenGoal, localBinders);

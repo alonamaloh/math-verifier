@@ -272,8 +272,8 @@ void Elaborator::runModule(const SurfaceModule& module) {
                     elaborateTopStatement(statement);
                 } catch (const ElaborateError& failure) {
                     if (bridgeDeclines_ == 0) throw;
-                    std::string route =
-                        describeDeepEqualityRoute(statement);
+                    std::string route = describeDeepEqualityRoute(
+                        statement, failure.line);
                     if (route.empty()) throw;
                     throw ElaborateError(
                         std::string(failure.what()) + route,
@@ -631,7 +631,7 @@ void Elaborator::reportClaimCosts(const std::string& declarationLabel) {
 // to describe the deeper route. Never called except on a failure path, so the
 // happy path pays nothing.
 std::string Elaborator::describeDeepEqualityRoute(
-        const SurfaceTopStatement& statement) {
+        const SurfaceTopStatement& statement, int failingLine) {
         if (inDeepRetry_) return "";
         struct Restore {
             Elaborator& e;
@@ -655,6 +655,17 @@ std::string Elaborator::describeDeepEqualityRoute(
             "to chain more rewrites than the current cap permits, so a step "
             "here is doing several rewrites at once and the proof would say "
             "more if they were named.";
+        // Keep only the rewrites performed FOR the claim that failed. The
+        // retry re-elaborates the whole declaration, so the raw collection
+        // mixes in every other claim's rewrites — on one site that produced an
+        // "11-step route" spanning two unrelated `case` arms.
+        if (failingLine > 0) {
+            std::vector<DeepRouteStep> onPath;
+            for (const DeepRouteStep& step : deepRoute_) {
+                if (step.line == failingLine) onPath.push_back(step);
+            }
+            if (!onPath.empty()) deepRoute_ = std::move(onPath);
+        }
         if (!deepRoute_.empty()) {
             // `deepRoute_` is innermost-first, which is already the order an
             // author states the intermediate forms in: the deepest rewritten
@@ -676,6 +687,19 @@ std::string Elaborator::describeDeepEqualityRoute(
                 // inferred)"). Print the lemma the author would type, not the
                 // provenance — otherwise the suggestion reads
                 // "by substituting `supplied via `by substituting``".
+                // An anonymous claim's internal binder (`_claim_anon_120_9`)
+                // is not citable and means nothing to a reader. Say where it
+                // is instead — naming that claim is the fix.
+                const std::string anon = "local binder _claim_anon_";
+                if (source.rfind(anon, 0) == 0) {
+                    std::string rest = source.substr(anon.size());
+                    size_t underscore = rest.find('_');
+                    if (underscore != std::string::npos) {
+                        return "the (unnamed) claim at line "
+                            + rest.substr(0, underscore)
+                            + " — give it a name and cite it";
+                    }
+                }
                 const std::string prefix = "supplied via";
                 if (source.rfind(prefix, 0) == 0) {
                     size_t open = source.find('(');
