@@ -16,6 +16,8 @@ for Zhuk's theorem on the left centre of a subdirect relation.
 - `Universal.Term` — terms over a signature with variables from an arbitrary
   type, in [term.math](term.math), together with `Universal.Term.evaluate` and
   `Universal.Term.substitute`.
+- `Universal.generated` — the least subuniverse containing a set, and
+  `Universal.Signature.HasNoConstants`, in [generated.math](generated.math).
 
 ## Main theorems
 
@@ -23,6 +25,10 @@ for Zhuk's theorem on the left centre of a subdirect relation.
 - `Universal.Term.evaluate_substitute` — evaluating a substituted term is
   evaluating the original under the valuation that first evaluates each
   assigned term.
+- `Universal.generated.contains_base`, `.least`, `.is_subuniverse`, `.monotone`,
+  and `.empty` — the characterising facts. Because a set is a predicate,
+  "least subuniverse containing `base`" is directly definable as quantification
+  over the subuniverses that contain it, so no closure construction is needed.
 
 ## Two representation choices
 
