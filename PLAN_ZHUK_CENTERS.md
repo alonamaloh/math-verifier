@@ -417,8 +417,9 @@ eighth draft; Lean version unchanged and complete.
 | Layer 2 relational constructions (`Universal/relation.math`) | 240 |
 | Layer 3 (`Natural/minimum`, `Lists/filter_length`, `Set/enumeration`) | 451 |
 | Layer 4 (`Universal/absorption`, `Universal/star_power`, + `term`, + `Set/finite_successor`) | 764 |
-| Layer 5 so far (`Universal/essential.math`) | 187 |
-| **Total** | **~2150** |
+| Layer 5 so far (`Universal/essential.math`) | 534 |
+| Dependent product (`Universal/dependent_product.math`) | 152 |
+| **Total** | **~2650** |
 
 **The remaining estimate, recalibrated.** The plan's "~15k lines of blueprint
 content" was a guess made before anything was measured, and it is about 4× too
@@ -441,13 +442,41 @@ box, contradicting the second clause. Stated at `index = NaturalsBelow(m)`,
 since it chooses one witness per coordinate and `NaturalsBelow.choice` is the
 choice principle available.
 
-Then the two hard ones, in order: Proposition 3.5 (arity reduction — projection
-along `NaturalsBelow.embed`, now available) and Lemma 3.7 (regrouping), which
-the plan has always called the single biggest milestone. Theorem 3.10 assembles
-them.
+Proposition 3.5 (arity reduction) is done too, as
+`Universal.IsEssential.deleteFirst` — the first consumer of
+`Universal/relation.math`, built as `project` of `relation ∩
+firstCoordinateIn`. It deletes the *first* coordinate rather than the
+blueprint's last, since `NaturalsBelow.shiftUp` makes that one cheap and which
+goes is immaterial. Corollary 3.7 follows: `HasEssential.descend` and
+`HasEssential.bounded_of_witnesses`.
 
-Layer 7 will want the **dependent product** `∏_{i∈I} A_i`, which is still owed;
-`Universal/relation.math` covers powers only, which is all Part II needs.
+**The dependent product is built** (`Universal/dependent_product.math`, 152
+lines): the definition, coordinatewise evaluation, the box, and the fact that
+the power *is* the constant family — `power_eq_dependentProduct` is `done`,
+since a non-dependent function type is the dependent one at a constant motive.
+`restrict`/`project`/`cylinder` stay in their power form until Layer 7 names the
+dependent counterparts it wants.
+
+**What is left in Layer 5:** Lemma 3.7 (regrouping), which the plan has always
+called the single biggest milestone and which settles design question 4;
+Lemma 3.9 (`Clo_m` as a subuniverse of `A^(A^m)`); and Theorem 3.10, which
+assembles them. Then Layers 6–7.
+
+### The trick that makes arithmetic-indexed induction work
+
+`Natural.add` is opaque, so `NaturalsBelow(gap + lower)` never reduces to the
+shape an induction step wants, and a descent stated directly on those types
+needs a type-level transport at every level. Wrapping the whole statement in a
+predicate on ℕ — `Universal.HasEssential(a, subset, arity)` — moves the same
+arithmetic to the propositional level, where `by substituting` handles it and
+the induction is ordinary. This is the counterpart to the star-power finding: do
+not induct on a numeral that indexes a type; induct on a numeral that indexes a
+proposition *about* the type.
+
+Note also that `by induction on x` needs `x` to be a **parameter**, not a
+binder of a `∀` in the statement. `descend` takes `gap` as a parameter and
+quantifies over `lower` in the conclusion, the shape `Natural.monus_add_left`
+uses.
 
 ## Milestones
 

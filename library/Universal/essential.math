@@ -418,3 +418,117 @@ theorem Universal.IsEssential.deleteFirst {signature : Universal.Signature}
            done };
   done
 }
+
+-- ── Bounded arity ─────────────────────────────────────────────────────
+--
+-- Wrapping the whole statement in a predicate on ℕ is what makes the descent
+-- ordinary. `NaturalsBelow(gap + lower)` is a type built from arithmetic, and
+-- `Natural.add` is opaque, so no arm of an induction on `gap` will ever *reduce*
+-- it to the shape the next step wants — a transport would be needed at every
+-- level. With the arity as a plain argument to a proposition, the same
+-- arithmetic is propositional and `by substituting` does it.
+
+definition Universal.HasEssential {signature : Universal.Signature}
+        (a : Universal.Algebra(signature))
+        (subset : Set(Universal.Algebra.carrier(a))) (arity : ℕ) : Proposition :=
+  ∃ (relation : Set(Universal.Algebra.carrier(
+      Universal.Algebra.power(a, NaturalsBelow(arity))))).
+    Universal.IsSubuniverse(
+      Universal.Algebra.power(a, NaturalsBelow(arity)), relation)
+    ∧ Universal.IsEssential(a, NaturalsBelow(arity),
+        ((slot : NaturalsBelow(arity)) ↦ subset), relation)
+
+-- One coordinate down.
+theorem Universal.HasEssential.one_less {signature : Universal.Signature}
+        (a : Universal.Algebra(signature))
+        (subset : Set(Universal.Algebra.carrier(a)))
+        (subsetClosed : Universal.IsSubuniverse(a, subset))
+        (bound : ℕ)
+        (has : Universal.HasEssential(a, subset, 1 + bound))
+        : Universal.HasEssential(a, subset, bound) := {
+  choose relation such that
+      Universal.IsSubuniverse(
+        Universal.Algebra.power(a, NaturalsBelow(1 + bound)), relation)
+      ∧ Universal.IsEssential(a, NaturalsBelow(1 + bound),
+          ((slot : NaturalsBelow(1 + bound)) ↦ subset), relation)
+      from has;
+  Universal.IsSubuniverse(
+      Universal.Algebra.power(a, NaturalsBelow(1 + bound)), relation);
+  Universal.IsEssential(a, NaturalsBelow(1 + bound),
+      ((slot : NaturalsBelow(1 + bound)) ↦ subset), relation);
+  Universal.IsSubuniverse(Universal.Algebra.power(a, NaturalsBelow(bound)),
+      Universal.deleteFirst(a, bound, subset, relation))
+      by Universal.IsSubuniverse.deleteFirst;
+  Universal.IsEssential(a, NaturalsBelow(bound),
+      ((slot : NaturalsBelow(bound)) ↦ subset),
+      Universal.deleteFirst(a, bound, subset, relation))
+      by Universal.IsEssential.deleteFirst;
+  witness Universal.deleteFirst(a, bound, subset, relation)
+}
+
+-- Any number of coordinates down. Blueprint Proposition 3.5's final sentence.
+theorem Universal.HasEssential.descend {signature : Universal.Signature}
+        (a : Universal.Algebra(signature))
+        (subset : Set(Universal.Algebra.carrier(a)))
+        (subsetClosed : Universal.IsSubuniverse(a, subset)) (gap : ℕ)
+        : ∀ (lower : ℕ).
+            Universal.HasEssential(a, subset, gap + lower)
+            → Universal.HasEssential(a, subset, lower) :=
+  by induction on gap with IH {
+    case gap = 0: {
+        take lower : ℕ;
+        suppose Universal.HasEssential(a, subset, 0 + lower);
+        (0 : ℕ) + lower = lower as noGap;
+        done by substituting noGap
+      }
+    case gap = 1 + rest for some (rest : ℕ): {
+        take lower : ℕ;
+        suppose Universal.HasEssential(a, subset, (1 + rest) + lower);
+        (1 + rest) + lower = 1 + (rest + lower) as regrouped;
+        Universal.HasEssential(a, subset, 1 + (rest + lower))
+            by substituting regrouped;
+        Universal.HasEssential(a, subset, rest + lower)
+            by Universal.HasEssential.one_less;
+        done by IH
+      }
+  }
+
+-- Blueprint Corollary 3.7: a witness of arity `arity` bounds every essential
+-- arity strictly below it. An essential relation of arity at least `arity`
+-- would descend to one of arity exactly `arity`, which Proposition 3.6 forbids.
+theorem Universal.HasEssential.bounded_of_witnesses {signature : Universal.Signature}
+        (a : Universal.Algebra(signature))
+        (subset : Set(Universal.Algebra.carrier(a)))
+        (subsetClosed : Universal.IsSubuniverse(a, subset))
+        (arity : ℕ)
+        (subject : Universal.Term(signature, NaturalsBelow(arity)))
+        (witnesses : Universal.Witnesses(a, subset,
+            Set.universe(Universal.Algebra.carrier(a)), subject))
+        (candidate : ℕ)
+        (has : Universal.HasEssential(a, subset, candidate))
+        : candidate < arity := {
+  ¬Universal.HasEssential(a, subset, arity)
+      by { suppose Universal.HasEssential(a, subset, arity) as hasAtArity;
+           choose relation such that
+               Universal.IsSubuniverse(
+                 Universal.Algebra.power(a, NaturalsBelow(arity)), relation)
+               ∧ Universal.IsEssential(a, NaturalsBelow(arity),
+                   ((slot : NaturalsBelow(arity)) ↦ subset), relation)
+               from hasAtArity;
+           Universal.IsSubuniverse(
+             Universal.Algebra.power(a, NaturalsBelow(arity)), relation);
+           Universal.IsEssential(a, NaturalsBelow(arity),
+             ((slot : NaturalsBelow(arity)) ↦ subset), relation);
+           done by Universal.no_essential_of_witnesses };
+  ¬(arity ≤ candidate)
+      by { suppose arity ≤ candidate as reachesArity;
+           choose gap such that candidate = arity + gap
+               from Natural.subtraction_witness(arity, candidate, reachesArity);
+           candidate = gap + arity as splitOff;
+           Universal.HasEssential(a, subset, gap + arity)
+               by substituting splitOff;
+           Universal.HasEssential(a, subset, arity)
+               by Universal.HasEssential.descend;
+           done };
+  done by Natural.lt_of_not_le
+}
