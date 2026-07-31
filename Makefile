@@ -240,6 +240,7 @@ graph: $(GRAPH_MATHV_FILES) $(GRAPH_MATHV_FILES:.mathv=.mathv.iface) \
 tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES) checker-tests \
 	carrier-normal-form-check matrix-ergonomics-statement-check \
 	premise-block-warning-check partial-choose-condition-check \
+	local-alias-display-check \
 	no-generated-in-library
 
 # The fifteen theorem's own gates. Separate from `tests` for the same reason
@@ -259,6 +260,25 @@ project-tests: projects rank-four-generated-check \
 # elaborator warns at write time; this asserts the warning still fires, and
 # that the idiomatic spelling beside it stays silent. The fixture VERIFIES,
 # so it cannot live in ErrorTest/ (whose files must fail).
+# A `let` is transparent to the elaborator on purpose: its value goes into the
+# kernel ContextEntry, and the anonymous-tuple path zeta-unfolds it to find an
+# inductive head. Without the display fold, every goal and error would then
+# print the expansion the abbreviation exists to avoid. Assert the goal report
+# names the alias and does not leak its body — a regression either way is
+# silent, since nothing else reads this output.
+local-alias-display-check:
+	@output=$$(./kernel verify --source library/Test/local_alias_display.math \
+	    --cache-root build --goal-at 20 2>&1); \
+	folded=$$(printf '%s\n' "$$output" | grep -c "sameSum : doubled = doubled"); \
+	leaked=$$(printf '%s\n' "$$output" | grep "sameSum :" | grep -c "n + n"); \
+	if [ "$$folded" != "1" ] || [ "$$leaked" != "0" ]; then \
+	  echo "local-alias-display-check: FAIL - expected the goal report to show"; \
+	  echo "  sameSum : doubled = doubled"; \
+	  printf '%s\n' "$$output" | sed 's/^/  /'; \
+	  exit 1; \
+	fi; \
+	echo "local-alias-display-check: PASS"
+
 premise-block-warning-check:
 	@output=$$(./kernel verify --source library/Test/premise_block_argument.math \
 	    --output build/premise-block-warning.mathv --cache-root build 2>&1); \

@@ -1,0 +1,65 @@
+-- Coercion to sort: a bundle value standing for its carrier wherever a TYPE
+-- is wanted, and a `let` alias that the anonymous-tuple path must see through.
+--
+-- Both behaviours are relied on throughout `library/Universal/`, which is
+-- their only consumer, so a regression there would otherwise surface as a
+-- confusing failure in an unrelated area. The bundle here is deliberately
+-- local: what is under test is the elaborator, not that library.
+
+module Test.coercion_to_sort_test
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Set.basics
+
+-- A bundle PARAMETRISED by a tag, so that `Widget.carrier` is
+-- `{tag} → Widget(tag) → Type(0)` — its carrier projection carries a leading
+-- implicit. Applying the projection without solving that implicit put the
+-- widget itself in the tag slot; the coercion must solve it from the term's
+-- type, as the value-level coercion chain does.
+definition Tag : Type(1) := ℕ → Type(0)
+
+inductive Widget (tag : Tag) : Type(1) where
+  | Widget.make : (carrier : Type(0)) → Widget(tag)
+
+definition Widget.carrier {tag : Tag} : Widget(tag) → Type(0)
+  | Widget.make(carrier) => carrier
+
+-- (1) Binder position: `(x : w)` means `(x : Widget.carrier(w))`.
+theorem Test.coercion_binder (tag : Tag) (w : Widget(tag)) (x : w) : x = x :=
+  reflexivity(Widget.carrier(w), x)
+
+-- (2) Argument position, where a `Type(0)` is expected.
+theorem Test.coercion_argument (tag : Tag) (w : Widget(tag))
+        (subset : Set(w)) (x : w) (inside : x ∈ subset) : x ∈ subset :=
+  inside
+
+-- (3) Pi domain and codomain.
+theorem Test.coercion_arrow (tag : Tag) (w : Widget(tag)) (f : w → w) (x : w)
+        : f(x) = f(x) :=
+  reflexivity(Widget.carrier(w), f(x))
+
+-- (4) A DECLARATION'S RETURN TYPE — the position the coercion originally did
+-- not reach, so `definition … : w := …` reported "Pi: codomain is not a type".
+definition Test.coercion_return (tag : Tag) (w : Widget(tag)) (x : w) : w := x
+
+theorem Test.coercion_return_typechecks (tag : Tag) (w : Widget(tag)) (x : w)
+        : Test.coercion_return(tag, w, x) = x :=
+  reflexivity(Widget.carrier(w), x)
+
+-- (5) A `let` alias must not hide an inductive from `witness`. `evens` unfolds
+-- to a set whose membership is an `∃`; the anonymous-tuple path takes no
+-- context of its own, so it has to ζ-unfold local aliases before looking for
+-- the inductive head. Without that this reports "expected type does not have
+-- an inductive head".
+definition Test.evens : Set(ℕ) :=
+  (n : ℕ) ↦ ∃ (half : ℕ). n = half + half
+
+theorem Test.let_alias_is_transparent_to_witness : True := {
+  let evens : Set(ℕ) := Test.evens;
+  (0 : ℕ) ∈ evens by { witness 0 };
+  done
+}
