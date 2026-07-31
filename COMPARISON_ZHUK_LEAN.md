@@ -441,6 +441,42 @@ Three findings worth keeping:
   free at the prover level, and that is worth knowing before a library-wide
   sweep.
 
+**Coercion to sort, and the rest of the sweep.** Four further levers, measured
+on top of the above:
+
+| lever | effect |
+|---|---|
+| coercion to sort — `Set(a)`, `(x : a)`, `a → a` | 673 sites |
+| `≠` for `¬(x = y)`, `∉` for `¬(x ∈ S)` | 217 + 19 sites |
+| deleting the hand-rolled `1 ≠ 0` derivations | 4 sites, 32 lines → 6 |
+| five `let`s for repeated compound terms | 82 sites |
+
+Running total against the pre-notation tree: **15.7% fewer lines, 14.9% fewer
+characters**, and the two proofs the reviewer named as unreadable now read as
+`(relation : Set(a × b))`, `(closed : Universal.IsSubuniverse(a × b, relation))`,
+`(element : a)`.
+
+Three things learned doing it:
+
+- **Coercion to sort was half-built.** `coerceBundleValueToCarrier` already
+  fired wherever a type was wanted, applying `<Structure>.carrier` by naming
+  convention. Two gaps kept it from this development: it did not solve the
+  projection's leading implicits (so a signature-parametrised carrier was
+  mis-applied), and a declaration's *return type* was not routed through it.
+  Both are a few lines. Its one real limit: a pattern-match definition's return
+  type cannot use it, because the recursor's motive must syntactically end in a
+  Sort — hit exactly twice.
+- **The `1 ≠ 0` ceremony was self-inflicted.** The reviewer read six lines of
+  value-chasing as a missing decision procedure. It is not: `by
+  NaturalsBelow.ne_of_value_ne` alone closes the goal, and always did. Four
+  copies of a hand-rolled derivation existed because nobody tried the one-liner.
+  A cheap tactic would have hidden the same mistake.
+- **The `let` traps are narrower than they looked.** Three of five attempted
+  abbreviations took, at 82 sites; the two that failed are the documented shape
+  — a `let`-bound set that a later `witness` must unfold. Abbreviating a
+  compound term used as an *argument* is safe; abbreviating one that has to be
+  seen through is not.
+
 What did **not** work: `Universal.Tm(V)` for `Universal.Term(signature, V)`. The
 convention makes `signature` implicit, and an implicit that appears only in a
 pattern-match definition's *return* type cannot be inferred. The same shape is

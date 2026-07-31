@@ -404,28 +404,29 @@ theorem Universal.center_step
                 Universal.neighborhood(a, b, relation, valuation(free))))
           ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation,
                 Universal.Term.evaluate(a, valuation, subject))) := {
-  Universal.neighborhood(a, b, relation, valuation(free))
-      ⊆ Universal.stepImage(b, arity, subject, free, Universal.neighborhood(a, b, relation, valuation(free)))
+  -- the neighbourhood being enlarged.
+  let nearFree : Set(b) := Universal.neighborhood(a, b, relation, valuation(free));
+  nearFree
+      ⊆ Universal.stepImage(b, arity, subject, free, nearFree)
       by Universal.subset_stepImage;
-  Universal.stepImage(b, arity, subject, free, Universal.neighborhood(a, b, relation, valuation(free)))
+  Universal.stepImage(b, arity, subject, free, nearFree)
       ⊆ Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation, subject))
       by Universal.stepImage_subset_neighborhood;
   done by cases {
-    case Universal.stepImage(b, arity, subject, free, Universal.neighborhood(a, b, relation, valuation(free)))
-         = Universal.neighborhood(a, b, relation, valuation(free))
+    case Universal.stepImage(b, arity, subject, free, nearFree)
+         = nearFree
            as collapsed: {
         -- The neighbourhood binary absorbs `B`, so it is not proper.
-        Universal.BinaryAbsorbs(b, Universal.neighborhood(a, b, relation, valuation(free)), Universal.universe(b))
+        Universal.BinaryAbsorbs(b, nearFree, Universal.universe(b))
             by Universal.BinaryAbsorbs.of_stepImage_eq;
-        Universal.IsSubuniverse(b, Universal.neighborhood(a, b, relation, valuation(free))) by Universal.IsSubuniverse.neighborhood;
-        Set.IsNonempty(b, Universal.neighborhood(a, b, relation, valuation(free))) by Universal.neighborhood_nonempty;
-        Universal.neighborhood(a, b, relation, valuation(free))
+        Universal.IsSubuniverse(b, nearFree) by Universal.IsSubuniverse.neighborhood;
+        Set.IsNonempty(b, nearFree) by Universal.neighborhood_nonempty;
+        nearFree
             = Universal.universe(b)
-            by { suppose ¬(Universal.neighborhood(a, b, relation, valuation(free))
+            by { suppose ¬(nearFree
                    = Universal.universe(b))
                      for contradiction;
-                 ¬Universal.BinaryAbsorbs(b, Universal.neighborhood(a, b, relation, valuation(free)), Universal.universe(b))
-                     by noProperBinaryAbsorbing;
+                 ¬Universal.BinaryAbsorbs(b, nearFree, Universal.universe(b)) by noProperBinaryAbsorbing;
                  done };
         -- So the free coordinate is central too, and hence so is the value.
         valuation(free) ∈ Universal.leftCenter(a, b, relation)
@@ -442,29 +443,27 @@ theorem Universal.center_step
         Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation, subject))
             = Universal.universe(b)
             by Universal.neighborhood_universe_of_leftCenter as valueSaturated;
-        min(Set.size(enumeration, Universal.universe(b)), 1 + Set.size(enumeration,
-              Universal.neighborhood(a, b, relation, valuation(free))))
+        min(Set.size(enumeration, Universal.universe(b)), 1 + Set.size(enumeration, nearFree))
            ≤ Set.size(enumeration, Universal.universe(b))
                  by Natural.minimum_le_left;
         done by substituting valueSaturated
       }
     otherwise as grows: {
         -- Strictly bigger, and Step 1 passes the gain on.
-        Set.size(enumeration, Universal.neighborhood(a, b, relation, valuation(free)))
-          < Set.size(enumeration, Universal.stepImage(b, arity, subject, free, Universal.neighborhood(a, b, relation, valuation(free))))
-          by { ¬(Universal.neighborhood(a, b, relation, valuation(free))
-                 = Universal.stepImage(b, arity, subject, free, Universal.neighborhood(a, b, relation, valuation(free))))
-                 by { suppose Universal.neighborhood(a, b, relation, valuation(free))
-                        = Universal.stepImage(b, arity, subject, free, Universal.neighborhood(a, b, relation, valuation(free))) as flipped;
-                      Universal.stepImage(b, arity, subject, free, Universal.neighborhood(a, b, relation, valuation(free)))
-                        = Universal.neighborhood(a, b, relation, valuation(free)) by flipped;
+        Set.size(enumeration, nearFree)
+          < Set.size(enumeration, Universal.stepImage(b, arity, subject, free, nearFree))
+          by { ¬(nearFree
+                 = Universal.stepImage(b, arity, subject, free, nearFree))
+                 by { suppose nearFree
+                        = Universal.stepImage(b, arity, subject, free, nearFree) as flipped;
+                      Universal.stepImage(b, arity, subject, free, nearFree)
+                        = nearFree by flipped;
                       done };
                done by Set.size_lt_of_proper_subset };
-        min(Set.size(enumeration, Universal.universe(b)), 1 + Set.size(enumeration,
-              Universal.neighborhood(a, b, relation, valuation(free))))
-           ≤ 1 + Set.size(enumeration, Universal.neighborhood(a, b, relation, valuation(free)))
+        min(Set.size(enumeration, Universal.universe(b)), 1 + Set.size(enumeration, nearFree))
+           ≤ 1 + Set.size(enumeration, nearFree)
                  by Natural.minimum_le_right
-           ≤ Set.size(enumeration, Universal.stepImage(b, arity, subject, free, Universal.neighborhood(a, b, relation, valuation(free))))
+           ≤ Set.size(enumeration, Universal.stepImage(b, arity, subject, free, nearFree))
            ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation, subject)))
                  by Set.size_le_of_subset;
         done

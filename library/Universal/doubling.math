@@ -517,16 +517,21 @@ theorem Universal.linking_disjoint
         : ¬(Universal.pair(a, a, left, right)
             ∈ Universal.generated(a × a,
                 Universal.centralPairs(a, subset, base))) := {
+  -- `B'` of the blueprint.
+  let beta : Set(a) := Universal.betaSet(a, subset, size, relation);
+  -- `S` of the blueprint: the subuniverse the two off-diagonal blocks
+  -- generate, which Step 3 shows misses `B' × B'`.
+  let link : Set(a × a) := Universal.generated(a × a, Universal.centralPairs(a, subset, base));
   suppose Universal.pair(a, a, left, right)
-      ∈ Universal.generated(a × a, Universal.centralPairs(a, subset, base)) as leftLinkedToRight;
-  Universal.IsSubuniverse(a × a, Universal.generated(a × a, Universal.centralPairs(a, subset, base))) by Universal.generated.is_subuniverse;
+      ∈ link as leftLinkedToRight;
+  Universal.IsSubuniverse(a × a, link) by Universal.generated.is_subuniverse;
   Universal.centralPairs(a, subset, base)
-    ⊆ Universal.generated(a × a, Universal.centralPairs(a, subset, base))
+    ⊆ link
       by Universal.generated.contains_base as pairsAreLinked;
-  Universal.IsSubuniverse(a, Universal.betaSet(a, subset, size, relation)) by Universal.IsSubuniverse.betaSet;
+  Universal.IsSubuniverse(a, beta) by Universal.IsSubuniverse.betaSet;
   -- The two generating blocks, read as links.
   ∀ (candidate : a). candidate ∈ subset → Universal.pair(a, a, candidate, base)
-        ∈ Universal.generated(a × a, Universal.centralPairs(a, subset, base))
+        ∈ link
       by { take candidate : a;
            suppose candidate ∈ subset;
            Universal.pair(a, a, candidate, base)
@@ -534,7 +539,7 @@ theorem Universal.linking_disjoint
                by Universal.centralPairs.to_element;
            done by pairsAreLinked } as blockToBase;
   ∀ (candidate : a). candidate ∈ subset → Universal.pair(a, a, base, candidate)
-        ∈ Universal.generated(a × a, Universal.centralPairs(a, subset, base))
+        ∈ link
       by { take candidate : a;
            suppose candidate ∈ subset;
            Universal.pair(a, a, base, candidate)
@@ -543,12 +548,10 @@ theorem Universal.linking_disjoint
            done by pairsAreLinked } as blockFromBase;
   -- `P`: the elements with a link-neighbour in `B'`. It holds `subset` and
   -- `left`, hence everything they generate — which by (‡) includes `base`.
-  Universal.IsSubuniverse(a, Universal.linkedInto(a, Universal.generated(a × a,
-          Universal.centralPairs(a, subset, base)), Universal.betaSet(a, subset, size, relation)))
+  Universal.IsSubuniverse(a, Universal.linkedInto(a, Universal.generated(a × a, Universal.centralPairs(a, subset, base)), beta))
       by Universal.IsSubuniverse.linkedInto;
   subset ∪ Set.singleton(a, left)
-    ⊆ Universal.linkedInto(a, Universal.generated(a × a, Universal.centralPairs(a, subset, base)),
-        Universal.betaSet(a, subset, size, relation))
+    ⊆ Universal.linkedInto(a, link, beta)
       by { take candidate : a;
            suppose candidate
                ∈ subset ∪ Set.singleton(a, left)
@@ -556,7 +559,7 @@ theorem Universal.linking_disjoint
            done by cases {
              case candidate ∈ subset as inSubset: {
                  Universal.pair(a, a, candidate, base)
-                     ∈ Universal.generated(a × a, Universal.centralPairs(a, subset, base))
+                     ∈ link
                      by blockToBase;
                  done by { witness base }
                }
@@ -565,33 +568,30 @@ theorem Universal.linking_disjoint
                   as isLeft: {
                  candidate = left;
                  Universal.pair(a, a, candidate, right)
-                     ∈ Universal.generated(a × a, Universal.centralPairs(a, subset, base));
+                     ∈ link;
                  done by { witness right }
                }
            } };
   Universal.generated(a, subset ∪ Set.singleton(a, left))
-    ⊆ Universal.linkedInto(a, Universal.generated(a × a, Universal.centralPairs(a, subset, base)),
-        Universal.betaSet(a, subset, size, relation))
+    ⊆ Universal.linkedInto(a, link, beta)
       by Universal.generated.least as spanOfLeftLinked;
-  Universal.betaSet(a, subset, size, relation)
+  beta
     ⊆ Universal.generated(a, subset ∪ Set.singleton(a, left))
       by Universal.betaSet_subset_generated;
   base ∈ Universal.generated(a, subset ∪ Set.singleton(a, left));
-  base ∈ Universal.linkedInto(a, Universal.generated(a × a, Universal.centralPairs(a, subset, base)),
-      Universal.betaSet(a, subset, size, relation)) by spanOfLeftLinked;
+  base ∈ Universal.linkedInto(a, link, beta) by spanOfLeftLinked;
   choose third such that Universal.pair(a, a, base, third)
-        ∈ Universal.generated(a × a, Universal.centralPairs(a, subset, base)) ∧ third ∈ Universal.betaSet(a, subset, size, relation)
-      from (base ∈ Universal.linkedInto(a, Universal.generated(a × a, Universal.centralPairs(a, subset, base)),
-        Universal.betaSet(a, subset, size, relation)));
+        ∈ link ∧ third ∈ beta
+      from (base ∈ Universal.linkedInto(a, link, beta));
   Universal.pair(a, a, base, third)
-      ∈ Universal.generated(a × a, Universal.centralPairs(a, subset, base));
-  third ∈ Universal.betaSet(a, subset, size, relation);
+      ∈ link;
+  third ∈ beta;
   -- `Q`: the link-neighbours of `base`. It holds `subset` and `third`, hence
   -- everything they generate — which by (‡) again includes `base`.
-  Universal.IsSubuniverse(a, Universal.neighborhood(a, a, Universal.generated(a × a, Universal.centralPairs(a, subset, base)), base))
+  Universal.IsSubuniverse(a, Universal.neighborhood(a, a, link, base))
       by Universal.IsSubuniverse.neighborhood;
   subset ∪ Set.singleton(a, third)
-    ⊆ Universal.neighborhood(a, a, Universal.generated(a × a, Universal.centralPairs(a, subset, base)), base)
+    ⊆ Universal.neighborhood(a, a, link, base)
       by { take candidate : a;
            suppose candidate
                ∈ subset ∪ Set.singleton(a, third)
@@ -607,20 +607,20 @@ theorem Universal.linking_disjoint
                }
            } };
   Universal.generated(a, subset ∪ Set.singleton(a, third))
-    ⊆ Universal.neighborhood(a, a, Universal.generated(a × a, Universal.centralPairs(a, subset, base)), base)
+    ⊆ Universal.neighborhood(a, a, link, base)
       by Universal.generated.least as spanOfThirdLinked;
-  Universal.betaSet(a, subset, size, relation)
+  beta
     ⊆ Universal.generated(a, subset ∪ Set.singleton(a, third))
       by Universal.betaSet_subset_generated;
   base ∈ Universal.generated(a, subset ∪ Set.singleton(a, third));
-  base ∈ Universal.neighborhood(a, a, Universal.generated(a × a, Universal.centralPairs(a, subset, base)), base) by spanOfThirdLinked;
+  base ∈ Universal.neighborhood(a, a, link, base) by spanOfThirdLinked;
   Universal.pair(a, a, base, base)
-      ∈ Universal.generated(a × a, Universal.centralPairs(a, subset, base));
+      ∈ link;
   -- But `base` lies outside `subset`, so central absorption forbids exactly
   -- that.
   base ∉ subset by Universal.betaSet_outside;
   ¬(Universal.pair(a, a, base, base)
-    ∈ Universal.generated(a × a, Universal.centralPairs(a, subset, base))) by central;
+    ∈ link) by central;
   done
 }
 
@@ -814,41 +814,40 @@ theorem Universal.linkedPair.of_halves
         (headsLinked : Universal.pair(a, a, leftPart(NaturalsBelow.first), rightPart(NaturalsBelow.first)) ∈ link)
         : Universal.sumTuple(a, size, leftPart, rightPart)
           ∈ Universal.linkedPair(a, size, relation, link) := {
+  -- the two halves laid side by side.
+  let joined : DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)) → a := Universal.sumTuple(a, size, leftPart, rightPart);
   Universal.restrict(a, DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)), NaturalsBelow(1 + size), Universal.leftHalf(size),
-      Universal.sumTuple(a, size, leftPart, rightPart)) = leftPart
+      joined) = leftPart
       by Universal.restrict_sumTuple_left;
   Universal.restrict(a, DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)), NaturalsBelow(1 + size), Universal.rightHalf(size),
-      Universal.sumTuple(a, size, leftPart, rightPart)) = rightPart
+      joined) = rightPart
       by Universal.restrict_sumTuple_right;
   Universal.restrict(a, DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)), NaturalsBelow(1 + size), Universal.leftHalf(size),
-      Universal.sumTuple(a, size, leftPart, rightPart)) ∈ relation;
-  Universal.sumTuple(a, size, leftPart, rightPart)
+      joined) ∈ relation;
+  joined
       ∈ Universal.cylinder(a, DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)),
           NaturalsBelow(1 + size), Universal.leftHalf(size), relation);
   Universal.restrict(a, DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)), NaturalsBelow(1 + size), Universal.rightHalf(size),
-      Universal.sumTuple(a, size, leftPart, rightPart)) ∈ relation;
-  Universal.sumTuple(a, size, leftPart, rightPart)
+      joined) ∈ relation;
+  joined
       ∈ Universal.cylinder(a, DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)),
           NaturalsBelow(1 + size), Universal.rightHalf(size), relation);
-  Universal.sumTuple(a, size, leftPart, rightPart)
+  joined
       ∈ Universal.cylinder(a, DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)),
             NaturalsBelow(1 + size), Universal.leftHalf(size), relation)
         ∩ Universal.cylinder(a, DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)),
             NaturalsBelow(1 + size), Universal.rightHalf(size), relation);
-  Universal.sumTuple(a, size, leftPart, rightPart)(Universal.leftHalf(size, NaturalsBelow.first))
+  joined(Universal.leftHalf(size, NaturalsBelow.first))
       = leftPart(NaturalsBelow.first) by Universal.sumTuple_left;
-  Universal.sumTuple(a, size, leftPart, rightPart)(Universal.rightHalf(size, NaturalsBelow.first))
+  joined(Universal.rightHalf(size, NaturalsBelow.first))
       = rightPart(NaturalsBelow.first) by Universal.sumTuple_right;
-  Universal.pair(a, a, Universal.sumTuple(a, size, leftPart, rightPart)(Universal.leftHalf(size, NaturalsBelow.first)),
-      Universal.sumTuple(a, size, leftPart, rightPart)(Universal.rightHalf(size, NaturalsBelow.first)))
-     = Universal.pair(a, a, leftPart(NaturalsBelow.first), Universal.sumTuple(a, size, leftPart, rightPart)(
-           Universal.rightHalf(size, NaturalsBelow.first)))
+  Universal.pair(a, a, joined(Universal.leftHalf(size, NaturalsBelow.first)), joined(Universal.rightHalf(size, NaturalsBelow.first)))
+     = Universal.pair(a, a, leftPart(NaturalsBelow.first), joined(Universal.rightHalf(size, NaturalsBelow.first)))
      = Universal.pair(a, a, leftPart(NaturalsBelow.first), rightPart(NaturalsBelow.first))
      as headsAre;
-  Universal.pair(a, a, Universal.sumTuple(a, size, leftPart, rightPart)(Universal.leftHalf(size, NaturalsBelow.first)),
-      Universal.sumTuple(a, size, leftPart, rightPart)(Universal.rightHalf(size, NaturalsBelow.first))) ∈ link
+  Universal.pair(a, a, joined(Universal.leftHalf(size, NaturalsBelow.first)), joined(Universal.rightHalf(size, NaturalsBelow.first))) ∈ link
       by substituting headsAre;
-  Universal.sumTuple(a, size, leftPart, rightPart)
+  joined
       ∈ Universal.linkedHeads(a, size, link);
   done
 }
@@ -879,6 +878,8 @@ theorem Universal.IsEssential.doubledRelation
         : Universal.IsEssential(a, DisjointUnion(NaturalsBelow(size), NaturalsBelow(size)), ((slot : DisjointUnion(NaturalsBelow(size),
             NaturalsBelow(size))) ↦ subset), Universal.doubledRelation(a, size, relation, Universal.generated(a × a,
                 Universal.centralPairs(a, subset, base)))) := {
+  -- `S` of the blueprint, the linking relation.
+  let link : Set(a × a) := Universal.generated(a × a, Universal.centralPairs(a, subset, base));
   choose anchorTuple such that anchorTuple ∈ relation ∧ (∀ (slot : NaturalsBelow(1 + size)).
            slot ≠ NaturalsBelow.first → anchorTuple(slot) ∈ subset) ∧ anchorTuple(NaturalsBelow.first) = base
       from baseInBeta;
@@ -890,12 +891,11 @@ theorem Universal.IsEssential.doubledRelation
         tuple ∈ relation ∧ ∀ (other : NaturalsBelow(1 + size)). other ≠ free → tuple(other) ∈ subset
       as freeAtEach;
   Universal.centralPairs(a, subset, base)
-    ⊆ Universal.generated(a × a, Universal.centralPairs(a, subset, base))
+    ⊆ link
       by Universal.generated.contains_base as pairsAreLinked;
   -- (E1).
   ∀ (free : DisjointUnion(NaturalsBelow(size), NaturalsBelow(size))).
-      ∃ (small : a ^ DisjointUnion(NaturalsBelow(size), NaturalsBelow(size))). small ∈ Universal.doubledRelation(a, size, relation,
-          Universal.generated(a × a, Universal.centralPairs(a, subset, base)))
+      ∃ (small : a ^ DisjointUnion(NaturalsBelow(size), NaturalsBelow(size))). small ∈ Universal.doubledRelation(a, size, relation, link)
         ∧ ∀ (other : DisjointUnion(NaturalsBelow(size), NaturalsBelow(size))). other ≠ free → small(other) ∈ subset
       by { take free : DisjointUnion(NaturalsBelow(size), NaturalsBelow(size));
            (∃ (value : NaturalsBelow(size)). free = Sum.left(value)) ∨ (∃ (value : NaturalsBelow(size)). free = Sum.right(value))
@@ -929,18 +929,18 @@ theorem Universal.IsEssential.doubledRelation
                      ∈ Universal.centralPairs(a, subset, base)
                      by Universal.centralPairs.to_element;
                  Universal.pair(a, a, freeTuple(NaturalsBelow.first), base)
-                     ∈ Universal.generated(a × a, Universal.centralPairs(a, subset, base))
+                     ∈ link
                      by pairsAreLinked;
                  Universal.pair(a, a, freeTuple(NaturalsBelow.first), anchorTuple(NaturalsBelow.first))
-                     ∈ Universal.generated(a × a, Universal.centralPairs(a, subset, base))
+                     ∈ link
                      by substituting anchorHead;
                  Universal.sumTuple(a, size, freeTuple, anchorTuple)
-                     ∈ Universal.linkedPair(a, size, relation, Universal.generated(a × a, Universal.centralPairs(a, subset, base)))
+                     ∈ Universal.linkedPair(a, size, relation, link)
                      by Universal.linkedPair.of_halves;
                  Universal.restrict(a, DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)),
                      DisjointUnion(NaturalsBelow(size), NaturalsBelow(size)), Universal.doubledShift(size),
                      Universal.sumTuple(a, size, freeTuple, anchorTuple))
-                   ∈ Universal.doubledRelation(a, size, relation, Universal.generated(a × a, Universal.centralPairs(a, subset, base)))
+                   ∈ Universal.doubledRelation(a, size, relation, link)
                      by { witness Universal.sumTuple(a, size, freeTuple, anchorTuple) };
                  ∀ (other : DisjointUnion(NaturalsBelow(size), NaturalsBelow(size))). other ≠ free → Universal.restrict(a,
                          DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)), DisjointUnion(NaturalsBelow(size),
@@ -1026,18 +1026,18 @@ theorem Universal.IsEssential.doubledRelation
                      ∈ Universal.centralPairs(a, subset, base)
                      by Universal.centralPairs.from_element;
                  Universal.pair(a, a, base, freeTuple(NaturalsBelow.first))
-                     ∈ Universal.generated(a × a, Universal.centralPairs(a, subset, base))
+                     ∈ link
                      by pairsAreLinked;
                  Universal.pair(a, a, anchorTuple(NaturalsBelow.first), freeTuple(NaturalsBelow.first))
-                     ∈ Universal.generated(a × a, Universal.centralPairs(a, subset, base))
+                     ∈ link
                      by substituting anchorHead;
                  Universal.sumTuple(a, size, anchorTuple, freeTuple)
-                     ∈ Universal.linkedPair(a, size, relation, Universal.generated(a × a, Universal.centralPairs(a, subset, base)))
+                     ∈ Universal.linkedPair(a, size, relation, link)
                      by Universal.linkedPair.of_halves;
                  Universal.restrict(a, DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)),
                      DisjointUnion(NaturalsBelow(size), NaturalsBelow(size)), Universal.doubledShift(size),
                      Universal.sumTuple(a, size, anchorTuple, freeTuple))
-                   ∈ Universal.doubledRelation(a, size, relation, Universal.generated(a × a, Universal.centralPairs(a, subset, base)))
+                   ∈ Universal.doubledRelation(a, size, relation, link)
                      by { witness Universal.sumTuple(a, size, anchorTuple, freeTuple) };
                  ∀ (other : DisjointUnion(NaturalsBelow(size), NaturalsBelow(size))). other ≠ free → Universal.restrict(a,
                          DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)), DisjointUnion(NaturalsBelow(size),
@@ -1112,21 +1112,21 @@ theorem Universal.IsEssential.doubledRelation
                    NaturalsBelow(size))). small(slot) ∈ subset
                from someInside;
            ∀ (slot : DisjointUnion(NaturalsBelow(size), NaturalsBelow(size))). small(slot) ∈ subset as smallInside;
-           small ∈ Universal.doubledRelation(a, size, relation, Universal.generated(a × a, Universal.centralPairs(a, subset, base)));
+           small ∈ Universal.doubledRelation(a, size, relation, link);
            choose big such that big ∈ Universal.linkedPair(a, size, relation, Universal.generated(a × a,
                Universal.centralPairs(a, subset, base))) ∧ Universal.restrict(a, DisjointUnion(NaturalsBelow(1 + size),
                      NaturalsBelow(1 + size)), DisjointUnion(NaturalsBelow(size), NaturalsBelow(size)),
                    Universal.doubledShift(size), big) = small
                from (small ∈ Universal.doubledRelation(a, size, relation, Universal.generated(a × a,
                    Universal.centralPairs(a, subset, base))));
-           big ∈ Universal.linkedPair(a, size, relation, Universal.generated(a × a, Universal.centralPairs(a, subset, base)));
+           big ∈ Universal.linkedPair(a, size, relation, link);
            Universal.restrict(a, DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)),
                DisjointUnion(NaturalsBelow(size), NaturalsBelow(size)), Universal.doubledShift(size), big) = small;
            big ∈ Universal.cylinder(a, DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)),
                    NaturalsBelow(1 + size), Universal.leftHalf(size), relation)
                  ∩ Universal.cylinder(a, DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)),
                      NaturalsBelow(1 + size), Universal.rightHalf(size), relation);
-           big ∈ Universal.linkedHeads(a, size, Universal.generated(a × a, Universal.centralPairs(a, subset, base)));
+           big ∈ Universal.linkedHeads(a, size, link);
            big ∈ Universal.cylinder(a, DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)),
              NaturalsBelow(1 + size), Universal.leftHalf(size), relation);
            big ∈ Universal.cylinder(a, DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)),
@@ -1197,9 +1197,9 @@ theorem Universal.IsEssential.doubledRelation
                by { witness Universal.restrict(a, DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)),
                       NaturalsBelow(1 + size), Universal.rightHalf(size), big) };
            Universal.pair(a, a, big(Universal.leftHalf(size, NaturalsBelow.first)), big(Universal.rightHalf(size, NaturalsBelow.first)))
-               ∈ Universal.generated(a × a, Universal.centralPairs(a, subset, base));
+               ∈ link;
            ¬(Universal.pair(a, a, big(Universal.leftHalf(size, NaturalsBelow.first)), big(Universal.rightHalf(size, NaturalsBelow.first)))
-             ∈ Universal.generated(a × a, Universal.centralPairs(a, subset, base)))
+             ∈ link)
                by Universal.linking_disjoint;
            done };
   done
