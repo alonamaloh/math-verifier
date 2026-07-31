@@ -25,6 +25,12 @@ for Zhuk's theorem on the left centre of a subdirect relation.
 - `Universal.box`, `Universal.restrict`, `Universal.project` and
   `Universal.cylinder` — the relational constructions, in
   [relation.math](relation.math).
+- `Universal.Algebra.dependentProduct` — the product of a family of algebras,
+  with `Universal.dependentBox`, in
+  [dependent_product.math](dependent_product.math). The power is its constant
+  case, recorded by `Universal.Algebra.power_eq_dependentProduct`.
+- `Universal.IsEssential`, `Universal.firstCoordinateIn` and
+  `Universal.deleteFirst`, in [essential.math](essential.math).
 - `Universal.Witnesses`, `Universal.Absorbs`, `Universal.BinaryAbsorbs`,
   `Universal.IsTaylorIdentity` and `Universal.IsTaylorOn`, in
   [absorption.math](absorption.math).
@@ -65,6 +71,14 @@ for Zhuk's theorem on the left centre of a subdirect relation.
   is used.
 - `Universal.starStep_evaluate` — one level of a star power evaluates the base
   term at the values its blocks take.
+- `Universal.Term.evaluate_dependentProduct` — terms are evaluated
+  coordinatewise in a product of a family, as in a power.
+- `Universal.no_essential_of_witnesses` — a term witnessing absorption forbids
+  an essential relation on the same index. The move Part II turns on: evaluate
+  the witnessing term *in the power*, at the tuple of witnesses.
+- `Universal.IsEssential.deleteFirst` — essentiality survives deleting a
+  coordinate, which is how an essential relation of large arity produces ones of
+  every smaller arity.
 
 ## Two representation choices
 

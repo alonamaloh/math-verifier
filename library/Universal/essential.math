@@ -31,6 +31,7 @@ import Natural.order
 import Set.basics
 import Set.algebra
 import Set.finite
+import Set.finite_successor
 import Set.finite_choice
 import Universal.signature
 import Universal.term
@@ -183,5 +184,237 @@ theorem Universal.no_essential_of_witnesses {signature : Universal.Signature}
       ∧ ∀ (coordinate : NaturalsBelow(arity)). tuple(coordinate) ∈ subset
       by { witness Universal.Term.evaluate(
              Universal.Algebra.power(a, NaturalsBelow(arity)), chosen, subject) };
+  done
+}
+
+-- ── Passing to a smaller index ────────────────────────────────────────
+
+-- The tuples whose first coordinate lies in `subset`. The blueprint intersects
+-- with the box `A × ⋯ × A × S_m`; since every other factor is the whole carrier,
+-- naming the one constrained coordinate is the same condition and shorter.
+definition Universal.firstCoordinateIn {signature : Universal.Signature}
+        (a : Universal.Algebra(signature)) (bound : ℕ)
+        (subset : Set(Universal.Algebra.carrier(a)))
+        : Set(Universal.Algebra.carrier(
+            Universal.Algebra.power(a, NaturalsBelow(1 + bound)))) :=
+  (tuple : Universal.Algebra.carrier(
+      Universal.Algebra.power(a, NaturalsBelow(1 + bound)))) ↦
+    tuple(NaturalsBelow.first) ∈ subset
+
+theorem Universal.IsSubuniverse.firstCoordinateIn {signature : Universal.Signature}
+        (a : Universal.Algebra(signature)) (bound : ℕ)
+        (subset : Set(Universal.Algebra.carrier(a)))
+        (closed : Universal.IsSubuniverse(a, subset))
+        : Universal.IsSubuniverse(
+            Universal.Algebra.power(a, NaturalsBelow(1 + bound)),
+            Universal.firstCoordinateIn(a, bound, subset)) := {
+  take arity : ℕ;
+  take symbol : signature(arity);
+  take arguments : NaturalsBelow(arity)
+                   → Universal.Algebra.carrier(
+                       Universal.Algebra.power(a, NaturalsBelow(1 + bound)));
+  suppose ∀ (slot : NaturalsBelow(arity)).
+      arguments(slot) ∈ Universal.firstCoordinateIn(a, bound, subset) as allInside;
+  ∀ (slot : NaturalsBelow(arity)).
+      arguments(slot)(NaturalsBelow.first) ∈ subset by allInside;
+  Universal.Algebra.interpret(arity, symbol,
+      ((slot : NaturalsBelow(arity)) ↦ arguments(slot)(NaturalsBelow.first)))
+      ∈ subset;
+  done
+}
+
+-- Delete the first coordinate: keep the members whose first coordinate is
+-- inside, then forget it. Blueprint Proposition 3.5 deletes the last
+-- coordinate; which one goes is immaterial, and the first is the one
+-- `NaturalsBelow.shiftUp` makes cheap.
+definition Universal.deleteFirst {signature : Universal.Signature}
+        (a : Universal.Algebra(signature)) (bound : ℕ)
+        (subset : Set(Universal.Algebra.carrier(a)))
+        (relation : Set(Universal.Algebra.carrier(
+            Universal.Algebra.power(a, NaturalsBelow(1 + bound)))))
+        : Set(Universal.Algebra.carrier(
+            Universal.Algebra.power(a, NaturalsBelow(bound)))) :=
+  Universal.project(a, NaturalsBelow(1 + bound), NaturalsBelow(bound),
+    NaturalsBelow.shiftUp,
+    relation ∩ Universal.firstCoordinateIn(a, bound, subset))
+
+theorem Universal.IsSubuniverse.deleteFirst {signature : Universal.Signature}
+        (a : Universal.Algebra(signature)) (bound : ℕ)
+        (subset : Set(Universal.Algebra.carrier(a)))
+        (subsetClosed : Universal.IsSubuniverse(a, subset))
+        (relation : Set(Universal.Algebra.carrier(
+            Universal.Algebra.power(a, NaturalsBelow(1 + bound)))))
+        (closed : Universal.IsSubuniverse(
+            Universal.Algebra.power(a, NaturalsBelow(1 + bound)), relation))
+        : Universal.IsSubuniverse(
+            Universal.Algebra.power(a, NaturalsBelow(bound)),
+            Universal.deleteFirst(a, bound, subset, relation)) := {
+  Universal.IsSubuniverse(Universal.Algebra.power(a, NaturalsBelow(1 + bound)),
+      Universal.firstCoordinateIn(a, bound, subset))
+      by Universal.IsSubuniverse.firstCoordinateIn;
+  Universal.IsSubuniverse(Universal.Algebra.power(a, NaturalsBelow(1 + bound)),
+      relation ∩ Universal.firstCoordinateIn(a, bound, subset))
+      by Universal.IsSubuniverse.intersection;
+  done by Universal.IsSubuniverse.project
+}
+
+-- Blueprint Proposition 3.5: deleting a coordinate keeps essentiality.
+--
+-- (E1) The original witness freed at `shiftUp(free)` already lies inside at the
+-- first coordinate — `shiftUp` never lands there — so it survives the
+-- intersection, and its restriction is free exactly at `free`, because `shiftUp`
+-- is injective. (E2) A restriction lying inside everywhere lifts to a member
+-- lying inside everywhere: at the first coordinate by the intersection, and at
+-- every other coordinate because every index is `first` or a shift.
+theorem Universal.IsEssential.deleteFirst {signature : Universal.Signature}
+        (a : Universal.Algebra(signature)) (bound : ℕ)
+        (parts : NaturalsBelow(1 + bound) → Set(Universal.Algebra.carrier(a)))
+        (relation : Set(Universal.Algebra.carrier(
+            Universal.Algebra.power(a, NaturalsBelow(1 + bound)))))
+        (essential : Universal.IsEssential(a, NaturalsBelow(1 + bound), parts,
+            relation))
+        : Universal.IsEssential(a, NaturalsBelow(bound),
+            ((slot : NaturalsBelow(bound)) ↦ parts(NaturalsBelow.shiftUp(slot))),
+            Universal.deleteFirst(a, bound, parts(NaturalsBelow.first),
+              relation)) := {
+  ∀ (free : NaturalsBelow(1 + bound)).
+      ∃ (tuple : Universal.Algebra.carrier(
+          Universal.Algebra.power(a, NaturalsBelow(1 + bound)))).
+        tuple ∈ relation
+        ∧ ∀ (other : NaturalsBelow(1 + bound)).
+            ¬(other = free) → tuple(other) ∈ parts(other)
+      as freeAtEach;
+  -- (E1)
+  ∀ (free : NaturalsBelow(bound)).
+      ∃ (small : Universal.Algebra.carrier(
+          Universal.Algebra.power(a, NaturalsBelow(bound)))).
+        small ∈ Universal.deleteFirst(a, bound, parts(NaturalsBelow.first), relation)
+        ∧ ∀ (other : NaturalsBelow(bound)).
+            ¬(other = free) → small(other) ∈ parts(NaturalsBelow.shiftUp(other))
+      by { take free : NaturalsBelow(bound);
+           choose tuple such that
+               tuple ∈ relation
+               ∧ ∀ (other : NaturalsBelow(1 + bound)).
+                   ¬(other = NaturalsBelow.shiftUp(free))
+                   → tuple(other) ∈ parts(other)
+               from freeAtEach(NaturalsBelow.shiftUp(free));
+           tuple ∈ relation;
+           ∀ (other : NaturalsBelow(1 + bound)).
+               ¬(other = NaturalsBelow.shiftUp(free)) → tuple(other) ∈ parts(other)
+               as insideElsewhere;
+           -- The first coordinate is not the freed one, so it is already inside.
+           ¬((NaturalsBelow.first : NaturalsBelow(1 + bound))
+               = NaturalsBelow.shiftUp(free))
+               by { suppose (NaturalsBelow.first : NaturalsBelow(1 + bound))
+                        = NaturalsBelow.shiftUp(free) as firstIsShift;
+                    ¬(NaturalsBelow.value(NaturalsBelow.shiftUp(free)) = 0)
+                        by NaturalsBelow.shiftUp_nonzero;
+                    NaturalsBelow.value(NaturalsBelow.shiftUp(free))
+                       = NaturalsBelow.value(
+                           (NaturalsBelow.first : NaturalsBelow(1 + bound)))
+                             by substituting firstIsShift
+                       = 0 by NaturalsBelow.first_value;
+                    done };
+           tuple(NaturalsBelow.first) ∈ parts(NaturalsBelow.first)
+               by insideElsewhere;
+           tuple ∈ Universal.firstCoordinateIn(a, bound, parts(NaturalsBelow.first));
+           tuple ∈ relation
+             ∩ Universal.firstCoordinateIn(a, bound, parts(NaturalsBelow.first));
+           Universal.restrict(a, NaturalsBelow(1 + bound), NaturalsBelow(bound),
+               NaturalsBelow.shiftUp, tuple)
+             ∈ Universal.deleteFirst(a, bound, parts(NaturalsBelow.first), relation)
+               by { witness tuple };
+           ∀ (other : NaturalsBelow(bound)).
+               ¬(other = free)
+               → Universal.restrict(a, NaturalsBelow(1 + bound),
+                   NaturalsBelow(bound), NaturalsBelow.shiftUp, tuple)(other)
+                 ∈ parts(NaturalsBelow.shiftUp(other))
+               by { take other : NaturalsBelow(bound);
+                    suppose ¬(other = free) as otherDiffers;
+                    ¬(NaturalsBelow.shiftUp(other) = NaturalsBelow.shiftUp(free))
+                        by { suppose NaturalsBelow.shiftUp(other)
+                                 = NaturalsBelow.shiftUp(free) as shiftsAgree;
+                             other = free by NaturalsBelow.shiftUp_injective;
+                             done };
+                    tuple(NaturalsBelow.shiftUp(other))
+                        ∈ parts(NaturalsBelow.shiftUp(other))
+                        by insideElsewhere;
+                    done };
+           witness Universal.restrict(a, NaturalsBelow(1 + bound),
+             NaturalsBelow(bound), NaturalsBelow.shiftUp, tuple) };
+  -- (E2)
+  ¬(∃ (small : Universal.Algebra.carrier(
+        Universal.Algebra.power(a, NaturalsBelow(bound)))).
+      small ∈ Universal.deleteFirst(a, bound, parts(NaturalsBelow.first), relation)
+      ∧ ∀ (coordinate : NaturalsBelow(bound)).
+          small(coordinate) ∈ parts(NaturalsBelow.shiftUp(coordinate)))
+      by { suppose ∃ (small : Universal.Algebra.carrier(
+                       Universal.Algebra.power(a, NaturalsBelow(bound)))).
+                     small ∈ Universal.deleteFirst(a, bound,
+                       parts(NaturalsBelow.first), relation)
+                     ∧ ∀ (coordinate : NaturalsBelow(bound)).
+                         small(coordinate)
+                           ∈ parts(NaturalsBelow.shiftUp(coordinate))
+                   as someSmallInside;
+           choose small such that
+               small ∈ Universal.deleteFirst(a, bound,
+                 parts(NaturalsBelow.first), relation)
+               ∧ ∀ (coordinate : NaturalsBelow(bound)).
+                   small(coordinate) ∈ parts(NaturalsBelow.shiftUp(coordinate))
+               from someSmallInside;
+           ∀ (coordinate : NaturalsBelow(bound)).
+               small(coordinate) ∈ parts(NaturalsBelow.shiftUp(coordinate))
+               as smallInside;
+           small ∈ Universal.deleteFirst(a, bound, parts(NaturalsBelow.first),
+             relation);
+           choose big such that
+               big ∈ relation
+                 ∩ Universal.firstCoordinateIn(a, bound, parts(NaturalsBelow.first))
+               ∧ Universal.restrict(a, NaturalsBelow(1 + bound),
+                   NaturalsBelow(bound), NaturalsBelow.shiftUp, big) = small
+               from (small ∈ Universal.deleteFirst(a, bound,
+                 parts(NaturalsBelow.first), relation));
+           big ∈ relation
+             ∩ Universal.firstCoordinateIn(a, bound, parts(NaturalsBelow.first));
+           big ∈ relation;
+           big ∈ Universal.firstCoordinateIn(a, bound, parts(NaturalsBelow.first));
+           big(NaturalsBelow.first) ∈ parts(NaturalsBelow.first);
+           Universal.restrict(a, NaturalsBelow(1 + bound), NaturalsBelow(bound),
+               NaturalsBelow.shiftUp, big) = small as restrictsToSmall;
+           -- Every coordinate is the first or a shift, and `big` is inside at both.
+           ∀ (coordinate : NaturalsBelow(1 + bound)).
+               big(coordinate) ∈ parts(coordinate)
+               by { take coordinate : NaturalsBelow(1 + bound);
+                    coordinate = NaturalsBelow.first
+                      ∨ ∃ (lower : NaturalsBelow(bound)).
+                          coordinate = NaturalsBelow.shiftUp(lower)
+                      by NaturalsBelow.first_or_shift;
+                    done by cases {
+                      case coordinate = NaturalsBelow.first as isFirst:
+                          done by substituting isFirst
+                      case ∃ (lower : NaturalsBelow(bound)).
+                             coordinate = NaturalsBelow.shiftUp(lower) as isShift: {
+                          choose lower such that
+                              coordinate = NaturalsBelow.shiftUp(lower) from isShift;
+                          small(lower) ∈ parts(NaturalsBelow.shiftUp(lower))
+                              by smallInside;
+                          big(NaturalsBelow.shiftUp(lower))
+                             = Universal.restrict(a, NaturalsBelow(1 + bound),
+                                 NaturalsBelow(bound), NaturalsBelow.shiftUp,
+                                 big)(lower)
+                             = small(lower) by substituting restrictsToSmall;
+                          big(NaturalsBelow.shiftUp(lower))
+                              ∈ parts(NaturalsBelow.shiftUp(lower));
+                          done by substituting (coordinate
+                            = NaturalsBelow.shiftUp(lower))
+                        }
+                    } };
+           ∃ (tuple : Universal.Algebra.carrier(
+               Universal.Algebra.power(a, NaturalsBelow(1 + bound)))).
+               tuple ∈ relation
+               ∧ ∀ (coordinate : NaturalsBelow(1 + bound)).
+                   tuple(coordinate) ∈ parts(coordinate)
+               by { witness big };
+           done };
   done
 }
