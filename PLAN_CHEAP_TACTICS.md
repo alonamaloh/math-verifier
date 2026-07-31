@@ -144,7 +144,7 @@ break as a proof to improve works, and the fixes are improvements:
 | prove cap | files failing | state |
 | --- | --- | --- |
 | 6 | 3 → **0** | done — three proofs written out |
-| 3 | 16 → **13** | in progress — every break explains itself |
+| 3 | 16 → **12** | in progress — every break dictates its own fix |
 | 1 | 35 | the goal; worth 14.9 s → 6.4 s on the profiled file |
 
 The three fixed: `Natural/distance.math` (`le_add_distance` was hiding
@@ -188,10 +188,43 @@ calc step 2 at line 125
 message says *what was used*, not *how to restructure the step*; turning that
 into named steps is ordinary proof work.
 
-So: **the diagnosis is free, the surgery is not.** Estimate for the rest of
-the ladder: 13 files at cap 3, then ~34 at cap 1, several sites each — a real
-sweep of maybe two sessions, but a guided one, with every edit improving the
-proof by the style guide's own standard.
+**Then the trace was extended to carry the intermediate STATEMENTS, and the
+surgery became mechanical too.** The message now reports the full route — every
+rewrite, in the order an author states them, with the goal each one produced:
+
+```
+  It got there in 2 rewrite(s). Stating the intermediate forms makes a
+  shallow search enough — in this order:
+
+      (successor dPredecessor) + (Natural.triangular dPredecessor)
+          = (Natural.triangular (1 + dPredecessor));
+      (Natural.triangular (1 + dPredecessor))
+          = (successor (dPredecessor + (Natural.triangular dPredecessor)))
+          by substituting `Natural.successor_add`;
+  and then the claim itself follows by substituting `Natural.one_add`.
+```
+
+`Natural/pairing.math` was fixed by transcribing that **verbatim** — the three
+lines above became the three lines of the proof, and the site now passes both
+capped and uncapped. That is the loop working end to end: the elaborator finds
+the multi-step argument and dictates the declarative form of it.
+
+Recording details that matter:
+
+- The step is recorded **after the transport typechecks**, not when the rewrite
+  is attempted. A rewrite rejected by that typecheck was never part of the
+  route, and reporting it sends the author after a step the search did not take.
+- `deepRoute_` is innermost-FIRST, because a nested success completes before
+  its caller records — which is already the order the author writes the
+  intermediate forms in, so no reversal is needed.
+- Equation names are printed through `citableNameFromFactSource`, so they are
+  paste-ready (`Natural.one_add`, not `library lemma Natural.one_add`). An
+  anonymous fact has no citable name and is printed raw — correctly, since it
+  has to be *stated* rather than cited.
+
+Ladder: cap 3 is **14 → 12 files**, and 12 of 12 explain themselves with a full
+trace. Then ~34 at cap 1. Still a sweep, but now a transcription rather than an
+investigation.
 
 ### Deep search as an error-message generator — BUILT 2026-07-30
 

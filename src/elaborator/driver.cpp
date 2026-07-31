@@ -656,21 +656,46 @@ std::string Elaborator::describeDeepEqualityRoute(
             "here is doing several rewrites at once and the proof would say "
             "more if they were named.";
         if (!deepRoute_.empty()) {
-            message += "\n  The deeper search rewrote with:";
-            std::vector<std::string> shown;
-            for (const std::string& step : deepRoute_) {
-                bool seen = false;
-                for (const std::string& already : shown) {
-                    if (already == step) seen = true;
+            // `deepRoute_` is innermost-first, which is already the order an
+            // author states the intermediate forms in: the deepest rewritten
+            // goal closes on its own, each earlier form follows from it by one
+            // equation, and the claim itself is the last link.
+            auto shorten = [](const std::string& text) {
+                if (text.size() <= 220) return text;
+                return text.substr(0, 217) + "...";
+            };
+            // Print the citation the author would actually type: strip the
+            // provenance prefix ("library lemma X" -> "X"), and fall back to
+            // the raw source for an anonymous fact, which cannot be cited by
+            // name and has to be stated instead.
+            auto citable = [this](const std::string& source) {
+                std::string name = citableNameFromFactSource(source);
+                return name.empty() ? source : name;
+            };
+            message +=
+                "\n  It got there in " + std::to_string(deepRoute_.size())
+                + " rewrite(s). Stating the intermediate forms makes a "
+                  "shallow search enough — in this order:\n";
+            size_t shown = 0;
+            for (size_t i = 0; i < deepRoute_.size(); ++i) {
+                if (shown++ >= 8) {
+                    message += "\n      … (" 
+                        + std::to_string(deepRoute_.size() - 8)
+                        + " more)";
+                    break;
                 }
-                if (seen) continue;
-                shown.push_back(step);
-                message += "\n    - " + step;
-                if (shown.size() >= 6) break;
+                const DeepRouteStep& step = deepRoute_[i];
+                message += "\n      " + shorten(step.statement);
+                if (i == 0) {
+                    message += ";";
+                } else {
+                    message += "\n          by substituting `"
+                        + citable(deepRoute_[i - 1].equation) + "`;";
+                }
             }
+            message += "\n  and then the claim itself follows by "
+                       "substituting `"
+                       + citable(deepRoute_.back().equation) + "`.";
         }
-        message +=
-            "\n  State each rewritten form as its own claim, or cite the "
-            "equation directly with `by substituting <eq>`.";
         return message;
     }

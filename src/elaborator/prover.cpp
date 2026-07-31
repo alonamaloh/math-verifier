@@ -2036,9 +2036,6 @@ ExpressionPointer Elaborator::tryContextEqualityBridge(
                       catch (const TypeError&) { continue; }
 
                 }
-                if (inDeepRetry_ && !eq.source.empty()) {
-                    deepRoute_.push_back(eq.source);
-                }
                 ExpressionPointer motive = makeLambda(
                     "_rewriteHole",
                     eq.carrierType, abstractedBody);
@@ -2084,6 +2081,19 @@ ExpressionPointer Elaborator::tryContextEqualityBridge(
                     inferTypeInLocalContext(localBinders, call);
                 } catch (const TypeError&) { continue; }
                   catch (const ElaborateError&) { continue; }
+                if (inDeepRetry_) {
+                    // Recorded HERE, after the transport typechecks: a
+                    // rewrite rejected above was never part of the route,
+                    // and reporting it would send the author after a step
+                    // the search did not actually take.
+                    DeepRouteStep step;
+                    step.equation = eq.source;
+                    try {
+                        step.statement = prettyPrintInLocalScope(
+                            rewrittenGoal, localBinders);
+                    } catch (...) { step.statement.clear(); }
+                    deepRoute_.push_back(std::move(step));
+                }
                 lastWinningDetail_ = eq.source;
                 recordWinningEquation(eq.lhs, eq.rhs, localBinders);
                 return call;

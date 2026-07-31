@@ -7100,7 +7100,15 @@ private:
     // `by cases` arm reports its own failure.
     int bridgeDeclines_ = 0;      // rewrites the cap refused, this claim
     bool inDeepRetry_ = false;    // keeps the retry from re-entering itself
-    std::vector<std::string> deepRoute_;  // equations the uncapped run used
+    // One rewrite the successful uncapped run performed: the equation it
+    // used, and the goal that rewrite produced. Recorded innermost-FIRST
+    // (a nested success completes before its caller records), which is
+    // exactly the order an author would state the intermediate forms in.
+    struct DeepRouteStep {
+        std::string equation;
+        std::string statement;
+    };
+    std::vector<DeepRouteStep> deepRoute_;
     // >0 forces the bridge's per-claim prove cap, overriding the env knob.
     // Used to lift the cap for the duration of a retry.
     int bridgeProveCapOverride_ = 0;
