@@ -29,8 +29,10 @@ for Zhuk's theorem on the left centre of a subdirect relation.
   with `Universal.dependentBox`, in
   [dependent_product.math](dependent_product.math). The power is its constant
   case, recorded by `Universal.Algebra.power_eq_dependentProduct`.
-- `Universal.IsEssential`, `Universal.firstCoordinateIn` and
-  `Universal.deleteFirst`, in [essential.math](essential.math).
+- `Universal.IsEssential`, `Universal.HasEssential`, `Universal.firstCoordinateIn`
+  and `Universal.deleteFirst`, in [essential.math](essential.math).
+- `Universal.Tuples` and `Universal.clone` — the `m`-ary term operations as a
+  subset of the power `A^(A^m)`, in [clone.math](clone.math).
 - `Universal.Witnesses`, `Universal.Absorbs`, `Universal.BinaryAbsorbs`,
   `Universal.IsTaylorIdentity` and `Universal.IsTaylorOn`, in
   [absorption.math](absorption.math).
@@ -79,6 +81,11 @@ for Zhuk's theorem on the left centre of a subdirect relation.
 - `Universal.IsEssential.deleteFirst` — essentiality survives deleting a
   coordinate, which is how an essential relation of large arity produces ones of
   every smaller arity.
+- `Universal.HasEssential.descend` and `.bounded_of_witnesses` — every essential
+  arity is strictly below the arity of any witness of absorption.
+- `Universal.IsSubuniverse.clone` — the `m`-ary term operations are closed under
+  the operations, applied pointwise. The index of the power is itself a function
+  type, which is why powers were built over an arbitrary index.
 
 ## Two representation choices
 

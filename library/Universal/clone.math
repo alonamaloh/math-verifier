@@ -1,0 +1,118 @@
+-- Universal/clone.math
+--
+-- `Clo_m(A)`, the algebra of `m`-ary term operations, as a subuniverse of the
+-- power `A^(A^m)`. Blueprint Lemma 3.9.
+--
+-- The index of that power is itself a function type — the `m`-tuples over the
+-- carrier — which is why `Universal.Algebra.power` was built over an arbitrary
+-- index type rather than over `NaturalsBelow(n)`. Nothing here needs the index
+-- finite; the relational description of absorption will project this power onto
+-- a *subset* of the tuples, and that is where finiteness enters.
+--
+-- The subuniverse property is the one calculation: applying an operation to
+-- term operations pointwise gives the term operation of the applied term.
+-- Choice enters as it always does — each argument is *some* term's operation,
+-- and an operation needs a whole tuple of terms at once.
+
+module Universal.clone
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Logic.functions
+import Equality.basics
+import Natural.basics
+import Set.basics
+import Set.finite
+import Set.finite_choice
+import Universal.signature
+import Universal.term
+import Universal.product
+
+-- The `m`-tuples over the carrier: the index of the power `Clo_m` lives in.
+definition Universal.Tuples {signature : Universal.Signature}
+        (a : Universal.Algebra(signature)) (arity : ℕ) : Type(0) :=
+  NaturalsBelow(arity) → Universal.Algebra.carrier(a)
+
+-- `Clo_m(A)`: the functions on `m`-tuples that some `m`-ary term realises.
+definition Universal.clone {signature : Universal.Signature}
+        (a : Universal.Algebra(signature)) (arity : ℕ)
+        : Set(Universal.Algebra.carrier(
+            Universal.Algebra.power(a, Universal.Tuples(a, arity)))) :=
+  (operation : Universal.Algebra.carrier(
+      Universal.Algebra.power(a, Universal.Tuples(a, arity)))) ↦
+    ∃ (subject : Universal.Term(signature, NaturalsBelow(arity))).
+      ∀ (tuple : Universal.Tuples(a, arity)).
+        operation(tuple) = Universal.Term.evaluate(a, tuple, subject)
+
+-- The coordinate projections are term operations, realised by the variables.
+theorem Universal.clone.projection {signature : Universal.Signature}
+        (a : Universal.Algebra(signature)) (arity : ℕ)
+        (slot : NaturalsBelow(arity))
+        : ((tuple : Universal.Tuples(a, arity)) ↦ tuple(slot))
+          ∈ Universal.clone(a, arity) := {
+  ∀ (tuple : Universal.Tuples(a, arity)).
+      ((place : Universal.Tuples(a, arity)) ↦ place(slot))(tuple)
+        = Universal.Term.evaluate(a, tuple,
+            Universal.Term.variable(signature, NaturalsBelow(arity), slot))
+      by { take tuple : Universal.Tuples(a, arity);
+           done };
+  witness Universal.Term.variable(signature, NaturalsBelow(arity), slot)
+}
+
+-- Blueprint Lemma 3.9. Applying an operation to term operations pointwise is
+-- the term operation of the applied term, so the clone is closed.
+theorem Universal.IsSubuniverse.clone {signature : Universal.Signature}
+        (a : Universal.Algebra(signature)) (arity : ℕ)
+        : Universal.IsSubuniverse(
+            Universal.Algebra.power(a, Universal.Tuples(a, arity)),
+            Universal.clone(a, arity)) := {
+  take symbolArity : ℕ;
+  take symbol : signature(symbolArity);
+  take arguments : NaturalsBelow(symbolArity)
+                   → Universal.Algebra.carrier(
+                       Universal.Algebra.power(a, Universal.Tuples(a, arity)));
+  suppose ∀ (slot : NaturalsBelow(symbolArity)).
+      arguments(slot) ∈ Universal.clone(a, arity) as allRealised;
+  choose realisers such that
+      ∀ (slot : NaturalsBelow(symbolArity)).
+        ∀ (tuple : Universal.Tuples(a, arity)).
+          arguments(slot)(tuple)
+            = Universal.Term.evaluate(a, tuple, realisers(slot))
+      from NaturalsBelow.choice(
+        Universal.Term(signature, NaturalsBelow(arity)),
+        symbolArity,
+        ((slot : NaturalsBelow(symbolArity)) ↦
+          (candidate : Universal.Term(signature, NaturalsBelow(arity))) ↦
+            ∀ (tuple : Universal.Tuples(a, arity)).
+              arguments(slot)(tuple)
+                = Universal.Term.evaluate(a, tuple, candidate)),
+        allRealised);
+  ∀ (slot : NaturalsBelow(symbolArity)).
+      ∀ (tuple : Universal.Tuples(a, arity)).
+        arguments(slot)(tuple) = Universal.Term.evaluate(a, tuple, realisers(slot));
+  -- At each tuple, the pointwise application is the applied term evaluated
+  -- there. The two sides differ only by the tuple of realisers.
+  ∀ (tuple : Universal.Tuples(a, arity)).
+      Universal.Algebra.interpret(symbolArity, symbol, arguments)(tuple)
+        = Universal.Term.evaluate(a, tuple,
+            Universal.Term.apply(signature, NaturalsBelow(arity), symbolArity,
+              symbol, realisers))
+      by { take tuple : Universal.Tuples(a, arity);
+           ((slot : NaturalsBelow(symbolArity)) ↦ arguments(slot)(tuple))
+             = ((slot : NaturalsBelow(symbolArity)) ↦
+                 Universal.Term.evaluate(a, tuple, realisers(slot)))
+             by Function.extensionality;
+           Universal.Algebra.interpret(symbolArity, symbol, arguments)(tuple)
+              = Universal.Algebra.interpret(symbolArity, symbol,
+                  ((slot : NaturalsBelow(symbolArity)) ↦ arguments(slot)(tuple)))
+              = Universal.Algebra.interpret(symbolArity, symbol,
+                  ((slot : NaturalsBelow(symbolArity)) ↦
+                    Universal.Term.evaluate(a, tuple, realisers(slot))))
+              = Universal.Term.evaluate(a, tuple,
+                  Universal.Term.apply(signature, NaturalsBelow(arity),
+                    symbolArity, symbol, realisers));
+           done };
+  witness Universal.Term.apply(signature, NaturalsBelow(arity), symbolArity,
+    symbol, realisers)
+}

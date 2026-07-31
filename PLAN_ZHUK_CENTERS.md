@@ -419,7 +419,8 @@ eighth draft; Lean version unchanged and complete.
 | Layer 4 (`Universal/absorption`, `Universal/star_power`, + `term`, + `Set/finite_successor`) | 764 |
 | Layer 5 so far (`Universal/essential.math`) | 534 |
 | Dependent product (`Universal/dependent_product.math`) | 152 |
-| **Total** | **~2650** |
+| `Clo_m` (`Universal/clone.math`) | 118 |
+| **Total** | **~2770** |
 
 **The remaining estimate, recalibrated.** The plan's "~15k lines of blueprint
 content" was a guess made before anything was measured, and it is about 4× too
@@ -457,10 +458,69 @@ since a non-dependent function type is the dependent one at a constant motive.
 `restrict`/`project`/`cylinder` stay in their power form until Layer 7 names the
 dependent counterparts it wants.
 
-**What is left in Layer 5:** Lemma 3.7 (regrouping), which the plan has always
-called the single biggest milestone and which settles design question 4;
-Lemma 3.9 (`Clo_m` as a subuniverse of `A^(A^m)`); and Theorem 3.10, which
-assembles them. Then Layers 6–7.
+Lemma 3.9 is done as well — `Universal.IsSubuniverse.clone`, 118 lines. It is
+the reason `Universal.Algebra.power` was built over an arbitrary index type:
+the index here is itself a function type, the `m`-tuples over the carrier.
+
+**What is left in Layer 5:** Lemma 3.7 (regrouping) and Theorem 3.10, which
+assembles it with 3.5, 3.6 and 3.9. Then Layers 6–7.
+
+### Regrouping — the design, worked out but not yet written
+
+This is the one genuine induction in the development, and the piece the plan has
+always called the largest. Design question 4 resolves in favour of the block
+function, as recommended.
+
+**Representation.** Index by `NaturalsBelow(size)`; the partition is
+`block : NaturalsBelow(size) → NaturalsBelow(blocks)`, *surjective* — which is
+exactly "every block nonempty", one hypothesis instead of `m`. Block
+essentiality is `Universal.IsEssential` with clause (B1) freeing a whole block
+rather than a single coordinate:
+
+```
+(∀ j. ∃ tuple. tuple ∈ relation ∧ ∀ i. ¬(block(i) = j) → tuple(i) ∈ subset)
+∧ ¬(∃ tuple. tuple ∈ relation ∧ ∀ i. tuple(i) ∈ subset)
+```
+
+The singleton-block case is where this coincides with `IsEssential`, which is
+what the base case exploits. Goal: block-essential ⟹
+`Universal.HasEssential(a, subset, blocks)`.
+
+**Induction.** Strong induction on `size`, `blocks` fixed — the blueprint's
+measure is `|I|`, and the two recursive calls are at strictly smaller sizes.
+`by strong induction on size with IH` is the form.
+
+**Base case: `block` injective.** With surjectivity it is a bijection, so
+`Universal.project` along a section `NaturalsBelow(blocks) → NaturalsBelow(size)`
+lands the relation in `A^(NaturalsBelow(blocks))` with no transport — the
+projection's target type is already the one `HasEssential` wants. Freeing block
+`j` becomes freeing the coordinate the section sends `j` to; (B2) transfers
+because injectivity makes every `i` equal to `section(block(i))`.
+
+**Inductive step.** `¬injective(block)` gives `i ≠ i'` with equal blocks, so the
+block containing them has more than one element; take `u := i`. The blueprint's
+two branches are a restriction to `I ∖ {u}` and one to `J = (I ∖ I_j) ∪ {u}`.
+
+**The prerequisite, and the thing to build first.** Both branches restrict to a
+*subset* of the index, and `Universal.project` needs an injection
+`NaturalsBelow(k) → NaturalsBelow(size)` naming it. So build, in `Set/`:
+
+> **Subset indexing.** For `chosen : Set(NaturalsBelow(n))`, an injection
+> `NaturalsBelow(Set.size(enumeration, chosen)) → NaturalsBelow(n)` whose image
+> is exactly `chosen`, together with its partial inverse.
+
+Layer 3's `Set.size` and `Set.IsEnumeration` are what this is built from, and
+`Set.size_lt_of_proper_subset` is what makes the measure drop: both `I ∖ {u}`
+and `J` are proper subsets, so both recursive calls are at a strictly smaller
+size without any separate counting argument. This also subsumes the
+"transpose `u` to the front" move that would otherwise be needed to reuse
+`Universal.deleteFirst` — with subset indexing, branch one is just the subset
+`I ∖ {u}` and no transposition is required.
+
+Estimate: ~300 lines for subset indexing, ~500 for the lemma. It is the place to
+expect the worst ratio against Lean, whose `Regrouping.lean` is 135 lines
+leaning on `Finset.card_erase_of_mem` and `Finset.card_lt_card` — the block
+bookkeeping the blueprint imports as Appendix C item 7.
 
 ### The trick that makes arithmetic-indexed induction work
 
