@@ -303,6 +303,16 @@ These came out of one system and improved the other, or improved the blueprint.
   uninferable argument rather than as the dependence. Both variants are
   documented side by side in `Natural/classical_decidable.math`; the trap is
   reaching for the more familiar one.
+
+  **This is a fixable leak, not a fact of life.** `if_positive` *is*
+  `if_positive_dependent` at a constant branch, so the choice the author is
+  being asked to make carries no mathematical content — it is about how the
+  branch was written. Publishing only the dependent forms, with the plain ones
+  as `automatic` corollaries, would remove the decision entirely. The same goes
+  for the module name: a file that wants `if P then a else b` must
+  `import Natural.classical_decidable`, which tells the author about a
+  decidability mechanism when what they wrote was "by cases on whether P".
+  Worth an issue against the library, independent of this development.
 - **Implicit arguments are not inferred in a theorem *statement* with no outer
   expected type.** `Universal.starPrepend(block, position, …)` with implicit
   `{arity depth}` put `block` in the `arity` slot — via the

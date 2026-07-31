@@ -23,6 +23,15 @@ enumerability, equinumerosity, and the finite counting layer.
   which is the form an indexing argument can use
 - Choice over a finite index, `NaturalsBelow.choice`, in
   [finite_choice.math](finite_choice.math)
+- `NaturalsBelow.consFunction` — a function on `NaturalsBelow(1 + n)` given by
+  its value at the first point and its values on the shifted copy, in
+  [finite_cons.math](finite_cons.math)
+- `NaturalsBelow.IndexesSubset` and `NaturalsBelow.index_subset` in
+  [subset_indexing.math](subset_indexing.math): every subset of
+  `NaturalsBelow(bound)` is the image of an injection from
+  `NaturalsBelow(count)` with `count ≤ bound`, strictly smaller as soon as the
+  subset misses anything. What lets an induction restrict to a subset and keep
+  indexing by an initial segment
 - Cardinality of a **subset** — `Set.IsEnumeration(A, enumeration)`,
   `Set.IsFinite(A)`, and `Set.size(enumeration, subset)` — in
   [enumeration.math](enumeration.math). `HasSize` counts a *type*; this counts

@@ -1,0 +1,458 @@
+-- Set/subset_indexing.math
+--
+-- Every subset of `NaturalsBelow(bound)` is the image of an injection from
+-- `NaturalsBelow(count)` for some `count ≤ bound`, strictly smaller as soon as
+-- the subset misses anything.
+--
+-- This is what lets an induction restrict to a subset of its index set and
+-- still be indexing by an initial segment — the shape every later construction
+-- wants, since `Universal.project` reindexes along a map of index types and
+-- `Universal.HasEssential` asks for `NaturalsBelow(k)` specifically. The
+-- regrouping lemma of Zhuk's development is the consumer: both branches of its
+-- induction restrict to a subset, and the strictness clause is exactly what
+-- makes the induction measure drop.
+--
+-- The count is not claimed to be the subset's cardinality. It is, but nothing
+-- downstream needs that, and proving it would drag in the enumeration machinery
+-- of `Set/enumeration.math`; `count ≤ bound` with strictness is what an
+-- induction runs on.
+--
+-- The two step lemmas take the extended indexing as a *parameter* constrained
+-- by its two defining equations, rather than building it inline. A `let`-bound
+-- function is expanded in the goal, so an equation about it has no syntactic
+-- occurrence left to rewrite; an opaque parameter with `atFirst` and `atShift`
+-- gives every step the handle it needs.
+
+module Set.subset_indexing
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.add_order
+import Set.basics
+import Set.finite
+import Set.finite_successor
+import Set.finite_cons
+
+-- `place` indexes `chosen`: injective, lands inside, covers it, and is short
+-- whenever anything is left out.
+definition NaturalsBelow.IndexesSubset (bound : ℕ)
+        (chosen : Set(NaturalsBelow(bound))) (count : ℕ)
+        (place : NaturalsBelow(count) → NaturalsBelow(bound)) : Proposition :=
+  count ≤ bound
+  ∧ (∀ (i : NaturalsBelow(count)). ∀ (j : NaturalsBelow(count)).
+       place(i) = place(j) → i = j)
+  ∧ (∀ (i : NaturalsBelow(count)). place(i) ∈ chosen)
+  ∧ (∀ (x : NaturalsBelow(bound)).
+       x ∈ chosen → ∃ (i : NaturalsBelow(count)). place(i) = x)
+  ∧ (∀ (x : NaturalsBelow(bound)). ¬(x ∈ chosen) → count < bound)
+
+-- A shifted point is never the first one. Used by both step lemmas.
+theorem NaturalsBelow.shift_ne_first {rest : ℕ} (lower : NaturalsBelow(rest))
+        : ¬(NaturalsBelow.shiftUp(lower)
+            = (NaturalsBelow.first : NaturalsBelow(1 + rest))) := {
+  suppose NaturalsBelow.shiftUp(lower)
+      = (NaturalsBelow.first : NaturalsBelow(1 + rest)) as isFirst;
+  ¬(NaturalsBelow.value(NaturalsBelow.shiftUp(lower)) = 0)
+      by NaturalsBelow.shiftUp_nonzero;
+  NaturalsBelow.value(NaturalsBelow.shiftUp(lower))
+     = NaturalsBelow.value((NaturalsBelow.first : NaturalsBelow(1 + rest)))
+           by substituting isFirst
+     = 0 by NaturalsBelow.first_value;
+  done
+}
+
+-- ── The step when the first point is in the subset ────────────────────
+
+theorem NaturalsBelow.IndexesSubset.cons (rest count : ℕ)
+        (chosen : Set(NaturalsBelow(1 + rest)))
+        (place : NaturalsBelow(count) → NaturalsBelow(rest))
+        (indexes : NaturalsBelow.IndexesSubset(rest,
+            ((lower : NaturalsBelow(rest)) ↦
+              NaturalsBelow.shiftUp(lower) ∈ chosen), count, place))
+        (firstInside : (NaturalsBelow.first : NaturalsBelow(1 + rest)) ∈ chosen)
+        (extended : NaturalsBelow(1 + count) → NaturalsBelow(1 + rest))
+        (atFirst : extended(NaturalsBelow.first)
+                   = (NaturalsBelow.first : NaturalsBelow(1 + rest)))
+        (atShift : ∀ (i : NaturalsBelow(count)).
+            extended(NaturalsBelow.shiftUp(i)) = NaturalsBelow.shiftUp(place(i)))
+        : NaturalsBelow.IndexesSubset(1 + rest, chosen, 1 + count, extended) := {
+  count ≤ rest;
+  ∀ (i : NaturalsBelow(count)). ∀ (j : NaturalsBelow(count)).
+      place(i) = place(j) → i = j as placeInjective;
+  ∀ (i : NaturalsBelow(count)).
+      NaturalsBelow.shiftUp(place(i)) ∈ chosen as placeInside;
+  ∀ (lower : NaturalsBelow(rest)).
+      NaturalsBelow.shiftUp(lower) ∈ chosen
+      → ∃ (i : NaturalsBelow(count)). place(i) = lower as placeCovers;
+  ∀ (lower : NaturalsBelow(rest)).
+      ¬(NaturalsBelow.shiftUp(lower) ∈ chosen) → count < rest as placeStrict;
+  (1 : ℕ) + count ≤ 1 + rest;
+  -- Injectivity, by cases on the shape of each argument.
+  ∀ (i : NaturalsBelow(1 + count)). ∀ (j : NaturalsBelow(1 + count)).
+      extended(i) = extended(j) → i = j
+      by { take i : NaturalsBelow(1 + count);
+           take j : NaturalsBelow(1 + count);
+           suppose extended(i) = extended(j) as imagesAgree;
+           i = NaturalsBelow.first
+             ∨ ∃ (lower : NaturalsBelow(count)). i = NaturalsBelow.shiftUp(lower)
+             by NaturalsBelow.first_or_shift;
+           done by cases {
+             case i = NaturalsBelow.first as iIsFirst: {
+                 j = NaturalsBelow.first
+                   ∨ ∃ (lower : NaturalsBelow(count)).
+                       j = NaturalsBelow.shiftUp(lower)
+                   by NaturalsBelow.first_or_shift;
+                 done by cases {
+                   case j = NaturalsBelow.first as jIsFirst: {
+                       i = NaturalsBelow.first = j;
+                       done
+                     }
+                   case ∃ (lower : NaturalsBelow(count)).
+                          j = NaturalsBelow.shiftUp(lower) as jIsShift: {
+                       choose jLower such that j = NaturalsBelow.shiftUp(jLower)
+                           from jIsShift;
+                       extended(NaturalsBelow.shiftUp(jLower))
+                          = NaturalsBelow.shiftUp(place(jLower))
+                          by atShift as jImage;
+                       extended(j)
+                          = extended(NaturalsBelow.shiftUp(jLower))
+                                by (j = NaturalsBelow.shiftUp(jLower))
+                          = NaturalsBelow.shiftUp(place(jLower)) by jImage
+                          as jLands;
+                       extended(i)
+                          = extended(NaturalsBelow.first) by iIsFirst
+                          = (NaturalsBelow.first : NaturalsBelow(1 + rest))
+                                by atFirst
+                          as iLands;
+                       NaturalsBelow.shiftUp(place(jLower))
+                          = extended(j) by jLands
+                          = extended(i) by imagesAgree
+                          = (NaturalsBelow.first : NaturalsBelow(1 + rest))
+                                by iLands;
+                       ¬(NaturalsBelow.shiftUp(place(jLower))
+                         = (NaturalsBelow.first : NaturalsBelow(1 + rest)))
+                           by NaturalsBelow.shift_ne_first;
+                       done
+                     }
+                 }
+               }
+             case ∃ (lower : NaturalsBelow(count)).
+                    i = NaturalsBelow.shiftUp(lower) as iIsShift: {
+                 choose iLower such that i = NaturalsBelow.shiftUp(iLower)
+                     from iIsShift;
+                 j = NaturalsBelow.first
+                   ∨ ∃ (lower : NaturalsBelow(count)).
+                       j = NaturalsBelow.shiftUp(lower)
+                   by NaturalsBelow.first_or_shift;
+                 done by cases {
+                   case j = NaturalsBelow.first as jIsFirst: {
+                       extended(NaturalsBelow.shiftUp(iLower))
+                          = NaturalsBelow.shiftUp(place(iLower))
+                          by atShift as iImage;
+                       extended(i)
+                          = extended(NaturalsBelow.shiftUp(iLower))
+                                by (i = NaturalsBelow.shiftUp(iLower))
+                          = NaturalsBelow.shiftUp(place(iLower)) by iImage
+                          as iLands;
+                       extended(j)
+                          = extended(NaturalsBelow.first) by jIsFirst
+                          = (NaturalsBelow.first : NaturalsBelow(1 + rest))
+                                by atFirst
+                          as jLands;
+                       NaturalsBelow.shiftUp(place(iLower))
+                          = extended(i) by iLands
+                          = extended(j) by imagesAgree
+                          = (NaturalsBelow.first : NaturalsBelow(1 + rest))
+                                by jLands;
+                       ¬(NaturalsBelow.shiftUp(place(iLower))
+                         = (NaturalsBelow.first : NaturalsBelow(1 + rest)))
+                           by NaturalsBelow.shift_ne_first;
+                       done
+                     }
+                   case ∃ (lower : NaturalsBelow(count)).
+                          j = NaturalsBelow.shiftUp(lower) as jIsShift: {
+                       choose jLower such that j = NaturalsBelow.shiftUp(jLower)
+                           from jIsShift;
+                       extended(NaturalsBelow.shiftUp(iLower))
+                          = NaturalsBelow.shiftUp(place(iLower))
+                          by atShift as iImage;
+                       extended(NaturalsBelow.shiftUp(jLower))
+                          = NaturalsBelow.shiftUp(place(jLower))
+                          by atShift as jImage;
+                       extended(i)
+                          = extended(NaturalsBelow.shiftUp(iLower))
+                                by (i = NaturalsBelow.shiftUp(iLower))
+                          = NaturalsBelow.shiftUp(place(iLower)) by iImage
+                          as iLands;
+                       extended(j)
+                          = extended(NaturalsBelow.shiftUp(jLower))
+                                by (j = NaturalsBelow.shiftUp(jLower))
+                          = NaturalsBelow.shiftUp(place(jLower)) by jImage
+                          as jLands;
+                       NaturalsBelow.shiftUp(place(iLower))
+                          = extended(i) by iLands
+                          = extended(j) by imagesAgree
+                          = NaturalsBelow.shiftUp(place(jLower)) by jLands;
+                       place(iLower) = place(jLower)
+                           by NaturalsBelow.shiftUp_injective;
+                       iLower = jLower by placeInjective;
+                       i = NaturalsBelow.shiftUp(iLower)
+                         = NaturalsBelow.shiftUp(jLower)
+                         = j;
+                       done
+                     }
+                 }
+               }
+           } };
+  -- Every value lies inside.
+  ∀ (i : NaturalsBelow(1 + count)). extended(i) ∈ chosen
+      by { take i : NaturalsBelow(1 + count);
+           i = NaturalsBelow.first
+             ∨ ∃ (lower : NaturalsBelow(count)). i = NaturalsBelow.shiftUp(lower)
+             by NaturalsBelow.first_or_shift;
+           done by cases {
+             case i = NaturalsBelow.first as iIsFirst:
+                 -- The arm's equation has already refined the goal to the
+                 -- first point, so `atFirst` closes it directly.
+                 done by substituting atFirst
+             case ∃ (lower : NaturalsBelow(count)).
+                    i = NaturalsBelow.shiftUp(lower) as iIsShift: {
+                 choose lower such that i = NaturalsBelow.shiftUp(lower)
+                     from iIsShift;
+                 NaturalsBelow.shiftUp(place(lower)) ∈ chosen by placeInside;
+                 extended(NaturalsBelow.shiftUp(lower))
+                    = NaturalsBelow.shiftUp(place(lower)) by atShift as lowerImage;
+                 extended(i)
+                    = extended(NaturalsBelow.shiftUp(lower))
+                          by (i = NaturalsBelow.shiftUp(lower))
+                    = NaturalsBelow.shiftUp(place(lower)) by lowerImage
+                    as landsOnShift;
+                 done by substituting landsOnShift
+               }
+           } };
+  -- Everything inside is covered.
+  ∀ (x : NaturalsBelow(1 + rest)).
+      x ∈ chosen → ∃ (i : NaturalsBelow(1 + count)). extended(i) = x
+      by { take x : NaturalsBelow(1 + rest);
+           suppose x ∈ chosen as xInside;
+           x = NaturalsBelow.first
+             ∨ ∃ (lower : NaturalsBelow(rest)). x = NaturalsBelow.shiftUp(lower)
+             by NaturalsBelow.first_or_shift;
+           done by cases {
+             case x = NaturalsBelow.first as xIsFirst: {
+                 extended(NaturalsBelow.first)
+                    = (NaturalsBelow.first : NaturalsBelow(1 + rest)) by atFirst
+                    = x by xIsFirst;
+                 witness (NaturalsBelow.first : NaturalsBelow(1 + count))
+               }
+             case ∃ (lower : NaturalsBelow(rest)).
+                    x = NaturalsBelow.shiftUp(lower) as xIsShift: {
+                 choose lower such that x = NaturalsBelow.shiftUp(lower)
+                     from xIsShift;
+                 NaturalsBelow.shiftUp(lower) ∈ chosen
+                     by substituting (x = NaturalsBelow.shiftUp(lower));
+                 choose i such that place(i) = lower from placeCovers;
+                 extended(NaturalsBelow.shiftUp(i))
+                    = NaturalsBelow.shiftUp(place(i)) by atShift as iImage;
+                 extended(NaturalsBelow.shiftUp(i))
+                    = NaturalsBelow.shiftUp(place(i)) by iImage
+                    = NaturalsBelow.shiftUp(lower) by (place(i) = lower)
+                    = x by (x = NaturalsBelow.shiftUp(lower));
+                 witness NaturalsBelow.shiftUp(i)
+               }
+           } };
+  -- Anything missing is a shift, so the shorter indexing was already strict.
+  ∀ (x : NaturalsBelow(1 + rest)). ¬(x ∈ chosen) → 1 + count < 1 + rest
+      by { take x : NaturalsBelow(1 + rest);
+           suppose ¬(x ∈ chosen) as xOutside;
+           x = NaturalsBelow.first
+             ∨ ∃ (lower : NaturalsBelow(rest)). x = NaturalsBelow.shiftUp(lower)
+             by NaturalsBelow.first_or_shift;
+           count < rest
+               by cases {
+                 case x = NaturalsBelow.first as xIsFirst: {
+                     x ∈ chosen by substituting xIsFirst;
+                     done
+                   }
+                 case ∃ (lower : NaturalsBelow(rest)).
+                        x = NaturalsBelow.shiftUp(lower) as xIsShift: {
+                     choose lower such that x = NaturalsBelow.shiftUp(lower)
+                         from xIsShift;
+                     ¬(NaturalsBelow.shiftUp(lower) ∈ chosen)
+                         by substituting (x = NaturalsBelow.shiftUp(lower));
+                     done by placeStrict
+                   }
+               };
+           done };
+  done
+}
+
+-- ── The step when the first point is not in the subset ────────────────
+
+theorem NaturalsBelow.IndexesSubset.raise (rest count : ℕ)
+        (chosen : Set(NaturalsBelow(1 + rest)))
+        (place : NaturalsBelow(count) → NaturalsBelow(rest))
+        (indexes : NaturalsBelow.IndexesSubset(rest,
+            ((lower : NaturalsBelow(rest)) ↦
+              NaturalsBelow.shiftUp(lower) ∈ chosen), count, place))
+        (firstOutside : ¬((NaturalsBelow.first : NaturalsBelow(1 + rest))
+                          ∈ chosen))
+        : NaturalsBelow.IndexesSubset(1 + rest, chosen, count,
+            ((i : NaturalsBelow(count)) ↦ NaturalsBelow.shiftUp(place(i)))) := {
+  count ≤ rest;
+  ∀ (i : NaturalsBelow(count)). ∀ (j : NaturalsBelow(count)).
+      place(i) = place(j) → i = j as placeInjective;
+  ∀ (i : NaturalsBelow(count)).
+      NaturalsBelow.shiftUp(place(i)) ∈ chosen;
+  ∀ (lower : NaturalsBelow(rest)).
+      NaturalsBelow.shiftUp(lower) ∈ chosen
+      → ∃ (i : NaturalsBelow(count)). place(i) = lower as placeCovers;
+  count ≤ 1 + rest;
+  ∀ (i : NaturalsBelow(count)). ∀ (j : NaturalsBelow(count)).
+      NaturalsBelow.shiftUp(place(i)) = NaturalsBelow.shiftUp(place(j)) → i = j
+      by { take i : NaturalsBelow(count);
+           take j : NaturalsBelow(count);
+           suppose NaturalsBelow.shiftUp(place(i))
+               = NaturalsBelow.shiftUp(place(j));
+           place(i) = place(j) by NaturalsBelow.shiftUp_injective;
+           done by placeInjective };
+  ∀ (x : NaturalsBelow(1 + rest)).
+      x ∈ chosen
+      → ∃ (i : NaturalsBelow(count)). NaturalsBelow.shiftUp(place(i)) = x
+      by { take x : NaturalsBelow(1 + rest);
+           suppose x ∈ chosen as xInside;
+           x = NaturalsBelow.first
+             ∨ ∃ (lower : NaturalsBelow(rest)). x = NaturalsBelow.shiftUp(lower)
+             by NaturalsBelow.first_or_shift;
+           done by cases {
+             case x = NaturalsBelow.first as xIsFirst: {
+                 (NaturalsBelow.first : NaturalsBelow(1 + rest)) ∈ chosen
+                     by substituting xIsFirst;
+                 done
+               }
+             case ∃ (lower : NaturalsBelow(rest)).
+                    x = NaturalsBelow.shiftUp(lower) as xIsShift: {
+                 choose lower such that x = NaturalsBelow.shiftUp(lower)
+                     from xIsShift;
+                 NaturalsBelow.shiftUp(lower) ∈ chosen
+                     by substituting (x = NaturalsBelow.shiftUp(lower));
+                 choose i such that place(i) = lower from placeCovers;
+                 NaturalsBelow.shiftUp(place(i))
+                    = NaturalsBelow.shiftUp(lower) by (place(i) = lower)
+                    = x by (x = NaturalsBelow.shiftUp(lower));
+                 witness i
+               }
+           } };
+  -- The first point is missing already, so strictness needs no hypothesis.
+  ∀ (x : NaturalsBelow(1 + rest)). ¬(x ∈ chosen) → count < 1 + rest
+      by { take x : NaturalsBelow(1 + rest);
+           suppose ¬(x ∈ chosen);
+           count ≤ rest < 1 + rest;
+           done };
+  done
+}
+
+-- ── The indexing itself ───────────────────────────────────────────────
+
+theorem NaturalsBelow.index_subset (bound : ℕ)
+        : ∀ (chosen : Set(NaturalsBelow(bound))).
+            ∃ (count : ℕ).
+              ∃ (place : NaturalsBelow(count) → NaturalsBelow(bound)).
+                NaturalsBelow.IndexesSubset(bound, chosen, count, place) :=
+  by induction on bound with IH {
+    case bound = 0: {
+        take chosen : Set(NaturalsBelow(0));
+        -- Nothing to index, and every clause is vacuous because
+        -- `NaturalsBelow(0)` has no elements.
+        (0 : ℕ) ≤ 0;
+        ∀ (i : NaturalsBelow(0)). ∀ (j : NaturalsBelow(0)).
+            ((slot : NaturalsBelow(0)) ↦ slot)(i)
+              = ((slot : NaturalsBelow(0)) ↦ slot)(j) → i = j
+            by { take i : NaturalsBelow(0);
+                 take j : NaturalsBelow(0);
+                 False by NaturalsBelow.zero_is_empty;
+                 done };
+        ∀ (i : NaturalsBelow(0)). ((slot : NaturalsBelow(0)) ↦ slot)(i) ∈ chosen
+            by { take i : NaturalsBelow(0);
+                 False by NaturalsBelow.zero_is_empty;
+                 done };
+        ∀ (x : NaturalsBelow(0)). x ∈ chosen
+            → ∃ (i : NaturalsBelow(0)). ((slot : NaturalsBelow(0)) ↦ slot)(i) = x
+            by { take x : NaturalsBelow(0);
+                 False by NaturalsBelow.zero_is_empty;
+                 done };
+        ∀ (x : NaturalsBelow(0)). ¬(x ∈ chosen) → (0 : ℕ) < 0
+            by { take x : NaturalsBelow(0);
+                 False by NaturalsBelow.zero_is_empty;
+                 done };
+        NaturalsBelow.IndexesSubset(0, chosen, 0,
+            ((slot : NaturalsBelow(0)) ↦ slot));
+        ∃ (place : NaturalsBelow(0) → NaturalsBelow(0)).
+            NaturalsBelow.IndexesSubset(0, chosen, 0, place)
+            by { witness ((slot : NaturalsBelow(0)) ↦ slot) };
+        witness 0
+      }
+    case bound = 1 + rest for some (rest : ℕ): {
+        take chosen : Set(NaturalsBelow(1 + rest));
+        choose count such that
+            ∃ (place : NaturalsBelow(count) → NaturalsBelow(rest)).
+              NaturalsBelow.IndexesSubset(rest,
+                ((lower : NaturalsBelow(rest)) ↦
+                  NaturalsBelow.shiftUp(lower) ∈ chosen), count, place)
+            from IH(((lower : NaturalsBelow(rest)) ↦
+                      NaturalsBelow.shiftUp(lower) ∈ chosen));
+        choose place such that
+            NaturalsBelow.IndexesSubset(rest,
+              ((lower : NaturalsBelow(rest)) ↦
+                NaturalsBelow.shiftUp(lower) ∈ chosen), count, place);
+        done by cases {
+          case (NaturalsBelow.first : NaturalsBelow(1 + rest)) ∈ chosen
+                 as firstInside: {
+              NaturalsBelow.consFunction(
+                  (NaturalsBelow.first : NaturalsBelow(1 + rest)),
+                  ((i : NaturalsBelow(count)) ↦
+                    NaturalsBelow.shiftUp(place(i))),
+                  NaturalsBelow.first)
+                = (NaturalsBelow.first : NaturalsBelow(1 + rest))
+                by NaturalsBelow.consFunction_first;
+              ∀ (i : NaturalsBelow(count)).
+                  NaturalsBelow.consFunction(
+                      (NaturalsBelow.first : NaturalsBelow(1 + rest)),
+                      ((slot : NaturalsBelow(count)) ↦
+                        NaturalsBelow.shiftUp(place(slot))),
+                      NaturalsBelow.shiftUp(i))
+                    = NaturalsBelow.shiftUp(place(i))
+                  by NaturalsBelow.consFunction_shift;
+              NaturalsBelow.IndexesSubset(1 + rest, chosen, 1 + count,
+                  NaturalsBelow.consFunction(
+                    (NaturalsBelow.first : NaturalsBelow(1 + rest)),
+                    ((i : NaturalsBelow(count)) ↦
+                      NaturalsBelow.shiftUp(place(i)))))
+                  by NaturalsBelow.IndexesSubset.cons;
+              ∃ (candidate : NaturalsBelow(1 + count) → NaturalsBelow(1 + rest)).
+                  NaturalsBelow.IndexesSubset(1 + rest, chosen, 1 + count,
+                    candidate)
+                  by { witness NaturalsBelow.consFunction(
+                         (NaturalsBelow.first : NaturalsBelow(1 + rest)),
+                         ((i : NaturalsBelow(count)) ↦
+                           NaturalsBelow.shiftUp(place(i)))) };
+              witness (1 + count)
+            }
+          otherwise as firstOutside: {
+              NaturalsBelow.IndexesSubset(1 + rest, chosen, count,
+                  ((i : NaturalsBelow(count)) ↦
+                    NaturalsBelow.shiftUp(place(i))))
+                  by NaturalsBelow.IndexesSubset.raise;
+              ∃ (candidate : NaturalsBelow(count) → NaturalsBelow(1 + rest)).
+                  NaturalsBelow.IndexesSubset(1 + rest, chosen, count, candidate)
+                  by { witness ((i : NaturalsBelow(count)) ↦
+                         NaturalsBelow.shiftUp(place(i))) };
+              witness count
+            }
+        }
+      }
+  }

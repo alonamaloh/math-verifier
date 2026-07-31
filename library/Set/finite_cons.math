@@ -1,0 +1,68 @@
+-- Set/finite_cons.math
+--
+-- Defining a function on `NaturalsBelow(1 + n)` by its value at the first point
+-- and its values on the shifted copy — the value-level counterpart of
+-- `NaturalsBelow.first_or_shift`, which justifies the recursion but is a
+-- theorem and so cannot be used to *build* anything.
+--
+-- `NaturalsBelow.first_or_shift` says every index has one of the two shapes,
+-- but it is a theorem, so it can justify a definition by cases without being
+-- able to *make* one. `consFunction` is that definition; the two equations
+-- below are its whole interface, and no consumer should look further.
+--
+-- Implementation note: the branch is taken by the classical conditional, which
+-- is why this lives here rather than in `Set/finite_successor.math` — that file
+-- is core counting machinery and is kept free of the dependency.
+
+module Set.finite_cons
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.classical_decidable
+import Set.subtype
+import Set.finite
+import Set.finite_successor
+
+-- Defining a function on `NaturalsBelow(1 + n)` by its value at the first
+-- point and its values on the shifted copy. The recursion `first_or_shift`
+-- justifies, in the form a *definition* can use.
+--
+-- The index is a parameter rather than the body's lambda binder, so a fully
+-- applied `consFunction(…, index)` has the conditional at its head and the two
+-- characterising equations below are instances of the conditional lemmas. They
+-- are the *dependent* ones: the else branch consumes the branch hypothesis,
+-- which is how it knows the index can be dropped.
+
+definition NaturalsBelow.consFunction {n : ℕ} {T : Type(0)}
+        (head : T) (tail : NaturalsBelow(n) → T)
+        (index : NaturalsBelow(1 + n)) : T :=
+  if NaturalsBelow.value(index) = 0
+  then head
+  else { ¬(NaturalsBelow.value(index) = 0) as nonzero;
+         tail(NaturalsBelow.dropFirst(index, nonzero)) }
+
+theorem NaturalsBelow.consFunction_first {n : ℕ} {T : Type(0)}
+        (head : T) (tail : NaturalsBelow(n) → T)
+        : NaturalsBelow.consFunction(head, tail, NaturalsBelow.first) = head := {
+  NaturalsBelow.value((NaturalsBelow.first : NaturalsBelow(1 + n))) = 0
+      by NaturalsBelow.first_value;
+  done by Logic.if_positive_dependent
+}
+
+theorem NaturalsBelow.consFunction_shift {n : ℕ} {T : Type(0)}
+        (head : T) (tail : NaturalsBelow(n) → T) (lower : NaturalsBelow(n))
+        : NaturalsBelow.consFunction(head, tail, NaturalsBelow.shiftUp(lower))
+          = tail(lower) := {
+  ¬(NaturalsBelow.value(NaturalsBelow.shiftUp(lower)) = 0)
+      by NaturalsBelow.shiftUp_nonzero as nonzero;
+  NaturalsBelow.dropFirst(NaturalsBelow.shiftUp(lower), nonzero) = lower
+      by NaturalsBelow.dropFirst_shiftUp as dropsBack;
+  NaturalsBelow.consFunction(head, tail, NaturalsBelow.shiftUp(lower))
+     = tail(NaturalsBelow.dropFirst(NaturalsBelow.shiftUp(lower), nonzero))
+           by Logic.if_negative_dependent
+     = tail(lower)
+           by substituting dropsBack;
+  done
+}
