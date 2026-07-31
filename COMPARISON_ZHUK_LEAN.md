@@ -245,6 +245,67 @@ formalizations; the eighth draft catches it up. Two independent formalizations
 converging on a representation the prose had not chosen is about as strong a
 signal as this exercise produces.
 
+### 2.7 Layer 5 — where Lean's proof was *mathematically* better
+
+Layer 5 is regrouping (Lemma 3.7) and the relational description of absorption
+(Theorem 3.10). Neither library supplies any of it, so this is the second fair
+fight.
+
+| | Lean | Here |
+|---|---|---|
+| Regrouping (Lemma 3.7) | `Regrouping.lean`, 135 | `regrouping.math`, 817 |
+| `Clo_m` + Theorem 3.10 | `Relational.lean`, 95 | `clone.math` 118 + `relational.math` 349 |
+| | **230** | **1284** |
+| Indexing a subset by an initial segment | `Finset` + `Finset.card` ✅ | `subset_indexing.math`, 458 |
+| A finite power of a finite type is finite | `Fintype` instance ✅ | `finite_function.math`, 191 |
+
+The two library rows are the familiar story — `Finset` and the `Fintype`
+instance graph collapse 649 lines to nothing. The two proof rows come in at
+5.6:1, noticeably worse than Layer 4's 3.3:1, and the reason is visible in the
+proofs: `Finset.card_lt_card` supplies the induction measure and `Finset`'s
+membership algebra is used at every step of both branches, where here each of
+those is a stated fact over `NaturalsBelow.IndexesSubset`.
+
+**The interesting difference is not a ratio.** Lean's Theorem 3.10 has *no
+degenerate cases*, where the blueprint's proof spends three paragraphs on
+`S = A`, `S = ∅` with `m ≥ 2`, and `S = ∅` with `m = 1`. The plan here had
+budgeted for those, and the first version written here had them: the blocks of
+the partition of `X` are nonempty because `S` and `A ∖ S` are, so both have to
+be inhabited, so the two extremes are peeled off first — and the statement was
+restricted to `2 ≤ arity` to drop the third.
+
+Lean does not need any of it, because `IsEssentialOn.exists_mem` derives
+"every block meets the live set" **from block essentiality itself**: if some
+block were empty, condition (B1)'s witness freed at that block would lie inside
+`S` at every live coordinate, which is exactly what (B2) forbids. Four lines.
+
+That fact is available here just as much as there, and it was simply not seen
+when the plan was written. `Universal.IsBlockEssential.blocks_populated` is the
+same argument, and with it Theorem 3.10 discharges regrouping's surjectivity
+premise inside the very branch where (B2) is assumed. `relational.math` came
+down from 537 lines to 349 (144 net, counting the new lemma), has no case split
+anywhere, and holds at **every** arity — no `2 ≤ arity`, no `S ≠ ∅`, no
+`S ≠ A`.
+
+Two things worth separating out.
+
+- **This is a blueprint edit, and the blueprint is behind both formalizations
+  again.** Definition 3.2 builds nonemptiness into the word "partition", so
+  Lemma 3.7 carries it as a hypothesis and Theorem 3.10 has to check it. Drop it
+  from the definition, prove it as a remark, and Theorem 3.10's preamble deletes
+  itself. Same shape as the star-power finding of §2.6: a representation the
+  prose had not chosen, which one formalization found and the other confirms.
+- **The mechanism of the discovery is worth recording.** Nothing about the
+  formalization forced this; the first version here typechecked, and was
+  complete and correct. What surfaced the redundancy was reading the *other*
+  system's proof of the same theorem and noticing it did less work. A second
+  formalization catches errors, which is its advertised value; catching
+  *unnecessary hypotheses* is a distinct and less obvious one, and it only
+  works if the two are read against each other rather than merely both
+  completed.
+
+---
+
 ## 3. Design lessons that transfer
 
 These came out of one system and improved the other, or improved the blueprint.
@@ -358,7 +419,9 @@ as they land.
 | Finite choice | 0 (a tactic) | ~60 |
 | Subset cardinality + `min` (App. C 1–2) | 1 (`by omega`) | 451 |
 | Absorption + star powers (Part II, Layer 4) | 232 | 764 |
-| Rest of Parts II–III | ~1170 | not started |
+| Subset indexing + finite powers (Layer 5 support) | 0 (`Finset`, `Fintype`) | 649 |
+| Regrouping + relational description (Part II, Layer 5) | 230 | 1284 |
+| Rest of Part III | ~775 | not started |
 
 The Lean figure for Part I is small because Mathlib supplied the rest; the
 figure here is the true cost of the same content. The Parts II–III rows are the

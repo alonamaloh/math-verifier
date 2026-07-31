@@ -33,6 +33,9 @@ for Zhuk's theorem on the left centre of a subdirect relation.
   and `Universal.deleteFirst`, in [essential.math](essential.math).
 - `Universal.IsBlockEssential` — essentiality for a partition, with the
   partition given as a block function, in [regrouping.math](regrouping.math).
+- `Universal.IsCritical` — the blueprint's `X`: a tuple with exactly one
+  coordinate outside a subset, in [relational.math](relational.math), together
+  with `NaturalsBelow.spike`, the tuple that escapes at one chosen coordinate.
 - `Universal.Tuples` and `Universal.clone` — the `m`-ary term operations as a
   subset of the power `A^(A^m)`, in [clone.math](clone.math).
 - `Universal.Witnesses`, `Universal.Absorbs`, `Universal.BinaryAbsorbs`,
@@ -94,6 +97,23 @@ for Zhuk's theorem on the left centre of a subdirect relation.
 - `Universal.IsSubuniverse.clone` — the `m`-ary term operations are closed under
   the operations, applied pointwise. The index of the power is itself a function
   type, which is why powers were built over an arbitrary index.
+- `Universal.IsBlockEssential.blocks_populated` — every block of a
+  block-essential relation is populated, which is therefore not worth assuming:
+  an empty block's (B1) witness would lie inside `subset` everywhere, which (B2)
+  forbids.
+- `Universal.exists_witnesses_of_no_essential` — **the relational description of
+  absorption**, blueprint Theorem 3.10 (Barto–Kazda), converse direction: over a
+  finite carrier, at any arity, no essential relation of that arity forces a
+  witnessing term of it. The relation regrouping is applied to is the clone read
+  at the critical tuples (`Universal.IsCritical.inside_of_no_essential`), and its
+  blocks are the coordinates — the block function is read off the tuple, so no
+  partition is constructed. `Universal.IsCritical.index` supplies the index: the
+  critical tuples are presented as the image of a map out of an initial segment,
+  by composing `HasSize.tuples` with `NaturalsBelow.index_subset`, so no subtype
+  and no transport appear. The blueprint's three degenerate cases (`S = A`, and
+  `S = ∅` at each of `m ≥ 2` and `m = 1`) do not appear, and no lower bound on
+  the arity is needed: they were there to secure nonempty blocks, which
+  `blocks_populated` supplies instead.
 
 ## Two representation choices
 

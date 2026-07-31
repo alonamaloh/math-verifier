@@ -56,6 +56,50 @@ definition Universal.IsBlockEssential {signature : Universal.Signature}
         tuple ∈ relation
         ∧ ∀ (i : NaturalsBelow(size)). tuple(i) ∈ subset)
 
+-- Every block is populated — and it need not be assumed. If no coordinate had
+-- block `j`, the (B1) witness freed at `j` would lie inside `subset` at every
+-- coordinate at all, which is exactly what (B2) forbids.
+theorem Universal.IsBlockEssential.blocks_populated {signature : Universal.Signature}
+        (a : Universal.Algebra(signature)) (size blocks : ℕ)
+        (block : NaturalsBelow(size) → NaturalsBelow(blocks))
+        (subset : Set(Universal.Algebra.carrier(a)))
+        (relation : Set(Universal.Algebra.carrier(
+            Universal.Algebra.power(a, NaturalsBelow(size)))))
+        (blockEssential : Universal.IsBlockEssential(a, size, blocks, block,
+            subset, relation))
+        (j : NaturalsBelow(blocks))
+        : ∃ (i : NaturalsBelow(size)). block(i) = j := {
+  ∀ (freeBlock : NaturalsBelow(blocks)).
+      ∃ (tuple : Universal.Algebra.carrier(
+          Universal.Algebra.power(a, NaturalsBelow(size)))).
+        tuple ∈ relation
+        ∧ ∀ (i : NaturalsBelow(size)).
+            ¬(block(i) = freeBlock) → tuple(i) ∈ subset
+      as blocksFreed;
+  suppose ¬(∃ (i : NaturalsBelow(size)). block(i) = j) for contradiction;
+  choose tuple such that
+      tuple ∈ relation
+      ∧ ∀ (i : NaturalsBelow(size)). ¬(block(i) = j) → tuple(i) ∈ subset
+      from blocksFreed(j);
+  tuple ∈ relation;
+  ∀ (i : NaturalsBelow(size)).
+      ¬(block(i) = j) → tuple(i) ∈ subset as insideOffBlock;
+  ∀ (i : NaturalsBelow(size)). tuple(i) ∈ subset
+      by { take i : NaturalsBelow(size);
+           ¬(block(i) = j)
+               by { suppose block(i) = j as isBlockJ;
+                    ∃ (candidate : NaturalsBelow(size)). block(candidate) = j
+                        by { witness i };
+                    done };
+           done by insideOffBlock };
+  ∃ (candidate : Universal.Algebra.carrier(
+      Universal.Algebra.power(a, NaturalsBelow(size)))).
+      candidate ∈ relation
+      ∧ ∀ (i : NaturalsBelow(size)). candidate(i) ∈ subset
+      by { witness tuple };
+  done
+}
+
 -- ── The base case: every block a singleton ────────────────────────────
 
 -- A surjection with a two-sided inverse — which is what an injective surjection

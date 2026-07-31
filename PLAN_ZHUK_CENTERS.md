@@ -423,7 +423,8 @@ eighth draft; Lean version unchanged and complete.
 | Subset indexing (`Set/subset_indexing`, `Set/finite_cons`) | 521 |
 | Regrouping, complete (`Universal/regrouping.math`) | 773 |
 | Finite powers (`Set/finite_function.math`) | 191 |
-| **Total** | **~4250** |
+| Theorem 3.10 (`Universal/relational.math`, + `regrouping` +44) | 393 |
+| **Total** | **~4650** |
 
 **The remaining estimate, recalibrated.** The plan's "~15k lines of blueprint
 content" was a guess made before anything was measured, and it is about 4× too
@@ -535,8 +536,8 @@ Branch two turned out simpler than the blueprint's prose suggests: condition
 block function is the old one composed with the indexing. Only branch one needs
 a case split, and only because its witness must additionally be inside at `u`.
 
-**What is left in Layer 5:** Theorem 3.10 (Barto–Kazda) alone, which assembles
-regrouping with 3.5, 3.6 and 3.9. Then Layers 6–7.
+**Layer 5 is complete.** Theorem 3.10 (Barto–Kazda) is
+`Universal.exists_witnesses_of_no_essential`. Then Layers 6–7.
 
 ### Theorem 3.10 — the design
 
@@ -567,7 +568,7 @@ exactly one coordinate outside, which is exactly membership in `X` — into
 `Universal.Witnesses`. A constrained tuple is either critical, handled by
 hypothesis, or wholly inside, handled by preservation.
 
-**What is left to write**, in order:
+**What was written**, in order:
 
 1. `X` and its indexing. `HasSize.tuples` gives `A^m ≅ NaturalsBelow(N)`;
    compose with `NaturalsBelow.index_subset` at the subset corresponding to `X`
@@ -585,9 +586,35 @@ hypothesis, or wholly inside, handled by preservation.
 5. Regrouping then forces (B2) to fail, which hands back a term of the clone
    inside on all of `X` — and step 0 above finishes it.
 
-Restrict the statement to `2 ≤ arity`. That is all Corollary 8.1 consumes (it
-applies the converse at arity 3), and it drops the `S = ∅`, `m = 1` degenerate
-case, which is the only one needing a nonempty-carrier hypothesis.
+### Theorem 3.10 — done, and the degenerate cases dissolved
+
+`Universal/relational.math`, 349 lines, plus one lemma added to
+`Universal/regrouping.math`. Steps 1 and 2 are `Universal.IsCritical.index` (the
+indexing, with `Universal.IsCritical` naming `X`'s membership condition) and a
+`NaturalsBelow.choice` over it; steps 4 and 5 are
+`Universal.IsCritical.inside_of_no_essential`.
+
+**Steps 3 and the degenerate cases are gone, and so is the arity restriction.**
+The plan called for surjectivity of the block function to be proved by exhibiting,
+for each coordinate, the tuple outside there and inside elsewhere — which needs
+`S` and its complement both nonempty, which is what forced the three degenerate
+cases and the `2 ≤ arity` restriction ahead of them. But **surjectivity is a
+consequence of block essentiality, not an extra fact about `S`**: if no
+coordinate had block `j`, then (B1)'s witness freed at `j` would lie inside `S`
+at every coordinate at all, which is exactly what (B2) forbids. That is
+`Universal.IsBlockEssential.blocks_populated`, ten lines, and Theorem 3.10 now
+discharges regrouping's surjectivity premise with it inside the very branch
+where (B2) is assumed. The statement holds at **every** arity, with no case
+split anywhere and no `S ≠ ∅`, `S ≠ A` hypotheses.
+
+The Lean formalization had already found this: `IsEssentialOn.exists_mem`
+derives the same fact, and `exists_witnesses_of_not_hasEssential` has no
+degenerate cases either. The blueprint is the one that is behind — its
+Definition 3.2 builds nonemptiness into "partition", so its Theorem 3.10 has to
+check it, and the three-paragraph degenerate-case preamble exists only for that.
+**This is a blueprint edit**, in the same class as the star-power one: drop the
+nonemptiness from Definition 3.2 and Lemma 3.7, prove it as a remark, and the
+preamble to Theorem 3.10's proof deletes itself.
 
 ### The trick that makes arithmetic-indexed induction work
 
