@@ -144,7 +144,7 @@ break as a proof to improve works, and the fixes are improvements:
 | prove cap | files failing | state |
 | --- | --- | --- |
 | 6 | 3 → **0** | done — three proofs written out |
-| 3 | 16 → **10** | in progress — 10 of 10 carry a usable route |
+| 3 | 16 → **6** | in progress — 8 fixed by transcribing their routes |
 | 1 | 35 | the goal; worth 14.9 s → 6.4 s on the profiled file |
 
 The three fixed: `Natural/distance.math` (`le_add_distance` was hiding
@@ -329,6 +329,32 @@ now *explains itself*, instead of having to be reverse-engineered.
   feature twice. The fixture procedure that works: run the full library at
   cap 1 with `make -k`, then re-verify candidates STANDALONE both capped and
   uncapped, and keep only those that pass uncapped and fail capped.
+
+### The cap-3 sweep so far: 14 → 6
+
+Eight files fixed by transcribing their routes. The transcription really is
+mechanical where the route is short, and two patterns recurred verbatim across
+unrelated files:
+
+- **State the goal the rewrite lands on, then substitute.**
+  `Natural/finite_range` and `Integer/finite_range` are the same proof over
+  different carriers, and took the same two lines (`P(certificateStart);` then
+  `by substituting …add_identity_right` / `…add_zero`). `Real/supremum`'s
+  `bisectionLeft` and `bisectionRight` monotonicity lemmas likewise.
+- **Name the metric distance before comparing it.** `Real/continuity` and
+  `Plane/exterior` both closed a `distance(…) < ε` step through
+  `…metric_distance` implicitly; stating the distance fact first and
+  substituting is both cheaper and what the step means.
+
+**One resisted and was reverted.** `Rational/from_natural_IsNonneg`'s route
+names a `Rational.IsNonneg` intermediate that sits *under* an `unfolding`, and
+the Integer-level form I tried instead introduced a claim that itself needed a
+two-rewrite search — making the proof worse, not better. Left alone. Not every
+route transcribes: when the intermediate lives under an unfolding there is no
+surface form to state.
+
+Remaining at cap 3: `escalator_tree`, `permutation_transposition_sign`,
+`binomial`, `units`, `archimedean`, `arithmetic_geometric_mean`.
 
 ### The reporting is now pinned by a self-check
 
