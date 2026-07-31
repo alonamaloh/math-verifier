@@ -6921,6 +6921,21 @@ private:
                 std::get_if<SurfaceIdentifier>(&claim.byHint->node)) {
             return "by " + identifier->qualifiedName;
         }
+        // A citation WITH arguments and a proof BLOCK are very different
+        // things to see at the top of a cost ranking — one line that is
+        // somehow expensive, versus a long proof that is legitimately doing
+        // work. Reporting both as `by <proof>` hid that distinction.
+        if (auto* application =
+                std::get_if<SurfaceApplication>(&claim.byHint->node)) {
+            if (auto* head = std::get_if<SurfaceIdentifier>(
+                    &application->function->node)) {
+                return "by " + head->qualifiedName + "(…)";
+            }
+        }
+        if (std::get_if<SurfaceLambda>(&claim.byHint->node)
+            || std::get_if<SurfaceLet>(&claim.byHint->node)) {
+            return "by { … } block";
+        }
         return "by <proof>";
     }
 

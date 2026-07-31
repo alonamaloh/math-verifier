@@ -412,13 +412,33 @@ Current slowest claims:
 | 23 311 | `Plane.concatenate IsLoop.concatenate` | 798 | `by …across_seam_of_loop` | *nothing* |
 | 23 293 | `Algebra.rank_nullity appended_images_independent` | 1836 | `by <proof>` | *nothing* |
 
-Two things to notice. **Four of the top eight are Layer-6 / Layer-4 proofs
-written in this session** (`subdivide_common_segment` ×2, `subdivide_separated`,
-`IsLoop.concatenate`) — the overlay work is the most expensive thing in the
-library and is the obvious next target. And **"closed by nothing" is now the
-dominant pattern**: the hint was checked directly, or the claim failed and fell
-back. Neither is a rewrite chain, so the deep-route tool has nothing to say
-about them — a different diagnosis is needed for that class.
+**`by <proof>` was hiding a distinction that matters.** It labelled both a
+citation WITH ARGUMENTS (`by Lemma(a := x)`, one line) and a genuine `by { … }`
+proof block the same way — so "a one-liner that somehow costs 48 s" and "a long
+proof that legitimately does work" sat side by side in the ranking with no way
+to tell them apart. The label now distinguishes them, and the answer is clear:
+
+| ms | declaration | hint | kind |
+| --- | --- | --- | --- |
+| 48 552 | `overlay subdivide_common_segment:248` | `by Plane.segment_inside_of_ends_outside(…)` | one line |
+| 46 908 | `overlay subdivide_common_segment:251` | `by Plane.segment_inside_of_ends_outside(…)` | one line |
+| 41 069 | `basis_pruning size_one_finite_dimensional:808` | `by pointNonzero` | one line |
+| 40 262 | `overlay subdivide_separated:323` | `by Plane.same_ends_of_meeting_interiors(…)` | one line |
+| 23 103 | `rank_nullity appended_images_independent:1836` | `by { … } block` | **a real proof** |
+| 22 867 | `concatenate IsLoop.concatenate:798` | `by Plane.concatenate_across_seam_of_loop` | one line |
+| 22 193 | `floor_divide monus_succ_implies_gt:370` | `by cases` | a case split |
+| 21 614 | `schur_complement quadraticForm_schurComplement:575` | `by Matrix.quadraticForm_bordered` | one line |
+
+**Exactly one of the top twelve is a genuine proof block**, and its 23 s is
+plausibly honest. Everything above it is a single citation — those are the real
+pathologies, and they are all the same shape: a lemma cited with its premises
+left to be discharged from a large context.
+
+**Known limitation of the `self` metric.** It subtracts nested *structured
+claims* but not calc steps, `take`/`suppose`, or term elaboration — so a block's
+non-claim work still lands in its parent. For a `by { … } block` the self figure
+therefore OVERSTATES what the step itself costs. It is reliable for the
+one-line citations, which is where the ranking's top now sits.
 
 ## Directions worth trying
 

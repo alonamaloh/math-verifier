@@ -1,0 +1,409 @@
+# PLAN — Zhuk's centers and ternary absorption
+
+Target: **the left center of a subdirect `R ≤ A × B` centrally absorbs `A`
+when `B` is Taylor and has no nonempty proper binary absorbing subuniverse,
+and the absorption is witnessed by a ternary term.** The blueprint is
+`~/claude/zeb/zhuk_centers.tex` (24 pp, 51 labelled statements, Appendix A a
+statement-level citation index, Appendix B a module order, Appendix C the
+imported-background package, Appendix D a concordance with the source).
+Published at <https://github.com/alonamaloh/csp-zhuk-centers>.
+
+This file is the layer plan for the *foundation the library does not yet
+have*, plus the milestones to steer by. It is not a proof outline — the
+blueprint is that.
+
+## Why this target
+
+1. **The blueprint is unusually close to formal already.** Six review rounds
+   across two independent reviewers went by without a mathematical objection;
+   what they found were quantifier-shape defects, a missing substitution
+   operation, and a type-level transport — precisely the failures a
+   formalization would otherwise discover three weeks in. Appendix C is five
+   items long, all finite combinatorics.
+2. **The foundation is the one piece of general algebra the library lacks.**
+   `Algebra/` has 100+ files and every one of them is *fixed-signature*:
+   `Group`, `Ring`, `Field`, `VectorSpace`. Nothing in the library treats a
+   signature as data, and nothing anywhere constructs a **generated**
+   substructure as a least closed set. Both are reusable well beyond this
+   theorem.
+3. **It is a different stress test from Jordan–Schönflies.** That one is ε-δ
+   geometry with configuration case analysis. This one is inductive types,
+   substitution, and finite counting — the parts of the elaborator that
+   `Lists/` and `Set/` exercise, pushed harder.
+
+## What is missing (measured, 2026-07-30)
+
+Library is 136,810 lines across 816 `.math` files.
+
+| Needed by the blueprint | In library |
+|---|---|
+| `Set(T) = T → Proposition`, `∈`, `⊆`, `∪`, `∩`, `∖`, image, extensionality | ✅ `Set/basics`, `Set/algebra` |
+| least-number principle, both forms | ✅ `Natural/least_number` |
+| `inductive` with parameters and recursive constructors | ✅ `Lists/list`, `Algebra/group_bundle` |
+| bundled structure + `IsSub…(G, subset)` idiom to imitate | ✅ `Algebra/group_bundle`, `Algebra/subgroup` |
+| lists: membership, `map`, `filter` (on a `Proposition` predicate), `length`, `Distinct`, `range` | ✅ `Lists/` |
+| strong induction / well-founded recursion | ✅ `Natural/strong_recursion`, `Logic/well_founded` |
+| `HasSize(X, n)`, `NaturalsBelow`, pigeonhole, `HasSize.product` | ✅ `Set/finite*` — but on **types**, not subsets |
+| signatures as data; algebras over a signature | — |
+| terms over a signature; term operations; substitution + evaluation law | — |
+| subuniverse; **generated** subuniverse `Sg` | — (`IsSubgroup` is the shape; no `Sg` anywhere, and `span` is by-combinations, not least-closed) |
+| finite indexed product `∏_{i∈I} A_i`; projection, cylinder, reindexing | — (`Logic/product` is binary pairs) |
+| cardinality of a **subset** as a natural; `S ⊆ T ⟹ ∣S∣ ≤ ∣T∣`; strict for proper | — |
+| greatest element of a bounded nonempty set of naturals | — (least exists) |
+| `Natural.minimum`, monotonicity, `min(N, min(N,x)+1) = min(N,x+1)` | — (`Natural.maximum` exists) |
+
+Estimated foundation: **~8k lines**. Blueprint content on top: **~15k**. Both
+soft, and both smaller than Jordan–Schönflies by a factor of five; see
+*Unknowns*.
+
+---
+
+## Layer 0 — `Universal/signature.math` : signatures, algebras, terms
+
+Everything rests here, so the representation choices below are the ones worth
+arguing about before any of it is written.
+
+**Signature as a bundle carrying its arity function.**
+
+```
+inductive Signature : Type(1) where
+  | Signature.make
+      : (symbol : Type(0))
+        → (arity : symbol → ℕ)
+        → (∀ (f : symbol). 1 ≤ arity(f))
+        → Signature
+```
+
+Putting *no nullary symbols* inside the signature rather than carrying it as a
+side hypothesis is what makes `Sg(∅) = ∅` — blueprint Lemma 1.6(d), used in
+the centrality theorem — a theorem with no hypotheses to thread. This is
+Convention 1.2(a) of the blueprint, and it should be a field, not prose.
+
+**Algebras bundled, subuniverses unbundled.** `Algebra(σ)` carries a `Type(0)`
+carrier and
+`interpret : (f : symbol(σ)) → (NaturalsBelow(arity(f)) → carrier) → carrier`.
+Subuniverses are `Set(carrier)` with a closure predicate, exactly as
+`IsSubgroup(G, subset)` is written. The blueprint has already made the
+matching decision (Definition 2.1 defines absorption relative to a *pair of
+subuniverses*, with the ambient algebra suppressed), so **no
+"subalgebra as an algebra" construction is ever needed.** Do not build one.
+
+### The one experiment that gates the layer
+
+`Term` needs a constructor whose recursive argument is a **function**:
+
+```
+inductive Term (σ : Signature) (V : Type(0)) : Type(0) where
+  | Term.variable : V → Term(σ, V)
+  | Term.apply : (f : symbol(σ)) → (NaturalsBelow(arity(f)) → Term(σ, V)) → Term(σ, V)
+```
+
+**No inductive type in the library has a function-typed recursive argument.**
+Whether the kernel's positivity check and the elaborator's recursor generation
+accept this is unknown, and every line of the development sits on it. Test it
+on day one, before anything else. If it is rejected, the fallbacks, in order
+of preference:
+
+1. `List(Term(σ, V))` plus a side condition `lengthOf(args) = arity(f)`, with
+   the arity discharged at every use. Costs a hypothesis everywhere and makes
+   the evaluation law uglier, but is plainly within what `Lists/` supports.
+2. A `Vector` type — `NaturalsBelow(n) → A` wrapped — introduced first, if
+   that changes the positivity analysis. Probably it does not.
+
+Option 1 is a real tax: the blueprint's Lemma 1.14 (preservation) and
+Lemma 1.11 (evaluation of a substitution) are both single structural
+inductions in the function form, and both acquire arity bookkeeping in the
+list form.
+
+### Variables drawn from an arbitrary type, not from `[n]`
+
+Write `Term(σ, V)` for `V : Type(0)`, not `Term(σ, n)` for `n : ℕ`. Three
+payoffs, in increasing order of size:
+
+- Substitution is `Term(σ, V) → (V → Term(σ, W)) → Term(σ, W)` — the monad
+  bind — and the blueprint's `t[ρ]` for `ρ : [m] → [n]` is the special case
+  `V := NaturalsBelow(m)`, `W := NaturalsBelow(n)`. One definition covers
+  permutation, identification and dummy variables, which is exactly what
+  Definition 1.10 asks for.
+- The evaluation law (Lemma 1.11) is one induction with no index arithmetic.
+- **The star powers stop needing Euclidean division.** See Layer 4.
+
+`Clo_m(A)` is then the image of `Term(σ, NaturalsBelow(m))` under evaluation.
+
+---
+
+## Layer 1 — `Universal/subuniverse.math` : subuniverses and generation
+
+**`Sg` is one line with predicate sets.** The library has no generated
+substructure anywhere, and the instinct from `span` — define it by what its
+elements look like — is the wrong one here. With `Set(T) = T → Proposition`,
+the least closed superset is directly definable:
+
+```
+definition Sg (A : Algebra(σ)) (S : Set(carrier(A))) : Set(carrier(A)) :=
+  (x) ↦ ∀ (T : Set(carrier(A))). IsSubuniverse(A, T) → S ⊆ T → x ∈ T
+```
+
+No completeness machinery, no transfinite construction. `Sg(S) ⊆ T` for any
+closed `T ⊇ S` is immediate; that `Sg(S)` is itself closed is a two-line
+argument. Blueprint Lemma 1.6 falls out.
+
+**Main results.** `IsSubuniverse` closed under intersection; `Sg` monotone and
+idempotent; `Sg(∅) = ∅`; singletons are subuniverses in an idempotent algebra;
+term operations preserve subuniverses (Lemma 1.14, structural induction);
+homomorphisms, images, preimages, and `h(Sg(S)) = Sg(h(S))`.
+
+**The workhorse is generation by a fixed list** (Lemma 1.15):
+
+> for `S = {s_1, …, s_N}`, `Sg(S) = { evaluate(t, s⃗) : t ∈ Term(σ, NaturalsBelow(N)) }`.
+
+Both the centrality theorem and Step 1 of the doubling lemma consume it, and
+the blueprint deliberately fixes the generator list once so that no
+substitution over varying generator lists is ever needed. Prove it in that
+form; do not generalize to arbitrary finite tuples.
+
+---
+
+## Layer 2 — `Universal/product.math` : finite indexed products
+
+Index by a **type** `I` with a finiteness witness, carrier `I → carrier(A_i)`
+for a family, `I → carrier(A)` for a power. The blueprint (Definition 1.8)
+deliberately allows an arbitrary finite index set rather than `[m]`, because
+the relational description of absorption forms `A^(A^m)` and projects onto a
+subset of `A^m`; an initial-segment-only product forces a transport there that
+an earlier draft got wrong.
+
+**Main results — the five relational constructions of Lemma 1.19**, and
+nothing else is needed: intersection, intersection with a box `∏ S_i`,
+projection `π_J` for `J ⊆ I`, cylinder `π_J⁻¹`, and reindexing along a
+bijection `I' → I`. All five are used; the blueprint says where.
+
+`π_J(R)` for `J : Set(I)` lands in `Subtype(I, J) → carrier`. That subtype
+indexing is the friction point of this layer and the thing to prototype
+before committing.
+
+---
+
+## Layer 3 — `Universal/counting.math` : cardinality of a subset
+
+**This is the layer the library does not have and the blueprint leans on
+hardest**, and it is where the estimate is least trustworthy.
+
+`Set/finite.math` gives `HasSize(X : Type(0), n)` — a *proposition* about a
+*type*. The blueprint compares and increments the cardinalities of *subsets*
+of a carrier (`|a+R|`, `|B|`, `|β(P)|`, `|I_j|`), and Step 0 of the doubling
+lemma feeds `|β(P)|` to the least-number principle as a natural number. Three
+ways to close the gap:
+
+1. **Relational.** `HasSize(Subtype(A, S), n)` plus `HasSize.unique`. Every
+   inequality becomes an existential dance; the enlargement induction, which
+   is a chain of four comparisons, becomes unreadable. Rejected.
+2. **Cardinality as a function via `Logic.the`.** Definite description on the
+   `HasSize` predicate. Clean statements, but every rewrite has to re-derive
+   the uniqueness side condition.
+3. **Enumeration list** (recommended). A `FiniteAlgebra` carries a
+   `List(carrier)` that is `Distinct` and covers; `size(S) := lengthOf(List.filter(S, enumeration))`.
+   `List.filter` already takes a `Proposition` predicate and routes through
+   `Natural.classical_decidable`, so no decidability obligation appears at
+   call sites.
+
+Option 3 makes the facts the blueprint needs into list lemmas —
+`S ⊆ T ⟹ size(S) ≤ size(T)`, strict when `S ≠ T`, and
+`size(S) = size(universe) ↔ S = universe` — and it matches the idiom next
+door: `Graph/` represents a finite graph as two finite lists, for the same
+reason.
+
+**Also here:** `Natural.minimum` (only `maximum` exists), with the two facts
+Appendix C item 2 names — monotonicity in the second argument, and
+`min(N, min(N,x)+1) = min(N,x+1)` — and the **greatest** element of a
+nonempty bounded set of naturals, which the maximal-arity argument needs and
+which `Natural/least_number` does not supply.
+
+---
+
+## Layer 4 — `Universal/absorption.math`
+
+Absorption, binary absorption, Taylor identities, and Lemma 2.6 (one-sided
+closure gives binary absorption).
+
+**Get the quantifier shape right, once.** Definition 2.1 constrains the tuple
+`(z_1,…,z_m)` rather than quantifying over a list from `E` and overwriting an
+entry. This is not a stylistic choice: the two readings differ exactly at
+`E = ∅`, `m = 1`, `D ≠ ∅`, and only the tuple form makes the relational
+description a true biconditional. Remark 2.2 of the blueprint records this,
+and two separate review rounds were spent because the *proofs* had drifted to
+the other form after the definition was fixed. Write the definition first,
+then make every consuming statement match it verbatim.
+
+### The star powers: an index type instead of arithmetic
+
+Definition 2.7 defines `t^{*ℓ}` of arity `k^ℓ` and decomposes
+`p ∈ [k^{ℓ+1}]` as `p = (j-1)k^ℓ + q` by Euclidean division — Appendix C
+item 6.
+
+With `Term(σ, V)` over an arbitrary variable type, take the variables of
+`t^{*ℓ}` to be `NaturalsBelow(ℓ) → NaturalsBelow(k)`. There are `k^ℓ` of
+them, and "block `j`, position `q`" is just *peeling off the first argument*
+of a function. The division disappears, and so does the item in Appendix C.
+
+**This changes the blueprint, not just this plan.** Definition 2.7 and
+Appendix C item 6 both need editing in `~/claude/zeb/zhuk_centers.tex`, and
+Appendix A regenerates with `python3 regen_appendix.py`. Settle it before
+writing Layer 4.
+
+---
+
+## Layer 5 — `Universal/essential.math`
+
+Essential relations for a product and for a partition, arity reduction,
+regrouping (Lemma 3.7), `Clo_m(A)` as a subuniverse of `A^(A^m)`, and the
+relational description of absorption (Theorem 3.10, Barto–Kazda).
+
+**The single biggest milestone**, and the only one whose proof is a genuine
+induction rather than a check.
+
+### Represent a partition by its block function
+
+The blueprint writes a partition as a tuple `(I_1, …, I_m)` of nonempty
+blocks. Formally, prefer
+
+```
+block : I → NaturalsBelow(m)          -- surjective
+```
+
+with `I_j := { i | block(i) = j }`. Nonemptiness of every block is exactly
+surjectivity, one hypothesis instead of `m`. Deleting an element from an
+oversized block — which is the whole inductive step, since the rewrite over
+arbitrary index sets removed the reordering — is then a statement about the
+restriction of `block` to `I ∖ {u}`.
+
+The payoff shows up immediately in Theorem 3.10: `X` is the set of tuples
+with exactly one coordinate outside `S`, and its block function is literally
+*which coordinate is free*. No partition needs to be constructed.
+
+---
+
+## Layer 6 — `Universal/center.math`
+
+Neighborhoods `a + R`, left and right centers, the enlargement step
+(Theorem 5.1), and the star-power iteration (Theorem 5.2).
+
+Both theorems are stated over tuples constrained coordinatewise, matching
+Definition 2.1. Theorem 5.2's induction `(∗_ℓ)` is stated in that shape
+deliberately — see Remark 5.3 — and the degenerate cases `C = ∅` and `|B| = 1`
+dissolve rather than needing a split. Do not "simplify" the statement back to
+the overwrite form; that reintroduces the gap.
+
+---
+
+## Layer 7 — `Universal/doubling.math`
+
+Central absorption, the Zhuk–Kozik doubling trick (Lemma 7.1), the ternary
+collapse (Corollary 8.1), and the main theorem.
+
+**Step 1 must be a standalone universally quantified lemma**, before the
+element `b` of Step 2 is fixed:
+
+> for all `b₁, b₂ ∈ B'`, `b₂ ∈ Sg(C' ∪ {b₁})`.
+
+Step 3 instantiates it twice, the second time at an element the first
+instantiation produced. Remark 7.2 spells this out; it is the only argument in
+the document that doubles back on itself, and the only place a reviewer had to
+draw the dependency by hand.
+
+Note that Lemma 7.1 requires **only `A_{n+1}` finite** — the other factors are
+arbitrary. An earlier draft strengthened this to all-finite and thereby
+imported, silently, that a finite algebra has finitely many subuniverses. The
+weaker hypothesis is both correct and cheaper: the minimization needs the
+least-number principle and nothing else.
+
+---
+
+## Design questions to settle before writing
+
+1. **`Term`'s recursive argument** — function-typed, or list-plus-arity?
+   Decided by the day-one experiment, not by preference. Everything else waits
+   on it.
+2. **Cardinality representation** — recommendation is the enumeration list
+   (Layer 3, option 3). The alternative worth a second look is `Logic.the` on
+   `HasSize`, if `List.filter` reasoning turns out to fight.
+3. **Star-power variables** — index type or Euclidean division? Recommendation
+   is the index type; **it edits the blueprint** (Definition 2.7, Appendix C
+   item 6).
+4. **Partition representation** — block function or tuple of subsets?
+   Recommendation is the block function; this does *not* edit the blueprint,
+   since Definition 3.2 is already stated over an arbitrary finite index set
+   and the block function is a faithful encoding of what it says.
+5. **Is `Algebra(σ)` bundled?** The library's fixed-signature structures all
+   are (`Group`, `VectorSpace`), and `Metric/space.math` shows the pattern for
+   a `Type(1)` bundle over a `Type(0)` carrier. Recommendation: bundle, and
+   follow `Algebra/group_bundle.math`'s projection style. The one thing to
+   check early is whether the dependent motive in
+   `interpret : (f : symbol) → (NaturalsBelow(arity(f)) → carrier) → carrier`
+   trips the same pattern-match codegen limitation that
+   `group_bundle.math` documents for `Group.operation`; if so, use the
+   `let ⟨…⟩ :=` destructuring form it fell back to.
+
+## Milestones
+
+- **M0 — the positivity experiment.** `Term` with a function-typed recursive
+  argument, its recursor, and one structural induction over it. Half a day, or
+  the plan changes.
+- **M1 — Layer 0 complete.** Signature, algebra, terms, substitution, the
+  evaluation law, idempotence of term operations. The first honest measurement
+  of the line-count estimate.
+- **M2 — Layers 1–2.** Subuniverses, `Sg`, preservation, generation by a fixed
+  list, homomorphisms, finite indexed products, the five relational
+  constructions.
+- **M3 — Layer 3.** Subset cardinality and its three order facts, `minimum`,
+  greatest element of a bounded set. Small but load-bearing; if it is not
+  small, that is the signal to switch cardinality representation.
+- **M4 — Layer 4.** Absorption and the Taylor lemma. First point where a
+  blueprint statement transfers verbatim.
+- **M5 — Layer 5.** Regrouping and the relational description. The one that
+  will take longest and the one worth reporting frictions from.
+- **M6 — Layers 6–7.** Centers, doubling, ternary, main theorem. Mostly
+  transcription if M1–M5 held.
+
+## Unknowns, honestly
+
+- **M0 gates everything and has no precedent in the library.** A function-typed
+  recursive argument is standard in other systems and absent here. If it is
+  rejected and option 1 is taken, add ~20% to every later estimate for arity
+  bookkeeping.
+- **Appendix C's exhaustiveness is an empirical claim.** Both reviewers said
+  so explicitly and neither would certify it. Expect one or two further silent
+  uses of `B ≠ ∅` beyond the three audited in Convention 1.2, and a handful of
+  finiteness obligations that the prose leaves implicit. Log them; each is a
+  blueprint edit.
+- **Cardinality is the estimate most likely to be wrong.** Layer 3 looks like
+  300 lines and could be 1500 if subset-vs-type counting fights.
+- **The rate to plan with is ~1k lines/day on foundational material**, the
+  same figure `PLAN_JORDAN_SCHOENFLIES.md` settled on. Nothing here bulk
+  generates; the regrouping induction and the doubling construction need
+  design, not pattern-following.
+- **This development touches no existing area.** It imports `Set/`, `Lists/`,
+  `Natural/`, `Logic/` and nothing else, and nothing existing imports it. That
+  makes it unusually safe to build in parallel with the Jordan–Schönflies
+  layers, and it means a narrow build target is worth adding on day one.
+
+## Building while working here
+
+Add `make -j 16 universal`, naming `library/Universal/*.math`, on the model of
+the `plane` and `graph` targets in the Makefile. The transitive closure is
+`Set/`, `Lists/`, `Natural/`, `Logic/`, `Equality/` — a small fraction of the
+library, so warm runs should be seconds. Reserve `make -j 16 library` for
+pre-commit checks.
+
+## Suggested first move
+
+**M0, today, in a scratch file.** Write the `Term` inductive with the
+function-typed recursive argument, generate its recursor, and prove one
+statement by structural induction over it — the evaluation law for
+substitution is the right test, since it is the induction every later proof
+imitates. Nothing else in this plan is worth writing until that either
+compiles or is known not to.
+
+Then settle design questions 3 and 4 before Layer 4, and edit the blueprint
+for question 3: Definition 2.7 and Appendix C item 6 in
+`~/claude/zeb/zhuk_centers.tex`, then `python3 regen_appendix.py` and rebuild.
