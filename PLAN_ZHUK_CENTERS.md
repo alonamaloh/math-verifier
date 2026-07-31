@@ -353,6 +353,40 @@ deliberately — see Remark 5.3 — and the degenerate cases `C = ∅` and `|B| 
 dissolve rather than needing a split. Do not "simplify" the statement back to
 the overwrite form; that reintroduces the gap.
 
+### Layer 6 — done
+
+`Universal/center.math`, 1166 lines, plus blueprint Lemma 1.13
+(`Universal.Term.evaluate_constant`, 45 lines in `Universal/term.math`) and
+`Set.size_positive_of_nonempty` (21 lines in `Set/enumeration.math`).
+
+Definitions 4.1 and 4.2 and Lemma 4.3 transcribe directly. The one thing worth
+recording is `Universal.pair`: `Product.make` on its own cannot be elaborated
+inside a tuple handed to `Universal.Algebra.interpret`, because the algebra
+`interpret` acts in is exactly what the component types would have to determine.
+Naming the constructor at the product's carrier type fixes it once, and every
+membership downstream reads `Universal.pair(a, b, x, y) ∈ relation`.
+
+**The star-power decision paid off exactly as predicted.** Theorem 5.2 cannot
+name `t^{*ℓ}` — see Layer 4 — so `Universal.center_star` is stated as
+*"there exists a term of that index type satisfying `(∗_ℓ)`"* and the induction
+produces the term together with the bound. That is not a workaround: the
+invariant is what has to be carried up the levels anyway, and the term comes
+along for free. The final theorem then names the depth the blueprint does,
+`|B| ∸ 1`, in the type of the term it produces.
+
+The degenerate cases did dissolve, as the plan said they would: nothing in
+either theorem splits on `C = ∅` or `|B| = 1`, and the tuple-shaped `(∗_ℓ)`
+needed no bridge to the unary instance of Definition 2.1.
+
+**One new friction, worth a library issue.** Named arguments (`by Lemma(x := v)`)
+work only for *globally declared* functions, not for a local hypothesis — so
+instantiating the inductive hypothesis `innerBound` at a higher-order argument
+the goal cannot determine had to be a positional call with all three arguments.
+The same limitation is why `Universal.center_star_step` takes its block values
+as a parameter constrained by a defining equation: that is the `let`-expansion
+workaround again, and it is now the second construction in this development
+shaped by it.
+
 ---
 
 ## Layer 7 — `Universal/doubling.math`
@@ -424,7 +458,8 @@ eighth draft; Lean version unchanged and complete.
 | Regrouping, complete (`Universal/regrouping.math`) | 773 |
 | Finite powers (`Set/finite_function.math`) | 191 |
 | Theorem 3.10 (`Universal/relational.math`, + `regrouping` +44) | 393 |
-| **Total** | **~4650** |
+| Layer 6 (`Universal/center.math`, + `term` +45, + `enumeration` +21) | 1232 |
+| **Total** | **~5900** |
 
 **The remaining estimate, recalibrated.** The plan's "~15k lines of blueprint
 content" was a guess made before anything was measured, and it is about 4× too

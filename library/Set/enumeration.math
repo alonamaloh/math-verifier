@@ -69,7 +69,7 @@ theorem Set.size_eq_filter_length {A : Type(0)} (enumeration : List(A))
 theorem Set.size_le_of_subset {A : Type(0)} (enumeration : List(A))
         (smaller larger : Set(A)) (inclusion : smaller ⊆ larger)
         : Set.size(enumeration, smaller) ≤ Set.size(enumeration, larger) := {
-  length(List.filter(smaller, enumeration)) ≤ length(List.filter(larger, enumeration))
+  length(List.filter(smaller, enumeration)) ≤ length(List.filter(larger, enumeration))  -- «redundant `by` on `claim` — auto-prover closes the goal without help»
       by List.filter_length_monotone;
   done
 }
@@ -81,7 +81,7 @@ theorem Set.size_lt_of_member_missing {A : Type(0)} (enumeration : List(A))
         (element : A) (inEnumeration : element ∈ enumeration)
         (missing : ¬(element ∈ smaller)) (inLarger : element ∈ larger)
         : Set.size(enumeration, smaller) < Set.size(enumeration, larger) := {
-  1 + length(List.filter(smaller, enumeration))
+  1 + length(List.filter(smaller, enumeration))  -- «redundant `by` on `claim` — auto-prover closes the goal without help»
       ≤ length(List.filter(larger, enumeration))
       by List.filter_length_strict;
   1 + Set.size(enumeration, smaller) ≤ Set.size(enumeration, larger);
@@ -101,10 +101,10 @@ theorem Set.equal_of_size_eq {A : Type(0)} (enumeration : List(A))
            suppose element ∈ larger;
            element ∈ enumeration;
            done by { suppose ¬(element ∈ smaller) for contradiction;
-                     Set.size(enumeration, smaller) < Set.size(enumeration, larger)
+                     Set.size(enumeration, smaller) < Set.size(enumeration, larger)  -- «redundant `by` on `claim` — auto-prover closes the goal without help»
                          by Set.size_lt_of_member_missing;
                      Set.size(enumeration, larger) < Set.size(enumeration, larger);
-                     done by Natural.lt_irreflexive } };
+                     done by Natural.lt_irreflexive } };  -- «redundant `by` on `claim` — auto-prover closes the goal without help»
   done by Set.equal_of_same_members
 }
 
@@ -115,14 +115,37 @@ theorem Set.size_lt_of_proper_subset {A : Type(0)} (enumeration : List(A))
         (smaller larger : Set(A)) (inclusion : smaller ⊆ larger)
         (different : ¬(smaller = larger))
         : Set.size(enumeration, smaller) < Set.size(enumeration, larger) := {
-  Set.size(enumeration, smaller) ≤ Set.size(enumeration, larger)
+  Set.size(enumeration, smaller) ≤ Set.size(enumeration, larger)  -- «redundant `by` on `claim` — auto-prover closes the goal without help»
       by Set.size_le_of_subset;
   ¬(Set.size(enumeration, smaller) = Set.size(enumeration, larger))
       by { suppose Set.size(enumeration, smaller) = Set.size(enumeration, larger);
-           smaller = larger by Set.equal_of_size_eq;
+           smaller = larger by Set.equal_of_size_eq;  -- «redundant `by` on `claim` — auto-prover closes the goal without help»
            done };
   done by cases {
     case Set.size(enumeration, smaller) < Set.size(enumeration, larger): done
     case Set.size(enumeration, smaller) = Set.size(enumeration, larger): done
   }
+}
+
+-- A nonempty subset is counted at least once. Its point is enumerated, so the
+-- empty set — which misses it — is counted strictly lower.
+theorem Set.size_positive_of_nonempty {A : Type(0)} (enumeration : List(A))
+        (isEnumeration : Set.IsEnumeration(A, enumeration))
+        (subset : Set(A)) (nonempty : Set.IsNonempty(A, subset))
+        : 1 ≤ Set.size(enumeration, subset) := {
+  choose element such that element ∈ subset from nonempty;
+  ∀ (candidate : A). candidate ∈ enumeration;
+  element ∈ enumeration;
+  Set.empty(A) ⊆ subset
+      by { take candidate : A;
+           suppose candidate ∈ Set.empty(A);
+           done };
+  ¬(element ∈ Set.empty(A))
+      by { suppose element ∈ Set.empty(A);
+           done };
+  Set.size(enumeration, Set.empty(A)) < Set.size(enumeration, subset)  -- «redundant `by` on `claim` — auto-prover closes the goal without help»
+      by Set.size_lt_of_member_missing;
+  1 ≤ 1 + Set.size(enumeration, Set.empty(A))
+    ≤ Set.size(enumeration, subset);
+  done
 }

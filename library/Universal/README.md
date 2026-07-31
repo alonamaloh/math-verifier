@@ -44,6 +44,10 @@ for Zhuk's theorem on the left centre of a subdirect relation.
 - `Universal.StarIndex`, `Universal.starPrepend`, `Universal.starBase` and
   `Universal.starStep` — the star powers' index type and one level of their
   recursion, in [star_power.math](star_power.math).
+- `Universal.IsSubdirect`, `Universal.neighborhood`, `Universal.leftCenter`,
+  `Universal.stepImage` and `Universal.pair` — subdirect relations, the
+  neighbourhood `a + R`, the left centre, and the image one enlargement step
+  produces, in [center.math](center.math).
 
 ## Main theorems
 
@@ -94,6 +98,21 @@ for Zhuk's theorem on the left centre of a subdirect relation.
   index set: either every block is a singleton and the block function is a
   bijection, or some block has two elements and one of
   `IsBlockEssential.deleteElement` / `.collapseBlock` shrinks the index set.
+- `Universal.Term.evaluate_constant` — blueprint Lemma 1.13: in an idempotent
+  algebra every term operation fixes the constant tuples.
+- `Universal.IsSubuniverse.neighborhood`, `.leftCenter`,
+  `Universal.neighborhood_nonempty` and `Universal.neighborhood.preserves` —
+  blueprint Lemma 4.3. The two idempotence hypotheses enter in mirror image:
+  `A` idempotent holds the first coordinate still, `B` idempotent the second.
+- `Universal.center_step` — **the enlargement step**, blueprint Theorem 5.1:
+  applying a Taylor term with one coordinate free and centre elements elsewhere
+  grows the neighbourhood by at least one, until it saturates. Either the image
+  is strictly larger, or it collapses and the neighbourhood binary absorbs `B`.
+- `Universal.center_star` and `Universal.leftCenter_witnesses` — **blueprint
+  Theorem 5.2**: a star power of a Taylor term witnesses that the left centre
+  absorbs `A`. The induction produces the term *with* its bound, since a star
+  power cannot be named as a function of the depth; the depth the final theorem
+  uses is the blueprint's `|B| ∸ 1`.
 - `Universal.IsSubuniverse.clone` — the `m`-ary term operations are closed under
   the operations, applied pointwise. The index of the power is itself a function
   type, which is why powers were built over an arbitrary index.

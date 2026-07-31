@@ -304,6 +304,52 @@ Two things worth separating out.
   works if the two are read against each other rather than merely both
   completed.
 
+### 2.8 Layer 6 — the cardinality representation shows its bill
+
+Layer 6 is the centre argument: neighbourhoods and the left centre (Lemma 4.3),
+the enlargement step (Theorem 5.1), and its iteration (Theorem 5.2). Part III,
+so again neither library supplies any of it.
+
+| | Lean | Here |
+|---|---|---|
+| Centres and neighbourhoods | `Center.lean`, 139 | `center.math` §1, ~300 |
+| Enlargement step | `Step.lean`, 93 | `center.math` §2, ~300 |
+| Star-power iteration | `Absorbs.lean`, 103 | `center.math` §3, ~570 |
+| Term operations fix constants | `IsIdempotent.realize_const` (written) | `term.math` +45 |
+| A nonempty subset is counted ≥ 1 | `Set.ncard_pos` ✅ | `enumeration.math` +21 |
+| | **335** | **~1230** |
+
+3.7:1, in line with the other fair fights. Three observations.
+
+**The cardinality representation is what costs here, and it is not the count —
+it is the enumeration.** `Set.ncard` is a function of a set alone, so Lean's
+statements never mention finiteness; ours are `Set.size(enumeration, subset)`
+against a fixed enumeration of `B`, so every statement in the layer carries
+`enumeration` and `isEnumeration` as parameters and every call site threads
+them. Layer 3 chose that representation and it held with no fight (see §2.5) —
+the bill arrives here, as parameter plumbing rather than as proof difficulty.
+Nothing was harder to prove; everything was longer to say.
+
+**`omega` again, and again it is cheap to name.** Lean's `min_min_add_one` is
+`by omega`. Here it is `Natural.minimum_absorbs_one_plus`, one of the two facts
+Layer 3 built for exactly this consumer — so the *use* site is the same length
+in both, and the difference stayed in Layer 3's 155 lines. This is the pattern
+worth noting: a decision procedure's advantage shows up once, in the layer that
+would have to prove the lemma, not repeatedly at every use.
+
+**The star-power decision was vindicated.** §2.6 recorded that `Natural.add`'s
+opacity makes `t^{*ℓ}` unnameable as a function of `ℓ`, and that the iteration
+would have to happen inside a proof. It did, and the shape it forced —
+`center_star` asserts *there exists* a term of the right index type satisfying
+`(∗_ℓ)`, with the induction producing term and bound together — turned out to
+be the natural statement rather than a concession: the invariant is what the
+argument carries up the levels, and the term rides along. The final theorem
+still names the blueprint's depth, `|B| ∸ 1`, in the type of the term it
+produces. Lean, which *can* define `starPower t ℓ` and prove
+`realize_starPower_succ` by `rfl`, states the two separately and needs no such
+existential; that is a genuine convenience, and it is the only place in this
+layer where the `Natural` seal is visibly charged for.
+
 ---
 
 ## 3. Design lessons that transfer
@@ -390,6 +436,16 @@ These came out of one system and improved the other, or improved the blueprint.
   equation about a `let`-bound function has no occurrence left to rewrite — and
   the shared lesson is that a `let` is fine for a value only *read*, and wrong
   for one whose definition a later step must see through.
+- **Named arguments work only for globally declared functions, not for a local
+  hypothesis.** `by innerBound(values := …)` reports "function 'innerBound' is
+  not in scope" — `innerBound` being a hypothesis of the theorem being proved.
+  So instantiating an induction hypothesis at a higher-order argument the goal
+  cannot determine has to be a positional call supplying *every* argument,
+  including the premise, which then has to be named. Lifting the named-argument
+  form to local binders would remove the only direct lemma call in Layer 6.
+- **`choose x such that P as name from source;`** — the `as` clause comes
+  *before* `from`, not after. Easy to get backwards, and the parse error points
+  at the `as`.
 - **A lambda on the right of a claim, or after `witness`, needs parentheses.**
   `arguments = (i : T) ↦ e;` is a parse error at the `↦`. Cost a round-trip
   three times.
@@ -430,7 +486,8 @@ as they land.
 | Absorption + star powers (Part II, Layer 4) | 232 | 764 |
 | Subset indexing + finite powers (Layer 5 support) | 0 (`Finset`, `Fintype`) | 649 |
 | Regrouping + relational description (Part II, Layer 5) | 230 | 1284 |
-| Rest of Part III | ~775 | not started |
+| Centres, enlargement step, iteration (Part III, Layer 6) | 335 | ~1230 |
+| Rest of Part III | ~440 | not started |
 
 The Lean figure for Part I is small because Mathlib supplied the rest; the
 figure here is the true cost of the same content. The Parts II–III rows are the
