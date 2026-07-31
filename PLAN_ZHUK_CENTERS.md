@@ -394,6 +394,45 @@ shaped by it.
 Central absorption, the Zhuk–Kozik doubling trick (Lemma 7.1), the ternary
 collapse (Corollary 8.1), and the main theorem.
 
+### Layer 7 — done, and the development is complete
+
+`Universal/central.math` (802 lines) and `Universal/doubling.math` (2128),
+plus `Universal.IsEssential.reindex` in `essential.math`. Every layer of the
+plan is now formalized, sorry-free, and in the library build. The headline is
+`Universal.leftCenter_ternary_witness`.
+
+**Lemma 7.1 is written in the specialized form, and the dependent product was
+never needed.** The blueprint states it over a mixed product
+`A₀ × ⋯ × A_{n+1}` with designated subuniverses `C, B₁, …, B_n, C'`, and this
+plan predicted Layer 7 would want `Universal/dependent_product.math` for it.
+Corollary 8.1 — the lemma's only consumer — applies it with every factor the
+same algebra and every designated subuniverse the same `C`. In that form every
+relation is a subset of a *power*, the statement is literally
+`Universal.HasEssential`, and the dependent product does not appear. The Lean
+formalization made the same specialization; `dependent_product.math` remains
+built and unused.
+
+**Two representation choices that paid off.** The distinguished coordinate is
+the *first*, not the blueprint's last, because `NaturalsBelow.first` /
+`.shiftUp` / `.first_or_shift` are what the library makes cheap. And the doubled
+index is `DisjointUnion(NaturalsBelow(size), NaturalsBelow(size))` with no
+reversal of the second half — essentiality does not depend on the order of the
+coordinates — with `Universal.IsEssential.reindex` moving the result onto
+`NaturalsBelow(size + size)` along `NaturalsBelow.sum_out_of`. Building `R'` the
+way the blueprint describes it, as an intersection of cylinders followed by a
+projection, then makes its closure free: `IsSubuniverse.project`, `.cylinder`
+and `.intersection`, with nothing checked by hand.
+
+**One loose end worth a library addition.** `Set.IsEnumeration` (Layer 3, used
+for subset cardinality) and `HasSize` (Layer 5, used for the tuple count) are
+independent notions with no bridge, so `centrally_absorbs_ternary` and the main
+theorem carry both finiteness hypotheses for the same carrier. A lemma
+`Set.IsEnumeration(A, e) → HasSize(A, length(e))` would collapse them; it needs
+an "index of an element in a distinct list" construction, which nothing else in
+the library has yet.
+
+---
+
 **Step 1 must be a standalone universally quantified lemma**, before the
 element `b` of Step 2 is fixed:
 
@@ -459,7 +498,8 @@ eighth draft; Lean version unchanged and complete.
 | Finite powers (`Set/finite_function.math`) | 191 |
 | Theorem 3.10 (`Universal/relational.math`, + `regrouping` +44) | 393 |
 | Layer 6 (`Universal/center.math`, + `term` +45, + `enumeration` +21) | 1232 |
-| **Total** | **~5900** |
+| Layer 7 (`Universal/central.math`, `Universal/doubling.math`, + `essential` +105) | 3035 |
+| **Total** | **~8900** |
 
 **The remaining estimate, recalibrated.** The plan's "~15k lines of blueprint
 content" was a guess made before anything was measured, and it is about 4× too

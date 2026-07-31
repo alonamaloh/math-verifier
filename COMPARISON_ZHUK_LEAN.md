@@ -350,6 +350,63 @@ produces. Lean, which *can* define `starPower t ℓ` and prove
 existential; that is a genuine convenience, and it is the only place in this
 layer where the `Natural` seal is visibly charged for.
 
+### 2.9 Layer 7 — the last layer, and what the blueprint over-specified
+
+Layer 7 is centrality (Theorem 6.1), central absorption (Definition 6.2 and
+Corollary 6.3), the Zhuk–Kozik doubling trick (Lemma 7.1), the ternary collapse
+(Corollary 8.1) and the main theorem.
+
+| | Lean | Here |
+|---|---|---|
+| Centrality, central absorption | `Central.lean`, 179 | `central.math`, 802 |
+| Doubling, ternary, main theorem | `Doubling.lean` 289 + `Ternary.lean` 71 | `doubling.math`, 2128 |
+| Reindexing essentiality along a bijection | (in `Regrouping.lean`) | `essential.math` +105 |
+| | **539** | **3035** |
+
+5.6:1 — the same as Layer 5, and for the same reason: `Finset`, `Set.ncard` and
+`Nat.find` do in one token each what is a stated fact here.
+
+**Both formalizations found the same two simplifications, independently of the
+blueprint.**
+
+- *Theorem 6.1 needs no sorted enumeration.* The blueprint enumerates the
+  generators so the three blocks are consecutive, extracts indices `p ≤ q` and
+  picks `m` between them — an apparatus that exists only to index a sorted list.
+  Both formalizations make the variable type of the realising term *be* the
+  generating set, so each variable already knows its block and the selector is
+  "is this generator's second coordinate the point". Blueprint Lemma 1.20, the
+  block-respecting enumeration, is used nowhere; it was written for this proof
+  and this proof does not want it.
+- *Lemma 7.1 does not need mixed factors.* The blueprint states it over
+  `A₀ × ⋯ × A_{n+1}` with designated subuniverses `C, B₁, …, B_n, C'`; its only
+  consumer, Corollary 8.1, applies it with everything equal. Specialized, every
+  relation is a subset of a power, the statement is literally `HasEssential`,
+  and neither formalization ever built a dependent product for it. Here that
+  retires `PLAN_ZHUK_CENTERS.md`'s prediction that Layer 7 would need
+  `dependent_product.math`, which remains built and unused.
+
+That is two blueprint over-specifications caught by *agreement between two
+formalizations* rather than by either one alone — the same mechanism as the
+`blocks_populated` finding of §2.7, and now the clearest recurring value this
+exercise has produced.
+
+**Where the two diverge.** Lean reaches for `Fin (n+1) ⊕ Fin (n+1)` as the
+doubled index and transports with `finSumFinEquiv`; here the same move needed
+`Universal.IsEssential.reindex` to be written first (105 lines — blueprint
+Lemma 1.19(e), which nothing earlier had consumed) and `NaturalsBelow.sum_out_of`
+from Layer 3's `finite_sum.math`. Building `R'` the way the blueprint describes
+it — an intersection of cylinders, then a projection — paid for itself
+immediately: closure is `IsSubuniverse.project`/`.cylinder`/`.intersection` and
+nothing is checked by hand, where Lean's `doubled` proves `fun_mem` directly.
+
+**A loose end this layer exposed.** `Set.IsEnumeration` (Layer 3, subset
+cardinality) and `HasSize` (Layer 5, type cardinality) are independent notions
+here with no bridge, so the main theorem carries both finiteness hypotheses for
+the same carrier. Mathlib has one `Finite` and derives what it needs. A lemma
+`Set.IsEnumeration(A, e) → HasSize(A, length(e))` would collapse them; it needs
+an "index of an element in a distinct list" construction the library does not
+have.
+
 ---
 
 ## 3. Design lessons that transfer
@@ -475,8 +532,7 @@ These came out of one system and improved the other, or improved the blueprint.
 
 ## 5. Line counts
 
-Not comparable yet — Lean is complete, this is through Layer 4 — but recorded
-as they land.
+Both formalizations are now complete.
 
 | | Lean | Here |
 |---|---|---|
@@ -487,7 +543,8 @@ as they land.
 | Subset indexing + finite powers (Layer 5 support) | 0 (`Finset`, `Fintype`) | 649 |
 | Regrouping + relational description (Part II, Layer 5) | 230 | 1284 |
 | Centres, enlargement step, iteration (Part III, Layer 6) | 335 | ~1230 |
-| Rest of Part III | ~440 | not started |
+| Centrality, doubling, ternary, main theorem (Layer 7) | 539 | 3035 |
+| | **1591** | **~8900** |
 
 The Lean figure for Part I is small because Mathlib supplied the rest; the
 figure here is the true cost of the same content. The Parts II–III rows are the

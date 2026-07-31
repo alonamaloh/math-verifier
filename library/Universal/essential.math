@@ -585,3 +585,112 @@ theorem Universal.Witnesses.of_inside_on_critical {signature : Universal.Signatu
       }
   }
 }
+
+-- ── Reindexing along a bijection ──────────────────────────────────────
+
+-- Blueprint Lemma 1.19(e) at the level of essentiality: a bijection of index
+-- types carries an essential relation to an essential relation, the relation
+-- moving by `Universal.project` along it. This is what lets a construction
+-- build its relation over whatever index type is natural — a disjoint union of
+-- two halves, say — and only afterwards present it on an initial segment.
+theorem Universal.IsEssential.reindex {signature : Universal.Signature}
+        (a : Universal.Algebra(signature)) (index sub : Type(0))
+        (forward : sub → index) (backward : index → sub)
+        (afterBackward : ∀ (coordinate : index).
+            forward(backward(coordinate)) = coordinate)
+        (afterForward : ∀ (slot : sub). backward(forward(slot)) = slot)
+        (parts : index → Set(Universal.Algebra.carrier(a)))
+        (relation : Set(Universal.Algebra.carrier(
+            Universal.Algebra.power(a, index))))
+        (essential : Universal.IsEssential(a, index, parts, relation))
+        : Universal.IsEssential(a, sub, ((slot : sub) ↦ parts(forward(slot))),
+            Universal.project(a, index, sub, forward, relation)) := {
+  ∀ (free : index).
+      ∃ (tuple : Universal.Algebra.carrier(Universal.Algebra.power(a, index))).
+        tuple ∈ relation
+        ∧ ∀ (other : index). ¬(other = free) → tuple(other) ∈ parts(other)
+      as freeAtEach;
+  -- (E1). The witness freed at `forward(free)`, restricted.
+  ∀ (free : sub).
+      ∃ (small : Universal.Algebra.carrier(Universal.Algebra.power(a, sub))).
+        small ∈ Universal.project(a, index, sub, forward, relation)
+        ∧ ∀ (other : sub).
+            ¬(other = free) → small(other) ∈ parts(forward(other))
+      by { take free : sub;
+           choose tuple such that
+               tuple ∈ relation
+               ∧ ∀ (other : index).
+                   ¬(other = forward(free)) → tuple(other) ∈ parts(other)
+               from freeAtEach(forward(free));
+           tuple ∈ relation;
+           ∀ (other : index).
+               ¬(other = forward(free)) → tuple(other) ∈ parts(other)
+               as insideElsewhere;
+           Universal.restrict(a, index, sub, forward, tuple)
+             ∈ Universal.project(a, index, sub, forward, relation)
+               by { witness tuple };
+           ∀ (other : sub).
+               ¬(other = free)
+               → Universal.restrict(a, index, sub, forward, tuple)(other)
+                 ∈ parts(forward(other))
+               by { take other : sub;
+                    suppose ¬(other = free) as otherDiffers;
+                    -- `forward` is injective: `backward` undoes it.
+                    ¬(forward(other) = forward(free))
+                        by { suppose forward(other) = forward(free)
+                                 as imagesAgree;
+                             other
+                                = backward(forward(other)) by afterForward
+                                = backward(forward(free))
+                                    by substituting imagesAgree
+                                = free by afterForward;
+                             done };
+                    tuple(forward(other)) ∈ parts(forward(other))
+                        by insideElsewhere;
+                    done };
+           witness Universal.restrict(a, index, sub, forward, tuple) };
+  -- (E2). A lift is inside at every index, because every index is the image of
+  -- its own preimage.
+  ¬(∃ (small : Universal.Algebra.carrier(Universal.Algebra.power(a, sub))).
+      small ∈ Universal.project(a, index, sub, forward, relation)
+      ∧ ∀ (slot : sub). small(slot) ∈ parts(forward(slot)))
+      by { suppose ∃ (small : Universal.Algebra.carrier(
+                       Universal.Algebra.power(a, sub))).
+                     small ∈ Universal.project(a, index, sub, forward, relation)
+                     ∧ ∀ (slot : sub). small(slot) ∈ parts(forward(slot))
+                   as someSmallInside;
+           choose small such that
+               small ∈ Universal.project(a, index, sub, forward, relation)
+               ∧ ∀ (slot : sub). small(slot) ∈ parts(forward(slot))
+               from someSmallInside;
+           ∀ (slot : sub). small(slot) ∈ parts(forward(slot)) as smallInside;
+           small ∈ Universal.project(a, index, sub, forward, relation);
+           choose big such that
+               big ∈ relation
+               ∧ Universal.restrict(a, index, sub, forward, big) = small
+               from (small ∈ Universal.project(a, index, sub, forward, relation));
+           big ∈ relation;
+           Universal.restrict(a, index, sub, forward, big) = small
+               as restrictsToSmall;
+           ∀ (coordinate : index). big(coordinate) ∈ parts(coordinate)
+               by { take coordinate : index;
+                    small(backward(coordinate))
+                        ∈ parts(forward(backward(coordinate))) by smallInside;
+                    big(forward(backward(coordinate)))
+                       = Universal.restrict(a, index, sub, forward,
+                           big)(backward(coordinate))
+                       = small(backward(coordinate))
+                           by substituting restrictsToSmall;
+                    big(forward(backward(coordinate)))
+                        ∈ parts(forward(backward(coordinate)));
+                    forward(backward(coordinate)) = coordinate
+                        by afterBackward as isSelf;
+                    done by substituting isSelf };
+           ∃ (tuple : Universal.Algebra.carrier(
+               Universal.Algebra.power(a, index))).
+               tuple ∈ relation
+               ∧ ∀ (coordinate : index). tuple(coordinate) ∈ parts(coordinate)
+               by { witness big };
+           done };
+  done
+}
