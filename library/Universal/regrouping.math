@@ -1,0 +1,214 @@
+-- Universal/regrouping.math
+--
+-- Blueprint Lemma 3.7: a relation that is essential for a *partition* of its
+-- index set into `blocks` blocks yields an essential relation of arity `blocks`.
+--
+-- The partition is a **block function** `block : NaturalsBelow(size) →
+-- NaturalsBelow(blocks)`, with `I_j` the fibre over `j`. Surjectivity is then
+-- exactly "every block is nonempty" — one hypothesis instead of one per block —
+-- and deleting an element from an oversized block is a statement about the
+-- restriction of `block`, not a reindexing of a tuple of subsets. This settles
+-- design question 4 of `PLAN_ZHUK_CENTERS.md`.
+--
+-- Block essentiality is `Universal.IsEssential` with the first clause freeing a
+-- whole block rather than a single coordinate. The two coincide exactly when
+-- every block is a singleton, which is what the base case of the induction
+-- exploits.
+
+module Universal.regrouping
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Logic.functions
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Set.basics
+import Set.algebra
+import Set.finite
+import Set.finite_choice
+import Set.finite_successor
+import Set.subset_indexing
+import Universal.signature
+import Universal.term
+import Universal.product
+import Universal.relation
+import Universal.essential
+
+-- ── Essential for a partition ─────────────────────────────────────────
+
+definition Universal.IsBlockEssential {signature : Universal.Signature}
+        (a : Universal.Algebra(signature)) (size blocks : ℕ)
+        (block : NaturalsBelow(size) → NaturalsBelow(blocks))
+        (subset : Set(Universal.Algebra.carrier(a)))
+        (relation : Set(Universal.Algebra.carrier(
+            Universal.Algebra.power(a, NaturalsBelow(size)))))
+        : Proposition :=
+  (∀ (freeBlock : NaturalsBelow(blocks)).
+     ∃ (tuple : Universal.Algebra.carrier(
+         Universal.Algebra.power(a, NaturalsBelow(size)))).
+       tuple ∈ relation
+       ∧ ∀ (i : NaturalsBelow(size)).
+           ¬(block(i) = freeBlock) → tuple(i) ∈ subset)
+  ∧ ¬(∃ (tuple : Universal.Algebra.carrier(
+          Universal.Algebra.power(a, NaturalsBelow(size)))).
+        tuple ∈ relation
+        ∧ ∀ (i : NaturalsBelow(size)). tuple(i) ∈ subset)
+
+-- ── The base case: every block a singleton ────────────────────────────
+
+-- A surjection with a two-sided inverse — which is what an injective surjection
+-- between initial segments gives — carries block essentiality to ordinary
+-- essentiality of arity `blocks`. Freeing block `j` becomes freeing the one
+-- coordinate `pick(j)` that the block contains.
+theorem Universal.HasEssential.of_block_bijection {signature : Universal.Signature}
+        (a : Universal.Algebra(signature)) (size blocks : ℕ)
+        (block : NaturalsBelow(size) → NaturalsBelow(blocks))
+        (pick : NaturalsBelow(blocks) → NaturalsBelow(size))
+        (blockOfPick : ∀ (j : NaturalsBelow(blocks)). block(pick(j)) = j)
+        (pickOfBlock : ∀ (i : NaturalsBelow(size)). pick(block(i)) = i)
+        (subset : Set(Universal.Algebra.carrier(a)))
+        (relation : Set(Universal.Algebra.carrier(
+            Universal.Algebra.power(a, NaturalsBelow(size)))))
+        (closed : Universal.IsSubuniverse(
+            Universal.Algebra.power(a, NaturalsBelow(size)), relation))
+        (blockEssential : Universal.IsBlockEssential(a, size, blocks, block,
+            subset, relation))
+        : Universal.HasEssential(a, subset, blocks) := {
+  ∀ (freeBlock : NaturalsBelow(blocks)).
+      ∃ (tuple : Universal.Algebra.carrier(
+          Universal.Algebra.power(a, NaturalsBelow(size)))).
+        tuple ∈ relation
+        ∧ ∀ (i : NaturalsBelow(size)).
+            ¬(block(i) = freeBlock) → tuple(i) ∈ subset
+      as blocksPopulated;
+  ¬(∃ (tuple : Universal.Algebra.carrier(
+        Universal.Algebra.power(a, NaturalsBelow(size)))).
+      tuple ∈ relation
+      ∧ ∀ (i : NaturalsBelow(size)). tuple(i) ∈ subset);
+  -- The relation read through the chosen representatives.
+  Universal.IsSubuniverse(Universal.Algebra.power(a, NaturalsBelow(blocks)),
+      Universal.project(a, NaturalsBelow(size), NaturalsBelow(blocks), pick,
+        relation))
+      by Universal.IsSubuniverse.project;
+  -- Every coordinate is free somewhere: the witness for block `j` restricts to
+  -- one free exactly at `j`, because `block(pick(j')) = j'`.
+  ∀ (freeSlot : NaturalsBelow(blocks)).
+      ∃ (small : Universal.Algebra.carrier(
+          Universal.Algebra.power(a, NaturalsBelow(blocks)))).
+        small ∈ Universal.project(a, NaturalsBelow(size),
+                  NaturalsBelow(blocks), pick, relation)
+        ∧ ∀ (other : NaturalsBelow(blocks)).
+            ¬(other = freeSlot) → small(other) ∈ subset
+      by { take freeSlot : NaturalsBelow(blocks);
+           choose tuple such that
+               tuple ∈ relation
+               ∧ ∀ (i : NaturalsBelow(size)).
+                   ¬(block(i) = freeSlot) → tuple(i) ∈ subset
+               from blocksPopulated(freeSlot);
+           tuple ∈ relation;
+           ∀ (i : NaturalsBelow(size)).
+               ¬(block(i) = freeSlot) → tuple(i) ∈ subset as tupleOutside;
+           Universal.restrict(a, NaturalsBelow(size), NaturalsBelow(blocks),
+               pick, tuple)
+             ∈ Universal.project(a, NaturalsBelow(size), NaturalsBelow(blocks),
+                 pick, relation)
+               by { witness tuple };
+           ∀ (other : NaturalsBelow(blocks)).
+               ¬(other = freeSlot)
+               → Universal.restrict(a, NaturalsBelow(size),
+                   NaturalsBelow(blocks), pick, tuple)(other) ∈ subset
+               by { take other : NaturalsBelow(blocks);
+                    suppose ¬(other = freeSlot) as otherDiffers;
+                    block(pick(other)) = other by blockOfPick as representative;
+                    ¬(block(pick(other)) = freeSlot)
+                        by { suppose block(pick(other)) = freeSlot as isFree;
+                             other
+                                = block(pick(other)) by representative
+                                = freeSlot by isFree;
+                             done };
+                    tuple(pick(other)) ∈ subset by tupleOutside;
+                    done };
+           witness Universal.restrict(a, NaturalsBelow(size),
+             NaturalsBelow(blocks), pick, tuple) };
+  -- And nothing lies inside everywhere: a lift would too, since every
+  -- coordinate is the representative of its own block.
+  ¬(∃ (small : Universal.Algebra.carrier(
+        Universal.Algebra.power(a, NaturalsBelow(blocks)))).
+      small ∈ Universal.project(a, NaturalsBelow(size), NaturalsBelow(blocks),
+                pick, relation)
+      ∧ ∀ (slot : NaturalsBelow(blocks)). small(slot) ∈ subset)
+      by { suppose ∃ (small : Universal.Algebra.carrier(
+                       Universal.Algebra.power(a, NaturalsBelow(blocks)))).
+                     small ∈ Universal.project(a, NaturalsBelow(size),
+                               NaturalsBelow(blocks), pick, relation)
+                     ∧ ∀ (slot : NaturalsBelow(blocks)). small(slot) ∈ subset
+                   as someSmallInside;
+           choose small such that
+               small ∈ Universal.project(a, NaturalsBelow(size),
+                         NaturalsBelow(blocks), pick, relation)
+               ∧ ∀ (slot : NaturalsBelow(blocks)). small(slot) ∈ subset
+               from someSmallInside;
+           ∀ (slot : NaturalsBelow(blocks)). small(slot) ∈ subset
+               as smallInside;
+           small ∈ Universal.project(a, NaturalsBelow(size),
+             NaturalsBelow(blocks), pick, relation);
+           choose big such that
+               big ∈ relation
+               ∧ Universal.restrict(a, NaturalsBelow(size),
+                   NaturalsBelow(blocks), pick, big) = small
+               from (small ∈ Universal.project(a, NaturalsBelow(size),
+                 NaturalsBelow(blocks), pick, relation));
+           big ∈ relation;
+           Universal.restrict(a, NaturalsBelow(size), NaturalsBelow(blocks),
+               pick, big) = small as restrictsToSmall;
+           ∀ (i : NaturalsBelow(size)). big(i) ∈ subset
+               by { take i : NaturalsBelow(size);
+                    small(block(i)) ∈ subset by smallInside;
+                    big(pick(block(i)))
+                       = Universal.restrict(a, NaturalsBelow(size),
+                           NaturalsBelow(blocks), pick, big)(block(i))
+                       = small(block(i)) by substituting restrictsToSmall;
+                    big(pick(block(i))) ∈ subset;
+                    pick(block(i)) = i by pickOfBlock as isSelf;
+                    done by substituting isSelf };
+           ∃ (tuple : Universal.Algebra.carrier(
+               Universal.Algebra.power(a, NaturalsBelow(size)))).
+               tuple ∈ relation
+               ∧ ∀ (i : NaturalsBelow(size)). tuple(i) ∈ subset
+               by { witness big };
+           done };
+  Universal.IsEssential(a, NaturalsBelow(blocks),
+      ((slot : NaturalsBelow(blocks)) ↦ subset),
+      Universal.project(a, NaturalsBelow(size), NaturalsBelow(blocks), pick,
+        relation));
+  witness Universal.project(a, NaturalsBelow(size), NaturalsBelow(blocks), pick,
+    relation)
+}
+
+-- An injective surjection between initial segments has a two-sided inverse:
+-- surjectivity chooses one, injectivity makes it two-sided.
+theorem NaturalsBelow.inverse_of_injective_surjective (size blocks : ℕ)
+        (block : NaturalsBelow(size) → NaturalsBelow(blocks))
+        (surjective : ∀ (j : NaturalsBelow(blocks)).
+            ∃ (i : NaturalsBelow(size)). block(i) = j)
+        (injective : ∀ (i : NaturalsBelow(size)). ∀ (j : NaturalsBelow(size)).
+            block(i) = block(j) → i = j)
+        : ∃ (pick : NaturalsBelow(blocks) → NaturalsBelow(size)).
+            (∀ (j : NaturalsBelow(blocks)). block(pick(j)) = j)
+            ∧ (∀ (i : NaturalsBelow(size)). pick(block(i)) = i) := {
+  choose pick such that
+      ∀ (j : NaturalsBelow(blocks)). block(pick(j)) = j
+      from NaturalsBelow.choice(
+        NaturalsBelow(size), blocks,
+        ((j : NaturalsBelow(blocks)) ↦ (candidate : NaturalsBelow(size)) ↦
+          block(candidate) = j),
+        surjective);
+  ∀ (j : NaturalsBelow(blocks)). block(pick(j)) = j as isSection;
+  ∀ (i : NaturalsBelow(size)). pick(block(i)) = i
+      by { take i : NaturalsBelow(size);
+           block(pick(block(i))) = block(i) by isSection;
+           done by injective };
+  witness pick
+}

@@ -420,7 +420,9 @@ eighth draft; Lean version unchanged and complete.
 | Layer 5 so far (`Universal/essential.math`) | 534 |
 | Dependent product (`Universal/dependent_product.math`) | 152 |
 | `Clo_m` (`Universal/clone.math`) | 118 |
-| **Total** | **~2770** |
+| Subset indexing (`Set/subset_indexing`, `Set/finite_cons`) | 521 |
+| Regrouping, base case (`Universal/regrouping.math`) | 214 |
+| **Total** | **~3500** |
 
 **The remaining estimate, recalibrated.** The plan's "~15k lines of blueprint
 content" was a guess made before anything was measured, and it is about 4× too
@@ -501,26 +503,52 @@ because injectivity makes every `i` equal to `section(block(i))`.
 block containing them has more than one element; take `u := i`. The blueprint's
 two branches are a restriction to `I ∖ {u}` and one to `J = (I ∖ I_j) ∪ {u}`.
 
-**The prerequisite, and the thing to build first.** Both branches restrict to a
-*subset* of the index, and `Universal.project` needs an injection
-`NaturalsBelow(k) → NaturalsBelow(size)` naming it. So build, in `Set/`:
+**Subset indexing is built** (`Set/subset_indexing.math`, with
+`Set/finite_cons.math` supplying the missing `consFunction` constructor).
+`NaturalsBelow.index_subset` presents any `chosen : Set(NaturalsBelow(bound))`
+as the image of an injection from `NaturalsBelow(count)` with `count ≤ bound`,
+strictly smaller as soon as anything is left out. It does not compute the
+cardinality — nothing needs that, and `count ≤ bound` plus strictness is what an
+induction runs on. It also subsumes the "transpose `u` to the front" move that
+reusing `Universal.deleteFirst` would have required.
 
-> **Subset indexing.** For `chosen : Set(NaturalsBelow(n))`, an injection
-> `NaturalsBelow(Set.size(enumeration, chosen)) → NaturalsBelow(n)` whose image
-> is exactly `chosen`, together with its partial inverse.
+**The base case is done**: `Universal.HasEssential.of_block_bijection`, with
+`NaturalsBelow.inverse_of_injective_surjective` supplying the two-sided inverse
+(surjectivity chooses a section, injectivity makes it two-sided). Freeing block
+`j` becomes freeing the single coordinate `pick(j)`, and (B2) transfers because
+every coordinate is the representative of its own block.
 
-Layer 3's `Set.size` and `Set.IsEnumeration` are what this is built from, and
-`Set.size_lt_of_proper_subset` is what makes the measure drop: both `I ∖ {u}`
-and `J` are proper subsets, so both recursive calls are at a strictly smaller
-size without any separate counting argument. This also subsumes the
-"transpose `u` to the front" move that would otherwise be needed to reuse
-`Universal.deleteFirst` — with subset indexing, branch one is just the subset
-`I ∖ {u}` and no transposition is required.
+### What remains of regrouping: the inductive step
 
-Estimate: ~300 lines for subset indexing, ~500 for the lemma. It is the place to
-expect the worst ratio against Lean, whose `Regrouping.lean` is 135 lines
-leaning on `Finset.card_erase_of_mem` and `Finset.card_lt_card` — the block
-bookkeeping the blueprint imports as Appendix C item 7.
+Strong induction on `size`, `blocks` fixed. `block` not injective gives `u ≠ u'`
+with `block(u) = block(u')`; write `j := block(u)`, so the fibre over `j` has at
+least two elements. Both branches are `Universal.project` along an indexing from
+`NaturalsBelow.index_subset`, with the new block function `block ∘ place`.
+
+**Branch 1 — `π_J(R) ∩ S^J ≠ ∅` (the blueprint's (†)).** Take
+`chosen := (i) ↦ ¬(i = u)` and
+
+    R₁ := project(place, relation ∩ firstCoordinateIn-style {x : x_u ∈ S})
+
+`count < size` because `u ∉ chosen`. Surjectivity of `block ∘ place` survives
+because block `j` still holds `u'`. (B2) for `R₁` is (B2) for `R`; (B1) at a
+block `l ≠ j` projects `R`'s witness, whose `u`-coordinate is already inside
+since `u ∈ I_j`; (B1) at block `j` is exactly (†).
+
+**Branch 2 — (†) fails.** Take `chosen := (i) ↦ ¬(block(i) = j) ∨ i = u` and
+`R₂ := project(place, relation)`, with the new block function sending `u` to `j`
+and everything else as before — so block `j` becomes the singleton `{u}`.
+`count < size` because `u' ∉ chosen`. (B2) for `R₂` is precisely the failure of
+(†). (B1) at `l ≠ j` projects `R`'s witness for `I_l`; (B1) at `{u}` projects
+`R`'s witness for `I_j`.
+
+`Universal.firstCoordinateIn` generalises to "coordinate `u` lies inside" with
+the same ten-line proof; that is the one small piece of new plumbing branch 1
+wants.
+
+Estimate: ~400 lines. It is still the place to expect the worst ratio against
+Lean, whose `Regrouping.lean` is 135 lines leaning on `Finset.card_erase_of_mem`
+and `Finset.card_lt_card`.
 
 ### The trick that makes arithmetic-indexed induction work
 
