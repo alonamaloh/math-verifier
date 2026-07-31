@@ -422,7 +422,8 @@ eighth draft; Lean version unchanged and complete.
 | `Clo_m` (`Universal/clone.math`) | 118 |
 | Subset indexing (`Set/subset_indexing`, `Set/finite_cons`) | 521 |
 | Regrouping, complete (`Universal/regrouping.math`) | 773 |
-| **Total** | **~4060** |
+| Finite powers (`Set/finite_function.math`) | 191 |
+| **Total** | **~4250** |
 
 **The remaining estimate, recalibrated.** The plan's "~15k lines of blueprint
 content" was a guess made before anything was measured, and it is about 4× too
@@ -536,6 +537,29 @@ a case split, and only because its witness must additionally be inside at `u`.
 
 **What is left in Layer 5:** Theorem 3.10 (Barto–Kazda) alone, which assembles
 regrouping with 3.5, 3.6 and 3.9. Then Layers 6–7.
+
+### Theorem 3.10 — the design
+
+The converse forms `X ⊆ A^m`, the tuples with exactly one coordinate outside
+`S`, and takes `R̃ := π_X(Clo_m(A))`. Regrouping wants its index to be
+`NaturalsBelow(count)`, and `X` is a set of tuples — so `X` has to be indexed by
+an initial segment. **No `Subtype` is needed**: compose a bijection
+`A^m ≅ NaturalsBelow(N)` with `NaturalsBelow.index_subset` to get an injection
+`NaturalsBelow(count) → A^m` whose image is exactly `X`, and use
+`NaturalsBelow(count)` directly as the index. `Universal.project` along it is
+`R̃`.
+
+`HasSize.tuples` (`Set/finite_function.math`) supplies the bijection: from
+`HasSize(carrier, n)` it gives `HasSize(NaturalsBelow(m) → carrier, n ^ m)`, by
+induction on `m` through the cons/uncons decomposition and `HasSize.product`.
+State Theorem 3.10 with `HasSize(carrier(a), n)` as the finiteness hypothesis —
+that is the library's own notion, and `Set.IsEnumeration` from Layer 3 is not
+needed here.
+
+The block function is *which coordinate is free*, read off the tuple; as the
+plan predicted at Layer 5's design, no partition has to be constructed. The
+three degenerate cases (`S = A`, `S = ∅` with `m ≥ 2`, `S = ∅` with `m = 1`) come
+first and are each a few lines.
 
 ### The trick that makes arithmetic-indexed induction work
 

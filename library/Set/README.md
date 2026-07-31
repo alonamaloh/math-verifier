@@ -32,6 +32,11 @@ enumerability, equinumerosity, and the finite counting layer.
   `NaturalsBelow(count)` with `count ≤ bound`, strictly smaller as soon as the
   subset misses anything. What lets an induction restrict to a subset and keep
   indexing by an initial segment
+- `HasSize.tuples` — a finite power of a finite type is finite, in
+  [finite_function.math](finite_function.math): if `X` has `n` elements then
+  `NaturalsBelow(m) → X` has `n ^ m`. Built on the cons/uncons decomposition,
+  and what lets a relation indexed by a set of tuples be re-indexed by an
+  initial segment
 - Cardinality of a **subset** — `Set.IsEnumeration(A, enumeration)`,
   `Set.IsFinite(A)`, and `Set.size(enumeration, subset)` — in
   [enumeration.math](enumeration.math). `HasSize` counts a *type*; this counts

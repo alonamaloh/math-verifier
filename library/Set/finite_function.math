@@ -1,0 +1,191 @@
+-- Set/finite_function.math
+--
+-- A finite power of a finite type is finite: if `X` has `n` elements then the
+-- tuples `NaturalsBelow(m) → X` number `n ^ m`.
+--
+-- The induction is the cons/uncons decomposition of `NaturalsBelow(1 + m)`:
+-- a tuple of length `1 + m` is its first entry paired with a tuple of length
+-- `m`, and `NaturalsBelow.consFunction` is what puts the two back together.
+-- With that bijection the count is `HasSize.product`.
+--
+-- This is what lets a relation indexed by a set of tuples be re-indexed by an
+-- initial segment — the form every construction in `Universal/` wants, and the
+-- one the relational description of absorption needs when it projects the
+-- clone onto a set of tuples.
+
+module Set.finite_function
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Logic.functions
+import Logic.product
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.arithmetic
+import Natural.power
+import Set.subtype
+import Set.equinumerous
+import Set.finite
+import Set.finite_product
+import Set.finite_successor
+import Set.finite_cons
+
+-- ── Tuples of length 1 + m split off their first entry ────────────────
+
+definition NaturalsBelow.uncons {m : ℕ} {X : Type(0)}
+        (tuple : NaturalsBelow(1 + m) → X)
+        : Pair(X, NaturalsBelow(m) → X) :=
+  Product.make(tuple(NaturalsBelow.first),
+    ((lower : NaturalsBelow(m)) ↦ tuple(NaturalsBelow.shiftUp(lower))))
+
+definition NaturalsBelow.cons {m : ℕ} {X : Type(0)}
+        (split : Pair(X, NaturalsBelow(m) → X))
+        : NaturalsBelow(1 + m) → X :=
+  NaturalsBelow.consFunction(Product.first(split), Product.second(split))
+
+theorem NaturalsBelow.cons_uncons (m : ℕ) (X : Type(0))
+        : Function.IsInverse(NaturalsBelow(1 + m) → X,
+            Pair(X, NaturalsBelow(m) → X),
+            NaturalsBelow.uncons, NaturalsBelow.cons) := {
+  -- Splitting then rejoining is the identity: the two pieces are exactly what
+  -- `consFunction` reads back at the first point and at a shift.
+  ∀ (tuple : NaturalsBelow(1 + m) → X).
+      NaturalsBelow.cons(NaturalsBelow.uncons(tuple)) = tuple
+      by { take tuple : NaturalsBelow(1 + m) → X;
+           ∀ (index : NaturalsBelow(1 + m)).
+               NaturalsBelow.cons(NaturalsBelow.uncons(tuple))(index)
+                 = tuple(index)
+               by { take index : NaturalsBelow(1 + m);
+                    index = NaturalsBelow.first
+                      ∨ ∃ (lower : NaturalsBelow(m)).
+                          index = NaturalsBelow.shiftUp(lower)
+                      by NaturalsBelow.first_or_shift;
+                    done by cases {
+                      case index = NaturalsBelow.first as isFirst:
+                          done by NaturalsBelow.consFunction_first
+                      case ∃ (lower : NaturalsBelow(m)).
+                             index = NaturalsBelow.shiftUp(lower) as isShift: {
+                          choose lower such that
+                              index = NaturalsBelow.shiftUp(lower) from isShift;
+                          NaturalsBelow.cons(NaturalsBelow.uncons(tuple))(
+                              NaturalsBelow.shiftUp(lower))
+                            = tuple(NaturalsBelow.shiftUp(lower))
+                            by NaturalsBelow.consFunction_shift;
+                          done by substituting (index
+                            = NaturalsBelow.shiftUp(lower))
+                        }
+                    } };
+           done by Function.extensionality };
+  -- Rejoining then splitting is the identity on pairs, componentwise. The
+  -- projections carry their type arguments explicitly: `Pair` is
+  -- universe-polymorphic and nothing in a chain step pins its levels.
+  ∀ (split : Pair(X, NaturalsBelow(m) → X)).
+      NaturalsBelow.uncons(NaturalsBelow.cons(split)) = split
+      by { take split : Pair(X, NaturalsBelow(m) → X);
+           NaturalsBelow.cons(split, NaturalsBelow.first)
+              = Product.first.{0,0}(X, NaturalsBelow(m) → X, split)
+              by NaturalsBelow.consFunction_first as headBack;
+           ∀ (lower : NaturalsBelow(m)).
+               NaturalsBelow.cons(split, NaturalsBelow.shiftUp(lower))
+                 = Product.second.{0,0}(X, NaturalsBelow(m) → X, split, lower)
+               by NaturalsBelow.consFunction_shift;
+           ((lower : NaturalsBelow(m)) ↦
+               NaturalsBelow.cons(split, NaturalsBelow.shiftUp(lower)))
+             = Product.second.{0,0}(X, NaturalsBelow(m) → X, split)
+             by Function.extensionality as tailBack;
+           NaturalsBelow.uncons(NaturalsBelow.cons(split))
+              = Product.make(NaturalsBelow.cons(split, NaturalsBelow.first),
+                  ((lower : NaturalsBelow(m)) ↦
+                    NaturalsBelow.cons(split, NaturalsBelow.shiftUp(lower))))
+              = Product.make(
+                  Product.first.{0,0}(X, NaturalsBelow(m) → X, split),
+                  ((lower : NaturalsBelow(m)) ↦
+                    NaturalsBelow.cons(split, NaturalsBelow.shiftUp(lower))))
+                    by substituting headBack
+              = Product.make(
+                  Product.first.{0,0}(X, NaturalsBelow(m) → X, split),
+                  Product.second.{0,0}(X, NaturalsBelow(m) → X, split))
+                    by substituting tailBack
+              = split by Product.eta;
+           done };
+  done
+}
+
+theorem NaturalsBelow.tuples_equinumerous_product (m : ℕ) (X : Type(0))
+        : Equinumerous(NaturalsBelow(1 + m) → X,
+            Pair(X, NaturalsBelow(m) → X)) := {
+  Function.IsInverse(NaturalsBelow(1 + m) → X, Pair(X, NaturalsBelow(m) → X),
+      NaturalsBelow.uncons, NaturalsBelow.cons)
+      by NaturalsBelow.cons_uncons;
+  witness NaturalsBelow.uncons with { witness NaturalsBelow.cons }
+}
+
+-- ── A tuple type of length 0 is a single point ────────────────────────
+
+theorem NaturalsBelow.tuples_zero_has_size (X : Type(0))
+        : HasSize(NaturalsBelow(0) → X, 1) := {
+  -- There is exactly one empty tuple, and `NaturalsBelow(1)` is one point, so
+  -- the constant maps in both directions are inverse: one round trip is
+  -- vacuous, the other is that `NaturalsBelow(1)` is a subsingleton.
+  ∀ (tuple : NaturalsBelow(0) → X).
+      ((point : NaturalsBelow(1)) ↦
+        ((index : NaturalsBelow(0)) ↦
+          False.eliminate(X, NaturalsBelow.zero_is_empty(index))))(
+        ((candidate : NaturalsBelow(0) → X) ↦ NaturalsBelow.one_point)(tuple))
+        = tuple
+      by { take tuple : NaturalsBelow(0) → X;
+           ∀ (index : NaturalsBelow(0)).
+               False.eliminate(X, NaturalsBelow.zero_is_empty(index))
+                 = tuple(index)
+               by { take index : NaturalsBelow(0);
+                    False by NaturalsBelow.zero_is_empty;
+                    done };
+           done by Function.extensionality };
+  ∀ (point : NaturalsBelow(1)).
+      ((candidate : NaturalsBelow(0) → X) ↦ NaturalsBelow.one_point)(
+        ((slot : NaturalsBelow(1)) ↦
+          ((index : NaturalsBelow(0)) ↦
+            False.eliminate(X, NaturalsBelow.zero_is_empty(index))))(point))
+        = point
+      by { take point : NaturalsBelow(1);
+           done by NaturalsBelow.one_subsingleton };
+  Function.IsInverse(NaturalsBelow(0) → X, NaturalsBelow(1),
+      ((candidate : NaturalsBelow(0) → X) ↦ NaturalsBelow.one_point),
+      ((point : NaturalsBelow(1)) ↦
+        ((index : NaturalsBelow(0)) ↦
+          False.eliminate(X, NaturalsBelow.zero_is_empty(index)))));
+  ∃ (g : NaturalsBelow(1) → (NaturalsBelow(0) → X)).
+      Function.IsInverse(NaturalsBelow(0) → X, NaturalsBelow(1),
+        ((candidate : NaturalsBelow(0) → X) ↦ NaturalsBelow.one_point), g)
+      by { witness ((point : NaturalsBelow(1)) ↦
+             ((index : NaturalsBelow(0)) ↦
+               False.eliminate(X, NaturalsBelow.zero_is_empty(index)))) };
+  witness ((candidate : NaturalsBelow(0) → X) ↦ NaturalsBelow.one_point)
+}
+
+-- ── The count ─────────────────────────────────────────────────────────
+
+theorem HasSize.tuples (X : Type(0)) (n : ℕ) (sizeX : HasSize(X, n)) (m : ℕ)
+        : HasSize(NaturalsBelow(m) → X, n ^ m) :=
+  by induction on m with IH {
+    case m = 0: {
+        HasSize(NaturalsBelow(0) → X, 1) by NaturalsBelow.tuples_zero_has_size;
+        n ^ 0 = successor(0) by Natural.power_zero;
+        (n : ℕ) ^ 0 = 1;
+        done by substituting ((n : ℕ) ^ 0 = 1)
+      }
+    case m = 1 + rest for some (rest : ℕ): {
+        HasSize(NaturalsBelow(rest) → X, n ^ rest) by IH;
+        HasSize(Pair(X, NaturalsBelow(rest) → X), n * n ^ rest)
+            by HasSize.product;
+        Equinumerous(NaturalsBelow(1 + rest) → X,
+            Pair(X, NaturalsBelow(rest) → X))
+            by NaturalsBelow.tuples_equinumerous_product;
+        HasSize(NaturalsBelow(1 + rest) → X, n * n ^ rest)
+            by HasSize.transport;
+        n ^ (1 + rest) = n * n ^ rest by Natural.power_one_plus;
+        done by substituting (n ^ (1 + rest) = n * n ^ rest)
+      }
+  }
