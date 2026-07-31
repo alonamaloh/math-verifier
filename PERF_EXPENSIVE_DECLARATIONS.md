@@ -473,6 +473,55 @@ That is direct confirmation of the "shrink the context" direction below, and it
 promotes it from plausible to indicated: 88 local facts is the input to a
 product, and the scans that fail are ~100 per claim.
 
+## The overlay fix: argument INFERENCE was the cost (2026-07-31)
+
+The scan census said the pool was 355 candidates and the scans found nothing.
+The decisive experiment was to supply the cited lemma's data arguments
+explicitly, leaving nothing to infer:
+
+```math
+-- before: 48 s
+by Plane.segment_inside_of_ends_outside(a := Product.first(sourcePart));
+
+-- after: below the 200 ms reporting floor
+by Plane.segment_inside_of_ends_outside(
+       a := Product.first(sourcePart), b := Product.second(sourcePart),
+       pieceLeft := Product.first(part), pieceRight := Product.second(part),
+       overlapLeft := meetNear, overlapRight := meetFar, x := x);
+```
+
+The claim vanished from the ranking while its **unchanged twin three lines
+below still cost 47 s** — as clean a control as one could ask for.
+
+Applied to all three citations in the file:
+
+| | |
+| --- | --- |
+| `Plane/Graph/overlay.math` | **140 s → 5.14 s (27×)** |
+| library total claim self-time | 815.2 s → **689.2 s** |
+| library top 10 | 295.9 s → **204.2 s** |
+
+Cumulative for the session: **1087 s → 689 s, −37%**.
+
+**What this means, and it is not what "shrink the context" predicted.** The
+context size is the *input* to the cost, but the mechanism is **inferring the
+lemma's data arguments from the goal**: with seven data parameters to solve and
+355 candidates in the pool, the matcher searches, and on these
+projection-headed goals every probe is expensive. Pinning the arguments removes
+the search entirely — the premises still discharge, but against known terms.
+
+**Style tension, flagged deliberately.** `docs/style.md` says to cite
+argument-free and name at most ONE argument when it cannot be inferred. These
+sites now name seven. The rule's rationale is readability, and it implicitly
+assumes inference is cheap; at 48 seconds a step it is not. Two honest options,
+and this is the owner's call:
+
+1. keep the explicit arguments and record the exception (what is committed);
+2. make the arguments unnecessary — bind `Product.first/second(part)` and the
+   rest to `let` names so the goal carries short terms the matcher can solve
+   fast. That would restore the argument-free citation AND likely keep most of
+   the win, and it is the readability-first version. Untested.
+
 ## Directions worth trying
 
 - **Shrink the context.** These proofs state ~30 facts before using any of
