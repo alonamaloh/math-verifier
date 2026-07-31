@@ -144,7 +144,7 @@ break as a proof to improve works, and the fixes are improvements:
 | prove cap | files failing | state |
 | --- | --- | --- |
 | 6 | 3 → **0** | done — three proofs written out |
-| 3 | 16 → **11** | in progress — every break dictates its own fix |
+| 3 | 16 → **10** | in progress — 10 of 10 carry a usable route |
 | 1 | 35 | the goal; worth 14.9 s → 6.4 s on the profiled file |
 
 The three fixed: `Natural/distance.math` (`le_add_distance` was hiding
@@ -254,8 +254,34 @@ would type it: `citableNameFromFactSource` for context/library facts, and for a
 since otherwise the suggestion reads ``by substituting `supplied via `by
 substituting```.
 
-Ladder: cap 3 is **14 → 11 files**, all 11 carrying a full trace. Then ~34 at
-cap 1. A transcription rather than an investigation.
+**Fourth iteration: group, do not filter.** Scoping the route to the failing
+claim by matching `failure.line` was wrong. An `ElaborateError`'s position is
+the innermost frame that HAS one — usually the enclosing `by cases` arm, not
+the claim — so the match failed and **9 of 11 sites reported "no route"** when
+in fact a perfectly good route had been recorded. Filtering was throwing away
+the answer.
+
+The report now **groups the recorded rewrites by the claim each was performed
+for, and labels each group with its line**:
+
+```
+  Stating the intermediate forms makes a shallow search enough. Per step:
+    for the step at line 64 (1 rewrite(s)):
+      certificateStart + 0 = certificateStart;
+      and that step follows by substituting `the equation supplied to
+      `by substituting``.
+    for the step at line 66 (1 rewrite(s)):
+      P certificateStart;
+      and that step follows by substituting `Natural.add_zero`.
+```
+
+Nothing is discarded, and a route can never be read as instructions for a step
+it does not belong to — which was the whole reason for filtering in the first
+place. `Natural/finite_range.math:66` was then fixed by transcribing its two
+labelled lines.
+
+Ladder: cap 3 is **14 → 10 files**, and now **10 of 10 carry a usable route**
+(it was 2 of 11 while the filter was discarding them). Then ~34 at cap 1.
 
 ### Deep search as an error-message generator — BUILT 2026-07-30
 

@@ -659,13 +659,13 @@ std::string Elaborator::describeDeepEqualityRoute(
         // retry re-elaborates the whole declaration, so the raw collection
         // mixes in every other claim's rewrites — on one site that produced an
         // "11-step route" spanning two unrelated `case` arms.
-        if (failingLine > 0) {
-            std::vector<DeepRouteStep> onPath;
-            for (const DeepRouteStep& step : deepRoute_) {
-                if (step.line == failingLine) onPath.push_back(step);
-            }
-            if (!onPath.empty()) deepRoute_ = std::move(onPath);
-        }
+        // Do NOT filter by the failing line. The error's position is the
+        // innermost frame that HAS one — often the enclosing `by cases` arm
+        // rather than the claim itself — so matching on it discards the very
+        // route we want. Group by the claim each rewrite was performed for and
+        // label the groups instead: nothing is lost, and a route can never be
+        // read as instructions for a step it does not belong to.
+        (void)failingLine;
         if (!deepRoute_.empty()) {
             // `deepRoute_` is innermost-first, which is already the order an
             // author states the intermediate forms in: the deepest rewritten
@@ -713,37 +713,43 @@ std::string Elaborator::describeDeepEqualityRoute(
                 }
                 return source;
             };
-            message +=
-                "\n  It got there in " + std::to_string(deepRoute_.size())
-                + " rewrite(s). Stating the intermediate forms makes a "
-                  "shallow search enough — in this order:\n";
-            size_t shown = 0;
-            for (size_t i = 0; i < deepRoute_.size(); ++i) {
-                if (shown++ >= 8) {
-                    message += "\n      … (" 
-                        + std::to_string(deepRoute_.size() - 8)
-                        + " more)";
-                    break;
-                }
-                const DeepRouteStep& step = deepRoute_[i];
-                message += "\n      " + shorten(step.statement);
-                if (i == 0) {
-                    // The innermost form is the base of the argument. Say how
-                    // it closed, so the author knows whether it stands bare.
-                    std::string base = citable(step.closedBy);
-                    if (base.empty()) {
-                        message += ";";
-                    } else {
-                        message += "\n          by " + base + ";";
-                    }
-                } else {
-                    message += "\n          by substituting `"
-                        + citable(deepRoute_[i - 1].equation) + "`;";
-                }
+            // Distinct claim lines, in the order first seen.
+            std::vector<int> lines;
+            for (const DeepRouteStep& step : deepRoute_) {
+                bool seen = false;
+                for (int already : lines) if (already == step.line) seen = true;
+                if (!seen) lines.push_back(step.line);
             }
-            message += "\n  and then the claim itself follows by "
-                       "substituting `"
-                       + citable(deepRoute_.back().equation) + "`.";
+            message += "\n  Stating the intermediate forms makes a shallow "
+                       "search enough. Per step:";
+            for (int claimLine : lines) {
+                std::vector<DeepRouteStep> group;
+                for (const DeepRouteStep& step : deepRoute_) {
+                    if (step.line == claimLine) group.push_back(step);
+                }
+                message += "\n    for the step at line "
+                    + std::to_string(claimLine) + " ("
+                    + std::to_string(group.size()) + " rewrite(s)):";
+                size_t shown = 0;
+                for (size_t i = 0; i < group.size(); ++i) {
+                    if (shown++ >= 6) {
+                        message += "\n      … ("
+                            + std::to_string(group.size() - 6) + " more)";
+                        break;
+                    }
+                    message += "\n      " + shorten(group[i].statement);
+                    if (i == 0) {
+                        std::string base = citable(group[i].closedBy);
+                        message += base.empty() ? ";" : ("\n          by "
+                            + base + ";");
+                    } else {
+                        message += "\n          by substituting `"
+                            + citable(group[i - 1].equation) + "`;";
+                    }
+                }
+                message += "\n      and that step follows by substituting `"
+                    + citable(group.back().equation) + "`.";
+            }
         }
         return message;
     }
