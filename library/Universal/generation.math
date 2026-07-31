@@ -28,83 +28,67 @@ import Universal.signature
 import Universal.term
 import Universal.generated
 
+convention signature : Universal.Signature
+
 -- The valuation that reads a generator out of the subtype.
-definition Universal.baseValuation {signature : Universal.Signature}
+definition Universal.baseValuation
         (a : Universal.Algebra(signature))
-        (base : Set(Universal.Algebra.carrier(a)))
-        : Subtype(Universal.Algebra.carrier(a), base) → Universal.Algebra.carrier(a) :=
-  (element : Subtype(Universal.Algebra.carrier(a), base)) ↦ Subtype.value(element)
+        (base : Set(Universal.carrier(a)))
+        : Subtype(Universal.carrier(a), base) → Universal.carrier(a) :=
+  (element : Subtype(Universal.carrier(a), base)) ↦ Subtype.value(element)
 
 -- The values of terms whose variables range over `base`.
-definition Universal.termValues {signature : Universal.Signature}
+definition Universal.termValues
         (a : Universal.Algebra(signature))
-        (base : Set(Universal.Algebra.carrier(a)))
-        : Set(Universal.Algebra.carrier(a)) :=
-  (subject : Universal.Algebra.carrier(a)) ↦
-    ∃ (subject_term : Universal.Term(signature,
-                        Subtype(Universal.Algebra.carrier(a), base))).
+        (base : Set(Universal.carrier(a)))
+        : Set(Universal.carrier(a)) :=
+  (subject : Universal.carrier(a)) ↦ ∃ (subject_term : Universal.Term(signature, Subtype(Universal.carrier(a), base))).
       Universal.Term.evaluate(a, Universal.baseValuation(a, base), subject_term)
         = subject
 
-theorem Universal.termValues.contains_base {signature : Universal.Signature}
+theorem Universal.termValues.contains_base
         (a : Universal.Algebra(signature))
-        (base : Set(Universal.Algebra.carrier(a)))
+        (base : Set(Universal.carrier(a)))
         : base ⊆ Universal.termValues(a, base) := {
-  take subject : Universal.Algebra.carrier(a);
+  take subject : Universal.carrier(a);
   suppose subject ∈ base as inBase;
-  witness Universal.Term.variable(signature,
-            Subtype(Universal.Algebra.carrier(a), base),
-            Subtype.make(Universal.Algebra.carrier(a), base, subject, inBase))
+  witness Universal.Term.variable(signature, Subtype(Universal.carrier(a), base), Subtype.make(Universal.carrier(a), base, subject, inBase))
 }
 
-theorem Universal.termValues.is_subuniverse {signature : Universal.Signature}
+theorem Universal.termValues.is_subuniverse
         (a : Universal.Algebra(signature))
-        (base : Set(Universal.Algebra.carrier(a)))
+        (base : Set(Universal.carrier(a)))
         : Universal.IsSubuniverse(a, Universal.termValues(a, base)) := {
   take arity : ℕ;
   take symbol : signature(arity);
-  take arguments : NaturalsBelow(arity) → Universal.Algebra.carrier(a);
-  suppose ∀ (index : NaturalsBelow(arity)).
-      arguments(index) ∈ Universal.termValues(a, base) as allValues;
-  choose chosen such that
-      ∀ (index : NaturalsBelow(arity)).
-        Universal.Term.evaluate(a, Universal.baseValuation(a, base), chosen(index))
+  take arguments : NaturalsBelow(arity) → Universal.carrier(a);
+  suppose ∀ (index : NaturalsBelow(arity)). arguments(index) ∈ Universal.termValues(a, base) as allValues;
+  choose chosen such that ∀ (index : NaturalsBelow(arity)). Universal.Term.evaluate(a, Universal.baseValuation(a, base), chosen(index))
           = arguments(index)
-      from NaturalsBelow.choice(
-        Universal.Term(signature, Subtype(Universal.Algebra.carrier(a), base)),
-        arity,
-        ((index : NaturalsBelow(arity)) ↦
-          (candidate : Universal.Term(signature,
-                         Subtype(Universal.Algebra.carrier(a), base))) ↦
+      from NaturalsBelow.choice(Universal.Term(signature, Subtype(Universal.carrier(a), base)), arity, ((index : NaturalsBelow(arity)) ↦
+          (candidate : Universal.Term(signature, Subtype(Universal.carrier(a), base))) ↦
             Universal.Term.evaluate(a, Universal.baseValuation(a, base), candidate)
-              = arguments(index)),
-        allValues);
-  ((index : NaturalsBelow(arity)) ↦
-      Universal.Term.evaluate(a, Universal.baseValuation(a, base), chosen(index)))
+              = arguments(index)), allValues);
+  ((index : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(a, Universal.baseValuation(a, base), chosen(index)))
     = arguments
     by Function.extensionality;
-  witness Universal.Term.apply(signature,
-            Subtype(Universal.Algebra.carrier(a), base), arity, symbol, chosen)
+  witness Universal.Term.apply(signature, Subtype(Universal.carrier(a), base), arity, symbol, chosen)
 }
 
-theorem Universal.termValues.subset_generated {signature : Universal.Signature}
+theorem Universal.termValues.subset_generated
         (a : Universal.Algebra(signature))
-        (base : Set(Universal.Algebra.carrier(a)))
+        (base : Set(Universal.carrier(a)))
         : Universal.termValues(a, base) ⊆ Universal.generated(a, base) := {
-  take subject : Universal.Algebra.carrier(a);
+  take subject : Universal.carrier(a);
   suppose subject ∈ Universal.termValues(a, base) as isValue;
-  choose subject_term such that
-      Universal.Term.evaluate(a, Universal.baseValuation(a, base), subject_term)
+  choose subject_term such that Universal.Term.evaluate(a, Universal.baseValuation(a, base), subject_term)
         = subject
       from isValue;
-  Universal.IsSubuniverse(a, Universal.generated(a, base))
-      by Universal.generated.is_subuniverse;
-  base ⊆ Universal.generated(a, base)
-      by Universal.generated.contains_base;
-  ∀ (element : Subtype(Universal.Algebra.carrier(a), base)).
-      Universal.baseValuation(a, base, element) ∈ Universal.generated(a, base)
+  Universal.IsSubuniverse(a, Universal.generated(a, base)) by Universal.generated.is_subuniverse;
+  base ⊆ Universal.generated(a, base) by Universal.generated.contains_base;
+  ∀ (element : Subtype(Universal.carrier(a), base)). Universal.baseValuation(a, base, element) ∈ Universal.generated(a, base)
     by {
-      take element : Subtype(Universal.Algebra.carrier(a), base);
+      take element : Subtype(Universal.carrier(a), base);
       Subtype.value(element) ∈ base by Subtype.property;
       done
     };
@@ -116,14 +100,13 @@ theorem Universal.termValues.subset_generated {signature : Universal.Signature}
 
 -- The generated subuniverse is exactly the term values. This is the blueprint's
 -- Lemma 1.15, in the form that needs no enumeration of the generators.
-theorem Universal.generated_eq_termValues {signature : Universal.Signature}
+theorem Universal.generated_eq_termValues
         (a : Universal.Algebra(signature))
-        (base : Set(Universal.Algebra.carrier(a)))
+        (base : Set(Universal.carrier(a)))
         : Universal.generated(a, base) = Universal.termValues(a, base) := {
   Universal.IsSubuniverse(a, Universal.termValues(a, base));
   base ⊆ Universal.termValues(a, base);
-  Universal.generated(a, base) ⊆ Universal.termValues(a, base)
-      by Universal.generated.least;
+  Universal.generated(a, base) ⊆ Universal.termValues(a, base) by Universal.generated.least;
   Universal.termValues(a, base) ⊆ Universal.generated(a, base);
   done by Set.equal_of_same_members
 }

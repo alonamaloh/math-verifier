@@ -375,6 +375,7 @@ private:
             {"∃", TokenKind::Exists},
             {"⟨", TokenKind::LeftAngle},
             {"⟩", TokenKind::RightAngle},
+            {"×", TokenKind::Cross},
             {"·", TokenKind::CenterDot},
             {"•", TokenKind::Bullet},
             {"∘", TokenKind::Compose},
@@ -593,6 +594,7 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::Star:                 return "'*'";
         case TokenKind::Slash:                return "'/'";
         case TokenKind::Caret:                return "'^'";
+        case TokenKind::Cross:                return "'×'";
         case TokenKind::CenterDot:            return "'·'";
         case TokenKind::Bullet:               return "'•'";
         case TokenKind::Compose:              return "'∘'";

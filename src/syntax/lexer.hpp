@@ -91,6 +91,7 @@ enum class TokenKind {
 
     // Operators
     Plus, Minus, Star, Slash, Caret,
+    Cross,           // "×" (cartesian product, multiplicative precedence)
     CenterDot,       // "·" (binary operation symbol, multiplicative precedence)
     Bullet,          // "•" (scalar action, multiplicative precedence)
     Compose,         // "∘" (composition, multiplicative precedence)

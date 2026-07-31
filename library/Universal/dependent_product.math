@@ -31,34 +31,26 @@ import Universal.signature
 import Universal.term
 import Universal.product
 
+convention signature : Universal.Signature
+
 -- The product of a family: tuples picking one element out of each factor, with
 -- every operation applied at each coordinate in that factor.
-definition Universal.Algebra.dependentProduct {signature : Universal.Signature}
+definition Universal.Algebra.dependentProduct
         (index : Type(0)) (family : index → Universal.Algebra(signature))
-        : Universal.Algebra(signature) :=
-  Universal.Algebra.make(signature,
-    (coordinate : index) → Universal.Algebra.carrier(family(coordinate)),
-    ((arity : ℕ) ↦ (symbol : signature(arity)) ↦
-      (arguments : NaturalsBelow(arity)
-                   → ((coordinate : index)
-                      → Universal.Algebra.carrier(family(coordinate)))) ↦
-        (coordinate : index) ↦
-          Universal.Algebra.interpret(arity, symbol,
-            ((slot : NaturalsBelow(arity)) ↦ arguments(slot)(coordinate)))))
+        : Universal.Algebra(signature) := Universal.Algebra.make(signature,
+    (coordinate : index) → Universal.carrier(family(coordinate)), ((arity : ℕ) ↦ (symbol : signature(arity)) ↦
+      (arguments : NaturalsBelow(arity) → ((coordinate : index) → Universal.carrier(family(coordinate)))) ↦
+        (coordinate : index) ↦ Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ arguments(slot)(coordinate)))))
 
 -- Terms are evaluated coordinatewise. As with the power, this is the whole
 -- content of the construction: every later fact about relations reduces to it.
-theorem Universal.Term.evaluate_dependentProduct {signature : Universal.Signature}
+theorem Universal.Term.evaluate_dependentProduct
         {variables : Type(0)}
         (index : Type(0)) (family : index → Universal.Algebra(signature))
-        (valuation : variables
-                     → Universal.Algebra.carrier(
-                         Universal.Algebra.dependentProduct(index, family)))
+        (valuation : variables → Universal.carrier(Universal.Algebra.dependentProduct(index, family)))
         (subject : Universal.Term(signature, variables))
         (coordinate : index)
-        : Universal.Term.evaluate(
-            Universal.Algebra.dependentProduct(index, family), valuation,
-            subject)(coordinate)
+        : Universal.Term.evaluate(Universal.Algebra.dependentProduct(index, family), valuation, subject)(coordinate)
           = Universal.Term.evaluate(family(coordinate),
               ((name : variables) ↦ valuation(name)(coordinate)), subject) := {
   by induction on subject with inductionHypothesis {
@@ -67,31 +59,18 @@ theorem Universal.Term.evaluate_dependentProduct {signature : Universal.Signatur
         for some (arity : ℕ), (symbol : signature(arity)),
                  (arguments : NaturalsBelow(arity)
                               → Universal.Term(signature, variables)): {
-        ((slot : NaturalsBelow(arity)) ↦
-            Universal.Term.evaluate(
-              Universal.Algebra.dependentProduct(index, family), valuation,
+        ((slot : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(Universal.Algebra.dependentProduct(index, family), valuation,
               arguments(slot))(coordinate))
-          = ((slot : NaturalsBelow(arity)) ↦
-              Universal.Term.evaluate(family(coordinate),
-                ((name : variables) ↦ valuation(name)(coordinate)),
+          = ((slot : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(family(coordinate), ((name : variables) ↦ valuation(name)(coordinate)),
                 arguments(slot)))
           by Function.extensionality;
-        Universal.Term.evaluate(
-            Universal.Algebra.dependentProduct(index, family), valuation,
-            Universal.Term.apply(signature, variables, arity, symbol,
-              arguments))(coordinate)
-          = Universal.Algebra.interpret(arity, symbol,
-              ((slot : NaturalsBelow(arity)) ↦
-                Universal.Term.evaluate(
-                  Universal.Algebra.dependentProduct(index, family), valuation,
-                  arguments(slot))(coordinate)))
-          = Universal.Algebra.interpret(arity, symbol,
-              ((slot : NaturalsBelow(arity)) ↦
-                Universal.Term.evaluate(family(coordinate),
-                  ((name : variables) ↦ valuation(name)(coordinate)),
-                  arguments(slot))))
-          = Universal.Term.evaluate(family(coordinate),
-              ((name : variables) ↦ valuation(name)(coordinate)),
+        Universal.Term.evaluate(Universal.Algebra.dependentProduct(index, family), valuation,
+            Universal.Term.apply(signature, variables, arity, symbol, arguments))(coordinate)
+          = Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(
+                  Universal.Algebra.dependentProduct(index, family), valuation, arguments(slot))(coordinate)))
+          = Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(family(coordinate),
+                  ((name : variables) ↦ valuation(name)(coordinate)), arguments(slot))))
+          = Universal.Term.evaluate(family(coordinate), ((name : variables) ↦ valuation(name)(coordinate)),
               Universal.Term.apply(signature, variables, arity, symbol, arguments));
         done
       }
@@ -102,51 +81,39 @@ theorem Universal.Term.evaluate_dependentProduct {signature : Universal.Signatur
 -- once the family is unfolded — a non-dependent function type IS the dependent
 -- one at a constant motive — so the two constructions never diverge and no
 -- transport is needed between them.
-theorem Universal.Algebra.power_eq_dependentProduct {signature : Universal.Signature}
+theorem Universal.Algebra.power_eq_dependentProduct
         (a : Universal.Algebra(signature)) (index : Type(0))
-        : Universal.Algebra.power(a, index)
-          = Universal.Algebra.dependentProduct(index, ((coordinate : index) ↦ a)) :=
-  done
+        : a ^ index
+          = Universal.Algebra.dependentProduct(index, ((coordinate : index) ↦ a)) := done
 
 -- The box `∏_{i ∈ I} S_i` inside a product: the tuples whose coordinate at
 -- `coordinate` lies in `parts(coordinate)`. This is the shape the essentiality
 -- of the doubling lemma is stated against, where the parts are the different
 -- subuniverses `C, B_1, …, B_n, C'`.
-definition Universal.dependentBox {signature : Universal.Signature}
+definition Universal.dependentBox
         (index : Type(0)) (family : index → Universal.Algebra(signature))
-        (parts : (coordinate : index)
-                 → Set(Universal.Algebra.carrier(family(coordinate))))
-        : Set(Universal.Algebra.carrier(
-            Universal.Algebra.dependentProduct(index, family))) :=
-  (tuple : Universal.Algebra.carrier(
-      Universal.Algebra.dependentProduct(index, family))) ↦
+        (parts : (coordinate : index) → Set(Universal.carrier(family(coordinate))))
+        : Set(Universal.carrier(Universal.Algebra.dependentProduct(index, family))) :=
+  (tuple : Universal.carrier(Universal.Algebra.dependentProduct(index, family))) ↦
     ∀ (coordinate : index). tuple(coordinate) ∈ parts(coordinate)
 
-theorem Universal.IsSubuniverse.dependentBox {signature : Universal.Signature}
+theorem Universal.IsSubuniverse.dependentBox
         (index : Type(0)) (family : index → Universal.Algebra(signature))
-        (parts : (coordinate : index)
-                 → Set(Universal.Algebra.carrier(family(coordinate))))
-        (partsClosed : ∀ (coordinate : index).
-            Universal.IsSubuniverse(family(coordinate), parts(coordinate)))
-        : Universal.IsSubuniverse(
-            Universal.Algebra.dependentProduct(index, family),
+        (parts : (coordinate : index) → Set(Universal.carrier(family(coordinate))))
+        (partsClosed : ∀ (coordinate : index). Universal.IsSubuniverse(family(coordinate), parts(coordinate)))
+        : Universal.IsSubuniverse(Universal.Algebra.dependentProduct(index, family),
             Universal.dependentBox(index, family, parts)) := {
   take arity : ℕ;
   take symbol : signature(arity);
-  take arguments : NaturalsBelow(arity)
-                   → Universal.Algebra.carrier(
-                       Universal.Algebra.dependentProduct(index, family));
-  suppose ∀ (slot : NaturalsBelow(arity)).
-      arguments(slot) ∈ Universal.dependentBox(index, family, parts) as allInside;
+  take arguments : NaturalsBelow(arity) → Universal.carrier(Universal.Algebra.dependentProduct(index, family));
+  suppose ∀ (slot : NaturalsBelow(arity)). arguments(slot) ∈ Universal.dependentBox(index, family, parts) as allInside;
   take coordinate : index;
   Universal.IsSubuniverse(family(coordinate), parts(coordinate)) by partsClosed;
-  ∀ (slot : NaturalsBelow(arity)).
-      arguments(slot)(coordinate) ∈ parts(coordinate)
+  ∀ (slot : NaturalsBelow(arity)). arguments(slot)(coordinate) ∈ parts(coordinate)
       by { take slot : NaturalsBelow(arity);
            ∀ (place : index). arguments(slot)(place) ∈ parts(place) by allInside;
            done };
-  Universal.Algebra.interpret(arity, symbol,
-      ((slot : NaturalsBelow(arity)) ↦ arguments(slot)(coordinate)))
+  Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ arguments(slot)(coordinate)))
       ∈ parts(coordinate);
   done
 }

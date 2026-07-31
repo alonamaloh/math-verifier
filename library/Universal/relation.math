@@ -33,17 +33,19 @@ import Universal.signature
 import Universal.term
 import Universal.product
 
+convention signature : Universal.Signature
+
 -- ── (a) Intersection ──────────────────────────────────────────────────
 
-theorem Universal.IsSubuniverse.intersection {signature : Universal.Signature}
+theorem Universal.IsSubuniverse.intersection
         (a : Universal.Algebra(signature))
-        (left right : Set(Universal.Algebra.carrier(a)))
+        (left right : Set(Universal.carrier(a)))
         (leftClosed : Universal.IsSubuniverse(a, left))
         (rightClosed : Universal.IsSubuniverse(a, right))
         : Universal.IsSubuniverse(a, left ∩ right) := {
   take arity : ℕ;
   take symbol : signature(arity);
-  take arguments : NaturalsBelow(arity) → Universal.Algebra.carrier(a);
+  take arguments : NaturalsBelow(arity) → Universal.carrier(a);
   suppose ∀ (index : NaturalsBelow(arity)). arguments(index) ∈ left ∩ right
       as allInside;
   ∀ (index : NaturalsBelow(arity)). arguments(index) ∈ left
@@ -62,37 +64,31 @@ theorem Universal.IsSubuniverse.intersection {signature : Universal.Signature}
 -- ── (b) The box ∏ Sᵢ ──────────────────────────────────────────────────
 
 -- The tuples whose coordinate at `coordinate` lies in `parts(coordinate)`.
-definition Universal.box {signature : Universal.Signature}
+definition Universal.box
         (a : Universal.Algebra(signature)) (index : Type(0))
-        (parts : index → Set(Universal.Algebra.carrier(a)))
-        : Set(Universal.Algebra.carrier(Universal.Algebra.power(a, index))) :=
-  (tuple : Universal.Algebra.carrier(Universal.Algebra.power(a, index))) ↦
-    ∀ (coordinate : index). tuple(coordinate) ∈ parts(coordinate)
+        (parts : index → Set(Universal.carrier(a)))
+        : Set(Universal.carrier(a ^ index)) :=
+  (tuple : Universal.carrier(a ^ index)) ↦ ∀ (coordinate : index). tuple(coordinate) ∈ parts(coordinate)
 
-theorem Universal.IsSubuniverse.box {signature : Universal.Signature}
+theorem Universal.IsSubuniverse.box
         (a : Universal.Algebra(signature)) (index : Type(0))
-        (parts : index → Set(Universal.Algebra.carrier(a)))
-        (partsClosed : ∀ (coordinate : index).
-            Universal.IsSubuniverse(a, parts(coordinate)))
-        : Universal.IsSubuniverse(Universal.Algebra.power(a, index),
+        (parts : index → Set(Universal.carrier(a)))
+        (partsClosed : ∀ (coordinate : index). Universal.IsSubuniverse(a, parts(coordinate)))
+        : Universal.IsSubuniverse(a ^ index,
             Universal.box(a, index, parts)) := {
   take arity : ℕ;
   take symbol : signature(arity);
-  take arguments : NaturalsBelow(arity)
-                   → Universal.Algebra.carrier(Universal.Algebra.power(a, index));
-  suppose ∀ (slot : NaturalsBelow(arity)).
-      arguments(slot) ∈ Universal.box(a, index, parts) as allInside;
+  take arguments : NaturalsBelow(arity) → Universal.carrier(a ^ index);
+  suppose ∀ (slot : NaturalsBelow(arity)). arguments(slot) ∈ Universal.box(a, index, parts) as allInside;
   take coordinate : index;
   -- At a fixed coordinate the operation is the one of `a`, applied to the
   -- coordinate's entries — each of which lies in `parts(coordinate)`.
   Universal.IsSubuniverse(a, parts(coordinate)) by partsClosed;
-  ∀ (slot : NaturalsBelow(arity)).
-      arguments(slot)(coordinate) ∈ parts(coordinate)
+  ∀ (slot : NaturalsBelow(arity)). arguments(slot)(coordinate) ∈ parts(coordinate)
       by { take slot : NaturalsBelow(arity);
            ∀ (place : index). arguments(slot)(place) ∈ parts(place) by allInside;
            done };
-  Universal.Algebra.interpret(arity, symbol,
-      ((slot : NaturalsBelow(arity)) ↦ arguments(slot)(coordinate)))
+  Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ arguments(slot)(coordinate)))
       ∈ parts(coordinate);
   done
 }
@@ -103,137 +99,105 @@ theorem Universal.IsSubuniverse.box {signature : Universal.Signature}
 -- coordinate up at the place `place` sends it to. For `place` the inclusion of a
 -- subtype this is the restriction `π_J`; for `place` a bijection it is the
 -- reindexing of (e).
-definition Universal.restrict {signature : Universal.Signature}
+definition Universal.restrict
         (a : Universal.Algebra(signature)) (index sub : Type(0))
         (place : sub → index)
-        (tuple : Universal.Algebra.carrier(Universal.Algebra.power(a, index)))
-        : Universal.Algebra.carrier(Universal.Algebra.power(a, sub)) :=
+        (tuple : Universal.carrier(a ^ index))
+        : Universal.carrier(a ^ sub) :=
   (coordinate : sub) ↦ tuple(place(coordinate))
 
 -- Reindexing is a homomorphism of powers. This is the whole content of the
 -- section: (c), (d) and (e) are its image, its preimage, and its bijective case.
-theorem Universal.restrict_interpret {signature : Universal.Signature}
+theorem Universal.restrict_interpret
         (a : Universal.Algebra(signature)) (index sub : Type(0))
         (place : sub → index) (arity : ℕ) (symbol : signature(arity))
-        (arguments : NaturalsBelow(arity)
-                     → Universal.Algebra.carrier(Universal.Algebra.power(a, index)))
-        : Universal.restrict(a, index, sub, place,
-            Universal.Algebra.interpret(arity, symbol, arguments))
-          = Universal.Algebra.interpret(arity, symbol,
-              ((slot : NaturalsBelow(arity)) ↦
+        (arguments : NaturalsBelow(arity) → Universal.carrier(a ^ index))
+        : Universal.restrict(a, index, sub, place, Universal.Algebra.interpret(arity, symbol, arguments))
+          = Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦
                 Universal.restrict(a, index, sub, place, arguments(slot)))) := {
-  ∀ (coordinate : sub).
-      Universal.restrict(a, index, sub, place,
-          Universal.Algebra.interpret(arity, symbol, arguments))(coordinate)
-        = Universal.Algebra.interpret(arity, symbol,
-            ((slot : NaturalsBelow(arity)) ↦
-              Universal.restrict(a, index, sub, place, arguments(slot))))(coordinate)
+  ∀ (coordinate : sub). Universal.restrict(a, index, sub, place, Universal.Algebra.interpret(arity, symbol, arguments))(coordinate)
+        = Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦
+      Universal.restrict(a, index, sub, place, arguments(slot))))(coordinate)
       by { take coordinate : sub;
            done };
   done by Function.extensionality
 }
 
 -- (d) The cylinder `π_J⁻¹(S)`: the tuples whose reindexing lands in `relation`.
-definition Universal.cylinder {signature : Universal.Signature}
+definition Universal.cylinder
         (a : Universal.Algebra(signature)) (index sub : Type(0))
         (place : sub → index)
-        (relation : Set(Universal.Algebra.carrier(Universal.Algebra.power(a, sub))))
-        : Set(Universal.Algebra.carrier(Universal.Algebra.power(a, index))) :=
-  (tuple : Universal.Algebra.carrier(Universal.Algebra.power(a, index))) ↦
-    Universal.restrict(a, index, sub, place, tuple) ∈ relation
+        (relation : Set(Universal.carrier(a ^ sub)))
+        : Set(Universal.carrier(a ^ index)) :=
+  (tuple : Universal.carrier(a ^ index)) ↦ Universal.restrict(a, index, sub, place, tuple) ∈ relation
 
-theorem Universal.IsSubuniverse.cylinder {signature : Universal.Signature}
+theorem Universal.IsSubuniverse.cylinder
         (a : Universal.Algebra(signature)) (index sub : Type(0))
         (place : sub → index)
-        (relation : Set(Universal.Algebra.carrier(Universal.Algebra.power(a, sub))))
-        (closed : Universal.IsSubuniverse(Universal.Algebra.power(a, sub), relation))
-        : Universal.IsSubuniverse(Universal.Algebra.power(a, index),
+        (relation : Set(Universal.carrier(a ^ sub)))
+        (closed : Universal.IsSubuniverse(a ^ sub, relation))
+        : Universal.IsSubuniverse(a ^ index,
             Universal.cylinder(a, index, sub, place, relation)) := {
   take arity : ℕ;
   take symbol : signature(arity);
-  take arguments : NaturalsBelow(arity)
-                   → Universal.Algebra.carrier(Universal.Algebra.power(a, index));
-  suppose ∀ (slot : NaturalsBelow(arity)).
-      arguments(slot) ∈ Universal.cylinder(a, index, sub, place, relation)
+  take arguments : NaturalsBelow(arity) → Universal.carrier(a ^ index);
+  suppose ∀ (slot : NaturalsBelow(arity)). arguments(slot) ∈ Universal.cylinder(a, index, sub, place, relation)
       as allInside;
-  ∀ (slot : NaturalsBelow(arity)).
-      Universal.restrict(a, index, sub, place, arguments(slot)) ∈ relation
-      by allInside;
-  Universal.Algebra.interpret(arity, symbol,
-      ((slot : NaturalsBelow(arity)) ↦
-        Universal.restrict(a, index, sub, place, arguments(slot))))
+  ∀ (slot : NaturalsBelow(arity)). Universal.restrict(a, index, sub, place, arguments(slot)) ∈ relation by allInside;
+  Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ Universal.restrict(a, index, sub, place, arguments(slot))))
       ∈ relation
       by closed;
-  Universal.restrict(a, index, sub, place,
-      Universal.Algebra.interpret(arity, symbol, arguments))
-     = Universal.Algebra.interpret(arity, symbol,
-         ((slot : NaturalsBelow(arity)) ↦
+  Universal.restrict(a, index, sub, place, Universal.Algebra.interpret(arity, symbol, arguments))
+     = Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦
            Universal.restrict(a, index, sub, place, arguments(slot))))
      by Universal.restrict_interpret as reindexed;
   done by substituting reindexed
 }
 
 -- (c) The projection `π_J(R)`: the reindexings of members of `relation`.
-definition Universal.project {signature : Universal.Signature}
+definition Universal.project
         (a : Universal.Algebra(signature)) (index sub : Type(0))
         (place : sub → index)
-        (relation : Set(Universal.Algebra.carrier(Universal.Algebra.power(a, index))))
-        : Set(Universal.Algebra.carrier(Universal.Algebra.power(a, sub))) :=
-  (small : Universal.Algebra.carrier(Universal.Algebra.power(a, sub))) ↦
-    ∃ (big : Universal.Algebra.carrier(Universal.Algebra.power(a, index))).
+        (relation : Set(Universal.carrier(a ^ index)))
+        : Set(Universal.carrier(a ^ sub)) :=
+  (small : Universal.carrier(a ^ sub)) ↦ ∃ (big : Universal.carrier(a ^ index)).
       big ∈ relation ∧ Universal.restrict(a, index, sub, place, big) = small
 
 -- Choice enters exactly here, as it did for the term values: each argument is
 -- the reindexing of SOME member, and an operation needs a whole tuple of them.
-theorem Universal.IsSubuniverse.project {signature : Universal.Signature}
+theorem Universal.IsSubuniverse.project
         (a : Universal.Algebra(signature)) (index sub : Type(0))
         (place : sub → index)
-        (relation : Set(Universal.Algebra.carrier(Universal.Algebra.power(a, index))))
-        (closed : Universal.IsSubuniverse(Universal.Algebra.power(a, index), relation))
-        : Universal.IsSubuniverse(Universal.Algebra.power(a, sub),
+        (relation : Set(Universal.carrier(a ^ index)))
+        (closed : Universal.IsSubuniverse(a ^ index, relation))
+        : Universal.IsSubuniverse(a ^ sub,
             Universal.project(a, index, sub, place, relation)) := {
   take arity : ℕ;
   take symbol : signature(arity);
-  take arguments : NaturalsBelow(arity)
-                   → Universal.Algebra.carrier(Universal.Algebra.power(a, sub));
-  suppose ∀ (slot : NaturalsBelow(arity)).
-      arguments(slot) ∈ Universal.project(a, index, sub, place, relation)
+  take arguments : NaturalsBelow(arity) → Universal.carrier(a ^ sub);
+  suppose ∀ (slot : NaturalsBelow(arity)). arguments(slot) ∈ Universal.project(a, index, sub, place, relation)
       as allProjected;
-  choose lifted such that
-      ∀ (slot : NaturalsBelow(arity)).
-        lifted(slot) ∈ relation
+  choose lifted such that ∀ (slot : NaturalsBelow(arity)). lifted(slot) ∈ relation
         ∧ Universal.restrict(a, index, sub, place, lifted(slot)) = arguments(slot)
-      from NaturalsBelow.choice(
-        Universal.Algebra.carrier(Universal.Algebra.power(a, index)),
-        arity,
-        ((slot : NaturalsBelow(arity)) ↦
-          (candidate : Universal.Algebra.carrier(Universal.Algebra.power(a, index))) ↦
-            candidate ∈ relation
-            ∧ Universal.restrict(a, index, sub, place, candidate) = arguments(slot)),
-        allProjected);
+      from NaturalsBelow.choice(Universal.carrier(a ^ index), arity, ((slot : NaturalsBelow(arity)) ↦
+          (candidate : Universal.carrier(a ^ index)) ↦ candidate ∈ relation
+            ∧ Universal.restrict(a, index, sub, place, candidate) = arguments(slot)), allProjected);
   ∀ (slot : NaturalsBelow(arity)). lifted(slot) ∈ relation
       by { take slot : NaturalsBelow(arity);
-           lifted(slot) ∈ relation
-             ∧ Universal.restrict(a, index, sub, place, lifted(slot))
+           lifted(slot) ∈ relation ∧ Universal.restrict(a, index, sub, place, lifted(slot))
                = arguments(slot);
            done };
   Universal.Algebra.interpret(arity, symbol, lifted) ∈ relation by closed;
-  ∀ (slot : NaturalsBelow(arity)).
-      Universal.restrict(a, index, sub, place, lifted(slot)) = arguments(slot)
+  ∀ (slot : NaturalsBelow(arity)). Universal.restrict(a, index, sub, place, lifted(slot)) = arguments(slot)
       by { take slot : NaturalsBelow(arity);
-           lifted(slot) ∈ relation
-             ∧ Universal.restrict(a, index, sub, place, lifted(slot))
+           lifted(slot) ∈ relation ∧ Universal.restrict(a, index, sub, place, lifted(slot))
                = arguments(slot);
            done };
-  ((slot : NaturalsBelow(arity)) ↦
-      Universal.restrict(a, index, sub, place, lifted(slot)))
+  ((slot : NaturalsBelow(arity)) ↦ Universal.restrict(a, index, sub, place, lifted(slot)))
     = arguments
     by Function.extensionality;
-  Universal.restrict(a, index, sub, place,
-      Universal.Algebra.interpret(arity, symbol, lifted))
-     = Universal.Algebra.interpret(arity, symbol,
-         ((slot : NaturalsBelow(arity)) ↦
-           Universal.restrict(a, index, sub, place, lifted(slot))))
+  Universal.restrict(a, index, sub, place, Universal.Algebra.interpret(arity, symbol, lifted))
+     = Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ Universal.restrict(a, index, sub, place, lifted(slot))))
            by Universal.restrict_interpret
      = Universal.Algebra.interpret(arity, symbol, arguments);
   witness Universal.Algebra.interpret(arity, symbol, lifted)
@@ -244,28 +208,24 @@ theorem Universal.IsSubuniverse.project {signature : Universal.Signature}
 -- The tuples whose coordinate at `slot` lies in `subset`. The blueprint
 -- intersects with a box that is the whole carrier everywhere else; naming the
 -- one constrained coordinate is the same condition and shorter.
-definition Universal.coordinateIn {signature : Universal.Signature}
+definition Universal.coordinateIn
         (a : Universal.Algebra(signature)) (index : Type(0)) (slot : index)
-        (subset : Set(Universal.Algebra.carrier(a)))
-        : Set(Universal.Algebra.carrier(Universal.Algebra.power(a, index))) :=
-  (tuple : Universal.Algebra.carrier(Universal.Algebra.power(a, index))) ↦
-    tuple(slot) ∈ subset
+        (subset : Set(Universal.carrier(a)))
+        : Set(Universal.carrier(a ^ index)) :=
+  (tuple : Universal.carrier(a ^ index)) ↦ tuple(slot) ∈ subset
 
-theorem Universal.IsSubuniverse.coordinateIn {signature : Universal.Signature}
+theorem Universal.IsSubuniverse.coordinateIn
         (a : Universal.Algebra(signature)) (index : Type(0)) (slot : index)
-        (subset : Set(Universal.Algebra.carrier(a)))
+        (subset : Set(Universal.carrier(a)))
         (closed : Universal.IsSubuniverse(a, subset))
-        : Universal.IsSubuniverse(Universal.Algebra.power(a, index),
+        : Universal.IsSubuniverse(a ^ index,
             Universal.coordinateIn(a, index, slot, subset)) := {
   take arity : ℕ;
   take symbol : signature(arity);
-  take arguments : NaturalsBelow(arity)
-                   → Universal.Algebra.carrier(Universal.Algebra.power(a, index));
-  suppose ∀ (place : NaturalsBelow(arity)).
-      arguments(place) ∈ Universal.coordinateIn(a, index, slot, subset)
+  take arguments : NaturalsBelow(arity) → Universal.carrier(a ^ index);
+  suppose ∀ (place : NaturalsBelow(arity)). arguments(place) ∈ Universal.coordinateIn(a, index, slot, subset)
       as allInside;
   ∀ (place : NaturalsBelow(arity)). arguments(place)(slot) ∈ subset by allInside;
-  Universal.Algebra.interpret(arity, symbol,
-      ((place : NaturalsBelow(arity)) ↦ arguments(place)(slot))) ∈ subset;
+  Universal.Algebra.interpret(arity, symbol, ((place : NaturalsBelow(arity)) ↦ arguments(place)(slot))) ∈ subset;
   done
 }

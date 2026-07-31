@@ -30,18 +30,18 @@ import Set.finite_successor
 import Universal.signature
 import Universal.term
 
+convention signature : Universal.Signature
+
 -- ── The index type ────────────────────────────────────────────────────
 
 -- The variables of a star power at depth `depth`: a block choice for each of
 -- the `depth` levels of nesting.
-definition Universal.StarIndex (arity depth : ℕ) : Type(0) :=
-  NaturalsBelow(depth) → NaturalsBelow(arity)
+definition Universal.StarIndex (arity depth : ℕ) : Type(0) := NaturalsBelow(depth) → NaturalsBelow(arity)
 
 -- Depth zero has exactly one index — the empty function — so `t^{*0}` is a
 -- single variable, as the blueprint's `x_∅`.
 definition Universal.emptyStarIndex (arity : ℕ) : Universal.StarIndex(arity, 0) :=
-  (index : NaturalsBelow(0)) ↦
-    False.eliminate(NaturalsBelow(arity), NaturalsBelow.zero_is_empty(index))
+  (index : NaturalsBelow(0)) ↦ False.eliminate(NaturalsBelow(arity), NaturalsBelow.zero_is_empty(index))
 
 -- The block inclusion `ρ^ℓ_j`: prepend the block number `block` to an index one
 -- level shallower. Reading the definition backwards, the block of an index is
@@ -57,8 +57,7 @@ definition Universal.starPrepend (arity depth : ℕ)
         (block : NaturalsBelow(arity))
         (position : Universal.StarIndex(arity, depth))
         (index : NaturalsBelow(1 + depth))
-        : NaturalsBelow(arity) :=
-  if NaturalsBelow.value(index) = 0
+        : NaturalsBelow(arity) := if NaturalsBelow.value(index) = 0
   then block
   else { ¬(NaturalsBelow.value(index) = 0) as nonzero;
          position(NaturalsBelow.dropFirst(index, nonzero)) }
@@ -68,8 +67,7 @@ theorem Universal.starPrepend_first {arity depth : ℕ}
         (block : NaturalsBelow(arity))
         (position : Universal.StarIndex(arity, depth))
         : Universal.starPrepend(arity, depth, block, position, NaturalsBelow.first) = block := {
-  NaturalsBelow.value((NaturalsBelow.first : NaturalsBelow(1 + depth))) = 0
-      by NaturalsBelow.first_value;
+  NaturalsBelow.value((NaturalsBelow.first : NaturalsBelow(1 + depth))) = 0 by NaturalsBelow.first_value;
   done by Logic.if_positive_dependent
 }
 
@@ -79,10 +77,8 @@ theorem Universal.starPrepend_shift {arity depth : ℕ}
         (lower : NaturalsBelow(depth))
         : Universal.starPrepend(arity, depth, block, position, NaturalsBelow.shiftUp(lower))
           = position(lower) := {
-  ¬(NaturalsBelow.value(NaturalsBelow.shiftUp(lower)) = 0)
-      by NaturalsBelow.shiftUp_nonzero as nonzero;
-  NaturalsBelow.dropFirst(NaturalsBelow.shiftUp(lower), nonzero) = lower
-      by NaturalsBelow.dropFirst_shiftUp as dropsBack;
+  ¬(NaturalsBelow.value(NaturalsBelow.shiftUp(lower)) = 0) by NaturalsBelow.shiftUp_nonzero as nonzero;
+  NaturalsBelow.dropFirst(NaturalsBelow.shiftUp(lower), nonzero) = lower by NaturalsBelow.dropFirst_shiftUp as dropsBack;
   Universal.starPrepend(arity, depth, block, position, NaturalsBelow.shiftUp(lower))
      = position(NaturalsBelow.dropFirst(NaturalsBelow.shiftUp(lower), nonzero))
            by Logic.if_negative_dependent
@@ -94,8 +90,7 @@ theorem Universal.starPrepend_shift {arity depth : ℕ}
 -- ── Reading an index back apart ───────────────────────────────────────
 
 definition Universal.starHead (arity depth : ℕ)
-        (index : Universal.StarIndex(arity, 1 + depth)) : NaturalsBelow(arity) :=
-  index(NaturalsBelow.first)
+        (index : Universal.StarIndex(arity, 1 + depth)) : NaturalsBelow(arity) := index(NaturalsBelow.first)
 
 definition Universal.starTail (arity depth : ℕ)
         (index : Universal.StarIndex(arity, 1 + depth))
@@ -112,8 +107,7 @@ theorem Universal.starTail_prepend {arity depth : ℕ}
         (block : NaturalsBelow(arity))
         (position : Universal.StarIndex(arity, depth))
         : Universal.starTail(arity, depth, Universal.starPrepend(arity, depth, block, position)) = position := {
-  ∀ (lower : NaturalsBelow(depth)).
-      Universal.starPrepend(arity, depth, block, position, NaturalsBelow.shiftUp(lower))
+  ∀ (lower : NaturalsBelow(depth)). Universal.starPrepend(arity, depth, block, position, NaturalsBelow.shiftUp(lower))
         = position(lower)
       by Universal.starPrepend_shift;
   done by Function.extensionality
@@ -125,19 +119,16 @@ theorem Universal.starPrepend_head_tail {arity depth : ℕ}
         (index : Universal.StarIndex(arity, 1 + depth))
         : Universal.starPrepend(arity, depth, Universal.starHead(arity, depth, index),
                                 Universal.starTail(arity, depth, index)) = index := {
-  ∀ (subject : NaturalsBelow(1 + depth)).
-      Universal.starPrepend(arity, depth, Universal.starHead(arity, depth, index),
-                            Universal.starTail(arity, depth, index), subject)
+  ∀ (subject : NaturalsBelow(1 + depth)). Universal.starPrepend(arity, depth, Universal.starHead(arity, depth, index),
+      Universal.starTail(arity, depth, index), subject)
         = index(subject)
       by { take subject : NaturalsBelow(1 + depth);
-           subject = NaturalsBelow.first
-             ∨ ∃ (lower : NaturalsBelow(depth)). subject = NaturalsBelow.shiftUp(lower)
+           subject = NaturalsBelow.first ∨ ∃ (lower : NaturalsBelow(depth)). subject = NaturalsBelow.shiftUp(lower)
              by NaturalsBelow.first_or_shift;
            done by cases {
              case subject = NaturalsBelow.first as isFirst: {
-                 Universal.starPrepend(arity, depth, Universal.starHead(arity, depth, index),
-                                       Universal.starTail(arity, depth, index),
-                                       NaturalsBelow.first)
+                 Universal.starPrepend(arity, depth, Universal.starHead(arity, depth, index), Universal.starTail(arity, depth, index),
+                     NaturalsBelow.first)
                     = Universal.starHead(arity, depth, index)
                           by Universal.starPrepend_first
                     = index(NaturalsBelow.first);
@@ -147,9 +138,8 @@ theorem Universal.starPrepend_head_tail {arity depth : ℕ}
                     as isShift: {
                  choose lower such that subject = NaturalsBelow.shiftUp(lower)
                      from isShift;
-                 Universal.starPrepend(arity, depth, Universal.starHead(arity, depth, index),
-                                       Universal.starTail(arity, depth, index),
-                                       NaturalsBelow.shiftUp(lower))
+                 Universal.starPrepend(arity, depth, Universal.starHead(arity, depth, index), Universal.starTail(arity, depth, index),
+                     NaturalsBelow.shiftUp(lower))
                     = Universal.starTail(arity, depth, index, lower)
                           by Universal.starPrepend_shift
                     = index(NaturalsBelow.shiftUp(lower));
@@ -204,18 +194,14 @@ theorem Universal.starPrepend_injective {arity depth : ℕ}
 
 -- `t^{*0}`: the single variable of the one-point index type.
 definition Universal.starBase (signature : Universal.Signature) (arity : ℕ)
-        : Universal.Term(signature, Universal.StarIndex(arity, 0)) :=
-  Universal.Term.variable(signature, Universal.StarIndex(arity, 0),
+        : Universal.Term(signature, Universal.StarIndex(arity, 0)) := Universal.Term.variable(signature, Universal.StarIndex(arity, 0),
     Universal.emptyStarIndex(arity))
 
 theorem Universal.starBase_evaluate (signature : Universal.Signature)
         (arity : ℕ) (a : Universal.Algebra(signature))
-        (valuation : Universal.StarIndex(arity, 0)
-                     → Universal.Algebra.carrier(a))
-        : Universal.Term.evaluate(a, valuation,
-            Universal.starBase(signature, arity))
-          = valuation(Universal.emptyStarIndex(arity)) :=
-  done
+        (valuation : Universal.StarIndex(arity, 0) → Universal.carrier(a))
+        : Universal.Term.evaluate(a, valuation, Universal.starBase(signature, arity))
+          = valuation(Universal.emptyStarIndex(arity)) := done
 
 -- One level: substitute a copy of `inner`, reindexed into block `j`, for the
 -- variable `x_j` of `subject`. Taking `inner` to be the previous level's star
@@ -223,14 +209,9 @@ theorem Universal.starBase_evaluate (signature : Universal.Signature)
 definition Universal.starStep (signature : Universal.Signature) (arity rest : ℕ)
         (subject : Universal.Term(signature, NaturalsBelow(arity)))
         (inner : Universal.Term(signature, Universal.StarIndex(arity, rest)))
-        : Universal.Term(signature, Universal.StarIndex(arity, 1 + rest)) :=
-  Universal.Term.substitute(
-    (block : NaturalsBelow(arity)) ↦
-      Universal.Term.rename(
-        (position : Universal.StarIndex(arity, rest)) ↦
-          Universal.starPrepend(arity, rest, block, position),
-        inner),
-    subject)
+        : Universal.Term(signature, Universal.StarIndex(arity, 1 + rest)) := Universal.Term.substitute(
+    (block : NaturalsBelow(arity)) ↦ Universal.Term.rename(
+        (position : Universal.StarIndex(arity, rest)) ↦ Universal.starPrepend(arity, rest, block, position), inner), subject)
 
 -- The evaluation law, which is the whole content of the construction: one level
 -- evaluates `subject` at the `arity` values obtained by evaluating `inner` on
@@ -240,57 +221,30 @@ theorem Universal.starStep_evaluate (signature : Universal.Signature)
         (a : Universal.Algebra(signature))
         (subject : Universal.Term(signature, NaturalsBelow(arity)))
         (inner : Universal.Term(signature, Universal.StarIndex(arity, rest)))
-        (valuation : Universal.StarIndex(arity, 1 + rest)
-                     → Universal.Algebra.carrier(a))
-        : Universal.Term.evaluate(a, valuation,
-            Universal.starStep(signature, arity, rest, subject, inner))
+        (valuation : Universal.StarIndex(arity, 1 + rest) → Universal.carrier(a))
+        : Universal.Term.evaluate(a, valuation, Universal.starStep(signature, arity, rest, subject, inner))
           = Universal.Term.evaluate(a,
-              (block : NaturalsBelow(arity)) ↦
-                Universal.Term.evaluate(a,
-                  (position : Universal.StarIndex(arity, rest)) ↦
-                    valuation(Universal.starPrepend(arity, rest, block, position)),
-                  inner),
+              (block : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(a,
+                  (position : Universal.StarIndex(arity, rest)) ↦ valuation(Universal.starPrepend(arity, rest, block, position)), inner),
               subject) := {
-  ∀ (block : NaturalsBelow(arity)).
-      Universal.Term.evaluate(a, valuation,
-          Universal.Term.rename(
-            (position : Universal.StarIndex(arity, rest)) ↦
-              Universal.starPrepend(arity, rest, block, position),
-            inner))
+  ∀ (block : NaturalsBelow(arity)). Universal.Term.evaluate(a, valuation, Universal.Term.rename(
+            (position : Universal.StarIndex(arity, rest)) ↦ Universal.starPrepend(arity, rest, block, position), inner))
         = Universal.Term.evaluate(a,
-            (position : Universal.StarIndex(arity, rest)) ↦
-              valuation(Universal.starPrepend(arity, rest, block, position)),
-            inner)
+            (position : Universal.StarIndex(arity, rest)) ↦ valuation(Universal.starPrepend(arity, rest, block, position)), inner)
       by Universal.Term.evaluate_rename;
-  ((block : NaturalsBelow(arity)) ↦
-      Universal.Term.evaluate(a, valuation,
-        Universal.Term.rename(
-          (position : Universal.StarIndex(arity, rest)) ↦
-            Universal.starPrepend(arity, rest, block, position),
-          inner)))
-    = ((block : NaturalsBelow(arity)) ↦
-        Universal.Term.evaluate(a,
-          (position : Universal.StarIndex(arity, rest)) ↦
-            valuation(Universal.starPrepend(arity, rest, block, position)),
-          inner))
+  ((block : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(a, valuation, Universal.Term.rename(
+          (position : Universal.StarIndex(arity, rest)) ↦ Universal.starPrepend(arity, rest, block, position), inner)))
+    = ((block : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(a,
+          (position : Universal.StarIndex(arity, rest)) ↦ valuation(Universal.starPrepend(arity, rest, block, position)), inner))
     by Function.extensionality as blockwise;
-  Universal.Term.evaluate(a, valuation,
-      Universal.starStep(signature, arity, rest, subject, inner))
+  Universal.Term.evaluate(a, valuation, Universal.starStep(signature, arity, rest, subject, inner))
      = Universal.Term.evaluate(a,
-         (block : NaturalsBelow(arity)) ↦
-           Universal.Term.evaluate(a, valuation,
-             Universal.Term.rename(
-               (position : Universal.StarIndex(arity, rest)) ↦
-                 Universal.starPrepend(arity, rest, block, position),
-               inner)),
-         subject)
+         (block : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(a, valuation, Universal.Term.rename(
+               (position : Universal.StarIndex(arity, rest)) ↦ Universal.starPrepend(arity, rest, block, position), inner)), subject)
            by Universal.Term.evaluate_substitute
      = Universal.Term.evaluate(a,
-         (block : NaturalsBelow(arity)) ↦
-           Universal.Term.evaluate(a,
-             (position : Universal.StarIndex(arity, rest)) ↦
-               valuation(Universal.starPrepend(arity, rest, block, position)),
-             inner),
+         (block : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(a,
+             (position : Universal.StarIndex(arity, rest)) ↦ valuation(Universal.starPrepend(arity, rest, block, position)), inner),
          subject)
            by substituting blockwise;
   done

@@ -71,6 +71,7 @@ bool isOperatorSymbolToken(TokenKind kind) {
         case TokenKind::Star:
         case TokenKind::Slash:
         case TokenKind::Caret:
+        case TokenKind::Cross:
         case TokenKind::CenterDot:
         case TokenKind::Bullet:
         case TokenKind::Less:
@@ -3402,6 +3403,7 @@ private:
     SurfaceExpressionPointer parseMultiplicative() {
         auto left = parseUnary();
         while (peek().kind == TokenKind::Star
+               || peek().kind == TokenKind::Cross
                || peek().kind == TokenKind::Slash
                || peek().kind == TokenKind::CenterDot
                || peek().kind == TokenKind::Bullet
@@ -3412,6 +3414,7 @@ private:
             switch (op.kind) {
                 case TokenKind::Intersection: sym = "∩"; break;
                 case TokenKind::Star:      sym = "*"; break;
+                case TokenKind::Cross:     sym = "×"; break;
                 case TokenKind::Slash:     sym = "/"; break;
                 case TokenKind::CenterDot: sym = "·"; break;
                 case TokenKind::Bullet:    sym = "•"; break;

@@ -54,13 +54,15 @@ import Universal.essential
 import Universal.regrouping
 import Universal.clone
 
+convention signature : Universal.Signature
+
 -- ── The critical tuples, and their indexing ───────────────────────────
 
 -- The blueprint's `X`: the tuples with exactly one coordinate outside `subset`.
 -- The distinguished coordinate is the one the regrouping partition blocks by.
-definition Universal.IsCritical {signature : Universal.Signature}
+definition Universal.IsCritical
         (a : Universal.Algebra(signature))
-        (subset : Set(Universal.Algebra.carrier(a))) (arity : ℕ)
+        (subset : Set(Universal.carrier(a))) (arity : ℕ)
         (tuple : Universal.Tuples(a, arity)) : Proposition := ∃ (free : NaturalsBelow(arity)). ¬(tuple(free) ∈ subset)
     ∧ ∀ (other : NaturalsBelow(arity)). ¬(other = free) → tuple(other) ∈ subset
 
@@ -70,16 +72,16 @@ definition Universal.IsCritical {signature : Universal.Signature}
 -- critical tuples as the image of a map out of `NaturalsBelow(count)`. Nothing
 -- is claimed about `count` — only that the map lands on critical tuples and
 -- reaches every one of them.
-theorem Universal.IsCritical.index {signature : Universal.Signature}
+theorem Universal.IsCritical.index
         (a : Universal.Algebra(signature))
-        (subset : Set(Universal.Algebra.carrier(a)))
-        (n : ℕ) (finite : HasSize(Universal.Algebra.carrier(a), n))
+        (subset : Set(Universal.carrier(a)))
+        (n : ℕ) (finite : HasSize(Universal.carrier(a), n))
         (arity : ℕ)
         : ∃ (count : ℕ). ∃ (place : NaturalsBelow(count) → Universal.Tuples(a, arity)). (∀ (k : NaturalsBelow(count)).
                  Universal.IsCritical(a, subset, arity, place(k))) ∧ ∀ (tuple : Universal.Tuples(a, arity)).
                   Universal.IsCritical(a, subset, arity, tuple)
                   → ∃ (k : NaturalsBelow(count)). place(k) = tuple := {
-  HasSize(NaturalsBelow(arity) → Universal.Algebra.carrier(a), n ^ arity) by HasSize.tuples as tuplesFinite;
+  HasSize(NaturalsBelow(arity) → Universal.carrier(a), n ^ arity) by HasSize.tuples as tuplesFinite;
   choose enumerate such that ∃ (decode : NaturalsBelow(n ^ arity) → Universal.Tuples(a, arity)).
         Function.IsInverse(Universal.Tuples(a, arity), NaturalsBelow(n ^ arity), enumerate, decode)
       from tuplesFinite;
@@ -122,9 +124,9 @@ theorem Universal.IsCritical.index {signature : Universal.Signature}
 -- would produce an essential relation of arity `arity` — and what its failure
 -- hands back is a term operation lying inside `subset` on all of `X`.
 
-theorem Universal.IsCritical.inside_of_no_essential {signature : Universal.Signature}
+theorem Universal.IsCritical.inside_of_no_essential
         (a : Universal.Algebra(signature))
-        (subset : Set(Universal.Algebra.carrier(a)))
+        (subset : Set(Universal.carrier(a)))
         (subsetClosed : Universal.IsSubuniverse(a, subset))
         (arity : ℕ)
         (noEssential : ¬Universal.HasEssential(a, subset, arity))
@@ -137,13 +139,12 @@ theorem Universal.IsCritical.inside_of_no_essential {signature : Universal.Signa
         : ∃ (subject : Universal.Term(signature, NaturalsBelow(arity))). ∀ (tuple : Universal.Tuples(a, arity)).
               Universal.IsCritical(a, subset, arity, tuple)
               → Universal.Term.evaluate(a, tuple, subject) ∈ subset := {
-  Universal.IsSubuniverse(Universal.Algebra.power(a, Universal.Tuples(a, arity)), Universal.clone(a, arity))
-      by Universal.IsSubuniverse.clone;
-  Universal.IsSubuniverse(Universal.Algebra.power(a, NaturalsBelow(count)),
+  Universal.IsSubuniverse(a ^ Universal.Tuples(a, arity), Universal.clone(a, arity)) by Universal.IsSubuniverse.clone;
+  Universal.IsSubuniverse(a ^ NaturalsBelow(count),
       Universal.project(a, Universal.Tuples(a, arity), NaturalsBelow(count), place, Universal.clone(a, arity)))
       by Universal.IsSubuniverse.project;
   -- (B1), witnessed by the coordinate projections.
-  ∀ (freeBlock : NaturalsBelow(arity)). ∃ (small : Universal.Algebra.carrier(Universal.Algebra.power(a, NaturalsBelow(count)))).
+  ∀ (freeBlock : NaturalsBelow(arity)). ∃ (small : Universal.carrier(a ^ NaturalsBelow(count))).
         small ∈ Universal.project(a, Universal.Tuples(a, arity), NaturalsBelow(count), place, Universal.clone(a, arity))
         ∧ ∀ (k : NaturalsBelow(count)). ¬(block(k) = freeBlock) → small(k) ∈ subset
       by { take freeBlock : NaturalsBelow(arity);
@@ -169,10 +170,10 @@ theorem Universal.IsCritical.inside_of_no_essential {signature : Universal.Signa
   -- (B2) must fail: were it to hold as well, the relation would be
   -- block-essential — its blocks are populated for that very reason — and
   -- regrouping would produce an essential relation of arity `arity`.
-  ∃ (small : Universal.Algebra.carrier(Universal.Algebra.power(a, NaturalsBelow(count)))).
+  ∃ (small : Universal.carrier(a ^ NaturalsBelow(count))).
       small ∈ Universal.project(a, Universal.Tuples(a, arity), NaturalsBelow(count), place, Universal.clone(a, arity))
       ∧ ∀ (k : NaturalsBelow(count)). small(k) ∈ subset
-      by { suppose ¬(∃ (small : Universal.Algebra.carrier(Universal.Algebra.power(a, NaturalsBelow(count)))).
+      by { suppose ¬(∃ (small : Universal.carrier(a ^ NaturalsBelow(count))).
                      small ∈ Universal.project(a, Universal.Tuples(a, arity), NaturalsBelow(count), place, Universal.clone(a, arity))
                      ∧ ∀ (k : NaturalsBelow(count)). small(k) ∈ subset)
                for contradiction;
@@ -220,15 +221,15 @@ theorem Universal.IsCritical.inside_of_no_essential {signature : Universal.Signa
 -- off their blocks, apply regrouping — and the term that comes back witnesses
 -- because a constrained tuple is either critical or lies wholly inside `subset`.
 
-theorem Universal.exists_witnesses_of_no_essential {signature : Universal.Signature}
+theorem Universal.exists_witnesses_of_no_essential
         (a : Universal.Algebra(signature))
-        (subset : Set(Universal.Algebra.carrier(a)))
+        (subset : Set(Universal.carrier(a)))
         (subsetClosed : Universal.IsSubuniverse(a, subset))
-        (n : ℕ) (finite : HasSize(Universal.Algebra.carrier(a), n))
+        (n : ℕ) (finite : HasSize(Universal.carrier(a), n))
         (arity : ℕ)
         (noEssential : ¬Universal.HasEssential(a, subset, arity))
         : ∃ (subject : Universal.Term(signature, NaturalsBelow(arity))). Universal.Witnesses(a, subset,
-              Set.universe(Universal.Algebra.carrier(a)), subject) := {
+              Universal.universe(a), subject) := {
   -- `X`, indexed by an initial segment.
   choose count such that ∃ (candidate : NaturalsBelow(count) → Universal.Tuples(a, arity)). (∀ (k : NaturalsBelow(count)).
            Universal.IsCritical(a, subset, arity, candidate(k))) ∧ ∀ (tuple : Universal.Tuples(a, arity)).
@@ -253,6 +254,6 @@ theorem Universal.exists_witnesses_of_no_essential {signature : Universal.Signat
       from Universal.IsCritical.inside_of_no_essential;
   ∀ (tuple : Universal.Tuples(a, arity)). Universal.IsCritical(a, subset, arity, tuple)
       → Universal.Term.evaluate(a, tuple, subject) ∈ subset;
-  Universal.Witnesses(a, subset, Set.universe(Universal.Algebra.carrier(a)), subject) by Universal.Witnesses.of_inside_on_critical;
+  Universal.Witnesses(a, subset, Universal.universe(a), subject) by Universal.Witnesses.of_inside_on_critical;
   witness subject
 }

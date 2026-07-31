@@ -35,48 +35,42 @@ import Set.finite
 import Universal.signature
 import Universal.term
 
+convention signature : Universal.Signature
+
 -- ── Witnessing ────────────────────────────────────────────────────────
 
 -- `subject` witnesses that `inner` absorbs `outer`: for each variable, freeing
 -- that one variable to range over `outer` while the rest stay in `inner` keeps
 -- the term's value in `inner`.
-definition Universal.Witnesses {signature : Universal.Signature}
+definition Universal.Witnesses
         {variables : Type(0)}
         (a : Universal.Algebra(signature))
-        (inner outer : Set(Universal.Algebra.carrier(a)))
-        (subject : Universal.Term(signature, variables)) : Proposition :=
-  ∀ (free : variables).
-    ∀ (valuation : variables → Universal.Algebra.carrier(a)).
-      valuation(free) ∈ outer
-      → (∀ (other : variables). ¬(other = free) → valuation(other) ∈ inner)
-      → Universal.Term.evaluate(a, valuation, subject) ∈ inner
+        (inner outer : Set(Universal.carrier(a)))
+        (subject : Universal.Term(signature, variables)) : Proposition := ∀ (free : variables).
+    ∀ (valuation : variables → Universal.carrier(a)). valuation(free) ∈ outer
+      → (∀ (other : variables). ¬(other = free) → valuation(other) ∈ inner) → Universal.Term.evaluate(a, valuation, subject) ∈ inner
 
 -- `inner ◅ outer`: witnessed by a term of some positive numeric arity.
-definition Universal.Absorbs {signature : Universal.Signature}
+definition Universal.Absorbs
         (a : Universal.Algebra(signature))
-        (inner outer : Set(Universal.Algebra.carrier(a))) : Proposition :=
-  ∃ (arity : ℕ).
-    1 ≤ arity
-    ∧ ∃ (subject : Universal.Term(signature, NaturalsBelow(arity))).
-        Universal.Witnesses(a, inner, outer, subject)
+        (inner outer : Set(Universal.carrier(a))) : Proposition := ∃ (arity : ℕ). 1 ≤ arity
+    ∧ ∃ (subject : Universal.Term(signature, NaturalsBelow(arity))). Universal.Witnesses(a, inner, outer, subject)
 
 -- `inner ◅_bin outer`: witnessed by a binary term.
-definition Universal.BinaryAbsorbs {signature : Universal.Signature}
+definition Universal.BinaryAbsorbs
         (a : Universal.Algebra(signature))
-        (inner outer : Set(Universal.Algebra.carrier(a))) : Proposition :=
-  ∃ (subject : Universal.Term(signature, NaturalsBelow(2))).
+        (inner outer : Set(Universal.carrier(a))) : Proposition := ∃ (subject : Universal.Term(signature, NaturalsBelow(2))).
     Universal.Witnesses(a, inner, outer, subject)
 
-theorem Universal.BinaryAbsorbs.absorbs {signature : Universal.Signature}
+theorem Universal.BinaryAbsorbs.absorbs
         (a : Universal.Algebra(signature))
-        (inner outer : Set(Universal.Algebra.carrier(a)))
+        (inner outer : Set(Universal.carrier(a)))
         (binary : Universal.BinaryAbsorbs(a, inner, outer))
         : Universal.Absorbs(a, inner, outer) := {
   choose subject such that Universal.Witnesses(a, inner, outer, subject)
       from binary;
   (1 : ℕ) ≤ 2;
-  ∃ (candidate : Universal.Term(signature, NaturalsBelow(2))).
-      Universal.Witnesses(a, inner, outer, candidate)
+  ∃ (candidate : Universal.Term(signature, NaturalsBelow(2))). Universal.Witnesses(a, inner, outer, candidate)
       by { witness subject };
   witness 2
 }
@@ -86,10 +80,10 @@ theorem Universal.BinaryAbsorbs.absorbs {signature : Universal.Signature}
 -- Transporting a witness along a bijection of variable types. The blueprint's
 -- Lemma 2.2: it is what lets a witness be built over whatever index type the
 -- construction hands you and only afterwards be given a numeric arity.
-theorem Universal.Witnesses.rename {signature : Universal.Signature}
+theorem Universal.Witnesses.rename
         {source : Type(0)} {target : Type(0)}
         (a : Universal.Algebra(signature))
-        (inner outer : Set(Universal.Algebra.carrier(a)))
+        (inner outer : Set(Universal.carrier(a)))
         (forward : source → target) (backward : target → source)
         (afterBackward : ∀ (name : target). forward(backward(name)) = name)
         (afterForward : ∀ (name : source). backward(forward(name)) = name)
@@ -98,7 +92,7 @@ theorem Universal.Witnesses.rename {signature : Universal.Signature}
         : Universal.Witnesses(a, inner, outer,
             Universal.Term.rename(forward, subject)) := {
   take free : target;
-  take valuation : target → Universal.Algebra.carrier(a);
+  take valuation : target → Universal.carrier(a);
   suppose valuation(free) ∈ outer as freeInOuter;
   suppose ∀ (other : target). ¬(other = free) → valuation(other) ∈ inner
       as othersInner;
@@ -120,8 +114,7 @@ theorem Universal.Witnesses.rename {signature : Universal.Signature}
   Universal.Term.evaluate(a,
       (name : source) ↦ valuation(forward(name)), subject) ∈ inner
       by witnesses;
-  Universal.Term.evaluate(a, valuation,
-      Universal.Term.rename(forward, subject))
+  Universal.Term.evaluate(a, valuation, Universal.Term.rename(forward, subject))
      = Universal.Term.evaluate(a,
          (name : source) ↦ valuation(forward(name)), subject)
      by Universal.Term.evaluate_rename;
@@ -130,23 +123,20 @@ theorem Universal.Witnesses.rename {signature : Universal.Signature}
 
 -- A witness over any variable type in bijection with `NaturalsBelow(arity)`
 -- gives absorption. This is the only place the numeric arity is recovered.
-theorem Universal.Absorbs.of_renaming {signature : Universal.Signature}
+theorem Universal.Absorbs.of_renaming
         {variables : Type(0)}
         (a : Universal.Algebra(signature))
-        (inner outer : Set(Universal.Algebra.carrier(a)))
+        (inner outer : Set(Universal.carrier(a)))
         (arity : ℕ) (positive : 1 ≤ arity)
         (forward : variables → NaturalsBelow(arity))
         (backward : NaturalsBelow(arity) → variables)
-        (afterBackward : ∀ (index : NaturalsBelow(arity)).
-            forward(backward(index)) = index)
+        (afterBackward : ∀ (index : NaturalsBelow(arity)). forward(backward(index)) = index)
         (afterForward : ∀ (name : variables). backward(forward(name)) = name)
         (subject : Universal.Term(signature, variables))
         (witnesses : Universal.Witnesses(a, inner, outer, subject))
         : Universal.Absorbs(a, inner, outer) := {
-  Universal.Witnesses(a, inner, outer, Universal.Term.rename(forward, subject))
-      by Universal.Witnesses.rename;
-  ∃ (candidate : Universal.Term(signature, NaturalsBelow(arity))).
-      Universal.Witnesses(a, inner, outer, candidate)
+  Universal.Witnesses(a, inner, outer, Universal.Term.rename(forward, subject)) by Universal.Witnesses.rename;
+  ∃ (candidate : Universal.Term(signature, NaturalsBelow(arity))). Universal.Witnesses(a, inner, outer, candidate)
       by { witness Universal.Term.rename(forward, subject) };
   witness arity
 }
@@ -157,34 +147,27 @@ theorem Universal.Absorbs.of_renaming {signature : Universal.Signature}
 -- `left`, `right` of feeding a two-element tuple into the term, agreeing on
 -- `subset` and disagreeing at the distinguished coordinate — `left` takes the
 -- first entry there, `right` the second.
-definition Universal.IsTaylorIdentity {signature : Universal.Signature}
+definition Universal.IsTaylorIdentity
         (a : Universal.Algebra(signature))
-        (subset : Set(Universal.Algebra.carrier(a)))
+        (subset : Set(Universal.carrier(a)))
         (arity : ℕ)
         (subject : Universal.Term(signature, NaturalsBelow(arity)))
         (coordinate : NaturalsBelow(arity))
-        (left right : NaturalsBelow(arity) → NaturalsBelow(2)) : Proposition :=
-  NaturalsBelow.value(left(coordinate)) = 0
-  ∧ NaturalsBelow.value(right(coordinate)) = 1
-  ∧ ∀ (pair : NaturalsBelow(2) → Universal.Algebra.carrier(a)).
-      (∀ (index : NaturalsBelow(2)). pair(index) ∈ subset)
-      → Universal.Term.evaluate(a,
+        (left right : NaturalsBelow(arity) → NaturalsBelow(2)) : Proposition := NaturalsBelow.value(left(coordinate)) = 0
+  ∧ NaturalsBelow.value(right(coordinate)) = 1 ∧ ∀ (pair : NaturalsBelow(2) → Universal.carrier(a)).
+      (∀ (index : NaturalsBelow(2)). pair(index) ∈ subset) → Universal.Term.evaluate(a,
             (index : NaturalsBelow(arity)) ↦ pair(left(index)), subject)
         = Universal.Term.evaluate(a,
             (index : NaturalsBelow(arity)) ↦ pair(right(index)), subject)
 
 -- `subject` is Taylor on `subset`: an identity at every coordinate.
-definition Universal.IsTaylorOn {signature : Universal.Signature}
+definition Universal.IsTaylorOn
         (a : Universal.Algebra(signature))
-        (subset : Set(Universal.Algebra.carrier(a)))
+        (subset : Set(Universal.carrier(a)))
         (arity : ℕ)
         (subject : Universal.Term(signature, NaturalsBelow(arity)))
-        : Proposition :=
-  ∀ (coordinate : NaturalsBelow(arity)).
-    ∃ (left : NaturalsBelow(arity) → NaturalsBelow(2)).
-      ∃ (right : NaturalsBelow(arity) → NaturalsBelow(2)).
-        Universal.IsTaylorIdentity(a, subset, arity, subject, coordinate,
-                                   left, right)
+        : Proposition := ∀ (coordinate : NaturalsBelow(arity)). ∃ (left : NaturalsBelow(arity) → NaturalsBelow(2)).
+      ∃ (right : NaturalsBelow(arity) → NaturalsBelow(2)). Universal.IsTaylorIdentity(a, subset, arity, subject, coordinate, left, right)
 
 -- ── One-sided closure gives binary absorption ─────────────────────────
 
@@ -198,30 +181,25 @@ definition Universal.IsTaylorOn {signature : Universal.Signature}
 -- first instead puts an element of `outer` at the distinguished coordinate,
 -- where closure says nothing — so the identity switches to the `right` form,
 -- which reads the second variable there, and closure applies to that.
-theorem Universal.BinaryAbsorbs.of_one_sided {signature : Universal.Signature}
+theorem Universal.BinaryAbsorbs.of_one_sided
         (a : Universal.Algebra(signature))
-        (inner outer : Set(Universal.Algebra.carrier(a)))
+        (inner outer : Set(Universal.carrier(a)))
         (nested : inner ⊆ outer)
         (arity : ℕ)
         (subject : Universal.Term(signature, NaturalsBelow(arity)))
         (coordinate : NaturalsBelow(arity))
         (left right : NaturalsBelow(arity) → NaturalsBelow(2))
-        (identity : Universal.IsTaylorIdentity(a, outer, arity, subject,
-                                               coordinate, left, right))
-        (oneSided : ∀ (valuation : NaturalsBelow(arity)
-                                   → Universal.Algebra.carrier(a)).
-            valuation(coordinate) ∈ inner
-            → (∀ (index : NaturalsBelow(arity)).
-                 ¬(index = coordinate) → valuation(index) ∈ outer)
+        (identity : Universal.IsTaylorIdentity(a, outer, arity, subject, coordinate, left, right))
+        (oneSided : ∀ (valuation : NaturalsBelow(arity) → Universal.carrier(a)). valuation(coordinate) ∈ inner
+            → (∀ (index : NaturalsBelow(arity)). ¬(index = coordinate) → valuation(index) ∈ outer)
             → Universal.Term.evaluate(a, valuation, subject) ∈ inner)
         : Universal.BinaryAbsorbs(a, inner, outer) := {
   Universal.Witnesses(a, inner, outer, Universal.Term.rename(left, subject))
       by {
         take free : NaturalsBelow(2);
-        take valuation : NaturalsBelow(2) → Universal.Algebra.carrier(a);
+        take valuation : NaturalsBelow(2) → Universal.carrier(a);
         suppose valuation(free) ∈ outer as freeInOuter;
-        suppose ∀ (other : NaturalsBelow(2)).
-            ¬(other = free) → valuation(other) ∈ inner as othersInner;
+        suppose ∀ (other : NaturalsBelow(2)). ¬(other = free) → valuation(other) ∈ inner as othersInner;
         -- Both entries lie in `outer`: the free one by hypothesis, the other
         -- because `inner ⊆ outer`.
         ∀ (index : NaturalsBelow(2)). valuation(index) ∈ outer
@@ -233,16 +211,13 @@ theorem Universal.BinaryAbsorbs.of_one_sided {signature : Universal.Signature}
                        done
                      }
                  } } as bothInOuter;
-        Universal.Term.evaluate(a, valuation,
-            Universal.Term.rename(left, subject))
+        Universal.Term.evaluate(a, valuation, Universal.Term.rename(left, subject))
            = Universal.Term.evaluate(a,
                (index : NaturalsBelow(arity)) ↦ valuation(left(index)), subject)
            by Universal.Term.evaluate_rename as leftIsTheTerm;
         NaturalsBelow.value(left(coordinate)) = 0;
         NaturalsBelow.value(right(coordinate)) = 1;
-        ∀ (pair : NaturalsBelow(2) → Universal.Algebra.carrier(a)).
-            (∀ (index : NaturalsBelow(2)). pair(index) ∈ outer)
-            → Universal.Term.evaluate(a,
+        ∀ (pair : NaturalsBelow(2) → Universal.carrier(a)). (∀ (index : NaturalsBelow(2)). pair(index) ∈ outer) → Universal.Term.evaluate(a,
                   (index : NaturalsBelow(arity)) ↦ pair(left(index)), subject)
               = Universal.Term.evaluate(a,
                   (index : NaturalsBelow(arity)) ↦ pair(right(index)), subject)
@@ -261,24 +236,19 @@ theorem Universal.BinaryAbsorbs.of_one_sided {signature : Universal.Signature}
                        done };
               ¬(right(coordinate) = free) by NaturalsBelow.ne_of_value_ne;
               valuation(right(coordinate)) ∈ inner by othersInner;
-              ∀ (index : NaturalsBelow(arity)).
-                  ¬(index = coordinate) → valuation(right(index)) ∈ outer
+              ∀ (index : NaturalsBelow(arity)). ¬(index = coordinate) → valuation(right(index)) ∈ outer
                   by { take index : NaturalsBelow(arity);
                        suppose ¬(index = coordinate);
                        done by bothInOuter };
               Universal.Term.evaluate(a,
-                  (index : NaturalsBelow(arity)) ↦ valuation(right(index)),
-                  subject) ∈ inner
+                  (index : NaturalsBelow(arity)) ↦ valuation(right(index)), subject) ∈ inner
                   by oneSided;
-              Universal.Term.evaluate(a, valuation,
-                  Universal.Term.rename(left, subject))
+              Universal.Term.evaluate(a, valuation, Universal.Term.rename(left, subject))
                  = Universal.Term.evaluate(a,
-                     (index : NaturalsBelow(arity)) ↦ valuation(left(index)),
-                     subject)
+                     (index : NaturalsBelow(arity)) ↦ valuation(left(index)), subject)
                        by leftIsTheTerm
                  = Universal.Term.evaluate(a,
-                     (index : NaturalsBelow(arity)) ↦ valuation(right(index)),
-                     subject)
+                     (index : NaturalsBelow(arity)) ↦ valuation(right(index)), subject)
                        by taylorLaw
                  as termIsRightForm;
               done by substituting termIsRightForm
@@ -295,14 +265,12 @@ theorem Universal.BinaryAbsorbs.of_one_sided {signature : Universal.Signature}
                        done };
               ¬(left(coordinate) = free) by NaturalsBelow.ne_of_value_ne;
               valuation(left(coordinate)) ∈ inner by othersInner;
-              ∀ (index : NaturalsBelow(arity)).
-                  ¬(index = coordinate) → valuation(left(index)) ∈ outer
+              ∀ (index : NaturalsBelow(arity)). ¬(index = coordinate) → valuation(left(index)) ∈ outer
                   by { take index : NaturalsBelow(arity);
                        suppose ¬(index = coordinate);
                        done by bothInOuter };
               Universal.Term.evaluate(a,
-                  (index : NaturalsBelow(arity)) ↦ valuation(left(index)),
-                  subject) ∈ inner
+                  (index : NaturalsBelow(arity)) ↦ valuation(left(index)), subject) ∈ inner
                   by oneSided;
               done by substituting leftIsTheTerm
             }

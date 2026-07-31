@@ -24,30 +24,28 @@ import Set.finite
 import Universal.signature
 import Universal.term
 
+convention signature : Universal.Signature
+
 -- The power `a ^ index`: functions from `index` into the carrier, with the
 -- operations applied at each coordinate.
-definition Universal.Algebra.power {signature : Universal.Signature}
+definition Universal.Algebra.power
         (a : Universal.Algebra(signature)) (index : Type(0))
-        : Universal.Algebra(signature) :=
-  Universal.Algebra.make(signature,
-    index → Universal.Algebra.carrier(a),
+        : Universal.Algebra(signature) := Universal.Algebra.make(signature, index → Universal.carrier(a),
     ((arity : ℕ) ↦ (symbol : signature(arity)) ↦
-      (arguments : NaturalsBelow(arity) → (index → Universal.Algebra.carrier(a))) ↦
-        (coordinate : index) ↦
-          Universal.Algebra.interpret(arity, symbol,
-            ((slot : NaturalsBelow(arity)) ↦ arguments(slot)(coordinate)))))
+      (arguments : NaturalsBelow(arity) → (index → Universal.carrier(a))) ↦
+        (coordinate : index) ↦ Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ arguments(slot)(coordinate)))))
+operator (^) on (Universal.Algebra, _) := Universal.Algebra.power
+
 
 -- Terms are evaluated coordinatewise in a power. This is the whole content of
 -- the power construction: every later fact about relations reduces to it.
-theorem Universal.Term.evaluate_power {signature : Universal.Signature}
+theorem Universal.Term.evaluate_power
         {variables : Type(0)}
         (a : Universal.Algebra(signature)) (index : Type(0))
-        (valuation : variables
-                     → Universal.Algebra.carrier(Universal.Algebra.power(a, index)))
+        (valuation : variables → Universal.carrier(a ^ index))
         (subject : Universal.Term(signature, variables))
         (coordinate : index)
-        : Universal.Term.evaluate(Universal.Algebra.power(a, index), valuation,
-            subject)(coordinate)
+        : Universal.Term.evaluate(a ^ index, valuation, subject)(coordinate)
           = Universal.Term.evaluate(a,
               ((name : variables) ↦ valuation(name)(coordinate)), subject) := {
   by induction on subject with inductionHypothesis {
@@ -56,60 +54,44 @@ theorem Universal.Term.evaluate_power {signature : Universal.Signature}
         for some (arity : ℕ), (symbol : signature(arity)),
                  (arguments : NaturalsBelow(arity)
                               → Universal.Term(signature, variables)): {
-        ((slot : NaturalsBelow(arity)) ↦
-            Universal.Term.evaluate(Universal.Algebra.power(a, index), valuation,
-              arguments(slot))(coordinate))
-          = ((slot : NaturalsBelow(arity)) ↦
-              Universal.Term.evaluate(a,
-                ((name : variables) ↦ valuation(name)(coordinate)),
+        ((slot : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(a ^ index, valuation, arguments(slot))(coordinate))
+          = ((slot : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(a, ((name : variables) ↦ valuation(name)(coordinate)),
                 arguments(slot)))
           by Function.extensionality;
-        Universal.Term.evaluate(Universal.Algebra.power(a, index), valuation,
-            Universal.Term.apply(signature, variables, arity, symbol,
-              arguments))(coordinate)
-          = Universal.Algebra.interpret(arity, symbol,
-              ((slot : NaturalsBelow(arity)) ↦
-                Universal.Term.evaluate(Universal.Algebra.power(a, index),
+        Universal.Term.evaluate(a ^ index, valuation, Universal.Term.apply(signature, variables, arity, symbol, arguments))(coordinate)
+          = Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(a ^ index,
                   valuation, arguments(slot))(coordinate)))
-          = Universal.Algebra.interpret(arity, symbol,
-              ((slot : NaturalsBelow(arity)) ↦
-                Universal.Term.evaluate(a,
-                  ((name : variables) ↦ valuation(name)(coordinate)),
-                  arguments(slot))))
-          = Universal.Term.evaluate(a,
-              ((name : variables) ↦ valuation(name)(coordinate)),
+          = Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(a,
+                  ((name : variables) ↦ valuation(name)(coordinate)), arguments(slot))))
+          = Universal.Term.evaluate(a, ((name : variables) ↦ valuation(name)(coordinate)),
               Universal.Term.apply(signature, variables, arity, symbol, arguments));
         done
       }
   }
 }
 
+-- `𝔸 ^ X` and `𝔸 * 𝔹`, the blueprint's notation for the power and the binary
+-- product. (`×` is not a token the lexer knows; `*` is the nearest available.)
+
 -- The binary product `a × b`.
-definition Universal.Algebra.product {signature : Universal.Signature}
-        (a b : Universal.Algebra(signature)) : Universal.Algebra(signature) :=
-  Universal.Algebra.make(signature,
-    Product(Universal.Algebra.carrier(a), Universal.Algebra.carrier(b)),
-    ((arity : ℕ) ↦ (symbol : signature(arity)) ↦
-      (arguments : NaturalsBelow(arity)
-                   → Product(Universal.Algebra.carrier(a),
-                             Universal.Algebra.carrier(b))) ↦
-        Product.make(Universal.Algebra.carrier(a), Universal.Algebra.carrier(b),
-          Universal.Algebra.interpret(arity, symbol,
-            ((slot : NaturalsBelow(arity)) ↦ Product.first(arguments(slot)))),
-          Universal.Algebra.interpret(arity, symbol,
+definition Universal.Algebra.product
+        (a b : Universal.Algebra(signature)) : Universal.Algebra(signature) := Universal.Algebra.make(signature,
+    Product(Universal.carrier(a), Universal.carrier(b)), ((arity : ℕ) ↦ (symbol : signature(arity)) ↦
+      (arguments : NaturalsBelow(arity) → Product(Universal.carrier(a), Universal.carrier(b))) ↦
+        Product.make(Universal.carrier(a), Universal.carrier(b), Universal.Algebra.interpret(arity, symbol,
+            ((slot : NaturalsBelow(arity)) ↦ Product.first(arguments(slot)))), Universal.Algebra.interpret(arity, symbol,
             ((slot : NaturalsBelow(arity)) ↦ Product.second(arguments(slot)))))))
+operator (×) on (Universal.Algebra, Universal.Algebra) := Universal.Algebra.product
+
 
 -- Terms are evaluated coordinatewise in a binary product too, one lemma per
 -- projection.
-theorem Universal.Term.first_evaluate_product {signature : Universal.Signature}
+theorem Universal.Term.first_evaluate_product
         {variables : Type(0)}
         (a b : Universal.Algebra(signature))
-        (valuation : variables
-                     → Universal.Algebra.carrier(Universal.Algebra.product(a, b)))
+        (valuation : variables → Universal.carrier(a × b))
         (subject : Universal.Term(signature, variables))
-        : Product.first(
-            Universal.Term.evaluate(Universal.Algebra.product(a, b), valuation,
-              subject))
+        : Product.first(Universal.Term.evaluate(a × b, valuation, subject))
           = Universal.Term.evaluate(a,
               ((name : variables) ↦ Product.first(valuation(name))), subject) := {
   by induction on subject with inductionHypothesis {
@@ -118,45 +100,28 @@ theorem Universal.Term.first_evaluate_product {signature : Universal.Signature}
         for some (arity : ℕ), (symbol : signature(arity)),
                  (arguments : NaturalsBelow(arity)
                               → Universal.Term(signature, variables)): {
-        ((slot : NaturalsBelow(arity)) ↦
-            Product.first(
-              Universal.Term.evaluate(Universal.Algebra.product(a, b), valuation,
-                arguments(slot))))
-          = ((slot : NaturalsBelow(arity)) ↦
-              Universal.Term.evaluate(a,
-                ((name : variables) ↦ Product.first(valuation(name))),
+        ((slot : NaturalsBelow(arity)) ↦ Product.first(Universal.Term.evaluate(a × b, valuation, arguments(slot))))
+          = ((slot : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(a, ((name : variables) ↦ Product.first(valuation(name))),
                 arguments(slot)))
           by Function.extensionality;
-        Product.first(
-            Universal.Term.evaluate(Universal.Algebra.product(a, b), valuation,
-              Universal.Term.apply(signature, variables, arity, symbol, arguments)))
-          = Universal.Algebra.interpret(arity, symbol,
-              ((slot : NaturalsBelow(arity)) ↦
-                Product.first(
-                  Universal.Term.evaluate(Universal.Algebra.product(a, b),
-                    valuation, arguments(slot)))))
-          = Universal.Algebra.interpret(arity, symbol,
-              ((slot : NaturalsBelow(arity)) ↦
-                Universal.Term.evaluate(a,
-                  ((name : variables) ↦ Product.first(valuation(name))),
-                  arguments(slot))))
-          = Universal.Term.evaluate(a,
-              ((name : variables) ↦ Product.first(valuation(name))),
+        Product.first(Universal.Term.evaluate(a × b, valuation, Universal.Term.apply(signature, variables, arity, symbol, arguments)))
+          = Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ Product.first(Universal.Term.evaluate(a × b,
+            valuation, arguments(slot)))))
+          = Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(a,
+                  ((name : variables) ↦ Product.first(valuation(name))), arguments(slot))))
+          = Universal.Term.evaluate(a, ((name : variables) ↦ Product.first(valuation(name))),
               Universal.Term.apply(signature, variables, arity, symbol, arguments));
         done
       }
   }
 }
 
-theorem Universal.Term.second_evaluate_product {signature : Universal.Signature}
+theorem Universal.Term.second_evaluate_product
         {variables : Type(0)}
         (a b : Universal.Algebra(signature))
-        (valuation : variables
-                     → Universal.Algebra.carrier(Universal.Algebra.product(a, b)))
+        (valuation : variables → Universal.carrier(a × b))
         (subject : Universal.Term(signature, variables))
-        : Product.second(
-            Universal.Term.evaluate(Universal.Algebra.product(a, b), valuation,
-              subject))
+        : Product.second(Universal.Term.evaluate(a × b, valuation, subject))
           = Universal.Term.evaluate(b,
               ((name : variables) ↦ Product.second(valuation(name))), subject) := {
   by induction on subject with inductionHypothesis {
@@ -165,30 +130,16 @@ theorem Universal.Term.second_evaluate_product {signature : Universal.Signature}
         for some (arity : ℕ), (symbol : signature(arity)),
                  (arguments : NaturalsBelow(arity)
                               → Universal.Term(signature, variables)): {
-        ((slot : NaturalsBelow(arity)) ↦
-            Product.second(
-              Universal.Term.evaluate(Universal.Algebra.product(a, b), valuation,
-                arguments(slot))))
-          = ((slot : NaturalsBelow(arity)) ↦
-              Universal.Term.evaluate(b,
-                ((name : variables) ↦ Product.second(valuation(name))),
+        ((slot : NaturalsBelow(arity)) ↦ Product.second(Universal.Term.evaluate(a × b, valuation, arguments(slot))))
+          = ((slot : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(b, ((name : variables) ↦ Product.second(valuation(name))),
                 arguments(slot)))
           by Function.extensionality;
-        Product.second(
-            Universal.Term.evaluate(Universal.Algebra.product(a, b), valuation,
-              Universal.Term.apply(signature, variables, arity, symbol, arguments)))
-          = Universal.Algebra.interpret(arity, symbol,
-              ((slot : NaturalsBelow(arity)) ↦
-                Product.second(
-                  Universal.Term.evaluate(Universal.Algebra.product(a, b),
-                    valuation, arguments(slot)))))
-          = Universal.Algebra.interpret(arity, symbol,
-              ((slot : NaturalsBelow(arity)) ↦
-                Universal.Term.evaluate(b,
-                  ((name : variables) ↦ Product.second(valuation(name))),
-                  arguments(slot))))
-          = Universal.Term.evaluate(b,
-              ((name : variables) ↦ Product.second(valuation(name))),
+        Product.second(Universal.Term.evaluate(a × b, valuation, Universal.Term.apply(signature, variables, arity, symbol, arguments)))
+          = Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ Product.second(Universal.Term.evaluate(a × b,
+            valuation, arguments(slot)))))
+          = Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(b,
+                  ((name : variables) ↦ Product.second(valuation(name))), arguments(slot))))
+          = Universal.Term.evaluate(b, ((name : variables) ↦ Product.second(valuation(name))),
               Universal.Term.apply(signature, variables, arity, symbol, arguments));
         done
       }

@@ -25,91 +25,70 @@ import Set.subtype
 import Set.finite
 import Universal.signature
 
+convention signature : Universal.Signature
+
 -- A variable, or an operation symbol applied to a tuple of terms.
 inductive Universal.Term (signature : Universal.Signature) (variables : Type(0))
         : Type(0) where
   | Universal.Term.variable
       : (name : variables) → Universal.Term(signature, variables)
   | Universal.Term.apply
-      : (arity : ℕ)
-        → (symbol : signature(arity))
-        → (arguments : NaturalsBelow(arity) → Universal.Term(signature, variables))
+      : (arity : ℕ) → (symbol : signature(arity)) → (arguments : NaturalsBelow(arity) → Universal.Term(signature, variables))
         → Universal.Term(signature, variables)
 
 -- The value of a term under a valuation of its variables.
-definition Universal.Term.evaluate {signature : Universal.Signature}
+definition Universal.Term.evaluate
         {variables : Type(0)} (a : Universal.Algebra(signature))
-        (valuation : variables → Universal.Algebra.carrier(a))
-        : Universal.Term(signature, variables) → Universal.Algebra.carrier(a)
+        (valuation : variables → Universal.carrier(a))
+        : Universal.Term(signature, variables) → Universal.carrier(a)
   | Universal.Term.variable(name) => valuation(name)
   | Universal.Term.apply(arity, symbol, arguments) =>
       Universal.Algebra.interpret(arity, symbol,
-        (index : NaturalsBelow(arity)) ↦
-          Universal.Term.evaluate(a, valuation, arguments(index)))
+        (index : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(a, valuation, arguments(index)))
 
 -- Replace every variable by a term.
-definition Universal.Term.substitute {signature : Universal.Signature}
+definition Universal.Term.substitute
         {source : Type(0)} {target : Type(0)}
         (assignment : source → Universal.Term(signature, target))
         : Universal.Term(signature, source) → Universal.Term(signature, target)
   | Universal.Term.variable(name) => assignment(name)
   | Universal.Term.apply(arity, symbol, arguments) =>
       Universal.Term.apply(signature, target, arity, symbol,
-        (index : NaturalsBelow(arity)) ↦
-          Universal.Term.substitute(assignment, arguments(index)))
+        (index : NaturalsBelow(arity)) ↦ Universal.Term.substitute(assignment, arguments(index)))
 
 -- Evaluating a substituted term is evaluating the original under the valuation
 -- that first evaluates each assigned term.
-theorem Universal.Term.evaluate_substitute {signature : Universal.Signature}
+theorem Universal.Term.evaluate_substitute
         {source : Type(0)} {target : Type(0)}
         (a : Universal.Algebra(signature))
         (assignment : source → Universal.Term(signature, target))
-        (valuation : target → Universal.Algebra.carrier(a))
+        (valuation : target → Universal.carrier(a))
         (subject : Universal.Term(signature, source))
-        : Universal.Term.evaluate(a, valuation,
-            Universal.Term.substitute(assignment, subject))
+        : Universal.Term.evaluate(a, valuation, Universal.Term.substitute(assignment, subject))
           = Universal.Term.evaluate(a,
-              (name : source) ↦
-                Universal.Term.evaluate(a, valuation, assignment(name)),
+              (name : source) ↦ Universal.Term.evaluate(a, valuation, assignment(name)),
               subject) := {
   by induction on subject with inductionHypothesis {
     case subject = Universal.Term.variable(name) for some (name : source): done
     case subject = Universal.Term.apply(arity, symbol, arguments)
         for some (arity : ℕ), (symbol : signature(arity)),
                  (arguments : NaturalsBelow(arity) → Universal.Term(signature, source)): {
-        ∀ (index : NaturalsBelow(arity)).
-          Universal.Term.evaluate(a, valuation,
-              Universal.Term.substitute(assignment, arguments(index)))
+        ∀ (index : NaturalsBelow(arity)). Universal.Term.evaluate(a, valuation, Universal.Term.substitute(assignment, arguments(index)))
             = Universal.Term.evaluate(a,
-                (name : source) ↦
-                  Universal.Term.evaluate(a, valuation, assignment(name)),
-                arguments(index))
+                (name : source) ↦ Universal.Term.evaluate(a, valuation, assignment(name)), arguments(index))
           by inductionHypothesis;
-        ((index : NaturalsBelow(arity)) ↦
-            Universal.Term.evaluate(a, valuation,
-              Universal.Term.substitute(assignment, arguments(index))))
-          = ((index : NaturalsBelow(arity)) ↦
-              Universal.Term.evaluate(a,
-                (name : source) ↦
-                  Universal.Term.evaluate(a, valuation, assignment(name)),
-                arguments(index)))
+        ((index : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(a, valuation, Universal.Term.substitute(assignment, arguments(index))))
+          = ((index : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(a,
+                (name : source) ↦ Universal.Term.evaluate(a, valuation, assignment(name)), arguments(index)))
           by Function.extensionality;
-        Universal.Term.evaluate(a, valuation,
-            Universal.Term.substitute(assignment,
+        Universal.Term.evaluate(a, valuation, Universal.Term.substitute(assignment,
               Universal.Term.apply(signature, source, arity, symbol, arguments)))
-          = Universal.Algebra.interpret(arity, symbol,
-              ((index : NaturalsBelow(arity)) ↦
-                Universal.Term.evaluate(a, valuation,
+          = Universal.Algebra.interpret(arity, symbol, ((index : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(a, valuation,
                   Universal.Term.substitute(assignment, arguments(index)))))
-          = Universal.Algebra.interpret(arity, symbol,
-              ((index : NaturalsBelow(arity)) ↦
-                Universal.Term.evaluate(a,
-                  (name : source) ↦
-                    Universal.Term.evaluate(a, valuation, assignment(name)),
-                  arguments(index))))
+          = Universal.Algebra.interpret(arity, symbol, ((index : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(a,
+                  (name : source) ↦ Universal.Term.evaluate(a, valuation, assignment(name)), arguments(index))))
           = Universal.Term.evaluate(a,
-              (name : source) ↦
-                Universal.Term.evaluate(a, valuation, assignment(name)),
+              (name : source) ↦ Universal.Term.evaluate(a, valuation, assignment(name)),
               Universal.Term.apply(signature, source, arity, symbol, arguments));
         done
       }
@@ -119,36 +98,29 @@ theorem Universal.Term.evaluate_substitute {signature : Universal.Signature}
 -- Renaming variables along a map — the blueprint's `t[ρ]`. The special case of
 -- substitution that puts a bare variable at every leaf, and the only form of
 -- substitution the absorption layer needs.
-definition Universal.Term.rename {signature : Universal.Signature}
+definition Universal.Term.rename
         {source : Type(0)} {target : Type(0)}
         (renaming : source → target)
-        : Universal.Term(signature, source) → Universal.Term(signature, target) :=
-  Universal.Term.substitute(
+        : Universal.Term(signature, source) → Universal.Term(signature, target) := Universal.Term.substitute(
     (name : source) ↦ Universal.Term.variable(signature, target, renaming(name)))
 
 -- Evaluating a renamed term is evaluating the original under the pulled-back
 -- valuation: `(t[ρ])^A(a⃗) = t^A(a⃗ ∘ ρ)`.
-theorem Universal.Term.evaluate_rename {signature : Universal.Signature}
+theorem Universal.Term.evaluate_rename
         {source : Type(0)} {target : Type(0)}
         (a : Universal.Algebra(signature))
         (renaming : source → target)
-        (valuation : target → Universal.Algebra.carrier(a))
+        (valuation : target → Universal.carrier(a))
         (subject : Universal.Term(signature, source))
-        : Universal.Term.evaluate(a, valuation,
-            Universal.Term.rename(renaming, subject))
+        : Universal.Term.evaluate(a, valuation, Universal.Term.rename(renaming, subject))
           = Universal.Term.evaluate(a,
               (name : source) ↦ valuation(renaming(name)), subject) := {
-  ((name : source) ↦
-      Universal.Term.evaluate(a, valuation,
-        Universal.Term.variable(signature, target, renaming(name))))
+  ((name : source) ↦ Universal.Term.evaluate(a, valuation, Universal.Term.variable(signature, target, renaming(name))))
     = ((name : source) ↦ valuation(renaming(name)))
     by Function.extensionality;
   Universal.Term.evaluate(a, valuation, Universal.Term.rename(renaming, subject))
      = Universal.Term.evaluate(a,
-         (name : source) ↦
-           Universal.Term.evaluate(a, valuation,
-             Universal.Term.variable(signature, target, renaming(name))),
-         subject)
+         (name : source) ↦ Universal.Term.evaluate(a, valuation, Universal.Term.variable(signature, target, renaming(name))), subject)
            by Universal.Term.evaluate_substitute
      = Universal.Term.evaluate(a,
          (name : source) ↦ valuation(renaming(name)), subject);
@@ -159,11 +131,11 @@ theorem Universal.Term.evaluate_rename {signature : Universal.Signature}
 -- constant tuples. Idempotence is stated for the basic operations; the induction
 -- promotes it to every term, and that is what makes a one-element subset a
 -- subuniverse and what makes `t(b, …, b) = b` available to the centre argument.
-theorem Universal.Term.evaluate_constant {signature : Universal.Signature}
+theorem Universal.Term.evaluate_constant
         {variables : Type(0)}
         (a : Universal.Algebra(signature))
         (idempotent : Universal.Algebra.IsIdempotent(a))
-        (element : Universal.Algebra.carrier(a))
+        (element : Universal.carrier(a))
         (subject : Universal.Term(signature, variables))
         : Universal.Term.evaluate(a, ((name : variables) ↦ element), subject)
           = element := {
@@ -173,25 +145,17 @@ theorem Universal.Term.evaluate_constant {signature : Universal.Signature}
         for some (arity : ℕ), (symbol : signature(arity)),
                  (arguments : NaturalsBelow(arity)
                               → Universal.Term(signature, variables)): {
-        ∀ (index : NaturalsBelow(arity)).
-            Universal.Term.evaluate(a, ((name : variables) ↦ element),
-              arguments(index))
+        ∀ (index : NaturalsBelow(arity)). Universal.Term.evaluate(a, ((name : variables) ↦ element), arguments(index))
               = element
             by inductionHypothesis;
-        ((index : NaturalsBelow(arity)) ↦
-            Universal.Term.evaluate(a, ((name : variables) ↦ element),
-              arguments(index)))
+        ((index : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(a, ((name : variables) ↦ element), arguments(index)))
           = ((index : NaturalsBelow(arity)) ↦ element)
           by Function.extensionality;
-        Universal.Algebra.interpret(arity, symbol,
-            ((index : NaturalsBelow(arity)) ↦ element))
+        Universal.Algebra.interpret(arity, symbol, ((index : NaturalsBelow(arity)) ↦ element))
           = element by idempotent;
-        Universal.Algebra.interpret(arity, symbol,
-            ((index : NaturalsBelow(arity)) ↦
-              Universal.Term.evaluate(a, ((name : variables) ↦ element),
-                arguments(index))))
-           = Universal.Algebra.interpret(arity, symbol,
-               ((index : NaturalsBelow(arity)) ↦ element))
+        Universal.Algebra.interpret(arity, symbol, ((index : NaturalsBelow(arity)) ↦
+              Universal.Term.evaluate(a, ((name : variables) ↦ element), arguments(index))))
+           = Universal.Algebra.interpret(arity, symbol, ((index : NaturalsBelow(arity)) ↦ element))
            = element;
         done
       }
@@ -201,12 +165,12 @@ theorem Universal.Term.evaluate_constant {signature : Universal.Signature}
 -- Preservation: a term's value lies in any subuniverse holding its variables'
 -- values. The blueprint's Lemma 1.14, and the reason a subuniverse never has to
 -- be checked against terms one at a time.
-theorem Universal.Term.evaluate_mem {signature : Universal.Signature}
+theorem Universal.Term.evaluate_mem
         {variables : Type(0)}
         (a : Universal.Algebra(signature))
-        (subset : Set(Universal.Algebra.carrier(a)))
+        (subset : Set(Universal.carrier(a)))
         (closed : Universal.IsSubuniverse(a, subset))
-        (valuation : variables → Universal.Algebra.carrier(a))
+        (valuation : variables → Universal.carrier(a))
         (valuationInside : ∀ (name : variables). valuation(name) ∈ subset)
         (subject : Universal.Term(signature, variables))
         : Universal.Term.evaluate(a, valuation, subject) ∈ subset := {
@@ -216,11 +180,8 @@ theorem Universal.Term.evaluate_mem {signature : Universal.Signature}
         for some (arity : ℕ), (symbol : signature(arity)),
                  (arguments : NaturalsBelow(arity)
                               → Universal.Term(signature, variables)): {
-        ∀ (index : NaturalsBelow(arity)).
-          Universal.Term.evaluate(a, valuation, arguments(index)) ∈ subset
-          by inductionHypothesis;
-        Universal.Algebra.interpret(arity, symbol,
-            ((index : NaturalsBelow(arity)) ↦
+        ∀ (index : NaturalsBelow(arity)). Universal.Term.evaluate(a, valuation, arguments(index)) ∈ subset by inductionHypothesis;
+        Universal.Algebra.interpret(arity, symbol, ((index : NaturalsBelow(arity)) ↦
               Universal.Term.evaluate(a, valuation, arguments(index))))
           ∈ subset;
         done

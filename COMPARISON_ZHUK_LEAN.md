@@ -407,6 +407,47 @@ the same carrier. Mathlib has one `Finite` and derives what it needs. A lemma
 an "index of an element in a distinct list" construction the library does not
 have.
 
+### 2.10 The notation experiment — 14% of lines for a day's work
+
+An outside reviewer measured this tree and found that three token substitutions
+removed 24% of its characters. That prompted an audit of what the language
+already offers, and most of the answer was: more than the development was using.
+
+| lever | status | effect |
+|---|---|---|
+| `convention signature : Universal.Signature` | **already existed** | removes a binder from 150 of 174 declarations |
+| `operator (^)` for the power, `(×)` for the product | operators existed; `×` needed one lexer entry | 237 + 177 call sites, and it is the blueprint's own notation |
+| `Universal.carrier`, `Universal.universe` aliases | ordinary definitions | 673 + 117 call sites |
+
+Net: **14.3% fewer lines and 9.7% fewer characters**, no mathematics touched.
+`center_central`'s signature went from 13 lines to 11 and now reads
+`(closed : Universal.IsSubuniverse(a × b, relation))` where it read
+`(closed : Universal.IsSubuniverse(Universal.Algebra.product(a, b), relation))`.
+
+Three findings worth keeping:
+
+- **`convention` is the feature Lean calls `variable`, and it was in the tree
+  the whole time** — `Graph/` uses it for exactly this. The development simply
+  never opened the door on it. That is a documentation failure more than a
+  language gap.
+- **Adding a lexer token is cheap.** `×` cost five lines of C++ (a `TokenKind`,
+  a table entry, a diagnostic string, an `isOperatorSymbolToken` case, and a
+  `parseMultiplicative` case). If notation is what makes a development readable,
+  the barrier to new notation should be this low, and it is.
+- **An alias can push the auto-prover off a fast path.** After `a ^ N` replaced
+  `Universal.Algebra.power(a, N)`, one bare conjunction-projection in
+  `doubling.math` went from silent to a 70k-step, 626 ms search, because the
+  prover's structural match no longer saw through the operator. Notation is not
+  free at the prover level, and that is worth knowing before a library-wide
+  sweep.
+
+What did **not** work: `Universal.Tm(V)` for `Universal.Term(signature, V)`. The
+convention makes `signature` implicit, and an implicit that appears only in a
+pattern-match definition's *return* type cannot be inferred. The same shape is
+why a coercion-to-sort is the remaining prize: `Universal.carrier` is still 3.2%
+of all characters, `NaturalsBelow` 7.5%, and the `Universal.` prefix 11.3% —
+the last needing a namespace mechanism the language does not have.
+
 ---
 
 ## 3. Design lessons that transfer
