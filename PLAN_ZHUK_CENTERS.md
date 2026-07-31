@@ -414,9 +414,9 @@ least-number principle and nothing else.
 - **M1 — Layer 0 complete.** Signature, algebra, terms, substitution, the
   evaluation law, idempotence of term operations. The first honest measurement
   of the line-count estimate.
-- **M2 — Layers 1–2.** Subuniverses, `Sg`, preservation, generation by a fixed
-  list, homomorphisms, finite indexed products, the five relational
-  constructions.
+- **M2 — Layers 1–2. Done** except the dependent product, which only Layer 7
+  needs. Subuniverses, `Sg`, preservation, generation by a fixed list, powers
+  and binary products, the five relational constructions.
 - **M3 — Layer 3. Done.** Subset cardinality and its three order facts,
   `minimum`, greatest element of a bounded set. 451 lines against an estimate
   of 300; the enumeration-list representation held and no switch was needed.

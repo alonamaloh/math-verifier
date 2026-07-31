@@ -22,6 +22,9 @@ for Zhuk's theorem on the left centre of a subdirect relation.
   in [generation.math](generation.math).
 - `Universal.Algebra.power` and `Universal.Algebra.product` — powers over an
   arbitrary index type and binary products, in [product.math](product.math).
+- `Universal.box`, `Universal.restrict`, `Universal.project` and
+  `Universal.cylinder` — the relational constructions, in
+  [relation.math](relation.math).
 - `Universal.Witnesses`, `Universal.Absorbs`, `Universal.BinaryAbsorbs`,
   `Universal.IsTaylorIdentity` and `Universal.IsTaylorOn`, in
   [absorption.math](absorption.math).
@@ -48,6 +51,11 @@ for Zhuk's theorem on the left centre of a subdirect relation.
 - `Universal.generated_eq_termValues` — the generated subuniverse is exactly the
   term values. The variable type is the generating set itself, so no enumeration
   of the generators appears anywhere.
+- `Universal.restrict_interpret` — reindexing a tuple along a map of index types
+  is a homomorphism of powers. The five relational constructions of blueprint
+  Lemma 1.19 are its consequences: `IsSubuniverse.intersection`, `.box`,
+  `.project` (its image), `.cylinder` (its preimage), and reindexing along a
+  bijection as the case where the map is one.
 - `Universal.Term.evaluate_rename` — the blueprint's `t[ρ]`, evaluated.
 - `Universal.Witnesses.rename` and `Universal.Absorbs.of_renaming` — a witness
   built over whatever index type a construction hands you is given a numeric
