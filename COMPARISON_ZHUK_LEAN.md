@@ -27,7 +27,7 @@ each system actually gave for free:
 | Preservation (Lemma 1.14) | `Term.realize_mem` ✅ | written (~25 lines) |
 | Generation by terms (Lemma 1.15) | `mem_closure_iff_exists_term` ✅ | written (~90 lines) |
 | Finite choice | `choose` (one word) | **derived, ~60 lines** |
-| Products of structures (Def 1.8) | ❌ absent — written (~30 lines) | not yet reached |
+| Products of structures (Def 1.8) | ❌ absent — written (~30 lines) | ❌ absent — written (~180 lines) |
 | CSP content (Parts II–III) | ❌ absent | ❌ absent |
 
 The honest summary of Part I: Mathlib supplied nearly all of it; here all of it
@@ -76,7 +76,39 @@ The blueprint's Appendix C predicted this exactly, listing finite choice as an
 import. It is the clearest instance of an "invisible" import in one system being
 real work in another.
 
-### 2.3 Generation: predicate sets beat a complete lattice
+### 2.3 Products — the first head-to-head, and the ratio is ~6:1
+
+Neither library has products of structures: Mathlib's `Ultraproducts` goes
+straight to the quotient via `Prestructure`, and there was nothing here either.
+So this is the first item both systems had to build from nothing.
+
+Lean: ~30 lines for the dependent product, the binary product, coordinatewise
+realization, and the reindexing and evaluation homomorphisms.
+
+Here: ~180 lines for powers, binary products, and the three coordinatewise
+evaluation lemmas.
+
+The gap is not the definitions — those are comparable — it is the evaluation
+lemmas. In Lean each is
+
+```lean
+induction t with
+| var a => rfl
+| func f ts ih => simp [Term.realize, ih]
+```
+
+three lines, because `simp` closes the constructor case from the induction
+hypothesis and the definitional unfoldings together. Here each needs the
+pointwise tuple equality by `Function.extensionality` AND an explicit four-step
+chain spelling out the two definitional unfoldings, because citing a hypothesis
+whose conclusion differs from the goal by an unfolding does not fire. That is
+~25 lines per lemma against three, and it is the single largest per-item ratio
+seen so far.
+
+Worth noting the chain is not *worse* to read — it says exactly what happens —
+but it is written by hand where `simp` finds it.
+
+### 2.4 Generation: predicate sets beat a complete lattice
 
 Mathlib builds `Substructure.closure` as `sInf {S | s ⊆ S}` over a complete
 lattice of substructures, with a `GaloisInsertion` on top.
@@ -170,7 +202,7 @@ they land.
 
 | | Lean | Here |
 |---|---|---|
-| Part I foundation | ~200 (products + inventory) | ~330 so far |
+| Part I foundation | ~200 (products + inventory) | ~510 so far |
 | Finite choice | 0 (a tactic) | ~60 |
 | Parts II–III | ~1400 | not started |
 

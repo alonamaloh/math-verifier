@@ -20,6 +20,8 @@ for Zhuk's theorem on the left centre of a subdirect relation.
   `Universal.Signature.HasNoConstants`, in [generated.math](generated.math).
 - `Universal.termValues` — the values of terms whose variables range over a set,
   in [generation.math](generation.math).
+- `Universal.Algebra.power` and `Universal.Algebra.product` — powers over an
+  arbitrary index type and binary products, in [product.math](product.math).
 
 ## Main theorems
 
@@ -33,6 +35,10 @@ for Zhuk's theorem on the left centre of a subdirect relation.
   and `.empty` — the characterising facts. Because a set is a predicate,
   "least subuniverse containing `base`" is directly definable as quantification
   over the subuniverses that contain it, so no closure construction is needed.
+- `Universal.Term.evaluate_power`, `.first_evaluate_product` and
+  `.second_evaluate_product` — terms are evaluated coordinatewise. This is the
+  whole content of the product constructions; every later fact about relations
+  reduces to it.
 - `Universal.generated_eq_termValues` — the generated subuniverse is exactly the
   term values. The variable type is the generating set itself, so no enumeration
   of the generators appears anywhere.
