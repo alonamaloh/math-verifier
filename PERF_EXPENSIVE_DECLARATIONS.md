@@ -541,9 +541,39 @@ seven data parameters; naming their values shorter leaves seven holes and a
 355-candidate pool to search for each. Only pinning them removes the search.
 
 So the readability-first version of this fix does not exist at the call site.
-If the argument-free spelling is to be recovered it has to come from the
-matcher — e.g. solving a metavariable from a premise that already mentions it
-before searching the pool — not from how the proof is written.
+
+### "Solve from premises first" already exists — and cannot be made cheap here
+
+The obvious matcher fix is to solve a metavariable from a premise that already
+mentions it rather than searching the pool. **That pass is already there**:
+`completeCitationWithStrategy`'s back-inference loop unifies each unfilled
+binder's domain against the context, "selecting a hypothesis AND back-filling
+the data binders it mentions", iterated to a fixpoint.
+
+So the mechanism is not missing; its COST is the problem. `scanHypotheses` runs
+per premise, per fixpoint round, and twice over (a greedy pass, then a
+unique-match-first retry after the greedy one fails) — with no prefilter, over
+every local binder.
+
+**Adding a head prefilter does not work, and the reason is the interesting
+part.** Skipping a candidate whose rigid head differs from the premise's rigid
+head is sound — it is exactly when the existing loop must fail — but measured on
+the original proof it gave **142.7 s against a 136.5 s baseline**: no gain, and
+slightly worse for the filter's own cost.
+
+The context is **head-homogeneous**. Nearly every fact in that proof region is
+`Set.member`-headed (`x ∈ Plane.segment(…)`, `… ∉ Plane.openSegment(…)`), and
+so is every premise of the cited lemma — 4 `∈ Plane.segment`, 2
+`∈ Plane.openSegment`, 2 `∉ Plane.openSegment`. A head index discriminates
+nothing, and a spine index would not either: the argument heads agree too.
+
+That also settles direction **D** (discrimination trees) for this class: already
+flagged as "tidying, not a performance fix", and now measured as such.
+
+**The matching work is therefore irreducible without changing what is in
+scope.** Which leaves exactly two levers, both already known: put fewer facts in
+scope (extract lemmas), or pin the arguments so nothing is searched for. The
+committed proofs do the second.
 
 ## Directions worth trying
 
