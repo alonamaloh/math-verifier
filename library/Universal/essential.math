@@ -532,3 +532,56 @@ theorem Universal.HasEssential.bounded_of_witnesses {signature : Universal.Signa
            done };
   done by Natural.lt_of_not_le
 }
+
+-- ── From "inside on the critical tuples" to witnessing ────────────────
+--
+-- The last step of the relational description of absorption (blueprint
+-- Theorem 3.10). Its construction produces a term that lands in `subset` on
+-- every tuple with exactly one coordinate outside — the *critical* tuples,
+-- which are the `X` of that proof. That is already enough to witness:
+-- a tuple constrained as `Universal.Witnesses` asks is either critical, and
+-- handled by hypothesis, or lies wholly inside, and handled by preservation.
+
+theorem Universal.Witnesses.of_inside_on_critical {signature : Universal.Signature}
+        (a : Universal.Algebra(signature))
+        (subset : Set(Universal.Algebra.carrier(a)))
+        (subsetClosed : Universal.IsSubuniverse(a, subset))
+        (arity : ℕ)
+        (subject : Universal.Term(signature, NaturalsBelow(arity)))
+        (insideOnCritical :
+            ∀ (valuation : NaturalsBelow(arity)
+                           → Universal.Algebra.carrier(a)).
+              (∃ (free : NaturalsBelow(arity)).
+                 ¬(valuation(free) ∈ subset)
+                 ∧ ∀ (other : NaturalsBelow(arity)).
+                     ¬(other = free) → valuation(other) ∈ subset)
+              → Universal.Term.evaluate(a, valuation, subject) ∈ subset)
+        : Universal.Witnesses(a, subset,
+            Set.universe(Universal.Algebra.carrier(a)), subject) := {
+  take free : NaturalsBelow(arity);
+  take valuation : NaturalsBelow(arity) → Universal.Algebra.carrier(a);
+  suppose valuation(free) ∈ Set.universe(Universal.Algebra.carrier(a));
+  suppose ∀ (other : NaturalsBelow(arity)).
+      ¬(other = free) → valuation(other) ∈ subset as othersInside;
+  done by cases {
+    case valuation(free) ∈ subset as freeInside: {
+        -- Wholly inside: preservation.
+        ∀ (slot : NaturalsBelow(arity)). valuation(slot) ∈ subset
+            by { take slot : NaturalsBelow(arity);
+                 done by cases {
+                   case slot = free as isFree: done by substituting isFree
+                   otherwise: done by othersInside
+                 } };
+        done by Universal.Term.evaluate_mem
+      }
+    otherwise as freeOutside: {
+        -- Critical, with the one outside coordinate at `free`.
+        ∃ (slot : NaturalsBelow(arity)).
+            ¬(valuation(slot) ∈ subset)
+            ∧ ∀ (other : NaturalsBelow(arity)).
+                ¬(other = slot) → valuation(other) ∈ subset
+            by { witness free };
+        done by insideOnCritical
+      }
+  }
+}

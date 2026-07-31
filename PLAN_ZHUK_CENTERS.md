@@ -561,6 +561,34 @@ plan predicted at Layer 5's design, no partition has to be constructed. The
 three degenerate cases (`S = A`, `S = ∅` with `m ≥ 2`, `S = ∅` with `m = 1`) come
 first and are each a few lines.
 
+**The last step is already written**: `Universal.Witnesses.of_inside_on_critical`
+turns "the term is inside `subset` on every critical tuple" — a tuple with
+exactly one coordinate outside, which is exactly membership in `X` — into
+`Universal.Witnesses`. A constrained tuple is either critical, handled by
+hypothesis, or wholly inside, handled by preservation.
+
+**What is left to write**, in order:
+
+1. `X` and its indexing. `HasSize.tuples` gives `A^m ≅ NaturalsBelow(N)`;
+   compose with `NaturalsBelow.index_subset` at the subset corresponding to `X`
+   to get `place : NaturalsBelow(count) → A^m` injective with image exactly `X`.
+2. The block function, by `NaturalsBelow.choice` over `NaturalsBelow(count)`:
+   each `place(k)` is critical, so it has a distinguished coordinate, and that
+   coordinate is unique because every other one is inside.
+3. Surjectivity of the block function: for each `i`, the tuple that is outside
+   at `i` and inside elsewhere is critical, hence some `place(k)`, and its
+   distinguished coordinate must be `i`. Needs `subset` and its complement both
+   nonempty — the two degenerate cases already peeled off.
+4. Blocks populated for `R̃ := project(place, clone(a, m))`: the `i`-th
+   coordinate projection lies in the clone, and its restriction is inside
+   wherever the block is not `i`.
+5. Regrouping then forces (B2) to fail, which hands back a term of the clone
+   inside on all of `X` — and step 0 above finishes it.
+
+Restrict the statement to `2 ≤ arity`. That is all Corollary 8.1 consumes (it
+applies the converse at arity 3), and it drops the `S = ∅`, `m = 1` degenerate
+case, which is the only one needing a nonempty-carrier hypothesis.
+
 ### The trick that makes arithmetic-indexed induction work
 
 `Natural.add` is opaque, so `NaturalsBelow(gap + lower)` never reduces to the
