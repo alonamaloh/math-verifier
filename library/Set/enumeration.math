@@ -1,0 +1,128 @@
+-- Set/enumeration.math
+--
+-- Cardinality of a *subset*, as a natural number.
+--
+-- `Set/finite.math` gives `HasSize(X, n)` — a proposition about a *type*.
+-- What the mathematics wants instead is `|S|` for `S : Set(A)`, a number one
+-- can compare, increment, and hand to the least-number principle. The route
+-- taken here is an enumeration: a list of the carrier that is distinct and
+-- covers, against which a subset is counted by filtering,
+--
+--     size(enumeration, S) = length(filter(S, enumeration)).
+--
+-- `List.filter` already takes a `Proposition` predicate and decides it
+-- classically, and a `Set(A)` *is* an `A → Proposition`, so a subset can be
+-- filtered by directly — no decidability obligation appears at any call site.
+-- The idiom matches `Graph/`, which represents a finite graph as two lists
+-- for the same reason.
+--
+-- The three order facts below are what the blueprint of Zhuk's theorem
+-- consumes (Appendix C, item 1): `S ⊆ T ⟹ |S| ≤ |T|`, with equality exactly
+-- when `S = T`, and the strict form for a proper inclusion. All three are
+-- inequalities of *lengths of filters*, so the work is in
+-- `Lists/filter_length.math` and this file is the translation.
+
+module Set.enumeration
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.add_order
+import Set.basics
+import Set.algebra
+import Lists.list
+import Lists.length
+import Lists.distinct
+import Lists.filter
+import Lists.filter_length
+
+-- A listing of the carrier with no repetitions. Distinctness is what makes
+-- the count below a cardinality rather than a multiplicity; the covering
+-- clause is what makes it a count of the whole subset.
+definition Set.IsEnumeration (A : Type(0)) (enumeration : List(A))
+        : Proposition :=
+  List.Distinct(A, enumeration) ∧ (∀ (element : A). element ∈ enumeration)
+
+-- A type is finite when it admits one.
+definition Set.IsFinite (A : Type(0)) : Proposition :=
+  ∃ (enumeration : List(A)). Set.IsEnumeration(A, enumeration)
+
+-- The number of enumerated elements a subset holds.
+definition Set.size {A : Type(0)} (enumeration : List(A)) (subset : Set(A))
+        : ℕ :=
+  length(List.filter(subset, enumeration))
+
+-- The boundary equation. `Set.size` is a one-line composition rather than a
+-- recursion, so this is reflexivity; it exists so that proofs move between
+-- the two spellings by a named step instead of by an unfolding.
+theorem Set.size_eq_filter_length {A : Type(0)} (enumeration : List(A))
+        (subset : Set(A))
+        : Set.size(enumeration, subset) = length(List.filter(subset, enumeration)) :=
+  done
+
+-- ── The order facts ───────────────────────────────────────────────────
+
+-- A subset is counted no higher than its superset.
+theorem Set.size_le_of_subset {A : Type(0)} (enumeration : List(A))
+        (smaller larger : Set(A)) (inclusion : smaller ⊆ larger)
+        : Set.size(enumeration, smaller) ≤ Set.size(enumeration, larger) := {
+  length(List.filter(smaller, enumeration)) ≤ length(List.filter(larger, enumeration))
+      by List.filter_length_monotone;
+  done
+}
+
+-- An enumerated element of the superset that the subset misses makes the
+-- inequality strict.
+theorem Set.size_lt_of_member_missing {A : Type(0)} (enumeration : List(A))
+        (smaller larger : Set(A)) (inclusion : smaller ⊆ larger)
+        (element : A) (inEnumeration : element ∈ enumeration)
+        (missing : ¬(element ∈ smaller)) (inLarger : element ∈ larger)
+        : Set.size(enumeration, smaller) < Set.size(enumeration, larger) := {
+  1 + length(List.filter(smaller, enumeration))
+      ≤ length(List.filter(larger, enumeration))
+      by List.filter_length_strict;
+  1 + Set.size(enumeration, smaller) ≤ Set.size(enumeration, larger);
+  done by Natural.lt_of_add_one_le
+}
+
+-- Equal counts force equal sets: any point of the larger set that the
+-- smaller one missed would have made the count strictly grow.
+theorem Set.equal_of_size_eq {A : Type(0)} (enumeration : List(A))
+        (isEnumeration : Set.IsEnumeration(A, enumeration))
+        (smaller larger : Set(A)) (inclusion : smaller ⊆ larger)
+        (sizesEqual : Set.size(enumeration, smaller) = Set.size(enumeration, larger))
+        : smaller = larger := {
+  ∀ (candidate : A). candidate ∈ enumeration;
+  larger ⊆ smaller
+      by { take element : A;
+           suppose element ∈ larger;
+           element ∈ enumeration;
+           done by { suppose ¬(element ∈ smaller) for contradiction;
+                     Set.size(enumeration, smaller) < Set.size(enumeration, larger)
+                         by Set.size_lt_of_member_missing;
+                     Set.size(enumeration, larger) < Set.size(enumeration, larger);
+                     done by Natural.lt_irreflexive } };
+  done by Set.equal_of_same_members
+}
+
+-- The blueprint's form of the strict inequality: a proper inclusion gains at
+-- least one. Refuting equality of the counts is enough, by the previous two.
+theorem Set.size_lt_of_proper_subset {A : Type(0)} (enumeration : List(A))
+        (isEnumeration : Set.IsEnumeration(A, enumeration))
+        (smaller larger : Set(A)) (inclusion : smaller ⊆ larger)
+        (different : ¬(smaller = larger))
+        : Set.size(enumeration, smaller) < Set.size(enumeration, larger) := {
+  Set.size(enumeration, smaller) ≤ Set.size(enumeration, larger)
+      by Set.size_le_of_subset;
+  ¬(Set.size(enumeration, smaller) = Set.size(enumeration, larger))
+      by { suppose Set.size(enumeration, smaller) = Set.size(enumeration, larger);
+           smaller = larger by Set.equal_of_size_eq;
+           done };
+  done by cases {
+    case Set.size(enumeration, smaller) < Set.size(enumeration, larger): done
+    case Set.size(enumeration, smaller) = Set.size(enumeration, larger): done
+  }
+}

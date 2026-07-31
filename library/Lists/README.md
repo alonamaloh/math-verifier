@@ -56,6 +56,10 @@ needed.
   composite over the original
 - Counting members: `List.sumOver_indicator` — summing one per member
   that satisfies a condition counts them — and `List.filter_length_two`
+- Counting under a filter, in [filter_length.math](filter_length.math):
+  `List.filter_length_monotone` — a stronger predicate keeps at least as
+  much — and `List.filter_length_strict`, which makes the gain strict at an
+  element the weaker predicate misses. These are what `Set.size` is built from
 
 `filter` and `remove` use classical decisions and publish characterizing
 equations; reason through those theorems rather than unfolding their bodies.

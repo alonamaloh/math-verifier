@@ -1,0 +1,155 @@
+-- Natural/minimum.math
+--
+-- Minimum of two Naturals as `a ∸ (a ∸ b)`, dual to `Natural.maximum`'s
+-- `a + (b ∸ a)`. Taking the truncated difference twice cuts `a` back down
+-- to `b` when `b` is smaller and returns `a` untouched when it is not, so
+-- no classical decision enters and the two characterising equations are
+-- ordinary monus arithmetic.
+--
+-- Past the equations every fact here is pure order reasoning: `min` is the
+-- greatest lower bound, and monotonicity and the absorption identity
+-- `min(n, 1 + min(n, x)) = min(n, 1 + x)` follow from that alone. Those two
+-- are what the centrality induction of Zhuk's theorem consumes — see
+-- `PLAN_ZHUK_CENTERS.md`, Layer 3.
+
+module Natural.minimum
+
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.arithmetic
+import Natural.add_order
+import Natural.monus
+import Natural.subtraction
+import Equality.basics
+
+definition Natural.minimum (a b : ℕ) : ℕ := a ∸ (a ∸ b)
+
+overload min := Natural.minimum
+
+-- ── Characterising equations ──────────────────────────────────────────
+
+-- When a ≤ b there is nothing to take away: a ∸ b vanishes and the outer
+-- subtraction leaves a alone.
+theorem Natural.minimum_eq_left (a b : ℕ) (aLeB : a ≤ b) : min(a, b) = a := {
+  a ∸ b = 0;
+  min(a, b)
+     = a ∸ (a ∸ b)
+     = a ∸ 0
+     = a;
+  done
+}
+
+-- When b ≤ a, write a = b + c. The inner subtraction recovers c and the
+-- outer one takes c back off, landing on b.
+theorem Natural.minimum_eq_right (a b : ℕ) (bLeA : b ≤ a) : min(a, b) = b := {
+  choose c such that a = b + c from Natural.subtraction_witness(b, a, bLeA);
+  a ∸ b
+     = (b + c) ∸ b
+     = c;
+  min(a, b)
+     = a ∸ (a ∸ b)
+     = a ∸ c
+     = (b + c) ∸ c
+     = (c + b) ∸ c
+     = b;
+  done
+}
+
+-- ── The greatest lower bound ──────────────────────────────────────────
+
+-- min(a, b) ≤ a: whichever endpoint the order picks is at most a.
+theorem Natural.minimum_le_left (a b : ℕ) : min(a, b) ≤ a := {
+  a ≤ b ∨ b ≤ a;
+  done by cases {
+    case a ≤ b as aLeB: {
+        min(a, b) = a by Natural.minimum_eq_left;
+        done
+      }
+    case b ≤ a as bLeA: {
+        min(a, b) = b   by Natural.minimum_eq_right
+                  ≤ a;
+        done
+      }
+  }
+}
+
+-- min(a, b) ≤ b. Symmetric.
+theorem Natural.minimum_le_right (a b : ℕ) : min(a, b) ≤ b := {
+  a ≤ b ∨ b ≤ a;
+  done by cases {
+    case a ≤ b as aLeB: {
+        min(a, b) = a   by Natural.minimum_eq_left
+                  ≤ b;
+        done
+      }
+    case b ≤ a as bLeA: {
+        min(a, b) = b by Natural.minimum_eq_right;
+        done
+      }
+  }
+}
+
+-- Anything below both endpoints is below the minimum: `min` really is the
+-- greatest lower bound, and this is the only property the results below use.
+theorem Natural.le_minimum (x a b : ℕ) (xLeA : x ≤ a) (xLeB : x ≤ b)
+        : x ≤ min(a, b) := {
+  a ≤ b ∨ b ≤ a;
+  done by cases {
+    case a ≤ b as aLeB: {
+        x ≤ a = min(a, b) by Natural.minimum_eq_left;
+        done
+      }
+    case b ≤ a as bLeA: {
+        x ≤ b = min(a, b) by Natural.minimum_eq_right;
+        done
+      }
+  }
+}
+
+-- ── The two facts the centrality induction consumes ───────────────────
+
+-- Monotone in the second argument. The blueprint uses this at x + 1 and
+-- y + 1, to push an inductive bound through `min(n, · + 1)`.
+theorem Natural.minimum_monotone_right (n x y : ℕ) (xLeY : x ≤ y)
+        : min(n, x) ≤ min(n, y) := {
+  min(n, x) ≤ n by Natural.minimum_le_left;
+  min(n, x)
+     ≤ x
+     ≤ y;
+  done by Natural.le_minimum
+}
+
+-- min(n, 1 + min(n, x)) = min(n, 1 + x): capping before incrementing does
+-- not change the capped increment. The forward inequality is monotonicity;
+-- the backward one splits on which of n, x is smaller — if x is, the inner
+-- min is x itself, and if n is, the whole left side is already n.
+theorem Natural.minimum_absorbs_one_plus (n x : ℕ)
+        : min(n, 1 + min(n, x)) = min(n, 1 + x) := {
+  min(n, x) ≤ x by Natural.minimum_le_right;
+  1 + min(n, x) ≤ 1 + x;
+  min(n, 1 + min(n, x)) ≤ min(n, 1 + x)
+      by Natural.minimum_monotone_right;
+  min(n, 1 + x) ≤ n by Natural.minimum_le_left;
+  min(n, 1 + x) ≤ 1 + min(n, x)
+      by { x ≤ n ∨ n ≤ x;
+           done by cases {
+             case x ≤ n as xLeN: {
+                 min(n, x) = x by Natural.minimum_eq_right;
+                 min(n, 1 + x)
+                    ≤ 1 + x
+                    = 1 + min(n, x);
+                 done
+               }
+             case n ≤ x as nLeX: {
+                 min(n, x) = n by Natural.minimum_eq_left;
+                 min(n, 1 + x)
+                    ≤ n
+                    = min(n, x)
+                    ≤ 1 + min(n, x);
+                 done
+               }
+           } };
+  min(n, 1 + x) ≤ min(n, 1 + min(n, x)) by Natural.le_minimum;
+  done by Natural.le_antisymmetric
+}

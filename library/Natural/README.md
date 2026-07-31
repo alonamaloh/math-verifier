@@ -104,7 +104,7 @@ recursion, or [number-theory.md](number-theory.md) for division, gcd, and primes
 - Order and induction: `order`, `add_order`, `one_plus_induction`,
   `strong_recursion`, `well_founded`
 - Subtraction and bounds: `subtraction`, `monus`, `distance`, `maximum`,
-  `multiply_order`, `multiply_bounds`, `finite_range`
+  `minimum`, `multiply_order`, `multiply_bounds`, `finite_range`
 - Decisions and data-producing comparison: `decide`, `decide_divides`,
   `compare`, `classical_decidable`
 - Division and gcd: `floor_divide`, `division`, `divisibility`, `gcd`,

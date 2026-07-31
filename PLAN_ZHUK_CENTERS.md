@@ -48,9 +48,9 @@ Library is 136,810 lines across 816 `.math` files.
 | terms over a signature; term operations; substitution + evaluation law | — |
 | subuniverse; **generated** subuniverse `Sg` | — (`IsSubgroup` is the shape; no `Sg` anywhere, and `span` is by-combinations, not least-closed) |
 | finite indexed product `∏_{i∈I} A_i`; projection, cylinder, reindexing | — (`Logic/product` is binary pairs) |
-| cardinality of a **subset** as a natural; `S ⊆ T ⟹ ∣S∣ ≤ ∣T∣`; strict for proper | — |
-| greatest element of a bounded nonempty set of naturals | — (least exists) |
-| `Natural.minimum`, monotonicity, `min(N, min(N,x)+1) = min(N,x+1)` | — (`Natural.maximum` exists) |
+| cardinality of a **subset** as a natural; `S ⊆ T ⟹ ∣S∣ ≤ ∣T∣`; strict for proper | ✅ written — `Set/enumeration.math` |
+| greatest element of a bounded nonempty set of naturals | ✅ `Natural.greatest_witness` — it was there all along |
+| `Natural.minimum`, monotonicity, `min(N, min(N,x)+1) = min(N,x+1)` | ✅ written — `Natural/minimum.math` |
 
 Estimated foundation: **~8k lines**. Blueprint content on top: **~15k**. Both
 soft, and both smaller than Jordan–Schönflies by a factor of five; see
@@ -184,10 +184,38 @@ before committing.
 
 ---
 
-## Layer 3 — `Universal/counting.math` : cardinality of a subset
+## Layer 3 — cardinality of a subset — **done**
 
-**This is the layer the library does not have and the blueprint leans on
-hardest**, and it is where the estimate is least trustworthy.
+Landed as three files, none of them under `Universal/`: nothing in this layer
+is universal algebra, so it went where it is reusable.
+
+| File | Lines | Contents |
+|---|---|---|
+| `Natural/minimum.math` | 155 | `Natural.minimum`, the greatest-lower-bound facts, and the two Appendix C item 2 facts |
+| `Lists/filter_length.math` | 168 | `List.filter_length_monotone` and `..._strict` |
+| `Set/enumeration.math` | 128 | `Set.IsEnumeration`, `Set.IsFinite`, `Set.size`, and the three order facts |
+
+The estimate was 300 lines and it came in at 451 — the closest any layer has
+landed so far, and the enumeration-list representation never fought. Three
+things made it cheap:
+
+- `Set(A)` *is* `A → Proposition` and `List.filter` takes a `Proposition`
+  predicate, so `size(enumeration, S) := length(filter(S, enumeration))`
+  typechecks with no coercion and no decidability obligation at any call site.
+- Every order fact reduces to a statement about lengths of filters, so the
+  induction happens once, in `Lists/`, and `Set/enumeration.math` is pure
+  translation.
+- `min` needed no classical decision: `a ∸ (a ∸ b)` is the dual of
+  `Natural.maximum`'s `a + (b ∸ a)`, so the characterising equations are monus
+  arithmetic and everything past them is order reasoning.
+
+`Natural.greatest_witness` — the greatest element of a bounded nonempty set,
+which this section listed as missing — turned out to already exist in
+`Natural/least_number.math`. Nothing was needed for it.
+
+The original plan for this layer, kept for the record:
+
+**It is where the estimate is least trustworthy.**
 
 `Set/finite.math` gives `HasSize(X : Type(0), n)` — a *proposition* about a
 *type*. The blueprint compares and increments the cardinalities of *subsets*
@@ -355,9 +383,9 @@ least-number principle and nothing else.
 - **M2 — Layers 1–2.** Subuniverses, `Sg`, preservation, generation by a fixed
   list, homomorphisms, finite indexed products, the five relational
   constructions.
-- **M3 — Layer 3.** Subset cardinality and its three order facts, `minimum`,
-  greatest element of a bounded set. Small but load-bearing; if it is not
-  small, that is the signal to switch cardinality representation.
+- **M3 — Layer 3. Done.** Subset cardinality and its three order facts,
+  `minimum`, greatest element of a bounded set. 451 lines against an estimate
+  of 300; the enumeration-list representation held and no switch was needed.
 - **M4 — Layer 4.** Absorption and the Taylor lemma. First point where a
   blueprint statement transfers verbatim.
 - **M5 — Layer 5.** Regrouping and the relational description. The one that
@@ -376,8 +404,9 @@ least-number principle and nothing else.
   uses of `B ≠ ∅` beyond the three audited in Convention 1.2, and a handful of
   finiteness obligations that the prose leaves implicit. Log them; each is a
   blueprint edit.
-- **Cardinality is the estimate most likely to be wrong.** Layer 3 looks like
-  300 lines and could be 1500 if subset-vs-type counting fights.
+- ~~**Cardinality is the estimate most likely to be wrong.** Layer 3 looks like
+  300 lines and could be 1500 if subset-vs-type counting fights.~~ Settled: 451
+  lines, no fight. See Layer 3 above.
 - **The rate to plan with is ~1k lines/day on foundational material**, the
   same figure `PLAN_JORDAN_SCHOENFLIES.md` settled on. Nothing here bulk
   generates; the regrouping induction and the doubling construction need

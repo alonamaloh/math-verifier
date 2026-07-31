@@ -28,6 +28,8 @@ each system actually gave for free:
 | Generation by terms (Lemma 1.15) | `mem_closure_iff_exists_term` ✅ | written (~90 lines) |
 | Finite choice | `choose` (one word) | **derived, ~60 lines** |
 | Products of structures (Def 1.8) | ❌ absent — written (~30 lines) | ❌ absent — written (~180 lines) |
+| Subset cardinality + its order facts (App. C 1) | `Set.ncard`, `Finset.card_lt_card`, `Set.eq_of_subset_of_ncard_le` ✅ | written (~300 lines) |
+| `min` arithmetic (App. C 2) | `omega` ✅ | written (~155 lines) |
 | CSP content (Parts II–III) | ❌ absent | ❌ absent |
 
 The honest summary of Part I: Mathlib supplied nearly all of it; here all of it
@@ -128,6 +130,47 @@ foundations are *lighter* than Mathlib's, and the plan predicted it.
 
 ---
 
+### 2.5 Layer 3 — the widest gap so far, and the least interesting one
+
+The plan called subset cardinality the estimate most likely to be wrong, and
+warned it could be 1500 lines. It came in at 451, split three ways: `min`
+arithmetic (155), the two filter-length inductions (168), and the translation
+into set language (128).
+
+Against Lean the ratio is not measurable, because Lean wrote **one line**:
+
+```lean
+theorem min_min_add_one (N x : ℕ) : min N (min N x + 1) = min N (x + 1) := by omega
+```
+
+and everything else — `Set.ncard`, `Finset.card_lt_card`,
+`Set.eq_of_subset_of_ncard_le`, monotonicity of `min` — came from Mathlib or
+from `omega` inline at the use site. Blueprint Appendix C items 1 and 2 are, in
+Lean, entirely invisible.
+
+Two observations that are not just "Mathlib is big":
+
+- **`omega` is doing the work, not the library.** The `min` facts are not
+  Mathlib theorems being cited; they are decided. A linear-arithmetic decision
+  procedure over ℕ collapses an entire module here to nothing there, and it is
+  the single cheapest thing this comparison has found that this system lacks.
+  Nothing about the 155 lines is *hard* — they are `a ∸ (a ∸ b)`, two
+  characterising equations, and greatest-lower-bound reasoning — which is
+  exactly the profile a decision procedure erases.
+- **Predicate sets paid again.** `Set(A)` *is* `A → Proposition` and
+  `List.filter` takes a `Proposition` predicate, so a subset can be filtered by
+  directly: `size(enumeration, S) := length(filter(S, enumeration))` needs no
+  coercion, no `Fintype` instance, and no decidability obligation at any call
+  site. Mathlib pays for the same generality with `Set.ncard` (a
+  `Nat.card` of a coercion to a type) alongside `Finset.card`, and with the
+  `Set.toFinite _` arguments visible at `Doubling.lean:109`. Here there is one
+  notion and it is a natural number.
+
+The layer also retired an item from the plan's missing list without writing
+anything: `Natural.greatest_witness` — a bounded nonempty predicate on ℕ has a
+greatest witness — was already in `Natural/least_number.math`. The plan said
+`Natural/least_number` does not supply it. It does.
+
 ## 3. Design lessons that transfer
 
 These came out of one system and improved the other, or improved the blueprint.
@@ -192,18 +235,27 @@ These came out of one system and improved the other, or improved the blueprint.
 - Citing a hypothesis whose conclusion differs from the goal by a definitional
   unfolding fails. State the operative fact and let `done` bridge — which reads
   better anyway.
+- **A chain step's `by` must prove that step's relation exactly.** `≤ 1 + f(y)
+  by IH` is rejected where `IH : f(x) ≤ f(y)` — "this step's justification
+  proves a different relation than the step claims" — even though the step
+  follows from `IH` by one monotonicity move the prover makes unaided. The fix
+  is to drop the `by` and let the by-less step pick `IH` out of context, which
+  costs the reader the one citation the style guide most wants kept. Hit three
+  times in `Lists/filter_length.math`. The diagnostic is excellent; the
+  asymmetry (a cite is *narrower* than no cite) is the surprise.
 
 ---
 
 ## 5. Line counts
 
-Not comparable yet — Lean is complete, this is mid-Layer-1 — but recorded as
-they land.
+Not comparable yet — Lean is complete, this is through Layer 3 — but recorded
+as they land.
 
 | | Lean | Here |
 |---|---|---|
-| Part I foundation | ~200 (products + inventory) | ~510 so far |
+| Part I foundation | ~200 (products + inventory) | ~510 |
 | Finite choice | 0 (a tactic) | ~60 |
+| Subset cardinality + `min` (App. C 1–2) | 1 (`by omega`) | 451 |
 | Parts II–III | ~1400 | not started |
 
 The Lean figure for Part I is small because Mathlib supplied the rest; the

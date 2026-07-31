@@ -1,0 +1,168 @@
+-- Lists/filter_length.math
+--
+-- How the length of a filter responds to strengthening the predicate: it
+-- can only grow, and it grows strictly once the weaker predicate misses an
+-- element of the list that the stronger one keeps.
+--
+-- These are the counting facts behind cardinality of a subset relative to
+-- an enumeration (`Set/enumeration.math`): with `P` and `Q` read as sets,
+-- the two theorems are `S ⊆ T ⟹ |S| ≤ |T|` and its strict form. Kept here,
+-- rather than in `Lists/filter.math`, so that `filter`'s own module does
+-- not acquire a dependency on `Lists.length`.
+--
+-- Every proof reasons through `List.filter_prepend_positive/_negative` and
+-- `List.length_prepend`; neither `filter` nor `length` is ever unfolded.
+
+module Lists.filter_length
+
+import axioms
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.add_order
+import Natural.classical_decidable
+import Lists.list
+import Lists.length
+import Lists.filter
+
+-- Filtering a longer list gives a longer result: the head either survives,
+-- adding one, or is dropped, changing nothing.
+theorem List.filter_length_tail_le (A : Type(0)) (P : A → Proposition)
+        (head : A) (tail : List(A))
+        : length(List.filter(P, tail))
+          ≤ length(List.filter(P, List.prepend(A, head, tail))) :=
+  done by cases {
+    case P(head) as holds: {
+        List.filter(P, List.prepend(A, head, tail))
+           = List.prepend(A, head, List.filter(P, tail))
+           by List.filter_prepend_positive;
+        length(List.filter(P, tail))
+           ≤ 1 + length(List.filter(P, tail))
+           = length(List.prepend(A, head, List.filter(P, tail)))
+           = length(List.filter(P, List.prepend(A, head, tail)));
+        done
+      }
+    otherwise as fails: {
+        List.filter(P, List.prepend(A, head, tail)) = List.filter(P, tail)
+            by List.filter_prepend_negative;
+        length(List.filter(P, tail))
+           = length(List.filter(P, List.prepend(A, head, tail)));
+        done
+      }
+  }
+
+-- A stronger predicate keeps at least as much. Induction on the list: at a
+-- kept head both sides gain one; at a dropped head the left side stands
+-- still while the right side can only grow.
+theorem List.filter_length_monotone (A : Type(0)) (P Q : A → Proposition)
+        (implies : ∀ (x : A). P(x) → Q(x)) (list : List(A))
+        : length(List.filter(P, list)) ≤ length(List.filter(Q, list)) :=
+  by induction on list with IH {
+    case List.empty: done
+    case List.prepend(head, tail):
+        done by cases {
+          case P(head) as holds: {
+              Q(head);
+              List.filter(P, List.prepend(A, head, tail))
+                 = List.prepend(A, head, List.filter(P, tail))
+                 by List.filter_prepend_positive;
+              List.filter(Q, List.prepend(A, head, tail))
+                 = List.prepend(A, head, List.filter(Q, tail))
+                 by List.filter_prepend_positive;
+              length(List.filter(P, List.prepend(A, head, tail)))
+                 = length(List.prepend(A, head, List.filter(P, tail)))
+                 = 1 + length(List.filter(P, tail))
+                 ≤ 1 + length(List.filter(Q, tail))
+                 = length(List.prepend(A, head, List.filter(Q, tail)))
+                 = length(List.filter(Q, List.prepend(A, head, tail)));
+              done
+            }
+          otherwise as fails: {
+              List.filter(P, List.prepend(A, head, tail)) = List.filter(P, tail)
+                  by List.filter_prepend_negative;
+              length(List.filter(P, List.prepend(A, head, tail)))
+                 = length(List.filter(P, tail))
+                 ≤ length(List.filter(Q, tail))
+                       by IH
+                 ≤ length(List.filter(Q, List.prepend(A, head, tail)))
+                       by List.filter_length_tail_le;
+              done
+            }
+        }
+  }
+
+-- The strict form: an element of the list that `Q` keeps and `P` misses
+-- makes the gain real. At that element the right-hand filter grows by one
+-- over a left-hand filter that does not move; everywhere else monotonicity
+-- carries the bound along.
+theorem List.filter_length_strict (A : Type(0)) (P Q : A → Proposition)
+        (implies : ∀ (x : A). P(x) → Q(x))
+        (x : A) (missesP : ¬P(x)) (holdsQ : Q(x)) (list : List(A))
+        : x ∈ list
+          → 1 + length(List.filter(P, list)) ≤ length(List.filter(Q, list)) :=
+  by induction on list with IH {
+    case List.empty: {
+        suppose x ∈ List.empty(A);
+        ¬(x ∈ List.empty(A));
+        done
+      }
+    case List.prepend(head, tail): {
+        suppose x ∈ List.prepend(A, head, tail);
+        x = head ∨ x ∈ tail by List.member_prepend_invert;
+        done by cases {
+          case x = head as isHead: {
+              -- The distinguished element is the head: `Q` keeps it, `P`
+              -- drops it, and the whole gap opens right here.
+              ¬P(head);
+              Q(head);
+              List.filter(P, List.prepend(A, head, tail)) = List.filter(P, tail)
+                  by List.filter_prepend_negative;
+              List.filter(Q, List.prepend(A, head, tail))
+                 = List.prepend(A, head, List.filter(Q, tail))
+                 by List.filter_prepend_positive;
+              length(List.filter(P, tail)) ≤ length(List.filter(Q, tail))
+                  by List.filter_length_monotone;
+              1 + length(List.filter(P, List.prepend(A, head, tail)))
+                 = 1 + length(List.filter(P, tail))
+                 ≤ 1 + length(List.filter(Q, tail))
+                 = length(List.prepend(A, head, List.filter(Q, tail)))
+                 = length(List.filter(Q, List.prepend(A, head, tail)));
+              done
+            }
+          case x ∈ tail as memberTail: {
+              1 + length(List.filter(P, tail)) ≤ length(List.filter(Q, tail))
+                  by IH(memberTail) as tailGap;
+              done by cases {
+                case P(head) as holds: {
+                    Q(head);
+                    List.filter(P, List.prepend(A, head, tail))
+                       = List.prepend(A, head, List.filter(P, tail))
+                       by List.filter_prepend_positive;
+                    List.filter(Q, List.prepend(A, head, tail))
+                       = List.prepend(A, head, List.filter(Q, tail))
+                       by List.filter_prepend_positive;
+                    1 + length(List.filter(P, List.prepend(A, head, tail)))
+                       = 1 + length(List.prepend(A, head, List.filter(P, tail)))
+                       = 1 + (1 + length(List.filter(P, tail)))
+                       ≤ 1 + length(List.filter(Q, tail))
+                       = length(List.prepend(A, head, List.filter(Q, tail)))
+                       = length(List.filter(Q, List.prepend(A, head, tail)));
+                    done
+                  }
+                otherwise as fails: {
+                    List.filter(P, List.prepend(A, head, tail)) = List.filter(P, tail)
+                        by List.filter_prepend_negative;
+                    1 + length(List.filter(P, List.prepend(A, head, tail)))
+                       = 1 + length(List.filter(P, tail))
+                       ≤ length(List.filter(Q, tail))
+                             by tailGap
+                       ≤ length(List.filter(Q, List.prepend(A, head, tail)))
+                             by List.filter_length_tail_le;
+                    done
+                  }
+              }
+            }
+        }
+      }
+  }
