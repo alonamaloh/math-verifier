@@ -406,6 +406,40 @@ least-number principle and nothing else.
    `group_bundle.math` documents for `Group.operation`; if so, use the
    `let ⟨…⟩ :=` destructuring form it fell back to.
 
+## State, and where to pick up
+
+Layers 0–4 are done, sorry-free, and in the library build. Blueprint at the
+eighth draft; Lean version unchanged and complete.
+
+| | Lines here |
+|---|---|
+| Layers 0–2 (signatures, terms, subuniverses, generation, products) | ~510 |
+| Layer 2 relational constructions (`Universal/relation.math`) | 240 |
+| Layer 3 (`Natural/minimum`, `Lists/filter_length`, `Set/enumeration`) | 451 |
+| Layer 4 (`Universal/absorption`, `Universal/star_power`, + `term`, + `Set/finite_successor`) | 764 |
+| **Total** | **~1965** |
+
+**Next is Layer 5**, and the first three items are short:
+
+1. `Universal.IsEssential` over an index type, in the two-clause form of
+   Definition 3.1 — a witness tuple free at each coordinate, and no tuple
+   inside the box.
+2. Lemma 3.4 (essentiality forces the parts nonempty) — three lines.
+3. Proposition 3.6 (a witness forbids an essential relation of the same index
+   type). This is the one that shows the layer will work: apply the witnessing
+   term *in the power* to the tuple of witnesses, and preservation plus
+   `Universal.Witnesses` put the result in the box. **State it at
+   `index = NaturalsBelow(m)`** — the proof needs a choice of one witness per
+   coordinate, and `NaturalsBelow.choice` is what we have.
+
+Then the two hard ones, in order: Proposition 3.5 (arity reduction — projection
+along `NaturalsBelow.embed`, now available) and Lemma 3.7 (regrouping), which
+the plan has always called the single biggest milestone. Theorem 3.10 assembles
+them.
+
+Layer 7 will want the **dependent product** `∏_{i∈I} A_i`, which is still owed;
+`Universal/relation.math` covers powers only, which is all Part II needs.
+
 ## Milestones
 
 - **M0 — the positivity experiment.** `Term` with a function-typed recursive
