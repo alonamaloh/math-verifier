@@ -1,0 +1,96 @@
+-- Set/finite_choice.math
+--
+-- Choice over a finite index: from a family of nonempty options indexed by
+-- `NaturalsBelow(bound)`, a function picking one from each.
+--
+-- Derived, not assumed. `Logic.countable_choice` indexes by ℕ, so the family has
+-- to be extended to every natural, and an index at or above the bound needs some
+-- option to return. There need not be one: the option type may be empty, which
+-- is exactly the case where the index set is empty too and the conclusion holds
+-- with the empty function.
+--
+-- So the split is on whether the index set is inhabited, not on the bound. That
+-- keeps the bound abstract throughout — an equation-shaped split on it would not
+-- refine the type of `property`, which mentions it.
+--
+-- What makes the filler harmless is that the extended predicate is guarded by
+-- the bound: at an index out of range it asks for nothing, so any option
+-- satisfies it.
+
+module Set.finite_choice
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Set.subtype
+import Set.finite
+
+theorem NaturalsBelow.choice (T : Type(0)) (bound : ℕ)
+        (property : NaturalsBelow(bound) → T → Proposition)
+        (inhabited : ∀ (index : NaturalsBelow(bound)). ∃ (option : T).
+                       property(index, option))
+        : ∃ (chosen : NaturalsBelow(bound) → T).
+            ∀ (index : NaturalsBelow(bound)). property(index, chosen(index)) := {
+  done by cases {
+    case ∃ (some : NaturalsBelow(bound)). True as indexExists: {
+        choose anchor such that True from indexExists;
+        choose filler such that property(anchor, filler) from inhabited;
+        ∀ (value : ℕ). ∃ (option : T).
+            ∀ (below : value < bound).
+              property(NaturalsBelow.make(value, below), option)
+          by {
+            take value : ℕ;
+            value < bound ∨ ¬(value < bound);
+            done by cases {
+              case value < bound as inRange: {
+                  choose option such that
+                      property(NaturalsBelow.make(value, inRange), option)
+                      from inhabited;
+                  witness option with {
+                    take below : value < bound;
+                    NaturalsBelow.make(value, below)
+                        = NaturalsBelow.make(value, inRange);
+                    done
+                  }
+                }
+              case ¬(value < bound) as outOfRange: {
+                  witness filler with {
+                    take below : value < bound;
+                    False by outOfRange;
+                    done
+                  }
+                }
+            }
+          };
+        choose extended such that
+            ∀ (value : ℕ). ∀ (below : value < bound).
+              property(NaturalsBelow.make(value, below), extended(value))
+            from Logic.countable_choice(P := ((value : ℕ) ↦ (option : T) ↦
+              ∀ (below : value < bound).
+                property(NaturalsBelow.make(value, below), option)));
+        witness ((index : NaturalsBelow(bound)) ↦
+            extended(NaturalsBelow.value(index))) with {
+          take index : NaturalsBelow(bound);
+          NaturalsBelow.make(NaturalsBelow.value(index), NaturalsBelow.below(index))
+              = index;
+          property(NaturalsBelow.make(NaturalsBelow.value(index),
+                                       NaturalsBelow.below(index)),
+                   extended(NaturalsBelow.value(index)));
+          done
+        }
+      }
+    case ¬(∃ (some : NaturalsBelow(bound)). True) as noIndex: {
+        witness ((index : NaturalsBelow(bound)) ↦
+            False.eliminate(T, noIndex(Exists.introduce(NaturalsBelow(bound),
+              (some : NaturalsBelow(bound)) ↦ True, index, True.trivial)))) with {
+          take index : NaturalsBelow(bound);
+          ∃ (some : NaturalsBelow(bound)). True by { witness index };
+          False;
+          done
+        }
+      }
+  }
+}

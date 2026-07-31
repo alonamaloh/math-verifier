@@ -16,6 +16,8 @@ enumerability, equinumerosity, and the finite counting layer.
   [equinumerous.math](equinumerous.math)
 - Finite yardstick `NaturalsBelow(n)` and cardinality predicate `HasSize(X, n)`
   in [finite.math](finite.math)
+- Choice over a finite index, `NaturalsBelow.choice`, in
+  [finite_choice.math](finite_choice.math)
 
 ## Main theorems
 
