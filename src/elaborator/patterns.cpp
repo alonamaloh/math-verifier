@@ -1902,35 +1902,59 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                             <= scrutineeIndex) {
                         continue;
                     }
-                    auto* scrutineeArgumentIdentifier =
-                        std::get_if<SurfaceIdentifier>(
-                            &rewrittenArguments[scrutineeIndex].value->node);
-                    if (!scrutineeArgumentIdentifier
-                        || !scrutineeArgumentIdentifier->universeArgs.empty()) {
+                    // The scrutinee of a recursive call is either the
+                    // recursive field itself (`tail`), or — for a
+                    // HIGHER-ORDER recursive field such as
+                    // `branches : ℕ → Tree` — that field applied to its
+                    // telescope arguments (`branches(0)`). The induction
+                    // hypothesis for a higher-order field has type
+                    // `Π telescope. motive(field telescope)`, so a call
+                    // recursing on `field(a …)` becomes the hypothesis
+                    // applied to those very arguments.
+                    const SurfaceExpressionPointer& scrutineeValue =
+                        rewrittenArguments[scrutineeIndex].value;
+                    const SurfaceIdentifier* fieldIdentifier = nullptr;
+                    std::vector<SurfaceArgument> telescopeArguments;
+                    if (auto* asIdentifier =
+                            std::get_if<SurfaceIdentifier>(
+                                &scrutineeValue->node)) {
+                        fieldIdentifier = asIdentifier;
+                    } else if (auto* asApplication =
+                                   std::get_if<SurfaceApplication>(
+                                       &scrutineeValue->node)) {
+                        fieldIdentifier = std::get_if<SurfaceIdentifier>(
+                            &asApplication->function->node);
+                        telescopeArguments = asApplication->arguments;
+                    }
+                    if (!fieldIdentifier
+                        || !fieldIdentifier->universeArgs.empty()) {
                         continue;
                     }
                     auto iterator = recursiveArgToHypothesis.find(
-                        scrutineeArgumentIdentifier->qualifiedName);
+                        fieldIdentifier->qualifiedName);
                     if (iterator == recursiveArgToHypothesis.end()) {
                         continue;
                     }
                     // Replace head with the recursion hypothesis,
                     // dropping the outer-binder arguments and the
-                    // scrutinee (the recursor handles them implicitly).
+                    // scrutinee (the recursor handles them implicitly),
+                    // and re-applying the telescope arguments if the
+                    // field was higher-order.
                     auto hypothesisIdentifier =
                         makeSurfaceIdentifier(iterator->second, {},
                                                node.line, node.column);
-                    std::vector<SurfaceArgument>
-                        remainingArguments(
-                            rewrittenArguments.begin()
-                                + scrutineeIndex + 1,
-                            rewrittenArguments.end());
-                    if (remainingArguments.empty()) {
+                    std::vector<SurfaceArgument> hypothesisArguments =
+                        std::move(telescopeArguments);
+                    hypothesisArguments.insert(
+                        hypothesisArguments.end(),
+                        rewrittenArguments.begin() + scrutineeIndex + 1,
+                        rewrittenArguments.end());
+                    if (hypothesisArguments.empty()) {
                         return hypothesisIdentifier;
                     }
                     return makeSurfaceApplication(
                         hypothesisIdentifier,
-                        std::move(remainingArguments),
+                        std::move(hypothesisArguments),
                         node.line, node.column);
                 }
             }

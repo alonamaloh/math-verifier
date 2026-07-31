@@ -1,0 +1,72 @@
+-- Feature test: structural recursion through a HIGHER-ORDER recursive
+-- field. A constructor whose recursive argument is a function
+-- (`branches : ℕ → Tree`) already produced the right induction
+-- hypothesis — `Π telescope. motive(field telescope)` — but a recursive
+-- call written on an APPLICATION of that field (`branches(0)`) was not
+-- recognised as a self-call, so it survived elaboration and the kernel
+-- reported the definition's own name as an undefined constant.
+--
+-- The rewrite now maps `f(field(a …))` to the hypothesis applied to the
+-- same arguments, which typechecks because that is exactly the
+-- hypothesis's type. Bare-identifier scrutinees keep the old path, so
+-- this is a strict generalisation.
+module Test.higher_order_recursion_test
+
+import Logic.basics
+import Natural.basics
+import Natural.order
+import Equality.basics
+import Set.subtype
+import Set.finite
+
+-- Branching arity ℕ: the recursive field is a function.
+inductive Test.Tree : Type(0) where
+  | Test.Tree.leaf : Test.Tree
+  | Test.Tree.node : (branches : ℕ → Test.Tree) → Test.Tree
+
+-- Recursion on `branches(0)`: an application of the recursive field.
+definition Test.leftmostDepth : Test.Tree → ℕ
+  | Test.Tree.leaf => 0
+  | Test.Tree.node(branches) => 1 + Test.leftmostDepth(branches(0))
+
+theorem Test.leftmostDepth_leaf : Test.leftmostDepth(Test.Tree.leaf) = 0 := reflexivity
+
+theorem Test.leftmostDepth_node (branches : ℕ → Test.Tree)
+        : Test.leftmostDepth(Test.Tree.node(branches))
+          = 1 + Test.leftmostDepth(branches(0)) := reflexivity
+
+-- Recursion at a varying index, not just a literal one.
+definition Test.depthAt (index : ℕ) : Test.Tree → ℕ
+  | Test.Tree.leaf => 0
+  | Test.Tree.node(branches) => 1 + Test.depthAt(index, branches(index))
+
+-- The shape the universal-algebra development needs: a signature indexed
+-- by arity, terms over an arbitrary variable type, and evaluation
+-- recursing through the argument tuple.
+inductive Test.Term (signature : ℕ → Type(0)) (variables : Type(0)) : Type(0) where
+  | Test.Term.variable : (name : variables) → Test.Term(signature, variables)
+  | Test.Term.apply
+      : (arity : ℕ)
+        → (symbol : signature(arity))
+        → (arguments : NaturalsBelow(arity) → Test.Term(signature, variables))
+        → Test.Term(signature, variables)
+
+definition Test.Term.evaluate
+        (signature : ℕ → Type(0)) (carrier : Type(0))
+        (interpret : (arity : ℕ) → signature(arity) → (NaturalsBelow(arity) → carrier) → carrier)
+        (variables : Type(0)) (valuation : variables → carrier)
+        : Test.Term(signature, variables) → carrier
+  | Test.Term.variable(name) => valuation(name)
+  | Test.Term.apply(arity, symbol, arguments) =>
+      interpret(arity, symbol,
+        (index : NaturalsBelow(arity)) ↦
+          Test.Term.evaluate(signature, carrier, interpret, variables, valuation,
+                             arguments(index)))
+
+theorem Test.Term.evaluate_variable
+        (signature : ℕ → Type(0)) (carrier : Type(0))
+        (interpret : (arity : ℕ) → signature(arity) → (NaturalsBelow(arity) → carrier) → carrier)
+        (variables : Type(0)) (valuation : variables → carrier) (name : variables)
+        : Test.Term.evaluate(signature, carrier, interpret, variables, valuation,
+                             Test.Term.variable(name))
+          = valuation(name) := reflexivity
