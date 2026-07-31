@@ -483,6 +483,17 @@ Three things learned doing it:
   that call site (`zetaUnfoldLetBinders`, exactly as the ordered-field and group
   tactics already do at their entry points) fixes it, and the `let` that
   motivated the diagnosis now takes.
+- **With the elaborator seeing through a `let`, the printer has to fold it
+  back.** Otherwise every goal and error shows the expansion the abbreviation
+  existed to avoid. `foldLocalAliasesForDisplay` runs before the existing
+  global `refoldForDisplay` and replaces each live alias's ζ-expanded value by
+  its name, later binders first so a longer alias beats one it contains. The
+  binder's own `x := V` line is excluded automatically (it prints at
+  `count = i`, which does not include `i`), so it never degenerates to
+  `x := x`. One trap: the codebase hash-conses expressions, so pointer identity
+  is *usually* structural identity — but not across `betaNormalizeForDisplay`,
+  and folding by pointer silently did nothing until it compared with
+  `structurallyEqual`.
 
 **Lifting the algebra too.** A follow-up review pointed out that removing the
 `{signature}` binder left 139 declarations still spelling

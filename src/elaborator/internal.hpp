@@ -521,6 +521,10 @@ private:
     // ONLY when `Name(args)` round-trips defeq to the subterm, so it can
     // never display a wrong type — at worst it declines to fold. Used by
     // the prettyPrint*ForDisplay paths; never affects elaboration.
+    ExpressionPointer foldLocalAliasesForDisplay(
+        ExpressionPointer expression,
+        const std::vector<LocalBinder>& localBinders,
+        size_t count) const;
     ExpressionPointer refoldForDisplay(
         ExpressionPointer expression) const;
     // Helper: the spine-head key used to index/compare foldable terms —

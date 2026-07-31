@@ -84,6 +84,88 @@ std::string Elaborator::foldHeadKey(
         return "";
     }
 
+// Replace every occurrence of `target` by `replacement`. Expressions are
+// interned, so structural identity is pointer identity and the walk is a
+// cheap comparison. `target` is closed over the printed scope (its
+// references are FreeVariables, not BoundVariables), so a match is valid at
+// any binder depth.
+static ExpressionPointer replaceSubtermForDisplay(
+        ExpressionPointer expression, ExpressionPointer target,
+        ExpressionPointer replacement) {
+    if (!expression) return expression;
+    if (expression.get() == target.get()
+        || structurallyEqual(expression, target)) {
+        return replacement;
+    }
+    if (auto* app = std::get_if<Application>(&expression->node)) {
+        ExpressionPointer function =
+            replaceSubtermForDisplay(app->function, target, replacement);
+        ExpressionPointer argument =
+            replaceSubtermForDisplay(app->argument, target, replacement);
+        if (function.get() != app->function.get()
+            || argument.get() != app->argument.get()) {
+            return makeApplication(function, argument);
+        }
+    } else if (auto* pi = std::get_if<Pi>(&expression->node)) {
+        ExpressionPointer domain =
+            replaceSubtermForDisplay(pi->domain, target, replacement);
+        ExpressionPointer codomain =
+            replaceSubtermForDisplay(pi->codomain, target, replacement);
+        if (domain.get() != pi->domain.get()
+            || codomain.get() != pi->codomain.get()) {
+            return makePi(pi->displayHint, domain, codomain);
+        }
+    } else if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+        ExpressionPointer domain =
+            replaceSubtermForDisplay(lambda->domain, target, replacement);
+        ExpressionPointer body =
+            replaceSubtermForDisplay(lambda->body, target, replacement);
+        if (domain.get() != lambda->domain.get()
+            || body.get() != lambda->body.get()) {
+            return makeLambda(lambda->displayHint, domain, body);
+        }
+    }
+    return expression;
+}
+
+// A `let` is transparent to the elaborator on purpose — its value goes into
+// the kernel ContextEntry, and the tuple/`witness` path ζ-unfolds it — so a
+// goal or error would otherwise print the expansion the reader wrote the
+// abbreviation to avoid. Fold each live local alias back to its name before
+// printing. Later binders first, so a longer alias whose value mentions an
+// earlier one (`doubled` over `link`) wins.
+ExpressionPointer Elaborator::foldLocalAliasesForDisplay(
+        ExpressionPointer expression,
+        const std::vector<LocalBinder>& localBinders,
+        size_t count) const {
+    if (!expression) return expression;
+    for (size_t k = count; k > 0; --k) {
+        const LocalBinder& binder = localBinders[k - 1];
+        if (!binder.value || binder.valueIsProof) continue;
+        // Elaborator-generated binders are plumbing, and `_` is anonymous:
+        // neither is a name the reader can read back.
+        if (binder.name.empty() || binder.name[0] == '_') continue;
+        ExpressionPointer target;
+        try {
+            std::vector<LocalBinder> below(
+                localBinders.begin(),
+                localBinders.begin() + static_cast<long>(k - 1));
+            target = zetaUnfoldLetBinders(binder.value, below);
+            for (size_t i = k - 1; i > 0; --i) {
+                target = openBinder(target, localBinders[i - 1].name,
+                                     FreeVariableOrigin::User);
+            }
+            target = betaNormalizeForDisplay(target);
+        } catch (...) {
+            continue;
+        }
+        if (!target) continue;
+        expression = replaceSubtermForDisplay(
+            expression, target, makeFreeVariable(binder.name));
+    }
+    return expression;
+}
+
 ExpressionPointer Elaborator::refoldForDisplay(
         ExpressionPointer expression) const {
         if (!expression) return expression;
@@ -212,7 +294,8 @@ std::string Elaborator::prettyPrintInLocalScope(
                                  FreeVariableOrigin::User);
         }
         return prettyPrint(refoldForDisplay(
-            betaNormalizeForDisplay(opened)));
+            foldLocalAliasesForDisplay(
+                betaNormalizeForDisplay(opened), localBinders, count)));
     }
 
 std::string Elaborator::prettyPrintInLocalScope(
