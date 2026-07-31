@@ -471,11 +471,18 @@ Three things learned doing it:
   NaturalsBelow.ne_of_value_ne` alone closes the goal, and always did. Four
   copies of a hand-rolled derivation existed because nobody tried the one-liner.
   A cheap tactic would have hidden the same mistake.
-- **The `let` traps are narrower than they looked.** Three of five attempted
-  abbreviations took, at 82 sites; the two that failed are the documented shape
-  — a `let`-bound set that a later `witness` must unfold. Abbreviating a
-  compound term used as an *argument* is safe; abbreviating one that has to be
-  seen through is not.
+- **The `let` traps are narrower than they looked** — and one of them was not a
+  property of `let` at all. Three of five attempted abbreviations took, at 82
+  sites. The failures looked like "a `let`-bound set blocks the unfolding
+  `witness` needs", but an ordinary `let` *is* ζ-transparent:
+  `buildContextFromLocalBinders` puts the value into the kernel `ContextEntry`
+  (proof values are excluded deliberately — a measured 120× defeq speedup). The
+  real cause was one routine: `weakHeadNormalForm` takes no `Context`, so
+  `weakHeadNormalFormForcingOpaqueHead` — which the anonymous-tuple path calls
+  to find the `∃` — structurally could not ζ-reduce a local alias. One line at
+  that call site (`zetaUnfoldLetBinders`, exactly as the ordered-field and group
+  tactics already do at their entry points) fixes it, and the `let` that
+  motivated the diagnosis now takes.
 
 **Lifting the algebra too.** A follow-up review pointed out that removing the
 `{signature}` binder left 139 declarations still spelling

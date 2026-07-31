@@ -338,6 +338,13 @@ ExpressionPointer Elaborator::elaborateAnonymousTuple(
             }
             return result;
         }
+        // A `let`-bound abbreviation must not hide the inductive. The whnf
+        // below takes no Context, so it cannot ζ-reduce a local alias on its
+        // own: `let R := Universal.project(…); … ∈ R by { witness x }` would
+        // report "expected type does not have an inductive head" even though
+        // `R` unfolds to an `∃`. Unfold local lets first, as the ordered-field
+        // and group tactics do at their entry points.
+        expectedType = zetaUnfoldLetBinders(expectedType, localBinders);
         // Force opaque heads transparent so an `IsNonneg(x)`-typed expected
         // type exposes its underlying `Exists` inductive — the construct-site
         // counterpart of the kernel's opacity-tolerant retries (replaces the
