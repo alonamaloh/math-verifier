@@ -115,3 +115,33 @@ theorem Universal.Term.evaluate_substitute {signature : Universal.Signature}
       }
   }
 }
+
+-- Preservation: a term's value lies in any subuniverse holding its variables'
+-- values. The blueprint's Lemma 1.14, and the reason a subuniverse never has to
+-- be checked against terms one at a time.
+theorem Universal.Term.evaluate_mem {signature : Universal.Signature}
+        {variables : Type(0)}
+        (a : Universal.Algebra(signature))
+        (subset : Set(Universal.Algebra.carrier(a)))
+        (closed : Universal.IsSubuniverse(a, subset))
+        (valuation : variables → Universal.Algebra.carrier(a))
+        (valuationInside : ∀ (name : variables). valuation(name) ∈ subset)
+        (subject : Universal.Term(signature, variables))
+        : Universal.Term.evaluate(a, valuation, subject) ∈ subset := {
+  by induction on subject with inductionHypothesis {
+    case subject = Universal.Term.variable(name) for some (name : variables): done
+    case subject = Universal.Term.apply(arity, symbol, arguments)
+        for some (arity : ℕ), (symbol : signature(arity)),
+                 (arguments : NaturalsBelow(arity)
+                              → Universal.Term(signature, variables)): {
+        ∀ (index : NaturalsBelow(arity)).
+          Universal.Term.evaluate(a, valuation, arguments(index)) ∈ subset
+          by inductionHypothesis;
+        Universal.Algebra.interpret(arity, symbol,
+            ((index : NaturalsBelow(arity)) ↦
+              Universal.Term.evaluate(a, valuation, arguments(index))))
+          ∈ subset;
+        done
+      }
+  }
+}

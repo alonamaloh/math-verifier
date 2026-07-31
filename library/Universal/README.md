@@ -22,6 +22,8 @@ for Zhuk's theorem on the left centre of a subdirect relation.
 ## Main theorems
 
 - `Universal.IsSubuniverse.universe` and `Universal.IsSubuniverse.singleton`
+- `Universal.Term.evaluate_mem` — preservation: a term's value lies in any
+  subuniverse holding its variables' values.
 - `Universal.Term.evaluate_substitute` — evaluating a substituted term is
   evaluating the original under the valuation that first evaluates each
   assigned term.
