@@ -381,6 +381,15 @@ These came out of one system and improved the other, or improved the blueprint.
   arguments later. Making the numeric parameters explicit fixed it; so did a
   `(… : T)` ascription where a bare `NaturalsBelow.first` appeared. Same root
   cause as the `Set.IsNonempty` note in `Set/basics.math`.
+- **A `let`-bound set blocks the unfolding that `witness` needs.** Binding the
+  long `Universal.project(a, …, clone(a, m))` as `let restrictedClone := …` and
+  then proving `restrict(…) ∈ restrictedClone` by `{ witness p }` fails with
+  "expected type does not have an inductive head": the goal does not reduce past
+  the `let` to the `∃` that `project`'s body is. Spelling the projection out at
+  every use fixes it. This is the second `let` trap — the first being that an
+  equation about a `let`-bound function has no occurrence left to rewrite — and
+  the shared lesson is that a `let` is fine for a value only *read*, and wrong
+  for one whose definition a later step must see through.
 - **A lambda on the right of a claim, or after `witness`, needs parentheses.**
   `arguments = (i : T) ↦ e;` is a parse error at the `↦`. Cost a round-trip
   three times.
