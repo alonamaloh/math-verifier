@@ -50,30 +50,26 @@ definition Universal.pair {signature : Universal.Signature}
         (a b : Universal.Algebra(signature))
         (base : Universal.Algebra.carrier(a))
         (fibre : Universal.Algebra.carrier(b))
-        : Universal.Algebra.carrier(Universal.Algebra.product(a, b)) :=
-  Product.make(base, fibre)
+        : Universal.Algebra.carrier(Universal.Algebra.product(a, b)) := Product.make(base, fibre)
 
 -- Its two components, and the reassembly.
 theorem Universal.pair_first {signature : Universal.Signature}
         (a b : Universal.Algebra(signature))
         (base : Universal.Algebra.carrier(a))
         (fibre : Universal.Algebra.carrier(b))
-        : Product.first(Universal.pair(a, b, base, fibre)) = base :=
-  done
+        : Product.first(Universal.pair(a, b, base, fibre)) = base := done
 
 theorem Universal.pair_second {signature : Universal.Signature}
         (a b : Universal.Algebra(signature))
         (base : Universal.Algebra.carrier(a))
         (fibre : Universal.Algebra.carrier(b))
-        : Product.second(Universal.pair(a, b, base, fibre)) = fibre :=
-  done
+        : Product.second(Universal.pair(a, b, base, fibre)) = fibre := done
 
 theorem Universal.pair_eta {signature : Universal.Signature}
         (a b : Universal.Algebra(signature))
         (point : Universal.Algebra.carrier(Universal.Algebra.product(a, b)))
         : Universal.pair(a, b, Product.first(point), Product.second(point))
-          = point :=
-  done by Product.eta
+          = point := done by Product.eta
 
 -- The operations act coordinatewise on pairs: this is the whole content of the
 -- binary product, and both halves of Lemma 4.3 are it plus idempotence.
@@ -82,44 +78,31 @@ theorem Universal.pair_interpret {signature : Universal.Signature}
         (symbol : signature(arity))
         (bases : NaturalsBelow(arity) → Universal.Algebra.carrier(a))
         (fibres : NaturalsBelow(arity) → Universal.Algebra.carrier(b))
-        : Universal.Algebra.interpret(arity, symbol,
-            ((slot : NaturalsBelow(arity)) ↦
-              Universal.pair(a, b, bases(slot), fibres(slot))))
-          = Universal.pair(a, b,
-              Universal.Algebra.interpret(arity, symbol, bases),
-              Universal.Algebra.interpret(arity, symbol, fibres)) :=
+        : Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ Universal.pair(a, b, bases(slot), fibres(slot))))
+          = Universal.pair(a, b, Universal.Algebra.interpret(arity, symbol, bases), Universal.Algebra.interpret(arity, symbol, fibres)) :=
   done
 
 -- Blueprint Definition 4.1: both projections are onto.
 definition Universal.IsSubdirect {signature : Universal.Signature}
         (a b : Universal.Algebra(signature))
-        (relation : Set(Universal.Algebra.carrier(
-            Universal.Algebra.product(a, b)))) : Proposition :=
-  (∀ (base : Universal.Algebra.carrier(a)).
-     ∃ (fibre : Universal.Algebra.carrier(b)).
-       Universal.pair(a, b, base, fibre) ∈ relation)
-  ∧ ∀ (fibre : Universal.Algebra.carrier(b)).
-      ∃ (base : Universal.Algebra.carrier(a)).
-        Universal.pair(a, b, base, fibre) ∈ relation
+        (relation : Set(Universal.Algebra.carrier(Universal.Algebra.product(a, b)))) : Proposition :=
+  (∀ (base : Universal.Algebra.carrier(a)). ∃ (fibre : Universal.Algebra.carrier(b)). Universal.pair(a, b, base, fibre) ∈ relation)
+  ∧ ∀ (fibre : Universal.Algebra.carrier(b)). ∃ (base : Universal.Algebra.carrier(a)). Universal.pair(a, b, base, fibre) ∈ relation
 
 -- Blueprint Definition 4.2: the neighbourhood `element + R`.
 definition Universal.neighborhood {signature : Universal.Signature}
         (a b : Universal.Algebra(signature))
-        (relation : Set(Universal.Algebra.carrier(
-            Universal.Algebra.product(a, b))))
+        (relation : Set(Universal.Algebra.carrier(Universal.Algebra.product(a, b))))
         (element : Universal.Algebra.carrier(a))
         : Set(Universal.Algebra.carrier(b)) :=
-  (candidate : Universal.Algebra.carrier(b)) ↦
-    Universal.pair(a, b, element, candidate) ∈ relation
+  (candidate : Universal.Algebra.carrier(b)) ↦ Universal.pair(a, b, element, candidate) ∈ relation
 
 -- Blueprint Definition 4.2: the left centre, the elements related to all of `B`.
 definition Universal.leftCenter {signature : Universal.Signature}
         (a b : Universal.Algebra(signature))
-        (relation : Set(Universal.Algebra.carrier(
-            Universal.Algebra.product(a, b))))
+        (relation : Set(Universal.Algebra.carrier(Universal.Algebra.product(a, b))))
         : Set(Universal.Algebra.carrier(a)) :=
-  (element : Universal.Algebra.carrier(a)) ↦
-    ∀ (candidate : Universal.Algebra.carrier(b)).
+  (element : Universal.Algebra.carrier(a)) ↦ ∀ (candidate : Universal.Algebra.carrier(b)).
       Universal.pair(a, b, element, candidate) ∈ relation
 
 -- ── Lemma 4.3 ─────────────────────────────────────────────────────────
@@ -129,37 +112,27 @@ definition Universal.leftCenter {signature : Universal.Signature}
 theorem Universal.IsSubuniverse.neighborhood {signature : Universal.Signature}
         (a b : Universal.Algebra(signature))
         (idempotentBase : Universal.Algebra.IsIdempotent(a))
-        (relation : Set(Universal.Algebra.carrier(
-            Universal.Algebra.product(a, b))))
-        (closed : Universal.IsSubuniverse(Universal.Algebra.product(a, b),
-            relation))
+        (relation : Set(Universal.Algebra.carrier(Universal.Algebra.product(a, b))))
+        (closed : Universal.IsSubuniverse(Universal.Algebra.product(a, b), relation))
         (element : Universal.Algebra.carrier(a))
         : Universal.IsSubuniverse(b,
             Universal.neighborhood(a, b, relation, element)) := {
   take arity : ℕ;
   take symbol : signature(arity);
   take arguments : NaturalsBelow(arity) → Universal.Algebra.carrier(b);
-  suppose ∀ (slot : NaturalsBelow(arity)).
-      arguments(slot) ∈ Universal.neighborhood(a, b, relation, element)
+  suppose ∀ (slot : NaturalsBelow(arity)). arguments(slot) ∈ Universal.neighborhood(a, b, relation, element)
       as allRelated;
-  ∀ (slot : NaturalsBelow(arity)).
-      Universal.pair(a, b, element, arguments(slot)) ∈ relation by allRelated;
-  Universal.Algebra.interpret(arity, symbol,
-      ((slot : NaturalsBelow(arity)) ↦ Universal.pair(a, b, element, arguments(slot))))
+  ∀ (slot : NaturalsBelow(arity)). Universal.pair(a, b, element, arguments(slot)) ∈ relation by allRelated;
+  Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ Universal.pair(a, b, element, arguments(slot))))
       ∈ relation;
   -- In the product the operation acts coordinatewise, and idempotence returns
   -- the first coordinate unchanged.
-  Universal.Algebra.interpret(arity, symbol,
-      ((slot : NaturalsBelow(arity)) ↦ element)) = element by idempotentBase;
-  Universal.Algebra.interpret(arity, symbol,
-      ((slot : NaturalsBelow(arity)) ↦ Universal.pair(a, b, element, arguments(slot))))
-     = Universal.pair(a, b,
-         Universal.Algebra.interpret(arity, symbol,
-           ((slot : NaturalsBelow(arity)) ↦ element)),
+  Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ element)) = element by idempotentBase;
+  Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ Universal.pair(a, b, element, arguments(slot))))
+     = Universal.pair(a, b, Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ element)),
          Universal.Algebra.interpret(arity, symbol, arguments))
            by Universal.pair_interpret
-     = Universal.pair(a, b, element,
-         Universal.Algebra.interpret(arity, symbol, arguments));
+     = Universal.pair(a, b, element, Universal.Algebra.interpret(arity, symbol, arguments));
   Universal.pair(a, b, element, Universal.Algebra.interpret(arity, symbol, arguments))
       ∈ relation;
   done
@@ -168,14 +141,12 @@ theorem Universal.IsSubuniverse.neighborhood {signature : Universal.Signature}
 -- (b) Neighbourhoods are nonempty — this is subdirectness on the first factor.
 theorem Universal.neighborhood_nonempty {signature : Universal.Signature}
         (a b : Universal.Algebra(signature))
-        (relation : Set(Universal.Algebra.carrier(
-            Universal.Algebra.product(a, b))))
+        (relation : Set(Universal.Algebra.carrier(Universal.Algebra.product(a, b))))
         (subdirect : Universal.IsSubdirect(a, b, relation))
         (element : Universal.Algebra.carrier(a))
         : Set.IsNonempty(Universal.Algebra.carrier(b),
             Universal.neighborhood(a, b, relation, element)) := {
-  ∀ (base : Universal.Algebra.carrier(a)).
-      ∃ (fibre : Universal.Algebra.carrier(b)).
+  ∀ (base : Universal.Algebra.carrier(a)). ∃ (fibre : Universal.Algebra.carrier(b)).
         Universal.pair(a, b, base, fibre) ∈ relation as everyBaseMet;
   choose fibre such that Universal.pair(a, b, element, fibre) ∈ relation
       from everyBaseMet(element);
@@ -188,29 +159,25 @@ theorem Universal.neighborhood_nonempty {signature : Universal.Signature}
 -- element, the other to read a centre element's neighbourhood off as full.
 theorem Universal.leftCenter_of_neighborhood_universe {signature : Universal.Signature}
         (a b : Universal.Algebra(signature))
-        (relation : Set(Universal.Algebra.carrier(
-            Universal.Algebra.product(a, b))))
+        (relation : Set(Universal.Algebra.carrier(Universal.Algebra.product(a, b))))
         (element : Universal.Algebra.carrier(a))
         (full : Universal.neighborhood(a, b, relation, element)
                 = Set.universe(Universal.Algebra.carrier(b)))
         : element ∈ Universal.leftCenter(a, b, relation) := {
   take candidate : Universal.Algebra.carrier(b);
   candidate ∈ Set.universe(Universal.Algebra.carrier(b));
-  candidate ∈ Universal.neighborhood(a, b, relation, element)
-      by substituting full;
+  candidate ∈ Universal.neighborhood(a, b, relation, element) by substituting full;
   done
 }
 
 theorem Universal.neighborhood_universe_of_leftCenter {signature : Universal.Signature}
         (a b : Universal.Algebra(signature))
-        (relation : Set(Universal.Algebra.carrier(
-            Universal.Algebra.product(a, b))))
+        (relation : Set(Universal.Algebra.carrier(Universal.Algebra.product(a, b))))
         (element : Universal.Algebra.carrier(a))
         (central : element ∈ Universal.leftCenter(a, b, relation))
         : Universal.neighborhood(a, b, relation, element)
           = Set.universe(Universal.Algebra.carrier(b)) := {
-  ∀ (candidate : Universal.Algebra.carrier(b)).
-      Universal.pair(a, b, element, candidate) ∈ relation by central;
+  ∀ (candidate : Universal.Algebra.carrier(b)). Universal.pair(a, b, element, candidate) ∈ relation by central;
   Universal.neighborhood(a, b, relation, element)
       ⊆ Set.universe(Universal.Algebra.carrier(b))
       by { take candidate : Universal.Algebra.carrier(b);
@@ -230,38 +197,26 @@ theorem Universal.neighborhood_universe_of_leftCenter {signature : Universal.Sig
 theorem Universal.IsSubuniverse.leftCenter {signature : Universal.Signature}
         (a b : Universal.Algebra(signature))
         (idempotentFibre : Universal.Algebra.IsIdempotent(b))
-        (relation : Set(Universal.Algebra.carrier(
-            Universal.Algebra.product(a, b))))
-        (closed : Universal.IsSubuniverse(Universal.Algebra.product(a, b),
-            relation))
+        (relation : Set(Universal.Algebra.carrier(Universal.Algebra.product(a, b))))
+        (closed : Universal.IsSubuniverse(Universal.Algebra.product(a, b), relation))
         : Universal.IsSubuniverse(a, Universal.leftCenter(a, b, relation)) := {
   take arity : ℕ;
   take symbol : signature(arity);
   take arguments : NaturalsBelow(arity) → Universal.Algebra.carrier(a);
-  suppose ∀ (slot : NaturalsBelow(arity)).
-      arguments(slot) ∈ Universal.leftCenter(a, b, relation) as allCentral;
+  suppose ∀ (slot : NaturalsBelow(arity)). arguments(slot) ∈ Universal.leftCenter(a, b, relation) as allCentral;
   take candidate : Universal.Algebra.carrier(b);
-  ∀ (slot : NaturalsBelow(arity)).
-      Universal.pair(a, b, arguments(slot), candidate) ∈ relation
+  ∀ (slot : NaturalsBelow(arity)). Universal.pair(a, b, arguments(slot), candidate) ∈ relation
       by { take slot : NaturalsBelow(arity);
-           ∀ (point : Universal.Algebra.carrier(b)).
-               Universal.pair(a, b, arguments(slot), point) ∈ relation by allCentral;
+           ∀ (point : Universal.Algebra.carrier(b)). Universal.pair(a, b, arguments(slot), point) ∈ relation by allCentral;
            done };
-  Universal.Algebra.interpret(arity, symbol,
-      ((slot : NaturalsBelow(arity)) ↦ Universal.pair(a, b, arguments(slot), candidate)))
+  Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ Universal.pair(a, b, arguments(slot), candidate)))
       ∈ relation;
-  Universal.Algebra.interpret(arity, symbol,
-      ((slot : NaturalsBelow(arity)) ↦ candidate)) = candidate
-      by idempotentFibre;
-  Universal.Algebra.interpret(arity, symbol,
-      ((slot : NaturalsBelow(arity)) ↦ Universal.pair(a, b, arguments(slot), candidate)))
-     = Universal.pair(a, b,
-         Universal.Algebra.interpret(arity, symbol, arguments),
-         Universal.Algebra.interpret(arity, symbol,
+  Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ candidate)) = candidate by idempotentFibre;
+  Universal.Algebra.interpret(arity, symbol, ((slot : NaturalsBelow(arity)) ↦ Universal.pair(a, b, arguments(slot), candidate)))
+     = Universal.pair(a, b, Universal.Algebra.interpret(arity, symbol, arguments), Universal.Algebra.interpret(arity, symbol,
            ((slot : NaturalsBelow(arity)) ↦ candidate)))
            by Universal.pair_interpret
-     = Universal.pair(a, b, Universal.Algebra.interpret(arity, symbol, arguments),
-         candidate);
+     = Universal.pair(a, b, Universal.Algebra.interpret(arity, symbol, arguments), candidate);
   Universal.pair(a, b, Universal.Algebra.interpret(arity, symbol, arguments), candidate)
       ∈ relation;
   done
@@ -273,22 +228,17 @@ theorem Universal.IsSubuniverse.leftCenter {signature : Universal.Signature}
 theorem Universal.neighborhood.preserves {signature : Universal.Signature}
         {variables : Type(0)}
         (a b : Universal.Algebra(signature))
-        (relation : Set(Universal.Algebra.carrier(
-            Universal.Algebra.product(a, b))))
-        (closed : Universal.IsSubuniverse(Universal.Algebra.product(a, b),
-            relation))
+        (relation : Set(Universal.Algebra.carrier(Universal.Algebra.product(a, b))))
+        (closed : Universal.IsSubuniverse(Universal.Algebra.product(a, b), relation))
         (subject : Universal.Term(signature, variables))
         (base : variables → Universal.Algebra.carrier(a))
         (fibre : variables → Universal.Algebra.carrier(b))
-        (related : ∀ (name : variables).
-            fibre(name) ∈ Universal.neighborhood(a, b, relation, base(name)))
+        (related : ∀ (name : variables). fibre(name) ∈ Universal.neighborhood(a, b, relation, base(name)))
         : Universal.Term.evaluate(b, fibre, subject)
           ∈ Universal.neighborhood(a, b, relation,
               Universal.Term.evaluate(a, base, subject)) := {
-  ∀ (name : variables). Universal.pair(a, b, base(name), fibre(name)) ∈ relation
-      by related;
-  Universal.Term.evaluate(Universal.Algebra.product(a, b),
-      ((name : variables) ↦ Universal.pair(a, b, base(name), fibre(name))), subject)
+  ∀ (name : variables). Universal.pair(a, b, base(name), fibre(name)) ∈ relation by related;
+  Universal.Term.evaluate(Universal.Algebra.product(a, b), ((name : variables) ↦ Universal.pair(a, b, base(name), fibre(name))), subject)
       ∈ relation by Universal.Term.evaluate_mem;
   -- The two coordinates of that value are the two evaluations.
   Product.first(Universal.Term.evaluate(Universal.Algebra.product(a, b),
@@ -299,24 +249,17 @@ theorem Universal.neighborhood.preserves {signature : Universal.Signature}
       ((name : variables) ↦ Universal.pair(a, b, base(name), fibre(name))), subject))
      = Universal.Term.evaluate(b, fibre, subject)
      by Universal.Term.second_evaluate_product;
-  Universal.Term.evaluate(Universal.Algebra.product(a, b),
-      ((name : variables) ↦ Universal.pair(a, b, base(name), fibre(name))), subject)
-     = Universal.pair(a, b,
-         Product.first(Universal.Term.evaluate(Universal.Algebra.product(a, b),
-           ((name : variables) ↦ Universal.pair(a, b, base(name), fibre(name))),
-           subject)),
+  Universal.Term.evaluate(Universal.Algebra.product(a, b), ((name : variables) ↦ Universal.pair(a, b, base(name), fibre(name))), subject)
+     = Universal.pair(a, b, Product.first(Universal.Term.evaluate(Universal.Algebra.product(a, b),
+           ((name : variables) ↦ Universal.pair(a, b, base(name), fibre(name))), subject)),
          Product.second(Universal.Term.evaluate(Universal.Algebra.product(a, b),
-           ((name : variables) ↦ Universal.pair(a, b, base(name), fibre(name))),
-           subject)))
+           ((name : variables) ↦ Universal.pair(a, b, base(name), fibre(name))), subject)))
            by Product.eta
      = Universal.pair(a, b, Universal.Term.evaluate(a, base, subject),
          Product.second(Universal.Term.evaluate(Universal.Algebra.product(a, b),
-           ((name : variables) ↦ Universal.pair(a, b, base(name), fibre(name))),
-           subject)))
-     = Universal.pair(a, b, Universal.Term.evaluate(a, base, subject),
-         Universal.Term.evaluate(b, fibre, subject));
-  Universal.pair(a, b, Universal.Term.evaluate(a, base, subject),
-      Universal.Term.evaluate(b, fibre, subject)) ∈ relation;
+           ((name : variables) ↦ Universal.pair(a, b, base(name), fibre(name))), subject)))
+     = Universal.pair(a, b, Universal.Term.evaluate(a, base, subject), Universal.Term.evaluate(b, fibre, subject));
+  Universal.pair(a, b, Universal.Term.evaluate(a, base, subject), Universal.Term.evaluate(b, fibre, subject)) ∈ relation;
   done
 }
 
@@ -325,18 +268,14 @@ theorem Universal.leftCenter.evaluate_mem {signature : Universal.Signature}
         {variables : Type(0)}
         (a b : Universal.Algebra(signature))
         (idempotentFibre : Universal.Algebra.IsIdempotent(b))
-        (relation : Set(Universal.Algebra.carrier(
-            Universal.Algebra.product(a, b))))
-        (closed : Universal.IsSubuniverse(Universal.Algebra.product(a, b),
-            relation))
+        (relation : Set(Universal.Algebra.carrier(Universal.Algebra.product(a, b))))
+        (closed : Universal.IsSubuniverse(Universal.Algebra.product(a, b), relation))
         (subject : Universal.Term(signature, variables))
         (valuation : variables → Universal.Algebra.carrier(a))
-        (allCentral : ∀ (name : variables).
-            valuation(name) ∈ Universal.leftCenter(a, b, relation))
+        (allCentral : ∀ (name : variables). valuation(name) ∈ Universal.leftCenter(a, b, relation))
         : Universal.Term.evaluate(a, valuation, subject)
           ∈ Universal.leftCenter(a, b, relation) := {
-  Universal.IsSubuniverse(a, Universal.leftCenter(a, b, relation))
-      by Universal.IsSubuniverse.leftCenter;
+  Universal.IsSubuniverse(a, Universal.leftCenter(a, b, relation)) by Universal.IsSubuniverse.leftCenter;
   done by Universal.Term.evaluate_mem
 }
 
@@ -355,9 +294,7 @@ definition Universal.stepImage {signature : Universal.Signature}
         (free : NaturalsBelow(arity))
         (part : Set(Universal.Algebra.carrier(b)))
         : Set(Universal.Algebra.carrier(b)) :=
-  (candidate : Universal.Algebra.carrier(b)) ↦
-    ∃ (tuple : NaturalsBelow(arity) → Universal.Algebra.carrier(b)).
-      tuple(free) ∈ part
+  (candidate : Universal.Algebra.carrier(b)) ↦ ∃ (tuple : NaturalsBelow(arity) → Universal.Algebra.carrier(b)). tuple(free) ∈ part
       ∧ Universal.Term.evaluate(b, tuple, subject) = candidate
 
 -- Step 2 of the blueprint's proof: the constant tuple at a point of `part` is
@@ -383,45 +320,35 @@ theorem Universal.subset_stepImage {signature : Universal.Signature}
 -- everything, so the constraint there is no constraint.
 theorem Universal.stepImage_subset_neighborhood {signature : Universal.Signature}
         (a b : Universal.Algebra(signature))
-        (relation : Set(Universal.Algebra.carrier(
-            Universal.Algebra.product(a, b))))
-        (closed : Universal.IsSubuniverse(Universal.Algebra.product(a, b),
-            relation))
+        (relation : Set(Universal.Algebra.carrier(Universal.Algebra.product(a, b))))
+        (closed : Universal.IsSubuniverse(Universal.Algebra.product(a, b), relation))
         (arity : ℕ)
         (subject : Universal.Term(signature, NaturalsBelow(arity)))
         (free : NaturalsBelow(arity))
         (valuation : NaturalsBelow(arity) → Universal.Algebra.carrier(a))
-        (othersCentral : ∀ (slot : NaturalsBelow(arity)).
-            ¬(slot = free)
-            → valuation(slot) ∈ Universal.leftCenter(a, b, relation))
-        : Universal.stepImage(b, arity, subject, free,
-            Universal.neighborhood(a, b, relation, valuation(free)))
+        (othersCentral : ∀ (slot : NaturalsBelow(arity)). ¬(slot = free) → valuation(slot) ∈ Universal.leftCenter(a, b, relation))
+        : Universal.stepImage(b, arity, subject, free, Universal.neighborhood(a, b, relation, valuation(free)))
           ⊆ Universal.neighborhood(a, b, relation,
               Universal.Term.evaluate(a, valuation, subject)) := {
   take candidate : Universal.Algebra.carrier(b);
-  suppose candidate ∈ Universal.stepImage(b, arity, subject, free,
-      Universal.neighborhood(a, b, relation, valuation(free))) as inImage;
-  choose tuple such that
-      tuple(free) ∈ Universal.neighborhood(a, b, relation, valuation(free))
+  suppose candidate ∈ Universal.stepImage(b, arity, subject, free, Universal.neighborhood(a, b, relation, valuation(free))) as inImage;
+  choose tuple such that tuple(free) ∈ Universal.neighborhood(a, b, relation, valuation(free))
       ∧ Universal.Term.evaluate(b, tuple, subject) = candidate
       from inImage;
   tuple(free) ∈ Universal.neighborhood(a, b, relation, valuation(free));
   Universal.Term.evaluate(b, tuple, subject) = candidate;
-  ∀ (slot : NaturalsBelow(arity)).
-      tuple(slot) ∈ Universal.neighborhood(a, b, relation, valuation(slot))
+  ∀ (slot : NaturalsBelow(arity)). tuple(slot) ∈ Universal.neighborhood(a, b, relation, valuation(slot))
       by { take slot : NaturalsBelow(arity);
            done by cases {
              case slot = free as isFree: done by substituting isFree
              otherwise as isOther: {
-                 valuation(slot) ∈ Universal.leftCenter(a, b, relation)
-                     by othersCentral;
+                 valuation(slot) ∈ Universal.leftCenter(a, b, relation) by othersCentral;
                  Universal.pair(a, b, valuation(slot), tuple(slot)) ∈ relation;
                  done
                }
            } };
   Universal.Term.evaluate(b, tuple, subject)
-      ∈ Universal.neighborhood(a, b, relation,
-          Universal.Term.evaluate(a, valuation, subject))
+      ∈ Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation, subject))
       by Universal.neighborhood.preserves;
   done
 }
@@ -432,38 +359,25 @@ theorem Universal.stepImage_subset_neighborhood {signature : Universal.Signature
 theorem Universal.BinaryAbsorbs.of_stepImage_eq {signature : Universal.Signature}
         (b : Universal.Algebra(signature)) (arity : ℕ)
         (subject : Universal.Term(signature, NaturalsBelow(arity)))
-        (taylor : Universal.IsTaylorOn(b,
-            Set.universe(Universal.Algebra.carrier(b)), arity, subject))
+        (taylor : Universal.IsTaylorOn(b, Set.universe(Universal.Algebra.carrier(b)), arity, subject))
         (free : NaturalsBelow(arity))
         (part : Set(Universal.Algebra.carrier(b)))
         (collapsed : Universal.stepImage(b, arity, subject, free, part) = part)
         : Universal.BinaryAbsorbs(b, part,
             Set.universe(Universal.Algebra.carrier(b))) := {
-  choose left such that
-      ∃ (right : NaturalsBelow(arity) → NaturalsBelow(2)).
-        Universal.IsTaylorIdentity(b,
-          Set.universe(Universal.Algebra.carrier(b)), arity, subject, free,
-          left, right)
+  choose left such that ∃ (right : NaturalsBelow(arity) → NaturalsBelow(2)). Universal.IsTaylorIdentity(b,
+          Set.universe(Universal.Algebra.carrier(b)), arity, subject, free, left, right)
       from taylor(free);
-  choose right such that
-      Universal.IsTaylorIdentity(b,
-        Set.universe(Universal.Algebra.carrier(b)), arity, subject, free,
-        left, right);
+  choose right such that Universal.IsTaylorIdentity(b, Set.universe(Universal.Algebra.carrier(b)), arity, subject, free, left, right);
   part ⊆ Set.universe(Universal.Algebra.carrier(b))
       by { take candidate : Universal.Algebra.carrier(b);
            suppose candidate ∈ part;
            done };
-  ∀ (tuple : NaturalsBelow(arity) → Universal.Algebra.carrier(b)).
-      tuple(free) ∈ part
-      → (∀ (slot : NaturalsBelow(arity)).
-           ¬(slot = free)
-           → tuple(slot) ∈ Set.universe(Universal.Algebra.carrier(b)))
-      → Universal.Term.evaluate(b, tuple, subject) ∈ part
+  ∀ (tuple : NaturalsBelow(arity) → Universal.Algebra.carrier(b)). tuple(free) ∈ part → (∀ (slot : NaturalsBelow(arity)). ¬(slot = free)
+           → tuple(slot) ∈ Set.universe(Universal.Algebra.carrier(b))) → Universal.Term.evaluate(b, tuple, subject) ∈ part
       by { take tuple : NaturalsBelow(arity) → Universal.Algebra.carrier(b);
            suppose tuple(free) ∈ part;
-           suppose ∀ (slot : NaturalsBelow(arity)).
-               ¬(slot = free)
-               → tuple(slot) ∈ Set.universe(Universal.Algebra.carrier(b));
+           suppose ∀ (slot : NaturalsBelow(arity)). ¬(slot = free) → tuple(slot) ∈ Set.universe(Universal.Algebra.carrier(b));
            Universal.Term.evaluate(b, tuple, subject)
                ∈ Universal.stepImage(b, arity, subject, free, part)
                by { witness tuple };
@@ -480,75 +394,52 @@ theorem Universal.center_step {signature : Universal.Signature}
         (idempotentBase : Universal.Algebra.IsIdempotent(a))
         (idempotentFibre : Universal.Algebra.IsIdempotent(b))
         (enumeration : List(Universal.Algebra.carrier(b)))
-        (isEnumeration : Set.IsEnumeration(Universal.Algebra.carrier(b),
-            enumeration))
-        (relation : Set(Universal.Algebra.carrier(
-            Universal.Algebra.product(a, b))))
-        (closed : Universal.IsSubuniverse(Universal.Algebra.product(a, b),
-            relation))
+        (isEnumeration : Set.IsEnumeration(Universal.Algebra.carrier(b), enumeration))
+        (relation : Set(Universal.Algebra.carrier(Universal.Algebra.product(a, b))))
+        (closed : Universal.IsSubuniverse(Universal.Algebra.product(a, b), relation))
         (subdirect : Universal.IsSubdirect(a, b, relation))
         (arity : ℕ)
         (subject : Universal.Term(signature, NaturalsBelow(arity)))
-        (taylor : Universal.IsTaylorOn(b,
-            Set.universe(Universal.Algebra.carrier(b)), arity, subject))
-        (noProperBinaryAbsorbing : ∀ (part : Set(Universal.Algebra.carrier(b))).
-            Universal.IsSubuniverse(b, part)
-            → Set.IsNonempty(Universal.Algebra.carrier(b), part)
-            → ¬(part = Set.universe(Universal.Algebra.carrier(b)))
-            → ¬Universal.BinaryAbsorbs(b, part,
-                Set.universe(Universal.Algebra.carrier(b))))
+        (taylor : Universal.IsTaylorOn(b, Set.universe(Universal.Algebra.carrier(b)), arity, subject))
+        (noProperBinaryAbsorbing : ∀ (part : Set(Universal.Algebra.carrier(b))). Universal.IsSubuniverse(b, part)
+            → Set.IsNonempty(Universal.Algebra.carrier(b), part) → ¬(part = Set.universe(Universal.Algebra.carrier(b)))
+            → ¬Universal.BinaryAbsorbs(b, part, Set.universe(Universal.Algebra.carrier(b))))
         (free : NaturalsBelow(arity))
         (valuation : NaturalsBelow(arity) → Universal.Algebra.carrier(a))
-        (othersCentral : ∀ (slot : NaturalsBelow(arity)).
-            ¬(slot = free)
-            → valuation(slot) ∈ Universal.leftCenter(a, b, relation))
-        : min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))),
-              1 + Set.size(enumeration,
+        (othersCentral : ∀ (slot : NaturalsBelow(arity)). ¬(slot = free) → valuation(slot) ∈ Universal.leftCenter(a, b, relation))
+        : min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))), 1 + Set.size(enumeration,
                 Universal.neighborhood(a, b, relation, valuation(free))))
-          ≤ Set.size(enumeration,
-              Universal.neighborhood(a, b, relation,
+          ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation,
                 Universal.Term.evaluate(a, valuation, subject))) := {
   Universal.neighborhood(a, b, relation, valuation(free))
-      ⊆ Universal.stepImage(b, arity, subject, free,
-          Universal.neighborhood(a, b, relation, valuation(free)))
+      ⊆ Universal.stepImage(b, arity, subject, free, Universal.neighborhood(a, b, relation, valuation(free)))
       by Universal.subset_stepImage;
-  Universal.stepImage(b, arity, subject, free,
-      Universal.neighborhood(a, b, relation, valuation(free)))
-      ⊆ Universal.neighborhood(a, b, relation,
-          Universal.Term.evaluate(a, valuation, subject))
+  Universal.stepImage(b, arity, subject, free, Universal.neighborhood(a, b, relation, valuation(free)))
+      ⊆ Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation, subject))
       by Universal.stepImage_subset_neighborhood;
   done by cases {
-    case Universal.stepImage(b, arity, subject, free,
-           Universal.neighborhood(a, b, relation, valuation(free)))
+    case Universal.stepImage(b, arity, subject, free, Universal.neighborhood(a, b, relation, valuation(free)))
          = Universal.neighborhood(a, b, relation, valuation(free))
            as collapsed: {
         -- The neighbourhood binary absorbs `B`, so it is not proper.
-        Universal.BinaryAbsorbs(b,
-            Universal.neighborhood(a, b, relation, valuation(free)),
-            Set.universe(Universal.Algebra.carrier(b)))
+        Universal.BinaryAbsorbs(b, Universal.neighborhood(a, b, relation, valuation(free)), Set.universe(Universal.Algebra.carrier(b)))
             by Universal.BinaryAbsorbs.of_stepImage_eq;
-        Universal.IsSubuniverse(b,
-            Universal.neighborhood(a, b, relation, valuation(free)))
-            by Universal.IsSubuniverse.neighborhood;
-        Set.IsNonempty(Universal.Algebra.carrier(b),
-            Universal.neighborhood(a, b, relation, valuation(free)))
+        Universal.IsSubuniverse(b, Universal.neighborhood(a, b, relation, valuation(free))) by Universal.IsSubuniverse.neighborhood;
+        Set.IsNonempty(Universal.Algebra.carrier(b), Universal.neighborhood(a, b, relation, valuation(free)))
             by Universal.neighborhood_nonempty;
         Universal.neighborhood(a, b, relation, valuation(free))
             = Set.universe(Universal.Algebra.carrier(b))
-            by { suppose ¬(Universal.neighborhood(a, b, relation,
-                     valuation(free))
+            by { suppose ¬(Universal.neighborhood(a, b, relation, valuation(free))
                    = Set.universe(Universal.Algebra.carrier(b)))
                      for contradiction;
-                 ¬Universal.BinaryAbsorbs(b,
-                     Universal.neighborhood(a, b, relation, valuation(free)),
+                 ¬Universal.BinaryAbsorbs(b, Universal.neighborhood(a, b, relation, valuation(free)),
                      Set.universe(Universal.Algebra.carrier(b)))
                      by noProperBinaryAbsorbing;
                  done };
         -- So the free coordinate is central too, and hence so is the value.
         valuation(free) ∈ Universal.leftCenter(a, b, relation)
             by Universal.leftCenter_of_neighborhood_universe;
-        ∀ (slot : NaturalsBelow(arity)).
-            valuation(slot) ∈ Universal.leftCenter(a, b, relation)
+        ∀ (slot : NaturalsBelow(arity)). valuation(slot) ∈ Universal.leftCenter(a, b, relation)
             by { take slot : NaturalsBelow(arity);
                  done by cases {
                    case slot = free as isFree: done by substituting isFree
@@ -557,54 +448,33 @@ theorem Universal.center_step {signature : Universal.Signature}
         Universal.Term.evaluate(a, valuation, subject)
             ∈ Universal.leftCenter(a, b, relation)
             by Universal.leftCenter.evaluate_mem;
-        Universal.neighborhood(a, b, relation,
-            Universal.Term.evaluate(a, valuation, subject))
+        Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation, subject))
             = Set.universe(Universal.Algebra.carrier(b))
             by Universal.neighborhood_universe_of_leftCenter as valueSaturated;
-        min(Set.size(enumeration,
-              Set.universe(Universal.Algebra.carrier(b))),
-            1 + Set.size(enumeration,
+        min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))), 1 + Set.size(enumeration,
               Universal.neighborhood(a, b, relation, valuation(free))))
-           ≤ Set.size(enumeration,
-               Set.universe(Universal.Algebra.carrier(b)))
+           ≤ Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b)))
                  by Natural.minimum_le_left;
         done by substituting valueSaturated
       }
     otherwise as grows: {
         -- Strictly bigger, and Step 1 passes the gain on.
-        Set.size(enumeration,
-            Universal.neighborhood(a, b, relation, valuation(free)))
-          < Set.size(enumeration,
-              Universal.stepImage(b, arity, subject, free,
-                Universal.neighborhood(a, b, relation, valuation(free))))
+        Set.size(enumeration, Universal.neighborhood(a, b, relation, valuation(free)))
+          < Set.size(enumeration, Universal.stepImage(b, arity, subject, free, Universal.neighborhood(a, b, relation, valuation(free))))
           by { ¬(Universal.neighborhood(a, b, relation, valuation(free))
-                 = Universal.stepImage(b, arity, subject, free,
-                     Universal.neighborhood(a, b, relation, valuation(free))))
-                 by { suppose Universal.neighborhood(a, b, relation,
-                          valuation(free))
-                        = Universal.stepImage(b, arity, subject, free,
-                            Universal.neighborhood(a, b, relation,
-                              valuation(free))) as flipped;
-                      Universal.stepImage(b, arity, subject, free,
-                          Universal.neighborhood(a, b, relation,
-                            valuation(free)))
-                        = Universal.neighborhood(a, b, relation,
-                            valuation(free)) by flipped;
+                 = Universal.stepImage(b, arity, subject, free, Universal.neighborhood(a, b, relation, valuation(free))))
+                 by { suppose Universal.neighborhood(a, b, relation, valuation(free))
+                        = Universal.stepImage(b, arity, subject, free, Universal.neighborhood(a, b, relation, valuation(free))) as flipped;
+                      Universal.stepImage(b, arity, subject, free, Universal.neighborhood(a, b, relation, valuation(free)))
+                        = Universal.neighborhood(a, b, relation, valuation(free)) by flipped;
                       done };
                done by Set.size_lt_of_proper_subset };
-        min(Set.size(enumeration,
-              Set.universe(Universal.Algebra.carrier(b))),
-            1 + Set.size(enumeration,
+        min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))), 1 + Set.size(enumeration,
               Universal.neighborhood(a, b, relation, valuation(free))))
-           ≤ 1 + Set.size(enumeration,
-                 Universal.neighborhood(a, b, relation, valuation(free)))
+           ≤ 1 + Set.size(enumeration, Universal.neighborhood(a, b, relation, valuation(free)))
                  by Natural.minimum_le_right
-           ≤ Set.size(enumeration,
-               Universal.stepImage(b, arity, subject, free,
-                 Universal.neighborhood(a, b, relation, valuation(free))))
-           ≤ Set.size(enumeration,
-               Universal.neighborhood(a, b, relation,
-                 Universal.Term.evaluate(a, valuation, subject)))
+           ≤ Set.size(enumeration, Universal.stepImage(b, arity, subject, free, Universal.neighborhood(a, b, relation, valuation(free))))
+           ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation, subject)))
                  by Set.size_le_of_subset;
         done
       }
@@ -631,227 +501,141 @@ theorem Universal.center_star_step {signature : Universal.Signature}
         (idempotentBase : Universal.Algebra.IsIdempotent(a))
         (idempotentFibre : Universal.Algebra.IsIdempotent(b))
         (enumeration : List(Universal.Algebra.carrier(b)))
-        (isEnumeration : Set.IsEnumeration(Universal.Algebra.carrier(b),
-            enumeration))
-        (relation : Set(Universal.Algebra.carrier(
-            Universal.Algebra.product(a, b))))
-        (closed : Universal.IsSubuniverse(Universal.Algebra.product(a, b),
-            relation))
+        (isEnumeration : Set.IsEnumeration(Universal.Algebra.carrier(b), enumeration))
+        (relation : Set(Universal.Algebra.carrier(Universal.Algebra.product(a, b))))
+        (closed : Universal.IsSubuniverse(Universal.Algebra.product(a, b), relation))
         (subdirect : Universal.IsSubdirect(a, b, relation))
         (arity : ℕ)
         (subject : Universal.Term(signature, NaturalsBelow(arity)))
-        (taylor : Universal.IsTaylorOn(b,
-            Set.universe(Universal.Algebra.carrier(b)), arity, subject))
-        (noProperBinaryAbsorbing : ∀ (part : Set(Universal.Algebra.carrier(b))).
-            Universal.IsSubuniverse(b, part)
-            → Set.IsNonempty(Universal.Algebra.carrier(b), part)
-            → ¬(part = Set.universe(Universal.Algebra.carrier(b)))
-            → ¬Universal.BinaryAbsorbs(b, part,
-                Set.universe(Universal.Algebra.carrier(b))))
+        (taylor : Universal.IsTaylorOn(b, Set.universe(Universal.Algebra.carrier(b)), arity, subject))
+        (noProperBinaryAbsorbing : ∀ (part : Set(Universal.Algebra.carrier(b))). Universal.IsSubuniverse(b, part)
+            → Set.IsNonempty(Universal.Algebra.carrier(b), part) → ¬(part = Set.universe(Universal.Algebra.carrier(b)))
+            → ¬Universal.BinaryAbsorbs(b, part, Set.universe(Universal.Algebra.carrier(b))))
         (rest : ℕ)
         (inner : Universal.Term(signature, Universal.StarIndex(arity, rest)))
-        (innerBound : ∀ (position : Universal.StarIndex(arity, rest)).
-            ∀ (values : Universal.StarIndex(arity, rest)
-                        → Universal.Algebra.carrier(a)).
-              (∀ (other : Universal.StarIndex(arity, rest)).
-                 ¬(other = position)
-                 → values(other) ∈ Universal.leftCenter(a, b, relation))
-              → min(Set.size(enumeration,
-                      Set.universe(Universal.Algebra.carrier(b))),
-                    rest + Set.size(enumeration,
-                      Universal.neighborhood(a, b, relation, values(position))))
-                ≤ Set.size(enumeration,
-                    Universal.neighborhood(a, b, relation,
-                      Universal.Term.evaluate(a, values, inner))))
+        (innerBound : ∀ (position : Universal.StarIndex(arity, rest)). ∀ (values : Universal.StarIndex(arity, rest)
+            → Universal.Algebra.carrier(a)). (∀ (other : Universal.StarIndex(arity, rest)). ¬(other = position)
+                 → values(other) ∈ Universal.leftCenter(a, b, relation)) → min(Set.size(enumeration,
+            Set.universe(Universal.Algebra.carrier(b))), rest + Set.size(enumeration,
+            Universal.neighborhood(a, b, relation, values(position))))
+                ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, values, inner))))
         (free : Universal.StarIndex(arity, 1 + rest))
-        (valuation : Universal.StarIndex(arity, 1 + rest)
-                     → Universal.Algebra.carrier(a))
-        (othersCentral : ∀ (other : Universal.StarIndex(arity, 1 + rest)).
-            ¬(other = free)
+        (valuation : Universal.StarIndex(arity, 1 + rest) → Universal.Algebra.carrier(a))
+        (othersCentral : ∀ (other : Universal.StarIndex(arity, 1 + rest)). ¬(other = free)
             → valuation(other) ∈ Universal.leftCenter(a, b, relation))
         (blockValues : NaturalsBelow(arity) → Universal.Algebra.carrier(a))
-        (blockValuesSpec : ∀ (block : NaturalsBelow(arity)).
-            blockValues(block)
-            = Universal.Term.evaluate(a,
-                ((position : Universal.StarIndex(arity, rest)) ↦
-                  valuation(Universal.starPrepend(arity, rest, block, position))),
-                inner))
-        : min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))),
-              (1 + rest) + Set.size(enumeration,
+        (blockValuesSpec : ∀ (block : NaturalsBelow(arity)). blockValues(block)
+            = Universal.Term.evaluate(a, ((position : Universal.StarIndex(arity, rest)) ↦
+                  valuation(Universal.starPrepend(arity, rest, block, position))), inner))
+        : min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))), (1 + rest) + Set.size(enumeration,
                 Universal.neighborhood(a, b, relation, valuation(free))))
-          ≤ Set.size(enumeration,
-              Universal.neighborhood(a, b, relation,
-                Universal.Term.evaluate(a, valuation,
+          ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation,
                   Universal.starStep(signature, arity, rest, subject,
                     inner)))) := {
   -- The free index sits in block `starHead(free)` at position `starTail(free)`.
-  Universal.starPrepend(arity, rest, Universal.starHead(arity, rest, free),
-      Universal.starTail(arity, rest, free)) = free
+  Universal.starPrepend(arity, rest, Universal.starHead(arity, rest, free), Universal.starTail(arity, rest, free)) = free
       by Universal.starPrepend_head_tail;
   -- Every other block carries centre elements only.
-  ∀ (block : NaturalsBelow(arity)).
-      ¬(block = Universal.starHead(arity, rest, free))
+  ∀ (block : NaturalsBelow(arity)). ¬(block = Universal.starHead(arity, rest, free))
       → blockValues(block) ∈ Universal.leftCenter(a, b, relation)
       by { take block : NaturalsBelow(arity);
            suppose ¬(block = Universal.starHead(arity, rest, free))
                as blockDiffers;
-           ∀ (position : Universal.StarIndex(arity, rest)).
-               valuation(Universal.starPrepend(arity, rest, block, position))
+           ∀ (position : Universal.StarIndex(arity, rest)). valuation(Universal.starPrepend(arity, rest, block, position))
                  ∈ Universal.leftCenter(a, b, relation)
                by { take position : Universal.StarIndex(arity, rest);
                     ¬(Universal.starPrepend(arity, rest, block, position) = free)
-                        by { suppose Universal.starPrepend(arity, rest, block,
-                                 position) = free as isFree;
-                             Universal.starHead(arity, rest,
-                                 Universal.starPrepend(arity, rest, block,
-                                   position)) = block
+                        by { suppose Universal.starPrepend(arity, rest, block, position) = free as isFree;
+                             Universal.starHead(arity, rest, Universal.starPrepend(arity, rest, block, position)) = block
                                  by Universal.starHead_prepend;
                              block
-                                = Universal.starHead(arity, rest,
-                                    Universal.starPrepend(arity, rest, block,
-                                      position))
+                                = Universal.starHead(arity, rest, Universal.starPrepend(arity, rest, block, position))
                                 = Universal.starHead(arity, rest, free)
                                     by substituting isFree;
                              done };
                     done by othersCentral };
-           Universal.Term.evaluate(a,
-               ((position : Universal.StarIndex(arity, rest)) ↦
-                 valuation(Universal.starPrepend(arity, rest, block, position))),
-               inner)
+           Universal.Term.evaluate(a, ((position : Universal.StarIndex(arity, rest)) ↦
+                 valuation(Universal.starPrepend(arity, rest, block, position))), inner)
              ∈ Universal.leftCenter(a, b, relation)
                by Universal.leftCenter.evaluate_mem;
            done by substituting blockValuesSpec(block) };
   -- The free block carries the free index, so the inductive bound applies there.
-  min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))),
-      rest + Set.size(enumeration,
+  min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))), rest + Set.size(enumeration,
         Universal.neighborhood(a, b, relation, valuation(free))))
-     ≤ Set.size(enumeration,
-         Universal.neighborhood(a, b, relation,
-           blockValues(Universal.starHead(arity, rest, free))))
-     by { ∀ (other : Universal.StarIndex(arity, rest)).
-              ¬(other = Universal.starTail(arity, rest, free))
-              → valuation(Universal.starPrepend(arity, rest,
-                  Universal.starHead(arity, rest, free), other))
+     ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, blockValues(Universal.starHead(arity, rest, free))))
+     by { ∀ (other : Universal.StarIndex(arity, rest)). ¬(other = Universal.starTail(arity, rest, free))
+              → valuation(Universal.starPrepend(arity, rest, Universal.starHead(arity, rest, free), other))
                 ∈ Universal.leftCenter(a, b, relation)
               by { take other : Universal.StarIndex(arity, rest);
                    suppose ¬(other = Universal.starTail(arity, rest, free))
                        as positionDiffers;
-                   ¬(Universal.starPrepend(arity, rest,
-                       Universal.starHead(arity, rest, free), other) = free)
-                       by { suppose Universal.starPrepend(arity, rest,
-                                Universal.starHead(arity, rest, free), other)
+                   ¬(Universal.starPrepend(arity, rest, Universal.starHead(arity, rest, free), other) = free)
+                       by { suppose Universal.starPrepend(arity, rest, Universal.starHead(arity, rest, free), other)
                               = free as isFree;
-                            Universal.starTail(arity, rest,
-                                Universal.starPrepend(arity, rest,
+                            Universal.starTail(arity, rest, Universal.starPrepend(arity, rest,
                                   Universal.starHead(arity, rest, free), other))
                               = other
                               by Universal.starTail_prepend;
                             other
-                               = Universal.starTail(arity, rest,
-                                   Universal.starPrepend(arity, rest,
-                                     Universal.starHead(arity, rest, free),
+                               = Universal.starTail(arity, rest, Universal.starPrepend(arity, rest, Universal.starHead(arity, rest, free),
                                      other))
                                = Universal.starTail(arity, rest, free)
                                    by substituting isFree;
                             done };
                    done by othersCentral } as positionsCentral;
           -- The value at the distinguished position is the value at `free`.
-          valuation(Universal.starPrepend(arity, rest,
-              Universal.starHead(arity, rest, free),
-              Universal.starTail(arity, rest, free)))
+          valuation(Universal.starPrepend(arity, rest, Universal.starHead(arity, rest, free), Universal.starTail(arity, rest, free)))
             = valuation(free) as freeValue;
-          min(Set.size(enumeration,
-                Set.universe(Universal.Algebra.carrier(b))),
-              rest + Set.size(enumeration,
-                Universal.neighborhood(a, b, relation,
-                  valuation(Universal.starPrepend(arity, rest,
-                    Universal.starHead(arity, rest, free),
+          min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))), rest + Set.size(enumeration,
+                Universal.neighborhood(a, b, relation, valuation(Universal.starPrepend(arity, rest, Universal.starHead(arity, rest, free),
                     Universal.starTail(arity, rest, free))))))
-            ≤ Set.size(enumeration,
-                Universal.neighborhood(a, b, relation,
-                  Universal.Term.evaluate(a,
-                    ((position : Universal.StarIndex(arity, rest)) ↦
-                      valuation(Universal.starPrepend(arity, rest,
-                        Universal.starHead(arity, rest, free), position))),
-                    inner)))
-            by innerBound(Universal.starTail(arity, rest, free),
-              ((position : Universal.StarIndex(arity, rest)) ↦
-                valuation(Universal.starPrepend(arity, rest,
-                  Universal.starHead(arity, rest, free), position))),
-              positionsCentral);
-          Universal.Term.evaluate(a,
-              ((position : Universal.StarIndex(arity, rest)) ↦
-                valuation(Universal.starPrepend(arity, rest,
-                  Universal.starHead(arity, rest, free), position))),
-              inner)
+            ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a,
+                    ((position : Universal.StarIndex(arity, rest)) ↦ valuation(Universal.starPrepend(arity, rest,
+              Universal.starHead(arity, rest, free), position))), inner)))
+            by innerBound(Universal.starTail(arity, rest, free), ((position : Universal.StarIndex(arity, rest)) ↦
+                valuation(Universal.starPrepend(arity, rest, Universal.starHead(arity, rest, free), position))), positionsCentral);
+          Universal.Term.evaluate(a, ((position : Universal.StarIndex(arity, rest)) ↦ valuation(Universal.starPrepend(arity, rest,
+                  Universal.starHead(arity, rest, free), position))), inner)
             = blockValues(Universal.starHead(arity, rest, free))
             by blockValuesSpec;
           done by substituting freeValue };
   -- One more enlargement step, at the free block.
-  min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))),
-      1 + Set.size(enumeration,
-        Universal.neighborhood(a, b, relation,
+  min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))), 1 + Set.size(enumeration, Universal.neighborhood(a, b, relation,
           blockValues(Universal.starHead(arity, rest, free)))))
-     ≤ Set.size(enumeration,
-         Universal.neighborhood(a, b, relation,
-           Universal.Term.evaluate(a, blockValues, subject)))
+     ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, blockValues, subject)))
      by Universal.center_step;
   -- And the two bounds compose, capping before incrementing.
-  Universal.Term.evaluate(a, valuation,
-      Universal.starStep(signature, arity, rest, subject, inner))
-     = Universal.Term.evaluate(a,
-         ((block : NaturalsBelow(arity)) ↦
-           Universal.Term.evaluate(a,
-             ((position : Universal.StarIndex(arity, rest)) ↦
-               valuation(Universal.starPrepend(arity, rest, block, position))),
-             inner)),
+  Universal.Term.evaluate(a, valuation, Universal.starStep(signature, arity, rest, subject, inner))
+     = Universal.Term.evaluate(a, ((block : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(a,
+      ((position : Universal.StarIndex(arity, rest)) ↦ valuation(Universal.starPrepend(arity, rest, block, position))), inner)),
          subject)
            by Universal.starStep_evaluate
      = Universal.Term.evaluate(a, blockValues, subject)
            by { blockValues
-                  = ((block : NaturalsBelow(arity)) ↦
-                      Universal.Term.evaluate(a,
-                        ((position : Universal.StarIndex(arity, rest)) ↦
-                          valuation(Universal.starPrepend(arity, rest, block,
-                            position))),
-                        inner))
-                  by { ∀ (block : NaturalsBelow(arity)).
-                           blockValues(block)
-                           = Universal.Term.evaluate(a,
-                               ((position : Universal.StarIndex(arity, rest)) ↦
-                                 valuation(Universal.starPrepend(arity, rest,
-                                   block, position))),
-                               inner)
+                  = ((block : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(a, ((position : Universal.StarIndex(arity, rest)) ↦
+                          valuation(Universal.starPrepend(arity, rest, block, position))), inner))
+                  by { ∀ (block : NaturalsBelow(arity)). blockValues(block)
+                           = Universal.Term.evaluate(a, ((position : Universal.StarIndex(arity, rest)) ↦
+                                 valuation(Universal.starPrepend(arity, rest, block, position))), inner)
                            by blockValuesSpec;
                        done by Function.extensionality };
                 done by substitution }
      as levelValue;
-  1 + min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))),
-        rest + Set.size(enumeration,
+  1 + min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))), rest + Set.size(enumeration,
           Universal.neighborhood(a, b, relation, valuation(free))))
-     ≤ 1 + Set.size(enumeration,
-           Universal.neighborhood(a, b, relation,
-             blockValues(Universal.starHead(arity, rest, free))));
-  min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))),
-      (1 + rest) + Set.size(enumeration,
+     ≤ 1 + Set.size(enumeration, Universal.neighborhood(a, b, relation, blockValues(Universal.starHead(arity, rest, free))));
+  min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))), (1 + rest) + Set.size(enumeration,
         Universal.neighborhood(a, b, relation, valuation(free))))
-     = min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))),
-         1 + (rest + Set.size(enumeration,
+     = min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))), 1 + (rest + Set.size(enumeration,
            Universal.neighborhood(a, b, relation, valuation(free)))))
-     = min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))),
-         1 + min(Set.size(enumeration,
-             Set.universe(Universal.Algebra.carrier(b))),
-           rest + Set.size(enumeration,
-             Universal.neighborhood(a, b, relation, valuation(free)))))
+     = min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))), 1 + min(Set.size(enumeration,
+      Set.universe(Universal.Algebra.carrier(b))), rest + Set.size(enumeration,
+      Universal.neighborhood(a, b, relation, valuation(free)))))
            by Natural.minimum_absorbs_one_plus
-     ≤ min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))),
-         1 + Set.size(enumeration,
-           Universal.neighborhood(a, b, relation,
-             blockValues(Universal.starHead(arity, rest, free)))))
+     ≤ min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))), 1 + Set.size(enumeration,
+           Universal.neighborhood(a, b, relation, blockValues(Universal.starHead(arity, rest, free)))))
            by Natural.minimum_monotone_right
-     ≤ Set.size(enumeration,
-         Universal.neighborhood(a, b, relation,
-           Universal.Term.evaluate(a, blockValues, subject)));
+     ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, blockValues, subject)));
   done by substituting levelValue
 }
 
@@ -866,148 +650,85 @@ theorem Universal.center_star {signature : Universal.Signature}
         (idempotentBase : Universal.Algebra.IsIdempotent(a))
         (idempotentFibre : Universal.Algebra.IsIdempotent(b))
         (enumeration : List(Universal.Algebra.carrier(b)))
-        (isEnumeration : Set.IsEnumeration(Universal.Algebra.carrier(b),
-            enumeration))
-        (relation : Set(Universal.Algebra.carrier(
-            Universal.Algebra.product(a, b))))
-        (closed : Universal.IsSubuniverse(Universal.Algebra.product(a, b),
-            relation))
+        (isEnumeration : Set.IsEnumeration(Universal.Algebra.carrier(b), enumeration))
+        (relation : Set(Universal.Algebra.carrier(Universal.Algebra.product(a, b))))
+        (closed : Universal.IsSubuniverse(Universal.Algebra.product(a, b), relation))
         (subdirect : Universal.IsSubdirect(a, b, relation))
         (arity : ℕ)
         (subject : Universal.Term(signature, NaturalsBelow(arity)))
-        (taylor : Universal.IsTaylorOn(b,
-            Set.universe(Universal.Algebra.carrier(b)), arity, subject))
-        (noProperBinaryAbsorbing : ∀ (part : Set(Universal.Algebra.carrier(b))).
-            Universal.IsSubuniverse(b, part)
-            → Set.IsNonempty(Universal.Algebra.carrier(b), part)
-            → ¬(part = Set.universe(Universal.Algebra.carrier(b)))
-            → ¬Universal.BinaryAbsorbs(b, part,
-                Set.universe(Universal.Algebra.carrier(b))))
+        (taylor : Universal.IsTaylorOn(b, Set.universe(Universal.Algebra.carrier(b)), arity, subject))
+        (noProperBinaryAbsorbing : ∀ (part : Set(Universal.Algebra.carrier(b))). Universal.IsSubuniverse(b, part)
+            → Set.IsNonempty(Universal.Algebra.carrier(b), part) → ¬(part = Set.universe(Universal.Algebra.carrier(b)))
+            → ¬Universal.BinaryAbsorbs(b, part, Set.universe(Universal.Algebra.carrier(b))))
         (depth : ℕ)
-        : ∃ (power : Universal.Term(signature,
-            Universal.StarIndex(arity, depth))).
-            ∀ (free : Universal.StarIndex(arity, depth)).
-            ∀ (valuation : Universal.StarIndex(arity, depth)
-                           → Universal.Algebra.carrier(a)).
-              (∀ (other : Universal.StarIndex(arity, depth)).
-                 ¬(other = free)
-                 → valuation(other) ∈ Universal.leftCenter(a, b, relation))
-              → min(Set.size(enumeration,
-                      Set.universe(Universal.Algebra.carrier(b))),
-                    depth + Set.size(enumeration,
-                      Universal.neighborhood(a, b, relation, valuation(free))))
-                ≤ Set.size(enumeration,
-                    Universal.neighborhood(a, b, relation,
-                      Universal.Term.evaluate(a, valuation, power))) :=
+        : ∃ (power : Universal.Term(signature, Universal.StarIndex(arity, depth))). ∀ (free : Universal.StarIndex(arity, depth)).
+            ∀ (valuation : Universal.StarIndex(arity, depth) → Universal.Algebra.carrier(a)).
+              (∀ (other : Universal.StarIndex(arity, depth)). ¬(other = free) → valuation(other) ∈ Universal.leftCenter(a, b, relation))
+              → min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))), depth + Set.size(enumeration,
+            Universal.neighborhood(a, b, relation, valuation(free))))
+                ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation, power))) :=
   by induction on depth with IH {
     case depth = 0: {
         -- The one-point index type: the term is the single variable, and the
         -- bound is `min(|B|, s) ≤ s`.
-        ∀ (free : Universal.StarIndex(arity, 0)).
-            ∀ (valuation : Universal.StarIndex(arity, 0)
-                           → Universal.Algebra.carrier(a)).
-              (∀ (other : Universal.StarIndex(arity, 0)).
-                 ¬(other = free)
-                 → valuation(other) ∈ Universal.leftCenter(a, b, relation))
-              → min(Set.size(enumeration,
-                      Set.universe(Universal.Algebra.carrier(b))),
-                    0 + Set.size(enumeration,
-                      Universal.neighborhood(a, b, relation, valuation(free))))
-                ≤ Set.size(enumeration,
-                    Universal.neighborhood(a, b, relation,
-                      Universal.Term.evaluate(a, valuation,
-                        Universal.starBase(signature, arity))))
+        ∀ (free : Universal.StarIndex(arity, 0)). ∀ (valuation : Universal.StarIndex(arity, 0) → Universal.Algebra.carrier(a)).
+              (∀ (other : Universal.StarIndex(arity, 0)). ¬(other = free) → valuation(other) ∈ Universal.leftCenter(a, b, relation))
+              → min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))), 0 + Set.size(enumeration,
+            Universal.neighborhood(a, b, relation, valuation(free))))
+                ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation,
+            Universal.starBase(signature, arity))))
             by { take free : Universal.StarIndex(arity, 0);
-                 take valuation : Universal.StarIndex(arity, 0)
-                                  → Universal.Algebra.carrier(a);
-                 suppose ∀ (other : Universal.StarIndex(arity, 0)).
-                     ¬(other = free)
+                 take valuation : Universal.StarIndex(arity, 0) → Universal.Algebra.carrier(a);
+                 suppose ∀ (other : Universal.StarIndex(arity, 0)). ¬(other = free)
                      → valuation(other) ∈ Universal.leftCenter(a, b, relation);
                  -- There is only one index at depth zero.
-                 ∀ (slot : NaturalsBelow(0)).
-                     Universal.emptyStarIndex(arity)(slot) = free(slot)
+                 ∀ (slot : NaturalsBelow(0)). Universal.emptyStarIndex(arity)(slot) = free(slot)
                      by { take slot : NaturalsBelow(0);
                           False by NaturalsBelow.zero_is_empty;
                           done };
-                 Universal.emptyStarIndex(arity) = free
-                     by Function.extensionality;
-                 Universal.Term.evaluate(a, valuation,
-                     Universal.starBase(signature, arity))
+                 Universal.emptyStarIndex(arity) = free by Function.extensionality;
+                 Universal.Term.evaluate(a, valuation, Universal.starBase(signature, arity))
                     = valuation(Universal.emptyStarIndex(arity))
                           by Universal.starBase_evaluate
                     = valuation(free);
-                 min(Set.size(enumeration,
-                       Set.universe(Universal.Algebra.carrier(b))),
-                     0 + Set.size(enumeration,
+                 min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))), 0 + Set.size(enumeration,
                        Universal.neighborhood(a, b, relation, valuation(free))))
-                    ≤ Set.size(enumeration,
-                        Universal.neighborhood(a, b, relation,
-                          valuation(free)))
+                    ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, valuation(free)))
                           by Natural.minimum_le_right;
                  done };
         witness Universal.starBase(signature, arity)
       }
     case depth = 1 + rest for some (rest : ℕ): {
-        choose inner such that
-            ∀ (free : Universal.StarIndex(arity, rest)).
-            ∀ (valuation : Universal.StarIndex(arity, rest)
-                           → Universal.Algebra.carrier(a)).
-              (∀ (other : Universal.StarIndex(arity, rest)).
-                 ¬(other = free)
-                 → valuation(other) ∈ Universal.leftCenter(a, b, relation))
-              → min(Set.size(enumeration,
-                      Set.universe(Universal.Algebra.carrier(b))),
-                    rest + Set.size(enumeration,
-                      Universal.neighborhood(a, b, relation, valuation(free))))
-                ≤ Set.size(enumeration,
-                    Universal.neighborhood(a, b, relation,
-                      Universal.Term.evaluate(a, valuation, inner)))
+        choose inner such that ∀ (free : Universal.StarIndex(arity, rest)). ∀ (valuation : Universal.StarIndex(arity, rest)
+            → Universal.Algebra.carrier(a)). (∀ (other : Universal.StarIndex(arity, rest)). ¬(other = free)
+                 → valuation(other) ∈ Universal.leftCenter(a, b, relation)) → min(Set.size(enumeration,
+            Set.universe(Universal.Algebra.carrier(b))), rest + Set.size(enumeration,
+            Universal.neighborhood(a, b, relation, valuation(free))))
+                ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation, inner)))
             from IH;
-        ∀ (free : Universal.StarIndex(arity, 1 + rest)).
-            ∀ (valuation : Universal.StarIndex(arity, 1 + rest)
-                           → Universal.Algebra.carrier(a)).
-              (∀ (other : Universal.StarIndex(arity, 1 + rest)).
-                 ¬(other = free)
-                 → valuation(other) ∈ Universal.leftCenter(a, b, relation))
-              → min(Set.size(enumeration,
-                      Set.universe(Universal.Algebra.carrier(b))),
-                    (1 + rest) + Set.size(enumeration,
-                      Universal.neighborhood(a, b, relation, valuation(free))))
-                ≤ Set.size(enumeration,
-                    Universal.neighborhood(a, b, relation,
-                      Universal.Term.evaluate(a, valuation,
-                        Universal.starStep(signature, arity, rest, subject,
-                          inner))))
+        ∀ (free : Universal.StarIndex(arity, 1 + rest)). ∀ (valuation : Universal.StarIndex(arity, 1 + rest)
+            → Universal.Algebra.carrier(a)). (∀ (other : Universal.StarIndex(arity, 1 + rest)). ¬(other = free)
+                 → valuation(other) ∈ Universal.leftCenter(a, b, relation)) → min(Set.size(enumeration,
+            Set.universe(Universal.Algebra.carrier(b))), (1 + rest) + Set.size(enumeration,
+            Universal.neighborhood(a, b, relation, valuation(free))))
+                ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation,
+            Universal.starStep(signature, arity, rest, subject, inner))))
             by { take free : Universal.StarIndex(arity, 1 + rest);
-                 take valuation : Universal.StarIndex(arity, 1 + rest)
-                                  → Universal.Algebra.carrier(a);
-                 suppose ∀ (other : Universal.StarIndex(arity, 1 + rest)).
-                     ¬(other = free)
+                 take valuation : Universal.StarIndex(arity, 1 + rest) → Universal.Algebra.carrier(a);
+                 suppose ∀ (other : Universal.StarIndex(arity, 1 + rest)). ¬(other = free)
                      → valuation(other) ∈ Universal.leftCenter(a, b, relation);
                  -- The block values are what the level's evaluation law
                  -- produces, so their defining equation is reflexivity.
-                 ∀ (block : NaturalsBelow(arity)).
-                     ((slot : NaturalsBelow(arity)) ↦
-                       Universal.Term.evaluate(a,
-                         ((position : Universal.StarIndex(arity, rest)) ↦
-                           valuation(Universal.starPrepend(arity, rest, slot,
-                             position))),
+                 ∀ (block : NaturalsBelow(arity)). ((slot : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(a,
+                         ((position : Universal.StarIndex(arity, rest)) ↦ valuation(Universal.starPrepend(arity, rest, slot, position))),
                          inner))(block)
-                     = Universal.Term.evaluate(a,
-                         ((position : Universal.StarIndex(arity, rest)) ↦
-                           valuation(Universal.starPrepend(arity, rest, block,
-                             position))),
-                         inner)
+                     = Universal.Term.evaluate(a, ((position : Universal.StarIndex(arity, rest)) ↦
+                           valuation(Universal.starPrepend(arity, rest, block, position))), inner)
                      by { take block : NaturalsBelow(arity);
                           done } as blockValuesReflexive;
-                 done by Universal.center_star_step(
-                   blockValues := ((slot : NaturalsBelow(arity)) ↦
-                     Universal.Term.evaluate(a,
-                       ((position : Universal.StarIndex(arity, rest)) ↦
-                         valuation(Universal.starPrepend(arity, rest, slot,
-                           position))),
-                       inner)),
-                   blockValuesSpec := blockValuesReflexive) };
+                 done by Universal.center_star_step(blockValues := ((slot : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(a,
+                       ((position : Universal.StarIndex(arity, rest)) ↦ valuation(Universal.starPrepend(arity, rest, slot, position))),
+                       inner)), blockValuesSpec := blockValuesReflexive) };
         witness Universal.starStep(signature, arity, rest, subject, inner)
       }
   }
@@ -1021,86 +742,51 @@ theorem Universal.leftCenter_witnesses {signature : Universal.Signature}
         (idempotentBase : Universal.Algebra.IsIdempotent(a))
         (idempotentFibre : Universal.Algebra.IsIdempotent(b))
         (enumeration : List(Universal.Algebra.carrier(b)))
-        (isEnumeration : Set.IsEnumeration(Universal.Algebra.carrier(b),
-            enumeration))
-        (relation : Set(Universal.Algebra.carrier(
-            Universal.Algebra.product(a, b))))
-        (closed : Universal.IsSubuniverse(Universal.Algebra.product(a, b),
-            relation))
+        (isEnumeration : Set.IsEnumeration(Universal.Algebra.carrier(b), enumeration))
+        (relation : Set(Universal.Algebra.carrier(Universal.Algebra.product(a, b))))
+        (closed : Universal.IsSubuniverse(Universal.Algebra.product(a, b), relation))
         (subdirect : Universal.IsSubdirect(a, b, relation))
         (arity : ℕ)
         (subject : Universal.Term(signature, NaturalsBelow(arity)))
-        (taylor : Universal.IsTaylorOn(b,
-            Set.universe(Universal.Algebra.carrier(b)), arity, subject))
-        (noProperBinaryAbsorbing : ∀ (part : Set(Universal.Algebra.carrier(b))).
-            Universal.IsSubuniverse(b, part)
-            → Set.IsNonempty(Universal.Algebra.carrier(b), part)
-            → ¬(part = Set.universe(Universal.Algebra.carrier(b)))
-            → ¬Universal.BinaryAbsorbs(b, part,
-                Set.universe(Universal.Algebra.carrier(b))))
-        : ∃ (power : Universal.Term(signature,
-            Universal.StarIndex(arity,
-              Set.size(enumeration,
-                Set.universe(Universal.Algebra.carrier(b))) ∸ 1))).
-            Universal.Witnesses(a, Universal.leftCenter(a, b, relation),
+        (taylor : Universal.IsTaylorOn(b, Set.universe(Universal.Algebra.carrier(b)), arity, subject))
+        (noProperBinaryAbsorbing : ∀ (part : Set(Universal.Algebra.carrier(b))). Universal.IsSubuniverse(b, part)
+            → Set.IsNonempty(Universal.Algebra.carrier(b), part) → ¬(part = Set.universe(Universal.Algebra.carrier(b)))
+            → ¬Universal.BinaryAbsorbs(b, part, Set.universe(Universal.Algebra.carrier(b))))
+        : ∃ (power : Universal.Term(signature, Universal.StarIndex(arity, Set.size(enumeration,
+                Set.universe(Universal.Algebra.carrier(b))) ∸ 1))). Universal.Witnesses(a, Universal.leftCenter(a, b, relation),
               Set.universe(Universal.Algebra.carrier(a)), power) := {
-  choose power such that
-      ∀ (free : Universal.StarIndex(arity,
-          Set.size(enumeration,
-            Set.universe(Universal.Algebra.carrier(b))) ∸ 1)).
-      ∀ (valuation : Universal.StarIndex(arity,
-          Set.size(enumeration,
-            Set.universe(Universal.Algebra.carrier(b))) ∸ 1)
-                     → Universal.Algebra.carrier(a)).
-        (∀ (other : Universal.StarIndex(arity,
-            Set.size(enumeration,
-              Set.universe(Universal.Algebra.carrier(b))) ∸ 1)).
-           ¬(other = free)
-           → valuation(other) ∈ Universal.leftCenter(a, b, relation))
-        → min(Set.size(enumeration,
-                Set.universe(Universal.Algebra.carrier(b))),
-              (Set.size(enumeration,
-                Set.universe(Universal.Algebra.carrier(b))) ∸ 1)
-              + Set.size(enumeration,
-                  Universal.neighborhood(a, b, relation, valuation(free))))
-          ≤ Set.size(enumeration,
-              Universal.neighborhood(a, b, relation,
-                Universal.Term.evaluate(a, valuation, power)))
+  choose power such that ∀ (free : Universal.StarIndex(arity, Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))) ∸ 1)).
+      ∀ (valuation : Universal.StarIndex(arity, Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))) ∸ 1)
+      → Universal.Algebra.carrier(a)). (∀ (other : Universal.StarIndex(arity, Set.size(enumeration,
+      Set.universe(Universal.Algebra.carrier(b))) ∸ 1)). ¬(other = free) → valuation(other) ∈ Universal.leftCenter(a, b, relation))
+        → min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))), (Set.size(enumeration,
+      Set.universe(Universal.Algebra.carrier(b))) ∸ 1)
+      + Set.size(enumeration, Universal.neighborhood(a, b, relation, valuation(free))))
+          ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation, power)))
       as powerBound
       from Universal.center_star(a, b, idempotentBase, idempotentFibre,
-        enumeration, isEnumeration, relation, closed, subdirect, arity, subject,
-        taylor, noProperBinaryAbsorbing,
+        enumeration, isEnumeration, relation, closed, subdirect, arity, subject, taylor, noProperBinaryAbsorbing,
         Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))) ∸ 1);
-  Universal.Witnesses(a, Universal.leftCenter(a, b, relation),
-      Set.universe(Universal.Algebra.carrier(a)), power)
+  Universal.Witnesses(a, Universal.leftCenter(a, b, relation), Set.universe(Universal.Algebra.carrier(a)), power)
       by {
-      take free : Universal.StarIndex(arity,
-          Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))) ∸ 1);
-      take valuation : Universal.StarIndex(arity,
-          Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))) ∸ 1)
-                       → Universal.Algebra.carrier(a);
+      take free : Universal.StarIndex(arity, Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))) ∸ 1);
+      take valuation : Universal.StarIndex(arity, Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))) ∸ 1)
+          → Universal.Algebra.carrier(a);
       suppose valuation(free) ∈ Set.universe(Universal.Algebra.carrier(a));
-      suppose ∀ (other : Universal.StarIndex(arity,
-          Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))) ∸ 1)).
-          ¬(other = free)
+      suppose ∀ (other : Universal.StarIndex(arity, Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))) ∸ 1)). ¬(other = free)
           → valuation(other) ∈ Universal.leftCenter(a, b, relation)
           as othersCentral;
       -- Every neighbourhood is nonempty, so `B` is, and one step per element of `B`
       -- beyond the first is enough to saturate.
-      Set.IsNonempty(Universal.Algebra.carrier(b),
-          Universal.neighborhood(a, b, relation, valuation(free)))
+      Set.IsNonempty(Universal.Algebra.carrier(b), Universal.neighborhood(a, b, relation, valuation(free)))
           by Universal.neighborhood_nonempty;
-      1 ≤ Set.size(enumeration,
-            Universal.neighborhood(a, b, relation, valuation(free)))
-          by Set.size_positive_of_nonempty;
+      1 ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, valuation(free))) by Set.size_positive_of_nonempty;
       Universal.neighborhood(a, b, relation, valuation(free))
           ⊆ Set.universe(Universal.Algebra.carrier(b))
           by { take candidate : Universal.Algebra.carrier(b);
-               suppose candidate ∈ Universal.neighborhood(a, b, relation,
-                 valuation(free));
+               suppose candidate ∈ Universal.neighborhood(a, b, relation, valuation(free));
                done };
-      Set.size(enumeration,
-          Universal.neighborhood(a, b, relation, valuation(free)))
+      Set.size(enumeration, Universal.neighborhood(a, b, relation, valuation(free)))
         ≤ Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b)))
           by Set.size_le_of_subset;
       1 ≤ Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b)));
@@ -1108,57 +794,37 @@ theorem Universal.leftCenter_witnesses {signature : Universal.Signature}
           = Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b)))
           by Natural.add_monus_of_le;
       Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b)))
-         = 1 + (Set.size(enumeration,
-             Set.universe(Universal.Algebra.carrier(b))) ∸ 1)
-         ≤ Set.size(enumeration,
-             Universal.neighborhood(a, b, relation, valuation(free)))
-           + (Set.size(enumeration,
-               Set.universe(Universal.Algebra.carrier(b))) ∸ 1)
-         = (Set.size(enumeration,
-             Set.universe(Universal.Algebra.carrier(b))) ∸ 1)
-           + Set.size(enumeration,
-               Universal.neighborhood(a, b, relation, valuation(free)));
+         = 1 + (Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))) ∸ 1)
+         ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, valuation(free)))
+           + (Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))) ∸ 1)
+         = (Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))) ∸ 1)
+           + Set.size(enumeration, Universal.neighborhood(a, b, relation, valuation(free)));
       min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))),
           (Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))) ∸ 1)
-          + Set.size(enumeration,
-              Universal.neighborhood(a, b, relation, valuation(free))))
+          + Set.size(enumeration, Universal.neighborhood(a, b, relation, valuation(free))))
           = Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b)))
           by Natural.minimum_eq_left;
       -- So the value's neighbourhood has the size of all of `B`, hence is all of it.
       Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b)))
-         ≤ Set.size(enumeration,
-             Universal.neighborhood(a, b, relation,
-               Universal.Term.evaluate(a, valuation, power)))
-           by { min(Set.size(enumeration,
-                      Set.universe(Universal.Algebra.carrier(b))),
-                    (Set.size(enumeration,
+         ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation, power)))
+           by { min(Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b))), (Set.size(enumeration,
                       Set.universe(Universal.Algebra.carrier(b))) ∸ 1)
-                    + Set.size(enumeration,
-                        Universal.neighborhood(a, b, relation, valuation(free))))
-                  ≤ Set.size(enumeration,
-                      Universal.neighborhood(a, b, relation,
-                        Universal.Term.evaluate(a, valuation, power)))
+                    + Set.size(enumeration, Universal.neighborhood(a, b, relation, valuation(free))))
+                  ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation, power)))
                   by powerBound;
                 done };
-      Universal.neighborhood(a, b, relation,
-          Universal.Term.evaluate(a, valuation, power))
+      Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation, power))
           ⊆ Set.universe(Universal.Algebra.carrier(b))
           by { take candidate : Universal.Algebra.carrier(b);
-               suppose candidate ∈ Universal.neighborhood(a, b, relation,
-                 Universal.Term.evaluate(a, valuation, power));
+               suppose candidate ∈ Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation, power));
                done };
-      Set.size(enumeration,
-          Universal.neighborhood(a, b, relation,
-            Universal.Term.evaluate(a, valuation, power)))
+      Set.size(enumeration, Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation, power)))
         ≤ Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b)))
           by Set.size_le_of_subset;
-      Set.size(enumeration,
-          Universal.neighborhood(a, b, relation,
-            Universal.Term.evaluate(a, valuation, power)))
+      Set.size(enumeration, Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation, power)))
         = Set.size(enumeration, Set.universe(Universal.Algebra.carrier(b)))
           by Natural.le_antisymmetric;
-      Universal.neighborhood(a, b, relation,
-          Universal.Term.evaluate(a, valuation, power))
+      Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation, power))
         = Set.universe(Universal.Algebra.carrier(b))
           by Set.equal_of_size_eq;
       done by Universal.leftCenter_of_neighborhood_universe };
