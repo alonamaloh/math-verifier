@@ -519,8 +519,31 @@ and this is the owner's call:
 1. keep the explicit arguments and record the exception (what is committed);
 2. make the arguments unnecessary — bind `Product.first/second(part)` and the
    rest to `let` names so the goal carries short terms the matcher can solve
-   fast. That would restore the argument-free citation AND likely keep most of
-   the win, and it is the readability-first version. Untested.
+   fast, restoring the argument-free citation. **TESTED 2026-07-31, and it does
+   not work.**
+
+### Why option 2 fails — measured three ways on the same file
+
+| variant | `overlay.math` |
+| --- | --- |
+| (a) original, one named argument | 136.5 s |
+| (b) `let`-bound endpoints, statements rewritten to use them | **111.9 s** |
+| (c) data arguments supplied explicitly | **5.2 s** |
+
+Binding the four endpoints and rewriting every statement in the arm to speak of
+`partLeft` / `partRight` rather than `Product.first(part)` buys **18%**. Nice to
+read, irrelevant to the cost.
+
+The reason is now clear, and it corrects the "shrink the context" framing for
+good: **the matcher's work is proportional to the number of METAVARIABLES it
+must solve, not to the size of the terms it solves them with.** The citation has
+seven data parameters; naming their values shorter leaves seven holes and a
+355-candidate pool to search for each. Only pinning them removes the search.
+
+So the readability-first version of this fix does not exist at the call site.
+If the argument-free spelling is to be recovered it has to come from the
+matcher — e.g. solving a metavariable from a premise that already mentions it
+before searching the pool — not from how the proof is written.
 
 ## Directions worth trying
 
