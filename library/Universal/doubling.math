@@ -56,14 +56,15 @@ import Universal.central
 import Universal.relational
 
 convention signature : Universal.Signature
+convention a b : Universal.Algebra(signature)
 
 -- ── The set `B'` ──────────────────────────────────────────────────────
 
 -- Blueprint `β(P)`: the first coordinates of the tuples of `relation` whose
 -- every *other* coordinate lies in `subset`.
 definition Universal.betaSet
-        (a : Universal.Algebra(signature))
-        (subset : Set(a)) (size : ℕ)
+        {a : Universal.Algebra(signature)} {size : ℕ}
+        (subset : Set(a))
         (relation : Set(a ^ NaturalsBelow(1 + size)))
         : Set(a) :=
   (candidate : a) ↦ ∃ (tuple : a ^ NaturalsBelow(1 + size)).
@@ -72,17 +73,16 @@ definition Universal.betaSet
 
 -- It is a subuniverse: apply the operation to a tuple of witnesses.
 theorem Universal.IsSubuniverse.betaSet
-        (a : Universal.Algebra(signature))
         (subset : Set(a))
         (subsetClosed : Universal.IsSubuniverse(a, subset)) (size : ℕ)
         (relation : Set(a ^ NaturalsBelow(1 + size)))
         (closed : Universal.IsSubuniverse(a ^ NaturalsBelow(1 + size), relation))
         : Universal.IsSubuniverse(a,
-            Universal.betaSet(a, subset, size, relation)) := {
+            Universal.betaSet(subset, relation)) := {
   take arity : ℕ;
   take symbol : signature(arity);
   take arguments : NaturalsBelow(arity) → a;
-  suppose ∀ (index : NaturalsBelow(arity)). arguments(index) ∈ Universal.betaSet(a, subset, size, relation)
+  suppose ∀ (index : NaturalsBelow(arity)). arguments(index) ∈ Universal.betaSet(subset, relation)
       as allInBeta;
   choose lifted such that ∀ (index : NaturalsBelow(arity)). lifted(index) ∈ relation ∧ (∀ (slot : NaturalsBelow(1 + size)).
       slot ≠ NaturalsBelow.first → lifted(index)(slot) ∈ subset) ∧ lifted(index)(NaturalsBelow.first) = arguments(index)
@@ -131,12 +131,11 @@ theorem Universal.IsSubuniverse.betaSet
 
 -- Essentiality at the first coordinate makes it nonempty.
 theorem Universal.betaSet_nonempty
-        (a : Universal.Algebra(signature))
         (subset : Set(a)) (size : ℕ)
         (relation : Set(a ^ NaturalsBelow(1 + size)))
         (essential : Universal.IsEssential(a, NaturalsBelow(1 + size), ((slot : NaturalsBelow(1 + size)) ↦ subset), relation))
         : Set.IsNonempty(a,
-            Universal.betaSet(a, subset, size, relation)) := {
+            Universal.betaSet(subset, relation)) := {
   ∀ (free : NaturalsBelow(1 + size)). ∃ (tuple : a ^ NaturalsBelow(1 + size)).
         tuple ∈ relation ∧ ∀ (other : NaturalsBelow(1 + size)). other ≠ free → tuple(other) ∈ subset
       as freeAtEach;
@@ -145,19 +144,18 @@ theorem Universal.betaSet_nonempty
   tuple ∈ relation;
   ∀ (other : NaturalsBelow(1 + size)). other ≠ NaturalsBelow.first → tuple(other) ∈ subset;
   tuple(NaturalsBelow.first) = tuple(NaturalsBelow.first);
-  tuple(NaturalsBelow.first) ∈ Universal.betaSet(a, subset, size, relation)
+  tuple(NaturalsBelow.first) ∈ Universal.betaSet(subset, relation)
       by { witness tuple };
   witness tuple(NaturalsBelow.first)
 }
 
 -- And essentiality's second clause keeps it away from `subset`.
 theorem Universal.betaSet_outside
-        (a : Universal.Algebra(signature))
         (subset : Set(a)) (size : ℕ)
         (relation : Set(a ^ NaturalsBelow(1 + size)))
         (essential : Universal.IsEssential(a, NaturalsBelow(1 + size), ((slot : NaturalsBelow(1 + size)) ↦ subset), relation))
         (candidate : a)
-        (inBeta : candidate ∈ Universal.betaSet(a, subset, size, relation))
+        (inBeta : candidate ∈ Universal.betaSet(subset, relation))
         : candidate ∉ subset := {
   suppose candidate ∈ subset as isInside;
   choose tuple such that tuple ∈ relation ∧ (∀ (slot : NaturalsBelow(1 + size)). slot ≠ NaturalsBelow.first → tuple(slot) ∈ subset)
@@ -183,14 +181,13 @@ theorem Universal.betaSet_outside
 
 -- Shrinking the relation shrinks `β`.
 theorem Universal.betaSet_monotone
-        (a : Universal.Algebra(signature))
         (subset : Set(a)) (size : ℕ)
         (smaller larger : Set(a ^ NaturalsBelow(1 + size)))
         (inclusion : smaller ⊆ larger)
-        : Universal.betaSet(a, subset, size, smaller)
-          ⊆ Universal.betaSet(a, subset, size, larger) := {
+        : Universal.betaSet(subset, smaller)
+          ⊆ Universal.betaSet(subset, larger) := {
   take candidate : a;
-  suppose candidate ∈ Universal.betaSet(a, subset, size, smaller) as inSmaller;
+  suppose candidate ∈ Universal.betaSet(subset, smaller) as inSmaller;
   choose tuple such that tuple ∈ smaller ∧ (∀ (slot : NaturalsBelow(1 + size)). slot ≠ NaturalsBelow.first → tuple(slot) ∈ subset)
       ∧ tuple(NaturalsBelow.first) = candidate
       from inSmaller;
@@ -222,7 +219,6 @@ definition Universal.doublingGenerators
 -- makes that visible.
 
 theorem Universal.betaSet_subset_generated
-        (a : Universal.Algebra(signature))
         (subset : Set(a))
         (subsetClosed : Universal.IsSubuniverse(a, subset))
         (enumeration : List(a))
@@ -233,12 +229,12 @@ theorem Universal.betaSet_subset_generated
         (essential : Universal.IsEssential(a, NaturalsBelow(1 + size), ((slot : NaturalsBelow(1 + size)) ↦ subset), relation))
         (minimal : ∀ (competitor : Set(a ^ NaturalsBelow(1 + size))). Universal.IsSubuniverse(a ^ NaturalsBelow(1 + size), competitor)
             → Universal.IsEssential(a, NaturalsBelow(1 + size), ((slot : NaturalsBelow(1 + size)) ↦ subset), competitor)
-            → Set.size(enumeration, Universal.betaSet(a, subset, size, relation))
-              ≤ Set.size(enumeration, Universal.betaSet(a, subset, size, competitor)))
+            → Set.size(enumeration, Universal.betaSet(subset, relation))
+              ≤ Set.size(enumeration, Universal.betaSet(subset, competitor)))
         (anchor : a)
         (anchorInBeta : anchor
-            ∈ Universal.betaSet(a, subset, size, relation))
-        : Universal.betaSet(a, subset, size, relation)
+            ∈ Universal.betaSet(subset, relation))
+        : Universal.betaSet(subset, relation)
           ⊆ Universal.generated(a,
               subset ∪ Set.singleton(a, anchor)) := {
   ∀ (free : NaturalsBelow(1 + size)). ∃ (tuple : a ^ NaturalsBelow(1 + size)).
@@ -347,25 +343,23 @@ theorem Universal.betaSet_subset_generated
                     done };
            done };
   -- Minimality plus the inclusion forces the two `β`s to coincide.
-  Universal.betaSet(a, subset, size, Universal.generated(a ^ NaturalsBelow(1 + size),
-        Universal.doublingGenerators(a, size, witnesses, anchorTuple)))
-    ⊆ Universal.betaSet(a, subset, size, relation)
+  Universal.betaSet(subset, Universal.generated(a ^ NaturalsBelow(1 + size), Universal.doublingGenerators(a, size, witnesses, anchorTuple)))
+    ⊆ Universal.betaSet(subset, relation)
       by Universal.betaSet_monotone;
-  Set.size(enumeration, Universal.betaSet(a, subset, size, relation))
-    ≤ Set.size(enumeration, Universal.betaSet(a, subset, size, Universal.generated(a ^ NaturalsBelow(1 + size),
+  Set.size(enumeration, Universal.betaSet(subset, relation))
+    ≤ Set.size(enumeration, Universal.betaSet(subset, Universal.generated(a ^ NaturalsBelow(1 + size),
             Universal.doublingGenerators(a, size, witnesses, anchorTuple))))
       by minimal;
-  Set.size(enumeration, Universal.betaSet(a, subset, size, Universal.generated(a ^ NaturalsBelow(1 + size),
+  Set.size(enumeration, Universal.betaSet(subset, Universal.generated(a ^ NaturalsBelow(1 + size),
         Universal.doublingGenerators(a, size, witnesses, anchorTuple))))
-    ≤ Set.size(enumeration, Universal.betaSet(a, subset, size, relation))
+    ≤ Set.size(enumeration, Universal.betaSet(subset, relation))
       by Set.size_le_of_subset;
-  Set.size(enumeration, Universal.betaSet(a, subset, size, Universal.generated(a ^ NaturalsBelow(1 + size),
+  Set.size(enumeration, Universal.betaSet(subset, Universal.generated(a ^ NaturalsBelow(1 + size),
         Universal.doublingGenerators(a, size, witnesses, anchorTuple))))
-    = Set.size(enumeration, Universal.betaSet(a, subset, size, relation))
+    = Set.size(enumeration, Universal.betaSet(subset, relation))
       by Natural.le_antisymmetric;
-  Universal.betaSet(a, subset, size, Universal.generated(a ^ NaturalsBelow(1 + size),
-        Universal.doublingGenerators(a, size, witnesses, anchorTuple)))
-    = Universal.betaSet(a, subset, size, relation)
+  Universal.betaSet(subset, Universal.generated(a ^ NaturalsBelow(1 + size), Universal.doublingGenerators(a, size, witnesses, anchorTuple)))
+    = Universal.betaSet(subset, relation)
       by Set.equal_of_size_eq;
   -- Every generator's first coordinate lies in `subset ∪ {anchor}`, so every
   -- member of the generated relation has its first coordinate in the
@@ -423,14 +417,14 @@ theorem Universal.betaSet_subset_generated
       by Universal.generated.least as headsGenerated;
   -- Which is the claim, read through the equality of the two `β`s.
   take candidate : a;
-  suppose candidate ∈ Universal.betaSet(a, subset, size, relation)
+  suppose candidate ∈ Universal.betaSet(subset, relation)
       as inBeta;
-  candidate ∈ Universal.betaSet(a, subset, size, Universal.generated(a ^ NaturalsBelow(1 + size),
+  candidate ∈ Universal.betaSet(subset, Universal.generated(a ^ NaturalsBelow(1 + size),
         Universal.doublingGenerators(a, size, witnesses, anchorTuple)));
   choose tuple such that tuple ∈ Universal.generated(a ^ NaturalsBelow(1 + size),
           Universal.doublingGenerators(a, size, witnesses, anchorTuple)) ∧ (∀ (slot : NaturalsBelow(1 + size)).
            slot ≠ NaturalsBelow.first → tuple(slot) ∈ subset) ∧ tuple(NaturalsBelow.first) = candidate
-      from (candidate ∈ Universal.betaSet(a, subset, size, Universal.generated(a ^ NaturalsBelow(1 + size),
+      from (candidate ∈ Universal.betaSet(subset, Universal.generated(a ^ NaturalsBelow(1 + size),
           Universal.doublingGenerators(a, size, witnesses, anchorTuple))));
   tuple ∈ Universal.generated(a ^ NaturalsBelow(1 + size), Universal.doublingGenerators(a, size, witnesses, anchorTuple));
   tuple(NaturalsBelow.first) = candidate as headIsCandidate;
@@ -457,7 +451,6 @@ definition Universal.linkedInto
   (candidate : a) ↦ ∃ (partner : a). Universal.pair(a, a, candidate, partner) ∈ link ∧ partner ∈ target
 
 theorem Universal.IsSubuniverse.linkedInto
-        (a : Universal.Algebra(signature))
         (link : Set(a × a))
         (linkClosed : Universal.IsSubuniverse(a × a, link))
         (target : Set(a))
@@ -493,7 +486,6 @@ theorem Universal.IsSubuniverse.linkedInto
 }
 
 theorem Universal.linking_disjoint
-        (a : Universal.Algebra(signature))
         (idempotent : Universal.Algebra.IsIdempotent(a))
         (subset : Set(a))
         (subsetClosed : Universal.IsSubuniverse(a, subset))
@@ -507,18 +499,18 @@ theorem Universal.linking_disjoint
         (essential : Universal.IsEssential(a, NaturalsBelow(1 + size), ((slot : NaturalsBelow(1 + size)) ↦ subset), relation))
         (minimal : ∀ (competitor : Set(a ^ NaturalsBelow(1 + size))). Universal.IsSubuniverse(a ^ NaturalsBelow(1 + size), competitor)
             → Universal.IsEssential(a, NaturalsBelow(1 + size), ((slot : NaturalsBelow(1 + size)) ↦ subset), competitor)
-            → Set.size(enumeration, Universal.betaSet(a, subset, size, relation))
-              ≤ Set.size(enumeration, Universal.betaSet(a, subset, size, competitor)))
+            → Set.size(enumeration, Universal.betaSet(subset, relation))
+              ≤ Set.size(enumeration, Universal.betaSet(subset, competitor)))
         (base : a)
-        (baseInBeta : base ∈ Universal.betaSet(a, subset, size, relation))
+        (baseInBeta : base ∈ Universal.betaSet(subset, relation))
         (left right : a)
-        (leftInBeta : left ∈ Universal.betaSet(a, subset, size, relation))
-        (rightInBeta : right ∈ Universal.betaSet(a, subset, size, relation))
+        (leftInBeta : left ∈ Universal.betaSet(subset, relation))
+        (rightInBeta : right ∈ Universal.betaSet(subset, relation))
         : ¬(Universal.pair(a, a, left, right)
             ∈ Universal.generated(a × a,
                 Universal.centralPairs(a, subset, base))) := {
   -- `B'` of the blueprint.
-  let beta : Set(a) := Universal.betaSet(a, subset, size, relation);
+  let beta : Set(a) := Universal.betaSet(subset, relation);
   -- `S` of the blueprint: the subuniverse the two off-diagonal blocks
   -- generate, which Step 3 shows misses `B' × B'`.
   let link : Set(a × a) := Universal.generated(a × a, Universal.centralPairs(a, subset, base));
@@ -707,7 +699,7 @@ definition Universal.linkedPair
 
 -- Blueprint `R'`: `T` with the two linked coordinates projected away.
 definition Universal.doubledRelation
-        (a : Universal.Algebra(signature)) (size : ℕ)
+        {a : Universal.Algebra(signature)} {size : ℕ}
         (relation : Set(a ^ NaturalsBelow(1 + size)))
         (link : Set(a × a))
         : Set(a ^ DisjointUnion(NaturalsBelow(size), NaturalsBelow(size))) :=
@@ -721,7 +713,7 @@ theorem Universal.IsSubuniverse.doubledRelation
         (link : Set(a × a))
         (linkClosed : Universal.IsSubuniverse(a × a, link))
         : Universal.IsSubuniverse(a ^ DisjointUnion(NaturalsBelow(size), NaturalsBelow(size)),
-            Universal.doubledRelation(a, size, relation, link)) := {
+            Universal.doubledRelation(relation, link)) := {
   Universal.IsSubuniverse(a ^ DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)), Universal.cylinder(a,
         DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)), NaturalsBelow(1 + size), Universal.leftHalf(size), relation))
       by Universal.IsSubuniverse.cylinder;
@@ -857,7 +849,6 @@ theorem Universal.linkedPair.of_halves
 -- the two heads are linked because one of them lies in `subset` and the other
 -- is `base`, which is exactly a generating block. (E2) is Step 3.
 theorem Universal.IsEssential.doubledRelation
-        (a : Universal.Algebra(signature))
         (idempotent : Universal.Algebra.IsIdempotent(a))
         (subset : Set(a))
         (subsetClosed : Universal.IsSubuniverse(a, subset))
@@ -871,12 +862,12 @@ theorem Universal.IsEssential.doubledRelation
         (essential : Universal.IsEssential(a, NaturalsBelow(1 + size), ((slot : NaturalsBelow(1 + size)) ↦ subset), relation))
         (minimal : ∀ (competitor : Set(a ^ NaturalsBelow(1 + size))). Universal.IsSubuniverse(a ^ NaturalsBelow(1 + size), competitor)
             → Universal.IsEssential(a, NaturalsBelow(1 + size), ((slot : NaturalsBelow(1 + size)) ↦ subset), competitor)
-            → Set.size(enumeration, Universal.betaSet(a, subset, size, relation))
-              ≤ Set.size(enumeration, Universal.betaSet(a, subset, size, competitor)))
+            → Set.size(enumeration, Universal.betaSet(subset, relation))
+              ≤ Set.size(enumeration, Universal.betaSet(subset, competitor)))
         (base : a)
-        (baseInBeta : base ∈ Universal.betaSet(a, subset, size, relation))
+        (baseInBeta : base ∈ Universal.betaSet(subset, relation))
         : Universal.IsEssential(a, DisjointUnion(NaturalsBelow(size), NaturalsBelow(size)), ((slot : DisjointUnion(NaturalsBelow(size),
-            NaturalsBelow(size))) ↦ subset), Universal.doubledRelation(a, size, relation, Universal.generated(a × a,
+            NaturalsBelow(size))) ↦ subset), Universal.doubledRelation(relation, Universal.generated(a × a,
                 Universal.centralPairs(a, subset, base)))) := {
   -- `S` of the blueprint, the linking relation.
   let link : Set(a × a) := Universal.generated(a × a, Universal.centralPairs(a, subset, base));
@@ -895,7 +886,7 @@ theorem Universal.IsEssential.doubledRelation
       by Universal.generated.contains_base as pairsAreLinked;
   -- (E1).
   ∀ (free : DisjointUnion(NaturalsBelow(size), NaturalsBelow(size))).
-      ∃ (small : a ^ DisjointUnion(NaturalsBelow(size), NaturalsBelow(size))). small ∈ Universal.doubledRelation(a, size, relation, link)
+      ∃ (small : a ^ DisjointUnion(NaturalsBelow(size), NaturalsBelow(size))). small ∈ Universal.doubledRelation(relation, link)
         ∧ ∀ (other : DisjointUnion(NaturalsBelow(size), NaturalsBelow(size))). other ≠ free → small(other) ∈ subset
       by { take free : DisjointUnion(NaturalsBelow(size), NaturalsBelow(size));
            (∃ (value : NaturalsBelow(size)). free = Sum.left(value)) ∨ (∃ (value : NaturalsBelow(size)). free = Sum.right(value))
@@ -940,7 +931,7 @@ theorem Universal.IsEssential.doubledRelation
                  Universal.restrict(a, DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)),
                      DisjointUnion(NaturalsBelow(size), NaturalsBelow(size)), Universal.doubledShift(size),
                      Universal.sumTuple(a, size, freeTuple, anchorTuple))
-                   ∈ Universal.doubledRelation(a, size, relation, link)
+                   ∈ Universal.doubledRelation(relation, link)
                      by { witness Universal.sumTuple(a, size, freeTuple, anchorTuple) };
                  ∀ (other : DisjointUnion(NaturalsBelow(size), NaturalsBelow(size))). other ≠ free → Universal.restrict(a,
                          DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)), DisjointUnion(NaturalsBelow(size),
@@ -1037,7 +1028,7 @@ theorem Universal.IsEssential.doubledRelation
                  Universal.restrict(a, DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)),
                      DisjointUnion(NaturalsBelow(size), NaturalsBelow(size)), Universal.doubledShift(size),
                      Universal.sumTuple(a, size, anchorTuple, freeTuple))
-                   ∈ Universal.doubledRelation(a, size, relation, link)
+                   ∈ Universal.doubledRelation(relation, link)
                      by { witness Universal.sumTuple(a, size, anchorTuple, freeTuple) };
                  ∀ (other : DisjointUnion(NaturalsBelow(size), NaturalsBelow(size))). other ≠ free → Universal.restrict(a,
                          DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)), DisjointUnion(NaturalsBelow(size),
@@ -1100,25 +1091,24 @@ theorem Universal.IsEssential.doubledRelation
   -- (E2). A member lying wholly inside `subset` would have both its halves in
   -- `B'` with their heads linked, which Step 3 forbids.
   ¬(∃ (small : a ^ DisjointUnion(NaturalsBelow(size), NaturalsBelow(size))).
-      small ∈ Universal.doubledRelation(a, size, relation, Universal.generated(a × a,
+      small ∈ Universal.doubledRelation(relation, Universal.generated(a × a,
       Universal.centralPairs(a, subset, base))) ∧ ∀ (slot : DisjointUnion(NaturalsBelow(size), NaturalsBelow(size))). small(slot) ∈ subset)
       by { suppose ∃ (small : a ^ DisjointUnion(NaturalsBelow(size),
-                           NaturalsBelow(size))). small ∈ Universal.doubledRelation(a, size, relation, Universal.generated(
+                           NaturalsBelow(size))). small ∈ Universal.doubledRelation(relation, Universal.generated(
                                  a × a, Universal.centralPairs(a, subset, base)))
                      ∧ ∀ (slot : DisjointUnion(NaturalsBelow(size), NaturalsBelow(size))). small(slot) ∈ subset
                    as someInside;
-           choose small such that small ∈ Universal.doubledRelation(a, size, relation, Universal.generated(a × a,
+           choose small such that small ∈ Universal.doubledRelation(relation, Universal.generated(a × a,
                Universal.centralPairs(a, subset, base))) ∧ ∀ (slot : DisjointUnion(NaturalsBelow(size),
                    NaturalsBelow(size))). small(slot) ∈ subset
                from someInside;
            ∀ (slot : DisjointUnion(NaturalsBelow(size), NaturalsBelow(size))). small(slot) ∈ subset as smallInside;
-           small ∈ Universal.doubledRelation(a, size, relation, link);
+           small ∈ Universal.doubledRelation(relation, link);
            choose big such that big ∈ Universal.linkedPair(a, size, relation, Universal.generated(a × a,
                Universal.centralPairs(a, subset, base))) ∧ Universal.restrict(a, DisjointUnion(NaturalsBelow(1 + size),
                      NaturalsBelow(1 + size)), DisjointUnion(NaturalsBelow(size), NaturalsBelow(size)),
                    Universal.doubledShift(size), big) = small
-               from (small ∈ Universal.doubledRelation(a, size, relation, Universal.generated(a × a,
-                   Universal.centralPairs(a, subset, base))));
+               from (small ∈ Universal.doubledRelation(relation, Universal.generated(a × a, Universal.centralPairs(a, subset, base))));
            big ∈ Universal.linkedPair(a, size, relation, link);
            Universal.restrict(a, DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)),
                DisjointUnion(NaturalsBelow(size), NaturalsBelow(size)), Universal.doubledShift(size), big) = small;
@@ -1189,11 +1179,11 @@ theorem Universal.IsEssential.doubledRelation
                     } };
            -- So both heads lie in `B'`, and they are linked.
            big(Universal.leftHalf(size, NaturalsBelow.first))
-               ∈ Universal.betaSet(a, subset, size, relation)
+               ∈ Universal.betaSet(subset, relation)
                by { witness Universal.restrict(a, DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)),
                       NaturalsBelow(1 + size), Universal.leftHalf(size), big) };
            big(Universal.rightHalf(size, NaturalsBelow.first))
-               ∈ Universal.betaSet(a, subset, size, relation)
+               ∈ Universal.betaSet(subset, relation)
                by { witness Universal.restrict(a, DisjointUnion(NaturalsBelow(1 + size), NaturalsBelow(1 + size)),
                       NaturalsBelow(1 + size), Universal.rightHalf(size), big) };
            Universal.pair(a, a, big(Universal.leftHalf(size, NaturalsBelow.first)), big(Universal.rightHalf(size, NaturalsBelow.first)))
@@ -1214,7 +1204,6 @@ theorem Universal.IsEssential.doubledRelation
 -- since a single attaining relation is named by existential instantiation.
 
 theorem Universal.HasEssential.doubled
-        (a : Universal.Algebra(signature))
         (idempotent : Universal.Algebra.IsIdempotent(a))
         (subset : Set(a))
         (subsetClosed : Universal.IsSubuniverse(a, subset))
@@ -1233,73 +1222,71 @@ theorem Universal.HasEssential.doubled
   Universal.IsEssential(a, NaturalsBelow(1 + size), ((slot : NaturalsBelow(1 + size)) ↦ subset), start);
   ∃ (competitor : Set(a ^ NaturalsBelow(1 + size))). Universal.IsSubuniverse(
         a ^ NaturalsBelow(1 + size), competitor) ∧ Universal.IsEssential(a, NaturalsBelow(1 + size),
-          ((slot : NaturalsBelow(1 + size)) ↦ subset), competitor) ∧ Set.size(enumeration, Universal.betaSet(a, subset, size, competitor))
-        = Set.size(enumeration, Universal.betaSet(a, subset, size, start))
+          ((slot : NaturalsBelow(1 + size)) ↦ subset), competitor) ∧ Set.size(enumeration, Universal.betaSet(subset, competitor))
+        = Set.size(enumeration, Universal.betaSet(subset, start))
       by { witness start } as startAttains;
   ∃ (least : ℕ). (∃ (competitor : Set(a ^ NaturalsBelow(1 + size))). Universal.IsSubuniverse(a ^ NaturalsBelow(1 + size), competitor)
          ∧ Universal.IsEssential(a, NaturalsBelow(1 + size), ((slot : NaturalsBelow(1 + size)) ↦ subset), competitor)
-         ∧ Set.size(enumeration, Universal.betaSet(a, subset, size, competitor)) = least) ∧ ∀ (candidate : ℕ).
+         ∧ Set.size(enumeration, Universal.betaSet(subset, competitor)) = least) ∧ ∀ (candidate : ℕ).
           (∃ (competitor : Set(a ^ NaturalsBelow(1 + size))). Universal.IsSubuniverse(
       a ^ NaturalsBelow(1 + size), competitor) ∧ Universal.IsEssential(a, NaturalsBelow(1 + size),
       ((slot : NaturalsBelow(1 + size)) ↦ subset), competitor) ∧ Set.size(enumeration,
-      Universal.betaSet(a, subset, size, competitor)) = candidate) → least ≤ candidate
+      Universal.betaSet(subset, competitor)) = candidate) → least ≤ candidate
       by Natural.least_witness(((candidate : ℕ) ↦ ∃ (competitor : Set(a ^ NaturalsBelow(1 + size))). Universal.IsSubuniverse(
       a ^ NaturalsBelow(1 + size), competitor) ∧ Universal.IsEssential(a, NaturalsBelow(1 + size),
-      ((slot : NaturalsBelow(1 + size)) ↦ subset), competitor) ∧ Set.size(enumeration,
-      Universal.betaSet(a, subset, size, competitor)) = candidate),
-        Set.size(enumeration, Universal.betaSet(a, subset, size, start)), startAttains) as leastExists;
+      ((slot : NaturalsBelow(1 + size)) ↦ subset), competitor) ∧ Set.size(enumeration, Universal.betaSet(subset, competitor)) = candidate),
+        Set.size(enumeration, Universal.betaSet(subset, start)), startAttains) as leastExists;
   choose least such that (∃ (competitor : Set(a ^ NaturalsBelow(1 + size))).
          Universal.IsSubuniverse(a ^ NaturalsBelow(1 + size), competitor)
          ∧ Universal.IsEssential(a, NaturalsBelow(1 + size), ((slot : NaturalsBelow(1 + size)) ↦ subset), competitor)
-         ∧ Set.size(enumeration, Universal.betaSet(a, subset, size, competitor)) = least) ∧ ∀ (candidate : ℕ).
+         ∧ Set.size(enumeration, Universal.betaSet(subset, competitor)) = least) ∧ ∀ (candidate : ℕ).
           (∃ (competitor : Set(a ^ NaturalsBelow(1 + size))). Universal.IsSubuniverse(
       a ^ NaturalsBelow(1 + size), competitor) ∧ Universal.IsEssential(a, NaturalsBelow(1 + size),
       ((slot : NaturalsBelow(1 + size)) ↦ subset), competitor) ∧ Set.size(enumeration,
-      Universal.betaSet(a, subset, size, competitor)) = candidate) → least ≤ candidate
+      Universal.betaSet(subset, competitor)) = candidate) → least ≤ candidate
       from leastExists;
   ∀ (candidate : ℕ). (∃ (competitor : Set(a ^ NaturalsBelow(1 + size))). Universal.IsSubuniverse(a ^ NaturalsBelow(1 + size), competitor)
          ∧ Universal.IsEssential(a, NaturalsBelow(1 + size), ((slot : NaturalsBelow(1 + size)) ↦ subset), competitor)
-         ∧ Set.size(enumeration, Universal.betaSet(a, subset, size, competitor)) = candidate) → least ≤ candidate as leastIsLeast;
+         ∧ Set.size(enumeration, Universal.betaSet(subset, competitor)) = candidate) → least ≤ candidate as leastIsLeast;
   ∃ (competitor : Set(a ^ NaturalsBelow(1 + size))). Universal.IsSubuniverse(
         a ^ NaturalsBelow(1 + size), competitor) ∧ Universal.IsEssential(a, NaturalsBelow(1 + size),
-          ((slot : NaturalsBelow(1 + size)) ↦ subset), competitor) ∧ Set.size(enumeration, Universal.betaSet(a, subset, size, competitor))
+          ((slot : NaturalsBelow(1 + size)) ↦ subset), competitor) ∧ Set.size(enumeration, Universal.betaSet(subset, competitor))
         = least as leastAttained;
   choose relation such that Universal.IsSubuniverse(a ^ NaturalsBelow(1 + size), relation)
       ∧ Universal.IsEssential(a, NaturalsBelow(1 + size), ((slot : NaturalsBelow(1 + size)) ↦ subset), relation)
-      ∧ Set.size(enumeration, Universal.betaSet(a, subset, size, relation))
+      ∧ Set.size(enumeration, Universal.betaSet(subset, relation))
         = least
       from leastAttained;
   Universal.IsSubuniverse(a ^ NaturalsBelow(1 + size), relation);
   Universal.IsEssential(a, NaturalsBelow(1 + size), ((slot : NaturalsBelow(1 + size)) ↦ subset), relation);
-  Set.size(enumeration, Universal.betaSet(a, subset, size, relation)) = least
+  Set.size(enumeration, Universal.betaSet(subset, relation)) = least
       as attainsLeast;
   ∀ (competitor : Set(a ^ NaturalsBelow(1 + size))). Universal.IsSubuniverse(
         a ^ NaturalsBelow(1 + size), competitor) → Universal.IsEssential(a, NaturalsBelow(1 + size),
-          ((slot : NaturalsBelow(1 + size)) ↦ subset), competitor) → Set.size(enumeration, Universal.betaSet(a, subset, size, relation))
-        ≤ Set.size(enumeration, Universal.betaSet(a, subset, size, competitor))
+          ((slot : NaturalsBelow(1 + size)) ↦ subset), competitor) → Set.size(enumeration, Universal.betaSet(subset, relation))
+        ≤ Set.size(enumeration, Universal.betaSet(subset, competitor))
       by { take competitor : Set(a ^ NaturalsBelow(1 + size));
            suppose Universal.IsSubuniverse(a ^ NaturalsBelow(1 + size), competitor);
            suppose Universal.IsEssential(a, NaturalsBelow(1 + size), ((slot : NaturalsBelow(1 + size)) ↦ subset), competitor);
-           Set.size(enumeration, Universal.betaSet(a, subset, size, competitor))
-             = Set.size(enumeration, Universal.betaSet(a, subset, size, competitor));
+           Set.size(enumeration, Universal.betaSet(subset, competitor))
+             = Set.size(enumeration, Universal.betaSet(subset, competitor));
            ∃ (candidate : Set(a ^ NaturalsBelow(1 + size))). Universal.IsSubuniverse(
                  a ^ NaturalsBelow(1 + size), candidate) ∧ Universal.IsEssential(a, NaturalsBelow(1 + size),
-                   ((slot : NaturalsBelow(1 + size)) ↦ subset), candidate) ∧ Set.size(enumeration,
-                   Universal.betaSet(a, subset, size, candidate))
-                 = Set.size(enumeration, Universal.betaSet(a, subset, size, competitor))
+                   ((slot : NaturalsBelow(1 + size)) ↦ subset), candidate) ∧ Set.size(enumeration, Universal.betaSet(subset, candidate))
+                 = Set.size(enumeration, Universal.betaSet(subset, competitor))
                by { witness competitor };
-           least ≤ Set.size(enumeration, Universal.betaSet(a, subset, size, competitor)) by leastIsLeast;
+           least ≤ Set.size(enumeration, Universal.betaSet(subset, competitor)) by leastIsLeast;
            done by substituting attainsLeast };
   -- Steps 1 to 4.
-  Set.IsNonempty(a, Universal.betaSet(a, subset, size, relation))
+  Set.IsNonempty(a, Universal.betaSet(subset, relation))
       by Universal.betaSet_nonempty;
-  choose base such that base ∈ Universal.betaSet(a, subset, size, relation);
+  choose base such that base ∈ Universal.betaSet(subset, relation);
   Universal.IsSubuniverse(a × a, Universal.generated(a × a, Universal.centralPairs(a, subset, base))) by Universal.generated.is_subuniverse;
   Universal.IsSubuniverse(a ^ DisjointUnion(NaturalsBelow(size), NaturalsBelow(size)),
-      Universal.doubledRelation(a, size, relation, Universal.generated(a × a, Universal.centralPairs(a, subset, base))))
+      Universal.doubledRelation(relation, Universal.generated(a × a, Universal.centralPairs(a, subset, base))))
       by Universal.IsSubuniverse.doubledRelation;
   Universal.IsEssential(a, DisjointUnion(NaturalsBelow(size), NaturalsBelow(size)), ((slot : DisjointUnion(NaturalsBelow(size),
-      NaturalsBelow(size))) ↦ subset), Universal.doubledRelation(a, size, relation,
+      NaturalsBelow(size))) ↦ subset), Universal.doubledRelation(relation,
         Universal.generated(a × a, Universal.centralPairs(a, subset, base))))
       by Universal.IsEssential.doubledRelation;
   -- Laid end to end, the two halves are an initial segment.
@@ -1310,14 +1297,14 @@ theorem Universal.HasEssential.doubled
       by NaturalsBelow.sum_round_trip_right;
   Universal.IsEssential(a, NaturalsBelow(size + size), ((slot : NaturalsBelow(size + size)) ↦ subset), Universal.project(a,
         DisjointUnion(NaturalsBelow(size), NaturalsBelow(size)), NaturalsBelow(size + size), NaturalsBelow.sum_out_of(size, size),
-        Universal.doubledRelation(a, size, relation, Universal.generated(a × a, Universal.centralPairs(a, subset, base)))))
+        Universal.doubledRelation(relation, Universal.generated(a × a, Universal.centralPairs(a, subset, base)))))
       by Universal.IsEssential.reindex;
   Universal.IsSubuniverse(a ^ NaturalsBelow(size + size), Universal.project(a,
         DisjointUnion(NaturalsBelow(size), NaturalsBelow(size)), NaturalsBelow(size + size), NaturalsBelow.sum_out_of(size, size),
-        Universal.doubledRelation(a, size, relation, Universal.generated(a × a, Universal.centralPairs(a, subset, base)))))
+        Universal.doubledRelation(relation, Universal.generated(a × a, Universal.centralPairs(a, subset, base)))))
       by Universal.IsSubuniverse.project;
   witness Universal.project(a, DisjointUnion(NaturalsBelow(size), NaturalsBelow(size)),
-    NaturalsBelow(size + size), NaturalsBelow.sum_out_of(size, size), Universal.doubledRelation(a, size, relation,
+    NaturalsBelow(size + size), NaturalsBelow.sum_out_of(size, size), Universal.doubledRelation(relation,
       Universal.generated(a × a, Universal.centralPairs(a, subset, base))))
 }
 
@@ -1330,7 +1317,6 @@ theorem Universal.HasEssential.doubled
 -- removes the induction the blueprint's Remark 8.2 discusses.
 
 theorem Universal.centrally_absorbs_ternary
-        (a : Universal.Algebra(signature))
         (idempotent : Universal.Algebra.IsIdempotent(a))
         (enumeration : List(a))
         (isEnumeration : Set.IsEnumeration(a, enumeration))
@@ -1398,7 +1384,6 @@ theorem Universal.centrally_absorbs_ternary
 -- term witnesses that the left centre absorbs `A`.
 
 theorem Universal.leftCenter_ternary_witness
-        (a b : Universal.Algebra(signature))
         (idempotentBase : Universal.Algebra.IsIdempotent(a))
         (idempotentFibre : Universal.Algebra.IsIdempotent(b))
         (baseEnumeration : List(a))
@@ -1415,9 +1400,9 @@ theorem Universal.leftCenter_ternary_witness
         (taylor : Universal.IsTaylorOn(b, Universal.universe(b), arity, subject))
         (noProperBinaryAbsorbing : ∀ (part : Set(b)). Universal.IsSubuniverse(b, part)
             → Set.IsNonempty(b, part) → part ≠ Universal.universe(b) → ¬Universal.BinaryAbsorbs(b, part, Universal.universe(b)))
-        : ∃ (ternary : Universal.Term(signature, NaturalsBelow(3))). Universal.Witnesses(a, Universal.leftCenter(a, b, relation),
+        : ∃ (ternary : Universal.Term(signature, NaturalsBelow(3))). Universal.Witnesses(a, Universal.leftCenter(relation),
               Universal.universe(a), ternary) := {
-  Universal.CentrallyAbsorbs(a, Universal.leftCenter(a, b, relation)) by Universal.zhuk_center;
-  Universal.IsSubuniverse(a, Universal.leftCenter(a, b, relation)) by Universal.IsSubuniverse.leftCenter;
+  Universal.CentrallyAbsorbs(a, Universal.leftCenter(relation)) by Universal.zhuk_center;
+  Universal.IsSubuniverse(a, Universal.leftCenter(relation)) by Universal.IsSubuniverse.leftCenter;
   done by Universal.centrally_absorbs_ternary
 }

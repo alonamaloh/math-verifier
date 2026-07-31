@@ -477,6 +477,35 @@ Three things learned doing it:
   compound term used as an *argument* is safe; abbreviating one that has to be
   seen through is not.
 
+**Lifting the algebra too.** A follow-up review pointed out that removing the
+`{signature}` binder left 139 declarations still spelling
+`(a : Universal.Algebra(signature))`, and that `Algebra/group.math` lifts a
+whole structure — carrier, operations, and the `IsGroup` proof — into chained
+conventions. It does, and `convention a b : Universal.Algebra(signature)` under
+`convention signature` works: 70 theorem binder lines gone, 21 left.
+
+The split that matters is theorem versus definition. A theorem's algebra is
+ambient and its citations are argument-free, so lifting it is free. A
+definition's is often what a reader needs to see, and making it implicit only
+pays where it is *inferable from another argument*: `Universal.leftCenter(relation)`,
+`Universal.betaSet(subset, relation)` and `Universal.doubledRelation(relation, link)`
+took (75 + 57 + 15 sites, the last turning a 103-character term into 40), while
+`Universal.pair` and `Universal.neighborhood` did not — the second algebra is not
+determined by the arguments the elaborator sees first.
+
+Two wrinkles found in the convention mechanism, both worth a diagnostic:
+
+- **A convention binder is prepended ahead of *all* user binders.** So a
+  convention whose type references a name the declaration also binds explicitly
+  dangles — `{a : Universal.Algebra(signature)}` in front of a user's
+  `(signature : Universal.Signature)`. The error points at the convention's
+  declaration line, several files away from the declaration that triggered it.
+  The fix at the use site is to drop the redundant explicit binder.
+- **A convention that is never mentioned is not free.** Adding
+  `convention a b` to a file that uses neither still tripped the above, because
+  another declaration bound `signature` explicitly. Declare conventions only in
+  the files that use them.
+
 What did **not** work: `Universal.Tm(V)` for `Universal.Term(signature, V)`. The
 convention makes `signature` implicit, and an implicit that appears only in a
 pattern-match definition's *return* type cannot be inferred. The same shape is

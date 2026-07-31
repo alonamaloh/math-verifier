@@ -49,6 +49,7 @@ import Universal.star_power
 import Universal.center
 
 convention signature : Universal.Signature
+convention a b : Universal.Algebra(signature)
 
 -- ── The generating sets ───────────────────────────────────────────────
 
@@ -60,8 +61,8 @@ definition Universal.centralGenerators
         (element : a)
         : Set(a × a) :=
   (point : a × a) ↦ (Product.first(point) = element
-     ∧ Product.second(point) ∈ Universal.leftCenter(a, b, relation)) ∨ (Product.first(point) ∈ Universal.leftCenter(a, b, relation)
-       ∧ Product.second(point) ∈ Universal.leftCenter(a, b, relation)) ∨ (Product.first(point) ∈ Universal.leftCenter(a, b, relation)
+     ∧ Product.second(point) ∈ Universal.leftCenter(relation)) ∨ (Product.first(point) ∈ Universal.leftCenter(relation)
+       ∧ Product.second(point) ∈ Universal.leftCenter(relation)) ∨ (Product.first(point) ∈ Universal.leftCenter(relation)
        ∧ Product.second(point) = element)
 
 -- Blueprint Definition 6.2's generators: the two off-diagonal blocks only.
@@ -75,19 +76,18 @@ definition Universal.centralPairs
     ∨ (Product.first(point) ∈ subset ∧ Product.second(point) = element)
 
 theorem Universal.centralPairs_subset_centralGenerators
-        (a b : Universal.Algebra(signature))
         (relation : Set(a × b))
         (element : a)
-        : Universal.centralPairs(a, Universal.leftCenter(a, b, relation), element)
+        : Universal.centralPairs(a, Universal.leftCenter(relation), element)
           ⊆ Universal.centralGenerators(a, b, relation, element) := {
   take point : a × a;
   suppose point
-      ∈ Universal.centralPairs(a, Universal.leftCenter(a, b, relation), element)
+      ∈ Universal.centralPairs(a, Universal.leftCenter(relation), element)
       as isPair;
   done by cases {
-    case Product.first(point) = element ∧ Product.second(point) ∈ Universal.leftCenter(a, b, relation)
+    case Product.first(point) = element ∧ Product.second(point) ∈ Universal.leftCenter(relation)
            as firstBlock: done
-    case Product.first(point) ∈ Universal.leftCenter(a, b, relation) ∧ Product.second(point) = element as thirdBlock: done
+    case Product.first(point) ∈ Universal.leftCenter(relation) ∧ Product.second(point) = element as thirdBlock: done
   }
 }
 
@@ -112,46 +112,44 @@ definition Universal.generatorSecond
 -- Each coordinate of a generator is either `element` or a centre element: that
 -- is what the three blocks say, read one coordinate at a time.
 theorem Universal.generatorFirst_alternative
-        (a b : Universal.Algebra(signature))
         (relation : Set(a × b))
         (element : a)
         (generator : Subtype(a × a, Universal.centralGenerators(a, b, relation, element)))
         : Universal.generatorFirst(a, Universal.centralGenerators(a, b, relation, element), generator)
             = element ∨ Universal.generatorFirst(a, Universal.centralGenerators(a, b, relation, element), generator)
-            ∈ Universal.leftCenter(a, b, relation) := {
+            ∈ Universal.leftCenter(relation) := {
   Subtype.value(generator)
       ∈ Universal.centralGenerators(a, b, relation, element)
       by Subtype.property;
   done by cases {
     case Product.first(Subtype.value(generator)) = element ∧ Product.second(Subtype.value(generator))
-           ∈ Universal.leftCenter(a, b, relation) as firstBlock: done
+           ∈ Universal.leftCenter(relation) as firstBlock: done
     case Product.first(Subtype.value(generator))
-           ∈ Universal.leftCenter(a, b, relation) ∧ Product.second(Subtype.value(generator))
-           ∈ Universal.leftCenter(a, b, relation) as secondBlock: done
+           ∈ Universal.leftCenter(relation) ∧ Product.second(Subtype.value(generator))
+           ∈ Universal.leftCenter(relation) as secondBlock: done
     case Product.first(Subtype.value(generator))
-           ∈ Universal.leftCenter(a, b, relation) ∧ Product.second(Subtype.value(generator)) = element as thirdBlock: done
+           ∈ Universal.leftCenter(relation) ∧ Product.second(Subtype.value(generator)) = element as thirdBlock: done
   }
 }
 
 theorem Universal.generatorSecond_alternative
-        (a b : Universal.Algebra(signature))
         (relation : Set(a × b))
         (element : a)
         (generator : Subtype(a × a, Universal.centralGenerators(a, b, relation, element)))
         : Universal.generatorSecond(a, Universal.centralGenerators(a, b, relation, element), generator)
             = element ∨ Universal.generatorSecond(a, Universal.centralGenerators(a, b, relation, element), generator)
-            ∈ Universal.leftCenter(a, b, relation) := {
+            ∈ Universal.leftCenter(relation) := {
   Subtype.value(generator)
       ∈ Universal.centralGenerators(a, b, relation, element)
       by Subtype.property;
   done by cases {
     case Product.first(Subtype.value(generator)) = element ∧ Product.second(Subtype.value(generator))
-           ∈ Universal.leftCenter(a, b, relation) as firstBlock: done
+           ∈ Universal.leftCenter(relation) as firstBlock: done
     case Product.first(Subtype.value(generator))
-           ∈ Universal.leftCenter(a, b, relation) ∧ Product.second(Subtype.value(generator))
-           ∈ Universal.leftCenter(a, b, relation) as secondBlock: done
+           ∈ Universal.leftCenter(relation) ∧ Product.second(Subtype.value(generator))
+           ∈ Universal.leftCenter(relation) as secondBlock: done
     case Product.first(Subtype.value(generator))
-           ∈ Universal.leftCenter(a, b, relation) ∧ Product.second(Subtype.value(generator)) = element as thirdBlock: done
+           ∈ Universal.leftCenter(relation) ∧ Product.second(Subtype.value(generator)) = element as thirdBlock: done
   }
 }
 
@@ -159,10 +157,9 @@ theorem Universal.generatorSecond_alternative
 -- generator whose first coordinate is `element` lies in the first block, so its
 -- second coordinate is central and therefore is not `element`.
 theorem Universal.generatorSecond_ne_of_generatorFirst_eq
-        (a b : Universal.Algebra(signature))
         (relation : Set(a × b))
         (element : a)
-        (outside : element ∉ Universal.leftCenter(a, b, relation))
+        (outside : element ∉ Universal.leftCenter(relation))
         (generator : Subtype(a × a, Universal.centralGenerators(a, b, relation, element)))
         (firstIsElement : Universal.generatorFirst(a, Universal.centralGenerators(a, b, relation, element), generator)
             = element)
@@ -175,26 +172,26 @@ theorem Universal.generatorSecond_ne_of_generatorFirst_eq
       by Subtype.property;
   -- In every block one of the two coordinates is central, and both are
   -- `element`, so `element` is central.
-  element ∈ Universal.leftCenter(a, b, relation)
+  element ∈ Universal.leftCenter(relation)
       by cases {
         case Product.first(Subtype.value(generator)) = element ∧ Product.second(Subtype.value(generator))
-               ∈ Universal.leftCenter(a, b, relation) as firstBlock: {
+               ∈ Universal.leftCenter(relation) as firstBlock: {
             Product.second(Subtype.value(generator))
-                ∈ Universal.leftCenter(a, b, relation);
+                ∈ Universal.leftCenter(relation);
             done by substituting secondIsElement
           }
         case Product.first(Subtype.value(generator))
-               ∈ Universal.leftCenter(a, b, relation) ∧ Product.second(Subtype.value(generator))
-               ∈ Universal.leftCenter(a, b, relation) as secondBlock: {
+               ∈ Universal.leftCenter(relation) ∧ Product.second(Subtype.value(generator))
+               ∈ Universal.leftCenter(relation) as secondBlock: {
             Product.first(Subtype.value(generator))
-                ∈ Universal.leftCenter(a, b, relation);
+                ∈ Universal.leftCenter(relation);
             done by substituting firstIsElement
           }
         case Product.first(Subtype.value(generator))
-               ∈ Universal.leftCenter(a, b, relation) ∧ Product.second(Subtype.value(generator)) = element
+               ∈ Universal.leftCenter(relation) ∧ Product.second(Subtype.value(generator)) = element
                as thirdBlock: {
             Product.first(Subtype.value(generator))
-                ∈ Universal.leftCenter(a, b, relation);
+                ∈ Universal.leftCenter(relation);
             done by substituting firstIsElement
           }
       };
@@ -210,14 +207,13 @@ theorem Universal.generatorSecond_ne_of_generatorFirst_eq
 -- that neighbourhood: elsewhere the coordinate is central, and a central
 -- element is related to everything.
 theorem Universal.centralGenerators.evaluate_mem_neighborhood
-        (a b : Universal.Algebra(signature))
         (relation : Set(a × b))
         (closed : Universal.IsSubuniverse(a × b, relation))
         (element : a)
         (base : Set(a × a))
         (coordinate : Subtype(a × a, base) → a)
         (alternative : ∀ (generator : Subtype(a × a, base)).
-            coordinate(generator) = element ∨ coordinate(generator) ∈ Universal.leftCenter(a, b, relation))
+            coordinate(generator) = element ∨ coordinate(generator) ∈ Universal.leftCenter(relation))
         (subject : Universal.Term(signature, Subtype(a × a, base)))
         (valueIsElement : Universal.Term.evaluate(a, coordinate, subject)
             = element)
@@ -229,7 +225,7 @@ theorem Universal.centralGenerators.evaluate_mem_neighborhood
   ∀ (generator : Subtype(a × a, base)). fibres(generator)
         ∈ Universal.neighborhood(a, b, relation, coordinate(generator))
       by { take generator : Subtype(a × a, base);
-           coordinate(generator) = element ∨ coordinate(generator) ∈ Universal.leftCenter(a, b, relation) by alternative;
+           coordinate(generator) = element ∨ coordinate(generator) ∈ Universal.leftCenter(relation) by alternative;
            done by cases {
              case coordinate(generator) = element as isElement: {
                  fibres(generator)
@@ -238,7 +234,7 @@ theorem Universal.centralGenerators.evaluate_mem_neighborhood
                  done by substituting isElement
                }
              case coordinate(generator)
-                    ∈ Universal.leftCenter(a, b, relation) as isCentral: {
+                    ∈ Universal.leftCenter(relation) as isCentral: {
                  ∀ (candidate : b). Universal.pair(a, b, coordinate(generator), candidate)
                        ∈ relation by isCentral;
                  Universal.pair(a, b, coordinate(generator), fibres(generator))
@@ -270,7 +266,6 @@ definition Universal.centralSelector
   else firstIndex
 
 theorem Universal.centralSelector_second
-        (a : Universal.Algebra(signature))
         (base : Set(a × a))
         (element : a)
         (firstIndex secondIndex : NaturalsBelow(2))
@@ -280,7 +275,6 @@ theorem Universal.centralSelector_second
         : Universal.centralSelector(a, base, element, firstIndex, secondIndex, generator) = secondIndex := by Logic.if_positive
 
 theorem Universal.centralSelector_first
-        (a : Universal.Algebra(signature))
         (base : Set(a × a))
         (element : a)
         (firstIndex secondIndex : NaturalsBelow(2))
@@ -295,7 +289,6 @@ theorem Universal.centralSelector_first
 -- has no proper binary absorbing subuniverse.
 
 theorem Universal.center_central
-        (a b : Universal.Algebra(signature))
         (idempotentBase : Universal.Algebra.IsIdempotent(a))
         (relation : Set(a × b))
         (closed : Universal.IsSubuniverse(a × b, relation))
@@ -303,7 +296,7 @@ theorem Universal.center_central
         (noProperBinaryAbsorbing : ∀ (part : Set(b)). Universal.IsSubuniverse(b, part)
             → Set.IsNonempty(b, part) → part ≠ Universal.universe(b) → ¬Universal.BinaryAbsorbs(b, part, Universal.universe(b)))
         (element : a)
-        (outside : element ∉ Universal.leftCenter(a, b, relation))
+        (outside : element ∉ Universal.leftCenter(relation))
         : ¬(Universal.pair(a, a, element, element)
             ∈ Universal.generated(a × a,
                 Universal.centralGenerators(a, b, relation, element))) := {
@@ -336,12 +329,12 @@ theorem Universal.center_central
   ∀ (generator : Subtype(a × a, Universal.centralGenerators(a, b, relation, element))).
       Universal.generatorFirst(a, Universal.centralGenerators(a, b, relation, element), generator)
           = element ∨ Universal.generatorFirst(a, Universal.centralGenerators(a, b, relation, element), generator)
-          ∈ Universal.leftCenter(a, b, relation)
+          ∈ Universal.leftCenter(relation)
       by Universal.generatorFirst_alternative;
   ∀ (generator : Subtype(a × a, Universal.centralGenerators(a, b, relation, element))).
       Universal.generatorSecond(a, Universal.centralGenerators(a, b, relation, element), generator)
           = element ∨ Universal.generatorSecond(a, Universal.centralGenerators(a, b, relation, element), generator)
-          ∈ Universal.leftCenter(a, b, relation)
+          ∈ Universal.leftCenter(relation)
       by Universal.generatorSecond_alternative;
   -- The two variables, and the selector that sends a generator to the second
   -- exactly when it lies in the third block.
@@ -437,7 +430,7 @@ theorem Universal.center_central
     = Universal.universe(b))
       by { suppose Universal.neighborhood(a, b, relation, element)
              = Universal.universe(b);
-           element ∈ Universal.leftCenter(a, b, relation) by Universal.leftCenter_of_neighborhood_universe;
+           element ∈ Universal.leftCenter(relation) by Universal.leftCenter_of_neighborhood_universe;
            done };
   ¬Universal.BinaryAbsorbs(b, Universal.neighborhood(a, b, relation, element), Universal.universe(b)) by noProperBinaryAbsorbing;
   done
@@ -450,7 +443,6 @@ theorem Universal.center_central
 -- `NaturalsBelow(arity)`, and `HasSize.tuples` counts exactly those; this is
 -- the only place a star power's arity is named as a number.
 theorem Universal.Absorbs.of_star_witness
-        (a : Universal.Algebra(signature))
         (inner outer : Set(a))
         (arity depth : ℕ) (positive : 1 ≤ arity)
         (power : Universal.Term(signature, Universal.StarIndex(arity, depth)))
@@ -479,7 +471,6 @@ definition Universal.CentrallyAbsorbs
 -- Theorem 5.2, given a numeric arity by `of_star_witness`; clause (b) is
 -- Theorem 6.1, whose generating set is the larger of the two.
 theorem Universal.zhuk_center
-        (a b : Universal.Algebra(signature))
         (idempotentBase : Universal.Algebra.IsIdempotent(a))
         (idempotentFibre : Universal.Algebra.IsIdempotent(b))
         (enumeration : List(b))
@@ -492,29 +483,29 @@ theorem Universal.zhuk_center
         (taylor : Universal.IsTaylorOn(b, Universal.universe(b), arity, subject))
         (noProperBinaryAbsorbing : ∀ (part : Set(b)). Universal.IsSubuniverse(b, part)
             → Set.IsNonempty(b, part) → part ≠ Universal.universe(b) → ¬Universal.BinaryAbsorbs(b, part, Universal.universe(b)))
-        : Universal.CentrallyAbsorbs(a, Universal.leftCenter(a, b, relation)) := {
+        : Universal.CentrallyAbsorbs(a, Universal.leftCenter(relation)) := {
   -- (a) The star power of the Taylor term witnesses, and its index type is
   -- finite, so the absorption has a numeric arity.
-  choose power such that Universal.Witnesses(a, Universal.leftCenter(a, b, relation), Universal.universe(a), power)
-      from Universal.leftCenter_witnesses(a, b, idempotentBase, idempotentFibre,
+  choose power such that Universal.Witnesses(a, Universal.leftCenter(relation), Universal.universe(a), power)
+      from Universal.leftCenter_witnesses(idempotentBase, idempotentFibre,
         enumeration, isEnumeration, relation, closed, subdirect, arity, subject, taylor, noProperBinaryAbsorbing);
-  Universal.Absorbs(a, Universal.leftCenter(a, b, relation), Universal.universe(a)) by Universal.Absorbs.of_star_witness;
+  Universal.Absorbs(a, Universal.leftCenter(relation), Universal.universe(a)) by Universal.Absorbs.of_star_witness;
   -- (b) The two off-diagonal blocks generate no more than all three do.
-  ∀ (element : a). element ∉ Universal.leftCenter(a, b, relation) → ¬(Universal.pair(a, a, element, element)
-          ∈ Universal.generated(a × a, Universal.centralPairs(a, Universal.leftCenter(a, b, relation), element)))
+  ∀ (element : a). element ∉ Universal.leftCenter(relation) → ¬(Universal.pair(a, a, element, element)
+          ∈ Universal.generated(a × a, Universal.centralPairs(a, Universal.leftCenter(relation), element)))
       by { take element : a;
-           suppose element ∉ Universal.leftCenter(a, b, relation);
-           Universal.centralPairs(a, Universal.leftCenter(a, b, relation), element)
+           suppose element ∉ Universal.leftCenter(relation);
+           Universal.centralPairs(a, Universal.leftCenter(relation), element)
              ⊆ Universal.centralGenerators(a, b, relation, element)
              by Universal.centralPairs_subset_centralGenerators;
-           Universal.generated(a × a, Universal.centralPairs(a, Universal.leftCenter(a, b, relation), element))
+           Universal.generated(a × a, Universal.centralPairs(a, Universal.leftCenter(relation), element))
              ⊆ Universal.generated(a × a, Universal.centralGenerators(a, b, relation, element))
              by Universal.generated.monotone as nested;
            ¬(Universal.pair(a, a, element, element)
              ∈ Universal.generated(a × a, Universal.centralGenerators(a, b, relation, element)))
              by Universal.center_central;
            suppose Universal.pair(a, a, element, element)
-               ∈ Universal.generated(a × a, Universal.centralPairs(a, Universal.leftCenter(a, b, relation), element));
+               ∈ Universal.generated(a × a, Universal.centralPairs(a, Universal.leftCenter(relation), element));
            Universal.pair(a, a, element, element)
                ∈ Universal.generated(a × a, Universal.centralGenerators(a, b, relation, element))
                by nested;
@@ -525,7 +516,6 @@ theorem Universal.zhuk_center
 -- The two generating blocks, as membership facts. Stating them once here keeps
 -- every consumer free of the disjunction and of the pair's projections.
 theorem Universal.centralPairs.from_element
-        (a : Universal.Algebra(signature))
         (subset : Set(a))
         (element candidate : a)
         (inSubset : candidate ∈ subset)
@@ -539,7 +529,6 @@ theorem Universal.centralPairs.from_element
 }
 
 theorem Universal.centralPairs.to_element
-        (a : Universal.Algebra(signature))
         (subset : Set(a))
         (element candidate : a)
         (inSubset : candidate ∈ subset)

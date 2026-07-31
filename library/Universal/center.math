@@ -39,6 +39,7 @@ import Universal.absorption
 import Universal.star_power
 
 convention signature : Universal.Signature
+convention a b : Universal.Algebra(signature)
 
 -- ── Subdirect relations, neighbourhoods, centres ──────────────────────
 
@@ -56,19 +57,16 @@ definition Universal.pair
 
 -- Its two components, and the reassembly.
 theorem Universal.pair_first
-        (a b : Universal.Algebra(signature))
         (base : a)
         (fibre : b)
         : Product.first(Universal.pair(a, b, base, fibre)) = base := done
 
 theorem Universal.pair_second
-        (a b : Universal.Algebra(signature))
         (base : a)
         (fibre : b)
         : Product.second(Universal.pair(a, b, base, fibre)) = fibre := done
 
 theorem Universal.pair_eta
-        (a b : Universal.Algebra(signature))
         (point : a × b)
         : Universal.pair(a, b, Product.first(point), Product.second(point))
           = point := done by Product.eta
@@ -100,7 +98,7 @@ definition Universal.neighborhood
 
 -- Blueprint Definition 4.2: the left centre, the elements related to all of `B`.
 definition Universal.leftCenter
-        (a b : Universal.Algebra(signature))
+        {a b : Universal.Algebra(signature)}
         (relation : Set(a × b))
         : Set(a) :=
   (element : a) ↦ ∀ (candidate : b). Universal.pair(a, b, element, candidate) ∈ relation
@@ -110,7 +108,6 @@ definition Universal.leftCenter
 -- (a) Each neighbourhood is a subuniverse of `B`. The operations act on the
 -- second coordinate while idempotence of `A` holds the first one still.
 theorem Universal.IsSubuniverse.neighborhood
-        (a b : Universal.Algebra(signature))
         (idempotentBase : Universal.Algebra.IsIdempotent(a))
         (relation : Set(a × b))
         (closed : Universal.IsSubuniverse(a × b, relation))
@@ -140,7 +137,6 @@ theorem Universal.IsSubuniverse.neighborhood
 
 -- (b) Neighbourhoods are nonempty — this is subdirectness on the first factor.
 theorem Universal.neighborhood_nonempty
-        (a b : Universal.Algebra(signature))
         (relation : Set(a × b))
         (subdirect : Universal.IsSubdirect(a, b, relation))
         (element : a)
@@ -157,12 +153,11 @@ theorem Universal.neighborhood_nonempty
 -- directions are used: one to recognise a saturated neighbourhood as a centre
 -- element, the other to read a centre element's neighbourhood off as full.
 theorem Universal.leftCenter_of_neighborhood_universe
-        (a b : Universal.Algebra(signature))
         (relation : Set(a × b))
         (element : a)
         (full : Universal.neighborhood(a, b, relation, element)
                 = Universal.universe(b))
-        : element ∈ Universal.leftCenter(a, b, relation) := {
+        : element ∈ Universal.leftCenter(relation) := {
   take candidate : b;
   candidate ∈ Universal.universe(b);
   candidate ∈ Universal.neighborhood(a, b, relation, element) by substituting full;
@@ -170,10 +165,9 @@ theorem Universal.leftCenter_of_neighborhood_universe
 }
 
 theorem Universal.neighborhood_universe_of_leftCenter
-        (a b : Universal.Algebra(signature))
         (relation : Set(a × b))
         (element : a)
-        (central : element ∈ Universal.leftCenter(a, b, relation))
+        (central : element ∈ Universal.leftCenter(relation))
         : Universal.neighborhood(a, b, relation, element)
           = Universal.universe(b) := {
   ∀ (candidate : b). Universal.pair(a, b, element, candidate) ∈ relation by central;
@@ -194,15 +188,14 @@ theorem Universal.neighborhood_universe_of_leftCenter
 -- (c) The left centre is a subuniverse of `A`. The mirror image of (a):
 -- idempotence of `B` holds the second coordinate still.
 theorem Universal.IsSubuniverse.leftCenter
-        (a b : Universal.Algebra(signature))
         (idempotentFibre : Universal.Algebra.IsIdempotent(b))
         (relation : Set(a × b))
         (closed : Universal.IsSubuniverse(a × b, relation))
-        : Universal.IsSubuniverse(a, Universal.leftCenter(a, b, relation)) := {
+        : Universal.IsSubuniverse(a, Universal.leftCenter(relation)) := {
   take arity : ℕ;
   take symbol : signature(arity);
   take arguments : NaturalsBelow(arity) → a;
-  suppose ∀ (slot : NaturalsBelow(arity)). arguments(slot) ∈ Universal.leftCenter(a, b, relation) as allCentral;
+  suppose ∀ (slot : NaturalsBelow(arity)). arguments(slot) ∈ Universal.leftCenter(relation) as allCentral;
   take candidate : b;
   ∀ (slot : NaturalsBelow(arity)). Universal.pair(a, b, arguments(slot), candidate) ∈ relation
       by { take slot : NaturalsBelow(arity);
@@ -226,7 +219,6 @@ theorem Universal.IsSubuniverse.leftCenter
 -- a time.
 theorem Universal.neighborhood.preserves
         {variables : Type(0)}
-        (a b : Universal.Algebra(signature))
         (relation : Set(a × b))
         (closed : Universal.IsSubuniverse(a × b, relation))
         (subject : Universal.Term(signature, variables))
@@ -261,16 +253,15 @@ theorem Universal.neighborhood.preserves
 -- The left centre is closed under term operations, by (c) and preservation.
 theorem Universal.leftCenter.evaluate_mem
         {variables : Type(0)}
-        (a b : Universal.Algebra(signature))
         (idempotentFibre : Universal.Algebra.IsIdempotent(b))
         (relation : Set(a × b))
         (closed : Universal.IsSubuniverse(a × b, relation))
         (subject : Universal.Term(signature, variables))
         (valuation : variables → a)
-        (allCentral : ∀ (name : variables). valuation(name) ∈ Universal.leftCenter(a, b, relation))
+        (allCentral : ∀ (name : variables). valuation(name) ∈ Universal.leftCenter(relation))
         : Universal.Term.evaluate(a, valuation, subject)
-          ∈ Universal.leftCenter(a, b, relation) := {
-  Universal.IsSubuniverse(a, Universal.leftCenter(a, b, relation)) by Universal.IsSubuniverse.leftCenter;
+          ∈ Universal.leftCenter(relation) := {
+  Universal.IsSubuniverse(a, Universal.leftCenter(relation)) by Universal.IsSubuniverse.leftCenter;
   done by Universal.Term.evaluate_mem
 }
 
@@ -313,14 +304,13 @@ theorem Universal.subset_stepImage
 -- centre elements at the other coordinates are used — their neighbourhoods are
 -- everything, so the constraint there is no constraint.
 theorem Universal.stepImage_subset_neighborhood
-        (a b : Universal.Algebra(signature))
         (relation : Set(a × b))
         (closed : Universal.IsSubuniverse(a × b, relation))
         (arity : ℕ)
         (subject : Universal.Term(signature, NaturalsBelow(arity)))
         (free : NaturalsBelow(arity))
         (valuation : NaturalsBelow(arity) → a)
-        (othersCentral : ∀ (slot : NaturalsBelow(arity)). slot ≠ free → valuation(slot) ∈ Universal.leftCenter(a, b, relation))
+        (othersCentral : ∀ (slot : NaturalsBelow(arity)). slot ≠ free → valuation(slot) ∈ Universal.leftCenter(relation))
         : Universal.stepImage(b, arity, subject, free, Universal.neighborhood(a, b, relation, valuation(free)))
           ⊆ Universal.neighborhood(a, b, relation,
               Universal.Term.evaluate(a, valuation, subject)) := {
@@ -336,7 +326,7 @@ theorem Universal.stepImage_subset_neighborhood
            done by cases {
              case slot = free as isFree: done by substituting isFree
              otherwise as isOther: {
-                 valuation(slot) ∈ Universal.leftCenter(a, b, relation) by othersCentral;
+                 valuation(slot) ∈ Universal.leftCenter(relation) by othersCentral;
                  Universal.pair(a, b, valuation(slot), tuple(slot)) ∈ relation;
                  done
                }
@@ -384,7 +374,6 @@ theorem Universal.BinaryAbsorbs.of_stepImage_eq
 -- the neighbourhood binary absorbs `B`, so it is all of `B` and the value's
 -- neighbourhood is too.
 theorem Universal.center_step
-        (a b : Universal.Algebra(signature))
         (idempotentBase : Universal.Algebra.IsIdempotent(a))
         (idempotentFibre : Universal.Algebra.IsIdempotent(b))
         (enumeration : List(b))
@@ -399,7 +388,7 @@ theorem Universal.center_step
             → Set.IsNonempty(b, part) → part ≠ Universal.universe(b) → ¬Universal.BinaryAbsorbs(b, part, Universal.universe(b)))
         (free : NaturalsBelow(arity))
         (valuation : NaturalsBelow(arity) → a)
-        (othersCentral : ∀ (slot : NaturalsBelow(arity)). slot ≠ free → valuation(slot) ∈ Universal.leftCenter(a, b, relation))
+        (othersCentral : ∀ (slot : NaturalsBelow(arity)). slot ≠ free → valuation(slot) ∈ Universal.leftCenter(relation))
         : min(Set.size(enumeration, Universal.universe(b)), 1 + Set.size(enumeration,
                 Universal.neighborhood(a, b, relation, valuation(free))))
           ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation,
@@ -429,16 +418,16 @@ theorem Universal.center_step
                  ¬Universal.BinaryAbsorbs(b, nearFree, Universal.universe(b)) by noProperBinaryAbsorbing;
                  done };
         -- So the free coordinate is central too, and hence so is the value.
-        valuation(free) ∈ Universal.leftCenter(a, b, relation)
+        valuation(free) ∈ Universal.leftCenter(relation)
             by Universal.leftCenter_of_neighborhood_universe;
-        ∀ (slot : NaturalsBelow(arity)). valuation(slot) ∈ Universal.leftCenter(a, b, relation)
+        ∀ (slot : NaturalsBelow(arity)). valuation(slot) ∈ Universal.leftCenter(relation)
             by { take slot : NaturalsBelow(arity);
                  done by cases {
                    case slot = free as isFree: done by substituting isFree
                    otherwise: done by othersCentral
                  } };
         Universal.Term.evaluate(a, valuation, subject)
-            ∈ Universal.leftCenter(a, b, relation)
+            ∈ Universal.leftCenter(relation)
             by Universal.leftCenter.evaluate_mem;
         Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation, subject))
             = Universal.universe(b)
@@ -487,7 +476,6 @@ theorem Universal.center_step
 -- their defining equation rather than a `let`-bound lambda: a `let` is expanded
 -- in the goal, leaving an equation about it nothing to rewrite.
 theorem Universal.center_star_step
-        (a b : Universal.Algebra(signature))
         (idempotentBase : Universal.Algebra.IsIdempotent(a))
         (idempotentFibre : Universal.Algebra.IsIdempotent(b))
         (enumeration : List(b))
@@ -504,13 +492,12 @@ theorem Universal.center_star_step
         (inner : Universal.Term(signature, Universal.StarIndex(arity, rest)))
         (innerBound : ∀ (position : Universal.StarIndex(arity, rest)). ∀ (values : Universal.StarIndex(arity, rest)
             → a). (∀ (other : Universal.StarIndex(arity, rest)). other ≠ position
-                 → values(other) ∈ Universal.leftCenter(a, b, relation)) → min(Set.size(enumeration,
+                 → values(other) ∈ Universal.leftCenter(relation)) → min(Set.size(enumeration,
             Universal.universe(b)), rest + Set.size(enumeration, Universal.neighborhood(a, b, relation, values(position))))
                 ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, values, inner))))
         (free : Universal.StarIndex(arity, 1 + rest))
         (valuation : Universal.StarIndex(arity, 1 + rest) → a)
-        (othersCentral : ∀ (other : Universal.StarIndex(arity, 1 + rest)). other ≠ free
-            → valuation(other) ∈ Universal.leftCenter(a, b, relation))
+        (othersCentral : ∀ (other : Universal.StarIndex(arity, 1 + rest)). other ≠ free → valuation(other) ∈ Universal.leftCenter(relation))
         (blockValues : NaturalsBelow(arity) → a)
         (blockValuesSpec : ∀ (block : NaturalsBelow(arity)). blockValues(block)
             = Universal.Term.evaluate(a, ((position : Universal.StarIndex(arity, rest)) ↦
@@ -524,13 +511,12 @@ theorem Universal.center_star_step
   Universal.starPrepend(arity, rest, Universal.starHead(arity, rest, free), Universal.starTail(arity, rest, free)) = free
       by Universal.starPrepend_head_tail;
   -- Every other block carries centre elements only.
-  ∀ (block : NaturalsBelow(arity)). block ≠ Universal.starHead(arity, rest, free)
-      → blockValues(block) ∈ Universal.leftCenter(a, b, relation)
+  ∀ (block : NaturalsBelow(arity)). block ≠ Universal.starHead(arity, rest, free) → blockValues(block) ∈ Universal.leftCenter(relation)
       by { take block : NaturalsBelow(arity);
            suppose block ≠ Universal.starHead(arity, rest, free)
                as blockDiffers;
            ∀ (position : Universal.StarIndex(arity, rest)). valuation(Universal.starPrepend(arity, rest, block, position))
-                 ∈ Universal.leftCenter(a, b, relation)
+                 ∈ Universal.leftCenter(relation)
                by { take position : Universal.StarIndex(arity, rest);
                     Universal.starPrepend(arity, rest, block, position) ≠ free
                         by { suppose Universal.starPrepend(arity, rest, block, position) = free as isFree;
@@ -544,7 +530,7 @@ theorem Universal.center_star_step
                     done by othersCentral };
            Universal.Term.evaluate(a, ((position : Universal.StarIndex(arity, rest)) ↦
                  valuation(Universal.starPrepend(arity, rest, block, position))), inner)
-             ∈ Universal.leftCenter(a, b, relation)
+             ∈ Universal.leftCenter(relation)
                by Universal.leftCenter.evaluate_mem;
            done by substituting blockValuesSpec(block) };
   -- The free block carries the free index, so the inductive bound applies there.
@@ -552,7 +538,7 @@ theorem Universal.center_star_step
      ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, blockValues(Universal.starHead(arity, rest, free))))
      by { ∀ (other : Universal.StarIndex(arity, rest)). other ≠ Universal.starTail(arity, rest, free)
               → valuation(Universal.starPrepend(arity, rest, Universal.starHead(arity, rest, free), other))
-                ∈ Universal.leftCenter(a, b, relation)
+                ∈ Universal.leftCenter(relation)
               by { take other : Universal.StarIndex(arity, rest);
                    suppose other ≠ Universal.starTail(arity, rest, free)
                        as positionDiffers;
@@ -631,7 +617,6 @@ theorem Universal.center_star_step
 -- overwritten". Blueprint Remark 5.3: the latter is unusable when the centre is
 -- empty, and no case analysis is needed here.
 theorem Universal.center_star
-        (a b : Universal.Algebra(signature))
         (idempotentBase : Universal.Algebra.IsIdempotent(a))
         (idempotentFibre : Universal.Algebra.IsIdempotent(b))
         (enumeration : List(b))
@@ -647,7 +632,7 @@ theorem Universal.center_star
         (depth : ℕ)
         : ∃ (power : Universal.Term(signature, Universal.StarIndex(arity, depth))). ∀ (free : Universal.StarIndex(arity, depth)).
             ∀ (valuation : Universal.StarIndex(arity, depth) → a).
-              (∀ (other : Universal.StarIndex(arity, depth)). other ≠ free → valuation(other) ∈ Universal.leftCenter(a, b, relation))
+              (∀ (other : Universal.StarIndex(arity, depth)). other ≠ free → valuation(other) ∈ Universal.leftCenter(relation))
               → min(Set.size(enumeration, Universal.universe(b)), depth + Set.size(enumeration,
             Universal.neighborhood(a, b, relation, valuation(free))))
                 ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation, power))) :=
@@ -656,14 +641,14 @@ theorem Universal.center_star
         -- The one-point index type: the term is the single variable, and the
         -- bound is `min(|B|, s) ≤ s`.
         ∀ (free : Universal.StarIndex(arity, 0)). ∀ (valuation : Universal.StarIndex(arity, 0) → a).
-              (∀ (other : Universal.StarIndex(arity, 0)). other ≠ free → valuation(other) ∈ Universal.leftCenter(a, b, relation))
+              (∀ (other : Universal.StarIndex(arity, 0)). other ≠ free → valuation(other) ∈ Universal.leftCenter(relation))
               → min(Set.size(enumeration, Universal.universe(b)), 0 + Set.size(enumeration,
             Universal.neighborhood(a, b, relation, valuation(free))))
                 ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation,
             Universal.starBase(signature, arity))))
             by { take free : Universal.StarIndex(arity, 0);
                  take valuation : Universal.StarIndex(arity, 0) → a;
-                 suppose ∀ (other : Universal.StarIndex(arity, 0)). other ≠ free → valuation(other) ∈ Universal.leftCenter(a, b, relation);
+                 suppose ∀ (other : Universal.StarIndex(arity, 0)). other ≠ free → valuation(other) ∈ Universal.leftCenter(relation);
                  -- There is only one index at depth zero.
                  ∀ (slot : NaturalsBelow(0)). Universal.emptyStarIndex(arity)(slot) = free(slot)
                      by { take slot : NaturalsBelow(0);
@@ -684,20 +669,19 @@ theorem Universal.center_star
     case depth = 1 + rest for some (rest : ℕ): {
         choose inner such that ∀ (free : Universal.StarIndex(arity, rest)). ∀ (valuation : Universal.StarIndex(arity, rest)
             → a). (∀ (other : Universal.StarIndex(arity, rest)). other ≠ free
-                 → valuation(other) ∈ Universal.leftCenter(a, b, relation)) → min(Set.size(enumeration,
+                 → valuation(other) ∈ Universal.leftCenter(relation)) → min(Set.size(enumeration,
             Universal.universe(b)), rest + Set.size(enumeration, Universal.neighborhood(a, b, relation, valuation(free))))
                 ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation, inner)))
             from IH;
         ∀ (free : Universal.StarIndex(arity, 1 + rest)). ∀ (valuation : Universal.StarIndex(arity, 1 + rest)
             → a). (∀ (other : Universal.StarIndex(arity, 1 + rest)). other ≠ free
-                 → valuation(other) ∈ Universal.leftCenter(a, b, relation)) → min(Set.size(enumeration,
+                 → valuation(other) ∈ Universal.leftCenter(relation)) → min(Set.size(enumeration,
             Universal.universe(b)), (1 + rest) + Set.size(enumeration, Universal.neighborhood(a, b, relation, valuation(free))))
                 ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation,
             Universal.starStep(signature, arity, rest, subject, inner))))
             by { take free : Universal.StarIndex(arity, 1 + rest);
                  take valuation : Universal.StarIndex(arity, 1 + rest) → a;
-                 suppose ∀ (other : Universal.StarIndex(arity, 1 + rest)). other ≠ free
-                     → valuation(other) ∈ Universal.leftCenter(a, b, relation);
+                 suppose ∀ (other : Universal.StarIndex(arity, 1 + rest)). other ≠ free → valuation(other) ∈ Universal.leftCenter(relation);
                  -- The block values are what the level's evaluation law
                  -- produces, so their defining equation is reflexivity.
                  ∀ (block : NaturalsBelow(arity)). ((slot : NaturalsBelow(arity)) ↦ Universal.Term.evaluate(a,
@@ -719,7 +703,6 @@ theorem Universal.center_star
 -- `B`, so it *is* all of `B`, and the value lies in the centre. That is
 -- precisely the condition of Definition 2.1 for the star power.
 theorem Universal.leftCenter_witnesses
-        (a b : Universal.Algebra(signature))
         (idempotentBase : Universal.Algebra.IsIdempotent(a))
         (idempotentFibre : Universal.Algebra.IsIdempotent(b))
         (enumeration : List(b))
@@ -733,26 +716,26 @@ theorem Universal.leftCenter_witnesses
         (noProperBinaryAbsorbing : ∀ (part : Set(b)). Universal.IsSubuniverse(b, part)
             → Set.IsNonempty(b, part) → part ≠ Universal.universe(b) → ¬Universal.BinaryAbsorbs(b, part, Universal.universe(b)))
         : ∃ (power : Universal.Term(signature, Universal.StarIndex(arity, Set.size(enumeration,
-                Universal.universe(b)) ∸ 1))). Universal.Witnesses(a, Universal.leftCenter(a, b, relation),
+                Universal.universe(b)) ∸ 1))). Universal.Witnesses(a, Universal.leftCenter(relation),
               Universal.universe(a), power) := {
   choose power such that ∀ (free : Universal.StarIndex(arity, Set.size(enumeration, Universal.universe(b)) ∸ 1)).
       ∀ (valuation : Universal.StarIndex(arity, Set.size(enumeration, Universal.universe(b)) ∸ 1)
       → a). (∀ (other : Universal.StarIndex(arity, Set.size(enumeration,
-      Universal.universe(b)) ∸ 1)). other ≠ free → valuation(other) ∈ Universal.leftCenter(a, b, relation))
+      Universal.universe(b)) ∸ 1)). other ≠ free → valuation(other) ∈ Universal.leftCenter(relation))
         → min(Set.size(enumeration, Universal.universe(b)), (Set.size(enumeration, Universal.universe(b)) ∸ 1)
       + Set.size(enumeration, Universal.neighborhood(a, b, relation, valuation(free))))
           ≤ Set.size(enumeration, Universal.neighborhood(a, b, relation, Universal.Term.evaluate(a, valuation, power)))
       as powerBound
-      from Universal.center_star(a, b, idempotentBase, idempotentFibre,
+      from Universal.center_star(idempotentBase, idempotentFibre,
         enumeration, isEnumeration, relation, closed, subdirect, arity, subject, taylor, noProperBinaryAbsorbing,
         Set.size(enumeration, Universal.universe(b)) ∸ 1);
-  Universal.Witnesses(a, Universal.leftCenter(a, b, relation), Universal.universe(a), power)
+  Universal.Witnesses(a, Universal.leftCenter(relation), Universal.universe(a), power)
       by {
       take free : Universal.StarIndex(arity, Set.size(enumeration, Universal.universe(b)) ∸ 1);
       take valuation : Universal.StarIndex(arity, Set.size(enumeration, Universal.universe(b)) ∸ 1) → a;
       suppose valuation(free) ∈ Universal.universe(a);
       suppose ∀ (other : Universal.StarIndex(arity, Set.size(enumeration, Universal.universe(b)) ∸ 1)). other ≠ free
-          → valuation(other) ∈ Universal.leftCenter(a, b, relation)
+          → valuation(other) ∈ Universal.leftCenter(relation)
           as othersCentral;
       -- Every neighbourhood is nonempty, so `B` is, and one step per element of `B`
       -- beyond the first is enough to saturate.
