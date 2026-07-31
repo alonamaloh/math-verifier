@@ -238,3 +238,34 @@ theorem Universal.IsSubuniverse.project {signature : Universal.Signature}
      = Universal.Algebra.interpret(arity, symbol, arguments);
   witness Universal.Algebra.interpret(arity, symbol, lifted)
 }
+
+-- ── One coordinate constrained ────────────────────────────────────────
+
+-- The tuples whose coordinate at `slot` lies in `subset`. The blueprint
+-- intersects with a box that is the whole carrier everywhere else; naming the
+-- one constrained coordinate is the same condition and shorter.
+definition Universal.coordinateIn {signature : Universal.Signature}
+        (a : Universal.Algebra(signature)) (index : Type(0)) (slot : index)
+        (subset : Set(Universal.Algebra.carrier(a)))
+        : Set(Universal.Algebra.carrier(Universal.Algebra.power(a, index))) :=
+  (tuple : Universal.Algebra.carrier(Universal.Algebra.power(a, index))) ↦
+    tuple(slot) ∈ subset
+
+theorem Universal.IsSubuniverse.coordinateIn {signature : Universal.Signature}
+        (a : Universal.Algebra(signature)) (index : Type(0)) (slot : index)
+        (subset : Set(Universal.Algebra.carrier(a)))
+        (closed : Universal.IsSubuniverse(a, subset))
+        : Universal.IsSubuniverse(Universal.Algebra.power(a, index),
+            Universal.coordinateIn(a, index, slot, subset)) := {
+  take arity : ℕ;
+  take symbol : signature(arity);
+  take arguments : NaturalsBelow(arity)
+                   → Universal.Algebra.carrier(Universal.Algebra.power(a, index));
+  suppose ∀ (place : NaturalsBelow(arity)).
+      arguments(place) ∈ Universal.coordinateIn(a, index, slot, subset)
+      as allInside;
+  ∀ (place : NaturalsBelow(arity)). arguments(place)(slot) ∈ subset by allInside;
+  Universal.Algebra.interpret(arity, symbol,
+      ((place : NaturalsBelow(arity)) ↦ arguments(place)(slot))) ∈ subset;
+  done
+}

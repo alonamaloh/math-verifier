@@ -421,8 +421,8 @@ eighth draft; Lean version unchanged and complete.
 | Dependent product (`Universal/dependent_product.math`) | 152 |
 | `Clo_m` (`Universal/clone.math`) | 118 |
 | Subset indexing (`Set/subset_indexing`, `Set/finite_cons`) | 521 |
-| Regrouping, base case (`Universal/regrouping.math`) | 214 |
-| **Total** | **~3500** |
+| Regrouping, complete (`Universal/regrouping.math`) | 773 |
+| **Total** | **~4060** |
 
 **The remaining estimate, recalibrated.** The plan's "~15k lines of blueprint
 content" was a guess made before anything was measured, and it is about 4× too
@@ -518,37 +518,24 @@ reusing `Universal.deleteFirst` would have required.
 `j` becomes freeing the single coordinate `pick(j)`, and (B2) transfers because
 every coordinate is the representative of its own block.
 
-### What remains of regrouping: the inductive step
+### Regrouping — done
 
-Strong induction on `size`, `blocks` fixed. `block` not injective gives `u ≠ u'`
-with `block(u) = block(u')`; write `j := block(u)`, so the fibre over `j` has at
-least two elements. Both branches are `Universal.project` along an indexing from
-`NaturalsBelow.index_subset`, with the new block function `block ∘ place`.
+`Universal.HasEssential.of_block_essential`, 773 lines including the two branch
+lemmas. Strong induction on the size of the index set with the number of blocks
+fixed; either the block function is injective — hence a bijection, and the base
+case applies — or some block holds `u ≠ v` and one of the branches shrinks the
+index. Both branches are `Universal.project` along a `NaturalsBelow.index_subset`
+indexing, with the new block function `block ∘ place`, and the measure drops
+because the omitted element (`u` in branch one, `v` in branch two) makes the
+indexing strict.
 
-**Branch 1 — `π_J(R) ∩ S^J ≠ ∅` (the blueprint's (†)).** Take
-`chosen := (i) ↦ ¬(i = u)` and
+Branch two turned out simpler than the blueprint's prose suggests: condition
+(B1) transfers *uniformly* over all blocks, with no case split, because the new
+block function is the old one composed with the indexing. Only branch one needs
+a case split, and only because its witness must additionally be inside at `u`.
 
-    R₁ := project(place, relation ∩ firstCoordinateIn-style {x : x_u ∈ S})
-
-`count < size` because `u ∉ chosen`. Surjectivity of `block ∘ place` survives
-because block `j` still holds `u'`. (B2) for `R₁` is (B2) for `R`; (B1) at a
-block `l ≠ j` projects `R`'s witness, whose `u`-coordinate is already inside
-since `u ∈ I_j`; (B1) at block `j` is exactly (†).
-
-**Branch 2 — (†) fails.** Take `chosen := (i) ↦ ¬(block(i) = j) ∨ i = u` and
-`R₂ := project(place, relation)`, with the new block function sending `u` to `j`
-and everything else as before — so block `j` becomes the singleton `{u}`.
-`count < size` because `u' ∉ chosen`. (B2) for `R₂` is precisely the failure of
-(†). (B1) at `l ≠ j` projects `R`'s witness for `I_l`; (B1) at `{u}` projects
-`R`'s witness for `I_j`.
-
-`Universal.firstCoordinateIn` generalises to "coordinate `u` lies inside" with
-the same ten-line proof; that is the one small piece of new plumbing branch 1
-wants.
-
-Estimate: ~400 lines. It is still the place to expect the worst ratio against
-Lean, whose `Regrouping.lean` is 135 lines leaning on `Finset.card_erase_of_mem`
-and `Finset.card_lt_card`.
+**What is left in Layer 5:** Theorem 3.10 (Barto–Kazda) alone, which assembles
+regrouping with 3.5, 3.6 and 3.9. Then Layers 6–7.
 
 ### The trick that makes arithmetic-indexed induction work
 

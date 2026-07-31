@@ -31,6 +31,8 @@ for Zhuk's theorem on the left centre of a subdirect relation.
   case, recorded by `Universal.Algebra.power_eq_dependentProduct`.
 - `Universal.IsEssential`, `Universal.HasEssential`, `Universal.firstCoordinateIn`
   and `Universal.deleteFirst`, in [essential.math](essential.math).
+- `Universal.IsBlockEssential` — essentiality for a partition, with the
+  partition given as a block function, in [regrouping.math](regrouping.math).
 - `Universal.Tuples` and `Universal.clone` — the `m`-ary term operations as a
   subset of the power `A^(A^m)`, in [clone.math](clone.math).
 - `Universal.Witnesses`, `Universal.Absorbs`, `Universal.BinaryAbsorbs`,
@@ -83,6 +85,12 @@ for Zhuk's theorem on the left centre of a subdirect relation.
   every smaller arity.
 - `Universal.HasEssential.descend` and `.bounded_of_witnesses` — every essential
   arity is strictly below the arity of any witness of absorption.
+- `Universal.HasEssential.of_block_essential` — **regrouping**, blueprint
+  Lemma 3.7. A relation essential for a partition into `blocks` blocks yields an
+  essential relation of arity `blocks`. Strong induction on the size of the
+  index set: either every block is a singleton and the block function is a
+  bijection, or some block has two elements and one of
+  `IsBlockEssential.deleteElement` / `.collapseBlock` shrinks the index set.
 - `Universal.IsSubuniverse.clone` — the `m`-ary term operations are closed under
   the operations, applied pointwise. The index of the power is itself a function
   type, which is why powers were built over an arbitrary index.
