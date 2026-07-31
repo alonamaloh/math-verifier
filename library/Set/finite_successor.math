@@ -52,3 +52,119 @@ theorem HasSize.one_plus (X : Type(0)) (n : ℕ) (sizeX : HasSize(X, n))
   HasSize(NaturalsBelow(1), 1) by NaturalsBelow.has_size;
   done by HasSize.sum
 }
+
+-- ----------------------------------------------------------------------
+-- The same decomposition as an element interface rather than a bijection:
+-- `NaturalsBelow(1 + n)` is its first point together with a shifted copy of
+-- `NaturalsBelow(n)`. `Equinumerous` says the two types match; what an
+-- indexing argument actually wants is to *name* the first point, to shift an
+-- index up, and to drop back down from a nonzero one. Reasoning stays at the
+-- level of values throughout, so `NaturalsBelow.equal_of_value` closes every
+-- round trip.
+
+theorem NaturalsBelow.zero_below_one_plus (n : ℕ) : (0 : ℕ) < 1 + n := {
+  (1 : ℕ) ≤ 1 + n by Natural.one_le_one_plus;
+  done by Natural.zero_lt_of_one_le
+}
+
+-- The first point of NaturalsBelow(1 + n).
+definition NaturalsBelow.first {n : ℕ} : NaturalsBelow(1 + n) :=
+  NaturalsBelow.make(0, NaturalsBelow.zero_below_one_plus(n))
+
+theorem NaturalsBelow.first_value (n : ℕ)
+        : NaturalsBelow.value((NaturalsBelow.first : NaturalsBelow(1 + n))) = (0 : ℕ) :=
+  done
+
+-- Shifting an index up past the first point.
+theorem NaturalsBelow.shifted_below {n : ℕ} (index : NaturalsBelow(n))
+        : 1 + NaturalsBelow.value(index) < 1 + n :=
+  1 + NaturalsBelow.value(index)
+     < 1 + n by NaturalsBelow.below
+
+definition NaturalsBelow.shiftUp {n : ℕ} (index : NaturalsBelow(n))
+        : NaturalsBelow(1 + n) :=
+  NaturalsBelow.make(1 + NaturalsBelow.value(index), NaturalsBelow.shifted_below)
+
+theorem NaturalsBelow.shiftUp_value {n : ℕ} (index : NaturalsBelow(n))
+        : NaturalsBelow.value(NaturalsBelow.shiftUp(index))
+          = 1 + NaturalsBelow.value(index) :=
+  done
+
+-- A shifted index is never the first point.
+theorem NaturalsBelow.shiftUp_nonzero {n : ℕ} (index : NaturalsBelow(n))
+        : ¬(NaturalsBelow.value(NaturalsBelow.shiftUp(index)) = 0) := {
+  suppose NaturalsBelow.value(NaturalsBelow.shiftUp(index)) = 0 as isZero;
+  (1 : ℕ)
+     ≤ 1 + NaturalsBelow.value(index)
+     = NaturalsBelow.value(NaturalsBelow.shiftUp(index))
+     = 0 by isZero;
+  done
+}
+
+-- Dropping a nonzero index back down.
+theorem NaturalsBelow.dropped_below {n : ℕ} (index : NaturalsBelow(1 + n))
+        (nonzero : ¬(NaturalsBelow.value(index) = 0))
+        : NaturalsBelow.value(index) ∸ 1 < n := {
+  NaturalsBelow.value(index) < 1 + n by NaturalsBelow.below;
+  NaturalsBelow.value(index) ≤ n by Natural.le_of_lt_one_plus;
+  (1 : ℕ) ≤ NaturalsBelow.value(index) by Natural.one_le_of_nonzero;
+  1 + (NaturalsBelow.value(index) ∸ 1)
+     = NaturalsBelow.value(index)   by Natural.add_monus_of_le
+     ≤ n;
+  (NaturalsBelow.value(index) ∸ 1) + 1 ≤ n;
+  done by Natural.lt_of_add_one_le
+}
+
+definition NaturalsBelow.dropFirst {n : ℕ} (index : NaturalsBelow(1 + n))
+        (nonzero : ¬(NaturalsBelow.value(index) = 0)) : NaturalsBelow(n) :=
+  NaturalsBelow.make(NaturalsBelow.value(index) ∸ 1, NaturalsBelow.dropped_below)
+
+theorem NaturalsBelow.dropFirst_value {n : ℕ} (index : NaturalsBelow(1 + n))
+        (nonzero : ¬(NaturalsBelow.value(index) = 0))
+        : NaturalsBelow.value(NaturalsBelow.dropFirst(index, nonzero))
+          = NaturalsBelow.value(index) ∸ 1 :=
+  done
+
+-- Dropping undoes shifting.
+theorem NaturalsBelow.dropFirst_shiftUp {n : ℕ} (index : NaturalsBelow(n))
+        (nonzero : ¬(NaturalsBelow.value(NaturalsBelow.shiftUp(index)) = 0))
+        : NaturalsBelow.dropFirst(NaturalsBelow.shiftUp(index), nonzero) = index := {
+  NaturalsBelow.value(NaturalsBelow.dropFirst(NaturalsBelow.shiftUp(index), nonzero))
+     = NaturalsBelow.value(NaturalsBelow.shiftUp(index)) ∸ 1
+     = (1 + NaturalsBelow.value(index)) ∸ 1
+     = NaturalsBelow.value(index)   by Natural.monus_add_left;
+  done by NaturalsBelow.equal_of_value
+}
+
+-- And shifting undoes dropping, on a nonzero index.
+theorem NaturalsBelow.shiftUp_dropFirst {n : ℕ} (index : NaturalsBelow(1 + n))
+        (nonzero : ¬(NaturalsBelow.value(index) = 0))
+        : NaturalsBelow.shiftUp(NaturalsBelow.dropFirst(index, nonzero)) = index := {
+  (1 : ℕ) ≤ NaturalsBelow.value(index) by Natural.one_le_of_nonzero;
+  NaturalsBelow.value(NaturalsBelow.shiftUp(NaturalsBelow.dropFirst(index, nonzero)))
+     = 1 + NaturalsBelow.value(NaturalsBelow.dropFirst(index, nonzero))
+     = 1 + (NaturalsBelow.value(index) ∸ 1)
+     = NaturalsBelow.value(index)   by Natural.add_monus_of_le;
+  done by NaturalsBelow.equal_of_value
+}
+
+-- Every index is either the first point or a shift.
+theorem NaturalsBelow.first_or_shift {n : ℕ} (index : NaturalsBelow(1 + n))
+        : index = NaturalsBelow.first
+          ∨ ∃ (lower : NaturalsBelow(n)). index = NaturalsBelow.shiftUp(lower) :=
+  done by cases {
+    case NaturalsBelow.value(index) = 0 as isZero: {
+        NaturalsBelow.value(index)
+           = 0
+           = NaturalsBelow.value((NaturalsBelow.first : NaturalsBelow(1 + n)));
+        index = NaturalsBelow.first by NaturalsBelow.equal_of_value;
+        done
+      }
+    otherwise as nonzero: {
+        index = NaturalsBelow.shiftUp(NaturalsBelow.dropFirst(index, nonzero))
+            by NaturalsBelow.shiftUp_dropFirst;
+        ∃ (lower : NaturalsBelow(n)). index = NaturalsBelow.shiftUp(lower)
+            by { witness NaturalsBelow.dropFirst(index, nonzero) };
+        done
+      }
+  }

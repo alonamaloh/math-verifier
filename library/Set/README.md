@@ -16,6 +16,11 @@ enumerability, equinumerosity, and the finite counting layer.
   [equinumerous.math](equinumerous.math)
 - Finite yardstick `NaturalsBelow(n)` and cardinality predicate `HasSize(X, n)`
   in [finite.math](finite.math)
+- The cons/uncons interface for `NaturalsBelow(1 + n)` — `NaturalsBelow.first`,
+  `.shiftUp`, `.dropFirst`, and `.first_or_shift` — in
+  [finite_successor.math](finite_successor.math). What
+  `NaturalsBelow.one_plus_equinumerous` says as a bijection, said as elements,
+  which is the form an indexing argument can use
 - Choice over a finite index, `NaturalsBelow.choice`, in
   [finite_choice.math](finite_choice.math)
 - Cardinality of a **subset** — `Set.IsEnumeration(A, enumeration)`,

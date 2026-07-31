@@ -171,6 +171,80 @@ anything: `Natural.greatest_witness` — a bounded nonempty predicate on ℕ has
 greatest witness — was already in `Natural/least_number.math`. The plan said
 `Natural/least_number` does not supply it. It does.
 
+### 2.6 Layer 4 — the first fair fight, and the ratio drops to ~3:1
+
+Absorption is Part II, so **neither library supplies any of it**. Both
+developments wrote the same four things from nothing, and this is the first
+place the comparison measures the two systems rather than the two libraries.
+
+| | Lean | Here |
+|---|---|---|
+| `Witnesses` / `Absorbs` / `BinAbsorbs` | `Absorption.lean`, 178 | `absorption.math`, 312 |
+| Star powers | `StarPower.lean`, 54 | `star_power.math`, 297 |
+| `t[ρ]` and its evaluation | `Term.relabel` (Mathlib) | `term.math` +39 |
+| cons/uncons of `Fin (n+1)` | `Fin.cons`, `fin_cases` (Mathlib) | `finite_successor.math` +116 |
+| | **232** | **764** |
+
+Three things are worth separating out of that 3.3:1.
+
+**The definitions are the same.** Lean's
+
+```lean
+def Witnesses (E D : Set M) {V : Type*} (t : L.Term V) : Prop :=
+  ∀ (i : V) (z : V → M), z i ∈ D → (∀ j, j ≠ i → z j ∈ E) → t.realize z ∈ E
+```
+
+and `Universal.Witnesses` are the same proposition, binder for binder, and both
+range over an arbitrary variable type. The *proof* of Lemma 2.6 is the same
+proof too — same preamble ("every coordinate lies in `D`"), same split on which
+of the two variables is free, same "switch to the `v` side" in the first arm.
+Where a blueprint statement is precise, both formalizations transcribe it and
+neither gets to be clever. That is the encouraging half.
+
+**Mathlib's `Fin` API is most of the gap.** `fin_cases i₀` splits a `Fin 2`
+into its two elements and `by decide` discharges `0 ≠ 1`; here the split is on
+`NaturalsBelow.value(free) = 0` and the disequality is an explicit
+value-level chain. Similarly `Fin.cons` and `Fin.elim0` are Mathlib primitives,
+where `NaturalsBelow.first` / `.shiftUp` / `.dropFirst` / `.first_or_shift` had
+to be written — 116 lines that are genuinely reusable and genuinely absent.
+None of this is deep; all of it is typing.
+
+**One difference is structural, not library depth.** Lean writes the star power
+as a dependent recursive definition and gets its unfolding for free:
+
+```lean
+def starPower {k : ℕ} (t : L.Term (Fin k)) : (ℓ : ℕ) → L.Term (Fin ℓ → Fin k)
+  | 0 => var Fin.elim0
+  | ℓ + 1 => t.subst fun j => (starPower t ℓ).relabel fun q => Fin.cons j q
+
+theorem starPower_succ … := rfl
+```
+
+That `rfl` is available because in Lean `ℓ + 1` is definitionally `Nat.succ ℓ`.
+Here `Natural.add` is **opaque**, so `1 + rest` and `successor rest` are not
+definitionally equal, and the recursive definition does not typecheck at all —
+its `1 + rest` arm must produce a `StarIndex(arity, successor(rest))` where it
+has a `StarIndex(arity, 1 + rest)`. There is no arrangement of the arithmetic
+that fixes this; opacity is the point of the seal.
+
+The fix is not a workaround so much as a relocation: publish `starBase` and one
+level `starStep`, and iterate inside a *proof*, where an equation-shaped
+`by induction on depth` **rewrites** the goal to the `1 + rest` form instead of
+needing it to reduce. That is where the centrality argument wants the iteration
+anyway, since it carries an invariant up the levels rather than just a term.
+The cost is that `star_power.math` cannot name `t^{*ℓ}` as a function of `ℓ`.
+
+This is the sharpest system-level difference the comparison has found so far,
+and it is a real trade: the `Natural` seal buys a `ℕ` whose representation
+never leaks, and charges for it exactly here.
+
+**A footnote on the blueprint.** Lean had already indexed star powers by
+`Fin ℓ → Fin k` and already had `Absorbs.of_finite` transporting a witness off
+an arbitrary finite variable type. The blueprint was behind *both*
+formalizations; the eighth draft catches it up. Two independent formalizations
+converging on a representation the prose had not chosen is about as strong a
+signal as this exercise produces.
+
 ## 3. Design lessons that transfer
 
 These came out of one system and improved the other, or improved the blueprint.
@@ -219,6 +293,23 @@ These came out of one system and improved the other, or improved the blueprint.
 
 ### Here
 
+- **`Natural.add` is opaque, so `1 + k` is never definitionally `successor k`.**
+  A dependent recursive definition on ℕ whose result type mentions the
+  recursion variable cannot be written at all. See §2.6; the workaround is to
+  publish the base and one step and iterate inside a proof.
+- **A conditional whose branch *uses* the branch hypothesis needs
+  `Logic.if_positive_dependent` / `if_negative_dependent`.** `if_positive`'s
+  branches are constants, so it silently fails to match — reported as an
+  uninferable argument rather than as the dependence. Both variants are
+  documented side by side in `Natural/classical_decidable.math`; the trap is
+  reaching for the more familiar one.
+- **Implicit arguments are not inferred in a theorem *statement* with no outer
+  expected type.** `Universal.starPrepend(block, position, …)` with implicit
+  `{arity depth}` put `block` in the `arity` slot — via the
+  `NaturalsBelow → ℕ` coercion, so the error surfaced as a type mismatch two
+  arguments later. Making the numeric parameters explicit fixed it; so did a
+  `(… : T)` ascription where a bare `NaturalsBelow.first` appeared. Same root
+  cause as the `Set.IsNonempty` note in `Set/basics.math`.
 - **A lambda on the right of a claim, or after `witness`, needs parentheses.**
   `arguments = (i : T) ↦ e;` is a parse error at the `↦`. Cost a round-trip
   three times.
@@ -248,7 +339,7 @@ These came out of one system and improved the other, or improved the blueprint.
 
 ## 5. Line counts
 
-Not comparable yet — Lean is complete, this is through Layer 3 — but recorded
+Not comparable yet — Lean is complete, this is through Layer 4 — but recorded
 as they land.
 
 | | Lean | Here |
@@ -256,9 +347,11 @@ as they land.
 | Part I foundation | ~200 (products + inventory) | ~510 |
 | Finite choice | 0 (a tactic) | ~60 |
 | Subset cardinality + `min` (App. C 1–2) | 1 (`by omega`) | 451 |
-| Parts II–III | ~1400 | not started |
+| Absorption + star powers (Part II, Layer 4) | 232 | 764 |
+| Rest of Parts II–III | ~1170 | not started |
 
 The Lean figure for Part I is small because Mathlib supplied the rest; the
-figure here is the true cost of the same content. The Parts II–III comparison,
-when it comes, is the one that measures the two systems on equal footing, since
-neither library supplies any of it.
+figure here is the true cost of the same content. The Parts II–III rows are the
+ones that measure the two systems on equal footing, since neither library
+supplies any of it — and the first of them, Layer 4, came in at 3.3:1 against
+the 6:1 of the products and the unbounded ratio of Layer 3. See §2.6.

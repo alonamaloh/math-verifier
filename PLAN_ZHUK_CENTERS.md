@@ -249,10 +249,41 @@ which `Natural/least_number` does not supply.
 
 ---
 
-## Layer 4 — `Universal/absorption.math`
+## Layer 4 — absorption — **done**
 
-Absorption, binary absorption, Taylor identities, and Lemma 2.6 (one-sided
-closure gives binary absorption).
+| File | Lines | Contents |
+|---|---|---|
+| `Universal/absorption.math` | 312 | `Witnesses`, `Absorbs`, `BinaryAbsorbs`, the renaming bridge, Taylor identities, Lemma 2.6 |
+| `Universal/star_power.math` | 297 | `StarIndex`, the block inclusion and its inverse, `starBase`, `starStep` and its evaluation law |
+| `Universal/term.math` (added) | 39 | `Term.rename` and `evaluate_rename` — the blueprint's `t[ρ]` |
+| `Set/finite_successor.math` (added) | 116 | the cons/uncons interface for `NaturalsBelow(1 + n)` |
+
+Design question 3 is settled in favour of the index type, and the blueprint
+was edited accordingly (eighth draft): terms range over an arbitrary variable
+set, `Definition 2.8` indexes a star power by `[k]^{[ℓ]}`, the new Lemma 2.2
+renames a witness onto a numeric arity, and Appendix C item 6 (Euclidean
+division) is gone. The plan under-costed that edit — it also needed
+Definitions 1.9, 1.10, Lemma 1.11, and preservation/idempotence generalized —
+but Part II was untouched, which was the thing worth protecting.
+
+Two frictions worth remembering, both new:
+
+- **`Natural.add` is opaque, so `1 + rest` is never definitionally
+  `successor rest`.** A dependent recursive definition on ℕ whose result type
+  mentions the recursion variable therefore cannot be written: the `1 + rest`
+  arm's body has the wrong type by exactly that non-reduction. `starPower` is
+  published as `starBase` + `starStep` instead, and the iteration lives in a
+  proof, where equation-shaped induction rewrites rather than reduces. Expect
+  this again in Layer 6 and anywhere else a construction recurses on a numeric
+  parameter that indexes its own type.
+- **A conditional whose else branch uses the branch hypothesis needs
+  `Logic.if_positive_dependent` / `if_negative_dependent`.** The plain
+  `if_positive` takes constant branches, so it cannot see a branch that
+  consumes the decision — which `starPrepend`'s does, since that is how it
+  knows the index can be dropped. The diagnostic points at an uninferable
+  argument, not at the dependence, so this costs a round trip if unexpected.
+
+The original plan for this layer:
 
 **Get the quantifier shape right, once.** Definition 2.1 constrains the tuple
 `(z_1,…,z_m)` rather than quantifying over a list from `E` and overwriting an
@@ -355,9 +386,12 @@ least-number principle and nothing else.
 2. **Cardinality representation** — recommendation is the enumeration list
    (Layer 3, option 3). The alternative worth a second look is `Logic.the` on
    `HasSize`, if `List.filter` reasoning turns out to fight.
-3. **Star-power variables** — index type or Euclidean division? Recommendation
-   is the index type; **it edits the blueprint** (Definition 2.7, Appendix C
-   item 6).
+3. ~~**Star-power variables** — index type or Euclidean division?~~ **Settled:
+   the index type.** The blueprint's eighth draft carries it — Definition 2.8,
+   the new Lemma 2.2, and Appendix C item 6 deleted — and `Universal.StarIndex`
+   implements it. Note the Lean formalization had already made this choice
+   (`Fin ℓ → Fin k`, `Fin.cons`, `Absorbs.of_finite`); the blueprint was behind
+   both.
 4. **Partition representation** — block function or tuple of subsets?
    Recommendation is the block function; this does *not* edit the blueprint,
    since Definition 3.2 is already stated over an arbitrary finite index set
@@ -386,8 +420,9 @@ least-number principle and nothing else.
 - **M3 — Layer 3. Done.** Subset cardinality and its three order facts,
   `minimum`, greatest element of a bounded set. 451 lines against an estimate
   of 300; the enumeration-list representation held and no switch was needed.
-- **M4 — Layer 4.** Absorption and the Taylor lemma. First point where a
-  blueprint statement transfers verbatim.
+- **M4 — Layer 4. Done.** Absorption and the Taylor lemma. 764 lines. The
+  first point where a blueprint statement transferred verbatim — and the first
+  where the formalization sent an edit back to the blueprint.
 - **M5 — Layer 5.** Regrouping and the relational description. The one that
   will take longest and the one worth reporting frictions from.
 - **M6 — Layers 6–7.** Centers, doubling, ternary, main theorem. Mostly

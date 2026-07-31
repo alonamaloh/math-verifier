@@ -116,6 +116,45 @@ theorem Universal.Term.evaluate_substitute {signature : Universal.Signature}
   }
 }
 
+-- Renaming variables along a map — the blueprint's `t[ρ]`. The special case of
+-- substitution that puts a bare variable at every leaf, and the only form of
+-- substitution the absorption layer needs.
+definition Universal.Term.rename {signature : Universal.Signature}
+        {source : Type(0)} {target : Type(0)}
+        (renaming : source → target)
+        : Universal.Term(signature, source) → Universal.Term(signature, target) :=
+  Universal.Term.substitute(
+    (name : source) ↦ Universal.Term.variable(signature, target, renaming(name)))
+
+-- Evaluating a renamed term is evaluating the original under the pulled-back
+-- valuation: `(t[ρ])^A(a⃗) = t^A(a⃗ ∘ ρ)`.
+theorem Universal.Term.evaluate_rename {signature : Universal.Signature}
+        {source : Type(0)} {target : Type(0)}
+        (a : Universal.Algebra(signature))
+        (renaming : source → target)
+        (valuation : target → Universal.Algebra.carrier(a))
+        (subject : Universal.Term(signature, source))
+        : Universal.Term.evaluate(a, valuation,
+            Universal.Term.rename(renaming, subject))
+          = Universal.Term.evaluate(a,
+              (name : source) ↦ valuation(renaming(name)), subject) := {
+  ((name : source) ↦
+      Universal.Term.evaluate(a, valuation,
+        Universal.Term.variable(signature, target, renaming(name))))
+    = ((name : source) ↦ valuation(renaming(name)))
+    by Function.extensionality;
+  Universal.Term.evaluate(a, valuation, Universal.Term.rename(renaming, subject))
+     = Universal.Term.evaluate(a,
+         (name : source) ↦
+           Universal.Term.evaluate(a, valuation,
+             Universal.Term.variable(signature, target, renaming(name))),
+         subject)
+           by Universal.Term.evaluate_substitute
+     = Universal.Term.evaluate(a,
+         (name : source) ↦ valuation(renaming(name)), subject);
+  done
+}
+
 -- Preservation: a term's value lies in any subuniverse holding its variables'
 -- values. The blueprint's Lemma 1.14, and the reason a subuniverse never has to
 -- be checked against terms one at a time.

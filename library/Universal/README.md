@@ -22,6 +22,12 @@ for Zhuk's theorem on the left centre of a subdirect relation.
   in [generation.math](generation.math).
 - `Universal.Algebra.power` and `Universal.Algebra.product` — powers over an
   arbitrary index type and binary products, in [product.math](product.math).
+- `Universal.Witnesses`, `Universal.Absorbs`, `Universal.BinaryAbsorbs`,
+  `Universal.IsTaylorIdentity` and `Universal.IsTaylorOn`, in
+  [absorption.math](absorption.math).
+- `Universal.StarIndex`, `Universal.starPrepend`, `Universal.starBase` and
+  `Universal.starStep` — the star powers' index type and one level of their
+  recursion, in [star_power.math](star_power.math).
 
 ## Main theorems
 
@@ -42,6 +48,15 @@ for Zhuk's theorem on the left centre of a subdirect relation.
 - `Universal.generated_eq_termValues` — the generated subuniverse is exactly the
   term values. The variable type is the generating set itself, so no enumeration
   of the generators appears anywhere.
+- `Universal.Term.evaluate_rename` — the blueprint's `t[ρ]`, evaluated.
+- `Universal.Witnesses.rename` and `Universal.Absorbs.of_renaming` — a witness
+  built over whatever index type a construction hands you is given a numeric
+  arity afterwards, by renaming along a bijection.
+- `Universal.BinaryAbsorbs.of_one_sided` — one-sided closure plus a Taylor
+  identity gives two-sided binary absorption. The only place a Taylor identity
+  is used.
+- `Universal.starStep_evaluate` — one level of a star power evaluates the base
+  term at the values its blocks take.
 
 ## Two representation choices
 
@@ -55,3 +70,12 @@ application of a higher-order recursive field; see
 **Variables come from an arbitrary type.** Substitution is then
 `(source → Term(target)) → Term(source) → Term(target)` — one operation covering
 renaming, identification of variables, and the introduction of unused ones.
+
+**A star power is not a recursive definition.** Its result type mentions the
+depth, so recursion on the depth would be dependent, and its `1 + rest` arm
+would have to produce a `StarIndex(arity, successor(rest))` where it has a
+`StarIndex(arity, 1 + rest)`. `Natural.add` is opaque, so those are not
+definitionally equal. `star_power.math` therefore publishes `starBase` and one
+level, `starStep`; the iteration happens inside a proof, where an
+equation-shaped `by induction on depth` *rewrites* the goal to the `1 + rest`
+form instead of needing it to reduce.
