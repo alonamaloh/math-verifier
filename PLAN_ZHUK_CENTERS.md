@@ -417,20 +417,29 @@ eighth draft; Lean version unchanged and complete.
 | Layer 2 relational constructions (`Universal/relation.math`) | 240 |
 | Layer 3 (`Natural/minimum`, `Lists/filter_length`, `Set/enumeration`) | 451 |
 | Layer 4 (`Universal/absorption`, `Universal/star_power`, + `term`, + `Set/finite_successor`) | 764 |
-| **Total** | **~1965** |
+| Layer 5 so far (`Universal/essential.math`) | 187 |
+| **Total** | **~2150** |
 
-**Next is Layer 5**, and the first three items are short:
+**The remaining estimate, recalibrated.** The plan's "~15k lines of blueprint
+content" was a guess made before anything was measured, and it is about 4× too
+high. Lean's remaining files — Essential 112, Regrouping 135, Relational 95,
+Center 139, Step 93, Absorbs 103, Central 179, Doubling 289, Ternary 71 — total
+1216 lines. At Layer 4's measured 3.3:1, the only fair-fight ratio available and
+the same kind of content (real proofs, not library lookup), that is **~4000
+lines here**. Layer 5's opening came in at 187 against Lean's `Essential.lean`
+112, a ratio of 1.7:1, so 3.3:1 may even be pessimistic for the transcription-
+heavy parts.
 
-1. `Universal.IsEssential` over an index type, in the two-clause form of
-   Definition 3.1 — a witness tuple free at each coordinate, and no tuple
-   inside the box.
-2. Lemma 3.4 (essentiality forces the parts nonempty) — three lines.
-3. Proposition 3.6 (a witness forbids an essential relation of the same index
-   type). This is the one that shows the layer will work: apply the witnessing
-   term *in the power* to the tuple of witnesses, and preservation plus
-   `Universal.Witnesses` put the result in the box. **State it at
-   `index = NaturalsBelow(m)`** — the proof needs a choice of one witness per
-   coordinate, and `NaturalsBelow.choice` is what we have.
+**Layer 5 is opened.** `Universal/essential.math` (187 lines) has
+`Universal.IsEssential` in the two-clause form of Definition 3.1, Lemma 3.4
+(essentiality forces the parts nonempty), and — the item that showed the layer
+will work — Proposition 3.6: a witnessing term forbids an essential relation on
+the same index. The proof is the one move Part II turns on, and it transcribed
+almost directly: evaluate the witnessing term *in the power* at the tuple of
+witnesses, and preservation plus `Universal.Witnesses` put the result inside the
+box, contradicting the second clause. Stated at `index = NaturalsBelow(m)`,
+since it chooses one witness per coordinate and `NaturalsBelow.choice` is the
+choice principle available.
 
 Then the two hard ones, in order: Proposition 3.5 (arity reduction — projection
 along `NaturalsBelow.embed`, now available) and Lemma 3.7 (regrouping), which

@@ -1,0 +1,187 @@
+-- Universal/essential.math
+--
+-- Essential relations: the obstruction to absorption.
+--
+-- A relation over an index type is `parts`-essential when it reaches outside
+-- `parts` at every single coordinate — for each coordinate there is a member
+-- lying in `parts` everywhere *else* — and yet no member lies in `parts`
+-- everywhere. Blueprint Definition 3.1.
+--
+-- The two clauses are stated over an arbitrary index type rather than over
+-- `NaturalsBelow(m)`, matching Definition 1.8's decision for products: the
+-- relational description of absorption forms a power indexed by a set of
+-- tuples, and an initial-segment-only notion would force a transport there.
+-- Where a *choice* of one witness per coordinate is needed the index does come
+-- back to `NaturalsBelow(m)`, since finite choice is what the library supplies.
+--
+-- The headline of this file is `Universal.no_essential_of_witnesses`, blueprint
+-- Proposition 3.6: a term witnessing absorption forbids an essential relation
+-- on the same index. The proof is the one move that makes Part II work —
+-- evaluate the witnessing term *in the power*, at the tuple of witnesses.
+
+module Universal.essential
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Logic.functions
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Set.basics
+import Set.algebra
+import Set.finite
+import Set.finite_choice
+import Universal.signature
+import Universal.term
+import Universal.product
+import Universal.relation
+import Universal.absorption
+
+-- ── The definition ────────────────────────────────────────────────────
+
+-- Free at every coordinate, but nowhere entirely inside.
+definition Universal.IsEssential {signature : Universal.Signature}
+        (a : Universal.Algebra(signature)) (index : Type(0))
+        (parts : index → Set(Universal.Algebra.carrier(a)))
+        (relation : Set(Universal.Algebra.carrier(
+            Universal.Algebra.power(a, index))))
+        : Proposition :=
+  (∀ (free : index).
+     ∃ (tuple : Universal.Algebra.carrier(Universal.Algebra.power(a, index))).
+       tuple ∈ relation
+       ∧ ∀ (other : index). ¬(other = free) → tuple(other) ∈ parts(other))
+  ∧ ¬(∃ (tuple : Universal.Algebra.carrier(Universal.Algebra.power(a, index))).
+        tuple ∈ relation
+        ∧ ∀ (coordinate : index). tuple(coordinate) ∈ parts(coordinate))
+
+-- ── Essentiality forces the parts nonempty ────────────────────────────
+
+-- Blueprint Lemma 3.4. The witness freed at *some other* coordinate lies in
+-- `parts` at this one. Stated with the other coordinate supplied rather than as
+-- a cardinality hypothesis on the index: "at least two coordinates" is exactly
+-- "there is one different from this one", and that is what the proof uses.
+theorem Universal.IsEssential.parts_nonempty {signature : Universal.Signature}
+        (a : Universal.Algebra(signature)) (index : Type(0))
+        (parts : index → Set(Universal.Algebra.carrier(a)))
+        (relation : Set(Universal.Algebra.carrier(
+            Universal.Algebra.power(a, index))))
+        (essential : Universal.IsEssential(a, index, parts, relation))
+        (coordinate other : index) (distinct : ¬(other = coordinate))
+        : Set.IsNonempty(Universal.Algebra.carrier(a), parts(coordinate)) := {
+  ∀ (free : index).
+      ∃ (tuple : Universal.Algebra.carrier(Universal.Algebra.power(a, index))).
+        tuple ∈ relation
+        ∧ ∀ (place : index). ¬(place = free) → tuple(place) ∈ parts(place)
+      as freeAtEach;
+  choose tuple such that
+      tuple ∈ relation
+      ∧ ∀ (place : index). ¬(place = other) → tuple(place) ∈ parts(place)
+      from freeAtEach(other);
+  ∀ (place : index). ¬(place = other) → tuple(place) ∈ parts(place);
+  ¬(coordinate = other);
+  tuple(coordinate) ∈ parts(coordinate);
+  witness tuple(coordinate)
+}
+
+-- ── Absorption forbids essential relations ────────────────────────────
+
+-- Blueprint Proposition 3.6. Apply the witnessing term in the power to the
+-- tuple of witnesses: preservation puts the result in the relation, and at each
+-- coordinate its arguments are exactly what `Universal.Witnesses` asks for —
+-- one entry free, all the others in `subset` — so the result lies in `subset`
+-- at every coordinate too. That contradicts the second clause.
+--
+-- The index is `NaturalsBelow(arity)` because the proof chooses one witness per
+-- coordinate; `NaturalsBelow.choice` is the choice principle available.
+theorem Universal.no_essential_of_witnesses {signature : Universal.Signature}
+        (a : Universal.Algebra(signature)) (arity : ℕ)
+        (subset : Set(Universal.Algebra.carrier(a)))
+        (subject : Universal.Term(signature, NaturalsBelow(arity)))
+        (witnesses : Universal.Witnesses(a, subset,
+            Set.universe(Universal.Algebra.carrier(a)), subject))
+        (relation : Set(Universal.Algebra.carrier(
+            Universal.Algebra.power(a, NaturalsBelow(arity)))))
+        (closed : Universal.IsSubuniverse(
+            Universal.Algebra.power(a, NaturalsBelow(arity)), relation))
+        (essential : Universal.IsEssential(a, NaturalsBelow(arity),
+            ((slot : NaturalsBelow(arity)) ↦ subset), relation))
+        : False := {
+  ∀ (free : NaturalsBelow(arity)).
+      ∃ (tuple : Universal.Algebra.carrier(
+          Universal.Algebra.power(a, NaturalsBelow(arity)))).
+        tuple ∈ relation
+        ∧ ∀ (other : NaturalsBelow(arity)). ¬(other = free) → tuple(other) ∈ subset
+      as freeAtEach;
+  choose chosen such that
+      ∀ (free : NaturalsBelow(arity)).
+        chosen(free) ∈ relation
+        ∧ ∀ (other : NaturalsBelow(arity)).
+            ¬(other = free) → chosen(free)(other) ∈ subset
+      from NaturalsBelow.choice(
+        Universal.Algebra.carrier(Universal.Algebra.power(a, NaturalsBelow(arity))),
+        arity,
+        ((free : NaturalsBelow(arity)) ↦
+          (candidate : Universal.Algebra.carrier(
+              Universal.Algebra.power(a, NaturalsBelow(arity)))) ↦
+            candidate ∈ relation
+            ∧ ∀ (other : NaturalsBelow(arity)).
+                ¬(other = free) → candidate(other) ∈ subset),
+        freeAtEach);
+  -- The value of the witnessing term at the tuple of witnesses, computed in the
+  -- power. Preservation keeps it in the relation.
+  ∀ (free : NaturalsBelow(arity)). chosen(free) ∈ relation
+      by { take free : NaturalsBelow(arity);
+           chosen(free) ∈ relation
+             ∧ ∀ (other : NaturalsBelow(arity)).
+                 ¬(other = free) → chosen(free)(other) ∈ subset;
+           done };
+  Universal.Term.evaluate(Universal.Algebra.power(a, NaturalsBelow(arity)),
+      chosen, subject) ∈ relation
+      by Universal.Term.evaluate_mem;
+  -- And at every coordinate its arguments meet the witnessing condition, with
+  -- the free entry sitting in that very coordinate.
+  ∀ (coordinate : NaturalsBelow(arity)).
+      Universal.Term.evaluate(Universal.Algebra.power(a, NaturalsBelow(arity)),
+        chosen, subject)(coordinate) ∈ subset
+      by { take coordinate : NaturalsBelow(arity);
+           ((slot : NaturalsBelow(arity)) ↦ chosen(slot)(coordinate))(coordinate)
+               ∈ Set.universe(Universal.Algebra.carrier(a));
+           ∀ (slot : NaturalsBelow(arity)).
+               ¬(slot = coordinate)
+               → ((place : NaturalsBelow(arity)) ↦ chosen(place)(coordinate))(slot)
+                 ∈ subset
+               by { take slot : NaturalsBelow(arity);
+                    suppose ¬(slot = coordinate) as slotDiffers;
+                    chosen(slot) ∈ relation
+                      ∧ ∀ (other : NaturalsBelow(arity)).
+                          ¬(other = slot) → chosen(slot)(other) ∈ subset;
+                    ∀ (other : NaturalsBelow(arity)).
+                        ¬(other = slot) → chosen(slot)(other) ∈ subset;
+                    ¬(coordinate = slot)
+                        by { suppose coordinate = slot as sameSlot;
+                             slot = coordinate;
+                             done };
+                    chosen(slot)(coordinate) ∈ subset;
+                    done };
+           Universal.Term.evaluate(a,
+               ((slot : NaturalsBelow(arity)) ↦ chosen(slot)(coordinate)),
+               subject) ∈ subset
+               by witnesses;
+           Universal.Term.evaluate(Universal.Algebra.power(a, NaturalsBelow(arity)),
+               chosen, subject)(coordinate)
+              = Universal.Term.evaluate(a,
+                  ((slot : NaturalsBelow(arity)) ↦ chosen(slot)(coordinate)),
+                  subject)
+              by Universal.Term.evaluate_power as coordinatewise;
+           done by substituting coordinatewise };
+  -- Which is a member of the relation lying inside the box: the second clause
+  -- of essentiality says there is none.
+  ∃ (tuple : Universal.Algebra.carrier(
+      Universal.Algebra.power(a, NaturalsBelow(arity)))).
+      tuple ∈ relation
+      ∧ ∀ (coordinate : NaturalsBelow(arity)). tuple(coordinate) ∈ subset
+      by { witness Universal.Term.evaluate(
+             Universal.Algebra.power(a, NaturalsBelow(arity)), chosen, subject) };
+  done
+}
