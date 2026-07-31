@@ -668,9 +668,26 @@ std::string Elaborator::describeDeepEqualityRoute(
             // provenance prefix ("library lemma X" -> "X"), and fall back to
             // the raw source for an anonymous fact, which cannot be cited by
             // name and has to be stated instead.
-            auto citable = [this](const std::string& source) {
+            auto citable = [this](const std::string& source) -> std::string {
                 std::string name = citableNameFromFactSource(source);
-                return name.empty() ? source : name;
+                if (!name.empty()) return name;
+                // A `by substituting` candidate labels itself by provenance
+                // ("supplied via `by substituting` (NAME, arguments
+                // inferred)"). Print the lemma the author would type, not the
+                // provenance — otherwise the suggestion reads
+                // "by substituting `supplied via `by substituting``".
+                const std::string prefix = "supplied via";
+                if (source.rfind(prefix, 0) == 0) {
+                    size_t open = source.find('(');
+                    if (open != std::string::npos) {
+                        size_t stop = source.find_first_of(",)", open + 1);
+                        if (stop != std::string::npos && stop > open + 1) {
+                            return source.substr(open + 1, stop - open - 1);
+                        }
+                    }
+                    return "the equation supplied to `by substituting`";
+                }
+                return source;
             };
             message +=
                 "\n  It got there in " + std::to_string(deepRoute_.size())
@@ -687,7 +704,14 @@ std::string Elaborator::describeDeepEqualityRoute(
                 const DeepRouteStep& step = deepRoute_[i];
                 message += "\n      " + shorten(step.statement);
                 if (i == 0) {
-                    message += ";";
+                    // The innermost form is the base of the argument. Say how
+                    // it closed, so the author knows whether it stands bare.
+                    std::string base = citable(step.closedBy);
+                    if (base.empty()) {
+                        message += ";";
+                    } else {
+                        message += "\n          by " + base + ";";
+                    }
                 } else {
                     message += "\n          by substituting `"
                         + citable(deepRoute_[i - 1].equation) + "`;";

@@ -7107,6 +7107,10 @@ private:
     struct DeepRouteStep {
         std::string equation;
         std::string statement;
+        // How the goal this rewrite produced was itself closed. For the
+        // innermost step that is the base justification the author needs —
+        // whether the form stands bare or wants a citation of its own.
+        std::string closedBy;
     };
     std::vector<DeepRouteStep> deepRoute_;
     // >0 forces the bridge's per-claim prove cap, overriding the env knob.

@@ -144,7 +144,7 @@ break as a proof to improve works, and the fixes are improvements:
 | prove cap | files failing | state |
 | --- | --- | --- |
 | 6 | 3 → **0** | done — three proofs written out |
-| 3 | 16 → **12** | in progress — every break dictates its own fix |
+| 3 | 16 → **11** | in progress — every break dictates its own fix |
 | 1 | 35 | the goal; worth 14.9 s → 6.4 s on the profiled file |
 
 The three fixed: `Natural/distance.math` (`le_add_distance` was hiding
@@ -222,9 +222,27 @@ Recording details that matter:
   anonymous fact has no citable name and is printed raw — correctly, since it
   has to be *stated* rather than cited.
 
-Ladder: cap 3 is **14 → 12 files**, and 12 of 12 explain themselves with a full
-trace. Then ~34 at cap 1. Still a sweep, but now a transcription rather than an
-investigation.
+**Second iteration: record every rewriter, not just the bridge.** The first
+version traced `contextEqualityBridge` only, and on a `by substituting` site it
+reported one rewrite whose "intermediate form" was **already written in the
+proof** — true but useless, because the steps that path performed itself were
+invisible. `elaborateClaimBySubstitution` now records its own rewrites into the
+same route, and each step carries how the goal it produced was closed. The same
+site went from 1 reported rewrite to 3, and transcribing the missing one fixed
+it.
+
+Route lengths now seen across the 11 remaining cap-3 breaks: 1, 1, 1, 1, 2, 2,
+5, 5, 5, 8, **11**. The 11-rewrite site is the clearest possible statement of
+why the tool was needed — no author was going to reconstruct that by hand.
+
+Naming matters as much as recording. Every equation is printed as the author
+would type it: `citableNameFromFactSource` for context/library facts, and for a
+`by substituting` candidate the lemma is pulled out of its provenance label,
+since otherwise the suggestion reads ``by substituting `supplied via `by
+substituting```.
+
+Ladder: cap 3 is **14 → 11 files**, all 11 carrying a full trace. Then ~34 at
+cap 1. A transcription rather than an investigation.
 
 ### Deep search as an error-message generator — BUILT 2026-07-30
 

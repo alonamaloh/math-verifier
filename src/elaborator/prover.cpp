@@ -2088,6 +2088,7 @@ ExpressionPointer Elaborator::tryContextEqualityBridge(
                     // the search did not actually take.
                     DeepRouteStep step;
                     step.equation = eq.source;
+                    step.closedBy = lastWinningDetail_;
                     try {
                         step.statement = prettyPrintInLocalScope(
                             rewrittenGoal, localBinders);

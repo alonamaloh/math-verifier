@@ -380,6 +380,24 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
                     }
                     return call;
                 };
+                // Record a rewrite this path performed, so the reported route
+                // is the WHOLE route. Without this the trace shows only the
+                // equality bridge's steps, and an author following it sees an
+                // intermediate form that is already written in the proof —
+                // with no indication of what else the search did.
+                auto recordSubstitutionStep =
+                    [&](ExpressionPointer rewrittenGoal,
+                        const std::string& closedBy) {
+                    if (!inDeepRetry_) return;
+                    DeepRouteStep step;
+                    step.equation = eq.source;
+                    step.closedBy = closedBy;
+                    try {
+                        step.statement = prettyPrintInLocalScope(
+                            rewrittenGoal, localBinders);
+                    } catch (...) { step.statement.clear(); }
+                    deepRoute_.push_back(std::move(step));
+                };
                 auto tryCloseAndBuild =
                     [&](ExpressionPointer abstractedBody,
                         int budget) -> ExpressionPointer {
@@ -467,7 +485,15 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
                                 reflexive, components.carrierType);
                             reflexive = makeApplication(
                                 reflexive, components.leftEndpoint);
-                            return buildTransport(abstractedBody, reflexive);
+                            {
+                                ExpressionPointer transported =
+                                    buildTransport(abstractedBody, reflexive);
+                                if (transported) {
+                                    recordSubstitutionStep(
+                                        rewrittenGoal, "reflexivity");
+                                }
+                                return transported;
+                            }
                         }
                     }
                     // Fast-path-only pass: the rewrite didn't make the goal
@@ -487,7 +513,15 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
                         }
                         ExpressionPointer proofRewritten = autoProveClaim(
                             rewrittenGoal, localBinders, line, budget);
-                        return buildTransport(abstractedBody, proofRewritten);
+                        {
+                            std::string closedBy = lastWinningDetail_;
+                            ExpressionPointer transported = buildTransport(
+                                abstractedBody, proofRewritten);
+                            if (transported) {
+                                recordSubstitutionStep(rewrittenGoal, closedBy);
+                            }
+                            return transported;
+                        }
                     } catch (const ElaborateError&) {
                         if (substTimingOn) {
                             proveFailedMicros +=
