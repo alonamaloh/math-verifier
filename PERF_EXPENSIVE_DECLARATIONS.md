@@ -440,6 +440,39 @@ non-claim work still lands in its parent. For a `by { … } block` the self figu
 therefore OVERSTATES what the step itself costs. It is reliable for the
 one-line citations, which is where the ranking's top now sits.
 
+## Where the time actually goes, measured (2026-07-31)
+
+For the one-line citations at the top of the ranking, `MATH_TIME_TACTICS=1` and
+`MATH_LOG_SCAN=1` on `Plane/Graph/overlay.math` answer it exactly.
+
+**Tactic totals for the file** (percentages double-count nesting):
+
+| rung | invocations | wins | total |
+| --- | --- | --- | --- |
+| `contextEqualityBridge` | 291 | **10** | 106.9 s (39%) |
+| `contextFactMatch` | 403 | 107 | 104.3 s (38%) |
+| `conjunctionIntro` | 479 | 29 | 30.7 s (11%) |
+
+**And the scan census for the single claim at line 250:**
+
+- the candidate pool is **355** — **88 local facts**, 4 module, 263 imported;
+- that one line runs **102 separate scans**;
+- **all 102 end `tier=none`** — the scan examines every candidate and finds
+  nothing;
+- **14 885 candidate examinations** for one line, out of 398 scans in the
+  whole file. A quarter of the file's scanning happens at that one citation,
+  and none of it succeeds.
+
+So the cost is not the lemma, the rewrite, or the kernel. It is: **the proof
+has 88 facts in scope, every premise-discharge attempt scans all 355
+candidates with a defeq probe apiece, the goals are dense in
+`Product.first/second` projections so each probe is expensive, and the scans
+almost always fail** — so the full price is paid every time.
+
+That is direct confirmation of the "shrink the context" direction below, and it
+promotes it from plausible to indicated: 88 local facts is the input to a
+product, and the scans that fail are ~100 per claim.
+
 ## Directions worth trying
 
 - **Shrink the context.** These proofs state ~30 facts before using any of
