@@ -144,7 +144,7 @@ break as a proof to improve works, and the fixes are improvements:
 | prove cap | files failing | state |
 | --- | --- | --- |
 | 6 | 3 → **0** | done — three proofs written out |
-| 3 | 16 → **6** | in progress — 8 fixed by transcribing their routes |
+| 3 | 16 → **2** | 12 fixed by transcribing their routes; 2 do not transcribe |
 | 1 | 35 | the goal; worth 14.9 s → 6.4 s on the profiled file |
 
 The three fixed: `Natural/distance.math` (`le_add_distance` was hiding
@@ -353,8 +353,30 @@ two-rewrite search — making the proof worse, not better. Left alone. Not every
 route transcribes: when the intermediate lives under an unfolding there is no
 surface form to state.
 
-Remaining at cap 3: `escalator_tree`, `permutation_transposition_sign`,
-`binomial`, `units`, `archimedean`, `arithmetic_geometric_mean`.
+**Twelve of fourteen fixed.** The later ones needed reading the argument rather
+than pattern-matching, but the route named the lemma every time:
+`arithmetic_geometric_mean` (two sites — `Real.augmentedScaledRow_zero`, then
+naming `Real.partialSum_split` on a calc step), `binomial`
+(`Natural.zero_add` + `Natural.multiply_associative`),
+`permutation_transposition_sign` (`Natural.add_commutative` — state the
+`value(a) + 1` form and commute), `escalator_tree` (`Integer.add_commutative`,
+likewise).
+
+**Two do not transcribe, and both fail the same way.** Their routes describe
+*mechanism* rather than a writable step:
+
+- `Rational.from_natural_IsNonneg` — the intermediate is a `Rational.IsNonneg`
+  form living **under an `unfolding`**, so there is no surface spelling to
+  state. The Integer-level form I tried instead needed a two-rewrite search of
+  its own, making the proof worse.
+- `Polynomial.units` — the route's intermediates are reflexive
+  (`p[k] = p[k] by reflexivity`) inside steps that **already carry their
+  `by substituting`**. Nothing is being hidden from the reader; the cap is
+  simply cutting the substitution's internal search.
+
+That is the honest boundary of the technique: it converts a step that is doing
+*several named rewrites at once*, and says nothing useful when the extra depth
+is the elaborator's own machinery rather than mathematics the author omitted.
 
 ### The reporting is now pinned by a self-check
 
