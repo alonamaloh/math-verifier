@@ -1,0 +1,765 @@
+-- Universal/central.math
+--
+-- Centrality of the left centre, and Zhuk's centre theorem. Blueprint
+-- Theorem 6.1, Definition 6.2 and Corollary 6.3.
+--
+-- For `element` outside the left centre `C`, the diagonal pair
+-- `(element, element)` is not generated in `A²` by
+-- `({element} × C) ∪ (C × C) ∪ (C × {element})`. If it were, the term realising
+-- it would — read at its two coordinates — say that the neighbourhood
+-- `element + R` binary absorbs `B`, which the hypothesis on `B` forbids for a
+-- proper subuniverse.
+--
+-- **The generator blocks are not sorted.** The blueprint enumerates the
+-- generators so the three blocks appear consecutively, extracts indices
+-- `p ≤ q`, and picks `m` between them; that apparatus exists only to index a
+-- sorted enumeration. Here the variable type of the term *is* the generating
+-- set (`Universal.generated_eq_termValues`), so each variable already knows
+-- which block it lies in and the selector is simply "does this generator's
+-- second coordinate equal `element`". Blueprint Lemma 1.20, the
+-- block-respecting enumeration, is not needed at all — the same simplification
+-- the Lean formalization found.
+
+module Universal.central
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Logic.functions
+import Logic.product
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.power
+import Natural.classical_decidable
+import Set.basics
+import Set.algebra
+import Set.subtype
+import Set.finite
+import Set.equinumerous
+import Set.finite_function
+import Set.enumeration
+import Universal.signature
+import Universal.term
+import Universal.generated
+import Universal.generation
+import Universal.product
+import Universal.absorption
+import Universal.star_power
+import Universal.center
+
+-- ── The generating sets ───────────────────────────────────────────────
+
+-- Blueprint Theorem 6.1's generators: the three blocks
+-- `({element} × C) ∪ (C × C) ∪ (C × {element})`.
+definition Universal.centralGenerators {signature : Universal.Signature}
+        (a b : Universal.Algebra(signature))
+        (relation : Set(Universal.Algebra.carrier(
+            Universal.Algebra.product(a, b))))
+        (element : Universal.Algebra.carrier(a))
+        : Set(Universal.Algebra.carrier(Universal.Algebra.product(a, a))) :=
+  (point : Universal.Algebra.carrier(Universal.Algebra.product(a, a))) ↦
+    (Product.first(point) = element
+     ∧ Product.second(point) ∈ Universal.leftCenter(a, b, relation))
+    ∨ (Product.first(point) ∈ Universal.leftCenter(a, b, relation)
+       ∧ Product.second(point) ∈ Universal.leftCenter(a, b, relation))
+    ∨ (Product.first(point) ∈ Universal.leftCenter(a, b, relation)
+       ∧ Product.second(point) = element)
+
+-- Blueprint Definition 6.2's generators: the two off-diagonal blocks only.
+-- Stated for an arbitrary subset, since the definition of central absorption is.
+definition Universal.centralPairs {signature : Universal.Signature}
+        (a : Universal.Algebra(signature))
+        (subset : Set(Universal.Algebra.carrier(a)))
+        (element : Universal.Algebra.carrier(a))
+        : Set(Universal.Algebra.carrier(Universal.Algebra.product(a, a))) :=
+  (point : Universal.Algebra.carrier(Universal.Algebra.product(a, a))) ↦
+    (Product.first(point) = element ∧ Product.second(point) ∈ subset)
+    ∨ (Product.first(point) ∈ subset ∧ Product.second(point) = element)
+
+theorem Universal.centralPairs_subset_centralGenerators
+        {signature : Universal.Signature}
+        (a b : Universal.Algebra(signature))
+        (relation : Set(Universal.Algebra.carrier(
+            Universal.Algebra.product(a, b))))
+        (element : Universal.Algebra.carrier(a))
+        : Universal.centralPairs(a, Universal.leftCenter(a, b, relation), element)
+          ⊆ Universal.centralGenerators(a, b, relation, element) := {
+  take point : Universal.Algebra.carrier(Universal.Algebra.product(a, a));
+  suppose point
+      ∈ Universal.centralPairs(a, Universal.leftCenter(a, b, relation), element)
+      as isPair;
+  done by cases {
+    case Product.first(point) = element
+         ∧ Product.second(point) ∈ Universal.leftCenter(a, b, relation)
+           as firstBlock: done
+    case Product.first(point) ∈ Universal.leftCenter(a, b, relation)
+         ∧ Product.second(point) = element as thirdBlock: done
+  }
+}
+
+-- ── Reading a generator's two coordinates ─────────────────────────────
+--
+-- Named rather than written as bare projections of the subtype value: the
+-- binder type of a valuation `(generator) ↦ Product.first(…)` is what pins the
+-- algebra a term is evaluated in, and a name supplies it once.
+
+definition Universal.generatorFirst {signature : Universal.Signature}
+        (a : Universal.Algebra(signature))
+        (base : Set(Universal.Algebra.carrier(Universal.Algebra.product(a, a))))
+        (generator : Subtype(
+            Universal.Algebra.carrier(Universal.Algebra.product(a, a)), base))
+        : Universal.Algebra.carrier(a) :=
+  Product.first(Subtype.value(generator))
+
+definition Universal.generatorSecond {signature : Universal.Signature}
+        (a : Universal.Algebra(signature))
+        (base : Set(Universal.Algebra.carrier(Universal.Algebra.product(a, a))))
+        (generator : Subtype(
+            Universal.Algebra.carrier(Universal.Algebra.product(a, a)), base))
+        : Universal.Algebra.carrier(a) :=
+  Product.second(Subtype.value(generator))
+
+-- Each coordinate of a generator is either `element` or a centre element: that
+-- is what the three blocks say, read one coordinate at a time.
+theorem Universal.generatorFirst_alternative {signature : Universal.Signature}
+        (a b : Universal.Algebra(signature))
+        (relation : Set(Universal.Algebra.carrier(
+            Universal.Algebra.product(a, b))))
+        (element : Universal.Algebra.carrier(a))
+        (generator : Subtype(
+            Universal.Algebra.carrier(Universal.Algebra.product(a, a)),
+            Universal.centralGenerators(a, b, relation, element)))
+        : Universal.generatorFirst(a,
+            Universal.centralGenerators(a, b, relation, element), generator)
+            = element
+          ∨ Universal.generatorFirst(a,
+              Universal.centralGenerators(a, b, relation, element), generator)
+            ∈ Universal.leftCenter(a, b, relation) := {
+  Subtype.value(generator)
+      ∈ Universal.centralGenerators(a, b, relation, element)
+      by Subtype.property;
+  done by cases {
+    case Product.first(Subtype.value(generator)) = element
+         ∧ Product.second(Subtype.value(generator))
+           ∈ Universal.leftCenter(a, b, relation) as firstBlock: done
+    case Product.first(Subtype.value(generator))
+           ∈ Universal.leftCenter(a, b, relation)
+         ∧ Product.second(Subtype.value(generator))
+           ∈ Universal.leftCenter(a, b, relation) as secondBlock: done
+    case Product.first(Subtype.value(generator))
+           ∈ Universal.leftCenter(a, b, relation)
+         ∧ Product.second(Subtype.value(generator)) = element as thirdBlock: done
+  }
+}
+
+theorem Universal.generatorSecond_alternative {signature : Universal.Signature}
+        (a b : Universal.Algebra(signature))
+        (relation : Set(Universal.Algebra.carrier(
+            Universal.Algebra.product(a, b))))
+        (element : Universal.Algebra.carrier(a))
+        (generator : Subtype(
+            Universal.Algebra.carrier(Universal.Algebra.product(a, a)),
+            Universal.centralGenerators(a, b, relation, element)))
+        : Universal.generatorSecond(a,
+            Universal.centralGenerators(a, b, relation, element), generator)
+            = element
+          ∨ Universal.generatorSecond(a,
+              Universal.centralGenerators(a, b, relation, element), generator)
+            ∈ Universal.leftCenter(a, b, relation) := {
+  Subtype.value(generator)
+      ∈ Universal.centralGenerators(a, b, relation, element)
+      by Subtype.property;
+  done by cases {
+    case Product.first(Subtype.value(generator)) = element
+         ∧ Product.second(Subtype.value(generator))
+           ∈ Universal.leftCenter(a, b, relation) as firstBlock: done
+    case Product.first(Subtype.value(generator))
+           ∈ Universal.leftCenter(a, b, relation)
+         ∧ Product.second(Subtype.value(generator))
+           ∈ Universal.leftCenter(a, b, relation) as secondBlock: done
+    case Product.first(Subtype.value(generator))
+           ∈ Universal.leftCenter(a, b, relation)
+         ∧ Product.second(Subtype.value(generator)) = element as thirdBlock: done
+  }
+}
+
+-- The three blocks are pairwise disjoint, because `element` is not central: a
+-- generator whose first coordinate is `element` lies in the first block, so its
+-- second coordinate is central and therefore is not `element`.
+theorem Universal.generatorSecond_ne_of_generatorFirst_eq
+        {signature : Universal.Signature}
+        (a b : Universal.Algebra(signature))
+        (relation : Set(Universal.Algebra.carrier(
+            Universal.Algebra.product(a, b))))
+        (element : Universal.Algebra.carrier(a))
+        (outside : ¬(element ∈ Universal.leftCenter(a, b, relation)))
+        (generator : Subtype(
+            Universal.Algebra.carrier(Universal.Algebra.product(a, a)),
+            Universal.centralGenerators(a, b, relation, element)))
+        (firstIsElement : Universal.generatorFirst(a,
+            Universal.centralGenerators(a, b, relation, element), generator)
+            = element)
+        : ¬(Universal.generatorSecond(a,
+              Universal.centralGenerators(a, b, relation, element), generator)
+            = element) := {
+  suppose Universal.generatorSecond(a,
+      Universal.centralGenerators(a, b, relation, element), generator) = element
+      as secondIsElement;
+  Subtype.value(generator)
+      ∈ Universal.centralGenerators(a, b, relation, element)
+      by Subtype.property;
+  -- In every block one of the two coordinates is central, and both are
+  -- `element`, so `element` is central.
+  element ∈ Universal.leftCenter(a, b, relation)
+      by cases {
+        case Product.first(Subtype.value(generator)) = element
+             ∧ Product.second(Subtype.value(generator))
+               ∈ Universal.leftCenter(a, b, relation) as firstBlock: {
+            Product.second(Subtype.value(generator))
+                ∈ Universal.leftCenter(a, b, relation);
+            done by substituting secondIsElement
+          }
+        case Product.first(Subtype.value(generator))
+               ∈ Universal.leftCenter(a, b, relation)
+             ∧ Product.second(Subtype.value(generator))
+               ∈ Universal.leftCenter(a, b, relation) as secondBlock: {
+            Product.first(Subtype.value(generator))
+                ∈ Universal.leftCenter(a, b, relation);
+            done by substituting firstIsElement
+          }
+        case Product.first(Subtype.value(generator))
+               ∈ Universal.leftCenter(a, b, relation)
+             ∧ Product.second(Subtype.value(generator)) = element
+               as thirdBlock: {
+            Product.first(Subtype.value(generator))
+                ∈ Universal.leftCenter(a, b, relation);
+            done by substituting firstIsElement
+          }
+      };
+  done
+}
+
+-- ── The two claims of blueprint Theorem 6.1 ───────────────────────────
+
+-- Claims 1 and 2 are the same statement read at the two coordinates, so it is
+-- proved once with the coordinate as a parameter. If the term evaluates to
+-- `element` on that coordinate, then it carries any `B`-tuple that is in the
+-- neighbourhood of `element` wherever the coordinate *is* `element` back into
+-- that neighbourhood: elsewhere the coordinate is central, and a central
+-- element is related to everything.
+theorem Universal.centralGenerators.evaluate_mem_neighborhood
+        {signature : Universal.Signature}
+        (a b : Universal.Algebra(signature))
+        (relation : Set(Universal.Algebra.carrier(
+            Universal.Algebra.product(a, b))))
+        (closed : Universal.IsSubuniverse(Universal.Algebra.product(a, b),
+            relation))
+        (element : Universal.Algebra.carrier(a))
+        (base : Set(Universal.Algebra.carrier(Universal.Algebra.product(a, a))))
+        (coordinate : Subtype(
+            Universal.Algebra.carrier(Universal.Algebra.product(a, a)), base)
+            → Universal.Algebra.carrier(a))
+        (alternative : ∀ (generator : Subtype(
+            Universal.Algebra.carrier(Universal.Algebra.product(a, a)), base)).
+            coordinate(generator) = element
+            ∨ coordinate(generator) ∈ Universal.leftCenter(a, b, relation))
+        (subject : Universal.Term(signature, Subtype(
+            Universal.Algebra.carrier(Universal.Algebra.product(a, a)), base)))
+        (valueIsElement : Universal.Term.evaluate(a, coordinate, subject)
+            = element)
+        (fibres : Subtype(
+            Universal.Algebra.carrier(Universal.Algebra.product(a, a)), base)
+            → Universal.Algebra.carrier(b))
+        (fibresInside : ∀ (generator : Subtype(
+            Universal.Algebra.carrier(Universal.Algebra.product(a, a)), base)).
+            coordinate(generator) = element
+            → fibres(generator)
+              ∈ Universal.neighborhood(a, b, relation, element))
+        : Universal.Term.evaluate(b, fibres, subject)
+          ∈ Universal.neighborhood(a, b, relation, element) := {
+  ∀ (generator : Subtype(
+      Universal.Algebra.carrier(Universal.Algebra.product(a, a)), base)).
+      fibres(generator)
+        ∈ Universal.neighborhood(a, b, relation, coordinate(generator))
+      by { take generator : Subtype(
+               Universal.Algebra.carrier(Universal.Algebra.product(a, a)), base);
+           coordinate(generator) = element
+             ∨ coordinate(generator) ∈ Universal.leftCenter(a, b, relation)
+             by alternative;
+           done by cases {
+             case coordinate(generator) = element as isElement: {
+                 fibres(generator)
+                     ∈ Universal.neighborhood(a, b, relation, element)
+                     by fibresInside;
+                 done by substituting isElement
+               }
+             case coordinate(generator)
+                    ∈ Universal.leftCenter(a, b, relation) as isCentral: {
+                 ∀ (candidate : Universal.Algebra.carrier(b)).
+                     Universal.pair(a, b, coordinate(generator), candidate)
+                       ∈ relation by isCentral;
+                 Universal.pair(a, b, coordinate(generator), fibres(generator))
+                     ∈ relation;
+                 done
+               }
+           } };
+  Universal.Term.evaluate(b, fibres, subject)
+      ∈ Universal.neighborhood(a, b, relation,
+          Universal.Term.evaluate(a, coordinate, subject))
+      by Universal.neighborhood.preserves;
+  done by substituting valueIsElement
+}
+
+-- ── The selector ──────────────────────────────────────────────────────
+--
+-- Which of the two variables a generator is sent to: the second exactly when
+-- its second coordinate is `element`, i.e. exactly when it lies in the third
+-- block. The two index values are parameters — `NaturalsBelow(2)` has no
+-- published constants, and `2` is a numeral, not `1 + 1`.
+
+definition Universal.centralSelector {signature : Universal.Signature}
+        (a : Universal.Algebra(signature))
+        (base : Set(Universal.Algebra.carrier(Universal.Algebra.product(a, a))))
+        (element : Universal.Algebra.carrier(a))
+        (firstIndex secondIndex : NaturalsBelow(2))
+        (generator : Subtype(
+            Universal.Algebra.carrier(Universal.Algebra.product(a, a)), base))
+        : NaturalsBelow(2) :=
+  if Universal.generatorSecond(a, base, generator) = element
+  then secondIndex
+  else firstIndex
+
+theorem Universal.centralSelector_second {signature : Universal.Signature}
+        (a : Universal.Algebra(signature))
+        (base : Set(Universal.Algebra.carrier(Universal.Algebra.product(a, a))))
+        (element : Universal.Algebra.carrier(a))
+        (firstIndex secondIndex : NaturalsBelow(2))
+        (generator : Subtype(
+            Universal.Algebra.carrier(Universal.Algebra.product(a, a)), base))
+        (secondIsElement : Universal.generatorSecond(a, base, generator)
+            = element)
+        : Universal.centralSelector(a, base, element, firstIndex, secondIndex,
+            generator) = secondIndex :=
+  by Logic.if_positive
+
+theorem Universal.centralSelector_first {signature : Universal.Signature}
+        (a : Universal.Algebra(signature))
+        (base : Set(Universal.Algebra.carrier(Universal.Algebra.product(a, a))))
+        (element : Universal.Algebra.carrier(a))
+        (firstIndex secondIndex : NaturalsBelow(2))
+        (generator : Subtype(
+            Universal.Algebra.carrier(Universal.Algebra.product(a, a)), base))
+        (secondIsNotElement : ¬(Universal.generatorSecond(a, base, generator)
+            = element))
+        : Universal.centralSelector(a, base, element, firstIndex, secondIndex,
+            generator) = firstIndex :=
+  by Logic.if_negative
+
+-- ── Blueprint Theorem 6.1 ─────────────────────────────────────────────
+--
+-- Note what is *not* assumed: no finiteness, and no Taylor term. Only that `B`
+-- has no proper binary absorbing subuniverse.
+
+theorem Universal.center_central {signature : Universal.Signature}
+        (a b : Universal.Algebra(signature))
+        (idempotentBase : Universal.Algebra.IsIdempotent(a))
+        (relation : Set(Universal.Algebra.carrier(
+            Universal.Algebra.product(a, b))))
+        (closed : Universal.IsSubuniverse(Universal.Algebra.product(a, b),
+            relation))
+        (subdirect : Universal.IsSubdirect(a, b, relation))
+        (noProperBinaryAbsorbing : ∀ (part : Set(Universal.Algebra.carrier(b))).
+            Universal.IsSubuniverse(b, part)
+            → Set.IsNonempty(Universal.Algebra.carrier(b), part)
+            → ¬(part = Set.universe(Universal.Algebra.carrier(b)))
+            → ¬Universal.BinaryAbsorbs(b, part,
+                Set.universe(Universal.Algebra.carrier(b))))
+        (element : Universal.Algebra.carrier(a))
+        (outside : ¬(element ∈ Universal.leftCenter(a, b, relation)))
+        : ¬(Universal.pair(a, a, element, element)
+            ∈ Universal.generated(Universal.Algebra.product(a, a),
+                Universal.centralGenerators(a, b, relation, element))) := {
+  suppose Universal.pair(a, a, element, element)
+      ∈ Universal.generated(Universal.Algebra.product(a, a),
+          Universal.centralGenerators(a, b, relation, element));
+  Universal.generated(Universal.Algebra.product(a, a),
+      Universal.centralGenerators(a, b, relation, element))
+    = Universal.termValues(Universal.Algebra.product(a, a),
+        Universal.centralGenerators(a, b, relation, element))
+    by Universal.generated_eq_termValues as isTermValues;
+  Universal.pair(a, a, element, element)
+      ∈ Universal.termValues(Universal.Algebra.product(a, a),
+          Universal.centralGenerators(a, b, relation, element))
+      by substituting isTermValues;
+  choose subject such that
+      Universal.Term.evaluate(Universal.Algebra.product(a, a),
+        Universal.baseValuation(Universal.Algebra.product(a, a),
+          Universal.centralGenerators(a, b, relation, element)),
+        subject)
+      = Universal.pair(a, a, element, element)
+      as realisesDiagonal;
+  -- Read the realising term at each coordinate of the generators.
+  Universal.Term.evaluate(a,
+      Universal.generatorFirst(a,
+        Universal.centralGenerators(a, b, relation, element)),
+      subject)
+     = Product.first(Universal.Term.evaluate(Universal.Algebra.product(a, a),
+         Universal.baseValuation(Universal.Algebra.product(a, a),
+           Universal.centralGenerators(a, b, relation, element)),
+         subject))
+           by Universal.Term.first_evaluate_product
+     = Product.first(Universal.pair(a, a, element, element))
+           by substituting realisesDiagonal
+     = element by Universal.pair_first;
+  Universal.Term.evaluate(a,
+      Universal.generatorSecond(a,
+        Universal.centralGenerators(a, b, relation, element)),
+      subject)
+     = Product.second(Universal.Term.evaluate(Universal.Algebra.product(a, a),
+         Universal.baseValuation(Universal.Algebra.product(a, a),
+           Universal.centralGenerators(a, b, relation, element)),
+         subject))
+           by Universal.Term.second_evaluate_product
+     = Product.second(Universal.pair(a, a, element, element))
+           by substituting realisesDiagonal
+     = element by Universal.pair_second;
+  ∀ (generator : Subtype(
+      Universal.Algebra.carrier(Universal.Algebra.product(a, a)),
+      Universal.centralGenerators(a, b, relation, element))).
+      Universal.generatorFirst(a,
+          Universal.centralGenerators(a, b, relation, element), generator)
+          = element
+        ∨ Universal.generatorFirst(a,
+            Universal.centralGenerators(a, b, relation, element), generator)
+          ∈ Universal.leftCenter(a, b, relation)
+      by Universal.generatorFirst_alternative;
+  ∀ (generator : Subtype(
+      Universal.Algebra.carrier(Universal.Algebra.product(a, a)),
+      Universal.centralGenerators(a, b, relation, element))).
+      Universal.generatorSecond(a,
+          Universal.centralGenerators(a, b, relation, element), generator)
+          = element
+        ∨ Universal.generatorSecond(a,
+            Universal.centralGenerators(a, b, relation, element), generator)
+          ∈ Universal.leftCenter(a, b, relation)
+      by Universal.generatorSecond_alternative;
+  -- The two variables, and the selector that sends a generator to the second
+  -- exactly when it lies in the third block.
+  (0 : ℕ) < 2 as zeroBelowTwo;
+  (1 : ℕ) < 2 as oneBelowTwo;
+  Universal.Witnesses(b,
+      Universal.neighborhood(a, b, relation, element),
+      Set.universe(Universal.Algebra.carrier(b)),
+      Universal.Term.rename(
+        Universal.centralSelector(a,
+          Universal.centralGenerators(a, b, relation, element), element,
+          NaturalsBelow.make(0, zeroBelowTwo),
+          NaturalsBelow.make(1, oneBelowTwo)),
+        subject))
+      by { take free : NaturalsBelow(2);
+           take fibres : NaturalsBelow(2) → Universal.Algebra.carrier(b);
+           suppose fibres(free) ∈ Set.universe(Universal.Algebra.carrier(b));
+           suppose ∀ (other : NaturalsBelow(2)).
+               ¬(other = free)
+               → fibres(other)
+                 ∈ Universal.neighborhood(a, b, relation, element)
+               as othersInside;
+           Universal.Term.evaluate(b, fibres,
+               Universal.Term.rename(
+                 Universal.centralSelector(a,
+                   Universal.centralGenerators(a, b, relation, element),
+                   element, NaturalsBelow.make(0, zeroBelowTwo),
+                   NaturalsBelow.make(1, oneBelowTwo)),
+                 subject))
+              = Universal.Term.evaluate(b,
+                  ((generator : Subtype(
+                      Universal.Algebra.carrier(
+                        Universal.Algebra.product(a, a)),
+                      Universal.centralGenerators(a, b, relation, element))) ↦
+                    fibres(Universal.centralSelector(a,
+                      Universal.centralGenerators(a, b, relation, element),
+                      element, NaturalsBelow.make(0, zeroBelowTwo),
+                      NaturalsBelow.make(1, oneBelowTwo), generator))),
+                  subject)
+              by Universal.Term.evaluate_rename as renamed;
+           done by cases {
+             case NaturalsBelow.value(free) = 0 as freeIsFirst: {
+                 -- The free variable is the first, so the second is inside the
+                 -- neighbourhood; the third block is where the selector sends
+                 -- generators to it, and there Claim 2 applies.
+                 ¬(NaturalsBelow.value(NaturalsBelow.make(1, oneBelowTwo))
+                   = NaturalsBelow.value(free))
+                     by { suppose NaturalsBelow.value(
+                              NaturalsBelow.make(1, oneBelowTwo))
+                            = NaturalsBelow.value(free) as valuesAgree;
+                          (1 : ℕ)
+                             = NaturalsBelow.value(
+                                 NaturalsBelow.make(1, oneBelowTwo))
+                             = NaturalsBelow.value(free) by valuesAgree
+                             = 0 by freeIsFirst;
+                          done };
+                 ¬(NaturalsBelow.make(1, oneBelowTwo) = free)
+                     by NaturalsBelow.ne_of_value_ne;
+                 fibres(NaturalsBelow.make(1, oneBelowTwo))
+                     ∈ Universal.neighborhood(a, b, relation, element)
+                     by othersInside;
+                 ∀ (generator : Subtype(
+                     Universal.Algebra.carrier(Universal.Algebra.product(a, a)),
+                     Universal.centralGenerators(a, b, relation, element))).
+                     Universal.generatorSecond(a,
+                         Universal.centralGenerators(a, b, relation, element),
+                         generator) = element
+                     → ((slot : Subtype(
+                           Universal.Algebra.carrier(
+                             Universal.Algebra.product(a, a)),
+                           Universal.centralGenerators(a, b, relation,
+                             element))) ↦
+                         fibres(Universal.centralSelector(a,
+                           Universal.centralGenerators(a, b, relation, element),
+                           element, NaturalsBelow.make(0, zeroBelowTwo),
+                           NaturalsBelow.make(1, oneBelowTwo), slot)))(generator)
+                       ∈ Universal.neighborhood(a, b, relation, element)
+                     by { take generator : Subtype(
+                              Universal.Algebra.carrier(
+                                Universal.Algebra.product(a, a)),
+                              Universal.centralGenerators(a, b, relation,
+                                element));
+                          suppose Universal.generatorSecond(a,
+                              Universal.centralGenerators(a, b, relation,
+                                element), generator) = element;
+                          Universal.centralSelector(a,
+                              Universal.centralGenerators(a, b, relation,
+                                element), element,
+                              NaturalsBelow.make(0, zeroBelowTwo),
+                              NaturalsBelow.make(1, oneBelowTwo), generator)
+                            = NaturalsBelow.make(1, oneBelowTwo)
+                            by Universal.centralSelector_second as goesSecond;
+                          done by substituting goesSecond };
+                 Universal.Term.evaluate(b,
+                     ((generator : Subtype(
+                         Universal.Algebra.carrier(
+                           Universal.Algebra.product(a, a)),
+                         Universal.centralGenerators(a, b, relation,
+                           element))) ↦
+                       fibres(Universal.centralSelector(a,
+                         Universal.centralGenerators(a, b, relation, element),
+                         element, NaturalsBelow.make(0, zeroBelowTwo),
+                         NaturalsBelow.make(1, oneBelowTwo), generator))),
+                     subject)
+                   ∈ Universal.neighborhood(a, b, relation, element)
+                   by Universal.centralGenerators.evaluate_mem_neighborhood;
+                 done by substituting renamed
+               }
+             otherwise as freeIsSecond: {
+                 -- The free variable is the second, so the first is inside; a
+                 -- generator with first coordinate `element` lies in the first
+                 -- block, so its second coordinate is not `element` and the
+                 -- selector sends it to the first variable. Claim 1 applies.
+                 ¬(NaturalsBelow.value(NaturalsBelow.make(0, zeroBelowTwo))
+                   = NaturalsBelow.value(free))
+                     by { suppose NaturalsBelow.value(
+                              NaturalsBelow.make(0, zeroBelowTwo))
+                            = NaturalsBelow.value(free) as valuesAgree;
+                          NaturalsBelow.value(free)
+                             = NaturalsBelow.value(
+                                 NaturalsBelow.make(0, zeroBelowTwo))
+                             = 0;
+                          done };
+                 ¬(NaturalsBelow.make(0, zeroBelowTwo) = free)
+                     by NaturalsBelow.ne_of_value_ne;
+                 fibres(NaturalsBelow.make(0, zeroBelowTwo))
+                     ∈ Universal.neighborhood(a, b, relation, element)
+                     by othersInside;
+                 ∀ (generator : Subtype(
+                     Universal.Algebra.carrier(Universal.Algebra.product(a, a)),
+                     Universal.centralGenerators(a, b, relation, element))).
+                     Universal.generatorFirst(a,
+                         Universal.centralGenerators(a, b, relation, element),
+                         generator) = element
+                     → ((slot : Subtype(
+                           Universal.Algebra.carrier(
+                             Universal.Algebra.product(a, a)),
+                           Universal.centralGenerators(a, b, relation,
+                             element))) ↦
+                         fibres(Universal.centralSelector(a,
+                           Universal.centralGenerators(a, b, relation, element),
+                           element, NaturalsBelow.make(0, zeroBelowTwo),
+                           NaturalsBelow.make(1, oneBelowTwo), slot)))(generator)
+                       ∈ Universal.neighborhood(a, b, relation, element)
+                     by { take generator : Subtype(
+                              Universal.Algebra.carrier(
+                                Universal.Algebra.product(a, a)),
+                              Universal.centralGenerators(a, b, relation,
+                                element));
+                          suppose Universal.generatorFirst(a,
+                              Universal.centralGenerators(a, b, relation,
+                                element), generator) = element;
+                          ¬(Universal.generatorSecond(a,
+                              Universal.centralGenerators(a, b, relation,
+                                element), generator) = element)
+                              by Universal.generatorSecond_ne_of_generatorFirst_eq;
+                          Universal.centralSelector(a,
+                              Universal.centralGenerators(a, b, relation,
+                                element), element,
+                              NaturalsBelow.make(0, zeroBelowTwo),
+                              NaturalsBelow.make(1, oneBelowTwo), generator)
+                            = NaturalsBelow.make(0, zeroBelowTwo)
+                            by Universal.centralSelector_first as goesFirst;
+                          done by substituting goesFirst };
+                 Universal.Term.evaluate(b,
+                     ((generator : Subtype(
+                         Universal.Algebra.carrier(
+                           Universal.Algebra.product(a, a)),
+                         Universal.centralGenerators(a, b, relation,
+                           element))) ↦
+                       fibres(Universal.centralSelector(a,
+                         Universal.centralGenerators(a, b, relation, element),
+                         element, NaturalsBelow.make(0, zeroBelowTwo),
+                         NaturalsBelow.make(1, oneBelowTwo), generator))),
+                     subject)
+                   ∈ Universal.neighborhood(a, b, relation, element)
+                   by Universal.centralGenerators.evaluate_mem_neighborhood;
+                 done by substituting renamed
+               }
+           } };
+  -- So the neighbourhood binary absorbs `B`, and it is nonempty and proper.
+  Universal.BinaryAbsorbs(b, Universal.neighborhood(a, b, relation, element),
+      Set.universe(Universal.Algebra.carrier(b)))
+      by { witness Universal.Term.rename(
+             Universal.centralSelector(a,
+               Universal.centralGenerators(a, b, relation, element), element,
+               NaturalsBelow.make(0, zeroBelowTwo),
+               NaturalsBelow.make(1, oneBelowTwo)),
+             subject) };
+  Universal.IsSubuniverse(b, Universal.neighborhood(a, b, relation, element))
+      by Universal.IsSubuniverse.neighborhood;
+  Set.IsNonempty(Universal.Algebra.carrier(b),
+      Universal.neighborhood(a, b, relation, element))
+      by Universal.neighborhood_nonempty;
+  ¬(Universal.neighborhood(a, b, relation, element)
+    = Set.universe(Universal.Algebra.carrier(b)))
+      by { suppose Universal.neighborhood(a, b, relation, element)
+             = Set.universe(Universal.Algebra.carrier(b));
+           element ∈ Universal.leftCenter(a, b, relation)
+               by Universal.leftCenter_of_neighborhood_universe;
+           done };
+  ¬Universal.BinaryAbsorbs(b, Universal.neighborhood(a, b, relation, element),
+      Set.universe(Universal.Algebra.carrier(b)))
+      by noProperBinaryAbsorbing;
+  done
+}
+
+-- ── Central absorption, and Zhuk's centre theorem ─────────────────────
+
+-- A witness over a star power's index type gives absorption at the numeric
+-- arity `arity ^ depth`. The index type is the tuples of length `depth` over
+-- `NaturalsBelow(arity)`, and `HasSize.tuples` counts exactly those; this is
+-- the only place a star power's arity is named as a number.
+theorem Universal.Absorbs.of_star_witness {signature : Universal.Signature}
+        (a : Universal.Algebra(signature))
+        (inner outer : Set(Universal.Algebra.carrier(a)))
+        (arity depth : ℕ) (positive : 1 ≤ arity)
+        (power : Universal.Term(signature, Universal.StarIndex(arity, depth)))
+        (witnesses : Universal.Witnesses(a, inner, outer, power))
+        : Universal.Absorbs(a, inner, outer) := {
+  HasSize(NaturalsBelow(arity), arity) by NaturalsBelow.has_size;
+  HasSize(NaturalsBelow(depth) → NaturalsBelow(arity), arity ^ depth)
+      by HasSize.tuples as indicesFinite;
+  choose forward such that
+      ∃ (backward : NaturalsBelow(arity ^ depth)
+                    → Universal.StarIndex(arity, depth)).
+        Function.IsInverse(Universal.StarIndex(arity, depth),
+          NaturalsBelow(arity ^ depth), forward, backward)
+      from indicesFinite;
+  choose backward such that
+      Function.IsInverse(Universal.StarIndex(arity, depth),
+        NaturalsBelow(arity ^ depth), forward, backward);
+  ∀ (name : Universal.StarIndex(arity, depth)). backward(forward(name)) = name;
+  ∀ (index : NaturalsBelow(arity ^ depth)). forward(backward(index)) = index;
+  1 ≤ arity ^ depth by Natural.power_positive;
+  done by Universal.Absorbs.of_renaming
+}
+
+-- Blueprint Definition 6.2: `subset` centrally absorbs the algebra.
+definition Universal.CentrallyAbsorbs {signature : Universal.Signature}
+        (a : Universal.Algebra(signature))
+        (subset : Set(Universal.Algebra.carrier(a))) : Proposition :=
+  Universal.Absorbs(a, subset, Set.universe(Universal.Algebra.carrier(a)))
+  ∧ ∀ (element : Universal.Algebra.carrier(a)).
+      ¬(element ∈ subset)
+      → ¬(Universal.pair(a, a, element, element)
+          ∈ Universal.generated(Universal.Algebra.product(a, a),
+              Universal.centralPairs(a, subset, element)))
+
+-- **Blueprint Corollary 6.3** (Zhuk's centre theorem). Clause (a) is
+-- Theorem 5.2, given a numeric arity by `of_star_witness`; clause (b) is
+-- Theorem 6.1, whose generating set is the larger of the two.
+theorem Universal.zhuk_center {signature : Universal.Signature}
+        (a b : Universal.Algebra(signature))
+        (idempotentBase : Universal.Algebra.IsIdempotent(a))
+        (idempotentFibre : Universal.Algebra.IsIdempotent(b))
+        (enumeration : List(Universal.Algebra.carrier(b)))
+        (isEnumeration : Set.IsEnumeration(Universal.Algebra.carrier(b),
+            enumeration))
+        (relation : Set(Universal.Algebra.carrier(
+            Universal.Algebra.product(a, b))))
+        (closed : Universal.IsSubuniverse(Universal.Algebra.product(a, b),
+            relation))
+        (subdirect : Universal.IsSubdirect(a, b, relation))
+        (arity : ℕ) (positive : 1 ≤ arity)
+        (subject : Universal.Term(signature, NaturalsBelow(arity)))
+        (taylor : Universal.IsTaylorOn(b,
+            Set.universe(Universal.Algebra.carrier(b)), arity, subject))
+        (noProperBinaryAbsorbing : ∀ (part : Set(Universal.Algebra.carrier(b))).
+            Universal.IsSubuniverse(b, part)
+            → Set.IsNonempty(Universal.Algebra.carrier(b), part)
+            → ¬(part = Set.universe(Universal.Algebra.carrier(b)))
+            → ¬Universal.BinaryAbsorbs(b, part,
+                Set.universe(Universal.Algebra.carrier(b))))
+        : Universal.CentrallyAbsorbs(a, Universal.leftCenter(a, b, relation)) := {
+  -- (a) The star power of the Taylor term witnesses, and its index type is
+  -- finite, so the absorption has a numeric arity.
+  choose power such that
+      Universal.Witnesses(a, Universal.leftCenter(a, b, relation),
+        Set.universe(Universal.Algebra.carrier(a)), power)
+      from Universal.leftCenter_witnesses(a, b, idempotentBase, idempotentFibre,
+        enumeration, isEnumeration, relation, closed, subdirect, arity, subject,
+        taylor, noProperBinaryAbsorbing);
+  Universal.Absorbs(a, Universal.leftCenter(a, b, relation),
+      Set.universe(Universal.Algebra.carrier(a)))
+      by Universal.Absorbs.of_star_witness;
+  -- (b) The two off-diagonal blocks generate no more than all three do.
+  ∀ (element : Universal.Algebra.carrier(a)).
+      ¬(element ∈ Universal.leftCenter(a, b, relation))
+      → ¬(Universal.pair(a, a, element, element)
+          ∈ Universal.generated(Universal.Algebra.product(a, a),
+              Universal.centralPairs(a, Universal.leftCenter(a, b, relation),
+                element)))
+      by { take element : Universal.Algebra.carrier(a);
+           suppose ¬(element ∈ Universal.leftCenter(a, b, relation));
+           Universal.centralPairs(a, Universal.leftCenter(a, b, relation),
+               element)
+             ⊆ Universal.centralGenerators(a, b, relation, element)
+             by Universal.centralPairs_subset_centralGenerators;
+           Universal.generated(Universal.Algebra.product(a, a),
+               Universal.centralPairs(a,
+                 Universal.leftCenter(a, b, relation), element))
+             ⊆ Universal.generated(Universal.Algebra.product(a, a),
+                 Universal.centralGenerators(a, b, relation, element))
+             by Universal.generated.monotone as nested;
+           ¬(Universal.pair(a, a, element, element)
+             ∈ Universal.generated(Universal.Algebra.product(a, a),
+                 Universal.centralGenerators(a, b, relation, element)))
+             by Universal.center_central;
+           suppose Universal.pair(a, a, element, element)
+               ∈ Universal.generated(Universal.Algebra.product(a, a),
+                   Universal.centralPairs(a,
+                     Universal.leftCenter(a, b, relation), element));
+           Universal.pair(a, a, element, element)
+               ∈ Universal.generated(Universal.Algebra.product(a, a),
+                   Universal.centralGenerators(a, b, relation, element))
+               by nested;
+           done };
+  done
+}
