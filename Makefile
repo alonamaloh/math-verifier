@@ -430,6 +430,12 @@ clean-check: $(CLEAN_MATHV_FILES)
 checker-tests: library $(TEST_MATHV_FILES)
 	@./kernel verify 	    --source library/Test/redundant_check_cache_isolation_test.math 	    --output build/checker-tests.mathv --cache-root build 	    --check-redundant-by --no-check-unused-names > /dev/null 2>&1 	  && echo "checker-tests: PASS" 	  || { echo "checker-tests: FAIL — a clean file broke under --check-redundant-by"; exit 1; }
 	@bash scripts/redundancy_probe_test.sh
+	@MATH_CHECK_DEEP_ROUTE=1 ./kernel verify \
+	    --source library/Test/numeral_table_check.math \
+	    --cache-root build > /dev/null 2> build/deep-route-check.log \
+	  && grep -q "deep-route-check: PASS" build/deep-route-check.log \
+	  && cat build/deep-route-check.log \
+	  || { echo "deep-route-check: FAIL — the deep-route report drifted:"; cat build/deep-route-check.log; exit 1; }
 	@MATH_CHECK_NUMERAL_TABLE=1 ./kernel verify \
 	    --source library/Test/numeral_table_check.math \
 	    --output build/numeral-table-check.mathv --cache-root build \

@@ -1772,7 +1772,8 @@ private:
     //   structural-type match.
     // On a failed declaration, diagnose a capped-bridge route (see above).
     std::string describeDeepEqualityRoute(
-        const SurfaceTopStatement& statement, int failingLine);
+        const SurfaceTopStatement& statement);
+
 
     ExpressionPointer elaborateStructuredClaim(
         const SurfaceStructuredClaim& claim,
@@ -7119,6 +7120,12 @@ private:
         int line = 0;
     };
     std::vector<DeepRouteStep> deepRoute_;
+    // Pure: renders a recorded route. Exercised by runDeepRouteSelfCheck(),
+    // which is where every reporting defect this has had would have been
+    // caught — they were all in the rendering, none in the search.
+    std::string formatDeepRoute(
+        const std::vector<DeepRouteStep>& route) const;
+    void runDeepRouteSelfCheck();
     // >0 forces the bridge's per-claim prove cap, overriding the env knob.
     // Used to lift the cap for the duration of a retry.
     int bridgeProveCapOverride_ = 0;

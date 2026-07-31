@@ -330,6 +330,33 @@ now *explains itself*, instead of having to be reverse-engineered.
   cap 1 with `make -k`, then re-verify candidates STANDALONE both capped and
   uncapped, and keep only those that pass uncapped and fail capped.
 
+### The reporting is now pinned by a self-check
+
+`MATH_CHECK_DEEP_ROUTE=1` runs `runDeepRouteSelfCheck()` — the same shape as
+the numeral-table self-check — and `make checker-tests` gates it. The rendering
+was split out as a **pure** function (`formatDeepRoute`) precisely so it can be
+driven with synthetic routes, because **every defect this reporting shipped
+with lived in the rendering, not in the search**. One assertion per past
+defect:
+
+| assertion | the defect it pins |
+| --- | --- |
+| innermost statement first | steps in the wrong order to transcribe |
+| grouped and labelled per claim line | a route read as instructions for another step |
+| `library lemma X` → `X` | un-typeable citations |
+| anonymous claim reported by LINE | `_claim_anon_120_9` printed as if citable |
+| supplied equation reported by its lemma | ``by substituting `supplied via `by substituting``` |
+| long statement never truncated | output that cannot be transcribed |
+| empty route still carries the NOTE | silent when the cap was not the cause |
+
+Verified to bite: reintroducing the truncation makes it report *"FAIL — a long
+statement is not truncated"* and exit non-zero.
+
+Bugs fixed alongside it: the dead `failingLine` parameter (with a comment that
+contradicted itself, still describing the filtering that had been removed), the
+220-character statement truncation, the six-step-per-group cap, and backticks
+wrapped around what is prose rather than a citation.
+
 ## Recommended order
 
 1. **A**, because it is additive, cannot regress anything, and lets us convert

@@ -272,8 +272,7 @@ void Elaborator::runModule(const SurfaceModule& module) {
                     elaborateTopStatement(statement);
                 } catch (const ElaborateError& failure) {
                     if (bridgeDeclines_ == 0) throw;
-                    std::string route = describeDeepEqualityRoute(
-                        statement, failure.line);
+                    std::string route = describeDeepEqualityRoute(statement);
                     if (route.empty()) throw;
                     throw ElaborateError(
                         std::string(failure.what()) + route,
@@ -288,6 +287,12 @@ void Elaborator::runModule(const SurfaceModule& module) {
         // (`MATH_CHECK_NUMERAL_TABLE=1`): cross-verify the kernel's
         // accelerated GMP op table against the library definitions
         // loaded in this module. A disagreement fails the build.
+        {
+            const char* routeFlag = std::getenv("MATH_CHECK_DEEP_ROUTE");
+            if (routeFlag && routeFlag[0] != '\0' && routeFlag[0] != '0') {
+                runDeepRouteSelfCheck();
+            }
+        }
         {
             const char* checkFlag =
                 std::getenv("MATH_CHECK_NUMERAL_TABLE");
@@ -630,8 +635,97 @@ void Elaborator::reportClaimCosts(const std::string& declarationLabel) {
 // Re-elaborate a failed top statement with the equality bridge uncapped, purely
 // to describe the deeper route. Never called except on a failure path, so the
 // happy path pays nothing.
+// Pure rendering of a recorded route. Split out from the retry so it can be
+// exercised directly by the self-check below: every defect this reporting has
+// had — steps in the wrong order, a route attributed to the wrong claim,
+// internal binder names printed as if citable, statements truncated so they
+// could not be transcribed — lived HERE, not in the search.
+std::string Elaborator::formatDeepRoute(
+        const std::vector<DeepRouteStep>& route) const {
+        std::string message =
+            "\n  NOTE: this DOES elaborate when the equality bridge is allowed "
+            "to chain more rewrites than the current cap permits, so a step "
+            "here is doing several rewrites at once and the proof would say "
+            "more if they were named.";
+        if (route.empty()) return message;
+        // Print the citation the author would actually type.
+        auto citable = [this](const std::string& source) -> std::string {
+            std::string name = citableNameFromFactSource(source);
+            if (!name.empty()) return name;
+            // An anonymous claim's internal binder (`_claim_anon_120_9`) is
+            // not citable and means nothing to a reader. Say where it is —
+            // naming that claim is the fix. Prose, so the caller's backticks
+            // are closed and reopened around it.
+            const std::string anon = "local binder _claim_anon_";
+            if (source.rfind(anon, 0) == 0) {
+                std::string rest = source.substr(anon.size());
+                size_t underscore = rest.find('_');
+                if (underscore != std::string::npos) {
+                    return "` — the unnamed claim at line "
+                        + rest.substr(0, underscore)
+                        + ", which needs a name before it can be cited: `";
+                }
+            }
+            // A `by substituting` candidate labels itself by provenance
+            // ("supplied via `by substituting` (NAME, arguments inferred)").
+            // Print the lemma, not the provenance.
+            const std::string prefix = "supplied via";
+            if (source.rfind(prefix, 0) == 0) {
+                size_t open = source.find('(');
+                if (open != std::string::npos) {
+                    size_t stop = source.find_first_of(",)", open + 1);
+                    if (stop != std::string::npos && stop > open + 1) {
+                        return source.substr(open + 1, stop - open - 1);
+                    }
+                }
+                return "the equation supplied to `by substituting`";
+            }
+            return source;
+        };
+        // Distinct claim lines, in the order first seen. The steps are
+        // GROUPED and labelled, never filtered against the error's own
+        // position — that position is the innermost frame that HAS one
+        // (usually an enclosing `by cases` arm) and filtering on it discards
+        // the route entirely.
+        std::vector<int> lines;
+        for (const DeepRouteStep& step : route) {
+            bool seen = false;
+            for (int already : lines) if (already == step.line) seen = true;
+            if (!seen) lines.push_back(step.line);
+        }
+        message += "\n  Stating the intermediate forms makes a shallow "
+                   "search enough. Per step:";
+        for (int claimLine : lines) {
+            std::vector<DeepRouteStep> group;
+            for (const DeepRouteStep& step : route) {
+                if (step.line == claimLine) group.push_back(step);
+            }
+            message += "\n    for the step at line "
+                + std::to_string(claimLine) + " ("
+                + std::to_string(group.size()) + " rewrite(s)):";
+            // Innermost-first, which is already the order an author states
+            // the forms in: the deepest rewritten goal closes on its own and
+            // each earlier form follows from it by one equation. Never
+            // truncated — the message exists to be transcribed.
+            for (size_t i = 0; i < group.size(); ++i) {
+                message += "\n      " + group[i].statement;
+                if (i == 0) {
+                    std::string base = citable(group[i].closedBy);
+                    message += base.empty()
+                        ? ";" : ("\n          by " + base + ";");
+                } else {
+                    message += "\n          by substituting `"
+                        + citable(group[i - 1].equation) + "`;";
+                }
+            }
+            message += "\n      and that step follows by substituting `"
+                + citable(group.back().equation) + "`.";
+        }
+        return message;
+    }
+
 std::string Elaborator::describeDeepEqualityRoute(
-        const SurfaceTopStatement& statement, int failingLine) {
+        const SurfaceTopStatement& statement) {
         if (inDeepRetry_) return "";
         struct Restore {
             Elaborator& e;
@@ -650,106 +744,92 @@ std::string Elaborator::describeDeepEqualityRoute(
         } catch (...) {
             return "";   // fails either way: the cap is not the story
         }
-        std::string message =
-            "\n  NOTE: this DOES elaborate when the equality bridge is allowed "
-            "to chain more rewrites than the current cap permits, so a step "
-            "here is doing several rewrites at once and the proof would say "
-            "more if they were named.";
-        // Keep only the rewrites performed FOR the claim that failed. The
-        // retry re-elaborates the whole declaration, so the raw collection
-        // mixes in every other claim's rewrites — on one site that produced an
-        // "11-step route" spanning two unrelated `case` arms.
-        // Do NOT filter by the failing line. The error's position is the
-        // innermost frame that HAS one — often the enclosing `by cases` arm
-        // rather than the claim itself — so matching on it discards the very
-        // route we want. Group by the claim each rewrite was performed for and
-        // label the groups instead: nothing is lost, and a route can never be
-        // read as instructions for a step it does not belong to.
-        (void)failingLine;
-        if (!deepRoute_.empty()) {
-            // `deepRoute_` is innermost-first, which is already the order an
-            // author states the intermediate forms in: the deepest rewritten
-            // goal closes on its own, each earlier form follows from it by one
-            // equation, and the claim itself is the last link.
-            auto shorten = [](const std::string& text) {
-                if (text.size() <= 220) return text;
-                return text.substr(0, 217) + "...";
-            };
-            // Print the citation the author would actually type: strip the
-            // provenance prefix ("library lemma X" -> "X"), and fall back to
-            // the raw source for an anonymous fact, which cannot be cited by
-            // name and has to be stated instead.
-            auto citable = [this](const std::string& source) -> std::string {
-                std::string name = citableNameFromFactSource(source);
-                if (!name.empty()) return name;
-                // A `by substituting` candidate labels itself by provenance
-                // ("supplied via `by substituting` (NAME, arguments
-                // inferred)"). Print the lemma the author would type, not the
-                // provenance — otherwise the suggestion reads
-                // "by substituting `supplied via `by substituting``".
-                // An anonymous claim's internal binder (`_claim_anon_120_9`)
-                // is not citable and means nothing to a reader. Say where it
-                // is instead — naming that claim is the fix.
-                const std::string anon = "local binder _claim_anon_";
-                if (source.rfind(anon, 0) == 0) {
-                    std::string rest = source.substr(anon.size());
-                    size_t underscore = rest.find('_');
-                    if (underscore != std::string::npos) {
-                        return "the (unnamed) claim at line "
-                            + rest.substr(0, underscore)
-                            + " — give it a name and cite it";
-                    }
-                }
-                const std::string prefix = "supplied via";
-                if (source.rfind(prefix, 0) == 0) {
-                    size_t open = source.find('(');
-                    if (open != std::string::npos) {
-                        size_t stop = source.find_first_of(",)", open + 1);
-                        if (stop != std::string::npos && stop > open + 1) {
-                            return source.substr(open + 1, stop - open - 1);
-                        }
-                    }
-                    return "the equation supplied to `by substituting`";
-                }
-                return source;
-            };
-            // Distinct claim lines, in the order first seen.
-            std::vector<int> lines;
-            for (const DeepRouteStep& step : deepRoute_) {
-                bool seen = false;
-                for (int already : lines) if (already == step.line) seen = true;
-                if (!seen) lines.push_back(step.line);
-            }
-            message += "\n  Stating the intermediate forms makes a shallow "
-                       "search enough. Per step:";
-            for (int claimLine : lines) {
-                std::vector<DeepRouteStep> group;
-                for (const DeepRouteStep& step : deepRoute_) {
-                    if (step.line == claimLine) group.push_back(step);
-                }
-                message += "\n    for the step at line "
-                    + std::to_string(claimLine) + " ("
-                    + std::to_string(group.size()) + " rewrite(s)):";
-                size_t shown = 0;
-                for (size_t i = 0; i < group.size(); ++i) {
-                    if (shown++ >= 6) {
-                        message += "\n      … ("
-                            + std::to_string(group.size() - 6) + " more)";
-                        break;
-                    }
-                    message += "\n      " + shorten(group[i].statement);
-                    if (i == 0) {
-                        std::string base = citable(group[i].closedBy);
-                        message += base.empty() ? ";" : ("\n          by "
-                            + base + ";");
-                    } else {
-                        message += "\n          by substituting `"
-                            + citable(group[i - 1].equation) + "`;";
-                    }
-                }
-                message += "\n      and that step follows by substituting `"
-                    + citable(group.back().equation) + "`.";
-            }
+        return formatDeepRoute(deepRoute_);
+    }
+
+// MATH_CHECK_DEEP_ROUTE=1 — self-check for the deep-route report.
+//
+// One case per defect this reporting actually shipped with, so none of them
+// can come back silently:
+//   1. steps rendered innermost-first (the order an author writes them);
+//   2. steps GROUPED and labelled by claim, so a route is never presented as
+//      instructions for a different step;
+//   3. library provenance stripped ("library lemma X" -> "X");
+//   4. an anonymous claim reported by LINE, never by its internal binder;
+//   5. a `by substituting` candidate reported by its lemma, not its
+//      provenance label;
+//   6. statements never truncated — the message exists to be transcribed.
+void Elaborator::runDeepRouteSelfCheck() {
+        int failures = 0;
+        auto check = [&](const std::string& what, bool ok) {
+            if (ok) return;
+            ++failures;
+            std::cerr << "deep-route-check: FAIL — " << what << "\n";
+        };
+        auto contains = [](const std::string& haystack,
+                           const std::string& needle) {
+            return haystack.find(needle) != std::string::npos;
+        };
+
+        // (1)(3)(6) ordering, provenance stripping, no truncation.
+        std::string longStatement(400, 'x');
+        std::vector<DeepRouteStep> route;
+        route.push_back({"library lemma Natural.one_add", "INNER", "", 10});
+        route.push_back({"library lemma Natural.add_zero", longStatement, "", 10});
+        std::string out = formatDeepRoute(route);
+        check("innermost statement comes first",
+              out.find("INNER") < out.find(longStatement));
+        check("library provenance stripped from an equation name",
+              contains(out, "`Natural.one_add`")
+              && !contains(out, "library lemma Natural.one_add"));
+        check("a long statement is not truncated",
+              contains(out, longStatement) && !contains(out, "..."));
+        check("the outermost equation closes the step",
+              contains(out, "and that step follows by substituting "
+                            "`Natural.add_zero`"));
+
+        // (2) grouping and labelling by claim line.
+        std::vector<DeepRouteStep> twoClaims;
+        twoClaims.push_back({"library lemma A.one", "S1", "", 7});
+        twoClaims.push_back({"library lemma B.two", "S2", "", 42});
+        std::string grouped = formatDeepRoute(twoClaims);
+        check("each claim's route is labelled with its own line",
+              contains(grouped, "for the step at line 7")
+              && contains(grouped, "for the step at line 42"));
+        check("a two-claim route is not merged into one list",
+              contains(grouped, "(1 rewrite(s))")
+              && !contains(grouped, "(2 rewrite(s))"));
+
+        // (4) an anonymous claim is located, never named by its binder.
+        std::vector<DeepRouteStep> anonymous;
+        anonymous.push_back({"local binder _claim_anon_120_9", "S", "", 5});
+        std::string anon = formatDeepRoute(anonymous);
+        check("an anonymous claim is reported by line",
+              contains(anon, "the unnamed claim at line 120"));
+        check("an internal binder name is never printed",
+              !contains(anon, "_claim_anon_"));
+
+        // (5) a supplied equation is reported by its lemma.
+        std::vector<DeepRouteStep> supplied;
+        supplied.push_back({"supplied via `by substituting` "
+                            "(Integer.absolute_value_multiplicative, "
+                            "arguments inferred)", "S", "", 5});
+        std::string sup = formatDeepRoute(supplied);
+        check("a supplied equation is reported by its lemma",
+              contains(sup, "Integer.absolute_value_multiplicative")
+              && !contains(sup, "arguments inferred"));
+
+        // An empty route still explains itself, and claims no steps.
+        std::string none = formatDeepRoute({});
+        check("an empty route still carries the NOTE",
+              contains(none, "NOTE: this DOES elaborate"));
+        check("an empty route lists no steps",
+              !contains(none, "for the step at line"));
+
+        if (failures == 0) {
+            std::cerr << "deep-route-check: PASS (10 assertions)\n";
+        } else {
+            std::cerr << "deep-route-check: " << failures << " FAILURE(S)\n";
+            std::exit(1);
         }
-        return message;
     }
