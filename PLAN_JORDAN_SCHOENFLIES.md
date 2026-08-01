@@ -714,6 +714,17 @@ puts each half's interior inside the whole's). The ordering along the segment
 is never mentioned — `Plane.distance_from_left` turns it into a comparison of
 distances from the left endpoint.
 
+**A note for anyone porting `subdivide` elsewhere.** `Plane.openSegment(a, b)`
+is defined here as `segment(a, b)` minus its two endpoints, so a degenerate
+`openSegment(a, a)` is EMPTY, and `Plane.splitSegmentAt_avoids` therefore
+needs no nondegeneracy hypothesis. A library that instead defines the open
+segment as the strict convex combination — as Mathlib's `openSegment` does —
+gets `openSegment(a, a) = {a}`, the degenerate piece contains the very point
+being cut at, and the `avoids` property becomes false without assuming the
+piece nondegenerate. Nothing here is wrong; the two conventions simply differ
+at exactly the degenerate case that `subdivide` is otherwise careful about,
+which makes it the easiest place to lose a hypothesis in transit.
+
 **Correction to the earlier plan here:** pairwise-disjoint interiors is NOT a
 property of `subdivide`. `subdivide([(a,b), (a,b)], [])` has two pieces with
 equal interiors. Disjointness comes from cutting at *the right* points and
@@ -944,6 +955,13 @@ The disk version is what would have needed the traversal Layer 4 withholds.
 
 ### H6 — the design, before building it
 
+The bricks below are marked with corrections where building them found the
+design wrong. The corrections come from the Lean 4 / Mathlib port of this
+same foundation (`~/claude/schoenflies-lean`, `alonamaloh/schoenflies-lean`),
+which has B1–B6 built; they are recorded here because they are defects in the
+DESIGN, not in any one language's rendering of it, and this area is unbuilt on
+this side.
+
 **Settled: the abstract graph does not change.** The blueprint's "isomorphic
 plane drawing" is the same finite graph drawn differently, and since the
 vertices of a plane graph ARE plane points and the redrawing leaves them where
@@ -975,15 +993,46 @@ substance**, and they are where the estimate lives.
   B1. Squares rather than disks because B5 needs the boundary to be made of
   segments; convexity, which the radial segments of the last step want, both
   shapes have.
+
+  **Correction, found by building it:** as stated this is TOO WEAK for B4 and
+  B7. A square about `v` that avoids `w` says nothing about the square about
+  `w` reaching back towards `v`, so distinct vertex squares need not be
+  disjoint, and B4's "the core meets no other vertex square" then fails. The
+  fix costs nothing but must be made here rather than downstream: take ONE
+  radius serving every vertex, by B1, and then **halve it**. Two squares of
+  radius `r` that met would put their centres within `2r` in the sup metric,
+  which the unhalved choice already forbids. The halving is what needs a
+  triangle inequality for `Plane.supDistance`, which `Plane/norm.math` has.
+  So B2's deliverable is the all-vertices statement; the per-vertex one is
+  only its ingredient.
 - **B3 — the last point of an arc inside a closed set.** The parameters that
   land in `D_v` form a closed bounded nonempty subset of `[0, 1]`; its
   supremum is attained, and past it the arc has left for good. This is
   `Real.supremum` plus closedness of the preimage — the same shape as
   `Plane.reached_supremum_inside`, which is the model to copy.
+
+  **Correction:** state it over an arbitrary `[α, β]`, not over `[0, 1]`.
+  B4 applies it twice and the second application lives on `[a, 1]`, where `a`
+  is the parameter the first one produced. The `[0, 1]` version is a wrapper.
 - **B4 — the cores.** `K_e` is the subarc between `c_{v,e}` and `c_{w,e}`,
   and the facts wanted of it are: compact, meets the two endpoint squares only
   at its ends, meets no other vertex square, and distinct cores are disjoint.
   All four are `Plane.subarc` plus B2 plus `arcs_meet_at_vertex`.
+
+  **Correction:** `c_{w,e}` is the first entry to `D_w` **after** `c_{v,e}`,
+  not the first entry. Nothing in B2 forbids the arc dipping into `D_w`,
+  returning to `D_v`, and only then running to `w`; with the global first
+  entry the two parameters can come out in the wrong order and the "core" is
+  empty or reversed. This is what forces B3's arbitrary-interval form.
+
+  Two packaging notes from building it. "Meets no other vertex square" is
+  really a statement about the whole ARC — it is B2 plus "an edge is incident
+  only with its own two ends", and the core plays no part — so prove it there.
+  And carry "the core contains no vertex" rather than "distinct cores are
+  disjoint": it is strictly stronger, it follows from `arcs_meet_at_vertex`,
+  and it never quantifies over pairs of cores. Proving it is the one place the
+  POSITIVITY of the radius is used, since the last exit from `D_v` happens at
+  a positive parameter and so the core's endpoint is not `v` itself.
 - **B5 — the plane minus the open vertex squares is locally polygonally
   connected.** Every point of `M` has a relative neighbourhood that is
   polygonally connected, and there are exactly three shapes: a disk (away from
