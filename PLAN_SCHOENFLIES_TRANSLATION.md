@@ -10,10 +10,13 @@ extension), translated from the Lean 4 / Mathlib development at
 
 **The Lean development, not `jordan_schoenflies.tex`, is now the proof
 source.** The blueprint remains the prose narrative, but the Lean repo is the
-debugged version of it: its README records 21 findings where formalization
-found the blueprint or the companion design over-assuming, under-assuming, or
-false-as-stated, and every repair is machine-checked there. Translating from
-the tex and rediscovering those 21 defects would be paying for them twice.
+debugged version of it: formalization found 21 places where the blueprint or
+the companion design was over-assuming, under-assuming, or false-as-stated,
+and every repair is machine-checked there. (The findings list was trimmed
+from the README when the theorem was finished; the full record survives in
+the Lean repo on branch `local-route-2026-08-02`, `README.md`, "Findings".)
+Translating from the tex and rediscovering those 21 defects would be paying
+for them twice.
 Concretely: before starting any statement, read its module in
 `~/claude/schoenflies-lean/Schoenflies/` and its row in
 `schoenflies-lean/docs/ROADMAP.md`; the tex supplies the prose argument, the
@@ -33,21 +36,24 @@ designed brick-by-brick (B1–B8 in `PLAN_JORDAN_SCHOENFLIES.md`, with the three
 design corrections found by building it in Lean already folded in, commit
 `afc8f5cb`). Zero lines of Part I or Part II content.
 
-**The Lean side** (last commit 2026-08-02). Part I is **complete and
-unconditional**: `Schoenflies.jordan_curve_theorem`, `arc_complement`, and
-`crosscut_theorem` rest on `propext`, `Classical.choice`, `Quot.sound` alone.
-Part II is complete *as a conditional chain*: `jordan_schoenflies` is proved
-from `SquareExtension`, and the discharge chain below it is closed except for:
+**The Lean side is FINISHED** (pulled 2026-08-08; last commit 2026-08-06).
+`Schoenflies.jordan_schoenflies_of_homeomorph` is unconditional — no `sorry`,
+no named hypotheses, `propext` / `Classical.choice` / `Quot.sound` alone —
+and its ROADMAP records zero live obligations in both parts. The whole
+translation therefore has a finished original end to end.
 
-- `HasGridAnchoredCores` (`GridTwoConnected.lean`) — the 2-connected core off
-  the grid; the one large open construction;
-- `lem:anchor-density`'s remaining clauses and the `fresh_anchorAt` delta of
-  `HasAnchoredMeshSteps`;
-- the initial-pair constructor for a *prescribed* boundary map `u` (a caveat
-  recorded in ROADMAP's live-obligations table).
-
-So Part I translation has a finished original to work from; the last wave of
-Part II does not, yet. That ordering risk is handled in Phase T3 below.
+**Fork note, for anyone reading old records.** The checkout at
+`~/claude/schoenflies-lean` held a divergent Part II route (the
+`EarStep`/`MeshSteps`/`GridSteps`/`StageRecursion` chain, 505 commits) that
+was superseded: the theorem was finished elsewhere along a different route
+(the `Quantitative*` recursion, `FiniteTransferTarget*`, `BoundaryAnchors`
+chain) and `main` now tracks that finished version (111 modules, ~77k
+lines). The superseded route is preserved on branch
+`local-route-2026-08-02` in that repo — its README's "Findings" section and
+its much longer ROADMAP narrative remain valuable reading, but **module
+names from that narrative do not match `main`**; when a findings entry names
+a Part II module, locate the corresponding statement on `main` (via
+`docs/INVENTORY.md`) rather than trusting the old file name.
 
 ## Representation deltas — the standing translation table
 
@@ -61,7 +67,7 @@ it. Check this table before starting any module.
 | Mathlib compactness (open cover) and connectedness (separation) | sequential compactness; clopen criterion as the definition | proofs that reach for open covers or `IsPreconnected` re-route through the sequential/clopen forms; Layers 2–3 were built for exactly this, so the re-route is local |
 | Mathlib `openSegment a a = {a}` | our `openSegment(a, a) = ∅` | the `subdivide`/`splitAt_avoids` nondegeneracy hypothesis appears on their side and not ours (Lean finding 2); do not import their hypothesis, and do not drop ours where theirs is stated without it |
 | Mathlib multigraph; loops allowed, handshake with loops, looplessness derived per-theorem | `Graph.IsWellFormed` excludes loops globally | Lean findings 3–9 list statements that are cleaner loop-free-per-theorem; where a Lean statement carries no looplessness and ours would, prefer restating ours only if a consumer pays — do not sweep Layer 5 preemptively |
-| `Realization` / edge relabelling: Lean has `Graph.renameEdges` | no edge relabelling here either | the `sourcePart` + `adj_congr_of_pointSet_eq` + `IsTwoConnected.of_adj_congr` trio is the Lean workaround for the same gap; translate the trio, not a relabelling mechanism |
+| edge relabelling: the finished route built `Graph/Relabel.lean` (fresh edge names along an injective-on-edges map; walks/paths/path graphs push forward) | no edge relabelling here | the ear construction needs it; plan on porting the relabelling module rather than the superseded route's `adj_congr` workaround |
 | model curve = square boundary, `IsSeparating` predicate | same square model; no separation predicate yet | **adopt** Lean's design: state `thm:jordan` through the *same* `IsSeparating` predicate as the polygonal case, so `inside`/`outside` and the region API transfer with nothing to transport |
 
 Two Lean design lessons to adopt wholesale, both from its README:
@@ -76,7 +82,12 @@ Two Lean design lessons to adopt wholesale, both from its README:
 
 ## The findings ledger — carry, don't rediscover
 
-The corrected statements to use, by area. (Numbers = Lean README findings.)
+The corrected statements to use, by area. (Numbers = findings in the
+preserved branch's README.) The cell-structure and transfer items below were
+recorded on the superseded route, but the structures they name
+(`boundaryStart`, `paths_meet`, `anchor_uniqueFaceAt`, `IsFaceJordan`,
+`MeetsFinitely`, `FreshDense`, …) carried over into the finished route —
+verify each against its module on `main` when translating.
 
 - **Overlay/subdivision**: nondegeneracy in `splitAt_avoids` (2) — ours is
   immune by convention, see table above.
@@ -165,7 +176,8 @@ theorem existed. Any session blocked on a T1 wave can advance here.
   `lem:combinatorial-invariance` (`CombinatorialInvariance.lean`).
 - T2.2 the generated structure, both elementary operations, boundary walks
   **as data** with `boundaryStart`, the cellulation invariants
-  (`GeneratedStructure`, `BoundaryWalks`, `CellulationInvariants`).
+  (`GeneratedStructure`, `BoundaryCycles`, `BoundaryCyclesGenerated`,
+  `CellulationInvariants`).
 - T2.3 realization constructors and skeleton-map transport for both
   operations (`RealizeSubdiv`, `RealizeSplit`, `RealizeSubdivHomeo`,
   `MatchedSplit`, `ArcMonotone`).
@@ -180,24 +192,20 @@ the "write down what the discharger passes first" rule is the check.
 
 ### Phase T3 — Part II geometry and the endgame (~20k lines)
 
-In Lean order: initial pair (`InitialPair*`, `InitialGenerated`), finite
-transfer both directions (`CommonSubdiv*`, `EarStep` chain, `EarStepTgt`
-chain, `AnchorFace`), the mesh chain (`SquareMesh*`, `MeshSteps` →
-`MeshStepsClosed` chain, `SkelCore`), the grid chain (`Windows`, `LocalGrid`,
-`GridAttach`, `GridComponents`, `GridStarEstimate`, `GridSteps`,
-`GridExtension`, `GridTwoConnected`), the stage recursion
-(`StageRecursion`, `AnchorDensity`), boundary continuity and the endgame
-(`BoundaryContinuity2`, `Inversion`, `SquareMover`, `Endgame`).
-
-**The ordering risk lives here.** The grid chain's last link
-(`HasGridAnchoredCores`), the anchor-density clauses, and the prescribed-`u`
-initial pair are still open in Lean. Decision, deliberately deferred until
-T3 approaches: either (a) the Lean side closes them first and this side
-translates a finished proof — the default, since everything before them is
-months of work — or (b) they get closed *here* first and back-translated,
-which the "Relation to the `math` foundation" section of the Lean README
-shows has already worked in the other direction. Do not start those specific
-modules from the tex alone.
+In the finished route's order: the initial pair (`InitialPair*`,
+`InitialGenerated`, `InitialOuterCycle`, `InitialReverseTransfer`), finite
+transfer both directions (`FiniteTransfer`, `CommonSubdivision`,
+`FiniteTransferTarget`, `FiniteTransferTargetMesh`), the overlay and mesh
+machinery (`SquareMesh*`, `SourceOverlay`, `TargetOverlay`,
+`OverlayExtension`, `FreshDenseSelection`), the source attachment and the
+quantitative recursion (`Windows`, `LocalGrid`, `GridAttach`,
+`SourceAttachment`, `SourceJoining`, `QuantitativeStages`,
+`QuantitativeForwardStages`, `QuantitativeRecursion`, `StageTransition`),
+the limit map and boundary continuity (`LimitMap`,
+`InteriorHomeomorphism`, `BoundaryAnchors`, `MatchedArc`,
+`BoundaryContinuity2`), and the endgame (`Inversion`, `SquareMover`,
+`Endgame`, `JordanSchoenflies`). Derive the exact wave order from the
+import graph when T3 starts, the way T1's table was derived.
 
 ## The ledger
 
@@ -211,8 +219,8 @@ transfers verbatim and is worth keeping: *a "done" that is really a
 
 ## Size and rate, honestly
 
-Lean total is ~68k lines including its own foundation re-build; the content
-above its foundation is roughly 35–40k. Our side historically runs wordier
+Lean total is ~77k lines including its own foundation re-build; the content
+above its foundation is roughly 40–45k. Our side historically runs wordier
 per statement but starts from a finished foundation and a debugged original.
 Working estimate: **~45–55k lines, multi-month at the ~1k/day foundational
 rate** — consistent with the original plan's Part I ~20k + Part II ~28k.
