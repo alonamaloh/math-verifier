@@ -154,6 +154,92 @@ theorem Plane.HalfPlane_IsConnected (coordinate : Plane.Point → ℝ)
 }
 
 -- ----------------------------------------------------------------------
+-- Closed half-planes.
+--
+-- What lies outside an OPEN square is a union of CLOSED half-planes — the
+-- bounding line belongs to the outside — so the strict half-plane above is
+-- not the shape the polygonal redrawing needs. Convexity is the same
+-- argument with the strictness dropped, and without the case split the
+-- strictness forced.
+
+definition Plane.ClosedHalfPlane (coordinate : Plane.Point → ℝ) (bound : ℝ)
+        : Set(Plane.Point) :=
+  (x : Plane.Point) ↦ coordinate(x) ≥ bound
+
+theorem Plane.ClosedHalfPlane_IsConvex (coordinate : Plane.Point → ℝ)
+        (affine : Plane.IsAffineCoordinate(coordinate)) (bound : ℝ)
+        : Plane.IsConvex(Plane.ClosedHalfPlane(coordinate, bound)) := {
+  take a : Plane.Point;
+  suppose a ∈ Plane.ClosedHalfPlane(coordinate, bound);
+  take b : Plane.Point;
+  suppose b ∈ Plane.ClosedHalfPlane(coordinate, bound);
+  take t : ℝ;
+  suppose 0 ≤ t;
+  suppose t ≤ 1;
+  coordinate(a) ≥ bound;
+  coordinate(b) ≥ bound;
+  Real.IsNonneg(1 - t);
+  Real.IsNonneg(t);
+  bound * (1 - t) ≤ coordinate(a) * (1 - t);
+  bound * t ≤ coordinate(b) * t;
+  coordinate(Plane.between(a, b, t))
+     = coordinate(a) + t * (coordinate(b) - coordinate(a)) by affine
+     = coordinate(a) * (1 - t) + coordinate(b) * t by ring
+     as mixture;
+  bound
+     = bound * (1 - t) + bound * t by ring
+     ≤ coordinate(a) * (1 - t) + coordinate(b) * t by ordered_field
+     = coordinate(Plane.between(a, b, t)) by mixture;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- Coordinates no pair of points can outrun.
+--
+-- Moving by a distance changes such a coordinate by at most that distance.
+-- This is what turns the room between a point and a side of a square into
+-- a radius: inside a disk of that radius the coordinate has not had time
+-- to reach the side.
+
+definition Plane.IsNonexpandingCoordinate (coordinate : Plane.Point → ℝ)
+        : Proposition :=
+  ∀ (x y : Plane.Point).
+    abs(coordinate(x) - coordinate(y)) ≤ Plane.distance(x, y)
+
+theorem Plane.first_IsNonexpandingCoordinate
+        : Plane.IsNonexpandingCoordinate(Plane.Point.first) := {
+  take x : Plane.Point;
+  take y : Plane.Point;
+  abs(Plane.Point.first(x) - Plane.Point.first(y))
+     ≤ Plane.distance(y, x) by Plane.first_gap_below_distance
+     = Plane.distance(x, y) by Plane.distance_symmetric;
+  done
+}
+
+theorem Plane.second_IsNonexpandingCoordinate
+        : Plane.IsNonexpandingCoordinate(Plane.Point.second) := {
+  take x : Plane.Point;
+  take y : Plane.Point;
+  abs(Plane.Point.second(x) - Plane.Point.second(y))
+     ≤ Plane.distance(y, x) by Plane.second_gap_below_distance
+     = Plane.distance(x, y) by Plane.distance_symmetric;
+  done
+}
+
+theorem Plane.IsNonexpandingCoordinate.negate (coordinate : Plane.Point → ℝ)
+        (nonexpanding : Plane.IsNonexpandingCoordinate(coordinate))
+        : Plane.IsNonexpandingCoordinate((x : Plane.Point) ↦ -coordinate(x)) := {
+  take x : Plane.Point;
+  take y : Plane.Point;
+  -coordinate(x) - -coordinate(y) = -(coordinate(x) - coordinate(y)) by ring as flipped;
+  abs(-coordinate(x) - -coordinate(y))
+     = abs(-(coordinate(x) - coordinate(y))) by flipped
+     = abs(coordinate(x) - coordinate(y))
+     ≤ Plane.distance(x, y) by nonexpanding;
+  done
+}
+
+-- ----------------------------------------------------------------------
 -- The square, and what lies beyond it.
 
 definition Plane.square (radius : ℝ) : Set(Plane.Point) :=
@@ -297,6 +383,210 @@ theorem Plane.squareAbout_IsClosed (center : Plane.Point) (radius : ℝ)
   };
   done
 }
+
+-- ----------------------------------------------------------------------
+-- The open square, and the four closed half-planes its sides bound.
+--
+-- The polygonal redrawing cuts an OPEN square out of the plane around each
+-- vertex, so what is left keeps every square's boundary. What is left of
+-- one square is covered by the four closed half-planes below — each of
+-- them convex, and that is all the local argument asks of them.
+
+definition Plane.openSquareAbout (center : Plane.Point) (radius : ℝ)
+        : Set(Plane.Point) :=
+  (x : Plane.Point) ↦
+    abs(Plane.Point.first(x) - Plane.Point.first(center)) < radius
+      ∧ abs(Plane.Point.second(x) - Plane.Point.second(center)) < radius
+
+theorem Plane.openSquareAbout_subset_squareAbout (center : Plane.Point) (radius : ℝ)
+        : Plane.openSquareAbout(center, radius) ⊆ Plane.squareAbout(center, radius) := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.openSquareAbout(center, radius);
+  abs(Plane.Point.first(x) - Plane.Point.first(center)) < radius;
+  abs(Plane.Point.second(x) - Plane.Point.second(center)) < radius;
+  abs(Plane.Point.first(x) - Plane.Point.first(center)) ≤ radius;
+  abs(Plane.Point.second(x) - Plane.Point.second(center)) ≤ radius;
+  done
+}
+
+theorem Plane.supDistance_of_openSquareAbout (center : Plane.Point) (radius : ℝ)
+        (x : Plane.Point) (inSquare : x ∈ Plane.openSquareAbout(center, radius))
+        : Plane.supDistance(center, x) < radius := {
+  abs(Plane.Point.first(x) - Plane.Point.first(center)) < radius;
+  abs(Plane.Point.second(x) - Plane.Point.second(center)) < radius;
+  abs(Plane.Vector.first(x - center)) < radius;
+  abs(Plane.Vector.second(x - center)) < radius;
+  done by Real.maximum_LessThan
+}
+
+definition Plane.rightOfSquare (center : Plane.Point) (radius : ℝ)
+        : Set(Plane.Point) :=
+  Plane.ClosedHalfPlane(Plane.Point.first, Plane.Point.first(center) + radius)
+
+definition Plane.aboveSquare (center : Plane.Point) (radius : ℝ)
+        : Set(Plane.Point) :=
+  Plane.ClosedHalfPlane(Plane.Point.second, Plane.Point.second(center) + radius)
+
+definition Plane.leftOfSquare (center : Plane.Point) (radius : ℝ)
+        : Set(Plane.Point) :=
+  Plane.ClosedHalfPlane((x : Plane.Point) ↦ -Plane.Point.first(x),
+      radius - Plane.Point.first(center))
+
+definition Plane.belowSquare (center : Plane.Point) (radius : ℝ)
+        : Set(Plane.Point) :=
+  Plane.ClosedHalfPlane((x : Plane.Point) ↦ -Plane.Point.second(x),
+      radius - Plane.Point.second(center))
+
+theorem Plane.rightOfSquare_IsConvex (center : Plane.Point) (radius : ℝ)
+        : Plane.IsConvex(Plane.rightOfSquare(center, radius)) := {
+  Plane.IsAffineCoordinate(Plane.Point.first) by Plane.first_IsAffineCoordinate;
+  done by Plane.ClosedHalfPlane_IsConvex
+}
+
+theorem Plane.aboveSquare_IsConvex (center : Plane.Point) (radius : ℝ)
+        : Plane.IsConvex(Plane.aboveSquare(center, radius)) := {
+  Plane.IsAffineCoordinate(Plane.Point.second) by Plane.second_IsAffineCoordinate;
+  done by Plane.ClosedHalfPlane_IsConvex
+}
+
+theorem Plane.leftOfSquare_IsConvex (center : Plane.Point) (radius : ℝ)
+        : Plane.IsConvex(Plane.leftOfSquare(center, radius)) := {
+  Plane.IsAffineCoordinate(Plane.Point.first) by Plane.first_IsAffineCoordinate;
+  Plane.IsAffineCoordinate((x : Plane.Point) ↦ -Plane.Point.first(x))
+      by Plane.IsAffineCoordinate.negate;
+  done by Plane.ClosedHalfPlane_IsConvex
+}
+
+theorem Plane.belowSquare_IsConvex (center : Plane.Point) (radius : ℝ)
+        : Plane.IsConvex(Plane.belowSquare(center, radius)) := {
+  Plane.IsAffineCoordinate(Plane.Point.second) by Plane.second_IsAffineCoordinate;
+  Plane.IsAffineCoordinate((x : Plane.Point) ↦ -Plane.Point.second(x))
+      by Plane.IsAffineCoordinate.negate;
+  done by Plane.ClosedHalfPlane_IsConvex
+}
+
+-- Each side is entirely outside the open square: a point of the square is
+-- strictly nearer the centre than the side is.
+
+theorem Plane.rightOfSquare_off_openSquareAbout (center : Plane.Point) (radius : ℝ)
+        (x : Plane.Point) (onSide : x ∈ Plane.rightOfSquare(center, radius))
+        : x ∉ Plane.openSquareAbout(center, radius) := {
+  Plane.Point.first(x) ≥ Plane.Point.first(center) + radius;
+  suppose x ∈ Plane.openSquareAbout(center, radius);
+  abs(Plane.Point.first(x) - Plane.Point.first(center)) < radius;
+  radius ≤ Plane.Point.first(x) - Plane.Point.first(center) by ordered_field
+         ≤ abs(Plane.Point.first(x) - Plane.Point.first(center))
+         < radius;
+  done
+}
+
+theorem Plane.aboveSquare_off_openSquareAbout (center : Plane.Point) (radius : ℝ)
+        (x : Plane.Point) (onSide : x ∈ Plane.aboveSquare(center, radius))
+        : x ∉ Plane.openSquareAbout(center, radius) := {
+  Plane.Point.second(x) ≥ Plane.Point.second(center) + radius;
+  suppose x ∈ Plane.openSquareAbout(center, radius);
+  abs(Plane.Point.second(x) - Plane.Point.second(center)) < radius;
+  radius ≤ Plane.Point.second(x) - Plane.Point.second(center) by ordered_field
+         ≤ abs(Plane.Point.second(x) - Plane.Point.second(center))
+         < radius;
+  done
+}
+
+theorem Plane.leftOfSquare_off_openSquareAbout (center : Plane.Point) (radius : ℝ)
+        (x : Plane.Point) (onSide : x ∈ Plane.leftOfSquare(center, radius))
+        : x ∉ Plane.openSquareAbout(center, radius) := {
+  -Plane.Point.first(x) ≥ radius - Plane.Point.first(center);
+  suppose x ∈ Plane.openSquareAbout(center, radius);
+  abs(Plane.Point.first(x) - Plane.Point.first(center)) < radius;
+  radius ≤ -(Plane.Point.first(x) - Plane.Point.first(center)) by ordered_field
+         ≤ abs(Plane.Point.first(x) - Plane.Point.first(center))
+         < radius;
+  done
+}
+
+theorem Plane.belowSquare_off_openSquareAbout (center : Plane.Point) (radius : ℝ)
+        (x : Plane.Point) (onSide : x ∈ Plane.belowSquare(center, radius))
+        : x ∉ Plane.openSquareAbout(center, radius) := {
+  -Plane.Point.second(x) ≥ radius - Plane.Point.second(center);
+  suppose x ∈ Plane.openSquareAbout(center, radius);
+  abs(Plane.Point.second(x) - Plane.Point.second(center)) < radius;
+  radius ≤ -(Plane.Point.second(x) - Plane.Point.second(center)) by ordered_field
+         ≤ abs(Plane.Point.second(x) - Plane.Point.second(center))
+         < radius;
+  done
+}
+
+-- And together they cover what the open square leaves: a point outside it
+-- has a coordinate at least a radius away from the centre's, on one side
+-- or the other.
+theorem Plane.side_of_not_openSquareAbout (center : Plane.Point) (radius : ℝ)
+        (x : Plane.Point) (outside : x ∉ Plane.openSquareAbout(center, radius))
+        : x ∈ Plane.rightOfSquare(center, radius)
+            ∨ x ∈ Plane.aboveSquare(center, radius)
+            ∨ x ∈ Plane.leftOfSquare(center, radius)
+            ∨ x ∈ Plane.belowSquare(center, radius) :=
+  done by cases {
+    case abs(Plane.Point.first(x) - Plane.Point.first(center)) ≥ radius:
+        done by cases {
+          case Real.IsNonneg(Plane.Point.first(x) - Plane.Point.first(center)): {
+              abs(Plane.Point.first(x) - Plane.Point.first(center))
+                 = Plane.Point.first(x) - Plane.Point.first(center);
+              Plane.Point.first(x) - Plane.Point.first(center) ≥ radius;
+              Plane.Point.first(x) ≥ Plane.Point.first(center) + radius;
+              x ∈ Plane.rightOfSquare(center, radius);
+              done
+            }
+          case Real.IsNonneg(-(Plane.Point.first(x) - Plane.Point.first(center))): {
+              abs(Plane.Point.first(x) - Plane.Point.first(center))
+                 = -(Plane.Point.first(x) - Plane.Point.first(center));
+              -(Plane.Point.first(x) - Plane.Point.first(center)) ≥ radius;
+              -Plane.Point.first(x) ≥ radius - Plane.Point.first(center);
+              x ∈ Plane.leftOfSquare(center, radius);
+              x ∈ Plane.leftOfSquare(center, radius)
+                  ∨ x ∈ Plane.belowSquare(center, radius);
+              x ∈ Plane.aboveSquare(center, radius)
+                  ∨ x ∈ Plane.leftOfSquare(center, radius)
+                  ∨ x ∈ Plane.belowSquare(center, radius);
+              done
+            }
+        }
+    otherwise: {
+        abs(Plane.Point.first(x) - Plane.Point.first(center)) < radius
+            by Real.LessThan_of_not_LessOrEqual;
+        ¬(abs(Plane.Point.second(x) - Plane.Point.second(center)) < radius)
+            by { suppose abs(Plane.Point.second(x) - Plane.Point.second(center)) < radius;
+                 x ∈ Plane.openSquareAbout(center, radius);
+                 done };
+        abs(Plane.Point.second(x) - Plane.Point.second(center)) ≥ radius
+            by Real.LessOrEqual_of_not_LessThan;
+        done by cases {
+          case Real.IsNonneg(Plane.Point.second(x) - Plane.Point.second(center)): {
+              abs(Plane.Point.second(x) - Plane.Point.second(center))
+                 = Plane.Point.second(x) - Plane.Point.second(center);
+              Plane.Point.second(x) - Plane.Point.second(center) ≥ radius;
+              Plane.Point.second(x) ≥ Plane.Point.second(center) + radius;
+              x ∈ Plane.aboveSquare(center, radius);
+              x ∈ Plane.aboveSquare(center, radius)
+                  ∨ x ∈ Plane.leftOfSquare(center, radius)
+                  ∨ x ∈ Plane.belowSquare(center, radius);
+              done
+            }
+          case Real.IsNonneg(-(Plane.Point.second(x) - Plane.Point.second(center))): {
+              abs(Plane.Point.second(x) - Plane.Point.second(center))
+                 = -(Plane.Point.second(x) - Plane.Point.second(center));
+              -(Plane.Point.second(x) - Plane.Point.second(center)) ≥ radius;
+              -Plane.Point.second(x) ≥ radius - Plane.Point.second(center);
+              x ∈ Plane.belowSquare(center, radius);
+              x ∈ Plane.leftOfSquare(center, radius)
+                  ∨ x ∈ Plane.belowSquare(center, radius);
+              x ∈ Plane.aboveSquare(center, radius)
+                  ∨ x ∈ Plane.leftOfSquare(center, radius)
+                  ∨ x ∈ Plane.belowSquare(center, radius);
+              done
+            }
+        }
+      }
+  }
 
 -- Listed so that consecutive sides share a corner, which is what the
 -- connectedness proof walks along.

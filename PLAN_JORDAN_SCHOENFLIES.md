@@ -1050,7 +1050,17 @@ substance**, and they are where the estimate lives.
   POSITIVITY of the radius is used, since the last exit from `D_v` happens at
   a positive parameter and so the core's endpoint is not `v` itself.
 - **B5 — the plane minus the open vertex squares is locally polygonally
-  connected.** Every point of `M` has a relative neighbourhood that is
+  connected. DONE**, `library/Plane/locally_polygonal.math` —
+  `Plane.IsLocallyPolygonallyConnectedAt` carries the basis form and
+  `Plane.outsideSquares_IsLocallyPolygonallyConnected` is the deliverable,
+  stated over a LIST of centres with one radius and the disjointness clause
+  `Plane.Graph.IsDrawing.exists_vertex_squares` already produces, so nothing
+  of the graph layer is imported. The neighbourhood basis is the Euclidean
+  disks (`Plane.Ball`), which are convex and bound each coordinate gap by
+  the distance; the sides are `Plane.rightOfSquare` / `.aboveSquare` /
+  `.leftOfSquare` / `.belowSquare`, closed half-planes of an affine
+  coordinate, in `Plane/exterior.math` beside the open ones. Every point of
+  `M` has a relative neighbourhood that is
   polygonally connected, and there are exactly three shapes: a disk (away from
   every square), a half-disk (against one side), a three-quarter disk (at a
   corner). This is the case analysis the blueprint compresses into one

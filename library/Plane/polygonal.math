@@ -66,6 +66,57 @@ theorem Plane.PolygonalReach.inside
       }
   }
 
+-- ----------------------------------------------------------------------
+-- The algebra of walks: join two, run one backwards, and the one-segment
+-- walk a convex piece of the region supplies.
+
+theorem Plane.PolygonalReach.transitive
+        (region : Set(Plane.Point)) (source middle target : Plane.Point)
+        (toMiddle : Plane.PolygonalReach(region, source, middle))
+        (fromMiddle : Plane.PolygonalReach(region, middle, target))
+        : Plane.PolygonalReach(region, source, target) :=
+  by induction on fromMiddle {
+    case Plane.PolygonalReach.arrived: toMiddle
+    case Plane.PolygonalReach.extend(
+        waypoint, endpoint, walkToWaypoint, segmentInside, reachesWaypoint): {
+        Plane.PolygonalReach(region, source, waypoint) by reachesWaypoint;
+        done by Plane.PolygonalReach.extend(waypoint := waypoint)
+      }
+  }
+
+-- A segment is walked as happily one way as the other, so a walk reverses
+-- segment by segment.
+theorem Plane.PolygonalReach.symmetric
+        (region : Set(Plane.Point)) (source target : Plane.Point)
+        (walk : Plane.PolygonalReach(region, source, target))
+        : Plane.PolygonalReach(region, target, source) :=
+  by induction on walk {
+    case Plane.PolygonalReach.arrived: done by Plane.PolygonalReach.arrived
+    case Plane.PolygonalReach.extend(
+        waypoint, endpoint, walkToWaypoint, segmentInside, reversedWalk): {
+        Plane.segment(endpoint, waypoint) ⊆ region
+            by substituting Plane.segment_symmetric;
+        Plane.PolygonalReach(region, endpoint, endpoint)
+            by Plane.PolygonalReach.arrived;
+        Plane.PolygonalReach(region, endpoint, waypoint)
+            by Plane.PolygonalReach.extend(waypoint := endpoint);
+        done by Plane.PolygonalReach.transitive
+      }
+  }
+
+-- Inside a convex piece of the region the walk is a single segment.
+theorem Plane.PolygonalReach.through_convex
+        (region : Set(Plane.Point)) (piece : Set(Plane.Point))
+        (pieceConvex : Plane.IsConvex(piece)) (pieceInside : piece ⊆ region)
+        (source target : Plane.Point)
+        (sourceInPiece : source ∈ piece) (targetInPiece : target ∈ piece)
+        : Plane.PolygonalReach(region, source, target) := {
+  Plane.segment(source, target) ⊆ piece by Plane.IsConvex.segment_inside;
+  Plane.segment(source, target) ⊆ region by Set.subset.transitive(b := piece);
+  Plane.PolygonalReach(region, source, source) by Plane.PolygonalReach.arrived;
+  done by Plane.PolygonalReach.extend(waypoint := source)
+}
+
 definition Plane.reachableFrom
         (region : Set(Plane.Point)) (source : Plane.Point)
         : Set(Plane.Point) :=

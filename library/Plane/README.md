@@ -113,7 +113,16 @@ have cost more than paying for it once.
   [concatenate.math](concatenate.math)
 - `Plane.IsAffineCoordinate`, `Plane.HalfPlane`, `Plane.square`,
   `Plane.farRight` / `.farAbove` / `.farLeft` / `.farBelow`,
-  `Plane.beyondSquare` — [exterior.math](exterior.math)
+  `Plane.beyondSquare` — [exterior.math](exterior.math). Alongside them the
+  closed reading of the same shapes, which is what the *outside* of an
+  **open** square is made of: `Plane.ClosedHalfPlane`,
+  `Plane.IsNonexpandingCoordinate` (a coordinate no pair of points can
+  outrun — the bridge from a distance to a coordinate gap),
+  `Plane.openSquareAbout`, and the four sides
+  `Plane.rightOfSquare` / `.aboveSquare` / `.leftOfSquare` / `.belowSquare`
+- `Plane.IsLocallyPolygonallyConnectedAt`,
+  `Plane.IsLocallyPolygonallyConnected`, `Plane.outsideSquares` —
+  [locally_polygonal.math](locally_polygonal.math)
 - `Plane.polyline`, `Plane.chainFrom`, and `Plane.IsPolygonal` —
   [polyline.math](polyline.math). A polygonal arc is built **from its vertex
   list** rather than existentially recovered from a union of segments:
@@ -193,7 +202,24 @@ have cost more than paying for it once.
   are joined by a chain of segments inside it (`Plane.IsRegion.polygonal_connected`
   is the same statement for a region) — and
   `Plane.Component_is_reachable_set`, which identifies the components of an
-  open set with the walk classes
+  open set with the walk classes. `Plane.PolygonalReach.transitive`,
+  `.symmetric` and `.through_convex` are the algebra of the walks themselves:
+  join two, run one backwards, and cross a convex piece in one segment
+- **`Plane.outsideSquares_IsLocallyPolygonallyConnected`** — the plane with an
+  open square cut out around each of finitely many centres, the squares
+  pairwise disjoint, is locally polygonally connected
+  ([locally_polygonal.math](locally_polygonal.math)). Local here is the strong
+  reading, and both halves of it are needed by the redrawing: the walk stays
+  inside the *disk*, not merely inside the carrier, and the disks run through
+  a whole basis at the point. There is no case analysis on angles and none of
+  the disk / half-disk / three-quarter-disk shapes is named: what an open
+  square leaves is covered by the four closed half-planes its sides bound
+  (`Plane.side_of_not_openSquareAbout`), each meets a small disk in a convex
+  piece, and once the radius is below every side's clearance
+  (`Plane.exists_radius_facing_sides`) each piece is empty or holds the
+  centre — so two segments through the centre join any two points. Finitely
+  many squares reduce to one by `Plane.exists_radius_off_far_squares`, which
+  is `Real.exists_common_positive_bound` over the list of centres
 - **`Plane.IsHomeomorphismOn.of_continuous_injective_on_compact`** (H4's
   engine) and `Plane.IsJordanParametrisation.IsHomeomorphismOn` — a
   continuous injection on the circle is a homeomorphism onto its image

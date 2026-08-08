@@ -1,0 +1,788 @@
+-- Plane/locally_polygonal.math
+--
+-- The plane minus finitely many open squares is locally polygonally
+-- connected. Brick B5 of the polygonal redrawing, H6 of
+-- PLAN_JORDAN_SCHOENFLIES.md.
+--
+-- The redrawing cuts an open axis-parallel square out of the plane around
+-- each vertex of a plane graph. What the rest of the argument needs of
+-- what is left is that near each of its points it is polygonally connected
+-- in arbitrarily small disks — that is what feeds the clopen argument one
+-- level up, where the basic piece is no longer a disk of the plane.
+--
+-- The informal description of the shapes involved — a disk away from every
+-- square, a half-disk against one side, a three-quarter disk at a corner —
+-- suggests a case analysis on angles. There is none here, and none of the
+-- three shapes is ever named. Both the squares and the disks are read in
+-- coordinates, so
+--
+--   * what an open square leaves is covered by the four closed half-planes
+--     its sides bound;
+--   * each of them meets a disk about the point in a convex piece;
+--   * once the disk is small enough, each of those pieces is either empty
+--     or holds the centre.
+--
+-- A union of convex pieces sharing the centre is polygonally connected by
+-- two segments through it, and the three shapes are just the ways the list
+-- of nonempty pieces can come out.
+--
+-- Finitely many squares reduce to one: the squares being disjoint, a point
+-- lies in at most one of them, and a small enough disk about it misses all
+-- the others outright.
+
+module Plane.locally_polygonal
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import axioms
+import Set.basics
+import Set.algebra
+import Lists.list
+import Real.interface
+import Real.order
+import Real.order_field
+import Real.linearity
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.minimum
+import Real.positive_bound
+import Plane.point
+import Plane.norm
+import Plane.metric
+import Plane.segment
+import Plane.topology
+import Plane.polygonal
+import Plane.exterior
+
+-- ----------------------------------------------------------------------
+-- Being polygonally connected near a point.
+
+-- Inside every disk about `p` there is a smaller one whose carrier points
+-- are joined to one another by polygonal walks that never leave it.
+--
+-- Both halves are load-bearing. The walk stays inside the disk, not merely
+-- inside the carrier; and the disks run through a whole basis at `p`
+-- rather than one fixed neighbourhood. Weakened either way the property
+-- says nothing at all: the plane is a neighbourhood of each of its points,
+-- so any carrier that is polygonally connected anywhere would satisfy it,
+-- and the property would not survive cutting the carrier down by an open
+-- set — which is exactly what the redrawing does to it.
+definition Plane.IsLocallyPolygonallyConnectedAt
+        (carrier : Set(Plane.Point)) (p : Plane.Point) : Proposition :=
+  ∀ (bound : ℝ). bound > 0 →
+    ∃ (radius : ℝ). radius > 0 ∧ radius ≤ bound ∧
+      ∀ (x : Plane.Point). x ∈ Plane.Ball(p, radius) ∩ carrier →
+        ∀ (y : Plane.Point). y ∈ Plane.Ball(p, radius) ∩ carrier →
+          Plane.PolygonalReach(Plane.Ball(p, radius) ∩ carrier, x, y)
+
+definition Plane.IsLocallyPolygonallyConnected (carrier : Set(Plane.Point))
+        : Proposition :=
+  ∀ (p : Plane.Point). p ∈ carrier →
+    Plane.IsLocallyPolygonallyConnectedAt(carrier, p)
+
+-- Walking through the centre is enough: a walk runs backwards as well as
+-- forwards, so two walks to the centre join their sources.
+theorem Plane.IsLocallyPolygonallyConnectedAt.of_reaching_center
+        (carrier : Set(Plane.Point)) (p : Plane.Point)
+        (everyDiskHoldsSmaller : ∀ (bound : ℝ). bound > 0 →
+             ∃ (radius : ℝ). radius > 0 ∧ radius ≤ bound ∧
+               ∀ (x : Plane.Point). x ∈ Plane.Ball(p, radius) ∩ carrier →
+                 Plane.PolygonalReach(Plane.Ball(p, radius) ∩ carrier, x, p))
+        : Plane.IsLocallyPolygonallyConnectedAt(carrier, p) := {
+  take bound : ℝ;
+  suppose bound > 0;
+  choose radius such that radius > 0 ∧ radius ≤ bound ∧
+      ∀ (x : Plane.Point). x ∈ Plane.Ball(p, radius) ∩ carrier →
+        Plane.PolygonalReach(Plane.Ball(p, radius) ∩ carrier, x, p)
+      from everyDiskHoldsSmaller;
+  radius > 0;
+  radius ≤ bound;
+  ∀ (x : Plane.Point). x ∈ Plane.Ball(p, radius) ∩ carrier →
+      Plane.PolygonalReach(Plane.Ball(p, radius) ∩ carrier, x, p)
+      as everyPointReachesCenter;
+  ∀ (x : Plane.Point). x ∈ Plane.Ball(p, radius) ∩ carrier →
+      ∀ (y : Plane.Point). y ∈ Plane.Ball(p, radius) ∩ carrier →
+        Plane.PolygonalReach(Plane.Ball(p, radius) ∩ carrier, x, y)
+      by { take x : Plane.Point;
+           suppose x ∈ Plane.Ball(p, radius) ∩ carrier;
+           take y : Plane.Point;
+           suppose y ∈ Plane.Ball(p, radius) ∩ carrier;
+           Plane.PolygonalReach(Plane.Ball(p, radius) ∩ carrier, x, p)
+               by everyPointReachesCenter;
+           Plane.PolygonalReach(Plane.Ball(p, radius) ∩ carrier, y, p)
+               by everyPointReachesCenter;
+           Plane.PolygonalReach(Plane.Ball(p, radius) ∩ carrier, p, y)
+               by Plane.PolygonalReach.symmetric;
+           done by Plane.PolygonalReach.transitive };
+  witness radius
+}
+
+-- ----------------------------------------------------------------------
+-- How small a disk has to be to face one side of a square.
+--
+-- The room between `p` and a closed half-plane it is outside of bounds the
+-- radius: a disk that small misses the half-plane outright, so the piece
+-- the half-plane cuts off it is empty. And when `p` is in the half-plane
+-- that piece holds `p`, and no room is needed. Either way a small enough
+-- disk meets the half-plane only in a piece through `p`.
+
+theorem Plane.exists_side_clearance (coordinate : Plane.Point → ℝ)
+        (nonexpanding : Plane.IsNonexpandingCoordinate(coordinate))
+        (bound : ℝ) (p : Plane.Point) (limit : ℝ) (limitPositive : limit > 0)
+        : ∃ (clearance : ℝ). clearance > 0 ∧ clearance ≤ limit ∧
+            ∀ (reach : ℝ). reach ≤ clearance →
+              ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+                z ∈ Plane.ClosedHalfPlane(coordinate, bound) →
+                  p ∈ Plane.ClosedHalfPlane(coordinate, bound) :=
+  done by cases {
+    case coordinate(p) ≥ bound: {
+        p ∈ Plane.ClosedHalfPlane(coordinate, bound);
+        limit ≤ limit;
+        ∀ (reach : ℝ). reach ≤ limit →
+            ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+              z ∈ Plane.ClosedHalfPlane(coordinate, bound) →
+                p ∈ Plane.ClosedHalfPlane(coordinate, bound)
+            by { take reach : ℝ;
+                 suppose reach ≤ limit;
+                 take z : Plane.Point;
+                 suppose z ∈ Plane.Ball(p, reach);
+                 suppose z ∈ Plane.ClosedHalfPlane(coordinate, bound);
+                 done };
+        witness limit
+      }
+    otherwise: {
+        coordinate(p) < bound by Real.LessThan_of_not_LessOrEqual;
+        bound - coordinate(p) > 0;
+        let clearance : ℝ := min(limit, bound - coordinate(p));
+        clearance > 0 by Real.minimum_positive;
+        clearance ≤ limit by Real.minimum_LessOrEqual_left;
+        clearance ≤ bound - coordinate(p) by Real.minimum_LessOrEqual_right;
+        ∀ (reach : ℝ). reach ≤ clearance →
+            ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+              z ∈ Plane.ClosedHalfPlane(coordinate, bound) →
+                p ∈ Plane.ClosedHalfPlane(coordinate, bound)
+            by { take reach : ℝ;
+                 suppose reach ≤ clearance;
+                 take z : Plane.Point;
+                 suppose z ∈ Plane.Ball(p, reach);
+                 suppose z ∈ Plane.ClosedHalfPlane(coordinate, bound);
+                 coordinate(z) ≥ bound;
+                 Plane.distance(p, z) < reach;
+                 coordinate(z) - coordinate(p)
+                    ≤ abs(coordinate(z) - coordinate(p))
+                    ≤ Plane.distance(z, p) by nonexpanding
+                    = Plane.distance(p, z) by Plane.distance_symmetric
+                    < reach
+                    ≤ clearance
+                    ≤ bound - coordinate(p);
+                 coordinate(z) < bound by ordered_field;
+                 done };
+        witness clearance
+      }
+  }
+
+theorem Plane.exists_rightOfSquare_clearance (center : Plane.Point) (radius : ℝ)
+        (p : Plane.Point) (limit : ℝ) (limitPositive : limit > 0)
+        : ∃ (clearance : ℝ). clearance > 0 ∧ clearance ≤ limit ∧
+            ∀ (reach : ℝ). reach ≤ clearance →
+              ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+                z ∈ Plane.rightOfSquare(center, radius) →
+                  p ∈ Plane.rightOfSquare(center, radius) := {
+  Plane.IsNonexpandingCoordinate(Plane.Point.first)
+      by Plane.first_IsNonexpandingCoordinate;
+  ∃ (clearance : ℝ). clearance > 0 ∧ clearance ≤ limit ∧
+      ∀ (reach : ℝ). reach ≤ clearance →
+        ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+          z ∈ Plane.ClosedHalfPlane(Plane.Point.first,
+                  Plane.Point.first(center) + radius) →
+            p ∈ Plane.ClosedHalfPlane(Plane.Point.first,
+                    Plane.Point.first(center) + radius)
+      by Plane.exists_side_clearance;
+  done
+}
+
+theorem Plane.exists_aboveSquare_clearance (center : Plane.Point) (radius : ℝ)
+        (p : Plane.Point) (limit : ℝ) (limitPositive : limit > 0)
+        : ∃ (clearance : ℝ). clearance > 0 ∧ clearance ≤ limit ∧
+            ∀ (reach : ℝ). reach ≤ clearance →
+              ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+                z ∈ Plane.aboveSquare(center, radius) →
+                  p ∈ Plane.aboveSquare(center, radius) := {
+  Plane.IsNonexpandingCoordinate(Plane.Point.second)
+      by Plane.second_IsNonexpandingCoordinate;
+  ∃ (clearance : ℝ). clearance > 0 ∧ clearance ≤ limit ∧
+      ∀ (reach : ℝ). reach ≤ clearance →
+        ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+          z ∈ Plane.ClosedHalfPlane(Plane.Point.second,
+                  Plane.Point.second(center) + radius) →
+            p ∈ Plane.ClosedHalfPlane(Plane.Point.second,
+                    Plane.Point.second(center) + radius)
+      by Plane.exists_side_clearance;
+  done
+}
+
+theorem Plane.exists_leftOfSquare_clearance (center : Plane.Point) (radius : ℝ)
+        (p : Plane.Point) (limit : ℝ) (limitPositive : limit > 0)
+        : ∃ (clearance : ℝ). clearance > 0 ∧ clearance ≤ limit ∧
+            ∀ (reach : ℝ). reach ≤ clearance →
+              ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+                z ∈ Plane.leftOfSquare(center, radius) →
+                  p ∈ Plane.leftOfSquare(center, radius) := {
+  Plane.IsNonexpandingCoordinate(Plane.Point.first)
+      by Plane.first_IsNonexpandingCoordinate;
+  Plane.IsNonexpandingCoordinate((x : Plane.Point) ↦ -Plane.Point.first(x))
+      by Plane.IsNonexpandingCoordinate.negate;
+  ∃ (clearance : ℝ). clearance > 0 ∧ clearance ≤ limit ∧
+      ∀ (reach : ℝ). reach ≤ clearance →
+        ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+          z ∈ Plane.ClosedHalfPlane((x : Plane.Point) ↦ -Plane.Point.first(x),
+                  radius - Plane.Point.first(center)) →
+            p ∈ Plane.ClosedHalfPlane((x : Plane.Point) ↦ -Plane.Point.first(x),
+                    radius - Plane.Point.first(center))
+      by Plane.exists_side_clearance;
+  done
+}
+
+theorem Plane.exists_belowSquare_clearance (center : Plane.Point) (radius : ℝ)
+        (p : Plane.Point) (limit : ℝ) (limitPositive : limit > 0)
+        : ∃ (clearance : ℝ). clearance > 0 ∧ clearance ≤ limit ∧
+            ∀ (reach : ℝ). reach ≤ clearance →
+              ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+                z ∈ Plane.belowSquare(center, radius) →
+                  p ∈ Plane.belowSquare(center, radius) := {
+  Plane.IsNonexpandingCoordinate(Plane.Point.second)
+      by Plane.second_IsNonexpandingCoordinate;
+  Plane.IsNonexpandingCoordinate((x : Plane.Point) ↦ -Plane.Point.second(x))
+      by Plane.IsNonexpandingCoordinate.negate;
+  ∃ (clearance : ℝ). clearance > 0 ∧ clearance ≤ limit ∧
+      ∀ (reach : ℝ). reach ≤ clearance →
+        ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+          z ∈ Plane.ClosedHalfPlane((x : Plane.Point) ↦ -Plane.Point.second(x),
+                  radius - Plane.Point.second(center)) →
+            p ∈ Plane.ClosedHalfPlane((x : Plane.Point) ↦ -Plane.Point.second(x),
+                    radius - Plane.Point.second(center))
+      by Plane.exists_side_clearance;
+  done
+}
+
+-- One radius facing all four sides at once: shrink it for the right side,
+-- then for the side above, then for the left, then for the side below,
+-- each time inside what the previous shrinking left.
+theorem Plane.exists_radius_facing_sides (center : Plane.Point) (radius : ℝ)
+        (p : Plane.Point) (limit : ℝ) (limitPositive : limit > 0)
+        : ∃ (reach : ℝ). reach > 0 ∧ reach ≤ limit
+            ∧ (∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+                   z ∈ Plane.rightOfSquare(center, radius) →
+                     p ∈ Plane.rightOfSquare(center, radius))
+            ∧ (∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+                   z ∈ Plane.aboveSquare(center, radius) →
+                     p ∈ Plane.aboveSquare(center, radius))
+            ∧ (∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+                   z ∈ Plane.leftOfSquare(center, radius) →
+                     p ∈ Plane.leftOfSquare(center, radius))
+            ∧ (∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+                   z ∈ Plane.belowSquare(center, radius) →
+                     p ∈ Plane.belowSquare(center, radius)) := {
+  choose rightClearance such that rightClearance > 0 ∧ rightClearance ≤ limit ∧
+      ∀ (reach : ℝ). reach ≤ rightClearance →
+        ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+          z ∈ Plane.rightOfSquare(center, radius) →
+            p ∈ Plane.rightOfSquare(center, radius)
+      from Plane.exists_rightOfSquare_clearance;
+  rightClearance > 0;
+  rightClearance ≤ limit;
+  ∀ (reach : ℝ). reach ≤ rightClearance →
+      ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+        z ∈ Plane.rightOfSquare(center, radius) →
+          p ∈ Plane.rightOfSquare(center, radius);
+
+  choose aboveClearance such that aboveClearance > 0
+      ∧ aboveClearance ≤ rightClearance ∧
+      ∀ (reach : ℝ). reach ≤ aboveClearance →
+        ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+          z ∈ Plane.aboveSquare(center, radius) →
+            p ∈ Plane.aboveSquare(center, radius)
+      from Plane.exists_aboveSquare_clearance;
+  aboveClearance > 0;
+  aboveClearance ≤ rightClearance;
+  ∀ (reach : ℝ). reach ≤ aboveClearance →
+      ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+        z ∈ Plane.aboveSquare(center, radius) →
+          p ∈ Plane.aboveSquare(center, radius);
+
+  choose leftClearance such that leftClearance > 0
+      ∧ leftClearance ≤ aboveClearance ∧
+      ∀ (reach : ℝ). reach ≤ leftClearance →
+        ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+          z ∈ Plane.leftOfSquare(center, radius) →
+            p ∈ Plane.leftOfSquare(center, radius)
+      from Plane.exists_leftOfSquare_clearance;
+  leftClearance > 0;
+  leftClearance ≤ aboveClearance;
+  ∀ (reach : ℝ). reach ≤ leftClearance →
+      ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+        z ∈ Plane.leftOfSquare(center, radius) →
+          p ∈ Plane.leftOfSquare(center, radius);
+
+  choose belowClearance such that belowClearance > 0
+      ∧ belowClearance ≤ leftClearance ∧
+      ∀ (reach : ℝ). reach ≤ belowClearance →
+        ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+          z ∈ Plane.belowSquare(center, radius) →
+            p ∈ Plane.belowSquare(center, radius)
+      from Plane.exists_belowSquare_clearance;
+  belowClearance > 0;
+  belowClearance ≤ leftClearance;
+  ∀ (reach : ℝ). reach ≤ belowClearance →
+      ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+        z ∈ Plane.belowSquare(center, radius) →
+          p ∈ Plane.belowSquare(center, radius);
+
+  belowClearance ≤ aboveClearance;
+  belowClearance ≤ rightClearance;
+  belowClearance ≤ limit;
+  belowClearance ≤ belowClearance;
+
+  ∀ (z : Plane.Point). z ∈ Plane.Ball(p, belowClearance) →
+      z ∈ Plane.rightOfSquare(center, radius) →
+        p ∈ Plane.rightOfSquare(center, radius);
+  ∀ (z : Plane.Point). z ∈ Plane.Ball(p, belowClearance) →
+      z ∈ Plane.aboveSquare(center, radius) →
+        p ∈ Plane.aboveSquare(center, radius);
+  ∀ (z : Plane.Point). z ∈ Plane.Ball(p, belowClearance) →
+      z ∈ Plane.leftOfSquare(center, radius) →
+        p ∈ Plane.leftOfSquare(center, radius);
+  ∀ (z : Plane.Point). z ∈ Plane.Ball(p, belowClearance) →
+      z ∈ Plane.belowSquare(center, radius) →
+        p ∈ Plane.belowSquare(center, radius);
+  witness belowClearance
+}
+
+-- ----------------------------------------------------------------------
+-- Walking to the centre.
+
+-- A disk lying wholly inside the carrier is its own neighbourhood: it is
+-- convex, so a single segment joins each of its points to the centre.
+theorem Plane.reach_center_inside_disk (carrier : Set(Plane.Point))
+        (p : Plane.Point) (reach : ℝ) (centerNear : p ∈ Plane.Ball(p, reach))
+        (diskInside : Plane.Ball(p, reach) ⊆ carrier)
+        (x : Plane.Point) (xNear : x ∈ Plane.Ball(p, reach))
+        : Plane.PolygonalReach(Plane.Ball(p, reach) ∩ carrier, x, p) := {
+  Plane.IsConvex(Plane.Ball(p, reach)) by Plane.Ball_IsConvex;
+  Plane.Ball(p, reach) ⊆ Plane.Ball(p, reach) ∩ carrier
+      by { take z : Plane.Point;
+           suppose z ∈ Plane.Ball(p, reach);
+           z ∈ carrier;
+           done };
+  done by Plane.PolygonalReach.through_convex
+}
+
+-- A point of the disk lying past one side of the square: that side meets
+-- the disk in a convex piece, the piece lies in the carrier, and it holds
+-- the centre, so a single segment joins the point to the centre.
+theorem Plane.reach_center_along_side (carrier side : Set(Plane.Point))
+        (p : Plane.Point) (reach : ℝ) (centerNear : p ∈ Plane.Ball(p, reach))
+        (sideConvex : Plane.IsConvex(side))
+        (sliceInCarrier : ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+             z ∈ side → z ∈ carrier)
+        (centerOnSide : p ∈ side)
+        (x : Plane.Point) (xNear : x ∈ Plane.Ball(p, reach)) (xOnSide : x ∈ side)
+        : Plane.PolygonalReach(Plane.Ball(p, reach) ∩ carrier, x, p) := {
+  Plane.IsConvex(Plane.Ball(p, reach)) by Plane.Ball_IsConvex;
+  Plane.IsConvex(Plane.Ball(p, reach) ∩ side) by Plane.IsConvex.intersection;
+  Plane.Ball(p, reach) ∩ side ⊆ Plane.Ball(p, reach) ∩ carrier
+      by { take z : Plane.Point;
+           suppose z ∈ Plane.Ball(p, reach) ∩ side;
+           z ∈ Plane.Ball(p, reach);
+           z ∈ side;
+           z ∈ carrier;
+           done };
+  x ∈ Plane.Ball(p, reach) ∩ side;
+  p ∈ Plane.Ball(p, reach) ∩ side;
+  done by Plane.PolygonalReach.through_convex
+}
+
+-- The one-square case, relative to a carrier which near `p` is exactly
+-- what the square leaves. Every point of a small enough disk lies past one
+-- of the square's four sides, and each side carries it to the centre.
+theorem Plane.exists_radius_reaching_center_off_square
+        (carrier : Set(Plane.Point)) (center : Plane.Point) (radius : ℝ)
+        (p : Plane.Point) (limit : ℝ) (limitPositive : limit > 0)
+        (carrierOffSquare : ∀ (z : Plane.Point). z ∈ carrier →
+             z ∉ Plane.openSquareAbout(center, radius))
+        (nearbyIsCarrier : ∀ (z : Plane.Point). z ∈ Plane.Ball(p, limit) →
+             z ∉ Plane.openSquareAbout(center, radius) → z ∈ carrier)
+        : ∃ (reach : ℝ). reach > 0 ∧ reach ≤ limit ∧
+            ∀ (x : Plane.Point). x ∈ Plane.Ball(p, reach) ∩ carrier →
+              Plane.PolygonalReach(Plane.Ball(p, reach) ∩ carrier, x, p) := {
+  choose reach such that reach > 0 ∧ reach ≤ limit
+      ∧ (∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+             z ∈ Plane.rightOfSquare(center, radius) →
+               p ∈ Plane.rightOfSquare(center, radius))
+      ∧ (∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+             z ∈ Plane.aboveSquare(center, radius) →
+               p ∈ Plane.aboveSquare(center, radius))
+      ∧ (∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+             z ∈ Plane.leftOfSquare(center, radius) →
+               p ∈ Plane.leftOfSquare(center, radius))
+      ∧ (∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+             z ∈ Plane.belowSquare(center, radius) →
+               p ∈ Plane.belowSquare(center, radius))
+      from Plane.exists_radius_facing_sides;
+  reach > 0;
+  reach ≤ limit;
+  ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+      z ∈ Plane.rightOfSquare(center, radius) →
+        p ∈ Plane.rightOfSquare(center, radius) as rightIsFaced;
+  ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+      z ∈ Plane.aboveSquare(center, radius) →
+        p ∈ Plane.aboveSquare(center, radius) as aboveIsFaced;
+  ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+      z ∈ Plane.leftOfSquare(center, radius) →
+        p ∈ Plane.leftOfSquare(center, radius) as leftIsFaced;
+  ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+      z ∈ Plane.belowSquare(center, radius) →
+        p ∈ Plane.belowSquare(center, radius) as belowIsFaced;
+
+  p ∈ Plane.Ball(p, reach);
+
+  ∀ (side : Set(Plane.Point)).
+      (∀ (z : Plane.Point). z ∈ side →
+           z ∉ Plane.openSquareAbout(center, radius)) →
+        ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) → z ∈ side → z ∈ carrier
+      by { take side : Set(Plane.Point);
+           suppose ∀ (z : Plane.Point). z ∈ side →
+               z ∉ Plane.openSquareAbout(center, radius) as sideOffSquare;
+           take z : Plane.Point;
+           suppose z ∈ Plane.Ball(p, reach);
+           suppose z ∈ side;
+           Plane.distance(p, z) < reach
+                                ≤ limit;
+           z ∈ Plane.Ball(p, limit);
+           z ∉ Plane.openSquareAbout(center, radius);
+           done by nearbyIsCarrier }
+      as sideSliceInCarrier;
+
+  ∀ (x : Plane.Point). x ∈ Plane.Ball(p, reach) ∩ carrier →
+      Plane.PolygonalReach(Plane.Ball(p, reach) ∩ carrier, x, p)
+      by {
+        take x : Plane.Point;
+        suppose x ∈ Plane.Ball(p, reach) ∩ carrier;
+        x ∈ Plane.Ball(p, reach);
+        x ∈ carrier;
+        x ∉ Plane.openSquareAbout(center, radius) by carrierOffSquare;
+        x ∈ Plane.rightOfSquare(center, radius)
+            ∨ x ∈ Plane.aboveSquare(center, radius)
+            ∨ x ∈ Plane.leftOfSquare(center, radius)
+            ∨ x ∈ Plane.belowSquare(center, radius)
+            by Plane.side_of_not_openSquareAbout;
+        done by cases {
+          case x ∈ Plane.rightOfSquare(center, radius): {
+              Plane.IsConvex(Plane.rightOfSquare(center, radius))
+                  by Plane.rightOfSquare_IsConvex;
+              ∀ (z : Plane.Point). z ∈ Plane.rightOfSquare(center, radius) →
+                  z ∉ Plane.openSquareAbout(center, radius)
+                  by Plane.rightOfSquare_off_openSquareAbout;
+              ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+                  z ∈ Plane.rightOfSquare(center, radius) → z ∈ carrier
+                  by sideSliceInCarrier;
+              p ∈ Plane.rightOfSquare(center, radius) by rightIsFaced;
+              done by Plane.reach_center_along_side
+            }
+          case x ∈ Plane.aboveSquare(center, radius): {
+              Plane.IsConvex(Plane.aboveSquare(center, radius))
+                  by Plane.aboveSquare_IsConvex;
+              ∀ (z : Plane.Point). z ∈ Plane.aboveSquare(center, radius) →
+                  z ∉ Plane.openSquareAbout(center, radius)
+                  by Plane.aboveSquare_off_openSquareAbout;
+              ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+                  z ∈ Plane.aboveSquare(center, radius) → z ∈ carrier
+                  by sideSliceInCarrier;
+              p ∈ Plane.aboveSquare(center, radius) by aboveIsFaced;
+              done by Plane.reach_center_along_side
+            }
+          case x ∈ Plane.leftOfSquare(center, radius): {
+              Plane.IsConvex(Plane.leftOfSquare(center, radius))
+                  by Plane.leftOfSquare_IsConvex;
+              ∀ (z : Plane.Point). z ∈ Plane.leftOfSquare(center, radius) →
+                  z ∉ Plane.openSquareAbout(center, radius)
+                  by Plane.leftOfSquare_off_openSquareAbout;
+              ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+                  z ∈ Plane.leftOfSquare(center, radius) → z ∈ carrier
+                  by sideSliceInCarrier;
+              p ∈ Plane.leftOfSquare(center, radius) by leftIsFaced;
+              done by Plane.reach_center_along_side
+            }
+          case x ∈ Plane.belowSquare(center, radius): {
+              Plane.IsConvex(Plane.belowSquare(center, radius))
+                  by Plane.belowSquare_IsConvex;
+              ∀ (z : Plane.Point). z ∈ Plane.belowSquare(center, radius) →
+                  z ∉ Plane.openSquareAbout(center, radius)
+                  by Plane.belowSquare_off_openSquareAbout;
+              ∀ (z : Plane.Point). z ∈ Plane.Ball(p, reach) →
+                  z ∈ Plane.belowSquare(center, radius) → z ∈ carrier
+                  by sideSliceInCarrier;
+              p ∈ Plane.belowSquare(center, radius) by belowIsFaced;
+              done by Plane.reach_center_along_side
+            }
+        }
+      };
+  witness reach
+}
+
+-- ----------------------------------------------------------------------
+-- Finitely many squares.
+
+-- The plane with an open square of one radius cut out around each of
+-- finitely many centres. Membership says the point misses every square,
+-- which is the form every step below uses; the centres arrive as a list,
+-- the way this development carries finiteness.
+definition Plane.outsideSquares (centers : List(Plane.Point)) (radius : ℝ)
+        : Set(Plane.Point) :=
+  (x : Plane.Point) ↦
+    ∀ (center : Plane.Point). center ∈ centers →
+      x ∉ Plane.openSquareAbout(center, radius)
+
+-- Near a point, the only square that can be in the way is one whose closed
+-- square already holds the point: every other centre keeps its distance,
+-- and finitely many distances share one positive bound.
+theorem Plane.exists_radius_off_far_squares (centers : List(Plane.Point))
+        (radius : ℝ) (p : Plane.Point) (limit : ℝ) (limitPositive : limit > 0)
+        : ∃ (near : ℝ). near > 0 ∧ near ≤ limit ∧
+            ∀ (z : Plane.Point). z ∈ Plane.Ball(p, near) →
+              ∀ (center : Plane.Point). center ∈ centers →
+                z ∈ Plane.openSquareAbout(center, radius) →
+                  p ∈ Plane.squareAbout(center, radius) := {
+  Real.HoldsAtSmallerBounds((center : Plane.Point) ↦ (bound : ℝ) ↦
+      ∀ (z : Plane.Point). z ∈ Plane.Ball(p, bound) →
+        z ∈ Plane.openSquareAbout(center, radius) →
+          p ∈ Plane.squareAbout(center, radius))
+      by { take center : Plane.Point;
+           take smaller : ℝ;
+           take larger : ℝ;
+           suppose smaller > 0;
+           suppose smaller ≤ larger;
+           suppose ∀ (z : Plane.Point). z ∈ Plane.Ball(p, larger) →
+               z ∈ Plane.openSquareAbout(center, radius) →
+                 p ∈ Plane.squareAbout(center, radius) as atLarger;
+           take z : Plane.Point;
+           suppose z ∈ Plane.Ball(p, smaller);
+           suppose z ∈ Plane.openSquareAbout(center, radius);
+           Plane.distance(p, z) < smaller
+                                ≤ larger;
+           z ∈ Plane.Ball(p, larger);
+           done by atLarger };
+
+  ∀ (center : Plane.Point). center ∈ centers →
+      ∃ (bound : ℝ). bound > 0 ∧
+        ∀ (z : Plane.Point). z ∈ Plane.Ball(p, bound) →
+          z ∈ Plane.openSquareAbout(center, radius) →
+            p ∈ Plane.squareAbout(center, radius)
+      by { take center : Plane.Point;
+           suppose center ∈ centers;
+           done by cases {
+             case p ∈ Plane.squareAbout(center, radius): {
+                 (1 : ℝ) > 0;
+                 ∀ (z : Plane.Point). z ∈ Plane.Ball(p, 1) →
+                     z ∈ Plane.openSquareAbout(center, radius) →
+                       p ∈ Plane.squareAbout(center, radius)
+                     by { take z : Plane.Point;
+                          suppose z ∈ Plane.Ball(p, 1);
+                          suppose z ∈ Plane.openSquareAbout(center, radius);
+                          done };
+                 witness (1 : ℝ)
+               }
+             otherwise: {
+                 ¬(Plane.supDistance(center, p) ≤ radius)
+                     by { suppose Plane.supDistance(center, p) ≤ radius;
+                          p ∈ Plane.squareAbout(center, radius)
+                              by Plane.squareAbout_of_supDistance;
+                          done };
+                 Plane.supDistance(center, p) > radius
+                     by Real.LessThan_of_not_LessOrEqual;
+                 Plane.supDistance(center, p) - radius > 0;
+                 ∀ (z : Plane.Point).
+                     z ∈ Plane.Ball(p, Plane.supDistance(center, p) - radius) →
+                       z ∈ Plane.openSquareAbout(center, radius) →
+                         p ∈ Plane.squareAbout(center, radius)
+                     by { take z : Plane.Point;
+                          suppose z ∈ Plane.Ball(
+                              p, Plane.supDistance(center, p) - radius);
+                          suppose z ∈ Plane.openSquareAbout(center, radius);
+                          Plane.supDistance(center, z) < radius
+                              by Plane.supDistance_of_openSquareAbout;
+                          Plane.supDistance(p, z)
+                             ≤ Plane.distance(p, z)
+                                   by Plane.supDistance_LessOrEqual_distance
+                             < Plane.supDistance(center, p) - radius;
+                          Plane.supDistance(center, p)
+                             ≤ Plane.supDistance(center, z)
+                                   + Plane.supDistance(z, p)
+                                   by Plane.supDistance_triangle
+                             = Plane.supDistance(center, z)
+                                   + Plane.supDistance(p, z)
+                                   by Plane.supDistance_symmetric;
+                          Plane.supDistance(center, p)
+                              < Plane.supDistance(center, p) by ordered_field;
+                          done by Real.LessThan.irreflexive };
+                 witness Plane.supDistance(center, p) - radius
+               }
+           } };
+
+  choose common such that common > 0 ∧
+      ∀ (center : Plane.Point). center ∈ centers →
+        ∀ (z : Plane.Point). z ∈ Plane.Ball(p, common) →
+          z ∈ Plane.openSquareAbout(center, radius) →
+            p ∈ Plane.squareAbout(center, radius)
+      from Real.exists_common_positive_bound(items := centers);
+  common > 0;
+  ∀ (center : Plane.Point). center ∈ centers →
+      ∀ (z : Plane.Point). z ∈ Plane.Ball(p, common) →
+        z ∈ Plane.openSquareAbout(center, radius) →
+          p ∈ Plane.squareAbout(center, radius)
+      as everyCenterIsFar;
+
+  let near : ℝ := min(limit, common);
+  near > 0 by Real.minimum_positive;
+  near ≤ limit by Real.minimum_LessOrEqual_left;
+  near ≤ common by Real.minimum_LessOrEqual_right;
+  ∀ (z : Plane.Point). z ∈ Plane.Ball(p, near) →
+      ∀ (center : Plane.Point). center ∈ centers →
+        z ∈ Plane.openSquareAbout(center, radius) →
+          p ∈ Plane.squareAbout(center, radius)
+      by { take z : Plane.Point;
+           suppose z ∈ Plane.Ball(p, near);
+           take center : Plane.Point;
+           suppose center ∈ centers;
+           suppose z ∈ Plane.openSquareAbout(center, radius);
+           Plane.distance(p, z) < near
+                                ≤ common;
+           z ∈ Plane.Ball(p, common);
+           done by everyCenterIsFar };
+  witness near
+}
+
+-- **Brick B5.** The plane with an open square cut out around each of
+-- finitely many centres, the squares pairwise disjoint, is locally
+-- polygonally connected.
+--
+-- Either the point lies in one of the closed squares — in exactly one,
+-- since they are disjoint — and near it the carrier is what that one
+-- square leaves; or it lies in none of them, and a small enough disk about
+-- it is inside the carrier outright.
+theorem Plane.outsideSquares_IsLocallyPolygonallyConnected
+        (centers : List(Plane.Point)) (radius : ℝ)
+        (squaresDisjoint : ∀ (center other x : Plane.Point).
+             center ∈ centers → other ∈ centers → center ≠ other →
+             x ∈ Plane.squareAbout(center, radius) →
+               x ∉ Plane.squareAbout(other, radius))
+        : Plane.IsLocallyPolygonallyConnected(
+            Plane.outsideSquares(centers, radius)) := {
+  take p : Plane.Point;
+  suppose p ∈ Plane.outsideSquares(centers, radius);
+  ∀ (bound : ℝ). bound > 0 →
+      ∃ (reach : ℝ). reach > 0 ∧ reach ≤ bound ∧
+        ∀ (x : Plane.Point).
+          x ∈ Plane.Ball(p, reach) ∩ Plane.outsideSquares(centers, radius) →
+            Plane.PolygonalReach(
+                Plane.Ball(p, reach) ∩ Plane.outsideSquares(centers, radius), x, p)
+      by {
+        take bound : ℝ;
+        suppose bound > 0;
+        choose near such that near > 0 ∧ near ≤ bound ∧
+            ∀ (z : Plane.Point). z ∈ Plane.Ball(p, near) →
+              ∀ (center : Plane.Point). center ∈ centers →
+                z ∈ Plane.openSquareAbout(center, radius) →
+                  p ∈ Plane.squareAbout(center, radius)
+            from Plane.exists_radius_off_far_squares;
+        near > 0;
+        near ≤ bound;
+        ∀ (z : Plane.Point). z ∈ Plane.Ball(p, near) →
+            ∀ (center : Plane.Point). center ∈ centers →
+              z ∈ Plane.openSquareAbout(center, radius) →
+                p ∈ Plane.squareAbout(center, radius)
+            as onlyOwnSquareIsNear;
+        done by cases {
+          case ∃ (own : Plane.Point).
+                   own ∈ centers ∧ p ∈ Plane.squareAbout(own, radius): {
+              choose own such that
+                  own ∈ centers ∧ p ∈ Plane.squareAbout(own, radius);
+              own ∈ centers;
+              p ∈ Plane.squareAbout(own, radius);
+
+              ∀ (z : Plane.Point). z ∈ Plane.outsideSquares(centers, radius) →
+                  z ∉ Plane.openSquareAbout(own, radius)
+                  by { take z : Plane.Point;
+                       suppose z ∈ Plane.outsideSquares(centers, radius);
+                       done };
+
+              ∀ (z : Plane.Point). z ∈ Plane.Ball(p, near) →
+                  z ∉ Plane.openSquareAbout(own, radius) →
+                    z ∈ Plane.outsideSquares(centers, radius)
+                  by { take z : Plane.Point;
+                       suppose z ∈ Plane.Ball(p, near);
+                       suppose z ∉ Plane.openSquareAbout(own, radius);
+                       take blocker : Plane.Point;
+                       suppose blocker ∈ centers;
+                       suppose z ∈ Plane.openSquareAbout(blocker, radius);
+                       p ∈ Plane.squareAbout(blocker, radius)
+                           by onlyOwnSquareIsNear;
+                       done by cases {
+                         case blocker = own as isOwn: {
+                             z ∈ Plane.openSquareAbout(own, radius)
+                                 by substituting isOwn;
+                             done
+                           }
+                         otherwise: {
+                             own ≠ blocker by { suppose own = blocker; done };
+                             p ∉ Plane.squareAbout(blocker, radius)
+                                 by squaresDisjoint;
+                             done
+                           }
+                       } };
+
+              choose reach such that reach > 0 ∧ reach ≤ near ∧
+                  ∀ (x : Plane.Point).
+                    x ∈ Plane.Ball(p, reach)
+                            ∩ Plane.outsideSquares(centers, radius) →
+                      Plane.PolygonalReach(
+                          Plane.Ball(p, reach)
+                              ∩ Plane.outsideSquares(centers, radius), x, p)
+                  from Plane.exists_radius_reaching_center_off_square;
+              reach > 0;
+              reach ≤ near
+                    ≤ bound;
+              witness reach
+            }
+          otherwise: {
+              Plane.Ball(p, near) ⊆ Plane.outsideSquares(centers, radius)
+                  by { take z : Plane.Point;
+                       suppose z ∈ Plane.Ball(p, near);
+                       take blocker : Plane.Point;
+                       suppose blocker ∈ centers;
+                       suppose z ∈ Plane.openSquareAbout(blocker, radius);
+                       p ∈ Plane.squareAbout(blocker, radius)
+                           by onlyOwnSquareIsNear;
+                       ∃ (own : Plane.Point).
+                           own ∈ centers ∧ p ∈ Plane.squareAbout(own, radius)
+                           by { witness blocker };
+                       done };
+              p ∈ Plane.Ball(p, near);
+              ∀ (x : Plane.Point).
+                  x ∈ Plane.Ball(p, near)
+                          ∩ Plane.outsideSquares(centers, radius) →
+                    Plane.PolygonalReach(
+                        Plane.Ball(p, near)
+                            ∩ Plane.outsideSquares(centers, radius), x, p)
+                  by { take x : Plane.Point;
+                       suppose x ∈ Plane.Ball(p, near)
+                           ∩ Plane.outsideSquares(centers, radius);
+                       x ∈ Plane.Ball(p, near);
+                       done by Plane.reach_center_inside_disk };
+              witness near
+            }
+        }
+      };
+  done by Plane.IsLocallyPolygonallyConnectedAt.of_reaching_center
+}

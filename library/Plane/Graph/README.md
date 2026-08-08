@@ -314,5 +314,9 @@ positive parameter.
 ## Not built yet
 
 - **H6, polygonal redrawing** — every finite plane graph is isomorphic to
-  one with polygonal edges. Bricks B2 (the vertex squares) and B4 (the cores)
-  have landed; the local polygonal connectivity and the assembly have not.
+  one with polygonal edges. Bricks B2 (the vertex squares), B4 (the cores),
+  and B5 (the plane minus the open vertex squares is locally polygonally
+  connected, a plane fact stated over a list of centres in
+  [`Plane/locally_polygonal.math`](../locally_polygonal.math)) have landed;
+  the clopen argument over such a carrier (B6), the ε-choices (B7) and the
+  assembly (B8) have not.
