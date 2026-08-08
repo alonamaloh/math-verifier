@@ -26,6 +26,7 @@ import Lists.list
 import Lists.set_union
 import Real.interface
 import Real.order
+import Real.minimum
 import Metric.space
 import Metric.topology
 import Metric.compactness
@@ -108,6 +109,59 @@ theorem MetricSpace.Closure.singleton_subset (m : MetricSpace) (point : m)
     distance(x, y) < distance(x, point);
     distance(x, point) < distance(x, point) by substituting (y = point);
     done
+  };
+  done
+}
+
+-- The union of two closed sets is closed, in the closure-inclusion form.
+-- A point outside both has room to spare against each, and the smaller of
+-- the two rooms is a ball the union never enters.
+theorem MetricSpace.Closure.union_subset (m : MetricSpace) (left right : Set(m))
+        (leftClosed : MetricSpace.Closure(left) ⊆ left)
+        (rightClosed : MetricSpace.Closure(right) ⊆ right)
+        : MetricSpace.Closure(left ∪ right) ⊆ left ∪ right := {
+  MetricSpace.IsOpen(Set.complement(left)) by MetricSpace.complement_IsOpen;
+  MetricSpace.IsOpen(Set.complement(right)) by MetricSpace.complement_IsOpen;
+  take x : m;
+  suppose x ∈ MetricSpace.Closure(left ∪ right);
+  suppose x ∉ left ∪ right for contradiction {
+    x ∉ left by { suppose x ∈ left; x ∈ left ∪ right; done };
+    x ∉ right by { suppose x ∈ right; x ∈ left ∪ right; done };
+    x ∈ Set.complement(left);
+    x ∈ Set.complement(right);
+    choose leftRoom such that leftRoom > 0 ∧
+        ∀ (y : m). distance(x, y) < leftRoom → y ∈ Set.complement(left)
+        from MetricSpace.IsOpen.ball_inside(subset := Set.complement(left));
+    choose rightRoom such that rightRoom > 0 ∧
+        ∀ (y : m). distance(x, y) < rightRoom → y ∈ Set.complement(right)
+        from MetricSpace.IsOpen.ball_inside(subset := Set.complement(right));
+    leftRoom > 0;
+    rightRoom > 0;
+    ∀ (y : m). distance(x, y) < leftRoom → y ∈ Set.complement(left) as leftIsFar;
+    ∀ (y : m). distance(x, y) < rightRoom → y ∈ Set.complement(right) as rightIsFar;
+
+    let room : ℝ := min(leftRoom, rightRoom);
+    room > 0 by Real.minimum_positive;
+    room ≤ leftRoom by Real.minimum_LessOrEqual_left;
+    room ≤ rightRoom by Real.minimum_LessOrEqual_right;
+    choose near such that near ∈ left ∪ right ∧ distance(x, near) < room
+        from MetricSpace.Closure.meets_every_ball;
+    near ∈ left ∪ right;
+    distance(x, near) < room;
+    done by cases {
+      case near ∈ left: {
+          distance(x, near) < room
+                            ≤ leftRoom;
+          near ∈ Set.complement(left) by leftIsFar;
+          done
+        }
+      case near ∈ right: {
+          distance(x, near) < room
+                            ≤ rightRoom;
+          near ∈ Set.complement(right) by rightIsFar;
+          done
+        }
+    }
   };
   done
 }

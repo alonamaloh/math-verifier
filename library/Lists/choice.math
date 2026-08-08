@@ -1,0 +1,80 @@
+-- Lists/choice.math
+--
+-- Finitely many choices make a function.
+--
+-- A statement of the form "for each of these finitely many things there is
+-- something with such-and-such property" is an existential per item, and a
+-- consumer that has to speak about all of them at once — one ε for every
+-- edge, one redrawing for every edge — needs them assembled into a single
+-- function. Over a list that assembly is a theorem rather than an axiom:
+-- recurse on the list, and at each step extend the function already built
+-- by sending the head to its own witness.
+--
+-- The extension is a classical conditional on `element = head`, so no
+-- decidable equality is asked of the element type; and outside the list the
+-- function is the caller's fallback, since nothing constrains it there.
+-- This is what stands in for the axiom of choice at a finite index, and it
+-- keeps `axioms.math` at unique choice plus countable choice.
+
+module Lists.choice
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Lists.list
+import Natural.classical_decidable
+
+theorem List.exists_choice_function {A : Type(0)} {B : Type(0)}
+        (items : List(A)) (fallback : B) (property : A → B → Proposition)
+        (available : ∀ (element : A). element ∈ items →
+            ∃ (value : B). property(element, value))
+        : ∃ (choice : A → B). ∀ (element : A). element ∈ items →
+            property(element, choice(element)) :=
+  by induction on items with IH {
+    case items = List.empty: {
+        ∀ (element : A). element ∈ List.empty(A) →
+            property(element, fallback)
+            by { take element : A;
+                 suppose element ∈ List.empty(A);
+                 done };
+        witness ((element : A) ↦ fallback)
+      }
+    case items = List.prepend(head, rest) for some head, rest: {
+        head ∈ List.prepend(A, head, rest);
+        choose chosen such that property(head, chosen) from available;
+        ∀ (element : A). element ∈ rest → ∃ (value : B). property(element, value)
+            by { take element : A;
+                 suppose element ∈ rest;
+                 element ∈ List.prepend(A, head, rest);
+                 done by available };
+        choose tailChoice such that
+            ∀ (element : A). element ∈ rest → property(element, tailChoice(element))
+            from IH;
+        ∀ (element : A). element ∈ rest → property(element, tailChoice(element))
+            as tailIsChosen;
+
+        ∀ (element : A). element ∈ List.prepend(A, head, rest) →
+            property(element, if element = head then chosen else tailChoice(element))
+            by { take element : A;
+                 suppose element ∈ List.prepend(A, head, rest);
+                 done by cases {
+                   case element = head: {
+                       head = head;
+                       (if head = head then chosen else tailChoice(head) : B) = chosen
+                           by Logic.if_positive as headTakesItsOwn;
+                       property(head, chosen);
+                       done by substituting headTakesItsOwn
+                     }
+                   otherwise: {
+                       (if element = head then chosen else tailChoice(element) : B)
+                           = tailChoice(element)
+                           by Logic.if_negative as tailTakesItsOwn;
+                       element ∈ rest by List.member_of_prepend_not_head;
+                       property(element, tailChoice(element)) by tailIsChosen;
+                       done by substituting tailTakesItsOwn
+                     }
+                 } };
+        witness ((element : A) ↦
+            if element = head then chosen else tailChoice(element))
+      }
+  }

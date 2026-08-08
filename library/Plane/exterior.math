@@ -384,6 +384,45 @@ theorem Plane.squareAbout_IsClosed (center : Plane.Point) (radius : ℝ)
   done
 }
 
+-- Read as an open set rather than as a closure inclusion: outside the
+-- square a whole ball is outside it, which is the form a relatively open
+-- complement is cut out by.
+theorem Plane.complement_squareAbout_IsOpen (center : Plane.Point) (radius : ℝ)
+        : Plane.IsOpen(Set.complement(Plane.squareAbout(center, radius))) := {
+  take x : Plane.Point;
+  suppose x ∈ Set.complement(Plane.squareAbout(center, radius));
+  suppose x ∈ Set.universe(Plane.Point);
+  x ∉ Plane.squareAbout(center, radius);
+  ¬(Plane.supDistance(center, x) ≤ radius)
+      by { suppose Plane.supDistance(center, x) ≤ radius;
+           x ∈ Plane.squareAbout(center, radius)
+               by Plane.squareAbout_of_supDistance;
+           done };
+  radius < Plane.supDistance(center, x) by Real.LessThan_of_not_LessOrEqual;
+  let gap : ℝ := Plane.supDistance(center, x) - radius;
+  gap > 0;
+  ∀ (y : Plane.Point). y ∈ Set.universe(Plane.Point) →
+      Plane.distance(x, y) < gap →
+        y ∈ Set.complement(Plane.squareAbout(center, radius))
+      by { take y : Plane.Point;
+           suppose y ∈ Set.universe(Plane.Point);
+           suppose Plane.distance(x, y) < gap;
+           suppose y ∈ Plane.squareAbout(center, radius);
+           Plane.supDistance(center, y) ≤ radius
+               by Plane.supDistance_of_squareAbout;
+           Plane.supDistance(y, x)
+              = Plane.supDistance(x, y) by Plane.supDistance_symmetric
+              ≤ Plane.distance(x, y) by Plane.supDistance_LessOrEqual_distance
+              < gap;
+           Plane.supDistance(center, x)
+              ≤ Plane.supDistance(center, y) + Plane.supDistance(y, x)
+                    by Plane.supDistance_triangle
+              < radius + gap
+              = Plane.supDistance(center, x) by ring;
+           done };
+  witness gap
+}
+
 -- ----------------------------------------------------------------------
 -- The open square, and the four closed half-planes its sides bound.
 --
@@ -406,6 +445,18 @@ theorem Plane.openSquareAbout_subset_squareAbout (center : Plane.Point) (radius 
   abs(Plane.Point.second(x) - Plane.Point.second(center)) < radius;
   abs(Plane.Point.first(x) - Plane.Point.first(center)) ≤ radius;
   abs(Plane.Point.second(x) - Plane.Point.second(center)) ≤ radius;
+  done
+}
+
+theorem Plane.openSquareAbout_of_supDistance (center : Plane.Point) (radius : ℝ)
+        (x : Plane.Point) (near : Plane.supDistance(center, x) < radius)
+        : x ∈ Plane.openSquareAbout(center, radius) := {
+  abs(Plane.Vector.first(x - center)) ≤ Plane.Vector.supNorm(x - center)
+                                      < radius;
+  abs(Plane.Vector.second(x - center)) ≤ Plane.Vector.supNorm(x - center)
+                                       < radius;
+  abs(Plane.Point.first(x) - Plane.Point.first(center)) < radius;
+  abs(Plane.Point.second(x) - Plane.Point.second(center)) < radius;
   done
 }
 

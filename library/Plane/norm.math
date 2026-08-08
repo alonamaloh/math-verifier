@@ -99,6 +99,39 @@ theorem Plane.Vector.supNorm_LessOrEqual_norm (v : Plane.Vector)
   done
 }
 
+-- Scaling a vector scales its sup norm, exactly as it scales the
+-- Euclidean one. Both coordinates pick up the same factor, and a
+-- nonnegative factor passes through the maximum.
+theorem Plane.Vector.supNorm_scale (factor : ℝ) (v : Plane.Vector)
+        : Plane.Vector.supNorm(factor * v)
+              = abs(factor) * Plane.Vector.supNorm(v) := {
+  abs(factor) ≥ 0;
+  Plane.Vector.first(factor * v) = factor * Plane.Vector.first(v)
+      by Plane.Vector.first_scale as firstScaled;
+  Plane.Vector.second(factor * v) = factor * Plane.Vector.second(v)
+      by Plane.Vector.second_scale as secondScaled;
+  abs(factor * Plane.Vector.first(v)) = abs(factor) * abs(Plane.Vector.first(v))
+      by Real.absolute_value_multiplicative as firstFactored;
+  abs(factor * Plane.Vector.second(v)) = abs(factor) * abs(Plane.Vector.second(v))
+      by Real.absolute_value_multiplicative as secondFactored;
+  Plane.Vector.supNorm(factor * v)
+     = max(abs(Plane.Vector.first(factor * v)), abs(Plane.Vector.second(factor * v)))
+     = max(abs(factor * Plane.Vector.first(v)), abs(Plane.Vector.second(factor * v)))
+           by substituting firstScaled
+     = max(abs(factor * Plane.Vector.first(v)), abs(factor * Plane.Vector.second(v)))
+           by substituting secondScaled
+     = max(abs(factor) * abs(Plane.Vector.first(v)),
+           abs(factor * Plane.Vector.second(v)))
+           by substituting firstFactored
+     = max(abs(factor) * abs(Plane.Vector.first(v)),
+           abs(factor) * abs(Plane.Vector.second(v)))
+           by substituting secondFactored
+     = abs(factor) * max(abs(Plane.Vector.first(v)), abs(Plane.Vector.second(v)))
+           by Real.maximum_scale
+     = abs(factor) * Plane.Vector.supNorm(v);
+  done
+}
+
 -- ----------------------------------------------------------------------
 -- Distance between points, in both metrics.
 
@@ -460,6 +493,14 @@ theorem Plane.distance_self (p : Plane.Point)
      = Plane.Vector.norm(p - p)
      = Plane.Vector.norm(Plane.Vector.zero) by Plane.Point.difference_self
      = 0 by Plane.Vector.norm_zero
+
+theorem Plane.supDistance_self (p : Plane.Point)
+        : Plane.supDistance(p, p) = 0 :=
+  Plane.supDistance(p, p)
+     = Plane.Vector.supNorm(p - p)
+     = Plane.Vector.supNorm(Plane.Vector.zero) by Plane.Point.difference_self
+     = max(abs((0 : ℝ)), abs((0 : ℝ)))
+     = 0 by Real.maximum_self
 
 -- ----------------------------------------------------------------------
 -- The remaining two metric axioms: distance separates points, and does

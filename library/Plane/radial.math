@@ -1,0 +1,431 @@
+-- Plane/radial.math
+--
+-- Radial segments in a square, and where a connected set first touches
+-- one. Part of brick B8 of the polygonal redrawing, H6 of
+-- PLAN_JORDAN_SCHOENFLIES.md.
+--
+-- The redrawing joins each vertex to a point on the frame of its square by
+-- the straight segment between them, and everything it then has to check
+-- about those segments is one fact: along a radius the sup distance to the
+-- centre is a faithful coordinate. It rises strictly from 0 at the centre
+-- to the radius at the far end, so a radial leaves the open square only at
+-- that far end, and two radials of one square that met anywhere but at the
+-- centre would have to end at the same point.
+--
+-- The last theorem is about the other end of the same picture. A core
+-- meets the square about its vertex in exactly one point, and the
+-- redrawing needs that point to be ON the frame — otherwise the core would
+-- dip inside the open square, where the carrier of the redrawing does not
+-- reach and where no radial from the centre arrives. The reason it cannot
+-- is connectedness: an interior contact point would be a nonempty proper
+-- relatively clopen piece of the core.
+
+module Plane.radial
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Set.algebra
+import Real.interface
+import Real.order
+import Real.order_field
+import Real.division
+import Real.absolute_value
+import Real.absolute_value_order
+import Plane.vector
+import Plane.point
+import Plane.norm
+import Plane.metric
+import Plane.segment
+import Plane.topology
+import Plane.connected
+import Plane.exterior
+import Plane.polygonal
+import Plane.locally_polygonal
+
+-- ----------------------------------------------------------------------
+-- A nonzero step tells two directions apart.
+
+theorem Plane.between_injective_in_tip
+        (center tipLeft tipRight : Plane.Point) (parameter : ℝ)
+        (parameterNonzero : parameter ≠ 0)
+        (sameStep : Plane.between(center, tipLeft, parameter)
+                        = Plane.between(center, tipRight, parameter))
+        : tipLeft = tipRight := {
+  Plane.Point.first(center)
+        + parameter * (Plane.Point.first(tipLeft) - Plane.Point.first(center))
+     = Plane.Point.first(Plane.between(center, tipLeft, parameter))
+           by Plane.Point.first_between
+     = Plane.Point.first(Plane.between(center, tipRight, parameter)) by sameStep
+     = Plane.Point.first(center)
+           + parameter * (Plane.Point.first(tipRight) - Plane.Point.first(center))
+           by Plane.Point.first_between
+     as firstStepsAgree;
+  Plane.Point.second(center)
+        + parameter * (Plane.Point.second(tipLeft) - Plane.Point.second(center))
+     = Plane.Point.second(Plane.between(center, tipLeft, parameter))
+           by Plane.Point.second_between
+     = Plane.Point.second(Plane.between(center, tipRight, parameter)) by sameStep
+     = Plane.Point.second(center)
+           + parameter * (Plane.Point.second(tipRight) - Plane.Point.second(center))
+           by Plane.Point.second_between
+     as secondStepsAgree;
+
+  Plane.Point.first(tipLeft)
+     = ((Plane.Point.first(center)
+            + parameter * (Plane.Point.first(tipLeft) - Plane.Point.first(center)))
+           - Plane.Point.first(center)) / parameter + Plane.Point.first(center)
+           by field
+     = ((Plane.Point.first(center)
+            + parameter * (Plane.Point.first(tipRight) - Plane.Point.first(center)))
+           - Plane.Point.first(center)) / parameter + Plane.Point.first(center)
+           by firstStepsAgree
+     = Plane.Point.first(tipRight) by field;
+  Plane.Point.second(tipLeft)
+     = ((Plane.Point.second(center)
+            + parameter * (Plane.Point.second(tipLeft) - Plane.Point.second(center)))
+           - Plane.Point.second(center)) / parameter + Plane.Point.second(center)
+           by field
+     = ((Plane.Point.second(center)
+            + parameter * (Plane.Point.second(tipRight) - Plane.Point.second(center)))
+           - Plane.Point.second(center)) / parameter + Plane.Point.second(center)
+           by secondStepsAgree
+     = Plane.Point.second(tipRight) by field;
+  done by Plane.Point.equal_of_coordinates
+}
+
+-- ----------------------------------------------------------------------
+-- The sup distance along a radius IS the parameter, scaled.
+
+theorem Plane.supDistance_along_segment (center tip : Plane.Point) (parameter : ℝ)
+        (parameterNonneg : parameter ≥ 0)
+        : Plane.supDistance(center, Plane.between(center, tip, parameter))
+              = parameter * Plane.supDistance(center, tip) := {
+  abs(parameter) = parameter by Real.absolute_value_when_nonneg as absoluteParameter;
+  Plane.supDistance(center, Plane.between(center, tip, parameter))
+     = Plane.Vector.supNorm((center + parameter * (tip - center)) - center)
+     = Plane.Vector.supNorm(parameter * (tip - center))
+           by Plane.Point.difference_translate
+     = abs(parameter) * Plane.Vector.supNorm(tip - center)
+           by Plane.Vector.supNorm_scale
+     = parameter * Plane.Vector.supNorm(tip - center) by absoluteParameter
+     = parameter * Plane.supDistance(center, tip)
+}
+
+-- Everything on a radius but its far end is strictly nearer the centre, in
+-- the sup metric, than the far end is.
+theorem Plane.supDistance_LessThan_of_segment (center tip x : Plane.Point)
+        (tipAway : Plane.supDistance(center, tip) > 0)
+        (onSegment : x ∈ Plane.segment(center, tip))
+        (notTip : x ≠ tip)
+        : Plane.supDistance(center, x) < Plane.supDistance(center, tip) := {
+  choose parameter such that
+      (0 ≤ parameter ∧ parameter ≤ 1) ∧ x = Plane.between(center, tip, parameter)
+      from onSegment;
+  parameter ≥ 0;
+  parameter ≤ 1;
+  x = Plane.between(center, tip, parameter) as atParameter;
+  parameter ≠ 1
+      by { suppose parameter = 1 as atFarEnd;
+           x = Plane.between(center, tip, parameter)
+             = Plane.between(center, tip, 1) by substituting atFarEnd
+             = tip by Plane.between_one;
+           done };
+  parameter < 1;
+  parameter * Plane.supDistance(center, tip) < 1 * Plane.supDistance(center, tip);
+  Plane.supDistance(center, x)
+     = Plane.supDistance(center, Plane.between(center, tip, parameter)) by atParameter
+     = parameter * Plane.supDistance(center, tip) by Plane.supDistance_along_segment
+     < 1 * Plane.supDistance(center, tip)
+     = Plane.supDistance(center, tip);
+  done
+}
+
+-- A radius stays inside its square.
+theorem Plane.segment_inside_squareAbout (center tip : Plane.Point) (radius : ℝ)
+        (tipInside : Plane.supDistance(center, tip) ≤ radius)
+        : Plane.segment(center, tip) ⊆ Plane.squareAbout(center, radius) := {
+  Plane.supDistance(center, tip) ≥ 0 by Plane.supDistance_nonneg;
+  take x : Plane.Point;
+  suppose x ∈ Plane.segment(center, tip) as onSegment;
+  choose parameter such that
+      (0 ≤ parameter ∧ parameter ≤ 1) ∧ x = Plane.between(center, tip, parameter)
+      from onSegment;
+  parameter ≥ 0;
+  parameter ≤ 1;
+  x = Plane.between(center, tip, parameter) as atParameter;
+  parameter * Plane.supDistance(center, tip) ≤ 1 * Plane.supDistance(center, tip);
+  Plane.supDistance(center, x)
+     = Plane.supDistance(center, Plane.between(center, tip, parameter)) by atParameter
+     = parameter * Plane.supDistance(center, tip) by Plane.supDistance_along_segment
+     ≤ 1 * Plane.supDistance(center, tip)
+     = Plane.supDistance(center, tip)
+     ≤ radius;
+  done by Plane.squareAbout_of_supDistance
+}
+
+-- ----------------------------------------------------------------------
+-- Two radials meet only at a centre.
+--
+-- If the centres differ their squares are disjoint and the two radials
+-- never meet at all. If they agree, a common point has one sup distance to
+-- the centre and hence one parameter on both radii, and a nonzero
+-- parameter would make the two far ends coincide.
+
+theorem Plane.radial_meet
+        (centerLeft tipLeft centerRight tipRight meeting : Plane.Point) (radius : ℝ)
+        (radiusPositive : radius > 0)
+        (tipLeftOnFrame : Plane.supDistance(centerLeft, tipLeft) = radius)
+        (tipRightOnFrame : Plane.supDistance(centerRight, tipRight) = radius)
+        (tipsDistinct : tipLeft ≠ tipRight)
+        (squaresDisjoint : centerLeft ≠ centerRight →
+            Set.Disjoint(Plane.squareAbout(centerLeft, radius),
+                Plane.squareAbout(centerRight, radius)))
+        (onLeft : meeting ∈ Plane.segment(centerLeft, tipLeft))
+        (onRight : meeting ∈ Plane.segment(centerRight, tipRight))
+        : meeting = centerLeft := {
+  radius ≠ 0;
+  Plane.supDistance(centerLeft, tipLeft) ≤ radius;
+  Plane.supDistance(centerRight, tipRight) ≤ radius;
+  Plane.segment(centerLeft, tipLeft) ⊆ Plane.squareAbout(centerLeft, radius)
+      by Plane.segment_inside_squareAbout;
+  Plane.segment(centerRight, tipRight) ⊆ Plane.squareAbout(centerRight, radius)
+      by Plane.segment_inside_squareAbout;
+  meeting ∈ Plane.squareAbout(centerLeft, radius);
+  meeting ∈ Plane.squareAbout(centerRight, radius);
+
+  centerLeft = centerRight
+      by { suppose centerLeft ≠ centerRight for contradiction;
+           Set.Disjoint(Plane.squareAbout(centerLeft, radius),
+               Plane.squareAbout(centerRight, radius)) by squaresDisjoint;
+           meeting ∉ Plane.squareAbout(centerRight, radius);
+           done }
+      as sameCenter;
+  meeting ∈ Plane.segment(centerLeft, tipRight) by substituting sameCenter
+      as onRightFromLeft;
+  Plane.supDistance(centerLeft, tipRight) = radius by substituting sameCenter
+      as rightTipOnFrame;
+
+  choose leftParameter such that
+      (0 ≤ leftParameter ∧ leftParameter ≤ 1)
+        ∧ meeting = Plane.between(centerLeft, tipLeft, leftParameter)
+      from onLeft;
+  choose rightParameter such that
+      (0 ≤ rightParameter ∧ rightParameter ≤ 1)
+        ∧ meeting = Plane.between(centerLeft, tipRight, rightParameter)
+      from onRightFromLeft;
+  leftParameter ≥ 0;
+  rightParameter ≥ 0;
+  meeting = Plane.between(centerLeft, tipLeft, leftParameter) as atLeftParameter;
+  meeting = Plane.between(centerLeft, tipRight, rightParameter) as atRightParameter;
+
+  leftParameter * radius
+     = leftParameter * Plane.supDistance(centerLeft, tipLeft) by tipLeftOnFrame
+     = Plane.supDistance(centerLeft, Plane.between(centerLeft, tipLeft, leftParameter))
+           by Plane.supDistance_along_segment
+     = Plane.supDistance(centerLeft, meeting) by atLeftParameter
+     = Plane.supDistance(centerLeft,
+           Plane.between(centerLeft, tipRight, rightParameter)) by atRightParameter
+     = rightParameter * Plane.supDistance(centerLeft, tipRight)
+           by Plane.supDistance_along_segment
+     = rightParameter * radius by rightTipOnFrame
+     as parametersScaleAlike;
+  leftParameter
+     = (leftParameter * radius) / radius by field
+     = (rightParameter * radius) / radius by parametersScaleAlike
+     = rightParameter by field
+     as sameParameter;
+
+  -- A nonzero common parameter would put the two far ends at one point.
+  leftParameter = 0
+      by { suppose leftParameter ≠ 0 for contradiction;
+           Plane.between(centerLeft, tipLeft, leftParameter)
+              = meeting by atLeftParameter
+              = Plane.between(centerLeft, tipRight, rightParameter) by atRightParameter
+              = Plane.between(centerLeft, tipRight, leftParameter)
+                    by substituting sameParameter;
+           tipLeft = tipRight by Plane.between_injective_in_tip;
+           done }
+      as atCentre;
+  meeting = Plane.between(centerLeft, tipLeft, leftParameter) by atLeftParameter
+          = Plane.between(centerLeft, tipLeft, 0) by substituting atCentre
+          = centerLeft by Plane.between_zero;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The contact point of a connected set is on the frame.
+--
+-- A connected set that meets a closed square in exactly one point and does
+-- not stay inside the square touches it on the frame. Were the contact
+-- point interior, the trace on the square would be a relatively clopen
+-- piece of the set — open because the contact point has room to spare
+-- inside the square, closed because the square is — and it is neither
+-- empty nor everything.
+
+theorem Plane.supDistance_on_frame (piece : Set(Plane.Point))
+        (center : Plane.Point) (radius : ℝ)
+        (pieceConnected : Plane.IsConnected(piece))
+        (contact : Plane.Point)
+        (meetsAtContact : piece ∩ Plane.squareAbout(center, radius)
+                              = Set.singleton(Plane.Point, contact))
+        (escape : Plane.Point) (escapeInPiece : escape ∈ piece)
+        (escapeOutside : escape ∉ Plane.squareAbout(center, radius))
+        : Plane.supDistance(center, contact) = radius := {
+  contact ∈ Set.singleton(Plane.Point, contact) by Set.singleton_member;
+  contact ∈ piece ∩ Plane.squareAbout(center, radius) by substituting meetsAtContact;
+  contact ∈ piece;
+  contact ∈ Plane.squareAbout(center, radius);
+  Plane.supDistance(center, contact) ≤ radius by Plane.supDistance_of_squareAbout;
+
+  radius ≤ Plane.supDistance(center, contact)
+      by {
+        suppose ¬(radius ≤ Plane.supDistance(center, contact)) for contradiction;
+        Plane.supDistance(center, contact) < radius
+            by Real.LessThan_of_not_LessOrEqual;
+        let room : ℝ := radius - Plane.supDistance(center, contact);
+        room > 0;
+
+        Plane.OpenIn(piece ∩ Plane.squareAbout(center, radius), piece)
+            by { take x : Plane.Point;
+                 suppose x ∈ piece ∩ Plane.squareAbout(center, radius) as inTrace;
+                 suppose x ∈ piece;
+                 x ∈ Set.singleton(Plane.Point, contact)
+                     by Set.member_of_equal(source := piece ∩ Plane.squareAbout(center, radius));
+                 x = contact as atContact;
+                 Plane.supDistance(center, x) = Plane.supDistance(center, contact)
+                     by substituting atContact as contactIsNear;
+                 ∀ (y : Plane.Point). y ∈ piece → Plane.distance(x, y) < room →
+                     y ∈ piece ∩ Plane.squareAbout(center, radius)
+                     by { take y : Plane.Point;
+                          suppose y ∈ piece;
+                          suppose Plane.distance(x, y) < room;
+                          Plane.supDistance(x, y)
+                             ≤ Plane.distance(x, y) by Plane.supDistance_LessOrEqual_distance
+                             < room;
+                          Plane.supDistance(center, y)
+                             ≤ Plane.supDistance(center, x) + Plane.supDistance(x, y)
+                                   by Plane.supDistance_triangle
+                             = Plane.supDistance(center, contact) + Plane.supDistance(x, y)
+                                   by contactIsNear
+                             < Plane.supDistance(center, contact) + room
+                             = radius by ring;
+                          y ∈ Plane.squareAbout(center, radius)
+                              by Plane.squareAbout_of_supDistance;
+                          done };
+                 witness room };
+
+        Plane.IsOpen(Set.complement(Plane.squareAbout(center, radius)))
+            by Plane.complement_squareAbout_IsOpen;
+        Plane.OpenIn(piece ∖ (piece ∩ Plane.squareAbout(center, radius)), piece)
+            by { take x : Plane.Point;
+                 suppose x ∈ piece ∖ (piece ∩ Plane.squareAbout(center, radius));
+                 suppose x ∈ piece;
+                 x ∉ piece ∩ Plane.squareAbout(center, radius);
+                 x ∉ Plane.squareAbout(center, radius)
+                     by { suppose x ∈ Plane.squareAbout(center, radius);
+                          x ∈ piece ∩ Plane.squareAbout(center, radius);
+                          done };
+                 x ∈ Set.complement(Plane.squareAbout(center, radius));
+                 choose gap such that gap > 0 ∧ ∀ (y : Plane.Point).
+                     Plane.distance(x, y) < gap →
+                       y ∈ Set.complement(Plane.squareAbout(center, radius))
+                     from Plane.IsOpen.ball_inside(subset :=
+                         Set.complement(Plane.squareAbout(center, radius)));
+                 gap > 0;
+                 ∀ (y : Plane.Point). Plane.distance(x, y) < gap →
+                     y ∈ Set.complement(Plane.squareAbout(center, radius))
+                     as farStaysOutside;
+                 ∀ (y : Plane.Point). y ∈ piece → Plane.distance(x, y) < gap →
+                     y ∈ piece ∖ (piece ∩ Plane.squareAbout(center, radius))
+                     by { take y : Plane.Point;
+                          suppose y ∈ piece;
+                          suppose Plane.distance(x, y) < gap;
+                          y ∈ Set.complement(Plane.squareAbout(center, radius))
+                              by farStaysOutside;
+                          y ∉ Plane.squareAbout(center, radius);
+                          y ∉ piece ∩ Plane.squareAbout(center, radius)
+                              by { suppose y ∈ piece ∩ Plane.squareAbout(center, radius);
+                                   y ∈ Plane.squareAbout(center, radius);
+                                   done };
+                          done };
+                 witness gap };
+
+        piece ⊆ piece by Set.subset.reflexive;
+        Set.IsNonempty(Plane.Point,
+            (piece ∩ Plane.squareAbout(center, radius)) ∩ piece)
+            by { contact ∈ (piece ∩ Plane.squareAbout(center, radius)) ∩ piece;
+                 witness contact };
+        piece ⊆ piece ∩ Plane.squareAbout(center, radius)
+            by Plane.IsConnected.swallows(whole := piece) as squareSwallowsPiece;
+        escape ∈ piece ∩ Plane.squareAbout(center, radius) by squareSwallowsPiece;
+        escape ∈ Plane.squareAbout(center, radius);
+        done
+      };
+  done by Real.LessOrEqual.antisymmetric
+}
+
+-- The form the redrawing consumes it in: a connected set meeting each of
+-- two disjoint squares in one point touches the first on its frame, since
+-- the point in the second square is a point of the set outside the first.
+theorem Plane.contact_on_frame_of_disjoint_squares (piece : Set(Plane.Point))
+        (pieceConnected : Plane.IsConnected(piece))
+        (center other : Plane.Point) (radius : ℝ)
+        (squaresDisjoint : Set.Disjoint(Plane.squareAbout(center, radius),
+            Plane.squareAbout(other, radius)))
+        (contact otherContact : Plane.Point)
+        (meetsHere : piece ∩ Plane.squareAbout(center, radius)
+                         = Set.singleton(Plane.Point, contact))
+        (meetsThere : piece ∩ Plane.squareAbout(other, radius)
+                          = Set.singleton(Plane.Point, otherContact))
+        : Plane.supDistance(center, contact) = radius := {
+  otherContact ∈ Set.singleton(Plane.Point, otherContact) by Set.singleton_member;
+  otherContact ∈ piece ∩ Plane.squareAbout(other, radius) by substituting meetsThere;
+  otherContact ∈ piece;
+  otherContact ∈ Plane.squareAbout(other, radius);
+  otherContact ∉ Plane.squareAbout(center, radius)
+      by { suppose otherContact ∈ Plane.squareAbout(center, radius);
+           otherContact ∉ Plane.squareAbout(other, radius) by squaresDisjoint;
+           done };
+  done by Plane.supDistance_on_frame(escape := otherContact)
+}
+
+-- ----------------------------------------------------------------------
+-- A radial against the plane minus the open squares.
+--
+-- The carrier the redrawing works in is the plane with an OPEN square cut
+-- out around each centre, so it keeps every square's frame and nothing
+-- inside. A radial from a centre to a point of its own frame therefore
+-- meets the carrier only at that far end, and no centre is in the carrier
+-- at all.
+
+theorem Plane.center_off_outsideSquares (centers : List(Plane.Point)) (radius : ℝ)
+        (radiusPositive : radius > 0)
+        (center : Plane.Point) (isCenter : center ∈ centers)
+        : center ∉ Plane.outsideSquares(centers, radius) := {
+  suppose center ∈ Plane.outsideSquares(centers, radius);
+  center ∉ Plane.openSquareAbout(center, radius);
+  Plane.supDistance(center, center) = 0 by Plane.supDistance_self;
+  Plane.supDistance(center, center) < radius;
+  center ∈ Plane.openSquareAbout(center, radius)
+      by Plane.openSquareAbout_of_supDistance;
+  done
+}
+
+theorem Plane.radial_meets_outsideSquares (centers : List(Plane.Point)) (radius : ℝ)
+        (radiusPositive : radius > 0)
+        (center : Plane.Point) (isCenter : center ∈ centers)
+        (tip : Plane.Point) (tipOnFrame : Plane.supDistance(center, tip) = radius)
+        (z : Plane.Point) (onRadial : z ∈ Plane.segment(center, tip))
+        (inCarrier : z ∈ Plane.outsideSquares(centers, radius))
+        : z = tip := {
+  suppose z ≠ tip for contradiction;
+  Plane.supDistance(center, tip) > 0;
+  Plane.supDistance(center, z) < Plane.supDistance(center, tip)
+      by Plane.supDistance_LessThan_of_segment
+                                              = radius by tipOnFrame;
+  z ∈ Plane.openSquareAbout(center, radius) by Plane.openSquareAbout_of_supDistance;
+  z ∉ Plane.openSquareAbout(center, radius);
+  done
+}

@@ -19,6 +19,7 @@ import Real.order
 import Real.order_field
 import Real.division
 import Real.absolute_value_order
+import Real.order_multiplication
 
 -- max(a, b): the larger of the two, read off the absolute value of the gap.
 definition Real.maximum (a b : ℝ) : ℝ :=
@@ -77,6 +78,24 @@ theorem Real.maximum_self (a : ℝ) : max(a, a) = a := {
      = (a + a + abs(a - a)) / 2
      = (a + a + 0) / 2
      = a by field;
+  done
+}
+
+-- Scaling by a nonnegative factor passes through the maximum. The closed
+-- form makes it one field identity, since the factor comes out of the
+-- absolute value of the gap.
+theorem Real.maximum_scale (factor a b : ℝ) (factorNonneg : factor ≥ 0)
+        : max(factor * a, factor * b) = factor * max(a, b) := {
+  abs(factor) = factor by Real.absolute_value_when_nonneg as absoluteFactor;
+  abs(factor * a - factor * b)
+     = abs(factor * (a - b))
+     = abs(factor) * abs(a - b) by Real.absolute_value_multiplicative
+     = factor * abs(a - b) by absoluteFactor as scaledGap;
+  max(factor * a, factor * b)
+     = (factor * a + factor * b + abs(factor * a - factor * b)) / 2
+     = (factor * a + factor * b + factor * abs(a - b)) / 2 by scaledGap
+     = factor * ((a + b + abs(a - b)) / 2) by field
+     = factor * max(a, b);
   done
 }
 

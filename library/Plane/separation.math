@@ -166,6 +166,35 @@ theorem Plane.subset_nearSet (region : Set(Plane.Point)) (radius : ℝ)
   done by Plane.nearSet_member
 }
 
+-- The neighbourhood is open: a point of it has room to spare against the
+-- witness that puts it there, and the triangle inequality spends that room.
+theorem Plane.nearSet_IsOpen (region : Set(Plane.Point)) (radius : ℝ)
+        : Plane.IsOpen(Plane.nearSet(region, radius)) := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.nearSet(region, radius) as inNearSet;
+  suppose x ∈ Set.universe(Plane.Point);
+  choose near such that
+      near ∈ region ∧ Plane.distance(x, near) < radius from inNearSet;
+  near ∈ region;
+  Plane.distance(x, near) < radius;
+  let room : ℝ := radius - Plane.distance(x, near);
+  room > 0;
+  ∀ (y : Plane.Point). y ∈ Set.universe(Plane.Point) →
+      Plane.distance(x, y) < room → y ∈ Plane.nearSet(region, radius)
+      by { take y : Plane.Point;
+           suppose y ∈ Set.universe(Plane.Point);
+           suppose Plane.distance(x, y) < room;
+           Plane.distance(y, near)
+              ≤ Plane.distance(y, x) + Plane.distance(x, near)
+                    by Plane.distance_triangle
+              = Plane.distance(x, y) + Plane.distance(x, near)
+                    by Plane.distance_symmetric
+              < room + Plane.distance(x, near)
+              = radius by ring;
+           done by Plane.nearSet_member };
+  witness room
+}
+
 -- A separation only gets easier to satisfy as the gap shrinks.
 theorem Plane.separated_at_smaller_gap (left right : Set(Plane.Point))
         (smaller larger : ℝ) (ordered : smaller ≤ larger)

@@ -1,0 +1,211 @@
+-- Plane/Graph/redrawing.math
+--
+-- The polygonal redrawing of a finite plane graph. Brick B8 of H6 in
+-- PLAN_JORDAN_SCHOENFLIES.md, and the headline theorem of Layer 6.
+--
+-- WORK IN PROGRESS. The vocabulary below — what a core is, the channel a
+-- redrawn edge runs through, the region it is confined to, and the fact
+-- that a core lies in the plane minus the open vertex squares — is built
+-- and verified. The assembly itself is drafted in `B8_ASSEMBLY_WIP.math`
+-- at the project root, which is deliberately outside `library/` so that
+-- it is not part of the build; see that file's header for what stands.
+--
+-- A finite plane graph is to be drawn again, on the SAME abstract graph and
+-- the SAME vertices, with every edge a polygonal arc. The blueprint speaks
+-- of an isomorphic plane drawing; since the vertices of a plane graph are
+-- plane points and the redrawing leaves them where they are, that
+-- isomorphism is the identity and no `Graph.IsIsomorphism` appears.
+--
+-- The construction, in the order the proof takes it.
+--
+--   * ONE radius serves every vertex (B2): the square about a vertex holds
+--     no other vertex, meets no arc of an edge it is not on, and distinct
+--     squares are disjoint.
+--   * The CORE of each edge (B4): its arc cut back to what lies between the
+--     last exit from the square at one end and the first entry into the
+--     square at the other. A core holds no vertex, and — this is the clause
+--     the design did not have — its two contact points sit on the FRAMES of
+--     the two squares, so the core lies in the carrier, the plane minus the
+--     OPEN squares.
+--   * ONE ε makes the tubes about the cores pairwise disjoint (B7). The
+--     CHANNEL of an edge is the component, inside the tube cut down to the
+--     carrier, that the core lies in; it is relatively open there, so B6
+--     joins the two contact points by a polygonal walk inside it.
+--   * The walk is straightened to a simple one
+--     (`Plane.PolygonalReach.exists_arcChain`), and a radial segment is
+--     prepended at each end. A radial meets the carrier only at its far end
+--     and two radials meet only at their common centre, so the three pieces
+--     glue into a simple polygonal chain, which is an arc between the
+--     edge's two vertices.
+--
+-- Each edge's data is named as a FUNCTION of the edge — the core, its two
+-- contact points, the parametrisation — because a single ε, and a single
+-- redrawing, have to speak about all the edges at once. Only the edge LIST
+-- matters, so that naming is a theorem rather than an axiom:
+-- `List.exists_choice_function`.
+
+module Plane.Graph.redrawing
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Equality.basics
+import axioms
+import Set.basics
+import Set.algebra
+import Lists.list
+import Lists.append
+import Lists.choice
+import Real.interface
+import Real.order
+import Real.order_field
+import Plane.point
+import Plane.norm
+import Plane.metric
+import Plane.segment
+import Plane.topology
+import Plane.connected
+import Plane.component
+import Plane.compactness
+import Plane.curve
+import Plane.subarc
+import Plane.concatenate
+import Plane.separation
+import Plane.exterior
+import Plane.polygonal
+import Plane.polyline
+import Plane.arcchain
+import Plane.radial
+import Plane.locally_polygonal
+import Plane.polygonal_carrier
+import Graph.basics
+import Plane.Graph.basics
+import Plane.Graph.pointset
+import Plane.Graph.vertexsquares
+import Plane.Graph.cores
+import Plane.Graph.tubes
+
+-- Throughout: a plane graph, that is an abstract graph on plane points
+-- together with a drawing of its edges.
+convention E : Type(0)
+convention ends : E → Pair(Plane.Point, Plane.Point)
+convention graph : Graph(Plane.Point, E, ends)
+convention drawing : E → (ℝ → Plane.Point)
+
+-- ----------------------------------------------------------------------
+-- What brick B4 delivers, named.
+--
+-- Named so that the core, and each of its two contact points, can be
+-- chosen as a function of the edge one at a time: each choice leaves the
+-- remaining existentials standing, and the last one has none left.
+
+definition Plane.Graph.IsCore (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point)) (radius : ℝ) (edge : E)
+        (core : Set(Plane.Point)) (nearContact farContact : Plane.Point)
+        : Proposition :=
+  (Plane.IsArcBetween(core, nearContact, farContact) ∧ Plane.IsCompact(core))
+    ∧ core ⊆ Plane.arc(drawing(edge))
+    ∧ (core ∩ Plane.squareAbout(Plane.arcStart(drawing(edge)), radius)
+             = Set.singleton(Plane.Point, nearContact)
+       ∧ core ∩ Plane.squareAbout(Plane.arcFinish(drawing(edge)), radius)
+             = Set.singleton(Plane.Point, farContact))
+    ∧ Set.Disjoint(core, Plane.Graph.vertexSet(graph))
+
+-- The piece of the carrier a redrawn edge runs through: the component,
+-- inside the edge's own tube cut down to the carrier, that its core lies
+-- in.
+definition Plane.Graph.coreChannel (core : E → Set(Plane.Point))
+        (nearContact : E → Plane.Point) (carrier : Set(Plane.Point))
+        (epsilon : ℝ) (edge : E) : Set(Plane.Point) :=
+  Plane.Component(Plane.nearSet(core(edge), epsilon) ∩ carrier, nearContact(edge))
+
+-- And where a redrawn edge is confined altogether: that channel, with a
+-- radial segment at each end.
+definition Plane.Graph.redrawnRegion (drawing : E → (ℝ → Plane.Point))
+        (core : E → Set(Plane.Point))
+        (nearContact farContact : E → Plane.Point)
+        (carrier : Set(Plane.Point)) (epsilon : ℝ) (edge : E)
+        : Set(Plane.Point) :=
+  Plane.segment(Plane.arcStart(drawing(edge)), nearContact(edge))
+    ∪ (Plane.Graph.coreChannel(core, nearContact, carrier, epsilon, edge)
+         ∪ Plane.segment(Plane.arcFinish(drawing(edge)), farContact(edge)))
+
+-- ----------------------------------------------------------------------
+-- The core lies in the plane minus the open squares.
+--
+-- Its two contact points are on the frames of their own squares, so
+-- neither is interior to one; and the square about any other vertex misses
+-- the whole arc the core is a piece of.
+
+theorem Plane.Graph.IsCore.inside_outsideSquares
+        (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
+        (radius : ℝ)
+        (everySquareIsClear : ∀ (vertex : Plane.Point).
+            vertex ∈ Graph.vertices(graph) →
+              Plane.Graph.ClearSquare(graph, drawing, vertex, radius))
+        (edge : E) (isEdge : edge ∈ Graph.edges(graph))
+        (core : Set(Plane.Point)) (nearContact farContact : Plane.Point)
+        (isCore : Plane.Graph.IsCore(
+            graph, drawing, radius, edge, core, nearContact, farContact))
+        (nearOnFrame
+            : Plane.supDistance(Plane.arcStart(drawing(edge)), nearContact) = radius)
+        (farOnFrame
+            : Plane.supDistance(Plane.arcFinish(drawing(edge)), farContact) = radius)
+        : core ⊆ Plane.outsideSquares(Graph.vertices(graph), radius) := {
+  core ⊆ Plane.arc(drawing(edge)) as coreInsideArc;
+  core ∩ Plane.squareAbout(Plane.arcStart(drawing(edge)), radius)
+      = Set.singleton(Plane.Point, nearContact) as meetsNearSquare;
+  core ∩ Plane.squareAbout(Plane.arcFinish(drawing(edge)), radius)
+      = Set.singleton(Plane.Point, farContact) as meetsFarSquare;
+
+  take z : Plane.Point;
+  suppose z ∈ core;
+  take vertex : Plane.Point;
+  suppose vertex ∈ Graph.vertices(graph);
+  suppose z ∈ Plane.openSquareAbout(vertex, radius);
+  z ∈ Plane.squareAbout(vertex, radius)
+      by Plane.openSquareAbout_subset_squareAbout;
+  Plane.supDistance(vertex, z) < radius by Plane.supDistance_of_openSquareAbout;
+  done by cases {
+    case vertex = Plane.arcStart(drawing(edge)) as atNearVertex: {
+        z ∈ core ∩ Plane.squareAbout(Plane.arcStart(drawing(edge)), radius)
+            by substituting atNearVertex;
+        z ∈ Set.singleton(Plane.Point, nearContact) by substituting meetsNearSquare;
+        z = nearContact as atNearContact;
+        Plane.supDistance(vertex, z)
+           = Plane.supDistance(Plane.arcStart(drawing(edge)), nearContact)
+                 by substituting atNearContact
+           = radius by nearOnFrame;
+        done
+      }
+    case vertex = Plane.arcFinish(drawing(edge)) as atFarVertex: {
+        z ∈ core ∩ Plane.squareAbout(Plane.arcFinish(drawing(edge)), radius)
+            by substituting atFarVertex;
+        z ∈ Set.singleton(Plane.Point, farContact) by substituting meetsFarSquare;
+        z = farContact as atFarContact;
+        Plane.supDistance(vertex, z)
+           = Plane.supDistance(Plane.arcFinish(drawing(edge)), farContact)
+                 by substituting atFarContact
+           = radius by farOnFrame;
+        done
+      }
+    otherwise: {
+        vertex ≠ Plane.arcStart(drawing(edge))
+            by { suppose vertex = Plane.arcStart(drawing(edge));
+                 vertex = Plane.arcStart(drawing(edge))
+                   ∨ vertex = Plane.arcFinish(drawing(edge));
+                 done };
+        vertex ≠ Plane.arcFinish(drawing(edge))
+            by { suppose vertex = Plane.arcFinish(drawing(edge));
+                 vertex = Plane.arcStart(drawing(edge))
+                   ∨ vertex = Plane.arcFinish(drawing(edge));
+                 done };
+        Plane.Graph.ClearSquare(graph, drawing, vertex, radius) by everySquareIsClear;
+        Set.Disjoint(Plane.squareAbout(vertex, radius), Plane.arc(drawing(edge)))
+            by Plane.Graph.ClearSquare.misses_arc_of_not_end;
+        z ∉ Plane.arc(drawing(edge));
+        z ∈ Plane.arc(drawing(edge)) by coreInsideArc;
+        done
+      }
+  }
+}

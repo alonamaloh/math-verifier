@@ -1,0 +1,392 @@
+-- ----------------------------------------------------------------------
+-- The polygonal redrawing.
+
+theorem Plane.Graph.polygonal_redrawing (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
+        : ∃ (redrawing : E → (ℝ → Plane.Point)).
+            Plane.Graph.IsDrawing(graph, redrawing)
+              ∧ ∀ (edge : E). edge ∈ Graph.edges(graph) →
+                    Plane.IsPolygonal(Plane.arc(redrawing(edge))) := {
+  Graph.IsWellFormed(graph) by Plane.Graph.IsDrawing.IsWellFormed;
+
+  -- ONE radius for every vertex square, with distinct squares disjoint.
+  choose radius such that radius > 0
+      ∧ (∀ (vertex : Plane.Point). vertex ∈ Graph.vertices(graph) →
+             Plane.Graph.ClearSquare(graph, drawing, vertex, radius))
+      ∧ Plane.Graph.DisjointSquares(graph, radius)
+      from Plane.Graph.IsDrawing.exists_vertex_squares;
+  radius > 0;
+  ∀ (vertex : Plane.Point). vertex ∈ Graph.vertices(graph) →
+      Plane.Graph.ClearSquare(graph, drawing, vertex, radius) as everySquareIsClear;
+  Plane.Graph.DisjointSquares(graph, radius) as squaresAreDisjoint;
+
+  -- The carrier: the plane with the OPEN square about each vertex removed,
+  -- so that every square keeps its frame and no vertex survives.
+  let outside : Set(Plane.Point) :=
+      Plane.outsideSquares(Graph.vertices(graph), radius);
+  ∀ (center other x : Plane.Point). center ∈ Graph.vertices(graph) →
+      other ∈ Graph.vertices(graph) → center ≠ other →
+      x ∈ Plane.squareAbout(center, radius) →
+        x ∉ Plane.squareAbout(other, radius)
+      by { take center : Plane.Point;
+           take other : Plane.Point;
+           take x : Plane.Point;
+           suppose center ∈ Graph.vertices(graph);
+           suppose other ∈ Graph.vertices(graph);
+           suppose center ≠ other;
+           Set.Disjoint(Plane.squareAbout(center, radius),
+               Plane.squareAbout(other, radius)) by squaresAreDisjoint;
+           done };
+  Plane.IsLocallyPolygonallyConnected(outside)
+      by Plane.outsideSquares_IsLocallyPolygonallyConnected
+      as carrierIsLocallyPolygonal;
+  ∀ (vertex : Plane.Point). vertex ∈ Graph.vertices(graph) → vertex ∉ outside
+      by { take vertex : Plane.Point;
+           suppose vertex ∈ Graph.vertices(graph);
+           done by Plane.center_off_outsideSquares }
+      as noVertexInCarrier;
+
+  -- The core of each edge, and its two contact points, as functions of the
+  -- edge: one ε and one redrawing have to speak about all of them at once.
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      ∃ (core : Set(Plane.Point)). ∃ (nearContact farContact : Plane.Point).
+        Plane.Graph.IsCore(graph, drawing, radius, edge, core, nearContact, farContact)
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           done by Plane.Graph.IsDrawing.exists_core };
+  choose coreOf : E → Set(Plane.Point) such that
+      ∀ (edge : E). edge ∈ Graph.edges(graph) →
+        ∃ (nearContact farContact : Plane.Point).
+          Plane.Graph.IsCore(
+              graph, drawing, radius, edge, coreOf(edge), nearContact, farContact)
+      from List.exists_choice_function(
+          fallback := Set.empty(Plane.Point),
+          property := (edge : E) ↦ (core : Set(Plane.Point)) ↦
+              ∃ (nearContact farContact : Plane.Point).
+                Plane.Graph.IsCore(
+                    graph, drawing, radius, edge, core, nearContact, farContact));
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      ∃ (nearContact farContact : Plane.Point).
+        Plane.Graph.IsCore(
+            graph, drawing, radius, edge, coreOf(edge), nearContact, farContact);
+  choose nearContactOf : E → Plane.Point such that
+      ∀ (edge : E). edge ∈ Graph.edges(graph) →
+        ∃ (farContact : Plane.Point).
+          Plane.Graph.IsCore(graph, drawing, radius, edge, coreOf(edge),
+              nearContactOf(edge), farContact)
+      from List.exists_choice_function(
+          fallback := Plane.Point.make(0, 0),
+          property := (edge : E) ↦ (nearContact : Plane.Point) ↦
+              ∃ (farContact : Plane.Point).
+                Plane.Graph.IsCore(graph, drawing, radius, edge, coreOf(edge),
+                    nearContact, farContact));
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      ∃ (farContact : Plane.Point).
+        Plane.Graph.IsCore(graph, drawing, radius, edge, coreOf(edge),
+            nearContactOf(edge), farContact);
+  choose farContactOf : E → Plane.Point such that
+      ∀ (edge : E). edge ∈ Graph.edges(graph) →
+        Plane.Graph.IsCore(graph, drawing, radius, edge, coreOf(edge),
+            nearContactOf(edge), farContactOf(edge))
+      from List.exists_choice_function(
+          fallback := Plane.Point.make(0, 0),
+          property := (edge : E) ↦ (farContact : Plane.Point) ↦
+              Plane.Graph.IsCore(graph, drawing, radius, edge, coreOf(edge),
+                  nearContactOf(edge), farContact));
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      Plane.Graph.IsCore(graph, drawing, radius, edge, coreOf(edge),
+          nearContactOf(edge), farContactOf(edge))
+      as everyEdgeHasItsCore;
+
+  -- What the core carries, edge by edge.
+  ∀ (edge : E). edge ∈ Graph.edges(graph) → Plane.IsCompact(coreOf(edge))
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           Plane.Graph.IsCore(graph, drawing, radius, edge, coreOf(edge),
+               nearContactOf(edge), farContactOf(edge)) by everyEdgeHasItsCore;
+           done }
+      as everyCoreIsCompact;
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      (coreOf(edge) : Set(Plane.Point)) ⊆ Plane.arc(drawing(edge))
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           Plane.Graph.IsCore(graph, drawing, radius, edge, coreOf(edge),
+               nearContactOf(edge), farContactOf(edge)) by everyEdgeHasItsCore;
+           done }
+      as everyCoreIsInsideItsArc;
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      Set.Disjoint(coreOf(edge), Plane.Graph.vertexSet(graph))
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           Plane.Graph.IsCore(graph, drawing, radius, edge, coreOf(edge),
+               nearContactOf(edge), farContactOf(edge)) by everyEdgeHasItsCore;
+           done }
+      as everyCoreHasNoVertex;
+  ∀ (edge : E). edge ∈ Graph.edges(graph) → Plane.IsConnected(coreOf(edge))
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           Plane.Graph.IsCore(graph, drawing, radius, edge, coreOf(edge),
+               nearContactOf(edge), farContactOf(edge)) by everyEdgeHasItsCore;
+           Plane.IsArcBetween(coreOf(edge), nearContactOf(edge), farContactOf(edge));
+           done by Plane.IsArcBetween.IsConnected }
+      as everyCoreIsConnected;
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      coreOf(edge) ∩ Plane.squareAbout(Plane.arcStart(drawing(edge)), radius)
+          = Set.singleton(Plane.Point, nearContactOf(edge))
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           Plane.Graph.IsCore(graph, drawing, radius, edge, coreOf(edge),
+               nearContactOf(edge), farContactOf(edge)) by everyEdgeHasItsCore;
+           done }
+      as everyCoreMeetsItsNearSquare;
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      coreOf(edge) ∩ Plane.squareAbout(Plane.arcFinish(drawing(edge)), radius)
+          = Set.singleton(Plane.Point, farContactOf(edge))
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           Plane.Graph.IsCore(graph, drawing, radius, edge, coreOf(edge),
+               nearContactOf(edge), farContactOf(edge)) by everyEdgeHasItsCore;
+           done }
+      as everyCoreMeetsItsFarSquare;
+
+  -- The two squares of an edge are disjoint, which is what puts each
+  -- contact point on the frame of its own square.
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      Set.Disjoint(Plane.squareAbout(Plane.arcStart(drawing(edge)), radius),
+          Plane.squareAbout(Plane.arcFinish(drawing(edge)), radius))
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           Plane.arcStart(drawing(edge)) ∈ Graph.vertices(graph)
+               by Plane.Graph.IsDrawing.arcStart_is_vertex;
+           Plane.arcFinish(drawing(edge)) ∈ Graph.vertices(graph)
+               by Plane.Graph.IsDrawing.arcFinish_is_vertex;
+           Plane.arcStart(drawing(edge)) ≠ Plane.arcFinish(drawing(edge))
+               by Plane.Graph.IsDrawing.arc_ends_distinct;
+           done by squaresAreDisjoint }
+      as edgeSquaresAreDisjoint;
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      Plane.supDistance(Plane.arcStart(drawing(edge)), nearContactOf(edge)) = radius
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           Plane.IsConnected(coreOf(edge)) by everyCoreIsConnected;
+           Set.Disjoint(Plane.squareAbout(Plane.arcStart(drawing(edge)), radius),
+               Plane.squareAbout(Plane.arcFinish(drawing(edge)), radius))
+               by edgeSquaresAreDisjoint;
+           coreOf(edge) ∩ Plane.squareAbout(Plane.arcStart(drawing(edge)), radius)
+               = Set.singleton(Plane.Point, nearContactOf(edge))
+               by everyCoreMeetsItsNearSquare;
+           coreOf(edge) ∩ Plane.squareAbout(Plane.arcFinish(drawing(edge)), radius)
+               = Set.singleton(Plane.Point, farContactOf(edge))
+               by everyCoreMeetsItsFarSquare;
+           done by Plane.contact_on_frame_of_disjoint_squares }
+      as everyNearContactIsOnItsFrame;
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      Plane.supDistance(Plane.arcFinish(drawing(edge)), farContactOf(edge)) = radius
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           Plane.IsConnected(coreOf(edge)) by everyCoreIsConnected;
+           Set.Disjoint(Plane.squareAbout(Plane.arcStart(drawing(edge)), radius),
+               Plane.squareAbout(Plane.arcFinish(drawing(edge)), radius))
+               by edgeSquaresAreDisjoint;
+           Set.Disjoint(Plane.squareAbout(Plane.arcFinish(drawing(edge)), radius),
+               Plane.squareAbout(Plane.arcStart(drawing(edge)), radius))
+               by Set.Disjoint.symmetric;
+           coreOf(edge) ∩ Plane.squareAbout(Plane.arcStart(drawing(edge)), radius)
+               = Set.singleton(Plane.Point, nearContactOf(edge))
+               by everyCoreMeetsItsNearSquare;
+           coreOf(edge) ∩ Plane.squareAbout(Plane.arcFinish(drawing(edge)), radius)
+               = Set.singleton(Plane.Point, farContactOf(edge))
+               by everyCoreMeetsItsFarSquare;
+           done by Plane.contact_on_frame_of_disjoint_squares(
+               center := Plane.arcFinish(drawing(edge))) }
+      as everyFarContactIsOnItsFrame;
+
+  -- So the core lies in the carrier.
+  ∀ (edge : E). edge ∈ Graph.edges(graph) → coreOf(edge) ⊆ outside
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           Plane.Graph.IsCore(graph, drawing, radius, edge, coreOf(edge),
+               nearContactOf(edge), farContactOf(edge)) by everyEdgeHasItsCore;
+           Plane.supDistance(Plane.arcStart(drawing(edge)), nearContactOf(edge))
+               = radius by everyNearContactIsOnItsFrame;
+           Plane.supDistance(Plane.arcFinish(drawing(edge)), farContactOf(edge))
+               = radius by everyFarContactIsOnItsFrame;
+           done by Plane.Graph.IsCore.inside_outsideSquares }
+      as everyCoreIsInTheCarrier;
+
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      nearContactOf(edge) ∈ coreOf(edge)
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           coreOf(edge) ∩ Plane.squareAbout(Plane.arcStart(drawing(edge)), radius)
+               = Set.singleton(Plane.Point, nearContactOf(edge))
+               by everyCoreMeetsItsNearSquare as meetsNearSquare;
+           nearContactOf(edge) ∈ Set.singleton(Plane.Point, nearContactOf(edge))
+               by Set.singleton_member;
+           nearContactOf(edge)
+               ∈ coreOf(edge) ∩ Plane.squareAbout(Plane.arcStart(drawing(edge)), radius)
+               by substituting meetsNearSquare;
+           done }
+      as everyNearContactIsOnItsCore;
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      farContactOf(edge) ∈ coreOf(edge)
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           coreOf(edge) ∩ Plane.squareAbout(Plane.arcFinish(drawing(edge)), radius)
+               = Set.singleton(Plane.Point, farContactOf(edge))
+               by everyCoreMeetsItsFarSquare as meetsFarSquare;
+           farContactOf(edge) ∈ Set.singleton(Plane.Point, farContactOf(edge))
+               by Set.singleton_member;
+           farContactOf(edge)
+               ∈ coreOf(edge) ∩ Plane.squareAbout(Plane.arcFinish(drawing(edge)), radius)
+               by substituting meetsFarSquare;
+           done }
+      as everyFarContactIsOnItsCore;
+
+  -- ONE ε makes the tubes about the cores pairwise disjoint.
+  choose epsilon such that epsilon > 0 ∧
+      ∀ (edge other : E). edge ∈ Graph.edges(graph) →
+        other ∈ Graph.edges(graph) → edge ≠ other →
+        Set.Disjoint(Plane.nearSet(coreOf(edge), epsilon),
+            Plane.nearSet(coreOf(other), epsilon))
+      from Plane.Graph.IsDrawing.exists_core_separation(core := coreOf);
+  epsilon > 0;
+  ∀ (edge other : E). edge ∈ Graph.edges(graph) →
+      other ∈ Graph.edges(graph) → edge ≠ other →
+      Set.Disjoint(Plane.nearSet(coreOf(edge), epsilon),
+          Plane.nearSet(coreOf(other), epsilon)) as tubesAreDisjoint;
+
+  -- The channel of an edge: the component of its tube, cut down to the
+  -- carrier, that its core lies in.
+  outside ⊆ Set.universe(Plane.Point) by Set.subset_universe;
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      Plane.OpenIn(Plane.nearSet(coreOf(edge), epsilon) ∩ outside, outside)
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           Plane.IsOpen(Plane.nearSet(coreOf(edge), epsilon)) by Plane.nearSet_IsOpen;
+           done by Plane.OpenIn.restrict(region := Set.universe(Plane.Point)) }
+      as everyTubeIsRelativelyOpen;
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      coreOf(edge) ⊆ Plane.nearSet(coreOf(edge), epsilon) ∩ outside
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           coreOf(edge) ⊆ Plane.nearSet(coreOf(edge), epsilon) by Plane.subset_nearSet;
+           coreOf(edge) ⊆ outside by everyCoreIsInTheCarrier;
+           take z : Plane.Point;
+           suppose z ∈ coreOf(edge);
+           z ∈ Plane.nearSet(coreOf(edge), epsilon);
+           z ∈ outside;
+           done }
+      as everyCoreIsInItsTube;
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      coreOf(edge) ⊆ Plane.Graph.coreChannel(coreOf, nearContactOf, outside, epsilon, edge)
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           coreOf(edge) ⊆ Plane.nearSet(coreOf(edge), epsilon) ∩ outside
+               by everyCoreIsInItsTube;
+           Plane.IsConnected(coreOf(edge)) by everyCoreIsConnected;
+           nearContactOf(edge) ∈ coreOf(edge) by everyNearContactIsOnItsCore;
+           done by Plane.Component_contains }
+      as everyCoreIsInItsChannel;
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      Plane.Graph.coreChannel(coreOf, nearContactOf, outside, epsilon, edge)
+          ⊆ Plane.nearSet(coreOf(edge), epsilon) ∩ outside
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           done by Plane.Component_subset }
+      as everyChannelIsInsideItsTube;
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      Plane.Graph.coreChannel(coreOf, nearContactOf, outside, epsilon, edge) ⊆ outside
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           Plane.Graph.coreChannel(coreOf, nearContactOf, outside, epsilon, edge)
+               ⊆ Plane.nearSet(coreOf(edge), epsilon) ∩ outside
+               by everyChannelIsInsideItsTube as insideTube;
+           take z : Plane.Point;
+           suppose z ∈ Plane.Graph.coreChannel(
+               coreOf, nearContactOf, outside, epsilon, edge);
+           z ∈ Plane.nearSet(coreOf(edge), epsilon) ∩ outside by insideTube;
+           done }
+      as everyChannelIsInTheCarrier;
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      nearContactOf(edge)
+          ∈ Plane.Graph.coreChannel(coreOf, nearContactOf, outside, epsilon, edge)
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           nearContactOf(edge) ∈ coreOf(edge) by everyNearContactIsOnItsCore;
+           coreOf(edge)
+               ⊆ Plane.Graph.coreChannel(coreOf, nearContactOf, outside, epsilon, edge)
+               by everyCoreIsInItsChannel as coreInside;
+           done by coreInside }
+      as everyNearContactIsInItsChannel;
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      farContactOf(edge)
+          ∈ Plane.Graph.coreChannel(coreOf, nearContactOf, outside, epsilon, edge)
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           farContactOf(edge) ∈ coreOf(edge) by everyFarContactIsOnItsCore;
+           coreOf(edge)
+               ⊆ Plane.Graph.coreChannel(coreOf, nearContactOf, outside, epsilon, edge)
+               by everyCoreIsInItsChannel as coreInside;
+           done by coreInside }
+      as everyFarContactIsInItsChannel;
+  ∀ (edge other : E). edge ∈ Graph.edges(graph) → other ∈ Graph.edges(graph) →
+      edge ≠ other →
+      Set.Disjoint(
+          Plane.Graph.coreChannel(coreOf, nearContactOf, outside, epsilon, edge),
+          Plane.Graph.coreChannel(coreOf, nearContactOf, outside, epsilon, other))
+      by { take edge : E;
+           take other : E;
+           suppose edge ∈ Graph.edges(graph);
+           suppose other ∈ Graph.edges(graph);
+           suppose edge ≠ other;
+           Set.Disjoint(Plane.nearSet(coreOf(edge), epsilon),
+               Plane.nearSet(coreOf(other), epsilon)) by tubesAreDisjoint as tubesApart;
+           Plane.Graph.coreChannel(coreOf, nearContactOf, outside, epsilon, edge)
+               ⊆ Plane.nearSet(coreOf(edge), epsilon) ∩ outside
+               by everyChannelIsInsideItsTube as edgeChannelInside;
+           Plane.Graph.coreChannel(coreOf, nearContactOf, outside, epsilon, other)
+               ⊆ Plane.nearSet(coreOf(other), epsilon) ∩ outside
+               by everyChannelIsInsideItsTube as otherChannelInside;
+           take z : Plane.Point;
+           suppose z ∈ Plane.Graph.coreChannel(
+               coreOf, nearContactOf, outside, epsilon, edge);
+           suppose z ∈ Plane.Graph.coreChannel(
+               coreOf, nearContactOf, outside, epsilon, other);
+           z ∈ Plane.nearSet(coreOf(edge), epsilon) ∩ outside by edgeChannelInside;
+           z ∈ Plane.nearSet(coreOf(other), epsilon) ∩ outside by otherChannelInside;
+           z ∈ Plane.nearSet(coreOf(edge), epsilon);
+           z ∈ Plane.nearSet(coreOf(other), epsilon);
+           z ∉ Plane.nearSet(coreOf(other), epsilon) by tubesApart;
+           done }
+      as channelsAreDisjoint;
+
+  -- Inside its own channel the two contact points are joined by a
+  -- polygonal walk.
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      Plane.PolygonalReach(
+          Plane.Graph.coreChannel(coreOf, nearContactOf, outside, epsilon, edge),
+          nearContactOf(edge), farContactOf(edge))
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           Plane.OpenIn(Plane.nearSet(coreOf(edge), epsilon) ∩ outside, outside)
+               by everyTubeIsRelativelyOpen;
+           Plane.nearSet(coreOf(edge), epsilon) ∩ outside ⊆ outside
+               by Set.intersection_subset_right;
+           coreOf(edge) ⊆ Plane.nearSet(coreOf(edge), epsilon) ∩ outside
+               by everyCoreIsInItsTube as coreInsideTube;
+           nearContactOf(edge) ∈ coreOf(edge) by everyNearContactIsOnItsCore;
+           nearContactOf(edge) ∈ Plane.nearSet(coreOf(edge), epsilon) ∩ outside
+               by coreInsideTube;
+           nearContactOf(edge)
+               ∈ Plane.Graph.coreChannel(coreOf, nearContactOf, outside, epsilon, edge)
+               by everyNearContactIsInItsChannel;
+           farContactOf(edge)
+               ∈ Plane.Graph.coreChannel(coreOf, nearContactOf, outside, epsilon, edge)
+               by everyFarContactIsInItsChannel;
+           done by Plane.IsLocallyPolygonallyConnected.Component_polygonal_connected(
+               carrier := outside) }
+      as everyChannelJoinsItsContacts;
+  sorry
+}

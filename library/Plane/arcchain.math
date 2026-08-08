@@ -1,0 +1,808 @@
+-- Plane/arcchain.math
+--
+-- Simple polygonal paths. Part of brick B8 of the polygonal redrawing, H6
+-- of PLAN_JORDAN_SCHOENFLIES.md.
+--
+-- `Plane.chainFrom(start, vertices)` is what a vertex list covers, and a
+-- general vertex list crosses itself. A plane graph is drawn by INJECTIVE
+-- parametrisations, so what the redrawing needs of its replacement paths is
+-- that their vertex lists be SIMPLE: consecutive vertices distinct, and each
+-- leg meeting the rest of the chain exactly at the vertex where they are
+-- joined. That is `Plane.IsArcChain`, and it is exactly the hypothesis
+-- `Plane.IsArcBetween.concatenate` asks for, one leg at a time.
+--
+-- The deliverable is `Plane.PolygonalReach.exists_arcChain`: ANY polygonal
+-- walk inside a set contains a simple one with the same ends. This is the
+-- half of the blueprint's Lemma 1.1 that `Plane/polygonal.math` deferred
+-- when it took the walk as an inductive relation rather than as a list of
+-- vertices, and without it nothing can discharge a drawing condition.
+--
+-- The induction is on the walk. At each step the new leg is run BACKWARDS
+-- from its far end and stopped the first time it meets the chain already
+-- built — `MetricSpace.exists_first_inside_unitInterval` is exactly that —
+-- and the old chain is cut there. What is appended is the stub from the
+-- stopping point outwards, which meets the cut chain only at the join,
+-- because everything strictly before the stopping parameter misses the old
+-- chain altogether. No plane geometry enters beyond that, and in particular
+-- no overlay graph.
+
+module Plane.arcchain
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Set.algebra
+import Lists.list
+import Lists.append
+import Real.interface
+import Real.order
+import Real.order_field
+import Metric.space
+import Metric.topology
+import Metric.continuity
+import Metric.entry_exit
+import Plane.vector
+import Plane.point
+import Plane.norm
+import Plane.metric
+import Plane.segment
+import Plane.topology
+import Plane.compactness
+import Plane.connected
+import Plane.model
+import Metric.finite_union
+import Plane.curve
+import Plane.subarc
+import Plane.concatenate
+import Plane.polyline
+import Plane.polygonal
+
+-- ----------------------------------------------------------------------
+-- Where a vertex list ends, and when it is simple.
+--
+-- Both recurse the way `Plane.chainFrom` does: the walk's current position
+-- is threaded through the RETURN TYPE, so the recursion equation is
+-- definitional.
+
+definition Plane.chainFinishFunction
+        : List(Plane.Point) → (Plane.Point → Plane.Point)
+  | List.empty => (start : Plane.Point) ↦ start
+  | List.prepend(next, rest) =>
+      (start : Plane.Point) ↦ Plane.chainFinishFunction(rest)(next)
+
+definition Plane.chainFinish (start : Plane.Point)
+        (vertices : List(Plane.Point)) : Plane.Point :=
+  Plane.chainFinishFunction(vertices)(start)
+
+definition Plane.IsArcChainFunction
+        : List(Plane.Point) → (Plane.Point → Proposition)
+  | List.empty => (start : Plane.Point) ↦ True
+  | List.prepend(next, rest) =>
+      (start : Plane.Point) ↦
+          start ≠ next
+            ∧ (Plane.segment(start, next) ∩ Plane.chainFrom(next, rest)
+                     = Set.singleton(Plane.Point, next)
+               ∧ Plane.IsArcChainFunction(rest)(next))
+
+definition Plane.IsArcChain (start : Plane.Point)
+        (vertices : List(Plane.Point)) : Proposition :=
+  Plane.IsArcChainFunction(vertices)(start)
+
+-- ----------------------------------------------------------------------
+-- What every chain carries: it holds both of its ends.
+
+theorem Plane.start_in_chainFrom (vertices : List(Plane.Point))
+        : ∀ (start : Plane.Point). start ∈ Plane.chainFrom(start, vertices) :=
+  by induction on vertices {
+    case vertices = List.empty: {
+        take start : Plane.Point;
+        done
+      }
+    case vertices = List.prepend(next, rest) for some next, rest: {
+        take start : Plane.Point;
+        start ∈ Plane.segment(start, next) by Plane.left_in_segment;
+        start ∈ Plane.segment(start, next) ∪ Plane.chainFrom(next, rest);
+        done
+      }
+  }
+
+theorem Plane.chainFinish_in_chainFrom (vertices : List(Plane.Point))
+        : ∀ (start : Plane.Point).
+            Plane.chainFinish(start, vertices) ∈ Plane.chainFrom(start, vertices) :=
+  by induction on vertices with tailHoldsItsFinish {
+    case vertices = List.empty: {
+        take start : Plane.Point;
+        done
+      }
+    case vertices = List.prepend(next, rest) for some next, rest: {
+        take start : Plane.Point;
+        Plane.chainFinish(next, rest) ∈ Plane.chainFrom(next, rest)
+            by tailHoldsItsFinish;
+        Plane.chainFinish(start, List.prepend(Plane.Point, next, rest))
+            ∈ Plane.segment(start, next) ∪ Plane.chainFrom(next, rest);
+        done
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- One more vertex at the far end.
+
+theorem Plane.chainFinish_extend (vertices : List(Plane.Point))
+        : ∀ (start last : Plane.Point).
+            Plane.chainFinish(start, List.extend(vertices, last)) = last :=
+  by induction on vertices with tailEndsAtLast {
+    case vertices = List.empty: {
+        take start : Plane.Point;
+        take last : Plane.Point;
+        done
+      }
+    case vertices = List.prepend(next, rest) for some next, rest: {
+        take start : Plane.Point;
+        take last : Plane.Point;
+        Plane.chainFinish(next, List.extend(rest, last)) = last by tailEndsAtLast;
+        done
+      }
+  }
+
+theorem Plane.chainFrom_extend (vertices : List(Plane.Point))
+        : ∀ (start last : Plane.Point).
+            Plane.chainFrom(start, List.extend(vertices, last))
+                = Plane.chainFrom(start, vertices)
+                      ∪ Plane.segment(Plane.chainFinish(start, vertices), last) :=
+  by induction on vertices with tailCovers {
+    case vertices = List.empty: {
+        take start : Plane.Point;
+        take last : Plane.Point;
+        start ∈ Plane.segment(start, last) by Plane.left_in_segment;
+        last ∈ Plane.segment(start, last) by Plane.right_in_segment;
+        Plane.segment(start, last) ∪ Set.singleton(Plane.Point, last)
+            ⊆ Set.singleton(Plane.Point, start) ∪ Plane.segment(start, last)
+            by { take x : Plane.Point;
+                 suppose x ∈ Plane.segment(start, last) ∪ Set.singleton(Plane.Point, last);
+                 x ∈ Plane.segment(start, last)
+                     by cases {
+                       case x ∈ Plane.segment(start, last):        done
+                       case x ∈ Set.singleton(Plane.Point, last):  { x = last; done }
+                     };
+                 done };
+        Set.singleton(Plane.Point, start) ∪ Plane.segment(start, last)
+            ⊆ Plane.segment(start, last) ∪ Set.singleton(Plane.Point, last)
+            by { take x : Plane.Point;
+                 suppose x ∈ Set.singleton(Plane.Point, start) ∪ Plane.segment(start, last);
+                 x ∈ Plane.segment(start, last)
+                     by cases {
+                       case x ∈ Set.singleton(Plane.Point, start): { x = start; done }
+                       case x ∈ Plane.segment(start, last):        done
+                     };
+                 done };
+        done by Set.equal_of_same_members
+      }
+    case vertices = List.prepend(next, rest) for some next, rest: {
+        take start : Plane.Point;
+        take last : Plane.Point;
+        Plane.chainFrom(next, List.extend(rest, last))
+            = Plane.chainFrom(next, rest)
+                  ∪ Plane.segment(Plane.chainFinish(next, rest), last)
+            by tailCovers as tailSplits;
+        Plane.chainFrom(start, List.extend(List.prepend(Plane.Point, next, rest), last))
+           = Plane.segment(start, next) ∪ Plane.chainFrom(next, List.extend(rest, last))
+           = Plane.segment(start, next)
+                 ∪ (Plane.chainFrom(next, rest)
+                        ∪ Plane.segment(Plane.chainFinish(next, rest), last))
+                 by substituting tailSplits
+           = (Plane.segment(start, next) ∪ Plane.chainFrom(next, rest))
+                 ∪ Plane.segment(Plane.chainFinish(next, rest), last)
+                 by Set.union_associative;
+        done
+      }
+  }
+
+-- A chain is closed: finitely many segments and one point, each closed.
+theorem Plane.chainFrom_IsClosed (vertices : List(Plane.Point))
+        : ∀ (start : Plane.Point).
+            Plane.Closure(Plane.chainFrom(start, vertices))
+                ⊆ Plane.chainFrom(start, vertices) :=
+  by induction on vertices with tailIsClosed {
+    case vertices = List.empty: {
+        take start : Plane.Point;
+        done by MetricSpace.Closure.singleton_subset
+      }
+    case vertices = List.prepend(next, rest) for some next, rest: {
+        take start : Plane.Point;
+        Plane.IsCompact(Plane.segment(start, next)) by Plane.segment_IsCompact;
+        Plane.Closure(Plane.segment(start, next)) ⊆ Plane.segment(start, next)
+            by Plane.IsCompact.Closure_subset;
+        Plane.Closure(Plane.chainFrom(next, rest)) ⊆ Plane.chainFrom(next, rest)
+            by tailIsClosed;
+        done by MetricSpace.Closure.union_subset
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- A simple chain is an arc between its ends.
+--
+-- One leg at a time, glued by `Plane.IsArcBetween.concatenate`, whose
+-- meeting hypothesis is the second clause of `Plane.IsArcChain`. The
+-- one-vertex chain is excluded: a single point is not an arc.
+
+theorem Plane.IsArcChain.IsArcBetween (rest : List(Plane.Point))
+        : ∀ (start next : Plane.Point).
+            Plane.IsArcChain(start, List.prepend(Plane.Point, next, rest)) →
+              Plane.IsArcBetween(
+                  Plane.chainFrom(start, List.prepend(Plane.Point, next, rest)),
+                  start, Plane.chainFinish(next, rest)) :=
+  by induction on rest with tailIsArc {
+    case rest = List.empty: {
+        take start : Plane.Point;
+        take next : Plane.Point;
+        suppose Plane.IsArcChain(
+            start, List.prepend(Plane.Point, next, List.empty(Plane.Point)));
+        start ≠ next;
+        next ∈ Plane.segment(start, next) by Plane.right_in_segment;
+        Plane.segment(start, next) ∪ Set.singleton(Plane.Point, next)
+            = Plane.segment(start, next)
+            by { Plane.segment(start, next) ∪ Set.singleton(Plane.Point, next)
+                     ⊆ Plane.segment(start, next)
+                     by { take x : Plane.Point;
+                          suppose x ∈ Plane.segment(start, next)
+                              ∪ Set.singleton(Plane.Point, next);
+                          done by cases {
+                            case x ∈ Plane.segment(start, next):        done
+                            case x ∈ Set.singleton(Plane.Point, next):  { x = next; done }
+                          } };
+                 Plane.segment(start, next)
+                     ⊆ Plane.segment(start, next) ∪ Set.singleton(Plane.Point, next)
+                     by Set.subset_union_left;
+                 done by Set.equal_of_same_members }
+            as oneLegIsItsSegment;
+        Plane.IsArcBetween(Plane.segment(start, next), start, next)
+            by Plane.IsArcBetween.segment;
+        done by substituting oneLegIsItsSegment
+      }
+    case rest = List.prepend(waypoint, tail) for some waypoint, tail: {
+        take start : Plane.Point;
+        take next : Plane.Point;
+        suppose Plane.IsArcChain(start,
+            List.prepend(Plane.Point, next,
+                List.prepend(Plane.Point, waypoint, tail)))
+            as chainIsSimple;
+        Plane.IsArcChain(next, List.prepend(Plane.Point, waypoint, tail))
+            by chainIsSimple;
+        start ≠ next;
+        Plane.segment(start, next)
+              ∩ Plane.chainFrom(next, List.prepend(Plane.Point, waypoint, tail))
+            = Set.singleton(Plane.Point, next) as legsMeetAtNext;
+
+        Plane.IsArcBetween(Plane.segment(start, next), start, next)
+            by Plane.IsArcBetween.segment;
+        Plane.IsArcBetween(
+            Plane.chainFrom(next, List.prepend(Plane.Point, waypoint, tail)),
+            next, Plane.chainFinish(waypoint, tail)) by tailIsArc;
+        ∀ (z : Plane.Point). z ∈ Plane.segment(start, next) →
+            z ∈ Plane.chainFrom(next, List.prepend(Plane.Point, waypoint, tail)) →
+              z = next
+            by { take z : Plane.Point;
+                 suppose z ∈ Plane.segment(start, next);
+                 suppose z ∈ Plane.chainFrom(next, List.prepend(Plane.Point, waypoint, tail));
+                 z ∈ Plane.segment(start, next)
+                     ∩ Plane.chainFrom(next, List.prepend(Plane.Point, waypoint, tail));
+                 z ∈ Set.singleton(Plane.Point, next) by substituting legsMeetAtNext;
+                 done };
+        done by Plane.IsArcBetween.concatenate
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- Cutting a simple chain at any of its points.
+
+theorem Plane.IsArcChain.truncate (vertices : List(Plane.Point))
+        : ∀ (start : Plane.Point). Plane.IsArcChain(start, vertices) →
+            ∀ (stop : Plane.Point). stop ∈ Plane.chainFrom(start, vertices) →
+              ∃ (cut : List(Plane.Point)).
+                Plane.IsArcChain(start, cut)
+                  ∧ (Plane.chainFrom(start, cut) ⊆ Plane.chainFrom(start, vertices)
+                     ∧ Plane.chainFinish(start, cut) = stop) :=
+  by induction on vertices with tailTruncates {
+    case vertices = List.empty: {
+        take start : Plane.Point;
+        suppose Plane.IsArcChain(start, List.empty(Plane.Point));
+        take stop : Plane.Point;
+        suppose stop ∈ Plane.chainFrom(start, List.empty(Plane.Point));
+        stop ∈ Set.singleton(Plane.Point, start);
+        stop = start;
+        Plane.IsArcChain(start, List.empty(Plane.Point));
+        Plane.chainFrom(start, List.empty(Plane.Point))
+            ⊆ Plane.chainFrom(start, List.empty(Plane.Point)) by Set.subset.reflexive;
+        Plane.chainFinish(start, List.empty(Plane.Point)) = stop;
+        witness List.empty(Plane.Point)
+      }
+    case vertices = List.prepend(next, rest) for some next, rest: {
+        take start : Plane.Point;
+        suppose Plane.IsArcChain(start, List.prepend(Plane.Point, next, rest));
+        take stop : Plane.Point;
+        suppose stop ∈ Plane.chainFrom(start, List.prepend(Plane.Point, next, rest));
+        start ≠ next;
+        Plane.segment(start, next) ∩ Plane.chainFrom(next, rest)
+            = Set.singleton(Plane.Point, next) as legsMeetAtNext;
+        Plane.IsArcChain(next, rest);
+
+        done by cases {
+          case stop ∈ Plane.chainFrom(next, rest): {
+              choose tailCut such that
+                  Plane.IsArcChain(next, tailCut)
+                    ∧ (Plane.chainFrom(next, tailCut) ⊆ Plane.chainFrom(next, rest)
+                       ∧ Plane.chainFinish(next, tailCut) = stop)
+                  from tailTruncates;
+              Plane.IsArcChain(next, tailCut);
+              Plane.chainFrom(next, tailCut) ⊆ Plane.chainFrom(next, rest)
+                  as tailCutInside;
+              Plane.chainFinish(next, tailCut) = stop;
+
+              next ∈ Plane.segment(start, next) by Plane.right_in_segment;
+              next ∈ Plane.chainFrom(next, tailCut) by Plane.start_in_chainFrom;
+              Plane.segment(start, next) ∩ Plane.chainFrom(next, tailCut)
+                  = Set.singleton(Plane.Point, next)
+                  by { Plane.segment(start, next) ∩ Plane.chainFrom(next, tailCut)
+                           ⊆ Set.singleton(Plane.Point, next)
+                           by { take z : Plane.Point;
+                                suppose z ∈ Plane.segment(start, next)
+                                    ∩ Plane.chainFrom(next, tailCut);
+                                z ∈ Plane.segment(start, next);
+                                z ∈ Plane.chainFrom(next, tailCut);
+                                z ∈ Plane.chainFrom(next, rest) by tailCutInside;
+                                z ∈ Plane.segment(start, next) ∩ Plane.chainFrom(next, rest);
+                                done by substituting legsMeetAtNext };
+                       Set.singleton(Plane.Point, next)
+                           ⊆ Plane.segment(start, next) ∩ Plane.chainFrom(next, tailCut)
+                           by { take z : Plane.Point;
+                                suppose z ∈ Set.singleton(Plane.Point, next);
+                                z = next;
+                                done };
+                       done by Set.equal_of_same_members };
+              Plane.IsArcChain(start, List.prepend(Plane.Point, next, tailCut));
+
+              Plane.chainFrom(start, List.prepend(Plane.Point, next, tailCut))
+                  ⊆ Plane.chainFrom(start, List.prepend(Plane.Point, next, rest))
+                  by { take z : Plane.Point;
+                       suppose z ∈ Plane.segment(start, next) ∪ Plane.chainFrom(next, tailCut);
+                       z ∈ Plane.segment(start, next) ∪ Plane.chainFrom(next, rest)
+                           by cases {
+                             case z ∈ Plane.segment(start, next): done
+                             case z ∈ Plane.chainFrom(next, tailCut): {
+                                 z ∈ Plane.chainFrom(next, rest) by tailCutInside;
+                                 done
+                               }
+                           };
+                       done };
+              Plane.chainFinish(start, List.prepend(Plane.Point, next, tailCut)) = stop;
+              witness List.prepend(Plane.Point, next, tailCut)
+            }
+          otherwise: {
+              stop ∉ Plane.chainFrom(next, rest);
+              stop ∈ Plane.segment(start, next);
+              start ∈ Plane.segment(start, next) by Plane.left_in_segment;
+
+              done by cases {
+                case stop = start as stopIsStart: {
+                    Plane.IsArcChain(start, List.empty(Plane.Point));
+                    Plane.chainFrom(start, List.empty(Plane.Point))
+                        ⊆ Plane.chainFrom(start, List.prepend(Plane.Point, next, rest))
+                        by { take z : Plane.Point;
+                             suppose z ∈ Set.singleton(Plane.Point, start);
+                             z = start;
+                             z ∈ Plane.segment(start, next);
+                             z ∈ Plane.segment(start, next) ∪ Plane.chainFrom(next, rest);
+                             done };
+                    Plane.chainFinish(start, List.empty(Plane.Point)) = stop
+                        by stopIsStart;
+                    witness List.empty(Plane.Point)
+                  }
+                otherwise: {
+                    stop ≠ start;
+                    start ≠ stop;
+                    stop ∈ Plane.segment(start, stop) by Plane.right_in_segment;
+                    Plane.segment(start, stop)
+                          ∩ Set.singleton(Plane.Point, stop)
+                        = Set.singleton(Plane.Point, stop)
+                        by { Plane.segment(start, stop) ∩ Set.singleton(Plane.Point, stop)
+                                 ⊆ Set.singleton(Plane.Point, stop)
+                                 by Set.intersection_subset_right;
+                             Set.singleton(Plane.Point, stop)
+                                 ⊆ Plane.segment(start, stop) ∩ Set.singleton(Plane.Point, stop)
+                                 by { take z : Plane.Point;
+                                      suppose z ∈ Set.singleton(Plane.Point, stop);
+                                      z = stop;
+                                      done };
+                             done by Set.equal_of_same_members };
+                    Plane.IsArcChain(start,
+                        List.prepend(Plane.Point, stop, List.empty(Plane.Point)));
+
+                    Plane.IsConvex(Plane.segment(start, next)) by Plane.segment_IsConvex;
+                    Plane.segment(start, stop) ⊆ Plane.segment(start, next)
+                        by Plane.IsConvex.segment_inside;
+                    Plane.chainFrom(start,
+                        List.prepend(Plane.Point, stop, List.empty(Plane.Point)))
+                        ⊆ Plane.chainFrom(start, List.prepend(Plane.Point, next, rest))
+                        by { take z : Plane.Point;
+                             suppose z ∈ Plane.segment(start, stop)
+                                 ∪ Set.singleton(Plane.Point, stop);
+                             z ∈ Plane.segment(start, stop)
+                                 by cases {
+                                   case z ∈ Plane.segment(start, stop): done
+                                   case z ∈ Set.singleton(Plane.Point, stop): { z = stop; done }
+                                 };
+                             z ∈ Plane.segment(start, next);
+                             z ∈ Plane.segment(start, next) ∪ Plane.chainFrom(next, rest);
+                             done };
+                    Plane.chainFinish(start,
+                        List.prepend(Plane.Point, stop, List.empty(Plane.Point))) = stop;
+                    witness List.prepend(Plane.Point, stop, List.empty(Plane.Point))
+                  }
+              }
+            }
+        }
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- Extending a simple chain by a leg that touches it only at its far end.
+
+theorem Plane.IsArcChain.extend (vertices : List(Plane.Point))
+        : ∀ (start : Plane.Point). Plane.IsArcChain(start, vertices) →
+            ∀ (last : Plane.Point). last ≠ Plane.chainFinish(start, vertices) →
+              Plane.segment(Plane.chainFinish(start, vertices), last)
+                      ∩ Plane.chainFrom(start, vertices)
+                  = Set.singleton(Plane.Point, Plane.chainFinish(start, vertices)) →
+                Plane.IsArcChain(start, List.extend(vertices, last)) :=
+  by induction on vertices with tailExtends {
+    case vertices = List.empty: {
+        take start : Plane.Point;
+        suppose Plane.IsArcChain(start, List.empty(Plane.Point));
+        take last : Plane.Point;
+        suppose last ≠ Plane.chainFinish(start, List.empty(Plane.Point));
+        suppose Plane.segment(Plane.chainFinish(start, List.empty(Plane.Point)), last)
+                    ∩ Plane.chainFrom(start, List.empty(Plane.Point))
+                = Set.singleton(Plane.Point,
+                      Plane.chainFinish(start, List.empty(Plane.Point)));
+        last ≠ start;
+        start ≠ last;
+        last ∈ Plane.segment(start, last) by Plane.right_in_segment;
+        Plane.segment(start, last) ∩ Set.singleton(Plane.Point, last)
+            = Set.singleton(Plane.Point, last)
+            by { Plane.segment(start, last) ∩ Set.singleton(Plane.Point, last)
+                     ⊆ Set.singleton(Plane.Point, last) by Set.intersection_subset_right;
+                 Set.singleton(Plane.Point, last)
+                     ⊆ Plane.segment(start, last) ∩ Set.singleton(Plane.Point, last)
+                     by { take z : Plane.Point;
+                          suppose z ∈ Set.singleton(Plane.Point, last);
+                          z = last;
+                          done };
+                 done by Set.equal_of_same_members };
+        done
+      }
+    case vertices = List.prepend(next, rest) for some next, rest: {
+        take start : Plane.Point;
+        suppose Plane.IsArcChain(start, List.prepend(Plane.Point, next, rest));
+        take last : Plane.Point;
+        suppose last ≠ Plane.chainFinish(start, List.prepend(Plane.Point, next, rest));
+        suppose Plane.segment(
+                    Plane.chainFinish(start, List.prepend(Plane.Point, next, rest)), last)
+                    ∩ Plane.chainFrom(start, List.prepend(Plane.Point, next, rest))
+                = Set.singleton(Plane.Point,
+                      Plane.chainFinish(start, List.prepend(Plane.Point, next, rest)))
+            as newLegMeetsOldChain;
+        start ≠ next;
+        Plane.segment(start, next) ∩ Plane.chainFrom(next, rest)
+            = Set.singleton(Plane.Point, next) as legsMeetAtNext;
+        Plane.IsArcChain(next, rest);
+        last ≠ Plane.chainFinish(next, rest);
+
+        -- The new leg meets the tail alone exactly where it meets the whole.
+        Plane.chainFinish(next, rest) ∈ Plane.chainFrom(next, rest)
+            by Plane.chainFinish_in_chainFrom;
+        Plane.chainFinish(next, rest)
+            ∈ Plane.segment(Plane.chainFinish(next, rest), last)
+            by Plane.left_in_segment;
+        Plane.segment(Plane.chainFinish(next, rest), last) ∩ Plane.chainFrom(next, rest)
+            = Set.singleton(Plane.Point, Plane.chainFinish(next, rest))
+            by { Plane.segment(Plane.chainFinish(next, rest), last)
+                       ∩ Plane.chainFrom(next, rest)
+                     ⊆ Set.singleton(Plane.Point, Plane.chainFinish(next, rest))
+                     by { take z : Plane.Point;
+                          suppose z ∈ Plane.segment(Plane.chainFinish(next, rest), last)
+                              ∩ Plane.chainFrom(next, rest);
+                          z ∈ Plane.segment(Plane.chainFinish(next, rest), last);
+                          z ∈ Plane.chainFrom(next, rest);
+                          z ∈ Plane.segment(start, next) ∪ Plane.chainFrom(next, rest);
+                          z ∈ Plane.segment(
+                                  Plane.chainFinish(start,
+                                      List.prepend(Plane.Point, next, rest)), last)
+                              ∩ Plane.chainFrom(start, List.prepend(Plane.Point, next, rest));
+                          done by substituting newLegMeetsOldChain };
+                 Set.singleton(Plane.Point, Plane.chainFinish(next, rest))
+                     ⊆ Plane.segment(Plane.chainFinish(next, rest), last)
+                           ∩ Plane.chainFrom(next, rest)
+                     by { take z : Plane.Point;
+                          suppose z ∈ Set.singleton(Plane.Point, Plane.chainFinish(next, rest));
+                          z = Plane.chainFinish(next, rest);
+                          done };
+                 done by Set.equal_of_same_members };
+        Plane.IsArcChain(next, List.extend(rest, last)) by tailExtends;
+
+        -- And the first leg still meets what follows it only at `next`.
+        Plane.chainFrom(next, List.extend(rest, last))
+            = Plane.chainFrom(next, rest)
+                  ∪ Plane.segment(Plane.chainFinish(next, rest), last)
+            by Plane.chainFrom_extend as extendedTailSplits;
+        next ∈ Plane.segment(start, next) by Plane.right_in_segment;
+        next ∈ Plane.chainFrom(next, List.extend(rest, last)) by Plane.start_in_chainFrom;
+        Plane.segment(start, next) ∩ Plane.chainFrom(next, List.extend(rest, last))
+            = Set.singleton(Plane.Point, next)
+            by { Plane.segment(start, next) ∩ Plane.chainFrom(next, List.extend(rest, last))
+                     ⊆ Set.singleton(Plane.Point, next)
+                     by { take z : Plane.Point;
+                          suppose z ∈ Plane.segment(start, next)
+                              ∩ Plane.chainFrom(next, List.extend(rest, last));
+                          z ∈ Plane.segment(start, next);
+                          z ∈ Plane.chainFrom(next, List.extend(rest, last));
+                          z ∈ Plane.chainFrom(next, rest)
+                                ∪ Plane.segment(Plane.chainFinish(next, rest), last)
+                              by substituting extendedTailSplits;
+                          z ∈ Plane.chainFrom(next, rest)
+                              by cases {
+                                case z ∈ Plane.chainFrom(next, rest): done
+                                case z ∈ Plane.segment(
+                                         Plane.chainFinish(next, rest), last): {
+                                    z ∈ Plane.segment(start, next)
+                                        ∪ Plane.chainFrom(next, rest);
+                                    z ∈ Plane.segment(
+                                            Plane.chainFinish(start,
+                                                List.prepend(Plane.Point, next, rest)), last)
+                                        ∩ Plane.chainFrom(start,
+                                              List.prepend(Plane.Point, next, rest));
+                                    z ∈ Set.singleton(
+                                            Plane.Point, Plane.chainFinish(next, rest))
+                                        by substituting newLegMeetsOldChain;
+                                    z = Plane.chainFinish(next, rest);
+                                    done
+                                  }
+                              };
+                          z ∈ Plane.segment(start, next) ∩ Plane.chainFrom(next, rest);
+                          done by substituting legsMeetAtNext };
+                 Set.singleton(Plane.Point, next)
+                     ⊆ Plane.segment(start, next)
+                           ∩ Plane.chainFrom(next, List.extend(rest, last))
+                     by { take z : Plane.Point;
+                          suppose z ∈ Set.singleton(Plane.Point, next);
+                          z = next;
+                          done };
+                 done by Set.equal_of_same_members };
+        done
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- Every polygonal walk contains a simple one.
+--
+-- The new leg is run backwards from its far end and stopped the first time
+-- it touches the chain already built; the chain is cut there, and the stub
+-- from the stopping point outwards is appended. The stub meets the cut
+-- chain only at the join, because everything strictly before the stopping
+-- parameter misses the old chain altogether.
+
+theorem Plane.PolygonalReach.exists_arcChain (region : Set(Plane.Point))
+        (source : Plane.Point) (sourceInRegion : source ∈ region)
+        (target : Plane.Point)
+        (walk : Plane.PolygonalReach(region, source, target))
+        : ∃ (vertices : List(Plane.Point)).
+            Plane.IsArcChain(source, vertices)
+              ∧ (Plane.chainFrom(source, vertices) ⊆ region
+                 ∧ Plane.chainFinish(source, vertices) = target) :=
+  by induction on walk {
+    case Plane.PolygonalReach.arrived: {
+        Plane.chainFrom(source, List.empty(Plane.Point)) ⊆ region
+            by { take z : Plane.Point;
+                 suppose z ∈ Set.singleton(Plane.Point, source);
+                 z = source;
+                 done };
+        witness List.empty(Plane.Point)
+      }
+    case Plane.PolygonalReach.extend(
+        waypoint, endpoint, walkToWaypoint, legInside, straightened): {
+        choose chain such that
+            Plane.IsArcChain(source, chain)
+              ∧ (Plane.chainFrom(source, chain) ⊆ region
+                 ∧ Plane.chainFinish(source, chain) = waypoint)
+            from straightened;
+        Plane.IsArcChain(source, chain);
+        Plane.chainFrom(source, chain) ⊆ region;
+        Plane.chainFinish(source, chain) = waypoint as chainEndsAtWaypoint;
+
+        -- Run the new leg backwards from its far end, and stop where it
+        -- first touches what is already drawn.
+        MetricSpace.ContinuousOn(Plane.between(endpoint, waypoint), Real.unitInterval)
+            by Plane.between_ContinuousOn;
+        Plane.Closure(Plane.chainFrom(source, chain)) ⊆ Plane.chainFrom(source, chain)
+            by Plane.chainFrom_IsClosed;
+        (1 : ℝ) ∈ Real.unitInterval by Real.one_in_unitInterval;
+        Plane.chainFinish(source, chain) ∈ Plane.chainFrom(source, chain)
+            by Plane.chainFinish_in_chainFrom;
+        waypoint ∈ Plane.chainFrom(source, chain) by substituting chainEndsAtWaypoint;
+        Plane.between(endpoint, waypoint, 1) = waypoint by Plane.between_one
+            as legEndsAtWaypoint;
+        Plane.between(endpoint, waypoint, 1) ∈ Plane.chainFrom(source, chain)
+            by substituting legEndsAtWaypoint;
+        choose contactParameter such that
+            contactParameter ∈ Real.unitInterval ∧ contactParameter ≤ 1
+              ∧ Plane.between(endpoint, waypoint, contactParameter)
+                    ∈ Plane.chainFrom(source, chain)
+              ∧ ∀ (t : ℝ). t ∈ Real.unitInterval → t < contactParameter →
+                    ¬(Plane.between(endpoint, waypoint, t)
+                          ∈ Plane.chainFrom(source, chain))
+            from MetricSpace.exists_first_inside_unitInterval;
+        contactParameter ∈ Real.unitInterval;
+        contactParameter ≥ 0 by Real.unitInterval_nonneg;
+        contactParameter ≤ 1;
+        ∀ (t : ℝ). t ∈ Real.unitInterval → t < contactParameter →
+            ¬(Plane.between(endpoint, waypoint, t) ∈ Plane.chainFrom(source, chain))
+            as nothingBeforeContact;
+
+        let contact : Plane.Point := Plane.between(endpoint, waypoint, contactParameter);
+        contact ∈ Plane.chainFrom(source, chain);
+        contact ∈ Plane.segment(endpoint, waypoint) by { witness contactParameter };
+
+        -- The stub touches the old chain only at that contact point.
+        contact ∈ Plane.segment(endpoint, contact) by Plane.right_in_segment;
+        Plane.segment(endpoint, contact) ∩ Plane.chainFrom(source, chain)
+            = Set.singleton(Plane.Point, contact)
+            by { Plane.segment(endpoint, contact) ∩ Plane.chainFrom(source, chain)
+                     ⊆ Set.singleton(Plane.Point, contact)
+                     by { take z : Plane.Point;
+                          suppose z ∈ Plane.segment(endpoint, contact)
+                              ∩ Plane.chainFrom(source, chain);
+                          z ∈ Plane.segment(endpoint, contact) as onStub;
+                          z ∈ Plane.chainFrom(source, chain);
+                          choose share such that
+                              (0 ≤ share ∧ share ≤ 1)
+                                ∧ z = Plane.between(endpoint, contact, share)
+                              from onStub;
+                          share ≥ 0;
+                          share ≤ 1;
+                          z = Plane.between(endpoint, contact, share) as atShare;
+                          Plane.between(endpoint, contact, share)
+                              = Plane.between(endpoint, waypoint, share * contactParameter)
+                              by Plane.between_nested_from_start as stubIsInnerLeg;
+                          share * contactParameter ≥ 0;
+                          share * contactParameter ≤ 1 * contactParameter
+                                                    = contactParameter;
+                          share * contactParameter ≤ contactParameter
+                                                   ≤ 1;
+                          share * contactParameter ∈ Real.unitInterval;
+                          share * contactParameter = contactParameter
+                              by { suppose share * contactParameter ≠ contactParameter
+                                       for contradiction;
+                                   share * contactParameter < contactParameter;
+                                   ¬(Plane.between(endpoint, waypoint,
+                                          share * contactParameter)
+                                         ∈ Plane.chainFrom(source, chain))
+                                       by nothingBeforeContact;
+                                   Plane.between(endpoint, waypoint,
+                                       share * contactParameter)
+                                       ∈ Plane.chainFrom(source, chain)
+                                       by { z = Plane.between(endpoint, contact, share)
+                                              = Plane.between(endpoint, waypoint,
+                                                    share * contactParameter)
+                                                    by stubIsInnerLeg;
+                                            done by substitution };
+                                   done }
+                              as stubReachedContact;
+                          z = Plane.between(endpoint, contact, share) by atShare
+                            = Plane.between(endpoint, waypoint, share * contactParameter)
+                                  by stubIsInnerLeg
+                            = Plane.between(endpoint, waypoint, contactParameter)
+                                  by substituting stubReachedContact;
+                          done };
+                 Set.singleton(Plane.Point, contact)
+                     ⊆ Plane.segment(endpoint, contact) ∩ Plane.chainFrom(source, chain)
+                     by { take z : Plane.Point;
+                          suppose z ∈ Set.singleton(Plane.Point, contact);
+                          z = contact;
+                          done };
+                 done by Set.equal_of_same_members }
+            as stubMeetsChainAtContact;
+
+        -- And the stub lies in the region, being part of the new leg.
+        Plane.segment(waypoint, endpoint) ⊆ region by legInside;
+        Plane.segment(endpoint, waypoint) ⊆ region
+            by substituting Plane.segment_symmetric;
+        Plane.IsConvex(Plane.segment(endpoint, waypoint)) by Plane.segment_IsConvex;
+        endpoint ∈ Plane.segment(endpoint, waypoint) by Plane.left_in_segment;
+        Plane.segment(endpoint, contact) ⊆ Plane.segment(endpoint, waypoint)
+            by Plane.IsConvex.segment_inside;
+        Plane.segment(endpoint, contact) ⊆ region by Set.subset.transitive(
+            b := Plane.segment(endpoint, waypoint));
+
+        -- Cut the old chain where the stub met it.
+        choose cut such that
+            Plane.IsArcChain(source, cut)
+              ∧ (Plane.chainFrom(source, cut) ⊆ Plane.chainFrom(source, chain)
+                 ∧ Plane.chainFinish(source, cut) = contact)
+            from Plane.IsArcChain.truncate;
+        Plane.IsArcChain(source, cut);
+        Plane.chainFrom(source, cut) ⊆ Plane.chainFrom(source, chain) as cutInsideChain;
+        Plane.chainFinish(source, cut) = contact as cutEndsAtContact;
+        Plane.chainFrom(source, cut) ⊆ region by Set.subset.transitive(
+            b := Plane.chainFrom(source, chain));
+
+        done by cases {
+          case endpoint = contact as legStopsAtOnce: {
+              Plane.chainFinish(source, cut) = contact by cutEndsAtContact
+                                             = endpoint by legStopsAtOnce;
+              witness cut
+            }
+          otherwise: {
+              endpoint ≠ contact;
+              endpoint ≠ Plane.chainFinish(source, cut) by substituting cutEndsAtContact;
+              contact ∈ Plane.chainFrom(source, cut) by substituting cutEndsAtContact;
+              contact ∈ Plane.segment(contact, endpoint) by Plane.left_in_segment;
+              Plane.segment(contact, endpoint) = Plane.segment(endpoint, contact)
+                  by Plane.segment_symmetric as stubEitherWay;
+
+              Plane.segment(Plane.chainFinish(source, cut), endpoint)
+                      ∩ Plane.chainFrom(source, cut)
+                  = Set.singleton(Plane.Point, Plane.chainFinish(source, cut))
+                  by { Plane.segment(contact, endpoint) ∩ Plane.chainFrom(source, cut)
+                           ⊆ Set.singleton(Plane.Point, contact)
+                           by { take z : Plane.Point;
+                                suppose z ∈ Plane.segment(contact, endpoint)
+                                    ∩ Plane.chainFrom(source, cut);
+                                z ∈ Plane.segment(contact, endpoint);
+                                z ∈ Plane.segment(endpoint, contact)
+                                    by substituting stubEitherWay;
+                                z ∈ Plane.chainFrom(source, cut);
+                                z ∈ Plane.chainFrom(source, chain) by cutInsideChain;
+                                z ∈ Plane.segment(endpoint, contact)
+                                    ∩ Plane.chainFrom(source, chain);
+                                done by substituting stubMeetsChainAtContact };
+                       Set.singleton(Plane.Point, contact)
+                           ⊆ Plane.segment(contact, endpoint) ∩ Plane.chainFrom(source, cut)
+                           by { take z : Plane.Point;
+                                suppose z ∈ Set.singleton(Plane.Point, contact);
+                                z = contact;
+                                done };
+                       Plane.segment(contact, endpoint) ∩ Plane.chainFrom(source, cut)
+                           = Set.singleton(Plane.Point, contact)
+                           by Set.equal_of_same_members;
+                       done by substituting cutEndsAtContact };
+              Plane.IsArcChain(source, List.extend(cut, endpoint))
+                  by Plane.IsArcChain.extend;
+
+              Plane.chainFrom(source, List.extend(cut, endpoint))
+                  = Plane.chainFrom(source, cut)
+                        ∪ Plane.segment(Plane.chainFinish(source, cut), endpoint)
+                  by Plane.chainFrom_extend as extendedChainSplits;
+              Plane.chainFrom(source, cut) ∪ Plane.segment(contact, endpoint) ⊆ region
+                  by { take z : Plane.Point;
+                       suppose z ∈ Plane.chainFrom(source, cut)
+                           ∪ Plane.segment(contact, endpoint);
+                       done by cases {
+                         case z ∈ Plane.chainFrom(source, cut): done
+                         case z ∈ Plane.segment(contact, endpoint): {
+                             z ∈ Plane.segment(endpoint, contact)
+                                 by substituting stubEitherWay;
+                             done
+                           }
+                       } };
+              Plane.chainFrom(source, List.extend(cut, endpoint)) ⊆ region
+                  by { Plane.chainFrom(source, cut)
+                           ∪ Plane.segment(Plane.chainFinish(source, cut), endpoint)
+                           ⊆ region by substituting cutEndsAtContact;
+                       done by substituting extendedChainSplits };
+              Plane.chainFinish(source, List.extend(cut, endpoint)) = endpoint
+                  by Plane.chainFinish_extend;
+              witness List.extend(cut, endpoint)
+            }
+        }
+      }
+  }
