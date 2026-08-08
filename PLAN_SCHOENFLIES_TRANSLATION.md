@@ -232,11 +232,27 @@ exactly that map for the Lean side. The ROADMAP's own status discipline
 transfers verbatim and is worth keeping: *a "done" that is really a
 "conditional" costs the next agent a day — and so does the reverse.*
 
-## Size and rate, honestly
+## Size and rate — measured, not assumed (git logs, 2026-08-08)
 
-Lean total is ~77k lines including its own foundation re-build; the content
-above its foundation is roughly 40–45k. Our side historically runs wordier
-per statement but starts from a finished foundation and a debugged original.
-Working estimate: **~45–55k lines, multi-month at the ~1k/day foundational
-rate** — consistent with the original plan's Part I ~20k + Part II ~28k.
-First real calibration: T0 + T1.1, both bounded and fully specified.
+The original plan's "~1k lines/day" was the May–July average, an era that
+included building the language itself. The measured rates on exactly this
+material are much higher:
+
+| Effort | Window | Output | Rate |
+|---|---|---|---|
+| this system, Layers 0–6 (minus H6) | 2026-07-25 → 07-31, **6 days** | ~24k lines (`Plane/` + `Graph/` + `Metric/`), 35–78 commits/day | **~4k lines/day** |
+| Lean, everything — foundation + Part I + Part II | 2026-07-31 → 08-06, **7 days** | ~77k lines, 351 commits (122 + 196 on the first two days; parallel worktree fleet) | ~11k lines/day |
+| Lean milestones | H7 on day **1**; JCT, `thm:general-crosscut` *and* the `thm:square-extension` scaffold on day **2**; days 3–7 were the stage recursion — including one full dead-end route (the fork: 187 commits, 2026-08-01/02) | | |
+
+Reading: Part I fell in two days even while its statements were still being
+debugged; the stage recursion consumed five of the seven days and one
+abandoned route. The translation inherits the debugged statements, so its
+risk profile is *flatter* than either measured effort.
+
+Working estimate, revised: **~45–55k lines at the measured ~4k/day ≈ 2–4
+weeks of similar-intensity sessions** — T0 + T1 (H6 + Part I, ~25k) in
+roughly one week with the JCT publish point at its end; T2 + T3 (Part II)
+in one to two more, the spread covering language frictions (ε-δ and
+bound-threading material will find elaborator gaps; fixing them is part of
+the work) and the per-wave tex updates. First calibration: T0, which has a
+prior design *and* a Lean rendering to check against.
