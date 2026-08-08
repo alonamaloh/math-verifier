@@ -1697,6 +1697,17 @@ private:
                     parseStructuredClaim();
                 auto* claimNode = std::get_if<SurfaceStructuredClaim>(
                     &claimExpression->node);
+                // A `, by definition of X` modifier wraps the claim in a
+                // SurfaceUnfold; peek through it so the anonymous-let
+                // still reads the inner claim's proposition (the whole
+                // unfold-wrapped expression stays the bound value).
+                if (!claimNode) {
+                    if (auto* unfold = std::get_if<SurfaceUnfold>(
+                            &claimExpression->node)) {
+                        claimNode = std::get_if<SurfaceStructuredClaim>(
+                            &unfold->body->node);
+                    }
+                }
                 if (claimNode && claimNode->proposition
                     && (peek().kind == TokenKind::Semicolon
                         || peek().kind == TokenKind::RightBrace)) {
@@ -1776,6 +1787,70 @@ private:
                     throwHere("expected identifier after 'take'");
                 }
                 Token nameToken = consumeAny();
+                if (isTakeHeaderRelation(peek().kind)) {
+                    // Combined take header `take IDENT REL EXPR;` — the
+                    // analytic opener. Desugar EXACTLY to the two
+                    // statements `take IDENT;` (type inferred from the
+                    // goal's Π) and an anonymous `suppose IDENT REL
+                    // EXPR;`. `>`/`≥` reverse to `<`/`≤` on their
+                    // operands, mirroring `parseRelational`, so only the
+                    // real relations ever reach the elaborator.
+                    Token relationToken = consumeAny();  // the relation
+                    SurfaceExpressionPointer leftOperand =
+                        makeSurfaceIdentifier(nameToken.lexeme, {},
+                                              nameToken.line,
+                                              nameToken.column);
+                    SurfaceExpressionPointer rightOperand =
+                        parseExpression();
+                    const char* relationSymbol = "?";
+                    bool reversed = false;
+                    switch (relationToken.kind) {
+                        case TokenKind::Less:
+                            relationSymbol = "<"; break;
+                        case TokenKind::LessOrEqual:
+                            relationSymbol = "≤"; break;
+                        case TokenKind::Greater:
+                            relationSymbol = "<"; reversed = true; break;
+                        case TokenKind::GreaterOrEqual:
+                            relationSymbol = "≤"; reversed = true; break;
+                        case TokenKind::NotEqual:
+                            relationSymbol = "≠"; break;
+                        default: break;
+                    }
+                    if (reversed) std::swap(leftOperand, rightOperand);
+                    SurfaceExpressionPointer proposition =
+                        makeSurfaceBinaryOperation(
+                            relationSymbol, std::move(leftOperand),
+                            std::move(rightOperand),
+                            relationToken.line, relationToken.column);
+                    // First the Pi-binder intro `take IDENT;` — a
+                    // Suppose wrapper with no annotation, so the
+                    // elaborator reads the domain from the goal's Π.
+                    // Pushed first, it becomes the OUTER lambda (the
+                    // fold is back-to-front), matching `∀ IDENT. REL →
+                    // …`.
+                    BlockWrapper takeIntro;
+                    takeIntro.kind = BlockWrapper::Suppose;
+                    takeIntro.name = nameToken.lexeme;
+                    takeIntro.line = statementToken.line;
+                    takeIntro.column = statementToken.column;
+                    wrappers.push_back(std::move(takeIntro));
+                    // Then the anonymous hypothesis `suppose IDENT REL
+                    // EXPR;` — named the way a standalone anonymous
+                    // suppose is, so the auto-prover picks it up by
+                    // type (the fact is statement-addressable, no `as`
+                    // clause in v1).
+                    wrapper.kind = BlockWrapper::Suppose;
+                    wrapper.name = "_supposed_"
+                        + std::to_string(statementToken.line) + "_"
+                        + std::to_string(statementToken.column);
+                    wrapper.type = std::move(proposition);
+                } else if (peek().kind == TokenKind::Comma) {
+                    throwHere("the combined take header `take IDENT REL "
+                              "EXPR;` binds a SINGLE variable; introduce "
+                              "several binders with separate `take` "
+                              "statements (take a; take b > 0;)");
+                } else {
                 SurfacePatternPointer destructurePattern;
                 if (peek().kind == TokenKind::KeywordAs) {
                     consumeAny();  // 'as'
@@ -1826,6 +1901,7 @@ private:
                         }
                         wrapper.source = parseExpression();  // `{ block }`
                     }
+                }
                 }
             } else if (isNote) {
                 // `note goal : <type>;` — assert the current expected
@@ -2981,6 +3057,19 @@ private:
                                                op.line, op.column);
         }
         return left;
+    }
+
+    // The five relations that select the combined take-header form
+    // `take IDENT REL EXPR;` — desugared to `take IDENT;` + anonymous
+    // `suppose IDENT REL EXPR;`. `≠` lives at the equality level, the
+    // other four at the relational level, but all read as "take an
+    // <IDENT> with <IDENT> <REL> <EXPR>".
+    static bool isTakeHeaderRelation(TokenKind kind) {
+        return kind == TokenKind::Greater
+            || kind == TokenKind::GreaterOrEqual
+            || kind == TokenKind::Less
+            || kind == TokenKind::LessOrEqual
+            || kind == TokenKind::NotEqual;
     }
 
     static bool isRelationalKind(TokenKind kind) {
@@ -4271,18 +4360,19 @@ private:
                     tryParseStructuredByHint(
                         claimToken, proposition,
                         /*eqAtAdditiveLevel=*/false)) {
-                return parseUnfoldingWrap(std::move(structured));
+                return parseByDefinitionWrap(
+                    parseUnfoldingWrap(std::move(structured)));
             } else {
                 // Plain `by <proof> [recalling …] [unfolding X]`.
                 byHint = parseUnfoldingWrap(
                     parseRecallingWrap(parseExpression()));
             }
         }
-        return makeSurfaceStructuredClaim(
+        return parseByDefinitionWrap(makeSurfaceStructuredClaim(
             std::move(proposition), std::move(label),
             std::move(byHint), byCases, std::move(arms),
             claimToken.line, claimToken.column, byInduction,
-            bySubstitution);
+            bySubstitution));
     }
 
     // `<hint> recalling <fact>, <fact>, …` — bring extra named facts into
@@ -4352,6 +4442,39 @@ private:
         return makeSurfaceUnfold(
             parseUnfoldingNames(), std::move(hint),
             unfoldingToken.line, unfoldingToken.column);
+    }
+
+    // `<claim>, by definition of NAME[, NAME]*` — the comma-joined
+    // definitional-unfold modifier on a claim. It wraps the WHOLE claim
+    // node (proposition + by-hint) in the exact same `SurfaceUnfold`
+    // that `suffices Q by definition of X` builds, so the stated
+    // proposition is matched against the goal — and the hint discharged
+    // — with the named definition(s) transparent. (Distinct from the
+    // postfix `by <hint> unfolding X`, which unfolds only inside the
+    // hint proof, not the proposition-vs-goal check.) Returns
+    // `claimNode` unchanged when no `, by definition of` clause follows.
+    SurfaceExpressionPointer parseByDefinitionWrap(
+        SurfaceExpressionPointer claimNode) {
+        if (!(peek().kind == TokenKind::Comma
+              && peekAt(1).kind == TokenKind::KeywordBy
+              && peekAt(2).kind == TokenKind::KeywordDefinition
+              && peekAt(3).kind == TokenKind::Identifier
+              && peekAt(3).lexeme == "of")) {
+            return claimNode;
+        }
+        Token commaToken = consumeAny();  // ','
+        consumeAny();  // 'by'
+        consumeAny();  // 'definition'
+        consumeAny();  // 'of'
+        std::vector<std::string> definitionNames;
+        definitionNames.push_back(consumeQualifiedNameString());
+        while (peek().kind == TokenKind::Comma) {
+            consumeAny();  // ','
+            definitionNames.push_back(consumeQualifiedNameString());
+        }
+        return makeSurfaceUnfold(
+            std::move(definitionNames), std::move(claimNode),
+            commaToken.line, commaToken.column);
     }
 
     // Parses the tail of `claim P by induction on E [with ih]

@@ -31,3 +31,29 @@ theorem Test.two_at_least_one : Test.AtLeastOne(2) := {
   suffices 1 ≤ 2 by definition of Test.AtLeastOne;
   done
 }
+
+-- The comma-joined by-definition modifier on a CLAIM. `<claim> by
+-- <hint>, by definition of X` checks the stated proposition — and
+-- discharges the hint — under the SAME unfold wrapper `suffices … by
+-- definition of X` uses (reused verbatim, not a second unfold path).
+-- Both pieces are load-bearing: the cited hint supplies the fact the
+-- prover cannot conjure, and the unfold bridges its opaque type to the
+-- stated relation. Models the A6 acceptance line `… by pointwiseLower(N),
+-- by definition of Real.LessOrEqual;`.
+opaque definition Test.AtMost (a b : Natural) : Proposition := a ≤ b
+
+theorem Test.claim_by_definition_modifier
+        (x y : Natural) (bounds : (n : Natural) → Test.AtMost(x, n)) : x ≤ y := {
+  claim x ≤ y by bounds(y), by definition of Test.AtMost;
+  done
+}
+
+-- Several definition names unfold at once, exactly as `suffices … by
+-- definition of X, Y` allows.
+opaque definition Test.AtMostToo (a b : Natural) : Proposition := Test.AtMost(a, b)
+
+theorem Test.claim_by_definition_modifier_multi
+        (x y : Natural) (bounds : (n : Natural) → Test.AtMostToo(x, n)) : x ≤ y := {
+  claim x ≤ y by bounds(y), by definition of Test.AtMostToo, Test.AtMost;
+  done
+}
