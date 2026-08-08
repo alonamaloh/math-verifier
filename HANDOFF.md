@@ -47,12 +47,13 @@ citation being weaker than the bare one (B7 report).
 
 ## Warnings
 
-- **Two STALE worktrees from 2026-07-04 hold uncommitted, unpushed edits**
-  (owner not yet consulted): `agent-a2c7baec…` (~139 lines, ComplexNumber
-  cone) and `agent-a874b3c3…` (~192 lines incl. 129 in
-  `src/syntax/parser.cpp` + `Test/suffices_by_definition_test.math` — looks
-  like an abandoned `suffices … by definition` feature). They exist ONLY on
-  the machine `alvaro@…claude/math` was on. Ask the owner before deleting.
+- **Two STALE worktrees from 2026-07-04 were rescue-committed and pushed**
+  at pause time, so nothing is machine-local any more: branches
+  `stale-2026-07-04-complexnumber-cone` (~139 lines, ComplexNumber cone) and
+  `stale-2026-07-04-suffices-by-definition` (~192 lines incl. 129 in
+  `src/syntax/parser.cpp` — looks like an abandoned `suffices … by
+  definition` feature). Neither is reviewed or merged; ask the owner whether
+  to salvage or delete.
 - Process rules that earned their place today: agents read `docs/style.md`
   before writing; no scripted edits of `.math` ever; brief carries the
   friction list; Opus 5 is the worker tier, Fable for elaborator/design.
