@@ -197,6 +197,7 @@ names draw the same points.
 | [overlay.math](overlay.math) | separation, the cut points, `Plane.overlayGraph`, and `Plane.polygonal_overlay` |
 | [cycle.math](cycle.math) | the realisation of a cycle is a Jordan curve |
 | [outerface.math](outerface.math) | the drawing fits in a square, and exactly one face is unbounded |
+| [vertexsquares.math](vertexsquares.math) | `Plane.Graph.ClearSquare` and one radius that clears every vertex at once |
 
 Each module opens with `convention E` and `convention ends`, as
 [`library/Graph/`](../../Graph/README.md) does, so a statement names the graph
@@ -249,7 +250,34 @@ would need the polar decomposition this development withholds.
   `Plane.unbounded_escapes_square` — an unbounded face reaches past the
   square, so it is named by a point of the outside and swallows all of it.
 
+## The vertex squares
+
+**`Plane.Graph.ClearSquare(graph, drawing, vertex, radius)`**
+([vertexsquares.math](vertexsquares.math)) — the closed axis-parallel square
+of that radius about that vertex holds no other vertex and meets no arc of an
+edge the vertex is not on. Squares rather than disks, because the redrawing
+needs a boundary made of segments; convexity, which its radial segments want,
+both shapes have. `Plane.squareAbout` and its sup-metric readers are in
+[`Plane/exterior.math`](../exterior.math).
+
+- `Plane.Graph.IsDrawing.vertex_off_arc` — a vertex lies on no arc but those
+  of its own edges, which is what the separation is run against.
+- `Plane.Graph.IsDrawing.exists_square_off_vertices` and
+  `.exists_square_off_edges` — one radius clearing each family, by
+  `Real.exists_common_positive_bound` over the graph's own vertex and edge
+  lists; `.exists_clear_square` keeps the smaller of the two.
+- **`Plane.Graph.IsDrawing.exists_vertex_squares`** is the form to consume:
+  ONE radius serving every vertex, and squares about distinct vertices
+  **disjoint**. Disjointness does not follow from the per-vertex statement —
+  that the square about `v` misses `w` says nothing about the square about `w`
+  reaching back — so the common radius is halved. Two halved squares that met
+  would put their centres within the common radius in the sup metric, that is
+  each centre inside the other's unhalved square, which the common choice
+  already forbids. This is the one place the sup-metric triangle inequality is
+  used.
+
 ## Not built yet
 
 - **H6, polygonal redrawing** — every finite plane graph is isomorphic to
-  one with polygonal edges.
+  one with polygonal edges. Brick B2 (the vertex squares, above) has landed;
+  the cores, the local polygonal connectivity and the assembly have not.

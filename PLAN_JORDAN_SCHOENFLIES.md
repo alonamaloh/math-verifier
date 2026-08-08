@@ -986,7 +986,14 @@ substance**, and they are where the estimate lives.
   three. By induction on the list over `Real.minimum`, stated for a predicate
   that is monotone downward in the bound; NOT as a `min`-fold definition,
   since no consumer wants the value. Reusable well beyond H6.
-- **B2 — the vertex squares.** `Plane.squareAbout(center, radius)` — the
+- **B2 — the vertex squares. DONE**, `library/Plane/Graph/vertexsquares.math`
+  — `Plane.Graph.ClearSquare` names the per-vertex condition and
+  `Plane.Graph.IsDrawing.exists_vertex_squares` is the halved all-vertices
+  deliverable. The separation against a non-incident arc runs through
+  `Plane.compact_separation_from_point` (a point off a compact set is a
+  positive distance from it) rather than `Plane.compact_separation` against a
+  singleton, since nothing in the layer proves a singleton compact.
+  `Plane.squareAbout(center, radius)` — the
   closed axis-parallel square — and, for each vertex, a radius whose square
   meets no other vertex and no arc of a non-incident edge. One
   `Plane.compact_separation` per other vertex and per non-incident arc, then
@@ -1172,7 +1179,10 @@ makes the prover try the false side first), L5 (the matcher does not reduce a
 projection of a definition), L6 (`let` and membership one level down), L7 (a
 `⊆`-on-lists citation needs its premise hoisted, and the error blames the
 lemma's name instead), L8 (disjunction-introduction does not walk a nested
-union), plus the note that nested module directories work with no build
+union), L10 (`suppose` does not destructure a goal spelled through a
+`let`-bound predicate), L11 (`ordered_field` sees a division as an opaque
+product), L12 (the goal printer names a set-shaped definition instead of the
+relation), plus the note that nested module directories work with no build
 change.
 
 `FRICTION_PLANE_LAYER0.md` — the running log from Layer 0, in

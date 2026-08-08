@@ -175,7 +175,9 @@ have cost more than paying for it once.
   `Plane.attains_maximum` / `attains_minimum`,
   `Plane.uniformly_continuous_on_compact`, and `Plane.compact_separation`
   ([separation.math](separation.math)) — disjoint compacta are a positive
-  distance apart. `Plane.segment_IsCompact`, and `Plane.circle_IsCompact` /
+  distance apart, with `Plane.compact_separation_from_point` for the case
+  where one side is a single point (a compact set is closed, so its
+  complement is open). `Plane.segment_IsCompact`, and `Plane.circle_IsCompact` /
   `Plane.squareBoundary_IsCompact` for the model curves, which are compact
   because they are bounded level sets
 - `Plane.IsConnected.image`, `.union` (through a common point), `.swallows`,
@@ -268,7 +270,14 @@ have cost more than paying for it once.
   Alongside it, `Plane.square` as the shape a bounded set is caught inside
   (`Plane.IsBounded.inside_square`, `Plane.unionOver_inside_square`), with
   radii kept nonnegative so two squares merge by **adding** them — no maximum,
-  and no case split on which is larger
+  and no case split on which is larger. `Plane.squareAbout(center, radius)` is
+  the same shape about an arbitrary centre, monotone in the radius
+  (`Plane.squareAbout_monotone`), reaching no further than `2 * radius`
+  (`Plane.squareAbout_distance_bound`, which is why every radius chosen against
+  a gap is a quarter of it), and read in both directions as the closed ball of
+  the sup metric (`Plane.supDistance_of_squareAbout`,
+  `Plane.squareAbout_of_supDistance`) — the bridge every comparison of two
+  squares crosses to reach `Plane.supDistance_triangle`
 
 ### Along one segment: the distance from an end as a coordinate
 

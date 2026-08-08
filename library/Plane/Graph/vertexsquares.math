@@ -1,0 +1,431 @@
+-- Plane/Graph/vertexsquares.math
+--
+-- The vertex squares of a plane graph. Brick B2 of the polygonal
+-- redrawing, H6 of PLAN_JORDAN_SCHOENFLIES.md.
+--
+-- Around each vertex sits a closed axis-parallel square which holds no
+-- other vertex and meets no edge the vertex is not on. Squares rather
+-- than disks, because the redrawing needs a boundary made of segments;
+-- convexity, which its radial segments want, both shapes have. Each
+-- other vertex and each non-incident arc keeps its own distance, and
+-- `Real.exists_common_positive_bound` folds finitely many such distances
+-- into one radius.
+--
+-- The radius is then chosen ONCE for the whole graph rather than vertex
+-- by vertex, and HALVED. That is what makes distinct vertex squares
+-- disjoint, which no per-vertex statement can give: that the square
+-- about one vertex misses another says nothing about the square about
+-- the other reaching back. So `Plane.Graph.IsDrawing.exists_vertex_squares`
+-- is the theorem to consume, and `.exists_clear_square` only its
+-- ingredient.
+
+module Plane.Graph.vertexsquares
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Equality.basics
+import axioms
+import Set.basics
+import Set.algebra
+import Lists.list
+import Real.interface
+import Real.order
+import Real.order_field
+import Real.minimum
+import Real.positive_bound
+import Metric.space
+import Plane.point
+import Plane.norm
+import Plane.metric
+import Plane.curve
+import Plane.compactness
+import Plane.exterior
+import Plane.separation
+import Graph.basics
+import Plane.Graph.basics
+
+-- Throughout: a plane graph, that is an abstract graph on plane points
+-- together with a drawing of its edges. Both are ambient, so a statement
+-- below names only the vertex and the radius it is about.
+convention E : Type(0)
+convention ends : E → Pair(Plane.Point, Plane.Point)
+convention graph : Graph(Plane.Point, E, ends)
+convention drawing : E → (ℝ → Plane.Point)
+
+-- ----------------------------------------------------------------------
+-- A clear square.
+
+-- The square of radius `radius` about `vertex` is clear when the rest of
+-- the drawing stays out of it: no other vertex is inside, and no edge
+-- that `vertex` is not an end of reaches it.
+definition Plane.Graph.ClearSquare (graph : Graph(Plane.Point, E, ends))
+        (drawing : E → (ℝ → Plane.Point))
+        (vertex : Plane.Point) (radius : ℝ) : Proposition :=
+  (∀ (other : Plane.Point). other ∈ Graph.vertices(graph) → other ≠ vertex →
+       other ∉ Plane.squareAbout(vertex, radius))
+  ∧ (∀ (edge : E). edge ∈ Graph.edges(graph) →
+       ¬Graph.Incident(graph, edge, vertex) →
+       ∀ (x : Plane.Point). x ∈ Plane.squareAbout(vertex, radius) →
+           x ∉ Plane.arc(drawing(edge)))
+
+-- Shrinking a clear square leaves it clear: the smaller square lies
+-- inside the larger one, so whatever avoided the larger avoids it too.
+theorem Plane.Graph.ClearSquare.shrink (vertex : Plane.Point)
+        (smaller larger : ℝ) (ordered : smaller ≤ larger)
+        (clear : Plane.Graph.ClearSquare(graph, drawing, vertex, larger))
+        : Plane.Graph.ClearSquare(graph, drawing, vertex, smaller) := {
+  Plane.squareAbout(vertex, smaller) ⊆ Plane.squareAbout(vertex, larger)
+      by Plane.squareAbout_monotone;
+
+  ∀ (other : Plane.Point). other ∈ Graph.vertices(graph) → other ≠ vertex →
+      other ∉ Plane.squareAbout(vertex, smaller)
+      by { take other : Plane.Point;
+           suppose other ∈ Graph.vertices(graph);
+           suppose other ≠ vertex;
+           other ∉ Plane.squareAbout(vertex, larger);
+           suppose other ∈ Plane.squareAbout(vertex, smaller);
+           other ∈ Plane.squareAbout(vertex, larger);
+           done };
+
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      ¬Graph.Incident(graph, edge, vertex) →
+      ∀ (x : Plane.Point). x ∈ Plane.squareAbout(vertex, smaller) →
+          x ∉ Plane.arc(drawing(edge))
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           suppose ¬Graph.Incident(graph, edge, vertex);
+           take x : Plane.Point;
+           suppose x ∈ Plane.squareAbout(vertex, smaller);
+           x ∈ Plane.squareAbout(vertex, larger);
+           done };
+
+  done
+}
+
+-- The hypothesis `Real.exists_common_positive_bound` asks for, at the
+-- shape both uses below need it.
+theorem Plane.Graph.ClearSquare.HoldsAtSmallerBounds
+        : Real.HoldsAtSmallerBounds(
+              (vertex : Plane.Point) ↦ (radius : ℝ) ↦
+                  Plane.Graph.ClearSquare(graph, drawing, vertex, radius)) := {
+  take vertex : Plane.Point;
+  take smaller : ℝ;
+  take larger : ℝ;
+  suppose smaller > 0;
+  suppose smaller ≤ larger;
+  suppose Plane.Graph.ClearSquare(graph, drawing, vertex, larger);
+  done by Plane.Graph.ClearSquare.shrink
+}
+
+-- ----------------------------------------------------------------------
+-- What a square about a vertex has to avoid.
+
+-- A vertex lies on no arc but those of its own edges: a point of an arc
+-- is either an end of that edge or interior to it, and no vertex of a
+-- plane graph is interior to any edge.
+theorem Plane.Graph.IsDrawing.vertex_off_arc
+        (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
+        (edge : E) (isEdge : edge ∈ Graph.edges(graph))
+        (vertex : Plane.Point) (isVertex : vertex ∈ Graph.vertices(graph))
+        (notIncident : ¬Graph.Incident(graph, edge, vertex))
+        : vertex ∉ Plane.arc(drawing(edge)) := {
+  suppose vertex ∈ Plane.arc(drawing(edge));
+  vertex ∉ Plane.openArc(drawing(edge))
+      by Plane.Graph.IsDrawing.vertex_off_interior;
+  Graph.Incident(graph, edge, vertex) ∨ vertex ∈ Plane.openArc(drawing(edge))
+      by Plane.Graph.IsDrawing.endpoint_or_interior;
+  Graph.Incident(graph, edge, vertex);
+  done
+}
+
+-- The two families that a square about a vertex must miss, separated one
+-- at a time and then folded into a single radius. A square of radius `r`
+-- reaches no further than `2r`, so a quarter of a gap is always small
+-- enough — that is `Plane.squareAbout_distance_bound`.
+
+theorem Plane.Graph.IsDrawing.exists_square_off_vertices
+        (vertex : Plane.Point)
+        : ∃ (radius : ℝ). radius > 0 ∧
+            ∀ (other : Plane.Point). other ∈ Graph.vertices(graph) →
+                other ≠ vertex → other ∉ Plane.squareAbout(vertex, radius) := {
+  let misses : Plane.Point → ℝ → Proposition :=
+      (other : Plane.Point) ↦ (radius : ℝ) ↦
+          (other ≠ vertex → other ∉ Plane.squareAbout(vertex, radius));
+
+  Real.HoldsAtSmallerBounds(misses)
+      by { take other : Plane.Point;
+           take smaller : ℝ;
+           take larger : ℝ;
+           suppose smaller > 0;
+           suppose smaller ≤ larger;
+           suppose other ≠ vertex → other ∉ Plane.squareAbout(vertex, larger);
+           change other ≠ vertex → other ∉ Plane.squareAbout(vertex, smaller);
+           suppose other ≠ vertex;
+           other ∉ Plane.squareAbout(vertex, larger);
+           suppose other ∈ Plane.squareAbout(vertex, smaller);
+           Plane.squareAbout(vertex, smaller) ⊆ Plane.squareAbout(vertex, larger)
+               by Plane.squareAbout_monotone;
+           other ∈ Plane.squareAbout(vertex, larger);
+           done };
+
+  ∀ (other : Plane.Point). other ∈ Graph.vertices(graph) →
+      ∃ (radius : ℝ). radius > 0
+          ∧ (other ≠ vertex → other ∉ Plane.squareAbout(vertex, radius))
+      by { take other : Plane.Point;
+           suppose other ∈ Graph.vertices(graph);
+           done by cases {
+             case other = vertex: {
+                 vertex ≠ vertex → vertex ∉ Plane.squareAbout(vertex, 1)
+                     by { suppose vertex ≠ vertex; done };
+                 (1 : ℝ) > 0;
+                 witness 1
+               }
+             otherwise: {
+                 Plane.distance(vertex, other) ≠ 0
+                     by { suppose Plane.distance(vertex, other) = 0;
+                          vertex = other by Plane.equal_of_distance_zero;
+                          done };
+                 Plane.distance(vertex, other) ≥ 0;
+                 Plane.distance(vertex, other) > 0;
+                 let gap : ℝ := Plane.distance(vertex, other) / 4;
+                 4 * gap = Plane.distance(vertex, other);
+                 gap > 0;
+                 other ≠ vertex → other ∉ Plane.squareAbout(vertex, gap)
+                     by { suppose other ≠ vertex;
+                          suppose other ∈ Plane.squareAbout(vertex, gap);
+                          Plane.distance(vertex, other)
+                             ≤ 2 * gap by Plane.squareAbout_distance_bound
+                             < 4 * gap
+                             = Plane.distance(vertex, other);
+                          done };
+                 witness gap
+               }
+           } };
+
+  done by Real.exists_common_positive_bound
+}
+
+theorem Plane.Graph.IsDrawing.exists_square_off_edges
+        (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
+        (vertex : Plane.Point) (isVertex : vertex ∈ Graph.vertices(graph))
+        : ∃ (radius : ℝ). radius > 0 ∧
+            ∀ (edge : E). edge ∈ Graph.edges(graph) →
+                ¬Graph.Incident(graph, edge, vertex) →
+                ∀ (x : Plane.Point). x ∈ Plane.squareAbout(vertex, radius) →
+                    x ∉ Plane.arc(drawing(edge)) := {
+  let misses : E → ℝ → Proposition :=
+      (edge : E) ↦ (radius : ℝ) ↦
+          (¬Graph.Incident(graph, edge, vertex) →
+              ∀ (x : Plane.Point). x ∈ Plane.squareAbout(vertex, radius) →
+                  x ∉ Plane.arc(drawing(edge)));
+
+  Real.HoldsAtSmallerBounds(misses)
+      by { take edge : E;
+           take smaller : ℝ;
+           take larger : ℝ;
+           suppose smaller > 0;
+           suppose smaller ≤ larger;
+           suppose ¬Graph.Incident(graph, edge, vertex) →
+               ∀ (x : Plane.Point). x ∈ Plane.squareAbout(vertex, larger) →
+                   x ∉ Plane.arc(drawing(edge));
+           change ¬Graph.Incident(graph, edge, vertex) →
+               ∀ (x : Plane.Point). x ∈ Plane.squareAbout(vertex, smaller) →
+                   x ∉ Plane.arc(drawing(edge));
+           suppose ¬Graph.Incident(graph, edge, vertex);
+           ∀ (x : Plane.Point). x ∈ Plane.squareAbout(vertex, larger) →
+               x ∉ Plane.arc(drawing(edge));
+           take x : Plane.Point;
+           suppose x ∈ Plane.squareAbout(vertex, smaller);
+           Plane.squareAbout(vertex, smaller) ⊆ Plane.squareAbout(vertex, larger)
+               by Plane.squareAbout_monotone;
+           x ∈ Plane.squareAbout(vertex, larger);
+           done };
+
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      ∃ (radius : ℝ). radius > 0
+          ∧ (¬Graph.Incident(graph, edge, vertex) →
+                 ∀ (x : Plane.Point). x ∈ Plane.squareAbout(vertex, radius) →
+                     x ∉ Plane.arc(drawing(edge)))
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           done by cases {
+             case Graph.Incident(graph, edge, vertex): {
+                 ¬Graph.Incident(graph, edge, vertex) →
+                     ∀ (x : Plane.Point). x ∈ Plane.squareAbout(vertex, 1) →
+                         x ∉ Plane.arc(drawing(edge))
+                     by { suppose ¬Graph.Incident(graph, edge, vertex); done };
+                 (1 : ℝ) > 0;
+                 witness 1
+               }
+             otherwise: {
+                 vertex ∉ Plane.arc(drawing(edge))
+                     by Plane.Graph.IsDrawing.vertex_off_arc;
+                 Plane.IsArc(drawing(edge)) by Plane.Graph.IsDrawing.IsArc;
+                 Plane.IsCompact(Plane.arc(drawing(edge)))
+                     by Plane.IsArc.IsCompact;
+                 choose separation such that separation > 0 ∧
+                     ∀ (y : Plane.Point). y ∈ Plane.arc(drawing(edge)) →
+                         separation ≤ Plane.distance(vertex, y)
+                     from Plane.compact_separation_from_point;
+                 separation > 0;
+                 let gap : ℝ := separation / 4;
+                 4 * gap = separation;
+                 gap > 0;
+                 ¬Graph.Incident(graph, edge, vertex) →
+                     ∀ (x : Plane.Point). x ∈ Plane.squareAbout(vertex, gap) →
+                         x ∉ Plane.arc(drawing(edge))
+                     by { suppose ¬Graph.Incident(graph, edge, vertex);
+                          take x : Plane.Point;
+                          suppose x ∈ Plane.squareAbout(vertex, gap);
+                          suppose x ∈ Plane.arc(drawing(edge));
+                          separation ≤ Plane.distance(vertex, x)
+                                     ≤ 2 * gap by Plane.squareAbout_distance_bound
+                                     < 4 * gap
+                                     = separation;
+                          done };
+                 witness gap
+               }
+           } };
+
+  done by Real.exists_common_positive_bound
+}
+
+-- B2 at one vertex. The two radii above are merged by keeping the
+-- smaller of them, which is legitimate because a clear square stays
+-- clear when it shrinks.
+theorem Plane.Graph.IsDrawing.exists_clear_square
+        (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
+        (vertex : Plane.Point) (isVertex : vertex ∈ Graph.vertices(graph))
+        : ∃ (radius : ℝ). radius > 0
+            ∧ Plane.Graph.ClearSquare(graph, drawing, vertex, radius) := {
+  choose vertexRadius such that vertexRadius > 0 ∧
+      ∀ (other : Plane.Point). other ∈ Graph.vertices(graph) →
+          other ≠ vertex → other ∉ Plane.squareAbout(vertex, vertexRadius)
+      from Plane.Graph.IsDrawing.exists_square_off_vertices;
+  choose edgeRadius such that edgeRadius > 0 ∧
+      ∀ (edge : E). edge ∈ Graph.edges(graph) →
+          ¬Graph.Incident(graph, edge, vertex) →
+          ∀ (x : Plane.Point). x ∈ Plane.squareAbout(vertex, edgeRadius) →
+              x ∉ Plane.arc(drawing(edge))
+      from Plane.Graph.IsDrawing.exists_square_off_edges;
+
+  let radius : ℝ := min(vertexRadius, edgeRadius);
+  radius > 0;
+  radius ≤ vertexRadius by Real.minimum_LessOrEqual_left;
+  radius ≤ edgeRadius by Real.minimum_LessOrEqual_right;
+  Plane.squareAbout(vertex, radius) ⊆ Plane.squareAbout(vertex, vertexRadius)
+      by Plane.squareAbout_monotone;
+  Plane.squareAbout(vertex, radius) ⊆ Plane.squareAbout(vertex, edgeRadius)
+      by Plane.squareAbout_monotone;
+
+  ∀ (other : Plane.Point). other ∈ Graph.vertices(graph) → other ≠ vertex →
+      other ∉ Plane.squareAbout(vertex, radius)
+      by { take other : Plane.Point;
+           suppose other ∈ Graph.vertices(graph);
+           suppose other ≠ vertex;
+           other ∉ Plane.squareAbout(vertex, vertexRadius);
+           suppose other ∈ Plane.squareAbout(vertex, radius);
+           other ∈ Plane.squareAbout(vertex, vertexRadius);
+           done };
+
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      ¬Graph.Incident(graph, edge, vertex) →
+      ∀ (x : Plane.Point). x ∈ Plane.squareAbout(vertex, radius) →
+          x ∉ Plane.arc(drawing(edge))
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           suppose ¬Graph.Incident(graph, edge, vertex);
+           take x : Plane.Point;
+           suppose x ∈ Plane.squareAbout(vertex, radius);
+           x ∈ Plane.squareAbout(vertex, edgeRadius);
+           done };
+
+  Plane.Graph.ClearSquare(graph, drawing, vertex, radius);
+  witness radius
+}
+
+-- ----------------------------------------------------------------------
+-- B2 as its consumers want it.
+
+-- One radius serving every vertex at once, with the squares about
+-- distinct vertices disjoint.
+--
+-- Disjointness is not a consequence of the per-vertex theorem: that the
+-- square about `vertex` misses `other` says nothing about the square
+-- about `other` reaching back towards `vertex`. It comes from choosing
+-- the radius once for all vertices and then halving it. Two squares of
+-- half the common radius that met would put their centres within the
+-- common radius in the sup metric — that is, each centre inside the
+-- other's unhalved square, which the common choice already forbids.
+theorem Plane.Graph.IsDrawing.exists_vertex_squares
+        (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
+        : ∃ (radius : ℝ). radius > 0
+            ∧ (∀ (vertex : Plane.Point). vertex ∈ Graph.vertices(graph) →
+                   Plane.Graph.ClearSquare(graph, drawing, vertex, radius))
+            ∧ (∀ (vertex other x : Plane.Point).
+                   vertex ∈ Graph.vertices(graph) →
+                   other ∈ Graph.vertices(graph) → vertex ≠ other →
+                   x ∈ Plane.squareAbout(vertex, radius) →
+                   x ∉ Plane.squareAbout(other, radius)) := {
+  Real.HoldsAtSmallerBounds(
+      (v : Plane.Point) ↦ (r : ℝ) ↦ Plane.Graph.ClearSquare(graph, drawing, v, r))
+      by Plane.Graph.ClearSquare.HoldsAtSmallerBounds;
+  ∀ (vertex : Plane.Point). vertex ∈ Graph.vertices(graph) →
+      ∃ (bound : ℝ). bound > 0 ∧ Plane.Graph.ClearSquare(graph, drawing, vertex, bound)
+      by { take vertex : Plane.Point;
+           suppose vertex ∈ Graph.vertices(graph);
+           done by Plane.Graph.IsDrawing.exists_clear_square };
+  choose common such that common > 0 ∧
+      ∀ (vertex : Plane.Point). vertex ∈ Graph.vertices(graph) →
+          Plane.Graph.ClearSquare(graph, drawing, vertex, common)
+      from Real.exists_common_positive_bound(items := Graph.vertices(graph));
+  common > 0;
+  ∀ (vertex : Plane.Point). vertex ∈ Graph.vertices(graph) →
+      Plane.Graph.ClearSquare(graph, drawing, vertex, common)
+      as everySquareIsClear;
+
+  let radius : ℝ := common / 2;
+  2 * radius = common;
+  radius > 0;
+  radius ≤ common;
+
+  ∀ (vertex : Plane.Point). vertex ∈ Graph.vertices(graph) →
+      Plane.Graph.ClearSquare(graph, drawing, vertex, radius)
+      by { take vertex : Plane.Point;
+           suppose vertex ∈ Graph.vertices(graph);
+           Plane.Graph.ClearSquare(graph, drawing, vertex, common)
+               by everySquareIsClear;
+           done by Plane.Graph.ClearSquare.shrink };
+
+  ∀ (vertex other x : Plane.Point).
+      vertex ∈ Graph.vertices(graph) → other ∈ Graph.vertices(graph) →
+      vertex ≠ other → x ∈ Plane.squareAbout(vertex, radius) →
+      x ∉ Plane.squareAbout(other, radius)
+      by { take vertex : Plane.Point;
+           take other : Plane.Point;
+           take x : Plane.Point;
+           suppose vertex ∈ Graph.vertices(graph);
+           suppose other ∈ Graph.vertices(graph);
+           suppose vertex ≠ other;
+           suppose x ∈ Plane.squareAbout(vertex, radius);
+           suppose x ∈ Plane.squareAbout(other, radius);
+           Plane.supDistance(vertex, x) ≤ radius;
+           Plane.supDistance(other, x) ≤ radius;
+           Plane.supDistance(vertex, other)
+              ≤ Plane.supDistance(vertex, x) + Plane.supDistance(x, other)
+                    by Plane.supDistance_triangle
+              = Plane.supDistance(vertex, x) + Plane.supDistance(other, x)
+                    by Plane.supDistance_symmetric
+              ≤ radius + radius
+              = common;
+           other ∈ Plane.squareAbout(vertex, common)
+               by Plane.squareAbout_of_supDistance;
+           Plane.Graph.ClearSquare(graph, drawing, vertex, common)
+               by everySquareIsClear;
+           other ≠ vertex by { suppose other = vertex; done };
+           other ∉ Plane.squareAbout(vertex, common);
+           done };
+
+  witness radius
+}

@@ -22,6 +22,7 @@ import Natural.subsequence
 import Real.interface
 import Real.order
 import Real.order_field
+import Real.linearity
 import Real.division
 import Real.absolute_value
 import Real.absolute_value_order
@@ -31,6 +32,7 @@ import Real.archimedean
 import Metric.space
 import Metric.sequence
 import Metric.compactness
+import Metric.finite_union
 import Metric.separation
 import Plane.vector
 import Plane.point
@@ -41,6 +43,7 @@ import Plane.metric
 import Plane.sequence
 import Plane.compact
 import Plane.compactness
+import Plane.topology
 
 -- Moving the far endpoint moves the distance by no more than the move.
 -- The Euclidean twin of `Plane.supDistance_shift_bound`, and what makes
@@ -97,3 +100,30 @@ theorem Plane.compact_separation (regionA regionB : Set(Plane.Point))
               ∀ (b : Plane.Point). b ∈ regionB →
                 gap ≤ Plane.distance(a, b) :=
   done by MetricSpace.compact_separation
+
+-- The case where one side is a single point, which is the one the vertex
+-- squares of a plane graph want: a point off a compact set stands a
+-- positive distance from all of it. A compact set is closed, so its
+-- complement is open, and the ball the complement supplies is the gap.
+theorem Plane.compact_separation_from_point (region : Set(Plane.Point))
+        (compact : Plane.IsCompact(region))
+        (x : Plane.Point) (outside : x ∉ region)
+        : ∃ (gap : ℝ). gap > 0 ∧
+            ∀ (y : Plane.Point). y ∈ region → gap ≤ Plane.distance(x, y) := {
+  Plane.Closure(region) ⊆ region by Plane.IsCompact.Closure_subset;
+  Plane.IsOpen(Set.complement(region)) by MetricSpace.complement_IsOpen;
+  x ∈ Set.complement(region);
+  choose gap such that gap > 0 ∧
+      ∀ (y : Plane.Point). Plane.distance(x, y) < gap → y ∈ Set.complement(region)
+      from Plane.IsOpen.ball_inside;
+  gap > 0;
+  ∀ (y : Plane.Point). y ∈ region → gap ≤ Plane.distance(x, y)
+      by { take y : Plane.Point;
+           suppose y ∈ region;
+           ¬(Plane.distance(x, y) < gap)
+               by { suppose Plane.distance(x, y) < gap;
+                    y ∈ Set.complement(region);
+                    done };
+           done by Real.LessOrEqual_of_not_LessThan };
+  witness gap
+}

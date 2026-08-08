@@ -443,3 +443,85 @@ cited lemma but by `contextEqualityBridge` reaching for
 `Plane.segmentDrawing_arcFinish` — a lemma about drawings, in a claim about
 endpoints. Full ledger, the wrong hypotheses it killed, and what to try next:
 `PERF_EXPENSIVE_DECLARATIONS.md`.
+
+## L10 — `suppose` does not destructure a goal spelled through a `let`-bound predicate
+
+**Symptom.** Building B2 (`Plane/Graph/vertexsquares.math`), the property fed
+to `Real.exists_common_positive_bound` is named by a `let`:
+
+```math
+let misses : Plane.Point → ℝ → Proposition :=
+    (other : Plane.Point) ↦ (radius : ℝ) ↦
+        (other ≠ vertex → other ∉ Plane.squareAbout(vertex, radius));
+```
+
+Inside the `Real.HoldsAtSmallerBounds(misses)` proof the goal after the
+introductions is `misses(other, smaller)`. Supplying a type reduces fine —
+`suppose other ≠ vertex → other ∉ Plane.squareAbout(vertex, larger);`
+discharges the hypothesis `property(item, larger)` — but *destructuring* the
+goal does not: `suppose other ≠ vertex;` fails with
+
+```
+bare `claim` / `done` needs an expected type from context (none available)
+```
+
+reported against the block's closing `done`. So the elaborator ζβ-reduces a
+supplied type against the expected one, but does not ζβ-reduce the expected
+type before asking whether it is an implication.
+
+**Least-bad accepted phrasing.** One `change` line with the reduced spelling,
+which is what `change` is documented for and which reads as "we need to show":
+
+```math
+change other ≠ vertex → other ∉ Plane.squareAbout(vertex, smaller);
+suppose other ≠ vertex;
+```
+
+The same shape appears in the arms of a `by cases` whose goal is the
+`let`-spelled property, and there the fix is to state the reduced proposition
+outright rather than the `misses(item, bound)` spelling.
+
+**Natural form.** `suppose` (and `take`, and the `by cases` arm) should WHNF
+the goal — ζ through local `let`s included — before deciding what it is.
+`Real.exists_common_positive_bound` itself is cited argument-free, so nothing
+else about the `let` costs anything.
+
+## L11 — `ordered_field` sees a division as an opaque product
+
+**Symptom.** With `let gap : ℝ := Plane.distance(vertex, other) / 4;` in scope
+and `Plane.distance(vertex, other) > 0`, the step `2 * gap < 4 * gap` is
+refused:
+
+```
+Note that the goal is not linear: `(Real.reciprocal 4) * (Plane.distance vertex other)`
+is an independent variable of the linear model, and nothing relates it to its factors.
+```
+
+The tactic does ζ-unfold the `let` — the message quotes the unfolded term —
+but then treats `reciprocal(4) * d` as an atom instead of evaluating the
+ground reciprocal to the rational `1/4` and scaling.
+
+**Least-bad accepted phrasing.** State the defining equation once, in
+multiplied form, and let every later step be linear in `gap`:
+
+```math
+let gap : ℝ := Plane.distance(vertex, other) / 4;
+4 * gap = Plane.distance(vertex, other);
+```
+
+This is arguably better prose anyway ("four times the gap is the distance"),
+so it is a small tax; but a mathematician would not have paused.
+
+## L12 — the goal printer names a set-shaped definition instead of the relation
+
+**Symptom.** Every error report in this file printed
+`Plane.distance(vertex, other) > 0` as
+`Plane.HalfPlane (Plane.distance vertex) 0 other`, and
+`Plane.distance(vertex, other) < Plane.distance(vertex, other)` as
+`Plane.Ball vertex (Plane.distance vertex other) other`. The printer is
+folding the goal against any definition whose body matches — here the
+half-plane and the open ball, neither of which the proof mentions.
+
+Cosmetic, but it costs real reading time in exactly the situation where the
+message matters. Same family as the recorded `Set.singleton`-instead-of-`=`
+printer bug in the matrix error tests.
