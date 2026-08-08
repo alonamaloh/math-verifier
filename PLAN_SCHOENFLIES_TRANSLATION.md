@@ -222,6 +222,43 @@ the limit map and boundary continuity (`LimitMap`,
 `Endgame`, `JordanSchoenflies`). Derive the exact wave order from the
 import graph when T3 starts, the way T1's table was derived.
 
+## Process — agents, gates, and the tex
+
+**Subagent tiers** (owner-set, 2026-08-08). Opus 5 (`model: "opus"`) is the
+default worker for bounded, well-specified translation tasks: a brick with a
+written spec and a Lean counterpart, a recipe-driven sweep, a
+statement-corrections pass. Fable stays on design, interfaces, elaborator
+work, and anything where the spec itself is in doubt. Sonnet remains fine
+for doc sweeps; Haiku is banned (standing rule).
+
+**Every agent that writes `.math` reads `docs/style.md` before its first
+line** — the instruction goes in every brief, verbatim, along with the area
+README and the relevant `docs/conventions/` files. A brief that omits it is
+a defective brief.
+
+**Hunt for notation, don't just avoid noise** (owner, 2026-08-08).
+Readability gains here come as much from *condensing* as from citing well:
+a file-level `convention` carrying ambient data (the way `Graph/` carries
+`(V, E, ends)`), a `let` naming a repeated subterm, an operator or postfix
+overload where the blueprint has one (`docs/conventions/
+structures-and-inference.md`). Translation waves import a lot of new
+vocabulary at once — each wave should ask, per new notion, "what would the
+blueprint's own notation be?" and either build it or flag it in the report
+as a candidate. H6's vertex squares, cores, and radials are the first test.
+
+**Parallel bricks run in isolated worktrees** (`isolation: "worktree"`), one
+brick per agent, because two concurrent `make` runs in one tree race on the
+`.mathv` cache. Agents commit on their worktree branch; the main session
+reviews the diff, runs the full `make -j 16 library && make -j 16 tests`
+gate, and merges. Memory caps (`ulimit -v`) on every kernel/make invocation,
+as always.
+
+**The tex keeps pace.** Before T1.1: a one-time corrections pass folding the
+enumerated findings into `~/claude/schoenflies/jordan_schoenflies.tex`
+(statement-level only; regenerate Appendix A). Thereafter each T-wave ends
+by revising the tex section it translated. The tex is the bridge narrative —
+statement-correct first, beautiful second.
+
 ## The ledger
 
 Maintain the statement-level map as translation proceeds, one row per
