@@ -601,3 +601,20 @@ Also worth recording beside L2: in that arm the equation refines the **goal**,
 so the vacuous clause has to be *stated* in the refined spelling (`edge`
 everywhere, never `other`), or `witness` reports a conjunction it cannot
 split.
+
+## L17 — `⊆` refused over a `choose`-bound function application (BLOCKER for B8)
+
+**Symptom** (B8, `B8_ASSEMBLY_WIP.math`). With `coreOf : E → Set(Plane.Point)`
+bound by `choose`, the claim `coreOf(edge) ⊆ Plane.arc(drawing(edge))` is
+rejected with "operator `⊆` is not supported for operand type `<unknown>`".
+Persists with the binder ascribed (`choose coreOf : E → Set(Plane.Point) such
+that …`) AND with the operand ascribed. The same spelling works when the
+function is a theorem PARAMETER (`Plane/Graph/tubes.math:96`), so the gap is
+operand-type resolution for applications of choose-bound functions. This is
+the one thing standing between the B8 draft and the headline.
+
+Two more from the same build, small: the `by cases` "bound 0 facts back —
+beyond the 0-fact window" warning is off by one and unsatisfiable; and citing
+a hypothesis whose type is a definition unfolding to a conjunction does not
+project (`core ⊆ … by isCore` refused — "conclusion is about
+`Plane.Graph.IsCore` but the goal is about `Set.subset`").
