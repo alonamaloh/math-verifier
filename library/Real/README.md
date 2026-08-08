@@ -17,6 +17,10 @@ construction internals.
 - Completeness order notions: `Real.IsUpperBound`, `Real.IsBoundedAbove`, and
   `Real.IsSupremum`
 - Functions: `Real.square_root`, `Real.exponential`, and `Real.e`
+- Uniform bounds: `Real.HoldsAtSmallerBounds` in
+  [positive_bound.math](positive_bound.math) — a property of an item and a
+  bound that only gets easier as the bound shrinks, the hypothesis every
+  "choose ε small enough for all of them" step needs
 - Calculus: `Real.ContinuousAt`, `Real.ContinuousOn`, and
   `Real.HasDerivativeAt`. `Real.ContinuousAt` **is** the metric-space
   notion over the whole line, not a second definition; cross between it
@@ -41,6 +45,10 @@ construction internals.
 - Exponential: `Real.exponential_converges`, `Real.exponential_zero`, and
   `Real.e_above_two`
 - Cardinality: `Real.not_enumerable`
+- Uniform bounds: `Real.exists_common_positive_bound` — finitely many items
+  (a list), each satisfied by a positive bound of its own, are satisfied by
+  one positive bound together — and its numerical case
+  `Real.exists_positive_lower_bound`
 
 ## Where to look
 
@@ -51,5 +59,6 @@ construction internals.
 - Series and special functions: `series`, `power`, `square_root`,
   `exponential`, `exponential_addition`
 - Calculus: `continuity`, `derivative`, `intermediate_value`
+- Uniform bounds over a finite list: `positive_bound`
 - Major inequalities/results: `cauchy_schwarz`, `arithmetic_geometric_mean`,
   `harmonic_series`, `binomial_theorem`, `triangular_series`

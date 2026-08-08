@@ -1,0 +1,97 @@
+-- Real/positive_bound.math
+--
+-- One positive bound for finitely many.
+--
+-- "Choose ε small enough for all of them" is this statement: finitely many
+-- items, each with a positive bound of its own, share a single positive
+-- bound. Finiteness is carried by a LIST, the way the plane development
+-- carries it, so the proof is an induction whose step takes the minimum of
+-- the head's bound and the tail's.
+--
+-- The form consumers want is not the numerical one but the one stated for a
+-- property that only gets easier as the bound shrinks — nobody wants the
+-- value of the minimum, only that one positive value works everywhere at
+-- once. `Real.HoldsAtSmallerBounds` names that hypothesis.
+
+module Real.positive_bound
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Lists.list
+import Real.interface
+
+-- A property of an item and a bound that only gets easier as the bound
+-- shrinks: whatever holds at a bound holds at every smaller positive one.
+definition Real.HoldsAtSmallerBounds {A : Type(0)} (property : A → ℝ → Proposition) : Proposition :=
+  ∀ (item : A). ∀ (smaller larger : ℝ). smaller > 0 → smaller ≤ larger → property(item, larger) → property(item, smaller)
+
+-- Finitely many items, each satisfied by a positive bound of its own, are
+-- satisfied by one positive bound together: keep the smaller of the head's
+-- bound and the tail's, and shrink both sides down to it.
+theorem Real.exists_common_positive_bound {A : Type(0)} (property : A → ℝ → Proposition) (items : List(A))
+        (shrinks : Real.HoldsAtSmallerBounds(property))
+        (eachBounded : ∀ (item : A). item ∈ items → ∃ (bound : ℝ). bound > 0 ∧ property(item, bound))
+        : ∃ (bound : ℝ). bound > 0 ∧ ∀ (item : A). item ∈ items → property(item, bound) :=
+  by induction on items with IH {
+    case items = List.empty: {
+        (1 : ℝ) > 0;
+        ∀ (item : A). item ∈ List.empty(A) → property(item, 1)
+            by { take item : A;
+                 suppose item ∈ List.empty(A);
+                 done };
+        witness 1
+      }
+    case items = List.prepend(head, tail) for some head, tail: {
+        choose headBound such that headBound > 0 ∧ property(head, headBound) from eachBounded;
+        ∀ (item : A). item ∈ tail → ∃ (bound : ℝ). bound > 0 ∧ property(item, bound)
+            by { take item : A;
+                 suppose item ∈ tail;
+                 item ∈ List.prepend(A, head, tail);
+                 done by eachBounded };
+        choose tailBound such that tailBound > 0 ∧ ∀ (item : A). item ∈ tail → property(item, tailBound) from IH;
+        let bound : ℝ := min(headBound, tailBound);
+        bound > 0 by Real.minimum_positive;
+        bound ≤ headBound by Real.minimum_LessOrEqual_left;
+        bound ≤ tailBound by Real.minimum_LessOrEqual_right;
+        ∀ (item : A). item ∈ List.prepend(A, head, tail) → property(item, bound)
+            by { take item : A;
+                 suppose item ∈ List.prepend(A, head, tail);
+                 item = head ∨ item ∈ tail by List.member_prepend_invert;
+                 done by cases {
+                   case item = head: {
+                       property(head, headBound);
+                       done by shrinks
+                     }
+                   case item ∈ tail: {
+                       property(item, tailBound);
+                       done by shrinks
+                     }
+                 } };
+        witness bound
+      }
+  }
+
+-- The numerical case: finitely many positive reals have a positive lower
+-- bound. "The bound is small enough for this value" is `bound ≤ value`,
+-- which only gets easier as the bound shrinks, and each value bounds itself.
+theorem Real.exists_positive_lower_bound (values : List(ℝ))
+        (allPositive : ∀ (value : ℝ). value ∈ values → value > 0)
+        : ∃ (bound : ℝ). bound > 0 ∧ ∀ (value : ℝ). value ∈ values → bound ≤ value := {
+  let smallEnough : ℝ → ℝ → Proposition := (value : ℝ) ↦ (bound : ℝ) ↦ bound ≤ value;
+  Real.HoldsAtSmallerBounds(smallEnough)
+      by { take value : ℝ;
+           take smaller : ℝ;
+           take larger : ℝ;
+           suppose smaller > 0;
+           suppose smaller ≤ larger;
+           suppose larger ≤ value;
+           smaller ≤ larger ≤ value };
+  ∀ (value : ℝ). value ∈ values → ∃ (bound : ℝ). bound > 0 ∧ smallEnough(value, bound)
+      by { take value : ℝ;
+           suppose value ∈ values;
+           value > 0 by allPositive;
+           value ≤ value;
+           witness value };
+  done by Real.exists_common_positive_bound
+}
