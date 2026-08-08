@@ -29,6 +29,21 @@ design (see "Representation deltas" below), our proofs must read like
 argument works. The unit of translation is the **statement and the proof
 strategy** — the lemma decomposition, the invariants, the case structure.
 
+**Readability tiebreaker.** Correctness structure from the winner;
+exposition from wherever it reads best. The *outer* skeleton — which
+statements exist, what each bundle carries, what each interface promises —
+comes from `main`, because that layer is about composition and `main` is the
+only route proven to compose end to end. *Inside* each proof, readability
+rules, and there are three sources: `main`'s proof, the superseded route's
+proof of the same fact (branch `local-route-2026-08-02`), and the tex
+blueprint — still the best-written version of the mathematics. Use the
+corrected statement, tell it in the blueprint's voice. If a `main`
+decomposition fights the natural mathematical phrasing (watch the
+`Quantitative*` bound-threading in T3), that is a "flag friction, don't
+contort" moment: inner lemmas may be restated more naturally so long as the
+outer interface still matches `main`; the fork's *outer* structure is never
+the fix.
+
 ## Honest status of both sides (measured 2026-08-08)
 
 **This side.** Layers 0–6 built except H6 (polygonal redrawing), which is
