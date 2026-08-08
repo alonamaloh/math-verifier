@@ -1040,6 +1040,19 @@ substance**, and they are where the estimate lives.
   corner). This is the case analysis the blueprint compresses into one
   sentence, and it is genuinely new plane geometry — nothing in Layers 0–3
   supplies it.
+
+  **Correction, from the finished Lean build (`LocallyPolygonal.lean`): the
+  three shapes never appear and there is NO angular case analysis.** The
+  complement of an open square is the union of the four closed coordinate
+  half-planes bounding it; intersecting with a small square about `p` gives
+  four RECTANGLES, each convex, and for a small enough radius each is empty
+  or contains `p`. A union of convex sets with a common point is polygonally
+  connected by two segments through that point, and the three shapes are just
+  the ways the nonempty-piece list can come out — none is ever named. Also
+  carry Lean finding 16 into the STATEMENT: "locally polygonally connected"
+  must put the path in `U ∩ M` AND let `U` range over a neighbourhood basis
+  at `p` (radius downward-closed); the weak one-neighbourhood form is vacuous
+  and fails B7.
 - **B6 — polygonal connectivity one level up.** Layer 3 proved
   `Plane.polygonal_connected` for a REGION of the plane and deliberately
   skipped the general "locally path-connected carrier" formulation, on the
