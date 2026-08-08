@@ -4018,26 +4018,54 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
             if (attempt) return attempt;
         }
 
-        // Last chance: a goal spelled through `let`-bound names. The
-        // structural matchers compare syntactically and do not see through
-        // a let-bound FreeVariable (a membership goal `x ∈ landing` never
-        // reaches the conjunction split hiding under `landing`'s value), so
-        // re-run the whole stack once at the ζ-unfolded spelling. The
-        // kernel's defeq ζ-reduces the let, so the unfolded proof proves
-        // the folded goal. Costs only on claims that would otherwise
-        // error; terminates because an unfolded goal unfolds to itself.
-        {
+        // Last chance: a claim spelled through `let`-bound names, on either
+        // side. The structural matchers compare syntactically and do not
+        // see through a let-bound FreeVariable — a membership goal
+        // `x ∈ landing` never reaches the conjunction split hiding under
+        // `landing`'s value, and a HYPOTHESIS `t ∈ landing` never yields
+        // its legs to a goal that needs one — so re-run the whole stack
+        // once at the ζ-unfolded spelling of the goal AND of every
+        // hypothesis type. The kernel's defeq ζ-reduces the let, so the
+        // unfolded proof proves the folded claim.
+        //
+        // OUTERMOST claims only (depth 1). Failing is routine for the
+        // speculative probes a search spawns at depth 2+, and paying the
+        // retry there multiplies over the search tree — measured as one
+        // budget blowout and a 12 s step before the gate was added. An
+        // author-written claim that is about to error is exactly depth 1.
+        //
+        // Each hypothesis type lives in the de Bruijn frame of the binders
+        // BELOW it, so it is unfolded against that prefix (the same frame
+        // discipline as the error printer's context dump). Terminates
+        // because an unfolded spelling unfolds to itself.
+        if (autoProveDepth_ == 1) {
             ExpressionPointer goalUnfolded =
                 zetaUnfoldLetBindersCached(goalClosed, localBinders);
-            if (!structurallyEqual(goalUnfolded, goalClosed)) {
+            std::vector<LocalBinder> bindersUnfolded = localBinders;
+            bool bindersChanged = false;
+            for (size_t i = 0; i < bindersUnfolded.size(); ++i) {
+                LocalBinder& binder = bindersUnfolded[i];
+                if (!binder.type) continue;
+                std::vector<LocalBinder> below(
+                    localBinders.begin(),
+                    localBinders.begin() + static_cast<long>(i));
+                ExpressionPointer typeUnfolded =
+                    zetaUnfoldLetBinders(binder.type, below);
+                if (!structurallyEqual(typeUnfolded, binder.type)) {
+                    binder.type = typeUnfolded;
+                    bindersChanged = true;
+                }
+            }
+            if (bindersChanged
+                || !structurallyEqual(goalUnfolded, goalClosed)) {
                 ExpressionPointer attempt = runTactic("zetaRetryStack",
                     [&]() -> ExpressionPointer {
                         try {
                             return autoProveClaimTactics(
-                                goalUnfolded, localBinders, line,
+                                goalUnfolded, bindersUnfolded, line,
                                 transportBudget);
                         } catch (const ElaborateError&) {
-                            // Report the failure against the goal as the
+                            // Report the failure against the claim as the
                             // author spelled it, not the expansion.
                             return nullptr;
                         }
