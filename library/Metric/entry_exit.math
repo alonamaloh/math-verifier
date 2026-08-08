@@ -1,0 +1,317 @@
+-- Metric/entry_exit.math
+--
+-- The last exit from a closed set along a curve, and the first entry
+-- into one.
+--
+-- A curve run over a closed interval of parameters meets a closed set in
+-- a closed set of parameters, so among the parameters that land in the
+-- set there is a largest one and a smallest one. Past the largest the
+-- curve has left for good; before the smallest it has not yet arrived.
+--
+-- Stated over an arbitrary interval rather than over `[0, 1]`, because
+-- the question that wants both is "the first entry into one set AFTER the
+-- last exit from another", and the second half of it lives on the
+-- subinterval the first half produced. The unit-interval forms are
+-- wrappers.
+--
+-- The first entry is the last exit of the curve run backwards, and that
+-- is how it is proved. `Real.reflect(a, b)` — the map `t ↦ a + b - t` —
+-- carries the interval onto itself and swaps its ends, so it is the
+-- reversal an arc needs, in the same partially-applied shape as
+-- `Real.between(a, b)`.
+
+module Metric.entry_exit
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Set.algebra
+import Real.interface
+import Real.order
+import Real.order_field
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.supremum
+import Metric.space
+import Metric.real
+import Metric.topology
+import Metric.continuity
+import Metric.compactness
+import Metric.interval
+
+-- Throughout: a curve runs into `space`, and `target` is a closed subset
+-- of it — closedness spelled, as everywhere in `Metric/`, as the closure
+-- inclusion.
+convention space : MetricSpace
+convention target : Set(space) with MetricSpace.Closure(target) ⊆ target
+
+-- ----------------------------------------------------------------------
+-- Reflecting an interval in its midpoint.
+
+definition Real.reflect (a b t : ℝ) : ℝ := a + b - t
+
+theorem Real.reflect_involution (a b t : ℝ)
+        : Real.reflect(a, b, Real.reflect(a, b, t)) = t :=
+  Real.reflect(a, b, Real.reflect(a, b, t))
+     = a + b - (a + b - t)
+     = t by ring
+
+-- The reflection swaps the ends of the interval, so it lands where it
+-- started: the walk that reaches `x` from `a` reaches its mirror from `b`.
+theorem Real.reflect_in_segment (a b x : ℝ) (onSegment : x ∈ Real.segment(a, b))
+        : Real.reflect(a, b, x) ∈ Real.segment(a, b) := {
+  choose t such that (0 ≤ t ∧ t ≤ 1) ∧ x = Real.between(a, b, t) from onSegment;
+  0 ≤ t;
+  t ≤ 1;
+  x = Real.between(a, b, t) as walk;
+  Real.reflect(a, b, x)
+     = a + b - x
+     = a + b - Real.between(a, b, t) by walk
+     = a + b - (a + t * (b - a))
+     = b + t * (a - b) by ring
+     = Real.between(b, a, t);
+  Real.reflect(a, b, x) ∈ Real.segment(b, a) by { witness t };
+  Real.segment(b, a) ⊆ Real.segment(a, b) by Real.segment_subset_swap;
+  done
+}
+
+-- Reflecting moves two parameters exactly as far apart as they were, so
+-- every tolerance is its own nearness.
+theorem Real.reflect_ContinuousOn (a b : ℝ)
+        : MetricSpace.ContinuousOn(Real.reflect(a, b), Real.segment(a, b)) := {
+  take x : ℝ;
+  suppose x ∈ Real.segment(a, b);
+  take tolerance : ℝ;
+  suppose tolerance > 0;
+  witness tolerance with {
+    tolerance > 0;
+    ∀ (y : ℝ). y ∈ Real.segment(a, b) → distance(x, y) < tolerance →
+        distance(Real.reflect(a, b, x), Real.reflect(a, b, y)) < tolerance
+        by {
+          take y : ℝ;
+          suppose y ∈ Real.segment(a, b);
+          suppose distance(x, y) < tolerance;
+          Real.reflect(a, b, y) - Real.reflect(a, b, x)
+             = (a + b - y) - (a + b - x)
+             = x - y by ring as reflectedGap;
+          distance(Real.reflect(a, b, x), Real.reflect(a, b, y))
+             = abs(Real.reflect(a, b, y) - Real.reflect(a, b, x))
+             = abs(x - y) by reflectedGap
+             = distance(x, y)
+             < tolerance;
+          done
+        };
+    done
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- The last exit.
+--
+-- The set the extremum is taken over: the parameters of the domain at
+-- which the curve has landed in the target.
+--
+-- They are bounded above by the far end of the interval and hold the
+-- parameter the caller supplies, so they have a supremum. The curve at
+-- the supremum lies in every ball about the target — parameters just
+-- short of the supremum land in it, and continuity keeps their images
+-- close — so it lies in the closure, which is the target. Past the
+-- supremum a landing parameter would exceed an upper bound.
+
+definition MetricSpace.landingParameters {space : MetricSpace}
+        (curve : ℝ → space) (domain : Set(ℝ)) (target : Set(space)) : Set(ℝ) :=
+  (t : ℝ) ↦ t ∈ domain ∧ curve(t) ∈ target
+
+theorem MetricSpace.exists_last_inside
+        (curve : ℝ → space) (a b : ℝ) (ordered : a ≤ b) (start : ℝ)
+        (continuous : MetricSpace.ContinuousOn(curve, Real.segment(a, b)))
+        (startInside : start ∈ Real.segment(a, b))
+        (startLands : curve(start) ∈ target)
+        : ∃ (last : ℝ).
+            last ∈ Real.segment(a, b) ∧ start ≤ last ∧ curve(last) ∈ target
+              ∧ ∀ (t : ℝ). t ∈ Real.segment(a, b) → last < t → ¬(curve(t) ∈ target) := {
+  start ∈ MetricSpace.landingParameters(curve, Real.segment(a, b), target);
+  Set.IsNonempty(ℝ, MetricSpace.landingParameters(curve, Real.segment(a, b), target))
+      by { witness start };
+  Real.IsUpperBound(MetricSpace.landingParameters(curve, Real.segment(a, b), target), b)
+      by { take t : ℝ;
+           suppose t ∈ MetricSpace.landingParameters(curve, Real.segment(a, b), target);
+           t ∈ Real.segment(a, b);
+           done by Real.segment_atMost };
+  Real.IsBoundedAbove(MetricSpace.landingParameters(curve, Real.segment(a, b), target))
+      by { witness b };
+  choose last such that
+      Real.IsSupremum(MetricSpace.landingParameters(curve, Real.segment(a, b), target), last)
+      from Real.supremum_exists;
+  Real.IsUpperBound(MetricSpace.landingParameters(curve, Real.segment(a, b), target), last)
+      as isUpperBound;
+  ∀ (otherBound : ℝ).
+      Real.IsUpperBound(MetricSpace.landingParameters(curve, Real.segment(a, b), target), otherBound)
+        → last ≤ otherBound
+      as isLeast;
+
+  start ≤ last by isUpperBound;
+  a ≤ start by Real.segment_atLeast;
+  a ≤ last;
+  last ≤ b by isLeast;
+  last ∈ Real.segment(a, b) by Real.member_segment_of_bounds;
+
+  ∀ (radius : ℝ). radius > 0 →
+      ∃ (y : space). y ∈ target ∧ distance(curve(last), y) < radius
+      by {
+        take radius : ℝ;
+        suppose radius > 0;
+        choose nearness such that
+            nearness > 0 ∧
+            ∀ (y : ℝ). y ∈ Real.segment(a, b) → distance(last, y) < nearness →
+                distance(curve(last), curve(y)) < radius
+            from continuous;
+        nearness > 0;
+        ∀ (y : ℝ). y ∈ Real.segment(a, b) → distance(last, y) < nearness →
+            distance(curve(last), curve(y)) < radius as nearbyClose;
+        last - nearness < last;
+        choose t such that
+            t ∈ MetricSpace.landingParameters(curve, Real.segment(a, b), target)
+              ∧ last - nearness < t
+            from Real.IsSupremum.exists_above(u := last - nearness);
+        t ∈ Real.segment(a, b);
+        curve(t) ∈ target;
+        t ≤ last by isUpperBound;
+        -nearness < t - last;
+        t - last < nearness;
+        abs(t - last) < nearness by Real.absolute_value_LessThan_of_bounds;
+        distance(last, t)
+           = abs(t - last)
+           < nearness;
+        distance(curve(last), curve(t)) < radius by nearbyClose;
+        witness curve(t)
+      };
+  curve(last) ∈ MetricSpace.Closure(target) by MetricSpace.Closure.of_meets_every_ball;
+  curve(last) ∈ target;
+
+  ∀ (t : ℝ). t ∈ Real.segment(a, b) → last < t → ¬(curve(t) ∈ target)
+      by {
+        take t : ℝ;
+        suppose t ∈ Real.segment(a, b);
+        suppose last < t;
+        suppose curve(t) ∈ target;
+        t ∈ MetricSpace.landingParameters(curve, Real.segment(a, b), target);
+        last < t ≤ last by isUpperBound;
+        done
+      };
+  witness last
+}
+
+-- ----------------------------------------------------------------------
+-- The first entry, as the last exit of the curve run backwards.
+
+theorem MetricSpace.exists_first_inside
+        (curve : ℝ → space) (a b : ℝ) (ordered : a ≤ b) (start : ℝ)
+        (continuous : MetricSpace.ContinuousOn(curve, Real.segment(a, b)))
+        (startInside : start ∈ Real.segment(a, b))
+        (startLands : curve(start) ∈ target)
+        : ∃ (first : ℝ).
+            first ∈ Real.segment(a, b) ∧ first ≤ start ∧ curve(first) ∈ target
+              ∧ ∀ (t : ℝ). t ∈ Real.segment(a, b) → t < first → ¬(curve(t) ∈ target) := {
+  let reversed : ℝ → space := (t : ℝ) ↦ curve(Real.reflect(a, b, t));
+  ∀ (x : ℝ). x ∈ Real.segment(a, b) → Real.reflect(a, b, x) ∈ Real.segment(a, b)
+      by { take x : ℝ;
+           suppose x ∈ Real.segment(a, b);
+           done by Real.reflect_in_segment };
+  MetricSpace.ContinuousOn(Real.reflect(a, b), Real.segment(a, b))
+      by Real.reflect_ContinuousOn;
+  MetricSpace.ContinuousOn(reversed, Real.segment(a, b))
+      by MetricSpace.ContinuousOn.compose;
+
+  Real.reflect(a, b, start) ∈ Real.segment(a, b);
+  reversed(Real.reflect(a, b, start))
+     = curve(Real.reflect(a, b, Real.reflect(a, b, start)))
+     = curve(start) by Real.reflect_involution;
+  reversed(Real.reflect(a, b, start)) ∈ target;
+
+  choose last such that
+      last ∈ Real.segment(a, b) ∧ Real.reflect(a, b, start) ≤ last
+        ∧ reversed(last) ∈ target
+        ∧ ∀ (t : ℝ). t ∈ Real.segment(a, b) → last < t → ¬(reversed(t) ∈ target)
+      from MetricSpace.exists_last_inside(curve := reversed);
+  ∀ (t : ℝ). t ∈ Real.segment(a, b) → last < t → ¬(reversed(t) ∈ target);
+
+  Real.reflect(a, b, last) ∈ Real.segment(a, b);
+  a + b - start ≤ last;
+  a + b - last ≤ start;
+  Real.reflect(a, b, last) ≤ start;
+  reversed(last) ∈ target;
+  curve(Real.reflect(a, b, last)) ∈ target;
+
+  ∀ (t : ℝ). t ∈ Real.segment(a, b) → t < Real.reflect(a, b, last) → ¬(curve(t) ∈ target)
+      by {
+        take t : ℝ;
+        suppose t ∈ Real.segment(a, b);
+        suppose t < Real.reflect(a, b, last);
+        suppose curve(t) ∈ target;
+        Real.reflect(a, b, t) ∈ Real.segment(a, b);
+        t < a + b - last;
+        last < a + b - t;
+        last < Real.reflect(a, b, t);
+        ¬(reversed(Real.reflect(a, b, t)) ∈ target);
+        reversed(Real.reflect(a, b, t))
+           = curve(Real.reflect(a, b, Real.reflect(a, b, t)))
+           = curve(t) by Real.reflect_involution;
+        reversed(Real.reflect(a, b, t)) ∈ target;
+        done
+      };
+  witness Real.reflect(a, b, last)
+}
+
+-- ----------------------------------------------------------------------
+-- The unit interval, which is the segment from 0 to 1 and the domain
+-- every arc is given.
+
+theorem MetricSpace.exists_last_inside_unitInterval
+        (curve : ℝ → space) (start : ℝ)
+        (continuous : MetricSpace.ContinuousOn(curve, Real.unitInterval))
+        (startInside : start ∈ Real.unitInterval)
+        (startLands : curve(start) ∈ target)
+        : ∃ (last : ℝ).
+            last ∈ Real.unitInterval ∧ start ≤ last ∧ curve(last) ∈ target
+              ∧ ∀ (t : ℝ). t ∈ Real.unitInterval → last < t → ¬(curve(t) ∈ target) := {
+  Real.unitInterval = Real.segment(0, 1) by Real.segment_zero_one as unitIsSegment;
+  (0 : ℝ) ≤ 1;
+  MetricSpace.ContinuousOn(curve, Real.segment(0, 1));
+  start ∈ Real.segment(0, 1);
+  choose last such that
+      last ∈ Real.segment(0, 1) ∧ start ≤ last ∧ curve(last) ∈ target
+        ∧ ∀ (t : ℝ). t ∈ Real.segment(0, 1) → last < t → ¬(curve(t) ∈ target)
+      from MetricSpace.exists_last_inside;
+  last ∈ Real.unitInterval;
+  start ≤ last;
+  curve(last) ∈ target;
+  ∀ (t : ℝ). t ∈ Real.unitInterval → last < t → ¬(curve(t) ∈ target)
+      by substituting unitIsSegment;
+  witness last
+}
+
+theorem MetricSpace.exists_first_inside_unitInterval
+        (curve : ℝ → space) (start : ℝ)
+        (continuous : MetricSpace.ContinuousOn(curve, Real.unitInterval))
+        (startInside : start ∈ Real.unitInterval)
+        (startLands : curve(start) ∈ target)
+        : ∃ (first : ℝ).
+            first ∈ Real.unitInterval ∧ first ≤ start ∧ curve(first) ∈ target
+              ∧ ∀ (t : ℝ). t ∈ Real.unitInterval → t < first → ¬(curve(t) ∈ target) := {
+  Real.unitInterval = Real.segment(0, 1) by Real.segment_zero_one as unitIsSegment;
+  (0 : ℝ) ≤ 1;
+  MetricSpace.ContinuousOn(curve, Real.segment(0, 1));
+  start ∈ Real.segment(0, 1);
+  choose first such that
+      first ∈ Real.segment(0, 1) ∧ first ≤ start ∧ curve(first) ∈ target
+        ∧ ∀ (t : ℝ). t ∈ Real.segment(0, 1) → t < first → ¬(curve(t) ∈ target)
+      from MetricSpace.exists_first_inside;
+  first ∈ Real.unitInterval;
+  first ≤ start;
+  curve(first) ∈ target;
+  ∀ (t : ℝ). t ∈ Real.unitInterval → t < first → ¬(curve(t) ∈ target)
+      by substituting unitIsSegment;
+  witness first
+}

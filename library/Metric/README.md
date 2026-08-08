@@ -81,6 +81,9 @@ about the subspace.)
   `Real.IsConvex`. This is the parameter domain every arc and curve of
   `Plane/` runs on, so it is also where the interval's compactness,
   convexity and connectedness are proved
+- `Real.reflect(a, b, t)` — the interval reflected in its midpoint,
+  `t ↦ a + b - t`, and `MetricSpace.landingParameters` — the parameters at
+  which a curve has landed in a set — [entry_exit.math](entry_exit.math)
 
 ## Main theorems
 
@@ -114,6 +117,17 @@ about the subspace.)
   `Real.between_distance` are what make a nondegenerate `Real.segment` usable
   as the domain of an arc, and `Real.member_segment_of_bounds` is its ordered
   reading
+- **`MetricSpace.exists_last_inside`** and **`.exists_first_inside`** — a curve
+  continuous on `Real.segment(a, b)` that lands in a closed set at some
+  parameter has a **last** such parameter and a **first** one; past the last,
+  and before the first, it is outside for good
+  ([entry_exit.math](entry_exit.math)). The set of landing parameters is
+  bounded and nonempty, so it has a supremum, and continuity plus closedness
+  put the curve there back in the set. Stated over an arbitrary interval
+  because the question that wants both is "the first entry into one set *after*
+  the last exit from another"; `.exists_last_inside_unitInterval` and
+  `.exists_first_inside_unitInterval` are the `[0, 1]` wrappers. The first
+  entry is the last exit of the curve run backwards, along `Real.reflect(a, b)`
 
 ## Reading it at ℝ
 
