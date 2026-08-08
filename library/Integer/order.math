@@ -131,6 +131,38 @@ automatic theorem Natural.to_integer.positive_preserves (n : Natural) (nPositive
 }
 
 -- ----------------------------------------------------------------------
+-- … and reflects it: an inequality between the images forces the Natural one.
+
+-- (a:ℤ) ≤ (b:ℤ) ⟹ a ≤ b: the gap witness reads back through the difference
+-- boundary as b = a + gap.
+theorem Natural.to_integer.LessOrEqual_reflects (a b : Natural)
+        (imageLessOrEqual : (a : Integer) ≤ (b : Integer)) : a ≤ b := {
+  choose gap such that (b : Integer) = (a : Integer) + (gap : Integer) from imageLessOrEqual;
+  calc (b : Integer)
+     = (a : Integer) + (gap : Integer)
+     = ((a + gap : Natural) : Integer);
+  b + 0 = 0 + (a + gap) by Integer.difference_equal_implies;
+  calc b
+     = b + 0             by Natural.add_zero
+     = 0 + (a + gap)
+     = a + gap           by Natural.zero_add
+    as bEquation;
+  a ≤ a + gap;
+  done by substituting bEquation
+}
+
+-- (a:ℤ) < (b:ℤ) ⟹ a < b: strictness lowers through the `+ 1` shift —
+-- (a:ℤ) + 1 is the image of a + 1, so a + 1 ≤ b.
+theorem Natural.to_integer.LessThan_reflects (a b : Natural)
+        (imageLessThan : (a : Integer) < (b : Integer)) : a < b := {
+  (a : Integer) + Integer.one ≤ (b : Integer);
+  ((a + 1 : Natural) : Integer) = (a : Integer) + Integer.one as castAddOne;
+  ((a + 1 : Natural) : Integer) ≤ (b : Integer) by substituting castAddOne;
+  a + 1 ≤ b by Natural.to_integer.LessOrEqual_reflects;
+  done by Natural.lt_of_add_one_le
+}
+
+-- ----------------------------------------------------------------------
 -- Order vs. addition.
 
 -- ≤ is preserved by adding the same value: x ≤ y implies x + z ≤ y + z.
