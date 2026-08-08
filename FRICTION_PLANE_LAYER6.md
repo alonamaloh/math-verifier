@@ -525,3 +525,24 @@ half-plane and the open ball, neither of which the proof mentions.
 Cosmetic, but it costs real reading time in exactly the situation where the
 message matters. Same family as the recorded `Set.singleton`-instead-of-`=`
 printer bug in the matrix error tests.
+
+## L13 — `suppose ¬P` toward a positive goal needs `for contradiction`, and the error blames the closer
+
+**Symptom** (B4, `cores.math`). Writing `Graph.Incident(…) by { suppose
+¬Graph.Incident(…); …; done }` fails at the `done` with "bare `claim` /
+`done` needs an expected type from context", pointing at the closer rather
+than at the `suppose`. The adjacent shape `¬P by { suppose P; …; done }` —
+where the goal already IS a negation — works without any keyword, which is
+exactly why the mistake is easy to make.
+
+**Natural form.** A diagnostic at the `suppose` itself: "the goal is `P`,
+not a negation; did you mean `for contradiction`?" — landing on the line
+the author has to change.
+
+## L14 — overload dispatch reads argument heads before numeral coercion
+
+**Symptom** (B4, `cores.math`, six sites). `distance(0, y)` with `y : ℝ`
+is rejected — "no overload of `distance` matches arguments of types
+(Natural, Real)" — and needs `distance((0 : ℝ), y)`. Bare numerals coerce
+in ordinary argument positions, so the gap is specifically that overload
+dispatch resolves before the coercion join runs on the operands.
