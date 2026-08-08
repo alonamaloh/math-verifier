@@ -2359,15 +2359,22 @@ private:
                 Token nameToken = consumeAny();
                 wrapper.kind = BlockWrapper::TypedLet;
                 wrapper.name = nameToken.lexeme;
-                if (peek().kind != TokenKind::Colon) {
-                    throwHere("typed let in block body requires ': type "
-                              "after the name (use let ⟨…⟩ := … ; for "
-                              "destructuring without a type)");
+                if (peek().kind == TokenKind::Colon) {
+                    consumeAny();  // ':'
+                    wrapper.type = parseExpression();
+                    expect(TokenKind::Assign, "after let type");
+                    wrapper.value = parseExpression();
+                } else if (peek().kind == TokenKind::Assign) {
+                    // Untyped `let x := v;` — the elaborator infers the
+                    // binding's type from the value (the same path the
+                    // `recalling` desugaring uses).
+                    consumeAny();  // ':='
+                    wrapper.value = parseExpression();
+                } else {
+                    throwHere("let in block body expects ': type :=' or "
+                              "':=' after the name (use let ⟨…⟩ := … ; "
+                              "for destructuring)");
                 }
-                consumeAny();  // ':'
-                wrapper.type = parseExpression();
-                expect(TokenKind::Assign, "after let type");
-                wrapper.value = parseExpression();
             } else {
                 throwHere("expected identifier or '⟨' after 'let'");
             }
