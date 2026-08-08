@@ -1,0 +1,419 @@
+-- Plane/Graph/cores.math
+--
+-- The core of an edge. Brick B4 of the polygonal redrawing, H6 of
+-- PLAN_JORDAN_SCHOENFLIES.md.
+--
+-- Around each vertex sits a square, and the redrawing keeps the middle of
+-- each edge and replaces only its two ends. The middle is the CORE: the
+-- subarc between the LAST parameter at which the arc is inside the square
+-- about the vertex it starts at, and the FIRST parameter after that at
+-- which it is inside the square about the vertex it finishes at.
+--
+-- "After that" is not a decoration. Nothing forbids an arc from dipping
+-- into the far square early, returning to the near one, and only then
+-- running to its far end; taken globally the first entry could precede the
+-- last exit and the core would be empty or reversed. That is why
+-- `MetricSpace.exists_first_inside` is stated over an arbitrary interval:
+-- the second half of the choice lives on the subinterval the first half
+-- produced.
+--
+-- Three facts are wanted of the core, and the third is the one the
+-- assembly runs on: it is compact, it meets each of the two endpoint
+-- squares in its own endpoint and nowhere else, and it CONTAINS NO VERTEX.
+-- That last is stronger than "distinct cores are disjoint" — two cores of
+-- distinct edges meet only at a vertex, so a core holding none meets no
+-- other — and it never quantifies over pairs of cores.
+--
+-- That the core reaches neither vertex is where the POSITIVITY of the
+-- radius is spent, and it is spent nowhere else: the arc starts AT the
+-- centre of the near square, so it is still inside just after starting,
+-- and the last exit therefore happens at a positive parameter.
+--
+-- The square about any OTHER vertex misses the core for a reason that has
+-- nothing to do with cores — it misses the whole arc — so that fact lives
+-- with the squares, as `Plane.Graph.ClearSquare.misses_arc_of_not_end`.
+
+module Plane.Graph.cores
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Equality.basics
+import axioms
+import Set.basics
+import Set.algebra
+import Lists.list
+import Real.interface
+import Real.order
+import Real.order_field
+import Real.linearity
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.minimum
+import Metric.space
+import Metric.real
+import Metric.topology
+import Metric.continuity
+import Metric.compactness
+import Metric.interval
+import Metric.entry_exit
+import Plane.point
+import Plane.norm
+import Plane.metric
+import Plane.compactness
+import Plane.curve
+import Plane.subarc
+import Plane.exterior
+import Graph.basics
+import Plane.Graph.basics
+import Plane.Graph.pointset
+import Plane.Graph.vertexsquares
+
+-- Throughout: a plane graph, that is an abstract graph on plane points
+-- together with a drawing of its edges.
+convention E : Type(0)
+convention ends : E → Pair(Plane.Point, Plane.Point)
+convention graph : Graph(Plane.Point, E, ends)
+convention drawing : E → (ℝ → Plane.Point)
+
+-- ----------------------------------------------------------------------
+-- The core.
+
+theorem Plane.Graph.IsDrawing.exists_core
+        (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
+        (edge : E) (isEdge : edge ∈ Graph.edges(graph))
+        (radius : ℝ) (radiusPositive : radius > 0)
+        (squaresDisjoint : Plane.Graph.DisjointSquares(graph, radius))
+        : ∃ (core : Set(Plane.Point)). ∃ (start finish : Plane.Point).
+            (Plane.IsArcBetween(core, start, finish) ∧ Plane.IsCompact(core))
+            ∧ core ⊆ Plane.arc(drawing(edge))
+            ∧ (core ∩ Plane.squareAbout(Plane.arcStart(drawing(edge)), radius)
+                     = Set.singleton(Plane.Point, start)
+               ∧ core ∩ Plane.squareAbout(Plane.arcFinish(drawing(edge)), radius)
+                     = Set.singleton(Plane.Point, finish))
+            ∧ Set.Disjoint(core, Plane.Graph.vertexSet(graph)) := {
+  let startVertex : Plane.Point := Plane.arcStart(drawing(edge));
+  let finishVertex : Plane.Point := Plane.arcFinish(drawing(edge));
+
+  Plane.IsArc(drawing(edge)) by Plane.Graph.IsDrawing.IsArc;
+  MetricSpace.ContinuousOn(drawing(edge), Real.unitInterval) as continuous;
+  MetricSpace.InjectiveOn(drawing(edge), Real.unitInterval) as injective;
+  Graph.Joins(graph, edge, startVertex, finishVertex)
+      by Plane.Graph.IsDrawing.joins_ends;
+  startVertex ∈ Graph.vertices(graph)
+      by Plane.Graph.IsDrawing.arcStart_is_vertex;
+  finishVertex ∈ Graph.vertices(graph)
+      by Plane.Graph.IsDrawing.arcFinish_is_vertex;
+  startVertex ≠ finishVertex by Plane.Graph.IsDrawing.arc_ends_distinct;
+  Set.Disjoint(Plane.squareAbout(startVertex, radius),
+      Plane.squareAbout(finishVertex, radius));
+
+  radius ≥ 0;
+  (0 : ℝ) ∈ Real.unitInterval;
+  (1 : ℝ) ∈ Real.unitInterval by Real.one_in_unitInterval;
+  Plane.Closure(Plane.squareAbout(startVertex, radius))
+      ⊆ Plane.squareAbout(startVertex, radius) by Plane.squareAbout_IsClosed;
+  Plane.Closure(Plane.squareAbout(finishVertex, radius))
+      ⊆ Plane.squareAbout(finishVertex, radius) by Plane.squareAbout_IsClosed;
+  drawing(edge)(0) ∈ Plane.squareAbout(startVertex, radius)
+      by Plane.squareAbout_center;
+  drawing(edge)(1) ∈ Plane.squareAbout(finishVertex, radius)
+      by Plane.squareAbout_center;
+
+  -- The last exit from the near square, and — on the interval that leaves,
+  -- not on the whole of it — the first entry into the far square after it.
+  choose lastExit such that
+      lastExit ∈ Real.unitInterval ∧ 0 ≤ lastExit
+        ∧ drawing(edge)(lastExit) ∈ Plane.squareAbout(startVertex, radius)
+        ∧ ∀ (t : ℝ). t ∈ Real.unitInterval → lastExit < t →
+              ¬(drawing(edge)(t) ∈ Plane.squareAbout(startVertex, radius))
+      from MetricSpace.exists_last_inside_unitInterval;
+  lastExit ∈ Real.unitInterval;
+  drawing(edge)(lastExit) ∈ Plane.squareAbout(startVertex, radius);
+  ∀ (t : ℝ). t ∈ Real.unitInterval → lastExit < t →
+      ¬(drawing(edge)(t) ∈ Plane.squareAbout(startVertex, radius))
+      as outsideAfterExit;
+  lastExit ≥ 0 by Real.unitInterval_nonneg;
+  lastExit ≤ 1;
+
+  Real.IsConvex(Real.unitInterval) by Real.unitInterval_IsConvex;
+  Real.segment(lastExit, 1) ⊆ Real.unitInterval
+      by Real.IsConvex.segment_inside as tailInside;
+  MetricSpace.ContinuousOn(drawing(edge), Real.segment(lastExit, 1))
+      by MetricSpace.ContinuousOn.restrict(larger := Real.unitInterval);
+  (1 : ℝ) ∈ Real.segment(lastExit, 1) by Real.right_in_segment;
+
+  choose firstEntry such that
+      firstEntry ∈ Real.segment(lastExit, 1) ∧ firstEntry ≤ 1
+        ∧ drawing(edge)(firstEntry) ∈ Plane.squareAbout(finishVertex, radius)
+        ∧ ∀ (t : ℝ). t ∈ Real.segment(lastExit, 1) → t < firstEntry →
+              ¬(drawing(edge)(t) ∈ Plane.squareAbout(finishVertex, radius))
+      from MetricSpace.exists_first_inside;
+  firstEntry ∈ Real.segment(lastExit, 1);
+  drawing(edge)(firstEntry) ∈ Plane.squareAbout(finishVertex, radius);
+  ∀ (t : ℝ). t ∈ Real.segment(lastExit, 1) → t < firstEntry →
+      ¬(drawing(edge)(t) ∈ Plane.squareAbout(finishVertex, radius))
+      as outsideBeforeEntry;
+  firstEntry ∈ Real.unitInterval by tailInside;
+  lastExit ≤ firstEntry by Real.segment_atLeast;
+
+  -- The two squares are disjoint, so the exit and the entry cannot be the
+  -- same parameter.
+  lastExit ≠ firstEntry
+      by { suppose lastExit = firstEntry as sameParameter;
+           drawing(edge)(lastExit) ∈ Plane.squareAbout(finishVertex, radius)
+               by substituting sameParameter;
+           drawing(edge)(lastExit) ∉ Plane.squareAbout(finishVertex, radius)
+               by Set.Disjoint.not_member_right;
+           done };
+  lastExit < firstEntry;
+
+  -- Neither endpoint of the core is a vertex: the arc starts at the centre
+  -- of the near square, so a positive radius keeps it inside just after
+  -- starting and the last exit happens after the start. This is the one
+  -- place the radius has to be positive.
+  drawing(edge)(lastExit) ≠ startVertex
+      by { suppose drawing(edge)(lastExit) = startVertex as exitAtVertex;
+           drawing(edge)(lastExit) = drawing(edge)(0) by exitAtVertex;
+           lastExit = 0 by injective;
+           choose nearness such that
+               nearness > 0 ∧
+               ∀ (y : ℝ). y ∈ Real.unitInterval → distance((0 : ℝ), y) < nearness →
+                   distance(drawing(edge)(0), drawing(edge)(y)) < radius
+               from continuous;
+           nearness > 0;
+           ∀ (y : ℝ). y ∈ Real.unitInterval → distance((0 : ℝ), y) < nearness →
+               distance(drawing(edge)(0), drawing(edge)(y)) < radius
+               as closeJustAfterStart;
+           min(nearness, 1) > 0 by Real.minimum_positive;
+           min(nearness, 1) ≤ nearness;
+           min(nearness, 1) ≤ 1 by Real.minimum_LessOrEqual_right;
+           let probe : ℝ := min(nearness, 1) / 2;
+           2 * probe = min(nearness, 1);
+           probe > 0;
+           probe ≤ 1;
+           probe ∈ Real.unitInterval;
+           -nearness < probe - 0;
+           probe - 0 < nearness;
+           abs(probe - 0) < nearness by Real.absolute_value_LessThan_of_bounds;
+           distance((0 : ℝ), probe) < nearness;
+           distance(drawing(edge)(0), drawing(edge)(probe)) < radius
+               by closeJustAfterStart;
+           Plane.distance(startVertex, drawing(edge)(probe)) ≤ radius;
+           drawing(edge)(probe) ∈ Plane.squareAbout(startVertex, radius)
+               by Plane.squareAbout_of_distance;
+           lastExit < probe;
+           ¬(drawing(edge)(probe) ∈ Plane.squareAbout(startVertex, radius))
+               by outsideAfterExit;
+           done };
+
+  drawing(edge)(firstEntry) ≠ finishVertex
+      by { suppose drawing(edge)(firstEntry) = finishVertex as entryAtVertex;
+           drawing(edge)(firstEntry) = drawing(edge)(1) by entryAtVertex;
+           firstEntry = 1 by injective;
+           lastExit < 1;
+           choose nearness such that
+               nearness > 0 ∧
+               ∀ (y : ℝ). y ∈ Real.unitInterval → distance((1 : ℝ), y) < nearness →
+                   distance(drawing(edge)(1), drawing(edge)(y)) < radius
+               from continuous;
+           nearness > 0;
+           ∀ (y : ℝ). y ∈ Real.unitInterval → distance((1 : ℝ), y) < nearness →
+               distance(drawing(edge)(1), drawing(edge)(y)) < radius
+               as closeJustBeforeFinish;
+           1 - lastExit > 0;
+           min(nearness, 1 - lastExit) > 0 by Real.minimum_positive;
+           min(nearness, 1 - lastExit) ≤ nearness;
+           min(nearness, 1 - lastExit) ≤ 1 - lastExit;
+           let approach : ℝ := min(nearness, 1 - lastExit) / 2;
+           2 * approach = min(nearness, 1 - lastExit);
+           approach > 0;
+           approach < nearness;
+           approach < 1 - lastExit;
+           let probe : ℝ := 1 - approach;
+           lastExit < probe;
+           probe < 1;
+           probe ∈ Real.segment(lastExit, 1) by Real.member_segment_of_bounds;
+           probe ∈ Real.unitInterval by tailInside;
+           -nearness < probe - 1;
+           probe - 1 < nearness;
+           abs(probe - 1) < nearness by Real.absolute_value_LessThan_of_bounds;
+           distance((1 : ℝ), probe) < nearness;
+           distance(drawing(edge)(1), drawing(edge)(probe)) < radius
+               by closeJustBeforeFinish;
+           Plane.distance(finishVertex, drawing(edge)(probe)) ≤ radius;
+           drawing(edge)(probe) ∈ Plane.squareAbout(finishVertex, radius)
+               by Plane.squareAbout_of_distance;
+           probe < 1 = firstEntry;
+           ¬(drawing(edge)(probe) ∈ Plane.squareAbout(finishVertex, radius))
+               by outsideBeforeEntry;
+           done };
+
+  let core : Set(Plane.Point) :=
+      Plane.arc(Plane.subarc(drawing(edge), lastExit, firstEntry));
+  core = Set.image(drawing(edge), Real.segment(lastExit, firstEntry))
+      by Plane.subarc_image as coreIsRestriction;
+  Real.segment(lastExit, firstEntry) ⊆ Real.unitInterval
+      by Real.IsConvex.segment_inside as coreParametersInside;
+
+  Plane.IsArc(Plane.subarc(drawing(edge), lastExit, firstEntry))
+      by Plane.IsArc.subarc;
+  Plane.IsCompact(core) by Plane.IsArc.IsCompact;
+  Plane.arcStart(Plane.subarc(drawing(edge), lastExit, firstEntry))
+      = drawing(edge)(lastExit) by Plane.subarc_start;
+  Plane.arcFinish(Plane.subarc(drawing(edge), lastExit, firstEntry))
+      = drawing(edge)(firstEntry) by Plane.subarc_finish;
+  Plane.IsArcBetween(core, drawing(edge)(lastExit), drawing(edge)(firstEntry))
+      by { witness Plane.subarc(drawing(edge), lastExit, firstEntry) };
+
+  core ⊆ Plane.arc(drawing(edge))
+      by { take x : Plane.Point;
+           suppose x ∈ core;
+           x ∈ Set.image(drawing(edge), Real.segment(lastExit, firstEntry))
+               by substituting coreIsRestriction as onCore;
+           choose parameter such that
+               parameter ∈ Real.segment(lastExit, firstEntry)
+                 ∧ drawing(edge)(parameter) = x
+               from onCore;
+           parameter ∈ Real.segment(lastExit, firstEntry);
+           drawing(edge)(parameter) = x;
+           parameter ∈ Real.unitInterval by coreParametersInside;
+           done by Plane.member_arc }
+      as coreInsideArc;
+
+  -- Past the last exit the arc is out of the near square, and before the
+  -- first entry it is out of the far one, so each square catches the core
+  -- only at the parameter it was chosen at.
+  core ∩ Plane.squareAbout(startVertex, radius)
+        ⊆ Set.singleton(Plane.Point, drawing(edge)(lastExit))
+      by { take x : Plane.Point;
+           suppose x ∈ core ∩ Plane.squareAbout(startVertex, radius);
+           x ∈ core;
+           x ∈ Plane.squareAbout(startVertex, radius);
+           x ∈ Set.image(drawing(edge), Real.segment(lastExit, firstEntry))
+               by substituting coreIsRestriction as onCore;
+           choose parameter such that
+               parameter ∈ Real.segment(lastExit, firstEntry)
+                 ∧ drawing(edge)(parameter) = x
+               from onCore;
+           parameter ∈ Real.segment(lastExit, firstEntry);
+           drawing(edge)(parameter) = x as valueAtParameter;
+           parameter ∈ Real.unitInterval by coreParametersInside;
+           lastExit ≤ parameter by Real.segment_atLeast;
+           parameter = lastExit
+               by { suppose parameter ≠ lastExit for contradiction {
+                      lastExit < parameter;
+                      ¬(drawing(edge)(parameter)
+                            ∈ Plane.squareAbout(startVertex, radius))
+                          by outsideAfterExit;
+                      drawing(edge)(parameter)
+                          ∈ Plane.squareAbout(startVertex, radius)
+                          by substituting valueAtParameter;
+                      done
+                    };
+                    done };
+           x = drawing(edge)(lastExit) by substituting valueAtParameter;
+           done };
+  lastExit ∈ Real.segment(lastExit, firstEntry) by Real.left_in_segment;
+  drawing(edge)(lastExit)
+      ∈ Set.image(drawing(edge), Real.segment(lastExit, firstEntry))
+      by { witness lastExit };
+  drawing(edge)(lastExit) ∈ core by substituting coreIsRestriction;
+  drawing(edge)(lastExit) ∈ core ∩ Plane.squareAbout(startVertex, radius);
+  Set.singleton(Plane.Point, drawing(edge)(lastExit))
+        ⊆ core ∩ Plane.squareAbout(startVertex, radius)
+      by Set.singleton_subset;
+  core ∩ Plane.squareAbout(startVertex, radius)
+      = Set.singleton(Plane.Point, drawing(edge)(lastExit))
+      by Set.equal_of_same_members as coreMeetsNearSquare;
+
+  core ∩ Plane.squareAbout(finishVertex, radius)
+        ⊆ Set.singleton(Plane.Point, drawing(edge)(firstEntry))
+      by { take x : Plane.Point;
+           suppose x ∈ core ∩ Plane.squareAbout(finishVertex, radius);
+           x ∈ core;
+           x ∈ Plane.squareAbout(finishVertex, radius);
+           x ∈ Set.image(drawing(edge), Real.segment(lastExit, firstEntry))
+               by substituting coreIsRestriction as onCore;
+           choose parameter such that
+               parameter ∈ Real.segment(lastExit, firstEntry)
+                 ∧ drawing(edge)(parameter) = x
+               from onCore;
+           parameter ∈ Real.segment(lastExit, firstEntry);
+           drawing(edge)(parameter) = x as valueAtParameter;
+           lastExit ≤ parameter by Real.segment_atLeast;
+           parameter ≤ firstEntry by Real.segment_atMost;
+           parameter ≤ 1;
+           parameter ∈ Real.segment(lastExit, 1) by Real.member_segment_of_bounds;
+           parameter = firstEntry
+               by { suppose parameter ≠ firstEntry for contradiction {
+                      parameter < firstEntry;
+                      ¬(drawing(edge)(parameter)
+                            ∈ Plane.squareAbout(finishVertex, radius))
+                          by outsideBeforeEntry;
+                      drawing(edge)(parameter)
+                          ∈ Plane.squareAbout(finishVertex, radius)
+                          by substituting valueAtParameter;
+                      done
+                    };
+                    done };
+           x = drawing(edge)(firstEntry) by substituting valueAtParameter;
+           done };
+  firstEntry ∈ Real.segment(lastExit, firstEntry) by Real.right_in_segment;
+  drawing(edge)(firstEntry)
+      ∈ Set.image(drawing(edge), Real.segment(lastExit, firstEntry))
+      by { witness firstEntry };
+  drawing(edge)(firstEntry) ∈ core by substituting coreIsRestriction;
+  drawing(edge)(firstEntry) ∈ core ∩ Plane.squareAbout(finishVertex, radius);
+  Set.singleton(Plane.Point, drawing(edge)(firstEntry))
+        ⊆ core ∩ Plane.squareAbout(finishVertex, radius)
+      by Set.singleton_subset;
+  core ∩ Plane.squareAbout(finishVertex, radius)
+      = Set.singleton(Plane.Point, drawing(edge)(firstEntry))
+      by Set.equal_of_same_members as coreMeetsFarSquare;
+
+  -- A vertex on this edge's arc is one of its two ends, and each end sits
+  -- in its own square — where the core has only its endpoint, which is not
+  -- that vertex.
+  Set.Disjoint(core, Plane.Graph.vertexSet(graph))
+      by { take x : Plane.Point;
+           suppose x ∈ core;
+           suppose x ∈ Plane.Graph.vertexSet(graph);
+           x ∈ Graph.vertices(graph) by Plane.Graph.vertexSet_member_invert;
+           x ∈ Plane.arc(drawing(edge)) by coreInsideArc;
+           Graph.Incident(graph, edge, x)
+               by { suppose ¬Graph.Incident(graph, edge, x) for contradiction;
+                    x ∉ Plane.arc(drawing(edge))
+                        by Plane.Graph.IsDrawing.vertex_off_arc;
+                    done };
+           x = startVertex ∨ x = finishVertex by Graph.Incident.is_end;
+           done by cases {
+             case x = startVertex as isStartVertex: {
+                 startVertex ∈ Plane.squareAbout(startVertex, radius)
+                     by Plane.squareAbout_center;
+                 x ∈ Plane.squareAbout(startVertex, radius)
+                     by substituting isStartVertex;
+                 x ∈ core ∩ Plane.squareAbout(startVertex, radius);
+                 x ∈ Set.singleton(Plane.Point, drawing(edge)(lastExit))
+                     by substituting coreMeetsNearSquare;
+                 x = drawing(edge)(lastExit);
+                 drawing(edge)(lastExit) = startVertex;
+                 done
+               }
+             case x = finishVertex as isFinishVertex: {
+                 finishVertex ∈ Plane.squareAbout(finishVertex, radius)
+                     by Plane.squareAbout_center;
+                 x ∈ Plane.squareAbout(finishVertex, radius)
+                     by substituting isFinishVertex;
+                 x ∈ core ∩ Plane.squareAbout(finishVertex, radius);
+                 x ∈ Set.singleton(Plane.Point, drawing(edge)(firstEntry))
+                     by substituting coreMeetsFarSquare;
+                 x = drawing(edge)(firstEntry);
+                 drawing(edge)(firstEntry) = finishVertex;
+                 done
+               }
+           } };
+
+  witness core with
+      witness drawing(edge)(lastExit) with witness drawing(edge)(firstEntry)
+}

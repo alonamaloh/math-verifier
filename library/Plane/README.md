@@ -277,7 +277,11 @@ have cost more than paying for it once.
   a gap is a quarter of it), and read in both directions as the closed ball of
   the sup metric (`Plane.supDistance_of_squareAbout`,
   `Plane.squareAbout_of_supDistance`) — the bridge every comparison of two
-  squares crosses to reach `Plane.supDistance_triangle`
+  squares crosses to reach `Plane.supDistance_triangle`. It holds its own centre
+  (`Plane.squareAbout_center`), swallows the Euclidean ball of the same radius
+  (`Plane.squareAbout_of_distance`, the direction a continuity estimate arrives
+  in), and is closed (`Plane.squareAbout_IsClosed`) — which is what lets a
+  last-exit argument run against it
 
 ### Along one segment: the distance from an end as a coordinate
 

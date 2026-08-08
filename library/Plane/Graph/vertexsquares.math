@@ -66,8 +66,17 @@ definition Plane.Graph.ClearSquare (graph : Graph(Plane.Point, E, ends))
        other ∉ Plane.squareAbout(vertex, radius))
   ∧ (∀ (edge : E). edge ∈ Graph.edges(graph) →
        ¬Graph.Incident(graph, edge, vertex) →
-       ∀ (x : Plane.Point). x ∈ Plane.squareAbout(vertex, radius) →
-           x ∉ Plane.arc(drawing(edge)))
+       Set.Disjoint(Plane.squareAbout(vertex, radius), Plane.arc(drawing(edge))))
+
+-- The squares of one radius about the vertices, pairwise disjoint. The
+-- form B4 takes as a hypothesis, and the clause B2 halves its radius to
+-- deliver.
+definition Plane.Graph.DisjointSquares (graph : Graph(Plane.Point, E, ends))
+        (radius : ℝ) : Proposition :=
+  ∀ (vertex other : Plane.Point).
+    vertex ∈ Graph.vertices(graph) → other ∈ Graph.vertices(graph) →
+    vertex ≠ other →
+    Set.Disjoint(Plane.squareAbout(vertex, radius), Plane.squareAbout(other, radius))
 
 -- Shrinking a clear square leaves it clear: the smaller square lies
 -- inside the larger one, so whatever avoided the larger avoids it too.
@@ -90,11 +99,11 @@ theorem Plane.Graph.ClearSquare.shrink (vertex : Plane.Point)
 
   ∀ (edge : E). edge ∈ Graph.edges(graph) →
       ¬Graph.Incident(graph, edge, vertex) →
-      ∀ (x : Plane.Point). x ∈ Plane.squareAbout(vertex, smaller) →
-          x ∉ Plane.arc(drawing(edge))
+      Set.Disjoint(Plane.squareAbout(vertex, smaller), Plane.arc(drawing(edge)))
       by { take edge : E;
            suppose edge ∈ Graph.edges(graph);
            suppose ¬Graph.Incident(graph, edge, vertex);
+           Set.Disjoint(Plane.squareAbout(vertex, larger), Plane.arc(drawing(edge)));
            take x : Plane.Point;
            suppose x ∈ Plane.squareAbout(vertex, smaller);
            x ∈ Plane.squareAbout(vertex, larger);
@@ -212,13 +221,12 @@ theorem Plane.Graph.IsDrawing.exists_square_off_edges
         : ∃ (radius : ℝ). radius > 0 ∧
             ∀ (edge : E). edge ∈ Graph.edges(graph) →
                 ¬Graph.Incident(graph, edge, vertex) →
-                ∀ (x : Plane.Point). x ∈ Plane.squareAbout(vertex, radius) →
-                    x ∉ Plane.arc(drawing(edge)) := {
+                Set.Disjoint(Plane.squareAbout(vertex, radius),
+                    Plane.arc(drawing(edge))) := {
   let misses : E → ℝ → Proposition :=
       (edge : E) ↦ (radius : ℝ) ↦
           (¬Graph.Incident(graph, edge, vertex) →
-              ∀ (x : Plane.Point). x ∈ Plane.squareAbout(vertex, radius) →
-                  x ∉ Plane.arc(drawing(edge)));
+              Set.Disjoint(Plane.squareAbout(vertex, radius), Plane.arc(drawing(edge))));
 
   Real.HoldsAtSmallerBounds(misses)
       by { take edge : E;
@@ -227,14 +235,11 @@ theorem Plane.Graph.IsDrawing.exists_square_off_edges
            suppose smaller > 0;
            suppose smaller ≤ larger;
            suppose ¬Graph.Incident(graph, edge, vertex) →
-               ∀ (x : Plane.Point). x ∈ Plane.squareAbout(vertex, larger) →
-                   x ∉ Plane.arc(drawing(edge));
+               Set.Disjoint(Plane.squareAbout(vertex, larger), Plane.arc(drawing(edge)));
            change ¬Graph.Incident(graph, edge, vertex) →
-               ∀ (x : Plane.Point). x ∈ Plane.squareAbout(vertex, smaller) →
-                   x ∉ Plane.arc(drawing(edge));
+               Set.Disjoint(Plane.squareAbout(vertex, smaller), Plane.arc(drawing(edge)));
            suppose ¬Graph.Incident(graph, edge, vertex);
-           ∀ (x : Plane.Point). x ∈ Plane.squareAbout(vertex, larger) →
-               x ∉ Plane.arc(drawing(edge));
+           Set.Disjoint(Plane.squareAbout(vertex, larger), Plane.arc(drawing(edge)));
            take x : Plane.Point;
            suppose x ∈ Plane.squareAbout(vertex, smaller);
            Plane.squareAbout(vertex, smaller) ⊆ Plane.squareAbout(vertex, larger)
@@ -245,15 +250,13 @@ theorem Plane.Graph.IsDrawing.exists_square_off_edges
   ∀ (edge : E). edge ∈ Graph.edges(graph) →
       ∃ (radius : ℝ). radius > 0
           ∧ (¬Graph.Incident(graph, edge, vertex) →
-                 ∀ (x : Plane.Point). x ∈ Plane.squareAbout(vertex, radius) →
-                     x ∉ Plane.arc(drawing(edge)))
+                 Set.Disjoint(Plane.squareAbout(vertex, radius), Plane.arc(drawing(edge))))
       by { take edge : E;
            suppose edge ∈ Graph.edges(graph);
            done by cases {
              case Graph.Incident(graph, edge, vertex): {
                  ¬Graph.Incident(graph, edge, vertex) →
-                     ∀ (x : Plane.Point). x ∈ Plane.squareAbout(vertex, 1) →
-                         x ∉ Plane.arc(drawing(edge))
+                     Set.Disjoint(Plane.squareAbout(vertex, 1), Plane.arc(drawing(edge)))
                      by { suppose ¬Graph.Incident(graph, edge, vertex); done };
                  (1 : ℝ) > 0;
                  witness 1
@@ -273,8 +276,7 @@ theorem Plane.Graph.IsDrawing.exists_square_off_edges
                  4 * gap = separation;
                  gap > 0;
                  ¬Graph.Incident(graph, edge, vertex) →
-                     ∀ (x : Plane.Point). x ∈ Plane.squareAbout(vertex, gap) →
-                         x ∉ Plane.arc(drawing(edge))
+                     Set.Disjoint(Plane.squareAbout(vertex, gap), Plane.arc(drawing(edge)))
                      by { suppose ¬Graph.Incident(graph, edge, vertex);
                           take x : Plane.Point;
                           suppose x ∈ Plane.squareAbout(vertex, gap);
@@ -306,8 +308,7 @@ theorem Plane.Graph.IsDrawing.exists_clear_square
   choose edgeRadius such that edgeRadius > 0 ∧
       ∀ (edge : E). edge ∈ Graph.edges(graph) →
           ¬Graph.Incident(graph, edge, vertex) →
-          ∀ (x : Plane.Point). x ∈ Plane.squareAbout(vertex, edgeRadius) →
-              x ∉ Plane.arc(drawing(edge))
+          Set.Disjoint(Plane.squareAbout(vertex, edgeRadius), Plane.arc(drawing(edge)))
       from Plane.Graph.IsDrawing.exists_square_off_edges;
 
   let radius : ℝ := min(vertexRadius, edgeRadius);
@@ -331,11 +332,11 @@ theorem Plane.Graph.IsDrawing.exists_clear_square
 
   ∀ (edge : E). edge ∈ Graph.edges(graph) →
       ¬Graph.Incident(graph, edge, vertex) →
-      ∀ (x : Plane.Point). x ∈ Plane.squareAbout(vertex, radius) →
-          x ∉ Plane.arc(drawing(edge))
+      Set.Disjoint(Plane.squareAbout(vertex, radius), Plane.arc(drawing(edge)))
       by { take edge : E;
            suppose edge ∈ Graph.edges(graph);
            suppose ¬Graph.Incident(graph, edge, vertex);
+           Set.Disjoint(Plane.squareAbout(vertex, edgeRadius), Plane.arc(drawing(edge)));
            take x : Plane.Point;
            suppose x ∈ Plane.squareAbout(vertex, radius);
            x ∈ Plane.squareAbout(vertex, edgeRadius);
@@ -363,11 +364,7 @@ theorem Plane.Graph.IsDrawing.exists_vertex_squares
         : ∃ (radius : ℝ). radius > 0
             ∧ (∀ (vertex : Plane.Point). vertex ∈ Graph.vertices(graph) →
                    Plane.Graph.ClearSquare(graph, drawing, vertex, radius))
-            ∧ (∀ (vertex other x : Plane.Point).
-                   vertex ∈ Graph.vertices(graph) →
-                   other ∈ Graph.vertices(graph) → vertex ≠ other →
-                   x ∈ Plane.squareAbout(vertex, radius) →
-                   x ∉ Plane.squareAbout(other, radius)) := {
+            ∧ Plane.Graph.DisjointSquares(graph, radius) := {
   Real.HoldsAtSmallerBounds(
       (v : Plane.Point) ↦ (r : ℝ) ↦ Plane.Graph.ClearSquare(graph, drawing, v, r))
       by Plane.Graph.ClearSquare.HoldsAtSmallerBounds;
@@ -398,16 +395,13 @@ theorem Plane.Graph.IsDrawing.exists_vertex_squares
                by everySquareIsClear;
            done by Plane.Graph.ClearSquare.shrink };
 
-  ∀ (vertex other x : Plane.Point).
-      vertex ∈ Graph.vertices(graph) → other ∈ Graph.vertices(graph) →
-      vertex ≠ other → x ∈ Plane.squareAbout(vertex, radius) →
-      x ∉ Plane.squareAbout(other, radius)
+  Plane.Graph.DisjointSquares(graph, radius)
       by { take vertex : Plane.Point;
            take other : Plane.Point;
-           take x : Plane.Point;
            suppose vertex ∈ Graph.vertices(graph);
            suppose other ∈ Graph.vertices(graph);
            suppose vertex ≠ other;
+           take x : Plane.Point;
            suppose x ∈ Plane.squareAbout(vertex, radius);
            suppose x ∈ Plane.squareAbout(other, radius);
            Plane.supDistance(vertex, x) ≤ radius;
@@ -428,4 +422,38 @@ theorem Plane.Graph.IsDrawing.exists_vertex_squares
            done };
 
   witness radius
+}
+
+-- ----------------------------------------------------------------------
+-- The square about a vertex the edge does not reach.
+
+-- A vertex is an end of an edge or it is not, and an edge has no ends
+-- beyond the two its arc runs between; so a clear square about a vertex
+-- that is neither end misses the WHOLE arc. This is a statement about the
+-- arc rather than about any piece of it, which is why the cores of the
+-- next brick inherit it without saying anything themselves.
+theorem Plane.Graph.ClearSquare.misses_arc_of_not_end
+        (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
+        (edge : E) (isEdge : edge ∈ Graph.edges(graph))
+        (vertex : Plane.Point) (radius : ℝ)
+        (clear : Plane.Graph.ClearSquare(graph, drawing, vertex, radius))
+        (notStart : vertex ≠ Plane.arcStart(drawing(edge)))
+        (notFinish : vertex ≠ Plane.arcFinish(drawing(edge)))
+        : Set.Disjoint(Plane.squareAbout(vertex, radius),
+              Plane.arc(drawing(edge))) := {
+  Graph.Joins(graph, edge,
+      Plane.arcStart(drawing(edge)), Plane.arcFinish(drawing(edge)))
+      by Plane.Graph.IsDrawing.joins_ends;
+  ¬Graph.Incident(graph, edge, vertex)
+      by { suppose Graph.Incident(graph, edge, vertex);
+           vertex = Plane.arcStart(drawing(edge))
+             ∨ vertex = Plane.arcFinish(drawing(edge))
+               by Graph.Incident.is_end;
+           done by cases {
+             case vertex = Plane.arcStart(drawing(edge)):   done
+             case vertex = Plane.arcFinish(drawing(edge)):  done
+           } };
+  ∀ (e : E). e ∈ Graph.edges(graph) → ¬Graph.Incident(graph, e, vertex) →
+      Set.Disjoint(Plane.squareAbout(vertex, radius), Plane.arc(drawing(e)));
+  done
 }

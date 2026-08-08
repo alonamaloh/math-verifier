@@ -238,6 +238,66 @@ theorem Plane.squareAbout_of_supDistance (center : Plane.Point) (radius : ℝ)
   done
 }
 
+-- A Euclidean ball of the same radius sits inside the square, since the sup
+-- norm is the smaller of the two. This is the direction a continuity
+-- estimate arrives in: a point near enough the centre is in the square.
+theorem Plane.squareAbout_of_distance (center : Plane.Point) (radius : ℝ)
+        (x : Plane.Point) (close : Plane.distance(center, x) ≤ radius)
+        : x ∈ Plane.squareAbout(center, radius) := {
+  Plane.supDistance(center, x)
+     ≤ Plane.distance(center, x) by Plane.supDistance_LessOrEqual_distance
+     ≤ radius;
+  done by Plane.squareAbout_of_supDistance
+}
+
+theorem Plane.squareAbout_center (center : Plane.Point) (radius : ℝ)
+        (radiusNonneg : radius ≥ 0)
+        : center ∈ Plane.squareAbout(center, radius) := {
+  Plane.distance(center, center) = 0
+                                 ≤ radius;
+  done by Plane.squareAbout_of_distance
+}
+
+-- The square is closed: a point outside it has a whole sup-metric gap to
+-- spare, and no point of the square comes that near.
+theorem Plane.squareAbout_IsClosed (center : Plane.Point) (radius : ℝ)
+        : Plane.Closure(Plane.squareAbout(center, radius))
+              ⊆ Plane.squareAbout(center, radius) := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.Closure(Plane.squareAbout(center, radius)) as inClosure;
+  ∀ (reach : ℝ). 0 < reach →
+      ∃ (y : Plane.Point). y ∈ Plane.squareAbout(center, radius)
+        ∧ Plane.distance(x, y) < reach
+      by { take reach : ℝ;
+           suppose 0 < reach;
+           done by Plane.Closure.meets_every_ball }
+      as squareComesNear;
+  suppose x ∉ Plane.squareAbout(center, radius) for contradiction {
+    ¬(Plane.supDistance(center, x) ≤ radius)
+        by { suppose Plane.supDistance(center, x) ≤ radius;
+             x ∈ Plane.squareAbout(center, radius) by Plane.squareAbout_of_supDistance;
+             done };
+    radius < Plane.supDistance(center, x) by Real.LessThan_of_not_LessOrEqual;
+    let gap : ℝ := Plane.supDistance(center, x) - radius;
+    gap > 0;
+    choose near such that
+        near ∈ Plane.squareAbout(center, radius) ∧ Plane.distance(x, near) < gap
+        from squareComesNear;
+    Plane.supDistance(center, near) ≤ radius by Plane.supDistance_of_squareAbout;
+    Plane.supDistance(near, x)
+       = Plane.supDistance(x, near) by Plane.supDistance_symmetric
+       ≤ Plane.distance(x, near) by Plane.supDistance_LessOrEqual_distance
+       < gap;
+    Plane.supDistance(center, x)
+       ≤ Plane.supDistance(center, near) + Plane.supDistance(near, x)
+             by Plane.supDistance_triangle
+       < radius + gap
+       = Plane.supDistance(center, x) by ring;
+    done
+  };
+  done
+}
+
 -- Listed so that consecutive sides share a corner, which is what the
 -- connectedness proof walks along.
 definition Plane.beyondSquare (radius : ℝ) : Set(Plane.Point) :=

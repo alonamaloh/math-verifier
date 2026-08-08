@@ -197,7 +197,8 @@ names draw the same points.
 | [overlay.math](overlay.math) | separation, the cut points, `Plane.overlayGraph`, and `Plane.polygonal_overlay` |
 | [cycle.math](cycle.math) | the realisation of a cycle is a Jordan curve |
 | [outerface.math](outerface.math) | the drawing fits in a square, and exactly one face is unbounded |
-| [vertexsquares.math](vertexsquares.math) | `Plane.Graph.ClearSquare` and one radius that clears every vertex at once |
+| [vertexsquares.math](vertexsquares.math) | `Plane.Graph.ClearSquare`, `Plane.Graph.DisjointSquares`, and one radius that clears every vertex at once |
+| [cores.math](cores.math) | the core of an edge — the subarc between the two vertex squares |
 
 Each module opens with `convention E` and `convention ends`, as
 [`library/Graph/`](../../Graph/README.md) does, so a statement names the graph
@@ -268,16 +269,50 @@ both shapes have. `Plane.squareAbout` and its sup-metric readers are in
   lists; `.exists_clear_square` keeps the smaller of the two.
 - **`Plane.Graph.IsDrawing.exists_vertex_squares`** is the form to consume:
   ONE radius serving every vertex, and squares about distinct vertices
-  **disjoint**. Disjointness does not follow from the per-vertex statement —
-  that the square about `v` misses `w` says nothing about the square about `w`
+  **disjoint** (`Plane.Graph.DisjointSquares`). Disjointness does not follow
+  from the per-vertex statement — that the square about `v` misses `w` says
+  nothing about the square about `w`
   reaching back — so the common radius is halved. Two halved squares that met
   would put their centres within the common radius in the sup metric, that is
   each centre inside the other's unhalved square, which the common choice
   already forbids. This is the one place the sup-metric triangle inequality is
   used.
+- `Plane.Graph.ClearSquare.misses_arc_of_not_end` — a clear square about a
+  vertex that is neither end of an edge misses that edge's **whole arc**. It is
+  a statement about the arc, not about any piece of it, so the cores inherit
+  "meets no other vertex square" without saying anything themselves.
+
+## The cores
+
+**`Plane.Graph.IsDrawing.exists_core`** ([cores.math](cores.math)) — the
+redrawing keeps the middle of each edge and replaces only its two ends, and the
+middle is the **core**: the subarc between the LAST parameter at which the arc
+is inside the square about the vertex it starts at, and the FIRST parameter
+**after that** at which it is inside the square about the vertex it finishes
+at.
+
+"After that" is not a decoration. Nothing forbids an arc from dipping into the
+far square early, returning to the near one, and only then running to its far
+end; taken globally the first entry can precede the last exit and the "core"
+would be empty or reversed. That is why `MetricSpace.exists_last_inside` /
+`.exists_first_inside` are stated over an arbitrary `Real.segment(a, b)` — the
+second half of the choice lives on the subinterval the first half produced.
+
+The core is compact, it is an arc between its two endpoints, it lies in the
+edge's arc, it meets each of the two endpoint squares in exactly its own
+endpoint there, and — the clause the assembly runs on — it **contains no
+vertex** (`Set.Disjoint(core, Plane.Graph.vertexSet(graph))`). That last is
+stronger than "distinct cores are disjoint": two cores of distinct edges meet
+only at a vertex (`arcs_meet_at_vertex`), so a core holding none meets no
+other, and nothing ever quantifies over pairs of cores.
+
+That the core reaches neither vertex is the one place the **positivity** of the
+radius is spent: the arc starts at the centre of the near square, so it is
+still inside just after starting, and the last exit therefore happens at a
+positive parameter.
 
 ## Not built yet
 
 - **H6, polygonal redrawing** — every finite plane graph is isomorphic to
-  one with polygonal edges. Brick B2 (the vertex squares, above) has landed;
-  the cores, the local polygonal connectivity and the assembly have not.
+  one with polygonal edges. Bricks B2 (the vertex squares) and B4 (the cores)
+  have landed; the local polygonal connectivity and the assembly have not.

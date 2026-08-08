@@ -1021,10 +1021,17 @@ substance**, and they are where the estimate lives.
   **Correction:** state it over an arbitrary `[α, β]`, not over `[0, 1]`.
   B4 applies it twice and the second application lives on `[a, 1]`, where `a`
   is the parameter the first one produced. The `[0, 1]` version is a wrapper.
-- **B4 — the cores.** `K_e` is the subarc between `c_{v,e}` and `c_{w,e}`,
+- **B4 — the cores. DONE**, `library/Plane/Graph/cores.math` —
+  `Plane.Graph.IsDrawing.exists_core`, with the arc's own `arcStart` /
+  `arcFinish` as the two vertices, so no orientation is ever asked of the
+  caller. `K_e` is the subarc between `c_{v,e}` and `c_{w,e}`,
   and the facts wanted of it are: compact, meets the two endpoint squares only
   at its ends, meets no other vertex square, and distinct cores are disjoint.
-  All four are `Plane.subarc` plus B2 plus `arcs_meet_at_vertex`.
+  All four are `Plane.subarc` plus B2 plus `arcs_meet_at_vertex`. The
+  disjointness clauses are stated through the new `Set.Disjoint`
+  (`library/Set/algebra.math`), and the pairwise-disjointness of the vertex
+  squares is now named `Plane.Graph.DisjointSquares`, which is what B2 delivers
+  and B4 consumes.
 
   **Correction:** `c_{w,e}` is the first entry to `D_w` **after** `c_{v,e}`,
   not the first entry. Nothing in B2 forbids the arc dipping into `D_w`,
@@ -1032,9 +1039,11 @@ substance**, and they are where the estimate lives.
   entry the two parameters can come out in the wrong order and the "core" is
   empty or reversed. This is what forces B3's arbitrary-interval form.
 
-  Two packaging notes from building it. "Meets no other vertex square" is
+  Two packaging notes from building it, both taken. "Meets no other vertex
+  square" is
   really a statement about the whole ARC — it is B2 plus "an edge is incident
-  only with its own two ends", and the core plays no part — so prove it there.
+  only with its own two ends", and the core plays no part — so prove it there
+  (`Plane.Graph.ClearSquare.misses_arc_of_not_end`, in `vertexsquares.math`).
   And carry "the core contains no vertex" rather than "distinct cores are
   disjoint": it is strictly stronger, it follows from `arcs_meet_at_vertex`,
   and it never quantifies over pairs of cores. Proving it is the one place the
