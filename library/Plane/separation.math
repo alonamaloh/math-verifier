@@ -6,6 +6,12 @@
 -- about the plane — the argument is the closing-pairs one over any metric
 -- space — so it lives in `Metric/separation.math` and the names here are
 -- how the Jordan–Schönflies development speaks it.
+--
+-- Beside it, what a separation is spent on: `Plane.nearSet(region, radius)`,
+-- the points within `radius` of some point of `region`. There is
+-- deliberately no distance-to-a-set function in this development — an
+-- infimum would have to be produced and then read back, where every
+-- consumer either exhibits a near point or is handed one.
 
 module Plane.separation
 
@@ -126,4 +132,76 @@ theorem Plane.compact_separation_from_point (region : Set(Plane.Point))
                     done };
            done by Real.LessOrEqual_of_not_LessThan };
   witness gap
+}
+
+-- ----------------------------------------------------------------------
+-- The neighbourhood of a set.
+
+definition Plane.nearSet (region : Set(Plane.Point)) (radius : ℝ)
+        : Set(Plane.Point) :=
+  (x : Plane.Point) ↦
+    ∃ (near : Plane.Point). near ∈ region ∧ Plane.distance(x, near) < radius
+
+theorem Plane.nearSet_member (region : Set(Plane.Point)) (radius : ℝ)
+        (x near : Plane.Point) (inRegion : near ∈ region)
+        (isNear : Plane.distance(x, near) < radius)
+        : x ∈ Plane.nearSet(region, radius) :=
+  witness near
+
+theorem Plane.nearSet_member_invert (region : Set(Plane.Point)) (radius : ℝ)
+        (x : Plane.Point) (inNearSet : x ∈ Plane.nearSet(region, radius))
+        : ∃ (near : Plane.Point).
+            near ∈ region ∧ Plane.distance(x, near) < radius :=
+  done
+
+-- A set lies in its own neighbourhood: each of its points is its own
+-- witness, at no distance at all.
+theorem Plane.subset_nearSet (region : Set(Plane.Point)) (radius : ℝ)
+        (radiusPositive : radius > 0)
+        : region ⊆ Plane.nearSet(region, radius) := {
+  take x : Plane.Point;
+  suppose x ∈ region;
+  Plane.distance(x, x) = 0;
+  Plane.distance(x, x) < radius;
+  done by Plane.nearSet_member
+}
+
+-- A separation only gets easier to satisfy as the gap shrinks.
+theorem Plane.separated_at_smaller_gap (left right : Set(Plane.Point))
+        (smaller larger : ℝ) (ordered : smaller ≤ larger)
+        (separated : ∀ (a b : Plane.Point). a ∈ left → b ∈ right →
+            2 * larger ≤ Plane.distance(a, b))
+        : ∀ (a b : Plane.Point). a ∈ left → b ∈ right →
+            2 * smaller ≤ Plane.distance(a, b) := {
+  take a : Plane.Point;
+  take b : Plane.Point;
+  suppose a ∈ left;
+  suppose b ∈ right;
+  2 * smaller ≤ 2 * larger
+              ≤ Plane.distance(a, b) by separated
+}
+
+-- Two sets `2 * radius` apart have disjoint `radius`-neighbourhoods: a
+-- point of both neighbourhoods would carry a point of each set across to
+-- the other in two steps of less than `radius`.
+theorem Plane.nearSet_disjoint_of_separated (left right : Set(Plane.Point))
+        (radius : ℝ)
+        (separated : ∀ (a b : Plane.Point). a ∈ left → b ∈ right →
+            2 * radius ≤ Plane.distance(a, b))
+        : Set.Disjoint(Plane.nearSet(left, radius),
+              Plane.nearSet(right, radius)) := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.nearSet(left, radius) as nearLeft;
+  suppose x ∈ Plane.nearSet(right, radius) as nearRight;
+  choose a such that a ∈ left ∧ Plane.distance(x, a) < radius from nearLeft;
+  choose b such that b ∈ right ∧ Plane.distance(x, b) < radius from nearRight;
+  a ∈ left;
+  b ∈ right;
+  2 * radius ≤ Plane.distance(a, b) by separated
+             ≤ Plane.distance(a, x) + Plane.distance(x, b)
+             = Plane.distance(x, a) + Plane.distance(x, b)
+                   by Plane.distance_symmetric
+             < radius + radius
+             = 2 * radius;
+  done
 }

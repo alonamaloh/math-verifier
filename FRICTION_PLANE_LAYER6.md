@@ -546,3 +546,58 @@ is rejected — "no overload of `distance` matches arguments of types
 (Natural, Real)" — and needs `distance((0 : ℝ), y)`. Bare numerals coerce
 in ordinary argument positions, so the gap is specifically that overload
 dispatch resolves before the coercion join runs on the operands.
+
+## L15 — a hypothesis headed by a `let`-bound predicate cannot be applied
+
+**Symptom** (B7, `tubes.math`). With
+
+```math
+let separated : E → E → ℝ → Proposition :=
+    (edge : E) ↦ (other : E) ↦ (gap : ℝ) ↦ (other ≠ edge → ∀ …);
+let separatedFromAll : E → ℝ → Proposition :=
+    (edge : E) ↦ (gap : ℝ) ↦
+        ∀ (other : E). other ∈ Graph.edges(graph) → separated(edge, other, gap);
+```
+
+a context fact `separatedFromAll(edge, epsilon)` is useless: the prover
+instantiates it at `other` and reaches a term of type
+`separated edge other epsilon`, which is an implication only after ζ, and
+then the application is refused with
+
+```
+this is being applied to an argument, but it is not a function
+  it has type:   separated edge other epsilon
+```
+
+The error is attributed to the `let` **binding line**, not to the step whose
+proof search failed, so nothing in the message points at the fact being used.
+Stating the proposition is fine everywhere — only *applying* it fails — so
+the same `let` reads perfectly in the statement positions two lines above.
+
+**Accepted phrasing.** Spell the inner predicate's body out inside the outer
+`let`, so the hypothesis's type is an honest chain of `→`. The duplication is
+the tax; the natural form is for the prover to ζ-unfold before deciding a
+term is not a function.
+
+## L16 — a vacuous `x ≠ x` reductio costs a second unless reflexivity is hoisted
+
+**Symptom** (B7, `tubes.math`). In the `case other = edge` arm the separation
+clause is vacuous, so it is discharged by `{ suppose edge ≠ edge; done }`.
+That `done` is closed, but by a one-second reductio search:
+
+```
+warning: expensive by-less proof step (74607 kernel-steps, 1034 ms) —
+  the auto-prover closed it by search (via the reductio strategy)
+```
+
+`done by Equality.reflexivity` is not available — `Equality.reflexivity` is
+the constructor of `=`, not a citable declaration ("unknown lemma … no
+declaration by that name is in scope"). The accepted phrasing is a bare
+`edge = edge;` line ahead of the block, which drops the cost to nothing but
+reads as pure plumbing. A citable reflexivity, or a cheap reflexivity rung
+ahead of the reductio one, would remove both.
+
+Also worth recording beside L2: in that arm the equation refines the **goal**,
+so the vacuous clause has to be *stated* in the refined spelling (`edge`
+everywhere, never `other`), or `witness` reports a conjunction it cannot
+split.

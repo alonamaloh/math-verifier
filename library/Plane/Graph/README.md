@@ -199,6 +199,7 @@ names draw the same points.
 | [outerface.math](outerface.math) | the drawing fits in a square, and exactly one face is unbounded |
 | [vertexsquares.math](vertexsquares.math) | `Plane.Graph.ClearSquare`, `Plane.Graph.DisjointSquares`, and one radius that clears every vertex at once |
 | [cores.math](cores.math) | the core of an edge — the subarc between the two vertex squares |
+| [tubes.math](tubes.math) | distinct cores are disjoint, and one ε makes the tubes about them disjoint |
 
 Each module opens with `convention E` and `convention ends`, as
 [`library/Graph/`](../../Graph/README.md) does, so a statement names the graph
@@ -311,12 +312,37 @@ radius is spent: the arc starts at the centre of the near square, so it is
 still inside just after starting, and the last exit therefore happens at a
 positive parameter.
 
+## The tubes
+
+**`Plane.Graph.IsDrawing.exists_core_separation`** ([tubes.math](tubes.math))
+— one ε for the whole redrawing: the tubes about the cores, where the tube is
+`Plane.nearSet(core(edge), epsilon)`, are pairwise disjoint. The cores of
+distinct edges are disjoint compacta, so `Plane.compact_separation` gives each
+pair a positive gap, `Real.exists_common_positive_bound` folds the finitely
+many gaps into one, and half of that is the ε — two points ε-near cores a
+full `2 * epsilon` apart cannot coincide.
+
+The family of cores arrives as a **function** of the edge carrying B4's
+clauses, since a single ε has to speak about all of them at once and no
+per-edge existential can.
+
+- **`Plane.Graph.IsDrawing.cores_disjoint`** — this is where B4's clause is
+  spent. Two arcs of distinct edges cross only at a vertex incident with
+  both, so a piece of one arc holding no vertex misses every other arc; it is
+  stated for arbitrary pieces, because that is all the argument uses.
+
+Nothing here says the tube of an edge avoids the squares about the other
+vertices, nor confines its contact with a square's boundary. Neither is
+needed: the assembly works inside the plane minus the **open** squares, which
+holds no vertex at all, and the contact points are pinned by the sup distance
+along a radial segment rather than by ε.
+
 ## Not built yet
 
 - **H6, polygonal redrawing** — every finite plane graph is isomorphic to
   one with polygonal edges. Bricks B2 (the vertex squares), B4 (the cores),
-  and B5 (the plane minus the open vertex squares is locally polygonally
+  B5 (the plane minus the open vertex squares is locally polygonally
   connected, a plane fact stated over a list of centres in
-  [`Plane/locally_polygonal.math`](../locally_polygonal.math)) have landed;
-  the clopen argument over such a carrier (B6), the ε-choices (B7) and the
+  [`Plane/locally_polygonal.math`](../locally_polygonal.math)) and B7 (the
+  ε) have landed; the clopen argument over such a carrier (B6) and the
   assembly (B8) have not.

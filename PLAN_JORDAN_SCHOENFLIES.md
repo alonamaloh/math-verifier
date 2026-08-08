@@ -1088,14 +1088,38 @@ substance**, and they are where the estimate lives.
   wants restating over a carrier with a polygonally-connected basis. Expect to
   reuse `Plane.reachableFrom`, `_OpenIn`, `_ClosedIn` verbatim and to replace
   only `Plane.segment_inside_of_open`.
-- **B7 — the ε-choices.** The cores are pairwise disjoint compacts with
-  disjoint finite endpoint sets on the square boundaries, so B1 over
-  `Plane.compact_separation` gives one `ε` making every
-  `O_e = {x ∈ M : dist(x, K_e) < ε}` pairwise disjoint and confining each
-  boundary contact to a small arc about the designated endpoint. `U_e` is the
-  component of `O_e` through `K_e`, relatively open by B5 + Layer 3's
-  "components of relatively open subsets of a locally path-connected set are
-  relatively open".
+- **B7 — the ε-choices. DONE**, `library/Plane/Graph/tubes.math` —
+  `Plane.Graph.IsDrawing.cores_disjoint` (distinct cores are disjoint, from
+  B4's "the core contains no vertex" plus `arcs_meet_at_vertex`, and stated
+  for arbitrary pieces of the two arcs since that is all the argument uses)
+  and `Plane.Graph.IsDrawing.exists_core_separation`: one ε making the tubes
+  about the cores pairwise disjoint. A tube is `Plane.nearSet(core, epsilon)`
+  (`library/Plane/separation.math`), the points within ε of the core —
+  the development has NO distance-to-a-set function and wants none, since
+  every consumer either exhibits a near point or is handed one. The family of
+  cores arrives as a FUNCTION of the edge carrying B4's clauses; one ε has to
+  speak about all of them at once, which no per-edge existential can.
+
+  **Correction, from the finished Lean build (`Redrawing.lean`): the other
+  two clauses of this brick are never consumed and are not built.** "The
+  tube stays clear of every other vertex square" is unnecessary because the
+  assembly works inside `M`, the plane minus the OPEN squares, which holds no
+  vertex at all; and "the contact with a square's boundary is confined to
+  within ε of the designated endpoint" is not an ε statement in the first
+  place — it is `Plane.supDist_lt_of_mem_segment` / `radial_meet`, that the
+  sup distance to the centre is a faithful coordinate along a radius, and it
+  belongs to B8.
+
+  `U_e` is the component of `M ∩ tube_e` through `K_e`, relatively open by
+  B5 + Layer 3's "components of relatively open subsets of a locally
+  path-connected set are relatively open" — that is B6/B8, not this brick.
+
+  **Open for B8: naming a core per edge needs a choice principle this
+  library does not have.** Lean uses `choose!` over `β`; here `axioms` offers
+  only `Logic.the` (unique choice) and `Logic.countable_choice`. Either the
+  core's two parameters are produced by `Logic.the` — the last exit and the
+  first entry after it are genuinely unique, so this is the honest route —
+  or B4 is restated to return the family.
 - **B8 — the assembly.** Join `c_{v,e}` to `c_{w,e}` inside `U_e` by B6, then
   join `v` to each `c_{v,e}` by the radial segment in the convex square `D_v`.
   Distinct radials in one square meet only at `v`; radials meet replacement

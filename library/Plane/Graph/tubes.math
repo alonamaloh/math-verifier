@@ -1,0 +1,225 @@
+-- Plane/Graph/tubes.math
+--
+-- One ε for the whole redrawing. Brick B7 of the polygonal redrawing, H6
+-- of PLAN_JORDAN_SCHOENFLIES.md.
+--
+-- The cores of distinct edges are disjoint compacts, so each pair stands a
+-- positive distance apart; finitely many such distances share one positive
+-- bound, and half of that bound is the ε. What the ε buys is that the
+-- TUBES about the cores — the points within ε of one of them — are
+-- pairwise disjoint, so the assembly can replace each edge inside its own
+-- tube and the replacements never meet.
+--
+-- Disjointness of the cores is where B4's odd-looking clause is spent. It
+-- carried "the core contains no vertex" rather than "distinct cores are
+-- disjoint" because the first is about one core and the second about
+-- pairs; here the two meet. Two arcs of distinct edges cross only at a
+-- vertex incident with both, so a piece of one arc that holds no vertex
+-- misses the whole of every other arc, and in particular every other core.
+--
+-- The cores arrive as a FUNCTION of the edge carrying B4's clauses. A
+-- single ε has to speak about all of them at once, which no per-edge
+-- existential can do.
+
+module Plane.Graph.tubes
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Equality.basics
+import axioms
+import Set.basics
+import Set.algebra
+import Lists.list
+import Real.interface
+import Real.order
+import Real.order_field
+import Real.positive_bound
+import Plane.point
+import Plane.norm
+import Plane.metric
+import Plane.curve
+import Plane.compactness
+import Plane.separation
+import Graph.basics
+import Plane.Graph.basics
+import Plane.Graph.pointset
+
+-- Throughout: a plane graph, that is an abstract graph on plane points
+-- together with a drawing of its edges.
+convention E : Type(0)
+convention ends : E → Pair(Plane.Point, Plane.Point)
+convention graph : Graph(Plane.Point, E, ends)
+convention drawing : E → (ℝ → Plane.Point)
+
+-- ----------------------------------------------------------------------
+-- Distinct cores are disjoint.
+
+-- Stated for arbitrary pieces of the two arcs rather than for cores,
+-- because that is all the argument uses: a common point would be a vertex
+-- incident with both edges, and the piece of the first arc holds none.
+theorem Plane.Graph.IsDrawing.cores_disjoint
+        (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
+        (edge other : E)
+        (isEdge : edge ∈ Graph.edges(graph)) (otherIsEdge : other ∈ Graph.edges(graph))
+        (distinct : edge ≠ other)
+        (core otherCore : Set(Plane.Point))
+        (coreInsideArc : core ⊆ Plane.arc(drawing(edge)))
+        (coreHasNoVertex : Set.Disjoint(core, Plane.Graph.vertexSet(graph)))
+        (otherCoreInsideArc : otherCore ⊆ Plane.arc(drawing(other)))
+        : Set.Disjoint(core, otherCore) := {
+  Graph.IsWellFormed(graph) by Plane.Graph.IsDrawing.IsWellFormed;
+  take x : Plane.Point;
+  suppose x ∈ core;
+  suppose x ∈ otherCore;
+  x ∈ Plane.arc(drawing(edge));
+  x ∈ Plane.arc(drawing(other));
+  Graph.Incident(graph, edge, x) ∧ Graph.Incident(graph, other, x)
+      by Plane.Graph.IsDrawing.arcs_meet_at_vertex;
+  Graph.Incident(graph, edge, x);
+  choose farEnd such that Graph.Joins(graph, edge, x, farEnd);
+  x ∈ Graph.vertices(graph) by Graph.IsWellFormed.end_is_vertex;
+  x ∈ Plane.Graph.vertexSet(graph) by Plane.Graph.vertexSet_member;
+  x ∉ Plane.Graph.vertexSet(graph);
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- One ε for every pair of cores.
+
+theorem Plane.Graph.IsDrawing.exists_core_separation
+        (isDrawing : Plane.Graph.IsDrawing(graph, drawing))
+        (core : E → Set(Plane.Point))
+        (coreIsCompact : ∀ (edge : E). edge ∈ Graph.edges(graph) →
+            Plane.IsCompact(core(edge)))
+        (coreInsideArc : ∀ (edge : E). edge ∈ Graph.edges(graph) →
+            core(edge) ⊆ Plane.arc(drawing(edge)))
+        (coreHasNoVertex : ∀ (edge : E). edge ∈ Graph.edges(graph) →
+            Set.Disjoint(core(edge), Plane.Graph.vertexSet(graph)))
+        : ∃ (epsilon : ℝ). epsilon > 0 ∧
+            ∀ (edge other : E). edge ∈ Graph.edges(graph) →
+              other ∈ Graph.edges(graph) → edge ≠ other →
+              Set.Disjoint(Plane.nearSet(core(edge), epsilon),
+                  Plane.nearSet(core(other), epsilon)) := {
+  let separated : E → E → ℝ → Proposition :=
+      (edge : E) ↦ (other : E) ↦ (gap : ℝ) ↦
+          (other ≠ edge → ∀ (a b : Plane.Point).
+              a ∈ core(edge) → b ∈ core(other) → 2 * gap ≤ Plane.distance(a, b));
+  let separatedFromAll : E → ℝ → Proposition :=
+      (edge : E) ↦ (gap : ℝ) ↦
+          ∀ (other : E). other ∈ Graph.edges(graph) → other ≠ edge →
+              ∀ (a b : Plane.Point).
+                  a ∈ core(edge) → b ∈ core(other) → 2 * gap ≤ Plane.distance(a, b);
+
+  ∀ (edge : E). Real.HoldsAtSmallerBounds(separated(edge))
+      by { take edge : E;
+           take other : E;
+           take smaller : ℝ;
+           take larger : ℝ;
+           suppose smaller > 0;
+           suppose smaller ≤ larger;
+           suppose other ≠ edge → ∀ (a b : Plane.Point).
+               a ∈ core(edge) → b ∈ core(other) → 2 * larger ≤ Plane.distance(a, b);
+           change other ≠ edge → ∀ (a b : Plane.Point).
+               a ∈ core(edge) → b ∈ core(other) → 2 * smaller ≤ Plane.distance(a, b);
+           suppose other ≠ edge;
+           ∀ (a b : Plane.Point).
+               a ∈ core(edge) → b ∈ core(other) → 2 * larger ≤ Plane.distance(a, b);
+           done by Plane.separated_at_smaller_gap };
+
+  Real.HoldsAtSmallerBounds(separatedFromAll)
+      by { take edge : E;
+           take smaller : ℝ;
+           take larger : ℝ;
+           suppose smaller > 0;
+           suppose smaller ≤ larger;
+           suppose ∀ (other : E). other ∈ Graph.edges(graph) →
+               separated(edge, other, larger);
+           change ∀ (other : E). other ∈ Graph.edges(graph) →
+               separated(edge, other, smaller);
+           take other : E;
+           suppose other ∈ Graph.edges(graph);
+           separated(edge, other, larger);
+           Real.HoldsAtSmallerBounds(separated(edge));
+           done };
+
+  -- Each edge against all the others: a pair of distinct cores is a pair
+  -- of disjoint compacts, and half their gap is a bound for that pair.
+  ∀ (edge : E). edge ∈ Graph.edges(graph) →
+      ∃ (bound : ℝ). bound > 0 ∧ separatedFromAll(edge, bound)
+      by { take edge : E;
+           suppose edge ∈ Graph.edges(graph);
+           Plane.IsCompact(core(edge));
+           core(edge) ⊆ Plane.arc(drawing(edge));
+           Set.Disjoint(core(edge), Plane.Graph.vertexSet(graph));
+           Real.HoldsAtSmallerBounds(separated(edge));
+           ∀ (other : E). other ∈ Graph.edges(graph) →
+               ∃ (bound : ℝ). bound > 0 ∧ separated(edge, other, bound)
+               by { take other : E;
+                    suppose other ∈ Graph.edges(graph);
+                    done by cases {
+                      case other = edge: {
+                          edge = edge;
+                          edge ≠ edge → ∀ (a b : Plane.Point).
+                              a ∈ core(edge) → b ∈ core(edge) →
+                              2 * 1 ≤ Plane.distance(a, b)
+                              by { suppose edge ≠ edge; done };
+                          (1 : ℝ) > 0;
+                          witness 1
+                        }
+                      otherwise: {
+                          edge ≠ other;
+                          Plane.IsCompact(core(other));
+                          core(other) ⊆ Plane.arc(drawing(other));
+                          Set.Disjoint(core(edge), core(other))
+                              by Plane.Graph.IsDrawing.cores_disjoint;
+                          choose gap such that gap > 0 ∧
+                              ∀ (a : Plane.Point). a ∈ core(edge) →
+                                ∀ (b : Plane.Point). b ∈ core(other) →
+                                  gap ≤ Plane.distance(a, b)
+                              from Plane.compact_separation;
+                          gap > 0;
+                          ∀ (a : Plane.Point). a ∈ core(edge) →
+                            ∀ (b : Plane.Point). b ∈ core(other) →
+                              gap ≤ Plane.distance(a, b) as coresApart;
+                          let bound : ℝ := gap / 2;
+                          2 * bound = gap;
+                          bound > 0;
+                          other ≠ edge → ∀ (a b : Plane.Point).
+                              a ∈ core(edge) → b ∈ core(other) →
+                              2 * bound ≤ Plane.distance(a, b)
+                              by { suppose other ≠ edge;
+                                   take a : Plane.Point;
+                                   take b : Plane.Point;
+                                   suppose a ∈ core(edge);
+                                   suppose b ∈ core(other);
+                                   2 * bound = gap
+                                             ≤ Plane.distance(a, b) by coresApart };
+                          witness bound
+                        }
+                    } };
+           done by Real.exists_common_positive_bound };
+
+  choose epsilon such that epsilon > 0 ∧
+      ∀ (edge : E). edge ∈ Graph.edges(graph) → separatedFromAll(edge, epsilon)
+      from Real.exists_common_positive_bound(items := Graph.edges(graph));
+  epsilon > 0;
+  ∀ (edge : E). edge ∈ Graph.edges(graph) → separatedFromAll(edge, epsilon);
+
+  ∀ (edge other : E). edge ∈ Graph.edges(graph) → other ∈ Graph.edges(graph) →
+      edge ≠ other →
+      Set.Disjoint(Plane.nearSet(core(edge), epsilon),
+          Plane.nearSet(core(other), epsilon))
+      by { take edge : E;
+           take other : E;
+           suppose edge ∈ Graph.edges(graph);
+           suppose other ∈ Graph.edges(graph);
+           suppose edge ≠ other;
+           other ≠ edge;
+           separatedFromAll(edge, epsilon);
+           ∀ (a b : Plane.Point).
+               a ∈ core(edge) → b ∈ core(other) → 2 * epsilon ≤ Plane.distance(a, b);
+           done by Plane.nearSet_disjoint_of_separated };
+
+  witness epsilon
+}

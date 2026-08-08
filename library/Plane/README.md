@@ -186,7 +186,13 @@ have cost more than paying for it once.
   ([separation.math](separation.math)) — disjoint compacta are a positive
   distance apart, with `Plane.compact_separation_from_point` for the case
   where one side is a single point (a compact set is closed, so its
-  complement is open). `Plane.segment_IsCompact`, and `Plane.circle_IsCompact` /
+  complement is open). What a separation is spent on lives beside it:
+  **`Plane.nearSet(region, radius)`**, the points within `radius` of some
+  point of `region` — there is deliberately no distance-to-a-set function
+  anywhere in this development, since every consumer either exhibits a near
+  point or is handed one. `Plane.nearSet_disjoint_of_separated` turns a gap
+  of `2 * radius` between two sets into disjointness of their
+  `radius`-neighbourhoods. `Plane.segment_IsCompact`, and `Plane.circle_IsCompact` /
   `Plane.squareBoundary_IsCompact` for the model curves, which are compact
   because they are bounded level sets
 - `Plane.IsConnected.image`, `.union` (through a common point), `.swallows`,
