@@ -1,0 +1,39 @@
+-- The auto-prover's last-chance ζ-retry: a claim spelled through a
+-- `let`-bound name that no structural matcher sees through directly is
+-- re-run once at the ζ-unfolded spelling.
+--
+-- The motivating shape, from Metric/entry_exit.math: a set of parameters
+-- named by a `let`, and a membership claim through the short name. Before
+-- the retry, the membership goal never reached the conjunction split
+-- hiding under the name, and the definition had to be spelled out at
+-- every claim site.
+
+module Test.zeta_retry_membership_test
+
+import Logic.basics
+import Equality.basics
+import Set.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+
+-- Membership through a let-bound set whose body is a conjunction: the
+-- ζ-retry unfolds `diagonal`, the membership split takes over, and the
+-- two legs close from context.
+theorem Test.membership_through_let_bound_set (n : Natural)
+        : n * 0 = 0 := {
+  let diagonal : Set(Natural) := (k : Natural) ↦ k = n ∧ k * 0 = 0;
+  n * 0 = 0 as clearsToZero;
+  n ∈ diagonal;
+  done by clearsToZero
+}
+
+-- The same shape one level up: the let-bound set is USED after the
+-- membership is established, so the fact bound through the short name
+-- must also be consumable through it.
+theorem Test.member_of_let_bound_set_consumed (n : Natural)
+        : n + 0 = n := {
+  let fixedPoints : Set(Natural) := (k : Natural) ↦ k + 0 = k;
+  n ∈ fixedPoints;
+  done
+}

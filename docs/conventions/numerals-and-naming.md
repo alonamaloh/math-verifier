@@ -147,7 +147,11 @@ through the name to its value), `ring` and `field` ζ-unfold the goal (and
 sign battery retries a declined sign/positivity goal at the ζ-unfolded
 spelling — so `mean * mean - x*y = halfDiff * halfDiff by field` with
 `let mean := (x + y) / 2` and bare `tolerance > 0` facts over a `let` both
-work as written (pinned by `Test/zeta_let_test.math`). The one remaining atom
+work as written (pinned by `Test/zeta_let_test.math`). The whole claim
+stack also retries once at the ζ-unfolded spelling as its last resort, so
+a membership claim through a `let`-bound set (`start ∈ landing` with
+`let landing : Set(ℝ) := …`) reaches the conjunction split under the name
+(pinned by `Test/zeta_retry_membership_test.math`). The one remaining atom
 treatment is `linear_combination`, whose cited hypothesis equations feed its
 coefficient bookkeeping at their stated spellings — keep explicit forms
 there. The dual caveat is reduction: a `cases`/`if` refinement won't compute

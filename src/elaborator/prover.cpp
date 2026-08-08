@@ -4018,6 +4018,34 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
             if (attempt) return attempt;
         }
 
+        // Last chance: a goal spelled through `let`-bound names. The
+        // structural matchers compare syntactically and do not see through
+        // a let-bound FreeVariable (a membership goal `x ∈ landing` never
+        // reaches the conjunction split hiding under `landing`'s value), so
+        // re-run the whole stack once at the ζ-unfolded spelling. The
+        // kernel's defeq ζ-reduces the let, so the unfolded proof proves
+        // the folded goal. Costs only on claims that would otherwise
+        // error; terminates because an unfolded goal unfolds to itself.
+        {
+            ExpressionPointer goalUnfolded =
+                zetaUnfoldLetBindersCached(goalClosed, localBinders);
+            if (!structurallyEqual(goalUnfolded, goalClosed)) {
+                ExpressionPointer attempt = runTactic("zetaRetryStack",
+                    [&]() -> ExpressionPointer {
+                        try {
+                            return autoProveClaimTactics(
+                                goalUnfolded, localBinders, line,
+                                transportBudget);
+                        } catch (const ElaborateError&) {
+                            // Report the failure against the goal as the
+                            // author spelled it, not the expansion.
+                            return nullptr;
+                        }
+                    });
+                if (attempt) return attempt;
+            }
+        }
+
         throwElaborate(
             "claim `"
             + prettyPrintInLocalScope(goalClosed, localBinders)
