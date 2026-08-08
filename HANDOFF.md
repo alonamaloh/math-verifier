@@ -7,13 +7,32 @@ not travel between machines; this file is the bridge.
 ## Where things stand
 
 **H6 (polygonal redrawing): B1–B7 built, merged, gated, pushed.** One brick
-remains — **B8, the assembly** (`Plane.Graph.polygonal_redrawing`). At pause
-time it was mid-build; its state is committed on branch
-**`worktree-agent-a7321616b116af171`** (pushed to origin — fetch it), commit
-subject "H6 B8 WIP: …" whose body lists what is done / stated-unproved /
-unwritten, with a CONTINUATION section in the plan-adjacent notes below.
-Resume by reading that commit's message first, then the brick briefs' shape:
-everything B8 consumes is on `main` (B1 `Real/positive_bound.math`, B2+B4
+remains — **B8, the assembly** (`Plane.Graph.polygonal_redrawing`). Its
+wrap-up state is **on `main`, fully gated**: all its green supporting
+material landed (`Plane/arcchain.math` — every polygonal walk contains a
+SIMPLE one; `Plane/radial.math` — the sup-metric frame geometry;
+`Lists/choice.math` — finite choice by list induction, no axiom;
+`Plane/Graph/redrawing.math` — the `IsCore`/`coreChannel`/`redrawnRegion`
+vocabulary), and the drafted-but-unverified assembly is
+**`B8_ASSEMBLY_WIP.math` at the repo root** (not compiled by the build).
+The headline theorem is NOT yet proved.
+
+**What blocked it: friction L17** (see `FRICTION_PLANE_LAYER6.md`) — the
+elaborator refuses `coreOf(edge) ⊆ X` when `coreOf` is a `choose`-bound
+function ("operand type `<unknown>`"), though the same spelling works for a
+theorem parameter. **Resume options: fix L17 in the elaborator first
+(Fable-tier; operand-type resolution over applications of choose-bound
+functions), or rewrite the draft's `⊆` claims in `take z; suppose z ∈ …`
+form.** Then the B8 continuation, verbatim from the wrap-up report: (1)
+re-verify the draft prefix (green up to `everyChannelJoinsItsContacts`);
+(2) write the per-edge chain — `exists_arcChain`, `IsArcChain.extend` at
+the far contact, `List.prepend` at the near one, `IsArcChain.IsArcBetween`,
+`IsPolygonal` by witness, and one final `List.exists_choice_function` at
+`B := ℝ → Plane.Point`; (3) `noVertexInRegion` + `regionsMeetAtVertices`
+via `Plane.radial_meet` + channel disjointness, then the four `IsDrawing`
+clauses. The Lean guide is `Schoenflies/Graph/Redrawing.lean:544–659`.
+
+Everything B8 consumes is on `main` (B1 `Real/positive_bound.math`, B2+B4
 `Plane/Graph/{vertexsquares,cores}.math`, B3 `Metric/entry_exit.math`, B5
 `Plane/locally_polygonal.math`, B6 `Plane/polygonal_carrier.math`, B7
 `Plane/Graph/tubes.math` + `Plane/separation.math` nearSet).
