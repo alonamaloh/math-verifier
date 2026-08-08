@@ -271,8 +271,14 @@ two chunks belonging to no wave are now scheduled — `lem:finite-polygonal-
 union` as **T1.0b**, and `SquareCycle`/`SquaresTwoConnected` attached to
 T1.10. Update the ledger's statuses as waves land. The ROADMAP's status
 discipline transfers verbatim: *a "done" that is really a "conditional"
-costs the next agent a day — and so does the reverse.* Part II gets the
-same survey treatment when T2 approaches.
+costs the next agent a day — and so does the reverse.* **`T2_LEDGER.md` is
+the Part II map** (same recipe, 2026-08-08): read its "Wave order and
+parallelism" section first — it carries four scheduling corrections to the
+T2/T3 phase list (Refines into T2.2, T2.4 split around the geometry gate,
+MatchedArc forward to T3.3, the mesh clause-5 repair into T3.4, ~300 dead
+GridAttach lines not translated), identifies the plane-free third of
+Part II that can start alongside Part I, and names the ownership gaps
+(GeneratedPair must be born in T2.2; T3.1a blocks T3.3).
 
 ## Size and rate — measured, not assumed (git logs, 2026-08-08)
 
