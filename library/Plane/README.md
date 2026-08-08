@@ -220,6 +220,22 @@ have cost more than paying for it once.
   centre — so two segments through the centre join any two points. Finitely
   many squares reduce to one by `Plane.exists_radius_off_far_squares`, which
   is `Real.exists_common_positive_bound` over the list of centres
+- **`Plane.IsLocallyPolygonallyConnected.polygonal_connected`** — the same
+  polygonal-connectedness theorem over a **carrier** that need not be open
+  ([polygonal_carrier.math](polygonal_carrier.math)). Openness is replaced by
+  the local property above and the clopen argument is unchanged:
+  `Plane.reachableFrom` and its two relatively open halves
+  (`.reachableFrom_OpenIn`, `.reachableFrom_ClosedIn`) are the same pieces,
+  with `Plane.PolygonalReach.widen` — a walk in a region is a walk in any
+  region holding it — carrying the neighbourhood's walk into the carrier.
+  Running through a basis of disks is what makes the property survive cutting
+  the carrier down by a relatively open set (`.restrict`), hence
+  `.Component_OpenIn` (a component of a relatively open piece is relatively
+  open in the carrier, the carrier reading of `Plane.Component_IsOpen`) and
+  `.Component_polygonal_connected` (two points of such a component are joined
+  inside the component), which is the shape the redrawing consumes.
+  `Plane.IsOpen.IsLocallyPolygonallyConnected` recovers the open case, so a
+  disk is used as a disk in exactly one place
 - **`Plane.IsHomeomorphismOn.of_continuous_injective_on_compact`** (H4's
   engine) and `Plane.IsJordanParametrisation.IsHomeomorphismOn` — a
   continuous injection on the circle is a homeomorphism onto its image

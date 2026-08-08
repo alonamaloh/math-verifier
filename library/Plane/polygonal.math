@@ -104,6 +104,23 @@ theorem Plane.PolygonalReach.symmetric
       }
   }
 
+-- A walk in a region is a walk in any region holding it: every segment it
+-- takes is still inside.
+theorem Plane.PolygonalReach.widen
+        (region wider : Set(Plane.Point)) (regionInside : region ⊆ wider)
+        (source target : Plane.Point)
+        (walk : Plane.PolygonalReach(region, source, target))
+        : Plane.PolygonalReach(wider, source, target) :=
+  by induction on walk {
+    case Plane.PolygonalReach.arrived: done by Plane.PolygonalReach.arrived
+    case Plane.PolygonalReach.extend(
+        waypoint, endpoint, walkToWaypoint, segmentInside, widerWalk): {
+        Plane.segment(waypoint, endpoint) ⊆ wider
+            by Set.subset.transitive(b := region);
+        done by Plane.PolygonalReach.extend(waypoint := waypoint)
+      }
+  }
+
 -- Inside a convex piece of the region the walk is a single segment.
 theorem Plane.PolygonalReach.through_convex
         (region : Set(Plane.Point)) (piece : Set(Plane.Point))

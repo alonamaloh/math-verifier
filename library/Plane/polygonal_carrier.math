@@ -1,0 +1,430 @@
+-- Plane/polygonal_carrier.math
+--
+-- Polygonal connectedness over a carrier. Brick B6 of the polygonal
+-- redrawing, H6 of PLAN_JORDAN_SCHOENFLIES.md.
+--
+-- Layer 3 joined two points of an open connected region by a polygonal
+-- walk. The redrawing needs that conclusion where the ambient set is not
+-- open: it is the plane with an open square cut out around each vertex, and
+-- the basic neighbourhood of a point on a square's boundary is not a disk.
+-- What stands in for openness is what brick B5 delivers — inside every disk
+-- about a point of the carrier sits a smaller one whose carrier points are
+-- joined to one another by walks that never leave it.
+--
+-- The clopen argument is the one in `Plane/polygonal.math`, unchanged: the
+-- points reachable from a source are relatively open in the carrier, the
+-- unreachable ones are relatively open too, and connectedness forbids the
+-- split. Only the basic step moves — the disk of an open region, convex and
+-- so crossed in a single segment, becomes the neighbourhood B5 supplies.
+--
+-- Running through a whole basis of disks, rather than through one
+-- neighbourhood, is what makes the property survive cutting the carrier
+-- down by a relatively open set. That inheritance is what carries the
+-- theorem to a component: a component of a relatively open subset is
+-- relatively open in the carrier, and any two of its points are joined
+-- inside the component itself. That last shape is what brick B7 asks for.
+
+module Plane.polygonal_carrier
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Set.algebra
+import Real.interface
+import Real.order
+import Real.minimum
+import Plane.point
+import Plane.norm
+import Plane.segment
+import Plane.topology
+import Plane.connected
+import Plane.component
+import Plane.polygonal
+import Plane.locally_polygonal
+
+-- ----------------------------------------------------------------------
+-- The basis form, weakened to what the clopen argument uses.
+--
+-- That argument asks only that every nearby point of the carrier be
+-- reached, and does not care where the walk runs. The disk the walk is
+-- confined to is what the inheritance lemma needs, and stays there.
+
+theorem Plane.IsLocallyPolygonallyConnectedAt.reaches_nearby
+        (carrier : Set(Plane.Point)) (p : Plane.Point) (pInCarrier : p ∈ carrier)
+        (locallyPolygonal : Plane.IsLocallyPolygonallyConnectedAt(carrier, p))
+        (limit : ℝ) (limitPositive : limit > 0)
+        : ∃ (radius : ℝ). radius > 0 ∧ radius ≤ limit ∧
+            ∀ (y : Plane.Point). y ∈ carrier → Plane.distance(p, y) < radius →
+              Plane.PolygonalReach(carrier, p, y) := {
+  choose radius such that radius > 0 ∧ radius ≤ limit ∧
+      ∀ (x : Plane.Point). x ∈ Plane.Ball(p, radius) ∩ carrier →
+        ∀ (y : Plane.Point). y ∈ Plane.Ball(p, radius) ∩ carrier →
+          Plane.PolygonalReach(Plane.Ball(p, radius) ∩ carrier, x, y)
+      from locallyPolygonal;
+  radius > 0;
+  radius ≤ limit;
+  ∀ (x : Plane.Point). x ∈ Plane.Ball(p, radius) ∩ carrier →
+      ∀ (y : Plane.Point). y ∈ Plane.Ball(p, radius) ∩ carrier →
+        Plane.PolygonalReach(Plane.Ball(p, radius) ∩ carrier, x, y);
+  Plane.distance(p, p) = 0 by Plane.distance_self;
+  Plane.distance(p, p) < radius;
+  p ∈ Plane.Ball(p, radius) ∩ carrier;
+  Plane.Ball(p, radius) ∩ carrier ⊆ carrier by Set.intersection_subset_right;
+  ∀ (y : Plane.Point). y ∈ carrier → Plane.distance(p, y) < radius →
+      Plane.PolygonalReach(carrier, p, y)
+      by { take y : Plane.Point;
+           suppose y ∈ carrier;
+           suppose Plane.distance(p, y) < radius;
+           y ∈ Plane.Ball(p, radius) ∩ carrier;
+           Plane.PolygonalReach(Plane.Ball(p, radius) ∩ carrier, p, y);
+           done by Plane.PolygonalReach.widen };
+  witness radius
+}
+
+-- ----------------------------------------------------------------------
+-- The property survives cutting the carrier down.
+--
+-- A relatively open piece holds a whole disk of the carrier about each of
+-- its points, so once the basis disk is taken inside that one, the piece
+-- and the carrier have the same trace on it — and the neighbourhood B5
+-- supplies for the carrier is already a neighbourhood for the piece.
+
+theorem Plane.IsLocallyPolygonallyConnected.restrict
+        (carrier piece : Set(Plane.Point))
+        (locallyPolygonal : Plane.IsLocallyPolygonallyConnected(carrier))
+        (pieceOpen : Plane.OpenIn(piece, carrier))
+        (pieceInside : piece ⊆ carrier)
+        : Plane.IsLocallyPolygonallyConnected(piece) := {
+  take p : Plane.Point;
+  suppose p ∈ piece;
+  p ∈ carrier;
+  Plane.IsLocallyPolygonallyConnectedAt(carrier, p) as locallyPolygonalAtPoint;
+  ∀ (bound : ℝ). bound > 0 →
+      ∃ (radius : ℝ). radius > 0 ∧ radius ≤ bound ∧
+        ∀ (x : Plane.Point). x ∈ Plane.Ball(p, radius) ∩ piece →
+          ∀ (y : Plane.Point). y ∈ Plane.Ball(p, radius) ∩ piece →
+            Plane.PolygonalReach(Plane.Ball(p, radius) ∩ piece, x, y)
+      by {
+        take bound : ℝ;
+        suppose bound > 0;
+        choose cut such that cut > 0 ∧
+            ∀ (y : Plane.Point). y ∈ carrier → Plane.distance(p, y) < cut →
+              y ∈ piece
+            from pieceOpen;
+        cut > 0;
+        ∀ (y : Plane.Point). y ∈ carrier → Plane.distance(p, y) < cut →
+            y ∈ piece;
+
+        let limit : ℝ := min(bound, cut);
+        limit > 0 by Real.minimum_positive;
+        limit ≤ bound by Real.minimum_LessOrEqual_left;
+        limit ≤ cut by Real.minimum_LessOrEqual_right;
+        choose radius such that radius > 0 ∧ radius ≤ limit ∧
+            ∀ (x : Plane.Point). x ∈ Plane.Ball(p, radius) ∩ carrier →
+              ∀ (y : Plane.Point). y ∈ Plane.Ball(p, radius) ∩ carrier →
+                Plane.PolygonalReach(Plane.Ball(p, radius) ∩ carrier, x, y)
+            from locallyPolygonalAtPoint;
+        radius > 0;
+        radius ≤ limit
+               ≤ bound;
+        radius ≤ limit
+               ≤ cut;
+        ∀ (x : Plane.Point). x ∈ Plane.Ball(p, radius) ∩ carrier →
+            ∀ (y : Plane.Point). y ∈ Plane.Ball(p, radius) ∩ carrier →
+              Plane.PolygonalReach(Plane.Ball(p, radius) ∩ carrier, x, y);
+
+        Plane.Ball(p, radius) ∩ piece ⊆ Plane.Ball(p, radius) ∩ carrier
+            by { take z : Plane.Point;
+                 suppose z ∈ Plane.Ball(p, radius) ∩ piece;
+                 z ∈ Plane.Ball(p, radius);
+                 z ∈ piece;
+                 z ∈ carrier;
+                 done }
+            as traceInCarrier;
+        Plane.Ball(p, radius) ∩ carrier ⊆ Plane.Ball(p, radius) ∩ piece
+            by { take z : Plane.Point;
+                 suppose z ∈ Plane.Ball(p, radius) ∩ carrier;
+                 z ∈ Plane.Ball(p, radius);
+                 z ∈ carrier;
+                 Plane.distance(p, z) < radius
+                                     ≤ cut;
+                 z ∈ piece;
+                 done };
+        Plane.Ball(p, radius) ∩ piece = Plane.Ball(p, radius) ∩ carrier
+            by Set.equal_of_same_members as sameTrace;
+
+        ∀ (x : Plane.Point). x ∈ Plane.Ball(p, radius) ∩ piece →
+            ∀ (y : Plane.Point). y ∈ Plane.Ball(p, radius) ∩ piece →
+              Plane.PolygonalReach(Plane.Ball(p, radius) ∩ piece, x, y)
+            by { take x : Plane.Point;
+                 suppose x ∈ Plane.Ball(p, radius) ∩ piece;
+                 take y : Plane.Point;
+                 suppose y ∈ Plane.Ball(p, radius) ∩ piece;
+                 x ∈ Plane.Ball(p, radius) ∩ carrier by traceInCarrier;
+                 y ∈ Plane.Ball(p, radius) ∩ carrier by traceInCarrier;
+                 Plane.PolygonalReach(Plane.Ball(p, radius) ∩ carrier, x, y);
+                 done by substituting sameTrace };
+        witness radius
+      };
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The reachable points are relatively clopen in the carrier.
+--
+-- Both halves are the same neighbourhood, run once forwards and once
+-- backwards: every carrier point near a reached point is reached in turn,
+-- and every carrier point near an unreached one is unreached — a walk to it
+-- would run on to the point it was chosen near.
+
+theorem Plane.IsLocallyPolygonallyConnected.reachableFrom_OpenIn
+        (carrier : Set(Plane.Point))
+        (locallyPolygonal : Plane.IsLocallyPolygonallyConnected(carrier))
+        (source : Plane.Point)
+        : Plane.OpenIn(Plane.reachableFrom(carrier, source), carrier) := {
+  take x : Plane.Point;
+  suppose x ∈ Plane.reachableFrom(carrier, source);
+  suppose x ∈ carrier;
+  Plane.PolygonalReach(carrier, source, x);
+  Plane.IsLocallyPolygonallyConnectedAt(carrier, x);
+  (1 : ℝ) > 0;
+  choose radius such that radius > 0 ∧ radius ≤ 1 ∧
+      ∀ (y : Plane.Point). y ∈ carrier → Plane.distance(x, y) < radius →
+        Plane.PolygonalReach(carrier, x, y)
+      from Plane.IsLocallyPolygonallyConnectedAt.reaches_nearby;
+  radius > 0;
+  ∀ (y : Plane.Point). y ∈ carrier → Plane.distance(x, y) < radius →
+      Plane.PolygonalReach(carrier, x, y);
+  witness radius with {
+    radius > 0;
+    ∀ (y : Plane.Point). y ∈ carrier → Plane.distance(x, y) < radius →
+        y ∈ Plane.reachableFrom(carrier, source)
+        by { take y : Plane.Point;
+             suppose y ∈ carrier;
+             suppose Plane.distance(x, y) < radius;
+             Plane.PolygonalReach(carrier, x, y);
+             Plane.PolygonalReach(carrier, source, y)
+                 by Plane.PolygonalReach.transitive;
+             done };
+    done
+  }
+}
+
+theorem Plane.IsLocallyPolygonallyConnected.reachableFrom_ClosedIn
+        (carrier : Set(Plane.Point))
+        (locallyPolygonal : Plane.IsLocallyPolygonallyConnected(carrier))
+        (source : Plane.Point)
+        : Plane.OpenIn(
+            carrier ∖ Plane.reachableFrom(carrier, source), carrier) := {
+  take x : Plane.Point;
+  suppose x ∈ carrier ∖ Plane.reachableFrom(carrier, source);
+  suppose x ∈ carrier;
+  x ∉ Plane.reachableFrom(carrier, source);
+  Plane.IsLocallyPolygonallyConnectedAt(carrier, x);
+  (1 : ℝ) > 0;
+  choose radius such that radius > 0 ∧ radius ≤ 1 ∧
+      ∀ (y : Plane.Point). y ∈ carrier → Plane.distance(x, y) < radius →
+        Plane.PolygonalReach(carrier, x, y)
+      from Plane.IsLocallyPolygonallyConnectedAt.reaches_nearby;
+  radius > 0;
+  ∀ (y : Plane.Point). y ∈ carrier → Plane.distance(x, y) < radius →
+      Plane.PolygonalReach(carrier, x, y);
+  witness radius with {
+    radius > 0;
+    ∀ (y : Plane.Point). y ∈ carrier → Plane.distance(x, y) < radius →
+        y ∈ carrier ∖ Plane.reachableFrom(carrier, source)
+        by { take y : Plane.Point;
+             suppose y ∈ carrier;
+             suppose Plane.distance(x, y) < radius;
+             Plane.PolygonalReach(carrier, x, y);
+             Plane.PolygonalReach(carrier, y, x)
+                 by Plane.PolygonalReach.symmetric;
+             suppose y ∈ Plane.reachableFrom(carrier, source) for contradiction {
+               Plane.PolygonalReach(carrier, source, y);
+               Plane.PolygonalReach(carrier, source, x)
+                   by Plane.PolygonalReach.transitive;
+               x ∈ Plane.reachableFrom(carrier, source);
+               done
+             };
+             done };
+    done
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- Any two points of the carrier are joined by a polygonal walk inside it.
+
+theorem Plane.IsLocallyPolygonallyConnected.polygonal_connected
+        (carrier : Set(Plane.Point))
+        (locallyPolygonal : Plane.IsLocallyPolygonallyConnected(carrier))
+        (carrierConnected : Plane.IsConnected(carrier))
+        (source : Plane.Point) (sourceInCarrier : source ∈ carrier)
+        (target : Plane.Point) (targetInCarrier : target ∈ carrier)
+        : Plane.PolygonalReach(carrier, source, target) := {
+  Plane.PolygonalReach(carrier, source, source)
+      by Plane.PolygonalReach.arrived;
+  source ∈ Plane.reachableFrom(carrier, source);
+  Set.IsNonempty(Plane.Point, Plane.reachableFrom(carrier, source))
+      by { witness source };
+  Plane.reachableFrom(carrier, source) ⊆ carrier
+      by Plane.reachableFrom_subset;
+  Plane.OpenIn(Plane.reachableFrom(carrier, source), carrier)
+      by Plane.IsLocallyPolygonallyConnected.reachableFrom_OpenIn;
+  Plane.OpenIn(carrier ∖ Plane.reachableFrom(carrier, source), carrier)
+      by Plane.IsLocallyPolygonallyConnected.reachableFrom_ClosedIn;
+  Plane.reachableFrom(carrier, source) = carrier by carrierConnected;
+  carrier = Plane.reachableFrom(carrier, source);
+  target ∈ Plane.reachableFrom(carrier, source);
+  done
+}
+
+-- A connected relatively open piece of the carrier inherits both
+-- hypotheses, so its own points are joined inside it.
+theorem Plane.IsLocallyPolygonallyConnected.polygonal_connected_in_piece
+        (carrier piece : Set(Plane.Point))
+        (locallyPolygonal : Plane.IsLocallyPolygonallyConnected(carrier))
+        (pieceOpen : Plane.OpenIn(piece, carrier))
+        (pieceInside : piece ⊆ carrier)
+        (pieceConnected : Plane.IsConnected(piece))
+        (source : Plane.Point) (sourceInPiece : source ∈ piece)
+        (target : Plane.Point) (targetInPiece : target ∈ piece)
+        : Plane.PolygonalReach(piece, source, target) := {
+  Plane.IsLocallyPolygonallyConnected(piece)
+      by Plane.IsLocallyPolygonallyConnected.restrict;
+  done by Plane.IsLocallyPolygonallyConnected.polygonal_connected
+}
+
+-- ----------------------------------------------------------------------
+-- Components of a relatively open piece are relatively open.
+--
+-- The carrier version of Layer 3's "components of an open set are open".
+-- Around a point of the component sits a disk of the piece all of whose
+-- points the point reaches; a walk inside the piece never leaves the
+-- component it starts in, so the whole disk is inside the component.
+
+theorem Plane.IsLocallyPolygonallyConnected.Component_OpenIn
+        (carrier piece : Set(Plane.Point))
+        (locallyPolygonal : Plane.IsLocallyPolygonallyConnected(carrier))
+        (pieceOpen : Plane.OpenIn(piece, carrier))
+        (pieceInside : piece ⊆ carrier)
+        (base : Plane.Point)
+        : Plane.OpenIn(Plane.Component(piece, base), carrier) := {
+  Plane.IsLocallyPolygonallyConnected(piece)
+      by Plane.IsLocallyPolygonallyConnected.restrict;
+  take x : Plane.Point;
+  suppose x ∈ Plane.Component(piece, base);
+  suppose x ∈ carrier;
+  Plane.Component(piece, base) ⊆ piece by Plane.Component_subset;
+  x ∈ piece;
+  Plane.Component(piece, x) = Plane.Component(piece, base)
+      by Plane.Component.equal_of_member as sameComponent;
+  choose cut such that cut > 0 ∧
+      ∀ (y : Plane.Point). y ∈ carrier → Plane.distance(x, y) < cut → y ∈ piece
+      from pieceOpen;
+  cut > 0;
+  ∀ (y : Plane.Point). y ∈ carrier → Plane.distance(x, y) < cut → y ∈ piece;
+  Plane.IsLocallyPolygonallyConnectedAt(piece, x);
+  choose radius such that radius > 0 ∧ radius ≤ cut ∧
+      ∀ (y : Plane.Point). y ∈ piece → Plane.distance(x, y) < radius →
+        Plane.PolygonalReach(piece, x, y)
+      from Plane.IsLocallyPolygonallyConnectedAt.reaches_nearby;
+  radius > 0;
+  radius ≤ cut;
+  ∀ (y : Plane.Point). y ∈ piece → Plane.distance(x, y) < radius →
+      Plane.PolygonalReach(piece, x, y);
+  witness radius with {
+    radius > 0;
+    ∀ (y : Plane.Point). y ∈ carrier → Plane.distance(x, y) < radius →
+        y ∈ Plane.Component(piece, base)
+        by { take y : Plane.Point;
+             suppose y ∈ carrier;
+             suppose Plane.distance(x, y) < radius;
+             Plane.distance(x, y) < radius
+                                 ≤ cut;
+             y ∈ piece;
+             Plane.PolygonalReach(piece, x, y);
+             y ∈ Plane.Component(piece, x)
+                 by Plane.reachableFrom_subset_Component;
+             done by substituting sameComponent };
+    done
+  }
+}
+
+-- **Brick B6.** Two points of a component of a relatively open piece are
+-- joined by a polygonal walk inside that component.
+theorem Plane.IsLocallyPolygonallyConnected.Component_polygonal_connected
+        (carrier piece : Set(Plane.Point))
+        (locallyPolygonal : Plane.IsLocallyPolygonallyConnected(carrier))
+        (pieceOpen : Plane.OpenIn(piece, carrier))
+        (pieceInside : piece ⊆ carrier)
+        (base : Plane.Point) (baseInPiece : base ∈ piece)
+        (source : Plane.Point)
+        (sourceInComponent : source ∈ Plane.Component(piece, base))
+        (target : Plane.Point)
+        (targetInComponent : target ∈ Plane.Component(piece, base))
+        : Plane.PolygonalReach(
+            Plane.Component(piece, base), source, target) := {
+  Plane.OpenIn(Plane.Component(piece, base), carrier)
+      by Plane.IsLocallyPolygonallyConnected.Component_OpenIn;
+  Plane.Component(piece, base) ⊆ piece by Plane.Component_subset;
+  Plane.Component(piece, base) ⊆ carrier by Set.subset.transitive(b := piece);
+  Plane.IsConnected(Plane.Component(piece, base))
+      by Plane.Component_IsConnected;
+  done by Plane.IsLocallyPolygonallyConnected.polygonal_connected_in_piece
+}
+
+-- ----------------------------------------------------------------------
+-- The open case.
+--
+-- An open set is locally polygonally connected — the disks it contains are
+-- convex, so one segment joins any two points of one — which is the only
+-- place a disk enters as a disk, and what makes Layer 3's
+-- `Plane.polygonal_connected` the `carrier = open region` case of the
+-- theorem above.
+
+theorem Plane.IsOpen.IsLocallyPolygonallyConnected (region : Set(Plane.Point))
+        (regionOpen : Plane.IsOpen(region))
+        : Plane.IsLocallyPolygonallyConnected(region) := {
+  take p : Plane.Point;
+  suppose p ∈ region;
+  ∀ (bound : ℝ). bound > 0 →
+      ∃ (radius : ℝ). radius > 0 ∧ radius ≤ bound ∧
+        ∀ (x : Plane.Point). x ∈ Plane.Ball(p, radius) ∩ region →
+          ∀ (y : Plane.Point). y ∈ Plane.Ball(p, radius) ∩ region →
+            Plane.PolygonalReach(Plane.Ball(p, radius) ∩ region, x, y)
+      by {
+        take bound : ℝ;
+        suppose bound > 0;
+        choose cut such that cut > 0 ∧
+            ∀ (y : Plane.Point). Plane.distance(p, y) < cut → y ∈ region
+            from Plane.IsOpen.ball_inside;
+        cut > 0;
+        ∀ (y : Plane.Point). Plane.distance(p, y) < cut → y ∈ region;
+
+        let radius : ℝ := min(bound, cut);
+        radius > 0 by Real.minimum_positive;
+        radius ≤ bound by Real.minimum_LessOrEqual_left;
+        radius ≤ cut by Real.minimum_LessOrEqual_right;
+        Plane.IsConvex(Plane.Ball(p, radius)) by Plane.Ball_IsConvex;
+        Plane.Ball(p, radius) ⊆ Plane.Ball(p, radius) ∩ region
+            by { take z : Plane.Point;
+                 suppose z ∈ Plane.Ball(p, radius);
+                 Plane.distance(p, z) < radius
+                                     ≤ cut;
+                 z ∈ region;
+                 done };
+        ∀ (x : Plane.Point). x ∈ Plane.Ball(p, radius) ∩ region →
+            ∀ (y : Plane.Point). y ∈ Plane.Ball(p, radius) ∩ region →
+              Plane.PolygonalReach(Plane.Ball(p, radius) ∩ region, x, y)
+            by { take x : Plane.Point;
+                 suppose x ∈ Plane.Ball(p, radius) ∩ region;
+                 take y : Plane.Point;
+                 suppose y ∈ Plane.Ball(p, radius) ∩ region;
+                 x ∈ Plane.Ball(p, radius);
+                 y ∈ Plane.Ball(p, radius);
+                 done by Plane.PolygonalReach.through_convex };
+        witness radius
+      };
+  done
+}
