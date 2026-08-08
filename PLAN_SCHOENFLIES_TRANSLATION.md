@@ -261,13 +261,18 @@ statement-correct first, beautiful second.
 
 ## The ledger
 
-Maintain the statement-level map as translation proceeds, one row per
-blueprint label: label → Lean module → math file → status
-(open / conditional-on-what / done). Seed it from the two tables at the end
-of `schoenflies-lean/docs/ROADMAP.md` ("Part I" and "Part II"), which are
-exactly that map for the Lean side. The ROADMAP's own status discipline
-transfers verbatim and is worth keeping: *a "done" that is really a
-"conditional" costs the next agent a day — and so does the reverse.*
+**`T1_LEDGER.md` (repo root, generated 2026-08-08 by the 13-agent survey
+workflow) is the Part I map**: proposed statement names per wave, shared
+stubs, per-wave stubs, notation candidates, and the risk register. Three
+corrections it forced on the phase plan: **T1.3 (the region API /
+`IsSeparating`) runs first** — nine waves consume it and it consumes no
+other wave; a **T1.0a shared-stubs wave** precedes all numbered waves; and
+two chunks belonging to no wave are now scheduled — `lem:finite-polygonal-
+union` as **T1.0b**, and `SquareCycle`/`SquaresTwoConnected` attached to
+T1.10. Update the ledger's statuses as waves land. The ROADMAP's status
+discipline transfers verbatim: *a "done" that is really a "conditional"
+costs the next agent a day — and so does the reverse.* Part II gets the
+same survey treatment when T2 approaches.
 
 ## Size and rate — measured, not assumed (git logs, 2026-08-08)
 
